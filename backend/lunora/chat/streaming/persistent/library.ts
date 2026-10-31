@@ -15,7 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
 import { patchRow } from "../../../lib/patch";
-import { scheduleRepliesUsage } from "../../lib/pause-usage";
+import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
@@ -178,6 +178,25 @@ export const setStreamStatus = internalMutation
         });
     });
 
+/** Every live stream of a thread, read in pages (a thread has one or two; the bound is for a runaway one). */
+const liveStreamsOf = async (ctx: MutationCtx, threadId: string): Promise<Doc<"persistentStreams">[]> => {
+    const live: Doc<"persistentStreams">[] = [];
+    let cursor: string | undefined;
+
+    do {
+        const page = await ctx.db.persistentStreams.findMany({
+            cursor,
+            limit: LIVE_STREAM_PAGE,
+            where: { status: { in: ["pending", "streaming"] }, threadId },
+        });
+
+        live.push(...page.page);
+        cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+    } while (cursor);
+
+    return live;
+};
+
 /**
  * The sidebar's stop for a persistent reply. Each live stream of the thread ends
  * `done` with the chunks it already has, so the run's next chunk write is refused
@@ -194,19 +213,7 @@ export const stopActiveForThread = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
-        const live: Doc<"persistentStreams">[] = [];
-        let cursor: string | undefined;
-
-        do {
-            const page = await ctx.db.persistentStreams.findMany({
-                cursor,
-                limit: LIVE_STREAM_PAGE,
-                where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
-            });
-
-            live.push(...page.page);
-            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
-        } while (cursor);
+        const live = await liveStreamsOf(ctx, args.threadId);
 
         // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
         // placeholder key, or a reply started from another row), it falls back to the whole thread.
@@ -228,7 +235,7 @@ export const stopActiveForThread = internalMutation
             const waiting = stream.pause !== undefined && stream.pausedRun !== undefined;
 
             if (waiting) {
-                await recordPausedRun(ctx, stream);
+                await recordPausedRunUsage(ctx, stream);
             }
 
             await patchRow(ctx.db, stream, { status: "done", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
@@ -599,38 +606,6 @@ const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pau
 };
 
 /**
- * Record the reply a paused run saved before its pause, for a pause that will never resume. The rows are the reply's
- * (`pausedRun`); the run that would have ended it records them itself, so a caller clears `pausedRun` after this.
- */
-const recordPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
-    const paused = stream.pausedRun;
-
-    if (!paused) {
-        return;
-    }
-
-    const found = await Promise.all(paused.replyRowIds.map(async (id) => await ctx.db.get(id as Id<"messages">)));
-    const docs = found.filter((row) => row !== null);
-    // The stored `message` is the AI SDK's, wider than the usage record reads: only its role is.
-    const rows = docs.map((row) => {
-        return {
-            _id: row._id,
-            message: row.message as { role?: string } | null | undefined,
-            order: row.order,
-            providerMetadata: row.providerMetadata,
-            usage: row.usage,
-        };
-    });
-
-    scheduleRepliesUsage(ctx.scheduler as never, rows, {
-        at: ctx.now,
-        userId: stream.pause?.run.userId ?? stream.userId,
-        ...(paused.skill && { skill: paused.skill }),
-        ...(paused.timeZone && { timeZone: paused.timeZone }),
-    });
-};
-
-/**
  * The paused run's reply can no longer be continued: the row it continues from is gone, or the thread has a later stream
  * (a regenerate, an edit, a new message), which makes this reply a branch nobody is reading. Streams are created in order,
  * so a later one is the latest by creation time; ties fail closed.
@@ -650,7 +625,7 @@ const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, 
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
 const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
-    await recordPausedRun(ctx, stream);
+    await recordPausedRunUsage(ctx, stream);
     await patchRow(ctx.db, stream, { pausedRun: undefined, status: "done" });
 
     const { page } = await ctx.db.persistentStreams.findMany({
@@ -823,13 +798,10 @@ export const retryPausedRunsNow = internalMutation
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const { page } = await ctx.db.persistentStreams.findMany({
-            limit: LIVE_STREAM_PAGE,
-            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
-        });
+        const live = await liveStreamsOf(ctx, args.threadId);
         let resumed = false;
 
-        for (const stream of page) {
+        for (const stream of live) {
             const { pause } = stream;
 
             if (!pause) {

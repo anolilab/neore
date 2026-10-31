@@ -910,6 +910,118 @@ describe("a pause that never resumes", () => {
         expect(state.threadStatus).toBe("running");
     });
 
+    const seedStreams = async (count: number, status: string) =>
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < count; index += 1) {
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: ids.messageId,
+                    status,
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+    it("still finds the newer stream behind many older ones", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+        // Four turns before this one, already finished.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete(ids.streamId as never);
+        });
+        await seedStreams(4, "done");
+        // The paused run's stream is created later, as it would be: a stream made in the same millisecond cannot be ordered.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+        ids.streamId = await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: ids.messageId,
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+            ),
+        );
+
+        await run();
+
+        const paused = await readState();
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+        await seedStreams(1, "done");
+        await run({ resume: paused.pause!.id });
+
+        expect(modelState.builtAgents).toBe(1);
+        const { streamStatus } = await readState();
+
+        expect(streamStatus).toBe("done");
+    });
+
+    it("resumes when only older streams exist, however many", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete(ids.streamId as never);
+        });
+        await seedStreams(5, "done");
+        // The paused run's stream is created later, as it would be: a stream made in the same millisecond cannot be ordered.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+        ids.streamId = await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: ids.messageId,
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+            ),
+        );
+
+        await run();
+
+        const paused = await readState();
+
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(2);
+        expect(state.rows.map((row) => row.role)).toStrictEqual(["user", "assistant"]);
+    });
+
+    it("the expiry sweep records the finished steps of a pause that was never resumed, once", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), textStep("All done.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { expiresAt: Date.now() - 1000 }));
+
+        const { cleanupExpiredStreams } = await import("./streaming/persistent/crons");
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(cleanupExpiredStreams, {}));
+        await harness.run(async (ctx: any) => await ctx.runMutation(cleanupExpiredStreams, {}));
+        await run({ resume: paused.pause!.id });
+
+        const { streamStatus } = await readState();
+
+        expect(streamStatus).toBe("timeout");
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: paused.rows[1]!.id, tokens: 8 });
+    });
+
     it("ends the paused run when the row it continues from was deleted", async () => {
         modelState.withTools = true;
         modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), textStep("All done.")]);
