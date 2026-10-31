@@ -7705,6 +7705,10 @@ msgstr "Could not rename the page"
 msgid "Could not restore this version"
 msgstr "Could not restore this version"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:19
+msgid "Could not resume its own session, so the conversation was handed over"
+msgstr "Could not resume its own session, so the conversation was handed over"
+
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
 msgstr "Could not retry. Please try again."
@@ -14676,7 +14680,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:35
+#: src/features/chat/thread/agent-switch-divider.tsx:31
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -16186,6 +16190,10 @@ msgstr "It may have been deleted, or you no longer have access."
 #: src/features/pages/components/page-invite-accept.tsx:44
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "It may have expired, been revoked, or already been used. Ask for a new link."
+
+#: src/features/chat/thread/agent-switch-divider.tsx:22
+msgid "It opened a different session than its own, so the conversation was handed over"
+msgstr "It opened a different session than its own, so the conversation was handed over"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:377
 msgid "It will be visible once approved by a moderator"
@@ -20795,7 +20803,7 @@ msgstr "Old generation cinematic model with higher consistency"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:35
+#: src/features/chat/thread/agent-switch-divider.tsx:31
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -25234,7 +25242,7 @@ msgstr "Resume import"
 msgid "Resume your latest chat"
 msgstr "Resume your latest chat"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:27
 msgid "Resumed its own session"
 msgstr "Resumed its own session"
 
@@ -29054,7 +29062,7 @@ msgstr "Switch workspace: currently {triggerLabel}"
 
 #. placeholder {0}: switchAgentName(part.from, nameOf)
 #. placeholder {1}: switchAgentName(part.to, nameOf)
-#: src/features/chat/thread/agent-switch-divider.tsx:27
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr "Switched from {0} to {1}"
 
@@ -30348,6 +30356,10 @@ msgstr "This action cannot be undone. All team members will be removed."
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "This action cannot be undone. This will permanently delete the organization and all associated data."
 
+#: src/features/chat/thread/agent-switch-divider.tsx:20
+msgid "This agent cannot resume its own session, so the conversation was handed over"
+msgstr "This agent cannot resume its own session, so the conversation was handed over"
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "This branch has conflicts with its base branch."
@@ -30389,6 +30401,10 @@ msgstr "This command name is reserved"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "This computer"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:21
+msgid "This computer did not resume its own session, so the conversation was handed over"
+msgstr "This computer did not resume its own session, so the conversation was handed over"
 
 #: src/features/devices/components/devices-settings.tsx:444
 msgid "This computer is not paired yet."

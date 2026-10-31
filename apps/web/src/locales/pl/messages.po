@@ -7706,6 +7706,10 @@ msgstr "Nie udało się zmienić nazwy strony"
 msgid "Could not restore this version"
 msgstr "Nie udało się przywrócić tej wersji"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:19
+msgid "Could not resume its own session, so the conversation was handed over"
+msgstr ""
+
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
 msgstr ""
@@ -14677,7 +14681,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:35
+#: src/features/chat/thread/agent-switch-divider.tsx:31
 msgid "Handed over"
 msgstr ""
 
@@ -16187,6 +16191,10 @@ msgstr "Mogła zostać usunięta albo nie masz już do niej dostępu."
 #: src/features/pages/components/page-invite-accept.tsx:44
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Mógł wygasnąć, zostać unieważniony lub już wykorzystany. Poproś o nowy link."
+
+#: src/features/chat/thread/agent-switch-divider.tsx:22
+msgid "It opened a different session than its own, so the conversation was handed over"
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:377
 msgid "It will be visible once approved by a moderator"
@@ -20796,7 +20804,7 @@ msgstr "Filmowy model starszej generacji o większej spójności"
 msgid "Older"
 msgstr "Starsze"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:35
+#: src/features/chat/thread/agent-switch-divider.tsx:31
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -25235,7 +25243,7 @@ msgstr "Wznów import"
 msgid "Resume your latest chat"
 msgstr "Wznów ostatni czat"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:27
 msgid "Resumed its own session"
 msgstr ""
 
@@ -29055,7 +29063,7 @@ msgstr "Zmień obszar roboczy: obecnie {triggerLabel}"
 
 #. placeholder {0}: switchAgentName(part.from, nameOf)
 #. placeholder {1}: switchAgentName(part.to, nameOf)
-#: src/features/chat/thread/agent-switch-divider.tsx:27
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr ""
 
@@ -30349,6 +30357,10 @@ msgstr "Tej operacji nie można cofnąć. Wszyscy członkowie zespołu zostaną 
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "Tej operacji nie można cofnąć. Organizacja i wszystkie powiązane dane zostaną trwale usunięte."
 
+#: src/features/chat/thread/agent-switch-divider.tsx:20
+msgid "This agent cannot resume its own session, so the conversation was handed over"
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr ""
@@ -30390,6 +30402,10 @@ msgstr "Ta nazwa komendy jest zarezerwowana"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Ten komputer"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:21
+msgid "This computer did not resume its own session, so the conversation was handed over"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:444
 msgid "This computer is not paired yet."
