@@ -24,6 +24,7 @@ import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
+import { documentTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -563,9 +564,7 @@ const runChatStartOnShard = async (
                 if (imagePart && Object.keys(imagePart).length > 0) {
                     messageContent.push(imagePart);
                 } else if (extractedText) {
-                    const label = filename ? `[Document: ${filename}]` : "[Attached Document]";
-
-                    messageContent.unshift({ text: `${label}\n\n${extractedText}`, type: "text" });
+                    messageContent.unshift(documentTextPart(filename, extractedText));
                 } else if (filePart && Object.keys(filePart).length > 0) {
                     messageContent.push(filePart);
                 }
@@ -1004,12 +1003,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     if (imagePart && Object.keys(imagePart).length > 0) {
                         messageContent.push(imagePart);
                     } else if (extractedText) {
-                        const label = filename ? `[Document: ${filename}]` : "[Attached Document]";
-
-                        messageContent.push({
-                            text: `${label}\n\n${extractedText}`,
-                            type: "text",
-                        });
+                        messageContent.push(documentTextPart(filename, extractedText));
                     } else if (filePart && Object.keys(filePart).length > 0) {
                         messageContent.push(filePart);
                     }

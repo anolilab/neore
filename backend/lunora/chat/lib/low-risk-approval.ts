@@ -22,14 +22,16 @@
  *   word (`get_or_create_user`, `fetch_and_send`) is out as well (`OUTWARD_WORDS`);
  * - a tool whose server declares it destructive or open-world. Server annotations are untrusted: they only ever
  *   narrow what is eligible;
- * - a call made after knowledge-base excerpts, memories or project context were injected into the prompt, or whose
- *   history carries a tool result or an attached file (`computeTaint`): the check never runs once the chat has read
- *   anything it did not write.
+ * - a call made after knowledge-base excerpts, memories, project context or any skill text were injected into the
+ *   prompt, or whose history carries a tool result, an attached file or image, an attached document's extracted text
+ *   or a captured browser page (`computeTaint`, `messagesCarryAttachedText`): the check never runs once the chat has
+ *   read anything it did not write.
  *
  * Pure apart from the injected `classify` and `consumeBudget`, so every rule
  * above is a unit test.
  */
 import { computeTaint } from "../../devices/lib/taint";
+import { messagesCarryAttachedText } from "./attached-text";
 import { isCompressedHistory } from "./auto-continue";
 import type { ToolDescriptor, ToolPermissionOptions } from "./tool-permissions";
 
@@ -236,6 +238,15 @@ export const lowRiskIneligibleReason = (
 export const injectsUntrustedContext = (context: { knowledge?: string | null; memory?: string | null; project?: string | null }): boolean =>
     Boolean(context.knowledge || context.memory || context.project);
 
+/**
+ * Whether the system prompt carries skill text: the enabled skills' descriptions, or an invoked skill's instructions.
+ * ANY skill counts. A skill's `source` is supplied by the client at creation, agents write skills from chats that may have
+ * read third-party content, and marketplace forks, imports and organisation-shared skills are someone else's text — so
+ * "the user wrote this" cannot be told cheaply or reliably, and not knowing is the same as yes.
+ */
+export const injectsSkillText = (skills: { enabledSkills: ReadonlyArray<unknown>; invocation: unknown }): boolean =>
+    skills.enabledSkills.length > 0 || Boolean(skills.invocation);
+
 // ---------------------------------------------------------------------------
 // The classifier's input and output
 // ---------------------------------------------------------------------------
@@ -324,7 +335,7 @@ export interface LowRiskApproverDependencies {
      */
     stillAllowed: () => Promise<boolean>;
     /**
-     * Whether the prompt carries knowledge-base excerpts, memories or project context (`loadRunContext`): text the person
+     * Whether the prompt carries knowledge-base excerpts, memories, project context or skill text (`loadRunContext`, `injectsSkillText`): text the person
      * did not write in this chat, which reaches the model as instructions. A rejection counts as `true`.
      */
     untrustedContext: () => Promise<boolean>;
@@ -348,7 +359,9 @@ export const createLowRiskApprover =
             if (
                 call.messages === undefined ||
                 isCompressedHistory(call.messages as Parameters<typeof isCompressedHistory>[0]) ||
-                computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0
+                computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0 ||
+                // An attached document's extracted text or a captured page is a plain text part, which `computeTaint` cannot tell from typing.
+                messagesCarryAttachedText(call.messages as Parameters<typeof messagesCarryAttachedText>[0])
             ) {
                 return done("tainted");
             }

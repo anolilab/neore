@@ -442,8 +442,18 @@ written here is what is not.
   never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
   (`get_or_create_user`). An allowlist, not a blocklist: a new write verb is a prompt by default.
   **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
-  (any tool result or attached file) AND `RunContext.untrustedContext` (retrieved knowledge, memories or
-  project context in the system prompt, which `computeTaint` cannot see). The tools are built while the
+  (any tool result or attached file or image), `messagesCarryAttachedText` (`chat/lib/attached-text.ts`: an
+  attached document's extracted text and a captured browser page, which `/chat/start` and the edit path put
+  into the user message as plain TEXT parts that `computeTaint` cannot tell from typing — found by their
+  `[Document: …]` / `[Attached Document]` / `[Web page context]` line label or the page's structural marker,
+  and built through `documentTextPart` so the label and the detector cannot drift) AND `untrustedContext`
+  (retrieved knowledge, memories or project context in the system prompt, plus ANY skill text there:
+  `execute.ts` ORs `injectsSkillText(skillRun)` — an enabled skill's description or an invoked skill's
+  instructions — into `RunContext.untrustedContext`). Skills are all-or-nothing on purpose: `skills.source`
+  is client-supplied at creation, agents write skills from chats that may have read third-party content, and
+  marketplace forks, imports and organisation-shared skills are other people's text, so "this user wrote it"
+  cannot be told cheaply or reliably. A user with any enabled skill therefore never gets the check; narrowing
+  that needs a server-minted authorship marker first. The tools are built while the
   context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
   reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
   thread's sharing are re-read at every call**, in the same mutation that spends the budget unit

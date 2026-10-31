@@ -3624,7 +3624,7 @@ msgstr "Antworten automatisch vorlesen"
 msgid "Auto-save"
 msgstr "Automatisch speichern"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:360
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:361
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Auto: läuft ohne Nachfrage. Fragen: pausiert für dein Genehmigen / Ablehnen. Aus: der Assistent sieht das Tool nie. Automatisierungen (Trigger, Messenger-Bots, Workflows) können nicht fragen, daher sind \"Fragen\"-Tools dort nicht verfügbar. MCP-Tools stehen standardmäßig auf Fragen, außer der Server markiert sie als schreibgeschützt."
 
@@ -3956,7 +3956,11 @@ msgid "Before"
 msgstr "Vorher"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:246
-msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result or an attached file. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+#~ msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result or an attached file. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:246
@@ -4505,8 +4509,8 @@ msgstr "Integrierter Canvas-Editor"
 msgid "Built-in reasoning before generating"
 msgstr "Integriertes Reasoning vor der Generierung"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:369
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:370
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:371
 #: src/features/settings/lib/settings-keywords.ts:101
 msgid "Built-in tools"
 msgstr "Integrierte Tools"
@@ -5308,7 +5312,7 @@ msgstr "Suchmodus wählen"
 msgid "Choose the camera system for your shot"
 msgstr "Wähle das Kamerasystem für deine Aufnahme"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:355
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Lege fest, welche Tools der Assistent selbstständig nutzen darf, welche deine Genehmigung brauchen und welche ausgeschaltet sind."
 
@@ -6496,7 +6500,7 @@ msgstr "Verbunden mit {0}"
 msgid "Connected. You can close this window."
 msgstr "Verbunden. Du kannst dieses Fenster schließen."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:391
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 msgid "Connecting to your MCP servers..."
 msgstr "Verbindung zu deinen MCP-Servern wird hergestellt..."
 
@@ -9624,7 +9628,7 @@ msgstr "z. B. Strenger JSON-Coder"
 msgid "Each case runs once, one after another. Every case counts toward your daily message and task limits, and the run stops when it reaches its cost cap."
 msgstr "Jeder Testfall läuft einmal, einer nach dem anderen. Jeder Testfall zählt zu deinen täglichen Nachrichten- und Aufgabenlimits, und der Durchlauf stoppt, wenn er sein Kostenlimit erreicht."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:258
 msgid "Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual."
 msgstr ""
 
@@ -11750,7 +11754,7 @@ msgstr "Sitzung konnte nicht widerrufen werden"
 msgid "Failed to revoke sessions"
 msgstr "Sitzungen konnten nicht widerrufen werden"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:321
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:322
 msgid "Failed to revoke the allow"
 msgstr ""
 
@@ -11982,7 +11986,7 @@ msgstr "Tags konnten nicht aktualisiert werden"
 msgid "Failed to update the case"
 msgstr "Der Testfall konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:309
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:310
 msgid "Failed to update the quick check"
 msgstr ""
 
@@ -11990,7 +11994,7 @@ msgstr ""
 msgid "Failed to update thread visibility"
 msgstr "Sichtbarkeit des Threads konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:297
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
 msgid "Failed to update tool permission"
 msgstr "Tool-Berechtigung konnte nicht aktualisiert werden"
 
@@ -16821,7 +16825,7 @@ msgstr ""
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:288
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:289
 #: src/features/settings/components/chat/trigger-settings.tsx:903
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -17431,7 +17435,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:397
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:398
 msgid "MCP server"
 msgstr "MCP-Server"
 
@@ -17472,8 +17476,8 @@ msgstr "MCP-Server"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "MCP-Server stellen zusätzliche Tools bereit, die die KI in Unterhaltungen nutzen kann. Tools von verbundenen Servern sind beim Chatten automatisch verfügbar."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:386
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:387
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:388
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "MCP tools"
 msgstr "MCP-Tools"
@@ -18825,7 +18829,15 @@ msgid "Neutral color, blockbuster look"
 msgstr "Neutrale Farben, Blockbuster-Look"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:256
-msgid "Never covers a call after the chat has read web pages, files, knowledge or other tool results: those can carry hidden instructions."
+msgid "Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions."
+msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
+#~ msgid "Never covers a call after the chat has read web pages, files, knowledge or other tool results: those can carry hidden instructions."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+msgid "Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check."
 msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:255
@@ -19299,7 +19311,7 @@ msgstr "Keine Geräte gekoppelt."
 msgid "No diff data available for this version"
 msgstr "Keine Differenzdaten für diese Version verfügbar"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:394
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:395
 msgid "No enabled MCP servers."
 msgstr "Keine aktivierten MCP-Server."
 
@@ -29836,7 +29848,7 @@ msgstr "Tool-Aufrufe"
 msgid "Tool Calling"
 msgstr "Tool-Aufrufe"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:353
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 #: src/features/settings/lib/settings-navigation.ts:95
 msgid "Tool Permissions"
 msgstr "Tool-Berechtigungen"

@@ -47,6 +47,7 @@ import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
+import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClients } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
@@ -193,6 +194,8 @@ export const runStreamingAgent = internalAction
             }
 
             const invokedSkill = skillRun.invocation;
+            // Skill text (enabled skills' descriptions, an invoked skill's instructions) reaches the prompt whoever wrote it.
+            const skillText = injectsSkillText(skillRun);
 
             // A live bot keeps its pinned model (`/chat/start`); a skill's preferred model does not replace it.
             const liveBot = thread?.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId }) : null;
@@ -262,7 +265,7 @@ export const runStreamingAgent = internalAction
                               : undefined,
                           threadId,
                           // The tools are built while the context loads; the quick check reads this at the first call.
-                          untrustedContext: runContextPromise.then((context) => context.untrustedContext).catch(() => true),
+                          untrustedContext: runContextPromise.then((context) => context.untrustedContext || skillText).catch(() => true),
                           userId,
                       })
                     : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
@@ -454,7 +457,7 @@ export const runStreamingAgent = internalAction
                         toolNames: Object.keys(tools),
                         toolPermissionKeys: toolResult.permissionKeys,
                         // A continuation does not reload the context, so the quick check reads this off the snapshot.
-                        untrustedContext: runContext.untrustedContext,
+                        untrustedContext: runContext.untrustedContext || skillText,
                     },
                     streamId,
                     threadId,

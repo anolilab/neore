@@ -17922,121 +17922,121 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 134,
+      "line": 135,
       "reason": "\"improvePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 237,
+      "line": 238,
       "reason": "\"optimizeSystemPromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 285,
+      "line": 286,
       "reason": "\"iteratePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 496,
+      "line": 497,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 531,
+      "line": 532,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 611,
+      "line": 610,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 623,
+      "line": 622,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 708,
+      "line": 707,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 720,
+      "line": 719,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 725,
+      "line": 724,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 734,
+      "line": 733,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 772,
+      "line": 771,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 801,
+      "line": 800,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 923,
+      "line": 922,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 938,
+      "line": 937,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 947,
+      "line": 946,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1068,
+      "line": 1062,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1076,
+      "line": 1070,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1217,
+      "line": 1211,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1243,
+      "line": 1237,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -18304,6 +18304,12 @@
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
+      "file": "chat/lib/low-risk-check",
+      "kind": "call",
+      "line": 83,
+      "reason": "\"createRunLowRiskCheck\" is not a registered function"
+    },
+    {
       "file": "chat/lib/mcp-apps",
       "kind": "call",
       "line": 303,
@@ -18540,19 +18546,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 281,
+      "line": 292,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 340,
+      "line": 351,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 485,
+      "line": 496,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
