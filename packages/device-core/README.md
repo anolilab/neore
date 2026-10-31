@@ -151,7 +151,8 @@ After the `200` the proxy reads the client's first TLS record and requires a Cli
 anything is sent upstream; the refusal is added to the blocked names with the reason. Without this check
 the CONNECT line would only be a claim, and a client could open a pipe to a listed host's address and ask it for
 any other site it serves. Clients that send an Encrypted ClientHello extension (browsers do, as GREASE) are not
-served; `npm`, `pip`, `cargo`, `git`, `go` and `gem` do not send one. The proxy also bounds what a tunnel can
+served. Node (`npm`, `npx`), `uv`, `cargo`, `git` and `curl` were run through the real filter (`measure_dependency_hosts`)
+and their hellos passed; `go`, `gem`, `yarn` and `pip` were not exercised. The proxy also bounds what a tunnel can
 hold: a read or write that stalls ends it once the other direction has been closed for 30 s or the proxy
 stops, so a peer that stops reading cannot keep a worker.
 
