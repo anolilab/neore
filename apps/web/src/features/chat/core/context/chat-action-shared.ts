@@ -54,6 +54,18 @@ export const localModelError = (message: string): AppError => new AppError(messa
 /** The reply stream this provider started, for `cancelStream` to abort. */
 export type StreamingMessage = { gatewayUrl?: string; messageId: string; streamId?: string; streamToken?: string; threadId: string };
 
+/**
+ * What a Stop aborts. The reply this provider is streaming has a message to name; a reply with none to name still has a
+ * live stream — a run waiting out a provider's rate limit, after a reload, has saved no row yet — and the thread's own stop ends it.
+ */
+export const stopTarget = (input: { activeStreamId: string | null; streamingMessage: StreamingMessage | null }): "message" | "none" | "thread" => {
+    if (input.streamingMessage) {
+        return "message";
+    }
+
+    return input.activeStreamId ? "thread" : "none";
+};
+
 /** The pending settings that differ from the thread's own, as `getChangedSettings` returns them. */
 export type ChangedSettings = Pick<PendingSettings, "customSystemPrompt" | "enabledFeatures" | "language" | "reasoningEffort" | "statelessMode">;
 

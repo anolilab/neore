@@ -1050,6 +1050,7 @@ export const persistentChunks = sqliteTable("persistentChunks", {
 export const persistentStreams = sqliteTable("persistentStreams", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    earlySteps: text("earlySteps", { mode: "json" }).$type<Array<string>>(),
     expiresAt: real("expiresAt").notNull(),
     hostEndReason: text("hostEndReason", { mode: "json" }).$type<"finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped">(),
     hostPendingPermissions: text("hostPendingPermissions", { mode: "json" }).$type<Array<string>>(),
@@ -1057,6 +1058,9 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     hostState: text("hostState", { mode: "json" }).$type<"accepted" | "received" | "running" | "ended">(),
     hostTurnId: text("hostTurnId"),
     messageId: text("messageId").notNull(),
+    pause: text("pause", { mode: "json" }).$type<{ from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number }>(),
+    pausedRun: text("pausedRun", { mode: "json" }).$type<{ replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string }>(),
+    pausedSteps: text("pausedSteps", { mode: "json" }).$type<Array<string>>(),
     producer: text("producer"),
     runClaimedAt: real("runClaimedAt"),
     status: text("status").notNull(),

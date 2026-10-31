@@ -18,6 +18,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import type { AcpCommand, AppliedCall } from "../acp/commands";
 import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
 import { EarlySends, NEVER_OPENED } from "../acp/early-sends";
+import { HookApprovals } from "../acp/hooks/approvals";
 import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
@@ -39,6 +40,8 @@ import {
     readAgentVersion,
     readDeviceId,
     readFolder,
+    readHookId,
+    readHooksHash,
     readHostPairing,
     readHostSpec,
     readNativeSessionId,
@@ -332,10 +335,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         const host = requireHost(core);
 
+        const hookApprovalsFile = path.join(app.getPath("userData"), "acp-hook-approvals.json");
+
         // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
         state.acp ??= new AcpManager({
             appVersion: app.getVersion(),
             gate: coreGate(core),
+            hooks: { approvals: new HookApprovals(hookApprovalsFile) },
             hostInfo: (agentKey, folder) => approvedFolder(core, agentKey, folder),
             log: (message) => console.error(message),
             observer: host,
@@ -738,6 +744,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpClose, (id) => requireAcp().close(readSessionId(id)));
 
     local(LOCAL_CHANNEL.acpForget, (id) => requireAcp().remove(readSessionId(id)));
+
+    // Hooks are repository content: only this window reads them in full, approves one file (by its hash) or runs a manual one.
+    local(LOCAL_CHANNEL.acpHooks, (id) => requireAcp().hooks(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpHooksApprove, (id, hash) => requireAcp().approveHooks(readSessionId(id), readHooksHash(hash)));
+
+    local(LOCAL_CHANNEL.acpHooksRevoke, (id) => requireAcp().revokeHooks(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpHookRun, (id, hookId, hash) => requireAcp().runHook(readSessionId(id), readHookId(hookId), readHooksHash(hash)));
 
     // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
     local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });
