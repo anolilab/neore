@@ -62,7 +62,11 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
 - `vis.config.ts` holds task defaults, `project.json` per-project metadata. In
   `vis.config.ts`, `dependsOn` takes **target names only** — named inputs and
   file globs belong in `inputs`, and vis silently drops them from `dependsOn`,
-  **disabling input tracking without saying so**.
+  **disabling input tracking without saying so**. A cache hit restores files
+  only for declared `outputs`, written `{projectRoot}/dist/**/*` (a bare
+  `dist/**/*` restores nothing): without them `build:packages` said "read from
+  cache" and left a missing or stale `dist` in place. `ai` and `service-sdk`
+  declare theirs for `build` and `build:prod` in `project.json`.
 
 ## ANTI-PATTERNS
 
