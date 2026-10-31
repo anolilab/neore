@@ -1721,6 +1721,9 @@ importers:
       expo-crypto:
         specifier: ~58.0.7
         version: 58.0.7(expo@58.0.14)
+      expo-file-system:
+        specifier: ~58.0.11
+        version: 58.0.11(expo@58.0.14)(react-native@0.88.0(@react-native/metro-config@0.88.0(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))
       expo-font:
         specifier: ~58.0.8
         version: 58.0.10(expo@58.0.14)(react-native@0.88.0(@react-native/metro-config@0.88.0(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1)

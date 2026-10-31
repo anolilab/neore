@@ -46,6 +46,12 @@ const orNull = <T extends number | string>(value: T | undefined): T | null => va
 
 const TABLES = ["cached_messages", "cached_statuses", "cached_threads", "cache_meta"] as const;
 
+/**
+ * Stored in the file (`PRAGMA user_version`). A file written under another version is only a cache: its tables are
+ * dropped and recreated, never migrated. Bump it whenever SCHEMA changes.
+ */
+const SCHEMA_VERSION = 1;
+
 /** The version guard of every upsert: a row is replaced only by a copy that is at least as new. */
 const newerThan = (table: string) =>
     `WHERE excluded.updated_at > ${table}.updated_at OR (excluded.updated_at = ${table}.updated_at AND excluded.synced_at >= ${table}.synced_at)`;
@@ -141,9 +147,34 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
         return result;
     };
 
+    const setUp = async () => {
+        const [stored] = await database.getAllAsync<{ user_version: number }>("PRAGMA user_version");
+
+        if (stored?.user_version !== SCHEMA_VERSION) {
+            for (const table of TABLES) {
+                // eslint-disable-next-line no-await-in-loop -- one statement after the other
+                await database.execAsync(`DROP TABLE IF EXISTS ${table}`);
+            }
+
+            await database.execAsync("DROP INDEX IF EXISTS cached_messages_by_thread");
+        }
+
+        await database.execAsync(SCHEMA);
+        // Last, so a setup that died half-way is run again from the start.
+        await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    };
+
     const open = async () => {
-        ready ??= database.execAsync(SCHEMA);
-        await ready;
+        ready ??= setUp();
+
+        try {
+            await ready;
+        } catch (error) {
+            // A setup that failed once (a full disk, a locked file) must not fail every later call, `clear()` included.
+            ready = undefined;
+
+            throw error;
+        }
     };
 
     const wipe = async () => {

@@ -361,6 +361,75 @@ describe("sign-out and account switch", () => {
     });
 });
 
+describe("schema setup", () => {
+    it("tries again after a failed setup instead of failing every later call, clear() included", async () => {
+        const database = createTestDatabase();
+        let failures = 1;
+        const flaky = {
+            ...database,
+            execAsync: async (source: string) => {
+                if (failures > 0) {
+                    failures -= 1;
+
+                    throw new Error("disk I/O error");
+                }
+
+                await database.execAsync(source);
+            },
+        };
+
+        open.push(database);
+
+        const cache = createOfflineCache(flaky);
+
+        await expect(cache.bindOwner("u1")).rejects.toThrow("disk I/O error");
+        await expect(cache.clear()).resolves.toBeUndefined();
+        await cache.bindOwner("u1");
+
+        const scoped = cache.forOwner("u1");
+
+        await scoped.saveThreads([thread("a", 10)]);
+
+        expect(await scoped.loadThreads()).toHaveLength(1);
+    });
+
+    it("recreates the tables when the file was written by another schema version", async () => {
+        const database = createTestDatabase();
+
+        open.push(database);
+        await database.execAsync("CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, headline TEXT); INSERT INTO cached_threads VALUES ('old', 'x');");
+
+        const cache = createOfflineCache(database);
+
+        await cache.bindOwner("u1");
+
+        const scoped = cache.forOwner("u1");
+
+        await scoped.saveThreads([thread("a", 10)]);
+
+        const listed = await scoped.loadThreads();
+
+        expect(listed.map((row) => row.id)).toEqual(["a"]);
+    });
+
+    it("keeps the rows of a file whose schema version matches", async () => {
+        const database = createTestDatabase();
+
+        open.push(database);
+
+        const first = createOfflineCache(database);
+
+        await first.bindOwner("u1");
+        await first.forOwner("u1").saveThreads([thread("a", 10)]);
+
+        const second = createOfflineCache(database);
+
+        await second.bindOwner("u1");
+
+        expect(await second.forOwner("u1").loadThreads()).toHaveLength(1);
+    });
+});
+
 describe("read-only by construction", () => {
     it("holds only read tables: no outbox or pending-write table", async () => {
         const { cache, database } = makeCache();
