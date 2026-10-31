@@ -1,15 +1,17 @@
 import { api } from "@neore/backend/api";
 import { Link } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Text } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
-
-interface ThreadRow {
-    id: string;
-    title: string;
-}
+import { isNetworkFailure } from "@/offline/connectivity";
+import { displayStatus } from "@/offline/labels";
+import { mergeRows } from "@/offline/merge";
+import { OfflineBanner } from "@/offline/offline-banner";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
+import { settleQuietly } from "@/offline/quietly";
+import type { ThreadRow } from "@/offline/types";
 
 /** Threads per request. The list asks for the next page when its end comes into view. */
 const PAGE_SIZE = 100;
@@ -20,16 +22,31 @@ const fetchThreadPage = async (cursor: string | null) => {
     return {
         continueCursor: data.threads.continueCursor,
         isDone: data.threads.isDone,
-        rows: data.threads.page.map((thread) => {
-            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
-            return { id: thread._id, title: thread.title || "Untitled" };
+        // A locked thread's title is its content: it is listed, never saved to the device.
+        // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
+        lockedIds: new Set(data.threads.page.filter((thread) => thread.lockedAt !== undefined && thread.lockedAt !== null).map((thread) => thread._id as string)),
+        rows: data.threads.page.map((thread): ThreadRow => {
+            /* eslint-disable no-underscore-dangle -- `_id` and `_creationTime` are the Lunora document fields, not private ones */
+            return {
+                id: thread._id,
+                status: thread.status,
+                syncedAt: Date.now(),
+                title: thread.title || "Untitled",
+                updatedAt: thread.updatedAt ?? thread._creationTime,
+                ...thread.runner === "host" && { runner: "host" as const },
+            };
+            /* eslint-enable no-underscore-dangle */
         }),
     };
 };
 
 const ThreadListScreen = () => {
     const { status } = useAuth();
+    const { cache, isOffline, refreshTick, reportRead } = useOffline();
+    const startChat = useWriteControl("start");
     const [threads, setThreads] = useState<ThreadRow[]>([]);
+    // Once live data is in, a late read of the cache must not touch the list.
+    const hasLiveData = useRef(false);
     const [cursor, setCursor] = useState<string | null>(null);
     const [isDone, setIsDone] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -42,19 +59,55 @@ const ThreadListScreen = () => {
 
         let isCancelled = false;
 
+        // The saved list paints first. Live rows replace it when they arrive, and a cached row never replaces a newer live one.
+        const showCached = async (): Promise<number> => {
+            let cached: ThreadRow[] = [];
+
+            try {
+                cached = await cache?.loadThreads() ?? [];
+            } catch {
+                // An unreadable cache is an empty one.
+            }
+
+            if (!isCancelled && !hasLiveData.current && cached.length > 0) {
+                setThreads((current) => mergeRows(current, cached));
+            }
+
+            return cached.length;
+        };
+
         const load = async () => {
+            const cachedCount = showCached();
+
             try {
                 const page = await fetchThreadPage(null);
 
                 if (!isCancelled) {
+                    hasLiveData.current = true;
                     setThreads(page.rows);
                     setCursor(page.continueCursor);
                     setIsDone(page.isDone);
+                    setError(null);
+                    reportRead("succeeded");
+                    settleQuietly(cache?.saveThreads(page.rows.filter((thread) => !page.lockedIds.has(thread.id))));
                 }
             } catch (error_: unknown) {
-                if (!isCancelled) {
-                    setError(error_ instanceof Error ? error_.message : "Could not load chats.");
+                if (isCancelled) {
+                    return;
                 }
+
+                if (isNetworkFailure(error_)) {
+                    // No answer is not an error to show: the saved list stays, under the offline banner.
+                    reportRead("failed");
+
+                    if (await cachedCount === 0) {
+                        setError("You are offline and nothing is saved on this device yet.");
+                    }
+
+                    return;
+                }
+
+                setError(error_ instanceof Error ? error_.message : "Could not load chats.");
             }
         };
 
@@ -63,13 +116,16 @@ const ThreadListScreen = () => {
         return () => {
             isCancelled = true;
         };
-    }, [status]);
+    }, [cache, refreshTick, reportRead, status]);
 
     if (error) {
         return (
-            <Text accessibilityRole="alert" style={{ padding: 16 }}>
-                {error}
-            </Text>
+            <>
+                <OfflineBanner syncedAt={undefined} />
+                <Text accessibilityRole="alert" style={{ padding: 16 }}>
+                    {error}
+                </Text>
+            </>
         );
     }
 
@@ -90,23 +146,42 @@ const ThreadListScreen = () => {
             });
             setCursor(page.continueCursor);
             setIsDone(page.isDone);
+            settleQuietly(cache?.saveThreads(page.rows.filter((thread) => !page.lockedIds.has(thread.id))));
         } catch (error_: unknown) {
-            setError(error_ instanceof Error ? error_.message : "Could not load chats.");
+            if (isNetworkFailure(error_)) {
+                // The rows already on screen stay; the offline banner says why more did not load.
+                reportRead("failed");
+            } else {
+                setError(error_ instanceof Error ? error_.message : "Could not load chats.");
+            }
         } finally {
             setIsLoadingMore(false);
         }
     };
+
+    // When the list was last synced: the newest sync among its rows.
+    const syncedAt = threads.length === 0 ? undefined : Math.max(...threads.map((thread) => thread.syncedAt));
 
     return (
         <FlatList
             data={threads}
             keyExtractor={(thread) => thread.id}
             ListHeaderComponent={(
-                <Link asChild href="/chat/new">
-                    <Pressable accessibilityRole="link" style={{ padding: 16 }}>
-                        <Text style={{ fontWeight: "600" }}>New chat</Text>
-                    </Pressable>
-                </Link>
+                <>
+                    <OfflineBanner syncedAt={syncedAt} />
+                    <Link asChild href="/chat/new">
+                        <Pressable
+                            accessibilityHint={startChat.reason}
+                            accessibilityRole="link"
+                            accessibilityState={{ disabled: startChat.disabled }}
+                            disabled={startChat.disabled}
+                            style={{ opacity: startChat.disabled ? 0.5 : 1, padding: 16 }}
+                        >
+                            <Text style={{ fontWeight: "600" }}>New chat</Text>
+                            {startChat.reason ? <Text style={{ fontSize: 12 }}>{startChat.reason}</Text> : null}
+                        </Pressable>
+                    </Link>
+                </>
               )}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
@@ -114,6 +189,7 @@ const ThreadListScreen = () => {
                 <Link asChild href={`/chat/${item.id}`}>
                     <Pressable accessibilityRole="link" style={{ padding: 16 }}>
                         <Text numberOfLines={1}>{item.title}</Text>
+                        {item.status === "running" ? <Text style={{ fontSize: 12 }}>{displayStatus(item.status, { isOffline, lastSeenAt: item.syncedAt })}</Text> : null}
                     </Pressable>
                 </Link>
             )}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
+import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
 import type { GrantUser } from "./grant";
@@ -43,8 +44,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             try {
                 jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
             } catch {
-                // The grant is still stored: keep the current state and try again.
+                // The grant is still stored: try again. Meanwhile a person who is known on this device is signed in, so
+                // that a launch with no connection opens on the saved chats instead of waiting for a token it cannot get.
+                const storedUser = await readStoredUser(secureGrantStore);
+
                 if (!isStale()) {
+                    if (storedUser !== null) {
+                        setUser(storedUser);
+                        setStatus("signed-in");
+                    }
+
                     timer = setTimeout(setRefreshTick, TOKEN_RETRY_MS, nextTick);
                 }
 
@@ -96,6 +105,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
             console.warn("Could not clear the stored sign-in.", error);
         } finally {
+            // The cache holds this person's chats: it is emptied with the sign-in, whether or not the server heard about it.
+            try {
+                await getOfflineCache().clear();
+            } catch (error) {
+                // eslint-disable-next-line no-console -- no logger in the app; a cache that could not be emptied must not be silent
+                console.warn("Could not empty the offline cache.", error);
+            }
+
             signOutCount.current += 1;
             client.setAuthToken(null);
             setUser(null);

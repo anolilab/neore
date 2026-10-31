@@ -742,6 +742,17 @@ written here is what is not.
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
+- **Mobile offline cache** (`apps/mobile/src/offline/`, plans/mobile-acp-and-remote-control.md §3.5) — read-only
+  `expo-sqlite` copy of the thread list, the last 50 messages of the 20 newest threads, and host/worker status. Every
+  row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
+  copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
+  delete either). There is deliberately no outbox table: offline, `write-gate.ts` disables the composer, send,
+  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(`/`.action(` call
+  in the app must pass `onlineOnly: true`, or the client queues it and replays it on reconnect (`reconnect.test.ts`
+  scans for it). The cache is bound to one account (`bindOwner`; a different id empties it) and `clear()` runs on
+  sign-out; a save from a screen of a signed-out account is refused. Locked threads are never cached. A cold start
+  with no network signs the stored user in without a JWT (`auth-context.tsx`) so the saved chats can open.
+
 - **Host-run threads** (`backend/lunora/acp/`, `apps/desktop/src/acp/`,
   plans/acp-agent-host.md) — a coding agent runs on a paired computer and the
   thread is `threads.runner = "host"` (`acp/lib/host-thread.ts`; deliberately

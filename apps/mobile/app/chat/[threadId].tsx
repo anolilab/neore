@@ -14,15 +14,19 @@ import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
+import { isNetworkFailure } from "@/offline/connectivity";
+import { mergeRows } from "@/offline/merge";
+import { OfflineBanner } from "@/offline/offline-banner";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
+import { settleQuietly } from "@/offline/quietly";
+import type { MessageRow } from "@/offline/types";
+import { requireOnline } from "@/offline/write-gate";
 
-interface Row {
-    id: string;
-    role: string;
-    text: string;
-}
+type Row = MessageRow;
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
+const MAX_CACHED_MESSAGES = 50;
 
 /** What one stored message part shows: its text, or a label for an attachment (the preview is not in this slice yet). */
 const partText = (part: unknown): string => {
@@ -35,13 +39,29 @@ const partText = (part: unknown): string => {
     return kind === "image" || kind === "file" ? "[Attachment]" : "";
 };
 
-const toRow = (message: { id: string; parts: unknown[]; role: string }): Row => {
+/* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
+const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; role: string; status: string }, threadId: string): Row => {
     return {
+        createdAt: message._creationTime,
         id: message.id,
         role: message.role,
+        status: message.status,
+        syncedAt: Date.now(),
         text: message.parts.map((part) => partText(part)).join(""),
+        threadId,
+        updatedAt: message._creationTime,
     };
 };
+/* eslint-enable no-underscore-dangle */
+
+/** A row made on this screen, before the server has stored it. It is never saved to the cache. */
+const localRow = (id: string, role: string, threadId: string, text: string): Row => {
+    const now = Date.now();
+
+    return { createdAt: now, id, role, status: "local", syncedAt: now, text, threadId, updatedAt: now };
+};
+
+const byCreation = (rows: Row[]): Row[] => rows.toSorted((a, b) => a.createdAt - b.createdAt);
 
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
 const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
@@ -63,6 +83,11 @@ const ChatScreen = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
     const { status } = useAuth();
+    const { cache, isOffline, refreshTick, reportRead } = useOffline();
+    const composer = useWriteControl("composer");
+    const sendControl = useWriteControl("send");
+    // Once live rows are in, a late read of the cache must not touch the thread.
+    const hasLiveRows = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
     // Where the next older page starts; null once the whole history is loaded.
@@ -88,17 +113,29 @@ const ChatScreen = () => {
                 const page = await fetchMessagePage(id, cursor);
 
                 // The server returns each page newest first; the rows are shown oldest first.
-                pages.unshift(page.page.map((message) => toRow(message)).toReversed());
+                pages.unshift(page.page.map((message) => toRow(message, id)).toReversed());
                 isDone = page.isDone;
                 cursor = page.continueCursor;
             }
 
-            setRows(pages.flat());
+            const loaded = pages.flat();
+
+            hasLiveRows.current = true;
+            setRows(loaded);
             setOlderCursor(isDone ? null : cursor);
+            reportRead("succeeded");
+            settleQuietly(cache?.saveMessages(id, loaded.slice(-MAX_CACHED_MESSAGES)));
         } catch (error_: unknown) {
+            if (isNetworkFailure(error_)) {
+                // No answer is not an error to show: the saved messages stay, under the offline banner.
+                reportRead("failed");
+
+                return;
+            }
+
             setError(error_ instanceof Error ? error_.message : "Could not load messages.");
         }
-    }, []);
+    }, [cache, reportRead]);
 
     const loadOlder = async () => {
         if (!threadId || olderCursor === null || isLoadingOlder) {
@@ -110,7 +147,7 @@ const ChatScreen = () => {
         try {
             const page = await fetchMessagePage(threadId, olderCursor);
 
-            setRows((current) => [...page.page.map((message) => toRow(message)).toReversed(), ...current]);
+            setRows((current) => [...page.page.map((message) => toRow(message, threadId)).toReversed(), ...current]);
             setOlderCursor(page.isDone ? null : page.continueCursor);
         } catch (error_: unknown) {
             setError(error_ instanceof Error ? error_.message : "Could not load messages.");
@@ -119,16 +156,43 @@ const ChatScreen = () => {
         }
     };
 
+    // The saved messages paint first; live rows replace them, and a cached row never replaces a newer live one.
+    useEffect(() => {
+        if (status !== "signed-in" || !threadId || !cache) {
+            return undefined;
+        }
+
+        let isCancelled = false;
+
+        const showCached = async () => {
+            try {
+                const cached = await cache.loadMessages(threadId);
+
+                if (!isCancelled && !hasLiveRows.current && cached.length > 0) {
+                    setRows((current) => byCreation(mergeRows(current, cached)));
+                }
+            } catch {
+                // An unreadable cache is an empty one.
+            }
+        };
+
+        showCached();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [cache, status, threadId]);
+
     useEffect(() => {
         if (status === "signed-in" && threadId && !sending) {
             loadMessages(threadId);
         }
-    }, [loadMessages, sending, status, threadId]);
+    }, [loadMessages, refreshTick, sending, status, threadId]);
 
     const send = async () => {
         const prompt = draft.trim();
 
-        if (!prompt || sending) {
+        if (!prompt || sending || sendControl.disabled) {
             return;
         }
 
@@ -143,7 +207,7 @@ const ChatScreen = () => {
         const stamp = Date.now();
         const assistantId = `pending-${stamp}`;
 
-        setRows((current) => [...current, { id: `user-${stamp}`, role: "user", text: prompt }, { id: assistantId, role: "assistant", text: "" }]);
+        setRows((current) => [...current, localRow(`user-${stamp}`, "user", threadId ?? NEW_THREAD, prompt), localRow(assistantId, "assistant", threadId ?? NEW_THREAD, "")]);
 
         try {
             const config = loadConfig();
@@ -155,12 +219,14 @@ const ChatScreen = () => {
 
             getClient().setAuthToken(jwt);
 
-            const started = await startChat({
-                body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
-                fetch,
-                gatewayUrl: config.gatewayUrl,
-                jwt,
-            });
+            // Nothing is held back for later: a send that finds the app offline is refused, not queued.
+            const started = await requireOnline({ isOffline }, () =>
+                startChat({
+                    body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
+                    fetch,
+                    gatewayUrl: config.gatewayUrl,
+                    jwt,
+                }));
 
             setThreadId(started.threadId);
 
@@ -196,8 +262,13 @@ const ChatScreen = () => {
         </Pressable>
         );
 
+    // When these messages were last synced: the newest sync among the rows that came from the server.
+    const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
+    const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
+
     return (
         <View style={{ flex: 1 }}>
+            <OfflineBanner syncedAt={syncedAt} />
             <LegendList
                 data={rows}
                 estimatedItemSize={72}
@@ -218,7 +289,10 @@ const ChatScreen = () => {
                 : null}
             <View style={{ flexDirection: "row", gap: 8, padding: 12 }}>
                 <TextInput
+                    accessibilityHint={composer.reason}
                     accessibilityLabel="Message"
+                    accessibilityState={{ disabled: composer.disabled }}
+                    editable={!composer.disabled}
                     multiline
                     onChangeText={setDraft}
                     placeholder="Message"
@@ -226,15 +300,17 @@ const ChatScreen = () => {
                     value={draft}
                 />
                 <Pressable
+                    accessibilityHint={sendControl.reason}
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: sending }}
-                    disabled={sending}
+                    accessibilityState={{ disabled: sending || sendControl.disabled }}
+                    disabled={sending || sendControl.disabled}
                     onPress={send}
-                    style={{ justifyContent: "center", padding: 12 }}
+                    style={{ justifyContent: "center", opacity: sendControl.disabled ? 0.5 : 1, padding: 12 }}
                 >
                     <Text style={{ fontWeight: "600" }}>Send</Text>
                 </Pressable>
             </View>
+            {sendControl.reason ? <Text style={{ fontSize: 12, paddingBottom: 8, paddingHorizontal: 12 }}>{sendControl.reason}</Text> : null}
         </View>
     );
 };
