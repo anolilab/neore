@@ -6,7 +6,7 @@
  * A hook does one thing, **send a prompt to this session** through its normal prompt path (so the agent's own tool
  * permissions and approvals apply). It never runs a command, starts a session or widens the folder.
  *
- * It is inert until the person approved this exact file (a content hash, kept by `approvals.ts`); the file is read
+ * It is inert until the person approved this exact file for this agent in this folder (a content hash, kept by `approvals.ts`); the file is read
  * again, and hashed again, at the moment a hook fires.
  *
  * It watches only inside the approved folder, never follows a symlink out of it, and ignores `.git/`,
@@ -45,6 +45,8 @@ const IGNORED_ANYWHERE = new Set([".git", "node_modules"]);
 type FileEvent = "created" | "deleted" | "saved";
 
 export interface HookRunnerOptions {
+    /** The agent this session runs: an approval is for one agent in one folder, so it does not reach another agent's session. */
+    agentKey: string;
     approvals: Pick<HookApprovals, "approve" | "get" | "revoke">;
     /** The approved folder, as the session has it. */
     folder: string;
@@ -225,7 +227,7 @@ export class HookRunner {
             return { error: file.error, hooks: [], state: "invalid", watching: this.watching };
         }
 
-        const approved = this.options.approvals.get(root);
+        const approved = this.options.approvals.get(this.options.agentKey, root);
         let state: HooksView["state"] = "changed";
 
         if (approved === file.hash) {
@@ -246,12 +248,12 @@ export class HookRunner {
             throw new Error("the hooks file changed since it was shown; review it again");
         }
 
-        this.options.approvals.approve(root, hash);
+        this.options.approvals.approve(this.options.agentKey, root, hash);
         this.options.onChange();
     }
 
     public revoke(): void {
-        this.options.approvals.revoke(this.requireRoot());
+        this.options.approvals.revoke(this.options.agentKey, this.requireRoot());
         this.options.onChange();
     }
 
@@ -292,7 +294,7 @@ export class HookRunner {
             throw new Error("there is no valid hooks file");
         }
 
-        if (this.options.approvals.get(root) !== file.hash || (expectedHash !== undefined && expectedHash !== file.hash)) {
+        if (this.options.approvals.get(this.options.agentKey, root) !== file.hash || (expectedHash !== undefined && expectedHash !== file.hash)) {
             throw new Error("the hooks file is not the one that was approved");
         }
 
@@ -449,7 +451,7 @@ export class HookRunner {
         const file = await loadHooksFile(this.options.fs, this.requireRoot());
 
         // Re-read now, hashed now: an edit since the approval means nothing fires.
-        if (file.state !== "ok" || this.options.approvals.get(this.requireRoot()) !== file.hash) {
+        if (file.state !== "ok" || this.options.approvals.get(this.options.agentKey, this.requireRoot()) !== file.hash) {
             return;
         }
 

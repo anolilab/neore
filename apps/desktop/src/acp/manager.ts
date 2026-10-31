@@ -203,6 +203,7 @@ export class AcpManager {
 
         if (hooks !== undefined) {
             runner = new HookRunner({
+                agentKey,
                 approvals: hooks.approvals,
                 folder: plan.cwd,
                 fs: hooks.fs ?? nodeHookFs,

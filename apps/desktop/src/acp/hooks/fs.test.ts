@@ -34,6 +34,7 @@ beforeEach(async () => {
 
     symlinkSync(folder, alias);
     runner = new HookRunner({
+        agentKey: "claude",
         approvals: new HookApprovals(path.join(directory, "approvals.json")),
         folder: alias,
         fs: {

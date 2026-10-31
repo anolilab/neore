@@ -533,12 +533,18 @@ const renderSession = (snapshot: SessionSnapshot | undefined): void => {
     $<HTMLButtonElement>("acp-end").textContent = ended ? "Remove session" : "End session";
 };
 
-const HOOK_STATE_TEXT: Record<HooksView["state"], string> = {
-    approved: "Approved. File events and the manual hooks below can prompt this session.",
-    changed: "This file changed since you approved it. Nothing fires until you approve it again.",
-    invalid: "This file is not a valid hooks file, so nothing fires.",
-    none: "",
-    unapproved: "Not approved. Nothing fires until you approve this file.",
+/** An approval is for one agent in one folder: it covers every session of that agent there, and no other agent's. */
+const hookStateText = (state: HooksView["state"], agentLabel: string): string => {
+    const scope = `any session of ${agentLabel} in this folder`;
+    const text: Record<HooksView["state"], string> = {
+        approved: `Approved for ${scope}. File events and the manual hooks below can prompt it.`,
+        changed: `This file changed since you approved it for ${scope}. Nothing fires until you approve it again.`,
+        invalid: "This file is not a valid hooks file, so nothing fires.",
+        none: "",
+        unapproved: `Not approved. Nothing fires until you approve this file for ${scope}.`,
+    };
+
+    return text[state];
 };
 
 const hookWhen = (hook: HooksView["hooks"][number]): string => hook.event === "manual" ? "Run by a button" : `When a file matching ${hook.glob ?? ""} is ${hook.event}`;
@@ -609,14 +615,14 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false): Promise<vo
     panel.hidden = view.state === "none";
     const unwatched = view.state !== "invalid" && !view.watching ? " The folder is not being watched, so file hooks cannot fire; manual hooks still work." : "";
 
-    $("acp-hooks-state").textContent = `${view.state === "invalid" ? `${HOOK_STATE_TEXT.invalid} ${view.error ?? ""}` : HOOK_STATE_TEXT[view.state]}${unwatched}`;
+    $("acp-hooks-state").textContent = `${view.state === "invalid" ? `${hookStateText("invalid", snapshot.agentLabel)} ${view.error ?? ""}` : hookStateText(view.state, snapshot.agentLabel)}${unwatched}`;
     $("acp-hooks-list").replaceChildren(...view.hooks.map((hook) => hookLine(view, snapshot.id, hook)));
 
     const actions: HTMLElement[] = [];
     const { hash } = view;
 
     if (hash !== undefined && (view.state === "unapproved" || view.state === "changed")) {
-        actions.push(button("Approve these hooks", "Approve the hooks file shown above", () => guarded(async () => {
+        actions.push(button(`Approve for ${snapshot.agentLabel} in this folder`, "Approve the hooks file shown above for this agent in this folder", () => guarded(async () => {
             await globalThis.neoreDevice.acpHooksApprove(snapshot.id, hash);
             await renderHooks(snapshot, true);
         })));

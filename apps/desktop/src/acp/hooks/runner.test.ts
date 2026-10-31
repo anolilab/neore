@@ -9,6 +9,7 @@ import { HookApprovals } from "./approvals";
 import { DEBOUNCE_MS, HOOK_MIN_INTERVAL_MS, HookRunner, MAX_FIRES_PER_HOUR, QUIET_MS } from "./runner";
 
 const ROOT = "/work/project";
+const AGENT = "claude";
 const REVIEW_PROMPT = /^\[Hook "Review"\] Review the saved file\./u;
 
 const hooksFile = (hooks: unknown[]): string => JSON.stringify({ hooks, version: 1 });
@@ -51,6 +52,7 @@ const setup = async (hooks: unknown[], approve = true): Promise<void> => {
     fs.write(".neore/hooks.json", hooksFile(hooks));
     fs.write("src/old.ts");
     runner = new HookRunner({
+        agentKey: AGENT,
         approvals,
         folder: ROOT,
         fs,
@@ -150,7 +152,7 @@ describe("approval", () => {
 
     it("shows a file that does not parse as invalid, with nothing to approve", async () => {
         fs.write(".neore/hooks.json", JSON.stringify({ hooks: [{ ...review, command: "rm -rf /" }], version: 1 }));
-        runner = new HookRunner({ approvals, folder: ROOT, fs, isIdle: () => true, onChange: () => {}, send: () => {} });
+        runner = new HookRunner({ agentKey: AGENT, approvals, folder: ROOT, fs, isIdle: () => true, onChange: () => {}, send: () => {} });
         await runner.start();
 
         expect(await stateOf()).toBe("invalid");
@@ -457,7 +459,7 @@ describe("the folder boundary", () => {
 
     it("is not fooled by a hooks folder or file that is a link", async () => {
         fs.link(".neore", "/elsewhere/.neore");
-        runner = new HookRunner({ approvals, folder: ROOT, fs, isIdle: () => true, onChange: () => {}, send: () => {} });
+        runner = new HookRunner({ agentKey: AGENT, approvals, folder: ROOT, fs, isIdle: () => true, onChange: () => {}, send: () => {} });
         await runner.start();
 
         expect(await stateOf()).toBe("invalid");
@@ -528,5 +530,61 @@ describe("stopping", () => {
         expect(fs.closed).toBe(true);
         expect(runner.watching).toBe(false);
         expect(sent).toEqual([]);
+    });
+});
+
+describe("approval scope", () => {
+    const other = async (): Promise<{ fs: FakeFs; runner: HookRunner; sent: string[] }> => {
+        const otherFs = new FakeFs(ROOT);
+        const otherSent: string[] = [];
+
+        otherFs.write(".neore/hooks.json", hooksFile([review, manual]));
+        otherFs.write("src/old.ts");
+
+        const otherRunner = new HookRunner({
+            agentKey: "codex",
+            approvals,
+            folder: ROOT,
+            fs: otherFs,
+            isIdle: () => true,
+            onChange: () => {},
+            send: (prompt) => {
+                otherSent.push(prompt);
+            },
+        });
+
+        await otherRunner.start();
+
+        return { fs: otherFs, runner: otherRunner, sent: otherSent };
+    };
+
+    it("does not carry one agent's approval to another agent in the same folder", async () => {
+        await setup([review, manual]);
+
+        const second = await other();
+
+        expect((await second.runner.view()).state).toBe("unapproved");
+        second.fs.emit("change", "src/old.ts");
+        await settle();
+        expect(second.sent).toEqual([]);
+        await expect(second.runner.runManual("summary", await hashOf())).rejects.toThrow("approved");
+
+        // The first agent's own approval still stands.
+        fs.emit("change", "src/old.ts");
+        await settle();
+        expect(sent).toHaveLength(1);
+    });
+
+    it("approving for one agent leaves the other's state alone, and revoking is per agent", async () => {
+        await setup([review, manual]);
+
+        const second = await other();
+
+        await second.runner.approve(await hashOf());
+        expect((await second.runner.view()).state).toBe("approved");
+
+        second.runner.revoke();
+        expect((await second.runner.view()).state).toBe("unapproved");
+        expect(await stateOf()).toBe("approved");
     });
 });
