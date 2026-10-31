@@ -5,7 +5,7 @@ import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { useMutation } from "@tanstack/react-query";
 import type { FC } from "react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { useProjectList } from "@/features/projects/hooks/use-projects";
@@ -15,10 +15,18 @@ import { useCRPC } from "@/lib/lunora/crpc";
  * Where one device's tools are offered: any chat, or only threads of the chosen projects. The server decides
  * (and re-checks at call time); this only edits the setting, which applies from the next turn.
  */
-const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId, projectIds }) => {
+/** Same set of ids, in any order; `undefined` is "any chat". */
+const sameScope = (a: string[] | undefined, b: string[] | undefined): boolean =>
+    a === undefined || b === undefined ? a === b : a.length === b.length && a.every((id) => b.includes(id));
+
+const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId, projectIds: stored }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const baseId = useId();
+    // What the last successful save sent, and the stored value it replaced. Until the live device list moves past
+    // that stored value, edits build on the saved one, so a second quick edit cannot undo the first.
+    const [saved, setSaved] = useState<{ from: string[] | undefined; to: string[] | undefined } | undefined>(undefined);
+    const projectIds = saved && sameScope(saved.from, stored) ? saved.to : stored;
     const scoped = projectIds !== undefined;
     // The project list is only needed to draw the picker, so a device offered in any chat starts no query.
     const { isAnswered, projects } = useProjectList(scoped);
@@ -32,7 +40,13 @@ const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId
     const unlisted = isAnswered ? [...chosen].filter((id) => !listed.has(id)) : [];
 
     const save = (scope: { kind: "any" } | { kind: "projects"; projectIds: Id<"projects">[] }): void => {
-        setScope.mutate({ deviceId: deviceId as Id<"devices">, scope }, { onError: () => toast.error(t`Could not change where this device is offered.`) });
+        setScope.mutate(
+            { deviceId: deviceId as Id<"devices">, scope },
+            {
+                onError: () => toast.error(t`Could not change where this device is offered.`),
+                onSuccess: () => setSaved({ from: stored, to: scope.kind === "any" ? undefined : scope.projectIds }),
+            },
+        );
     };
 
     return (

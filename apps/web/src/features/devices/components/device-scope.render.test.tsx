@@ -112,4 +112,31 @@ describe("<DeviceScope>", () => {
 
         expect(screen.getByRole("checkbox", { name: "Flow" }).getAttribute("aria-checked")).toBe("true");
     });
+
+    it("builds the next edit from the last saved scope while the device list has not caught up", async () => {
+        projectList.current = {
+            isAnswered: true,
+            projects: [
+                { _id: "p-a", projectType: "chat", title: "A" },
+                { _id: "p-b", projectType: "chat", title: "B" },
+            ],
+        };
+        setDeviceProjectScope.mockClear();
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceScope deviceId="d1" projectIds={[]} />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("checkbox", { name: "A" }));
+        await waitFor(() => {
+            expect(screen.getByRole("checkbox", { name: "B" }).getAttribute("aria-disabled")).not.toBe("true");
+        });
+        // The live update has not arrived: the prop still says "no projects".
+        fireEvent.click(screen.getByRole("checkbox", { name: "B" }));
+
+        await waitFor(() => {
+            expect(setDeviceProjectScope.mock.calls[1]?.[0]).toStrictEqual({ deviceId: "d1", scope: { kind: "projects", projectIds: ["p-a", "p-b"] } });
+        });
+    });
 });
