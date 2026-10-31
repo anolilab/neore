@@ -26,7 +26,7 @@ export const WATCH_WEBHOOK_SCOPE = "watch-webhook";
 
 const DISPATCH_BATCH = 25;
 
-/** Where a refused poll or an unreachable host leaves the cache: as it was. */
+/** What a poll found: nothing new, a new list, or a failure (which leaves the cached list as it was). */
 const vRecorded = v.union(
     v.object({ kind: v.literal("not_modified") }),
     v.object({
@@ -165,7 +165,7 @@ export const recordRepoPoll = internalMutation
         // A webhook that arrived during the poll may describe a change the answer predates: look again at once.
         const changedMeanwhile = row.dirtyAt > args.lease;
         const delay = changedMeanwhile ? 0 : nextPollDelay(status, { now, webhookSeenAt: row.webhookSeenAt });
-        const nextPollAt = now + Math.max(delay, 0);
+        const nextPollAt = now + delay;
         const common = { checkedAt: now, dirtyAt: changedMeanwhile ? row.dirtyAt : 0, lastStatus: status, leasedAt: 0, nextPollAt };
         let notified = 0;
 

@@ -13,6 +13,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { encryptKey } from "../lib/encryption";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -35,7 +36,7 @@ const vWatched = v.object({
     webhook: v.object({ enabled: v.boolean(), seenAt: v.number() }),
 });
 
-const rowFor = async (ctx: { db: Pick<import("../_generated/server").QueryCtx["db"], "query"> }, userId: string, repo: string): Promise<Doc<"watchedRepositories"> | null> => {
+const rowFor = async (ctx: Pick<QueryCtx, "db">, userId: string, repo: string): Promise<Doc<"watchedRepositories"> | null> => {
     const wanted = repo.toLowerCase();
     const rows = await ctx.db
         .query("watchedRepositories")
