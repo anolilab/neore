@@ -7223,7 +7223,7 @@ msgstr "プレビューできません · クリックしてダウンロード"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} を取得できませんでした：{1}"
 
-#: src/features/chat/core/context/chat-context.tsx:651
+#: src/features/chat/core/context/chat-context.tsx:652
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7259,7 +7259,7 @@ msgstr "ページの名前を変更できませんでした"
 msgid "Could not restore this version"
 msgstr "このバージョンを復元できませんでした"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
 msgstr ""
 
@@ -7315,7 +7315,7 @@ msgid "Could not stop the conversation"
 msgstr "会話を停止できませんでした"
 
 #: src/features/chat/thread-list/thread-node.tsx:533
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:148
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -16802,7 +16802,7 @@ msgstr "読み込んでいます…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:687
+#: src/features/chat/core/context/chat-context.tsx:688
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
@@ -23013,19 +23013,19 @@ msgstr "レート制限に達しました。{minutes, plural, other {# 分}}後�
 msgid "Rate limited"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:78
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:90
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:77
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:89
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:81
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:93
 msgid "Rate limited, retrying in {countdown}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:80
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:92
 msgid "Rate limited. Retrying in about {announced}"
 msgstr ""
 
@@ -24314,7 +24314,7 @@ msgstr "エクスポートを再試行"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "{retryAfterMinutes} 分後に再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:95
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
 msgid "Retry now"
 msgstr ""
 
@@ -24322,7 +24322,7 @@ msgstr ""
 msgid "Retry with note"
 msgstr "メモを付けて再試行"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:74
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:86
 msgid "Retrying now"
 msgstr ""
 
@@ -27184,7 +27184,7 @@ msgstr "株式"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:99
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -28856,6 +28856,10 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:528
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "「キーとエンドポイント」に表示されるリソースのエンドポイント（*.openai.azure.com または *.cognitiveservices.azure.com）。"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:83
+msgid "The retry is taking longer than expected"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:51
 msgid "The right model, every time."
@@ -31964,7 +31968,7 @@ msgstr "待機対象：{0}"
 msgid "Want to continue from here?"
 msgstr "ここから続けますか？"
 
-#: src/features/chat/core/context/chat-context.tsx:689
+#: src/features/chat/core/context/chat-context.tsx:690
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
 
@@ -32848,7 +32852,7 @@ msgstr "ローカルサーバーは応答しましたが、このサイトを拒
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
-#: src/features/chat/core/context/chat-context.tsx:686
+#: src/features/chat/core/context/chat-context.tsx:687
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 

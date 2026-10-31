@@ -15303,6 +15303,18 @@
     "persistentStreams": {
       "commitOrdered": false,
       "fields": {
+        "earlySteps": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "expiresAt": {
           "kind": "number",
           "nullable": false,
@@ -15519,7 +15531,8 @@
                   "kind": "string",
                   "nullable": false,
                   "optional": true,
-                  "unique": false
+                  "unique": false,
+                  "refined": true
                 },
                 "streamId": {
                   "kind": "string",
@@ -15637,6 +15650,58 @@
               "kind": "number",
               "nullable": false,
               "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "pausedRun": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "replyRowIds": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
+            "skill": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "id": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "name": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
+            },
+            "stepsUsed": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "timeZone": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
               "unique": false
             }
           }

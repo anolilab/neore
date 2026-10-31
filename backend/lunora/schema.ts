@@ -1733,6 +1733,9 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
+        // such a step may pause once more. It still counts toward the cap on pauses.
+        earlySteps: v.optional(v.array(v.string())),
         expiresAt: v.number(),
         // Host-run turns (`acp/`; unset = a cloud turn). `hostTurnId` is the UUID the starter minted;
         // `hostState` drives "Sending" versus "Working"; the permission ids are the requests the agent is
@@ -1760,6 +1763,18 @@ export const schema = defineSchema({
                 retryAt: v.number(),
                 run: v.object({ ...runStreamingAgentFields }),
                 status: v.number(),
+            }),
+        ),
+        // What the run has done before its pauses, cumulative across them: the reply rows it saved, how many steps
+        // it ran (the resume gets only the rest of the step cap), and what its usage record needs (`skill`,
+        // `timeZone`). The run records ONE reply when it ends, covering these rows; a pause that never resumes
+        // (a stop, a superseded run) records them itself (`pause-usage.ts`), once, and clears this.
+        pausedRun: v.optional(
+            v.object({
+                replyRowIds: v.array(v.string()),
+                skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })),
+                stepsUsed: v.number(),
+                timeZone: v.optional(v.string()),
             }),
         ),
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.

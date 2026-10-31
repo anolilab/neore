@@ -9,8 +9,8 @@
  * the harness cannot hold — the same edges as `execute.run.test.ts`.
  */
 import { lunoraTest } from "@lunora/testing";
-import { MockLanguageModelV3 } from "ai/test";
-import { tool } from "ai";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
+import { RetryError, tool } from "ai";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -19,6 +19,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
+import { RATE_LIMIT_RESUME_SLACK_MS } from "./lib/rate-limit-pause";
 
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
@@ -300,9 +301,9 @@ const readState = async (): Promise<RunState> =>
 
 describe("a provider rate limit on the first model call", () => {
     it("pauses the run instead of failing it, and queues its resume for the retry time", async () => {
-        modelState.model = planned([rateLimited()]);
-
         const before = Date.now();
+
+        modelState.model = planned([rateLimited()]);
 
         await run();
 
@@ -322,8 +323,9 @@ describe("a provider rate limit on the first model call", () => {
         // Exactly one resume is queued: the same job, naming the pause, delayed to the retry time. Nothing waited here.
         expect(enqueued).toHaveLength(1);
         expect(enqueued[0]!.args).toMatchObject({ messageId: ids.messageId, resume: state.pause!.id, streamId: ids.streamId, userId: OWNER });
-        expect(enqueued[0]!.delayMs).toBeGreaterThan(RETRY_IN_MS - 5000);
-        expect(enqueued[0]!.delayMs).toBeLessThanOrEqual(RETRY_IN_MS);
+        // Queued a moment after the provider's time, so it does not land just before the limit lifts.
+        expect(enqueued[0]!.delayMs).toBeGreaterThan(RETRY_IN_MS + RATE_LIMIT_RESUME_SLACK_MS - 5000);
+        expect(enqueued[0]!.delayMs).toBeLessThanOrEqual(RETRY_IN_MS + RATE_LIMIT_RESUME_SLACK_MS);
     });
 
     it("keeps the pause visible to the live query that drives the countdown", async () => {
@@ -592,6 +594,7 @@ describe("Stop during a pause", () => {
             async (ctx: any) =>
                 await ctx.runMutation(pauseRunForRateLimit, {
                     from: ids.messageId,
+                    replyRowIds: [],
                     run: {
                         messageId: ids.messageId,
                         streamId: ids.streamId,
@@ -600,6 +603,7 @@ describe("Stop during a pause", () => {
                         userId: OWNER,
                     },
                     status: 429,
+                    stepsUsed: 0,
                     streamId: ids.streamId,
                 }),
         );
@@ -626,8 +630,8 @@ describe("a rate limit after earlier steps", () => {
             ["tool", "success"],
         ]);
         expect(paused.pause!.from).toBe(paused.rows.at(-1)!.id);
-        // The steps that did finish are recorded as a reply of their own.
-        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        // Nothing is recorded yet: the reply is one reply, recorded when it ends.
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
 
         await run({ resume: paused.pause!.id });
 
@@ -644,5 +648,341 @@ describe("a rate limit after earlier steps", () => {
         expect(state.rows.at(-1)!.parent).toBe(state.rows[2]!.id);
         expect(state.chunkText).toContain("All done.");
         expect(state.streamStatus).toBe("done");
+        // One reply, keyed on its first reply row, covering the steps from before the pause and the one after.
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: state.rows[1]!.id, tokens: 16 });
+    });
+});
+
+/** An empty assistant reply row under `parent`, as a rejected step leaves one. */
+const seedEmptyReply = async (status: "failed" | "pending", parent: string, stepOrder: number) =>
+    await harness.run(async (ctx: any) => {
+        const id = await ctx.db.insert("messages", {
+            message: { content: [], role: "assistant" },
+            order: 0,
+            parentMessageId: parent,
+            status,
+            stepOrder,
+            threadId: ids.threadId,
+            tool: false,
+            userId: OWNER,
+        });
+
+        return String(id);
+    });
+
+describe("the placeholder a pause removes", () => {
+    it("is this run's own: a sibling reply's failed row and another run's pending row stay", async () => {
+        const failedSibling = await seedEmptyReply("failed", ids.messageId, 7);
+        const pendingSibling = await seedEmptyReply("pending", ids.messageId, 8);
+
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const state = await readState();
+
+        expect(state.pause).toBeDefined();
+        expect(new Set(state.rows.map((row) => row.id))).toStrictEqual(new Set([failedSibling, ids.messageId, pendingSibling]));
+    });
+});
+
+describe("one reply, however many pauses", () => {
+    const stepsCalled = () => (modelState.model as MockLanguageModelV3).doStreamCalls.length;
+
+    it("gives the resume only the steps the run has left", async () => {
+        modelState.withTools = true;
+        // Two tool steps, a rejection, then tool steps for as long as the model is asked: the cap of five steps is for the run.
+        modelState.model = planned([toolCallStep("echo", "call-1"), toolCallStep("echo", "call-2"), rateLimited(), toolCallStep("echo", "call-3")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await run({ resume: paused.pause!.id });
+
+        // 2 steps + the rejected call, then the 3 steps that were left: 6 calls, not 2 + 1 + 5.
+        expect(stepsCalled()).toBe(6);
+    });
+
+    it("pauses a second time on a later step, and records the reply once when it ends", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), toolCallStep("echo", "call-2"), rateLimited(), textStep("All done.")]);
+
+        await run();
+
+        const first = await readState();
+
+        await run({ resume: first.pause!.id });
+
+        const second = await readState();
+
+        // A different step (it continues from the row the first resume saved), so it may pause too.
+        expect(second.pause).toBeDefined();
+        expect(second.pause!.id).not.toBe(first.pause!.id);
+        expect(second.pause!.from).not.toBe(first.pause!.from);
+        expect(second.pausedSteps).toHaveLength(2);
+        expect(enqueued).toHaveLength(2);
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+
+        await run({ resume: second.pause!.id });
+
+        const state = await readState();
+
+        expect(state.rows.map((row) => row.role)).toStrictEqual(["user", "assistant", "tool", "assistant", "tool", "assistant"]);
+        expect(new Set(state.rows.map((row) => row.order)).size).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: state.rows[1]!.id, tokens: 24 });
+    });
+
+    it("records the finished steps once when the run is stopped after its resume", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), rateLimited()]);
+
+        await run();
+
+        const paused = await readState();
+
+        // The resumed step is rejected again, which fails the run (one pause per step) through the stop path.
+        await run({ resume: paused.pause!.id });
+
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: paused.rows[1]!.id });
+    });
+});
+
+describe("Retry now and the step's one pause", () => {
+    it("lets a step that Retry now cut short pause once more when the limit has not lifted", async () => {
+        modelState.model = planned([rateLimited(), rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const first = await readState();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+        await run({ resume: first.pause!.id });
+
+        const second = await readState();
+
+        expect(second.streamStatus).not.toBe("done");
+        expect(second.pause).toBeDefined();
+        expect(second.pause!.id).not.toBe(first.pause!.id);
+
+        // Only once: the second resume was not cut short, so a third rejection fails the run.
+        await run({ resume: second.pause!.id });
+
+        const third = await readState();
+
+        expect(third.rows.map((row) => row.role)).toStrictEqual(["user", "assistant"]);
+        expect(third.streamStatus).toBe("done");
+        expect(third.chunkText).toContain("Hello there.");
+    });
+
+    it("does not give the allowance to a resume that waited out the whole pause", async () => {
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        await run({ resume: pause!.id });
+
+        const state = await readState();
+
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("error");
+    });
+});
+
+describe("a pause whose resume never came", () => {
+    const overdueBy = async (ms: number) =>
+        await harness.run(async (ctx: any) => {
+            const stream = await ctx.db.get(ids.streamId as never);
+
+            await ctx.db.patch(ids.streamId as never, { pause: { ...stream.pause, retryAt: Date.now() - ms } });
+        });
+
+    it("can be resumed with Retry now once it is more than 30 seconds overdue, and that is not an early resume", async () => {
+        modelState.model = planned([rateLimited(), rateLimited()]);
+
+        await run();
+        await overdueBy(60_000);
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+        const { pause } = await readState();
+
+        expect(resumed).toBe(true);
+        expect(enqueued).toHaveLength(2);
+        expect(enqueued[1]!.delayMs).toBe(0);
+
+        await run({ resume: pause!.id });
+
+        // The wait had run out, so this was not cut short: a rejection now fails the run.
+        const { streamStatus } = await readState();
+
+        expect(streamStatus).toBe("done");
+    });
+
+    it("is left alone while the resume that was queued may still be on its way", async () => {
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+        await overdueBy(5000);
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(false);
+        expect(enqueued).toHaveLength(1);
+    });
+});
+
+describe("a pause that never resumes", () => {
+    it("Stop records the steps that finished, once", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), textStep("All done.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+        await run({ resume: paused.pause!.id });
+
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: paused.rows[1]!.id, tokens: 8 });
+    });
+
+    it("a regenerate that moved the conversation on ends the paused run and frees the thread", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), textStep("All done.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        // A later reply to the same prompt got its own stream, and has finished since.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 60_000,
+                messageId: ids.messageId,
+                status: "done",
+                streamingConfig: { contentType: "text", model: "test-model" },
+                threadId: ids.threadId,
+                userId: OWNER,
+            });
+        });
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+        expect(state.rows.map((row) => row.role)).toStrictEqual(["user", "assistant", "tool"]);
+        expect(state.chunkText).not.toContain("All done.");
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("leaves the thread to the newer run that is still live", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 60_000,
+                messageId: ids.messageId,
+                status: "streaming",
+                streamingConfig: { contentType: "text", model: "test-model" },
+                threadId: ids.threadId,
+                userId: OWNER,
+            });
+        });
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("running");
+    });
+
+    it("ends the paused run when the row it continues from was deleted", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), textStep("All done.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(paused.pause!.from as never));
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+});
+
+describe("how the model fails", () => {
+    it("pauses when the error comes in the middle of a reply, and resumes it cleanly", async () => {
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async () => {
+                calls += 1;
+
+                if (calls > 1) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: textStep("Hello there."), initialDelayInMs: null }) };
+                }
+
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ type: "stream-start", warnings: [] });
+                            controller.enqueue({ id: "t", type: "text-start" });
+                            controller.enqueue({ delta: "Hel", id: "t", type: "text-delta" });
+                            controller.error(rateLimited());
+                        },
+                    }),
+                };
+            },
+        });
+
+        await run();
+
+        const paused = await readState();
+
+        expect(paused.pause).toBeDefined();
+        expect(paused.chunkText).not.toContain("Error:");
+        expect(paused.rows.map((row) => row.role)).toStrictEqual(["user"]);
+
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(state.rows.map((row) => [row.role, row.status])).toStrictEqual([
+            ["user", "success"],
+            ["assistant", "success"],
+        ]);
+        expect(state.streamStatus).toBe("done");
+    });
+
+    it("finds the rate limit through the AI SDK's retry wrapper", async () => {
+        const wrapped = new RetryError({ errors: [new Error("overloaded"), rateLimited()], message: "Failed after 3 attempts", reason: "maxRetriesExceeded" });
+
+        modelState.model = planned([wrapped, textStep("Hello there.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        expect(wrapped.lastError).toBeDefined();
+        expect(paused.pause).toMatchObject({ provider: "anthropic", status: 429 });
     });
 });

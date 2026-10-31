@@ -7223,7 +7223,7 @@ msgstr "Anteprima non disponibile · Fai clic per scaricare"
 msgid "Could not pull {0}: {1}"
 msgstr "Impossibile scaricare {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:651
+#: src/features/chat/core/context/chat-context.tsx:652
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7259,7 +7259,7 @@ msgstr "Impossibile rinominare la pagina"
 msgid "Could not restore this version"
 msgstr "Impossibile ripristinare questa versione"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:125
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
 msgstr ""
 
@@ -7315,7 +7315,7 @@ msgid "Could not stop the conversation"
 msgstr "Impossibile interrompere la conversazione"
 
 #: src/features/chat/thread-list/thread-node.tsx:533
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:128
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:148
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -16802,7 +16802,7 @@ msgstr "Caricamento…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:687
+#: src/features/chat/core/context/chat-context.tsx:688
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "I modelli locali supportano solo testo. Rimuovi gli allegati per inviare."
 
@@ -23013,19 +23013,19 @@ msgstr "Limite di frequenza raggiunto. Potrai migliorare {minutes, plural, one {
 msgid "Rate limited"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:78
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:90
 msgid "Rate limited by {provider}, retrying in {countdown}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:77
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:89
 msgid "Rate limited by {provider}. Retrying in about {announced}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:81
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:93
 msgid "Rate limited, retrying in {countdown}"
 msgstr ""
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:80
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:92
 msgid "Rate limited. Retrying in about {announced}"
 msgstr ""
 
@@ -24314,7 +24314,7 @@ msgstr "Riprova esportazione"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "Riprova tra {retryAfterMinutes} min"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:95
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
 msgid "Retry now"
 msgstr ""
 
@@ -24322,7 +24322,7 @@ msgstr ""
 msgid "Retry with note"
 msgstr "Riprova con una nota"
 
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:74
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:86
 msgid "Retrying now"
 msgstr ""
 
@@ -27184,7 +27184,7 @@ msgstr "Azioni"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/thread/rate-limit-pause-notice.tsx:99
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -28856,6 +28856,10 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:528
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "L'endpoint della risorsa da Chiavi ed endpoint: *.openai.azure.com o *.cognitiveservices.azure.com."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:83
+msgid "The retry is taking longer than expected"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:51
 msgid "The right model, every time."
@@ -31964,7 +31968,7 @@ msgstr "In attesa di: {0}"
 msgid "Want to continue from here?"
 msgstr "Vuoi continuare da qui?"
 
-#: src/features/chat/core/context/chat-context.tsx:689
+#: src/features/chat/core/context/chat-context.tsx:690
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Non siamo riusciti a confermare la tua sessione in tempo. Il tuo messaggio è ancora nel campo di scrittura. Prova a inviarlo di nuovo."
 
@@ -32848,7 +32852,7 @@ msgstr "Il tuo server locale ha risposto, ma ha rifiutato questo sito (CORS). Co
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "La tua località (ad es. \"Roma, Italia\", \"Berlino, Germania\")."
 
-#: src/features/chat/core/context/chat-context.tsx:686
+#: src/features/chat/core/context/chat-context.tsx:687
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Il tuo messaggio contiene contenuti inappropriati e non può essere inviato."
 

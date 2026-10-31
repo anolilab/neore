@@ -7,10 +7,12 @@
  * pause's id. One definition keeps the stored copy and the job's input from drifting.
  *
  * Imported by `schema.ts`, so this module must stay free of runtime imports
- * beyond `lunorash/server`.
+ * beyond `lunorash/server` and the validator caps (`lib/validators.ts`, which imports nothing of ours).
  */
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
+
+import { MAX_LENGTH } from "../../lib/validators";
 
 export const runStreamingAgentFields = {
     /** Anonymous callers are pinned to the free model; a skill must not lift that. */
@@ -24,7 +26,7 @@ export const runStreamingAgentFields = {
      * Set on the job that resumes a run paused on a provider rate limit: the id of the pause it answers
      * (`persistentStreams.pause.id`). It claims that pause instead of the stream's first-run claim.
      */
-    resume: v.optional(v.string()),
+    resume: v.optional(v.string().max(MAX_LENGTH.short)),
     streamId: v.string(),
     streamingConfig: v.object({
         contentType: v.string(),

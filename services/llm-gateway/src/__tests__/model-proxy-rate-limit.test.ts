@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createProviderModelForEnv } from "../providers/factory.js";
+import { createProviderModelForEnv, resolveApiKey } from "../providers/factory.js";
 import { bindingEnv } from "./helpers/internal.js";
 import { createMockEnv } from "./helpers/mock-env.js";
 import { useTrackedAppFetch } from "./helpers/tracked-app-fetch.js";
@@ -31,7 +31,7 @@ interface RateLimit {
 const providerError = (statusCode: number, headers: Record<string, string> = {}, responseBody = "") =>
     Object.assign(new Error(responseBody || "rejected"), { responseBody, responseHeaders: headers, statusCode });
 
-const post = async (action: "generate" | "stream", doCall: () => Promise<unknown>) => {
+const post = async (action: "generate" | "stream", doCall: () => Promise<unknown>, extra: Record<string, unknown> = {}) => {
     vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({ doGenerate: doCall, doStream: doCall } as never);
 
     return await fetchApp(
@@ -44,6 +44,7 @@ const post = async (action: "generate" | "stream", doCall: () => Promise<unknown
                 provider: "google",
                 requestId: "req-rate-limit-1",
                 userId: "user-1",
+                ...extra,
             }),
             headers: { "Content-Type": "application/json" },
             method: "POST",
@@ -124,6 +125,31 @@ describe("POST /internal/model/proxy reports a provider rate limit", () => {
             const body = (await response.json()) as { error: { rateLimit?: RateLimit } };
 
             expect(body.error.rateLimit).toEqual({ status: 429 });
+        });
+
+        it("reports it for a call made with the user's own key (BYOK) as it does for ours", async () => {
+            const response = await post(
+                "stream",
+                async () => {
+                    throw providerError(429, { "retry-after": "5" });
+                },
+                { providerApiKey: "user-key" },
+            );
+            const body = (await response.json()) as { error: { rateLimit?: RateLimit } };
+
+            expect(vi.mocked(resolveApiKey)).toHaveBeenCalledWith("google", expect.anything(), "user-key");
+            expect(body.error.rateLimit?.status).toBe(429);
+            expect(body.error.rateLimit?.retryAt).toBeGreaterThan(Date.now());
+        });
+
+        it("does not report a 429 for an account out of quota", async () => {
+            const responseBody = JSON.stringify({ error: { code: "insufficient_quota", type: "insufficient_quota" } });
+            const response = await post("generate", async () => {
+                throw providerError(429, {}, responseBody);
+            });
+            const body = (await response.json()) as { error: { rateLimit?: RateLimit } };
+
+            expect(body.error.rateLimit).toBeUndefined();
         });
 
         it.each([401, 403, 404, 500])("a %s is not a rate limit", async (statusCode) => {

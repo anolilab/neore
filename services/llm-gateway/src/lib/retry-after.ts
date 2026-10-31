@@ -19,6 +19,9 @@ export interface RateLimitInfo {
     status: number;
 }
 
+/** Stands in for a retry time that is no number: further out than any pause the backend allows. */
+const NEVER_AT = Number.MAX_SAFE_INTEGER;
+
 /** A parsed JSON body or an error object: read field by field, never trusted whole. */
 interface Loose {
     [key: string]: unknown;
@@ -180,7 +183,9 @@ const protobufDelayMs = (value: unknown): number | undefined => {
     }
 
     if (isRecord(value) && (typeof value.seconds === "number" || typeof value.seconds === "string")) {
-        return Math.round(Number(value.seconds) * 1000 + (typeof value.nanos === "number" ? value.nanos / 1e6 : 0));
+        const delay = Math.round(Number(value.seconds) * 1000 + (typeof value.nanos === "number" ? value.nanos / 1e6 : 0));
+
+        return Number.isFinite(delay) ? delay : undefined;
     }
 
     return undefined;
@@ -253,6 +258,13 @@ const nestedErrorOf = (error: Loose, body: unknown): Loose | undefined => {
     return isRecord(body) && isRecord(body.error) ? body.error : undefined;
 };
 
+/** OpenAI answers 429 for an account with no quota left, which no wait cures: `error.code` / `error.type` is `insufficient_quota`. */
+const isQuotaExhausted = (error: Loose, body: unknown): boolean => {
+    const nested = nestedErrorOf(error, body);
+
+    return [error.code, error.type, nested?.code, nested?.type].some((code) => typeof code === "string" && code.toLowerCase() === "insufficient_quota");
+};
+
 const isThrottleCode = (error: Loose, body: unknown): boolean => {
     const nested = nestedErrorOf(error, body);
     const codes = [error.code, error.name, nested?.code, nested?.type, nested?.status];
@@ -288,11 +300,21 @@ export const readRateLimit = (error: unknown, now: number = Date.now()): RateLim
     const retryAt = readRetryAt(error, headers, body, now);
     const status = readStatus(error) ?? (isThrottleCode(error, body) ? 429 : undefined);
 
-    if (status === undefined) {
+    if (status === undefined || isQuotaExhausted(error, body)) {
         return undefined;
     }
 
     const isRateLimit = status === 429 || ((status === 408 || status >= 500) && retryAt !== undefined);
 
-    return isRateLimit ? { ...(retryAt !== undefined && { retryAt: Math.max(now, retryAt) }), status } : undefined;
+    if (!isRateLimit) {
+        return undefined;
+    }
+
+    if (retryAt === undefined) {
+        return { status };
+    }
+
+    // A time that is not a number ("Infinity", NaN) means no wait will do: send one far enough out that the backend refuses
+    // it as too long, not nothing, which the backend would read as "no time given" and wait the default for.
+    return { retryAt: Number.isFinite(retryAt) ? Math.max(now, retryAt) : NEVER_AT, status };
 };

@@ -88,6 +88,24 @@ describe("planPause", () => {
         expect(planPause({ ...base, pausedSteps: ["row-1"], rateLimit: { status: 429 } })).toEqual({ pause: false, reason: "step_repeated" });
     });
 
+    it("lets a step that Retry now cut short pause once more, and only once", () => {
+        const rateLimit = { status: 429 };
+
+        expect(planPause({ ...base, earlySteps: ["row-1"], pausedSteps: ["row-1"], rateLimit }).pause).toBe(true);
+        expect(planPause({ ...base, earlySteps: ["row-1"], pausedSteps: ["row-1", "row-1"], rateLimit })).toEqual({ pause: false, reason: "step_repeated" });
+        // The allowance belongs to the step it was given for.
+        expect(planPause({ ...base, earlySteps: ["row-2"], pausedSteps: ["row-1"], rateLimit })).toEqual({ pause: false, reason: "step_repeated" });
+    });
+
+    it("still counts the extra pause toward the cap", () => {
+        const pausedSteps = ["row-1", "row-1", "row-2"];
+
+        expect(planPause({ ...base, earlySteps: ["row-1"], pausedSteps, rateLimit: { status: 429 }, stepKey: "row-3" })).toEqual({
+            pause: false,
+            reason: "too_many_pauses",
+        });
+    });
+
     it("allows the third pause and refuses the fourth", () => {
         const earlier = Array.from({ length: RATE_LIMIT_MAX_PAUSES - 1 }, (_, index) => `earlier-${index}`);
 

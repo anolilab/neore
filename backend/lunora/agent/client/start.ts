@@ -114,6 +114,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
             tools?: Tools;
         };
     fail: (reason: string) => Promise<void>;
+    getPendingMessageId: () => string | undefined;
     getSavedMessages: () => MessageDoc[];
     order: number;
     promptMessageId: string | undefined;
@@ -349,6 +350,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     return {
         args: aiArgs,
         fail,
+        getPendingMessageId: () => pendingMessageId,
         getSavedMessages: () => savedMessages,
         order: order ?? 0,
         promptMessageId,

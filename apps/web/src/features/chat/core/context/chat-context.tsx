@@ -41,7 +41,7 @@ import { mapNavigatorLanguage } from "../utils/language-utilities";
 import { createReadinessGate } from "../utils/readiness-gate";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
-import { toAppError } from "./chat-action-shared";
+import { stopTarget, toAppError } from "./chat-action-shared";
 import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "./chat-context-hooks";
 import type {
     ChatActionsContextValue,
@@ -639,6 +639,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const isStreaming = (Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating)) || isLocalStreaming;
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
+    const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
     const streamingMessageRef = useRef<StreamingMessage | null>(null);
 
     // Posts the media kick-off for a reply `/v1/chat` created. A refusal (the daily limit, a 401, a 404) or a
@@ -737,7 +738,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             streamingMessageRef.current = threadId && streamingId ? { messageId: streamingId, threadId } : null;
         }
 
-        if (streamingMessageRef.current) {
+        const target = stopTarget({ activeStreamId, streamingMessage: streamingMessageRef.current });
+
+        if (target === "message" && streamingMessageRef.current) {
             trackEvent("stream_cancelled", { model });
 
             try {
@@ -750,8 +753,16 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             }
 
             streamingMessageRef.current = null;
+        } else if (target === "thread" && threadId) {
+            trackEvent("stream_cancelled", { model });
+
+            try {
+                await abortThreadStreamMutation({ threadId: threadId as Id<"threads"> });
+            } catch (abortError) {
+                providerLogger.error("[ChatProvider] Failed to abort", { error: abortError });
+            }
         }
-    }, [abortStreamMutation, setIsRegenerating, model, cancelLocalTurn, threadId]);
+    }, [abortStreamMutation, abortThreadStreamMutation, activeStreamId, setIsRegenerating, model, cancelLocalTurn, threadId]);
 
     const reloadMessage = useCallback(
         (messageId: string) =>

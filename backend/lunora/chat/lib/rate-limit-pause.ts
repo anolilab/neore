@@ -17,6 +17,9 @@ export const RATE_LIMIT_MAX_PAUSES = 3;
 /** The wait when a provider answered 429 without saying when to retry. */
 export const RATE_LIMIT_DEFAULT_DELAY_MS = 30 * 1000;
 
+/** A scheduled resume is queued this much after the provider's retry time, so it does not land just before the limit lifts. */
+export const RATE_LIMIT_RESUME_SLACK_MS = 1500;
+
 /** A shorter wait would only hit the same limit again; also keeps a resume off the instant it was paused. */
 export const RATE_LIMIT_MIN_DELAY_MS = 1000;
 
@@ -79,17 +82,27 @@ export type PausePlan = { pause: false; reason: PauseRefusal } | { pause: true; 
  *
  * - `stepKey` names the step that was rejected (the row it continues from); `pausedSteps` are the steps this run
  *   already paused on. A step that is rejected again after its pause fails: one pause per step.
+ * - `earlySteps` are the steps whose pause "Retry now" cut short: the limit may not have lifted yet, so each such step
+ *   may pause once more. The extra pause is in `pausedSteps` too, so the cap below still bounds it.
  * - A pause longer than {@link RATE_LIMIT_MAX_PAUSE_MS}, or a fourth one, fails the run.
  */
-export const planPause = (input: { now: number; pausedSteps: ReadonlyArray<string>; rateLimit: ProviderRateLimit; stepKey: string }): PausePlan => {
-    const { now, pausedSteps, rateLimit, stepKey } = input;
+export const planPause = (input: {
+    earlySteps?: ReadonlyArray<string>;
+    now: number;
+    pausedSteps: ReadonlyArray<string>;
+    rateLimit: ProviderRateLimit;
+    stepKey: string;
+}): PausePlan => {
+    const { earlySteps = [], now, pausedSteps, rateLimit, stepKey } = input;
     const retryAt = Math.max(rateLimit.retryAt ?? now + RATE_LIMIT_DEFAULT_DELAY_MS, now + RATE_LIMIT_MIN_DELAY_MS);
 
     if (retryAt - now > RATE_LIMIT_MAX_PAUSE_MS) {
         return { pause: false, reason: "too_long" };
     }
 
-    if (pausedSteps.includes(stepKey)) {
+    const count = (steps: ReadonlyArray<string>) => steps.filter((step) => step === stepKey).length;
+
+    if (count(pausedSteps) > count(earlySteps)) {
         return { pause: false, reason: "step_repeated" };
     }
 

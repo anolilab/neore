@@ -15,7 +15,8 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
 import { patchRow } from "../../../lib/patch";
-import { planPause } from "../../lib/rate-limit-pause";
+import { scheduleRepliesUsage } from "../../lib/pause-usage";
+import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
@@ -223,7 +224,14 @@ export const stopActiveForThread = internalMutation
 
             const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-            await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
+            // A run that is waiting out a rate limit has no run left to record the steps it finished: do it here, once.
+            const waiting = stream.pause !== undefined && stream.pausedRun !== undefined;
+
+            if (waiting) {
+                await recordPausedRun(ctx, stream);
+            }
+
+            await patchRow(ctx.db, stream, { status: "done", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
         }
 
         // The thread leaves `running` only when no live reply is left to keep running.
@@ -570,6 +578,9 @@ export const getChunksAfter = internalQuery
 
 const isLiveStream = (stream: { status: string }): boolean => stream.status === "pending" || stream.status === "streaming";
 
+/** A pause this far past its retry time has lost its resume (a dead-lettered or dropped job): "Retry now" queues another. */
+const RESUME_OVERDUE_MS = 30 * 1000;
+
 /** A reply row the model never wrote into: the placeholder a step opens before its call, left behind when that call is rejected. */
 const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
     const message = row.message as { content?: unknown; role?: string } | undefined;
@@ -587,6 +598,71 @@ const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pau
     await enqueueJob(internal.chat.execute.runStreamingAgent, { ...pause.run, resume: pause.id }, { delayMs });
 };
 
+/**
+ * Record the reply a paused run saved before its pause, for a pause that will never resume. The rows are the reply's
+ * (`pausedRun`); the run that would have ended it records them itself, so a caller clears `pausedRun` after this.
+ */
+const recordPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+    const paused = stream.pausedRun;
+
+    if (!paused) {
+        return;
+    }
+
+    const found = await Promise.all(paused.replyRowIds.map(async (id) => await ctx.db.get(id as Id<"messages">)));
+    const docs = found.filter((row) => row !== null);
+    // The stored `message` is the AI SDK's, wider than the usage record reads: only its role is.
+    const rows = docs.map((row) => {
+        return {
+            _id: row._id,
+            message: row.message as { role?: string } | null | undefined,
+            order: row.order,
+            providerMetadata: row.providerMetadata,
+            usage: row.usage,
+        };
+    });
+
+    scheduleRepliesUsage(ctx.scheduler as never, rows, {
+        at: ctx.now,
+        userId: stream.pause?.run.userId ?? stream.userId,
+        ...(paused.skill && { skill: paused.skill }),
+        ...(paused.timeZone && { timeZone: paused.timeZone }),
+    });
+};
+
+/**
+ * The paused run's reply can no longer be continued: the row it continues from is gone, or the thread has a later stream
+ * (a regenerate, an edit, a new message), which makes this reply a branch nobody is reading. Streams are created in order,
+ * so a later one is the latest by creation time; ties fail closed.
+ */
+const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, from: string): Promise<boolean> => {
+    const threadId = stream.threadId as Id<"threads">;
+    const anchor = await ctx.db.messages.findFirst({ where: { _id: from as Id<"messages">, threadId } });
+
+    if (!anchor) {
+        return true;
+    }
+
+    const { page } = await ctx.db.persistentStreams.findMany({ limit: 3, orderBy: [{ _creationTime: "desc" }], where: { threadId: stream.threadId } });
+
+    return page.some((other) => other._id !== stream._id && other._creationTime >= stream._creationTime);
+};
+
+/** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
+const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+    await recordPausedRun(ctx, stream);
+    await patchRow(ctx.db, stream, { pausedRun: undefined, status: "done" });
+
+    const { page } = await ctx.db.persistentStreams.findMany({
+        limit: 2,
+        where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId },
+    });
+
+    if (page.every((other) => other._id === stream._id)) {
+        await patchThread(ctx.db, stream.threadId as Id<"threads">, { status: "active", updatedAt: ctx.now });
+    }
+};
+
 const vPauseOutcome = v.object({
     paused: v.boolean(),
     reason: v.optional(v.union(v.literal("not_live"), v.literal("steered"), v.literal("step_repeated"), v.literal("too_long"), v.literal("too_many_pauses"))),
@@ -600,16 +676,25 @@ const vPauseOutcome = v.object({
  *
  * Refused when the stream is not live (a stop got there first), when a steered message was delivered into the run (the
  * resume would put its rows under the wrong prompt), or when the caps in `planPause` say so.
+ *
+ * `replyRowIds` and `stepsUsed` are what THIS invocation of the run did; they are added to what the earlier ones did
+ * (`pausedRun`), so the resume knows how many steps are left and the run can record one reply when it ends.
  */
 export const pauseRunForRateLimit = internalMutation
     .input({
         /** The row the rejected step continues from: the last row this run saved, else the prompt. */
         from: v.string().max(MAX_LENGTH.id),
+        /** The row the rejected step opened before its call, if it opened one: the only row a pause removes. */
+        placeholderId: v.optional(v.string().max(MAX_LENGTH.id)),
         provider: v.optional(v.string().max(MAX_LENGTH.short)),
+        replyRowIds: v.array(v.string().max(MAX_LENGTH.id)),
         retryAt: v.optional(v.number()),
         run: v.object({ ...runStreamingAgentFields }),
+        skill: v.optional(v.object({ id: v.optional(v.string().max(MAX_LENGTH.id)), name: v.string().max(MAX_LENGTH.short) })),
         status: v.number(),
+        stepsUsed: v.number(),
         streamId: v.id("persistentStreams"),
+        timeZone: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(vPauseOutcome)
     .mutation(async ({ args, ctx }) => {
@@ -627,6 +712,7 @@ export const pauseRunForRateLimit = internalMutation
         // after its pause is not paused on twice.
         const stepKey = args.from;
         const plan = planPause({
+            earlySteps: stream.earlySteps ?? [],
             now: ctx.now,
             pausedSteps: stream.pausedSteps ?? [],
             rateLimit: { ...(args.retryAt !== undefined && { retryAt: args.retryAt }), status: args.status },
@@ -637,26 +723,24 @@ export const pauseRunForRateLimit = internalMutation
             return { paused: false, reason: plan.reason };
         }
 
-        // The rejected step opened a placeholder under `from` before its call (the agent marks it failed when the call
-        // is rejected). The resume opens its own, so this one goes, or the reply would show an error beside the answer.
-        // Only a placeholder directly under `from` is this run's: a sibling reply's is left alone.
+        // The rejected step opened a placeholder before its call (the agent marks it failed when the call is rejected).
+        // The resume opens its own, so this one goes, or the reply would show an error beside the answer. Only the row
+        // this run named goes: a sibling reply's failed row, or another run's placeholder, shares its prompt and order.
         const threadId = stream.threadId as Id<"threads">;
-        const prompt = await ctx.db.messages.findFirst({ where: { _id: stream.messageId as Id<"messages">, threadId } });
-        const { page: siblings } = prompt ? await ctx.db.messages.findMany({ where: { order: prompt.order, threadId } }) : { page: [] };
+        const placeholder = args.placeholderId ? await ctx.db.messages.findFirst({ where: { _id: args.placeholderId as Id<"messages">, threadId } }) : null;
 
-        for (const row of siblings) {
-            if (!isEmptyPlaceholder(row)) {
-                continue;
-            }
-
-            const parent = await parentOf(ctx, threadId, row);
-
-            if (parent?._id === args.from) {
-                await removeEmptyPending(ctx, threadId, row);
-            }
+        if (placeholder && isEmptyPlaceholder(placeholder)) {
+            await removeEmptyPending(ctx, threadId, placeholder);
         }
 
+        const earlier = stream.pausedRun;
         const pausedSteps = [...(stream.pausedSteps ?? []), stepKey];
+        const pausedRun = {
+            replyRowIds: [...new Set([...(earlier?.replyRowIds ?? []), ...args.replyRowIds])],
+            stepsUsed: (earlier?.stepsUsed ?? 0) + args.stepsUsed,
+            ...((args.skill ?? earlier?.skill) && { skill: args.skill ?? earlier?.skill }),
+            ...((args.timeZone ?? earlier?.timeZone) && { timeZone: args.timeZone ?? earlier?.timeZone }),
+        };
         const pause = {
             from: args.from,
             id: `${ctx.now}-${pausedSteps.length}`,
@@ -667,20 +751,35 @@ export const pauseRunForRateLimit = internalMutation
             status: args.status,
         };
 
-        await ctx.db.patch(stream._id, { expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS), pause, pausedSteps });
-        await enqueueRunResume(pause, plan.retryAt - ctx.now);
+        await ctx.db.patch(stream._id, { expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS), pause, pausedRun, pausedSteps });
+        // A moment after the provider's time, so the resume does not land just before the limit lifts.
+        await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
 
         return { paused: true, retryAt: plan.retryAt };
     });
 
+const vResumeClaim = v.object({
+    from: v.string(),
+    /** The reply rows the run saved before this pause (all pauses): the resume records one reply covering them and its own. */
+    replyRowIds: v.array(v.string()),
+    skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })),
+    /** Steps the run already ran: the resume gets only the rest of the step cap. */
+    stepsUsed: v.number(),
+    timeZone: v.optional(v.string()),
+});
+
 /**
  * The resume job's claim, the pause's counterpart of `claimStreamRun`: only the job that names the stream's CURRENT pause
- * gets it, and only once; it answers with the row the run continues from, or `null` when the claim is not its. A redelivery, the delayed job after "Retry now" already resumed the run, and a late job of an
- * earlier pause all find the pause gone (or another id) and must do nothing. A stream a stop ended is not live.
+ * gets it, and only once; it answers with where the run continues, or `null` when the claim is not its. A redelivery, the
+ * delayed job after "Retry now" already resumed the run, and a late job of an earlier pause all find the pause gone (or
+ * another id) and must do nothing. A stream a stop ended is not live.
+ *
+ * A pause whose conversation moved on while it waited (`isSuperseded`) is not resumed: the claim ends the run, records
+ * what it did and frees the thread, and answers `null` too.
  */
 export const claimRunResume = internalMutation
     .input({ pauseId: v.string().max(MAX_LENGTH.short), streamId: v.id("persistentStreams") })
-    .output(v.union(v.object({ from: v.string() }), v.null()))
+    .output(v.union(vResumeClaim, v.null()))
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
@@ -688,16 +787,37 @@ export const claimRunResume = internalMutation
             return null;
         }
 
+        const { from } = stream.pause;
+
+        if (await isSuperseded(ctx, stream, from)) {
+            await endPausedRun(ctx, stream);
+
+            return null;
+        }
+
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
         await patchRow(ctx.db, stream, { expiresAt: ctx.now + STREAM_TTL_MS, pause: undefined });
 
-        return { from: stream.pause.from };
+        const done = stream.pausedRun;
+
+        return {
+            from,
+            replyRowIds: done?.replyRowIds ?? [],
+            ...(done?.skill && { skill: done.skill }),
+            stepsUsed: done?.stepsUsed ?? 0,
+            ...(done?.timeZone && { timeZone: done.timeZone }),
+        };
     });
 
 /**
  * "Retry now": every live stream of the thread that is waiting out a rate limit resumes at once. The wait is ended by
  * queueing the same resume the pause queued — the claim (`claimRunResume`) lets the first of the two run it and drops the
- * other. Asking again once the wait has ended queues nothing. Returns whether a run was resumed.
+ * other. Asking again once the wait has ended queues nothing, except for a pause whose resume is overdue by
+ * {@link RESUME_OVERDUE_MS}: it was lost, and another is queued (the claim keeps two from both running). Returns whether
+ * a run was resumed.
+ *
+ * Cutting a wait short may hit the same limit again, so that step may pause once more (`earlySteps`); a resume that
+ * waited the whole pause out gets no such allowance.
  */
 export const retryPausedRunsNow = internalMutation
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
@@ -712,13 +832,19 @@ export const retryPausedRunsNow = internalMutation
         for (const stream of page) {
             const { pause } = stream;
 
-            if (!pause || pause.retryAt <= ctx.now) {
+            if (!pause) {
+                continue;
+            }
+
+            const early = pause.retryAt > ctx.now;
+
+            if (!early && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
                 continue;
             }
 
             const due = { ...pause, retryAt: ctx.now };
 
-            await ctx.db.patch(stream._id, { pause: due });
+            await ctx.db.patch(stream._id, { pause: due, ...(early && { earlySteps: [...(stream.earlySteps ?? []), pause.from] }) });
             await enqueueRunResume(due, 0);
             resumed = true;
         }

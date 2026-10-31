@@ -53,6 +53,7 @@ import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { pauseOnRateLimit } from "./lib/pause-run";
+import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
 import { toUserFacingError } from "./lib/user-facing-error";
 
@@ -84,6 +85,8 @@ export const runStreamingAgent = internalAction
         // resumes a run paused on a rate limit (`resume`) claims that pause
         // instead, and learns which row the run continues from.
         let resumedFrom: string | undefined;
+        // What the run did before its pauses: the reply rows it saved, the steps it ran, what its usage record needs.
+        let before: { replyRowIds: string[]; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string } = { replyRowIds: [], stepsUsed: 0 };
 
         if (resume === undefined) {
             if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
@@ -104,7 +107,17 @@ export const runStreamingAgent = internalAction
             }
 
             resumedFrom = claim.from;
+            before = claim;
         }
+
+        // The reply's earlier rows, so the run records ONE reply covering them and its own steps. Best-effort: usage is not worth the run.
+        const priorRows =
+            before.replyRowIds.length > 0
+                ? await ctx
+                      .runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: before.replyRowIds as Id<"messages">[] })
+                      .then((rows) => rows.filter((row) => row !== null))
+                      .catch(() => [])
+                : [];
 
         const startTime = Date.now();
         let mcpClients: import("@ai-sdk/mcp").MCPClient[] = [];
@@ -267,6 +280,8 @@ export const runStreamingAgent = internalAction
 
             // Build agent
             const isAutoContinue = streamingConfig.shouldAutoContinue === true;
+            // The step cap is for the whole reply: a run resumed after a pause gets what the earlier steps left.
+            const maxSteps = Math.max(1, getMaxSteps(isAutoContinue) - before.stepsUsed);
 
             const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, agentModulePrefs.modelFilterRules ?? {});
             const agent = await getAgent(model, {
@@ -277,7 +292,7 @@ export const runStreamingAgent = internalAction
                 gateway: gatewayFetch(ctx),
                 language: prefs.language,
                 location: prefs.location,
-                maxSteps: getMaxSteps(isAutoContinue),
+                maxSteps,
                 modelFilterRules: agentModulePrefs.modelFilterRules ?? undefined,
                 personalization: prefs.personalization,
                 skillContext: invokedSkill ? { config: invokedSkill.config, instructions: invokedSkill.instructions } : undefined,
@@ -350,7 +365,17 @@ export const runStreamingAgent = internalAction
             const stopping = new AbortController();
 
             streamTextArgs.abortSignal = stopping.signal;
-            streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(isAutoContinue));
+            // The steps this invocation finished: a pause carries the count to its resume.
+            const stepsFinished = { count: 0 };
+
+            streamTextArgs.stopWhen = [
+                ...stopWhenStopped(ctx, streamId, maxSteps),
+                ({ steps }: { steps: ReadonlyArray<unknown> }) => {
+                    stepsFinished.count = steps.length;
+
+                    return false;
+                },
+            ];
             const result = await threadObject.streamText(streamTextArgs, {
                 admittedRun: true,
                 statelessMode: threadStatelessMode,
@@ -361,13 +386,15 @@ export const runStreamingAgent = internalAction
             const timingStart = Date.now();
             let piped: PipedStream;
 
+            const skill = invokedSkill ? { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } : undefined;
             // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
             const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
                 await afterRun(ctx, {
                     knowledgeSources: runContext.knowledgeSources,
                     retrievedMemories: runContext.retrievedMemories,
-                    savedMessages: result.savedMessages,
-                    ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
+                    // A run resumed after a pause records the whole reply: its earlier rows come first, so the key is the reply's first row.
+                    savedMessages: [...priorRows, ...(result.savedMessages ?? [])],
+                    ...(skill && { skill }),
                     steeredTexts: steering.steeredTexts(),
                     threadId,
                     ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
@@ -399,18 +426,25 @@ export const runStreamingAgent = internalAction
                     !threadStatelessMode &&
                     (await pauseOnRateLimit(ctx, {
                         error,
-                        from: result.savedMessages?.at(-1)?._id ?? resumedFrom ?? messageId,
+                        progress: () => {
+                            const saved = result.savedMessages ?? [];
+
+                            return {
+                                from: saved.at(-1)?._id ?? resumedFrom ?? messageId,
+                                placeholderId: result.getPendingMessageId(),
+                                replyRowIds: saved.map((row) => row._id),
+                                stepsUsed: stepsFinished.count,
+                            };
+                        },
+                        reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
                         run: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
                         settle: async () => await result.consumeStream(),
                         streamId,
                     }));
 
+                // The steps that finished are not recorded yet: the reply is one reply, recorded when the run ends (or, if
+                // it never resumes, by whatever ends it).
                 if (paused) {
-                    // The steps that finished before the pause are a reply like any other on the usage page.
-                    if ((result.savedMessages?.length ?? 0) > 0) {
-                        await recordRun({ extractMemory: false, firstTokenTime: undefined, prompt: "" });
-                    }
-
                     return;
                 }
 
@@ -503,6 +537,14 @@ export const runStreamingAgent = internalAction
             }
 
             await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "error" });
+
+            // A run that failed after its pause still answered with the steps from before it: those are its reply.
+            scheduleRepliesUsage(ctx.scheduler as never, priorRows, {
+                at: Date.now(),
+                userId,
+                ...(before.skill && { skill: before.skill }),
+                ...(before.timeZone && { timeZone: before.timeZone }),
+            });
         } finally {
             await closeMCPClients(mcpClients);
         }

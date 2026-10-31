@@ -165,6 +165,29 @@ describe("readRateLimit: what counts", () => {
         expect(readRateLimit(new Error("rate limit mentioned in passing"), NOW)).toBeUndefined();
     });
 
+    it("a non-finite retry time is sent as one too far out to wait, never dropped", () => {
+        const limited = Object.assign(new Error("slow"), { retryAfter: Infinity, statusCode: 429 });
+
+        expect(readRateLimit(limited, NOW)).toEqual({ retryAt: Number.MAX_SAFE_INTEGER, status: 429 });
+    });
+
+    it("skips a protobuf delay that is not a number and reads the next source", () => {
+        const body = { error: { details: [{ retryDelay: { seconds: "Infinity" } }], message: "Please try again in 5s" } };
+
+        expect(readRateLimit(rejection(429, { body }), NOW)).toEqual({ retryAt: NOW + 5000, status: 429 });
+        expect(readRateLimit(rejection(429, { body: { error: { details: [{ retryDelay: { seconds: "Infinity" } }] } } }), NOW)).toEqual({ status: 429 });
+    });
+
+    it("does not treat a 429 for an account with no quota left as a rate limit", () => {
+        const quota = { error: { code: "insufficient_quota", message: "You exceeded your current quota", type: "insufficient_quota" } };
+
+        expect(readRateLimit(rejection(429, { body: quota }), NOW)).toBeUndefined();
+        expect(readRateLimit(rejection(429, { body: { error: { type: "insufficient_quota" } } }), NOW)).toBeUndefined();
+        expect(readRateLimit(Object.assign(new Error("quota"), { code: "insufficient_quota", statusCode: 429 }), NOW)).toBeUndefined();
+        // Another 429 body from the same provider still is one.
+        expect(readRateLimit(rejection(429, { body: { error: { code: "rate_limit_exceeded", type: "requests" } } }), NOW)).toEqual({ status: 429 });
+    });
+
     it("returns nothing for what is not an object", () => {
         expect(readRateLimit(undefined, NOW)).toBeUndefined();
         expect(readRateLimit("429", NOW)).toBeUndefined();
