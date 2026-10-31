@@ -1387,6 +1387,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sub_agents_functions:dispatchToWorker": lunora_sub_agents_functions_184.dispatchToWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_184.getRunByToolCall as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:getWorker": lunora_sub_agents_functions_184.getWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:isHostWorker": lunora_sub_agents_functions_184.isHostWorker as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:listActiveWorkerRuns": lunora_sub_agents_functions_184.listActiveWorkerRuns as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:listWorkers": lunora_sub_agents_functions_184.listWorkers as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:messageWorker": lunora_sub_agents_functions_184.messageWorker as unknown as RegisteredLunoraFunction,
@@ -8098,7 +8099,7 @@ export interface Caller {
             startHostSession: (args: { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }) => Promise<{ started: boolean; threadId?: string }>;
         };
         send: {
-            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
+            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" | "worker_thread" }>;
         };
         upload: {
             finalizeHostUpload: (args: { filename: string; uploadId: string; userId: string }) => Promise<null | { fileId: string; mediaType: string; storageKey: string }>;
@@ -9174,7 +9175,7 @@ export interface Caller {
             searchSharedCollections: (args: { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
         summarize: {
-            resummarizeFile: (args: { knowledgeFileId: Id<"knowledgeFiles"> }) => Promise<{ error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "reference" | "other" | "data" | "code" | "technical_doc" | "article" | "report" | "guide" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;
+            resummarizeFile: (args: { knowledgeFileId: Id<"knowledgeFiles"> }) => Promise<{ error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "reference" | "data" | "code" | "other" | "technical_doc" | "article" | "report" | "guide" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;
             summarizeCollection: (args: { userId: string }) => Promise<{ fileCount: number; summary: string; topics?: undefined; } | { fileCount: number; summary: string; topics: string[]; }>;
         };
     };
@@ -9630,14 +9631,15 @@ export interface Caller {
             cancelRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ cancelled: boolean }>;
             claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ childThreadId?: string; clientId?: string; depth: number; dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
-            createRun: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
-            createWorker: (args: { clientId: string; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string>; unlockProof?: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
+            createRun: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            createWorker: (args: { clientId: string; host?: { agentKey: string; deviceId: string; folderId: string }; leadThreadId: Id<"threads">; model?: string; name: string; skill?: string; task: string; toolAllowlist?: Array<string>; unlockProof?: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             dispatchToWorker: (args: { clientId: string; message: string; workerId: Id<"threads"> }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string }>;
             getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
             getWorker: (args: { workerId: Id<"threads"> }) => Promise<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; followUp: "none" | "queue" | "steer" | "steer-restart"; lastActivityAt: number | null; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; postFailed: string | null; queuedRuns: number; quietAfterMs: number; runs: Array<{ createdAt: number; delivery: "failed" | "none" | "pending" | "posted"; dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent" | null; runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string }>; state: "idle" | "queued" | "running"; stopping: boolean; workerId: string } | null>;
+            isHostWorker: (args: { userId: string; workerId: string }) => Promise<boolean>;
             listActiveWorkerRuns: (args?: {}) => Promise<Array<{ createdAt: number; leadThreadId: string; name: string; runId: Id<"subAgentRuns">; startedAt: number | null; status: "queued" | "running"; workerId: string }>>;
             listWorkers: (args: { leadThreadId: Id<"threads">; unlockProof?: string }) => Promise<Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; followUp: "none" | "queue" | "steer" | "steer-restart"; lastActivityAt: number | null; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; postFailed: string | null; queuedRuns: number; quietAfterMs: number; runs: Array<{ createdAt: number; delivery: "failed" | "none" | "pending" | "posted"; dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent" | null; runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string }>; state: "idle" | "queued" | "running"; stopping: boolean; workerId: string }>>;
-            messageWorker: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
+            messageWorker: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
             setWorkerPolicy: (args: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; leadThreadId: Id<"threads">; maxDispatchesPerHour?: number; unlockProof?: string }) => Promise<null>;
@@ -9807,7 +9809,7 @@ export interface Caller {
             updateGalleryMeta: (args: { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }) => Promise<{ success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "image" | "file" | "output" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         media_ops: {
             extractVideoFrame: (args: { charge?: { costMicrodollars: number; orgId: string; requestId: string }; frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }) => Promise<{ fileId: string; mimeType: string }>;
@@ -11427,6 +11429,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             dispatchToWorker: (args) => callRegistered(context, "sub_agents_functions:dispatchToWorker", args),
             getRunByToolCall: (args) => callRegistered(context, "sub_agents_functions:getRunByToolCall", args),
             getWorker: (args) => callRegistered(context, "sub_agents_functions:getWorker", args),
+            isHostWorker: (args) => callRegistered(context, "sub_agents_functions:isHostWorker", args),
             listActiveWorkerRuns: (args) => callRegistered(context, "sub_agents_functions:listActiveWorkerRuns", args),
             listWorkers: (args) => callRegistered(context, "sub_agents_functions:listWorkers", args),
             messageWorker: (args) => callRegistered(context, "sub_agents_functions:messageWorker", args),

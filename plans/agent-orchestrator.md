@@ -328,6 +328,19 @@ capability-gated steer.
   `messageWorker` to a host worker asks for approval even when configured `on`;
   a headless lead has no path to a host worker.
 
+- Built: `runner.kind = "host"` takes a `host: { deviceId, agentKey, folderId }` on `createWorker` and on
+  `delegateToSubAgent` (with `persistent`). Admission refuses a pair the computer did not offer, an offline computer
+  and a source other than `lead`/`user`, and writes the child thread (`runner: "host"`), its `acpSessions` row and the
+  signed `acp_start` in one transaction (a refused start throws, taking all of it back). A run is started in the
+  transaction that claims it: the same `acp_send` as `/hosts/send`, no charge, and a host that cannot be reached
+  (offline, busy, no session) fails the run at once through `finishRun`, so the lead gets the per-run failure post. The
+  turn's end (`turn_end`, the reaper, a revoke, Stop, a deleted thread) finishes the run that sent it (`hostTurnId`).
+  A stop or a stale-run failure on this side cancels the turn on the computer and releases the line at once.
+  `messageWorker` and `delegateToSubAgent` carry a `needsApproval` function that asks for a host target whatever the
+  mode or a timed allow says; a headless run is not asked and `headless` makes admission refuse it.
+  `/hosts/send` refuses a worker's thread. Left out: no UI to pick a computer when creating a worker, and the model
+  has no tool to list the offered pairs (a refused pair names none).
+
 **S6 — Stop and stuck runs.** `stopWorker`, the worker-thread stop control, the
 quiet notice.
 - Acceptance: `current` stops only the active run; `all_queued` also cancels the
@@ -342,8 +355,8 @@ quiet notice.
   the queue reaches it. `SUB_WORKER_QUIET_MS` (20 min) is provisional: it is not measured against real
   quiet gaps yet. `getWorker` and `listWorkers` return `lastActivityAt` (running run only) and
   `quietAfterMs`; the client counts the minutes, since a live query does not re-run with the clock.
-- Left for S5: a host run's activity is its host events, read where `workerActivityAt` reads the
-  thread; the quiet notice and the stale clock both pause while a host run waits on a person, which
+- Done in S5: a host run's activity is its host events, read where `workerActivityAt` reads the
+  thread (`workerActivity`); the quiet notice and the stale clock both pause while a host run waits on a person, which
   a headless run cannot do (it drops `ask` tools); a host run whose host goes away fails at once with
   "host did not answer" and posts to the lead as a failure.
 
@@ -356,7 +369,7 @@ quiet notice.
   `pending`, `failed`, or `none` when the lead never asked), and the worker thread shows them.
   `finishRun` posts inline and `postRunResult` answers a refusal rather than throwing, so a result
   that cannot land ends in its own `postFailed` and never holds the line.
-- Left for S5: a host run whose host goes away fails with "host did not answer" and posts to the
+- Done in S5: a host run whose host goes away fails with "host did not answer" and posts to the
   lead as a failure, through the same `finishRun` and per-run post.
 
 **S8 — Dispatch policy and attribution.** `workerPolicy`, `dispatchedBy`, the
@@ -375,7 +388,7 @@ quiet notice.
   (at most 60) is counted from the lead's runs in the last hour. The "sent by" label is per run in
   the worker thread; per-message labels need metadata on the saved prompt row and are a follow-up.
   There is no UI to edit the policy yet.
-- Left for S5: a dispatch to a host worker asks for approval even when the policy would allow it
+- Done in S5: a dispatch to a host worker asks for approval even when the policy would allow it
   (`hostDispatch` is the literal `ask`; the tool's forced `ask` for a host runner is S5's), and
   `outside_agent` is already refused for a host runner in `dispatchSourceProblem`.
 

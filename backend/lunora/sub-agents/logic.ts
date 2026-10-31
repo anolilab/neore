@@ -259,18 +259,24 @@ export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt
  * that is still writing is left alone and checked again when its quiet window would end, a run quiet
  * for the whole window is failed, and a queued one is never reaped, since its clock has not started
  * (a stop, or the queue reaching it, ends it). A run stopped while running is judged the same way:
- * its loop is gone only once it has been quiet for the window.
+ * its loop is gone only once it has been quiet for the window. A host run waiting on a person is checked again later and never failed for it.
  * `lastActivityAt` is the newest message in the worker's thread; `startedAt` floors it.
  */
 export const workerReapDecision = (input: {
     lastActivityAt: number | undefined;
     now: number;
     run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus };
+    /** A host run whose agent waits on a person's answer: the person holds it up, so its clock does not run. */
+    waitingOnPerson?: boolean;
 }): { kind: "fail" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
     const { run } = input;
 
     if (!isWorkerLoopLive(run) || run.startedAt === undefined) {
         return { kind: "skip" };
+    }
+
+    if (input.waitingOnPerson) {
+        return { delayMs: SUB_AGENT_STALE_MS, kind: "later" };
     }
 
     const quietFor = input.now - Math.max(run.startedAt, input.lastActivityAt ?? 0);

@@ -9,13 +9,12 @@
  * rather than waiting for the ten-minute housekeeping sweep (that sweep still reaps one through
  * `cleanupExpiredStreams`, as a backstop).
  */
-import type { Doc, Id } from "../../_generated/dataModel";
+import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { extendHostStream } from "../../chat/streaming/persistent/host";
 import { HOST_TURN_MAX_MS } from "./constants";
 import { withdrawSend } from "./withdraw";
 import { endHostTurn, sendHostCancel } from "./finish";
-import { sessionOfThread, touchSession } from "./sessions";
 
 const REAP_BATCH = 100;
 
@@ -37,29 +36,14 @@ export const expireHostStream = async (ctx: MutationCtx, stream: Stream, now: nu
     // The host never acknowledged the prompt (`accepted`): it did not answer, and the prompt must not run later.
     if (stream.hostState === "accepted") {
         await withdrawSend(ctx, stream, now);
-
-        if (await endHostTurn(ctx, stream, { error: "The host did not answer.", reason: "failed" }, now)) {
-            const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
-
-            if (session) {
-                await touchSession(ctx, session, "idle", now);
-            }
-        }
+        await endHostTurn(ctx, stream, { error: "The host did not answer.", idle: true, reason: "failed" }, now);
 
         return;
     }
 
-    if (!(await endHostTurn(ctx, stream, { reason: "timeout" }, now))) {
-        return;
+    if (await endHostTurn(ctx, stream, { idle: true, reason: "timeout" }, now)) {
+        await sendHostCancel(ctx, stream, now);
     }
-
-    const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
-
-    if (session) {
-        await touchSession(ctx, session, "idle", now);
-    }
-
-    await sendHostCancel(ctx, stream, now);
 };
 
 /** Reaps the expired host streams of this shard. Returns when the next live one expires, to re-arm the tick. */

@@ -31,11 +31,6 @@
       "to": "table:persistentStreams"
     },
     {
-      "from": "function:acp_remote:startHostSession",
-      "kind": "write",
-      "to": "table:acpSessions"
-    },
-    {
       "from": "function:acp_upload:finalizeHostUpload",
       "kind": "call",
       "to": "function:lib_action_cache:get"
@@ -6437,6 +6432,11 @@
     },
     {
       "from": "function:sub_agents_functions:getWorker",
+      "kind": "read",
+      "to": "table:subAgentRuns"
+    },
+    {
+      "from": "function:sub_agents_functions:isHostWorker",
       "kind": "read",
       "to": "table:subAgentRuns"
     },
@@ -15151,6 +15151,13 @@
     },
     {
       "detail": "query",
+      "id": "function:sub_agents_functions:isHostWorker",
+      "kind": "function",
+      "name": "sub_agents.functions.isHostWorker",
+      "module": "sub-agents"
+    },
+    {
+      "detail": "query",
       "id": "function:sub_agents_functions:listActiveWorkerRuns",
       "kind": "function",
       "name": "sub_agents.functions.listActiveWorkerRuns",
@@ -17365,21 +17372,27 @@
       "reason": "\"touchSession\" is not a registered function"
     },
     {
+      "file": "acp/lib/start-session",
+      "kind": "write",
+      "line": 18,
+      "reason": "\"openHostSession\" is not a registered function"
+    },
+    {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 50,
+      "line": 52,
       "reason": "\"endHostThread\" is not a registered function"
     },
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 71,
+      "line": 73,
       "reason": "\"restoreHostThread\" is not a registered function"
     },
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 208,
+      "line": 193,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
@@ -19035,163 +19048,163 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 256,
+      "line": 261,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 347,
+      "line": 352,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 383,
+      "line": 388,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 384,
+      "line": 389,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 392,
+      "line": 397,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 411,
+      "line": 416,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 544,
+      "line": 549,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 579,
+      "line": 584,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 590,
+      "line": 595,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 605,
+      "line": 610,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 617,
+      "line": 622,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 638,
+      "line": 643,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 759,
+      "line": 764,
       "reason": "\"createRunSteering\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 811,
+      "line": 816,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 818,
+      "line": 823,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 830,
+      "line": 835,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 882,
+      "line": 887,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 976,
+      "line": 981,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 983,
+      "line": 988,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1075,
+      "line": 1080,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1182,
+      "line": 1187,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1207,
+      "line": 1212,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1214,
+      "line": 1219,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1225,
+      "line": 1230,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1235,
+      "line": 1240,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1241,
+      "line": 1246,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1255,
+      "line": 1260,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -19257,31 +19270,31 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 166,
+      "line": 167,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 250,
+      "line": 252,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 269,
+      "line": 271,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 306,
+      "line": 308,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 324,
+      "line": 326,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -19677,7 +19690,7 @@
     {
       "file": "chat/tools/delegate-to-sub-agent",
       "kind": "call",
-      "line": 68,
+      "line": 81,
       "reason": "the default export is not a registered function"
     },
     {
@@ -19719,7 +19732,13 @@
     {
       "file": "chat/tools/message-worker",
       "kind": "call",
-      "line": 38,
+      "line": 39,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "chat/tools/message-worker",
+      "kind": "call",
+      "line": 73,
       "reason": "the default export is not a registered function"
     },
     {
@@ -21771,211 +21790,205 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 106,
+      "line": 112,
       "reason": "\"admitSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 106,
+      "line": 112,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 125,
+      "line": 131,
       "reason": "\"admitSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 125,
+      "line": 131,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 286,
+      "line": 306,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 304,
+      "line": 324,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 304,
+      "line": 324,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 304,
+      "line": 324,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 304,
+      "line": 324,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 304,
+      "line": 324,
       "reason": "\"finishRunFromLoop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 313,
+      "line": 333,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 313,
+      "line": 333,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 313,
+      "line": 333,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 313,
+      "line": 333,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 313,
+      "line": 333,
       "reason": "\"finishRunFromLoop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 328,
+      "line": 348,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 328,
+      "line": 348,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 328,
+      "line": 348,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 328,
+      "line": 348,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 328,
+      "line": 348,
       "reason": "\"finishRunFromLoop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 351,
+      "line": 377,
       "reason": "\"dispatchWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 351,
+      "line": 377,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 351,
+      "line": 377,
       "reason": "\"finishRunFromLoop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 357,
-      "reason": "\"isWorkerThread\" is not a registered function"
-    },
-    {
-      "file": "sub-agents/functions",
-      "kind": "read",
-      "line": 373,
+      "line": 408,
       "reason": "\"admitSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 373,
+      "line": 408,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 386,
+      "line": 421,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 400,
+      "line": 435,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 428,
+      "line": 492,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "write",
-      "line": 605,
+      "line": 713,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 743,
+      "line": 864,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 943,
+      "line": 1075,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 972,
+      "line": 1104,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1106,
+      "line": 1250,
       "reason": "\"reapSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1154,
+      "line": 1298,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
@@ -21995,6 +22008,24 @@
       "kind": "write",
       "line": 42,
       "reason": "\"pruneSubAgentRunsBefore\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/host-runs",
+      "kind": "write",
+      "line": 52,
+      "reason": "\"sendHostRunTurn\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/host-runs",
+      "kind": "read",
+      "line": 66,
+      "reason": "\"findRunningHostRun\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/worker-thread",
+      "kind": "read",
+      "line": 5,
+      "reason": "\"isWorkerThread\" is not a registered function"
     },
     {
       "file": "system-prompts/gdpr",

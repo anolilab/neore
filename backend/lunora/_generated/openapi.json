@@ -47789,6 +47789,25 @@
                       "clientId": {
                         "type": "string"
                       },
+                      "host": {
+                        "properties": {
+                          "agentKey": {
+                            "type": "string"
+                          },
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "folderId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "agentKey",
+                          "deviceId",
+                          "folderId"
+                        ],
+                        "type": "object"
+                      },
                       "leadThreadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

@@ -1,7 +1,7 @@
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { endHostStream } from "../../chat/streaming/persistent/host";
-import { LIVE_STREAM_BATCH, sendHostCancel } from "./finish";
+import { LIVE_STREAM_BATCH, sendHostCancel, settleWorkerRun } from "./finish";
 import { isHostRunThread } from "./host-thread";
 import { sessionOfThread } from "./sessions";
 
@@ -35,6 +35,8 @@ export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads"
 
             if (wasLive) {
                 await sendHostCancel(ctx, stream, now);
+                // A worker run waiting on this turn ends with the thread.
+                await settleWorkerRun(ctx, stream, { kind: "cancelled" });
                 ended += 1;
             }
         }

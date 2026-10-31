@@ -282,6 +282,16 @@ describe(workerReapDecision, () => {
         expect(workerReapDecision({ lastActivityAt: startedAt + 1, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toMatchObject({ kind: "later" });
     });
 
+    it("never fails a run that waits on a person's answer, however long it has been quiet", () => {
+        const now = startedAt + SUB_AGENT_STALE_MS * 5;
+
+        expect(workerReapDecision({ lastActivityAt: undefined, now, run: running, waitingOnPerson: true })).toStrictEqual({
+            delayMs: SUB_AGENT_STALE_MS,
+            kind: "later",
+        });
+        expect(workerReapDecision({ lastActivityAt: undefined, now, run: running, waitingOnPerson: false })).toStrictEqual({ kind: "fail" });
+    });
+
     it("never reaps a queued run, or one that ended", () => {
         expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { status: "queued" } })).toStrictEqual({ kind: "skip" });
         expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt * 100, run: { startedAt, status: "succeeded" } })).toStrictEqual({

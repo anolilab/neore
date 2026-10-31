@@ -239,6 +239,11 @@ export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => 
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `headless`; the action ctx has no such field. */
+export const setHeadlessRun = (ctx: object): void => {
+    (ctx as { headless?: boolean }).headless = true;
+};
+
 /** Personalization only when the user set any of it; `undefined` otherwise, so the prompt carries no empty block. */
 export const toPersonalization = (prefs: {
     aboutMe?: string;

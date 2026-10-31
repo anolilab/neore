@@ -1267,6 +1267,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     depth: real("depth").notNull(),
     dispatchedBy: text("dispatchedBy", { mode: "json" }).$type<"lead" | "user" | "trigger" | "messenger" | "outside_agent">(),
     error: text("error"),
+    hostTurnId: text("hostTurnId"),
     loopExitedAt: real("loopExitedAt"),
     mode: text("mode", { mode: "json" }).$type<"run" | "worker">(),
     organizationId: text("organizationId"),

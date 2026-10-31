@@ -10,6 +10,8 @@ import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
+import { findRunningHostRun } from "../../sub-agents/host-runs";
+import type { SubAgentOutcome } from "../../sub-agents/functions";
 import type { HostChanges } from "./changes";
 import {
     addMediaToTranscript,
@@ -22,7 +24,7 @@ import {
     type HostReplyReason,
 } from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
-import { withdrawPermissionAnswers } from "./withdraw";
+import { withdrawPermissionAnswers, withdrawSend } from "./withdraw";
 
 type Stream = Doc<"persistentStreams">;
 
@@ -126,7 +128,7 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
 /**
  * Saves the reply through the agent write surface, so branches apply: a regenerate points the thread at the
  * prompt first and fails the earlier pending step, which makes the new reply the prompt's SIBLING
- * (the rule `saveLocalTurnHandler` follows). Returns the saved row, or undefined when there was nothing to save.
+ * (the rule `saveLocalTurnHandler` follows). Returns what the agent said, whether or not there was a row to save.
  */
 const saveHostReply = async (
     ctx: MutationCtx,
@@ -134,32 +136,27 @@ const saveHostReply = async (
     reason: HostReplyReason,
     error: string | undefined,
     changes: HostChanges | undefined,
-): Promise<Id<"messages"> | undefined> => {
+): Promise<string> => {
     const threadId = stream.threadId as Id<"threads">;
     const thread = await ctx.db.get(threadId);
 
     // The thread was deleted while the turn ran: a reply saved now would outlive its cleanup.
     if (!thread || thread.deleted) {
-        return undefined;
+        return "";
     }
 
     // The prompt the reply answers is gone (a deleted message): saving would assert, and the reaper would
     // fail the whole shard tick on it.
     if (stream.messageId && !(await ctx.db.get(stream.messageId as Id<"messages">))) {
-        return undefined;
+        return "";
     }
 
     const session = await sessionOfThread(ctx, threadId);
-    const reply = buildHostReply({
-        agentKey: session?.agentKey ?? "host",
-        changes,
-        error,
-        reason,
-        transcript: await readHostTranscript(ctx, stream._id),
-    });
+    const transcript = await readHostTranscript(ctx, stream._id);
+    const reply = buildHostReply({ agentKey: session?.agentKey ?? "host", changes, error, reason, transcript });
 
     if (!reply) {
-        return undefined;
+        return transcript.text;
     }
 
     const promptMessageId = stream.messageId as Id<"messages">;
@@ -169,9 +166,9 @@ const saveHostReply = async (
         await patchThread(ctx.db, threadId, { activeLeafMessageId: promptMessageId });
     }
 
-    const { messages } = await addMessagesHandler(ctx, { failPendingSteps: regenerate, messages: [reply], promptMessageId, threadId, userId: stream.userId });
+    await addMessagesHandler(ctx, { failPendingSteps: regenerate, messages: [reply], promptMessageId, threadId, userId: stream.userId });
 
-    return messages[0]?._id as Id<"messages"> | undefined;
+    return transcript.text;
 };
 
 const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {
@@ -184,24 +181,77 @@ const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {
     timeout: "timeout",
 };
 
+/** What a worker run is told when its host turn ends: the agent's words on success, the reason on a failure. */
+const workerOutcomeOf = (reason: HostReplyReason, error: string | undefined, text: string): SubAgentOutcome => {
+    if (reason === "finished") {
+        return { kind: "succeeded", result: text };
+    }
+
+    if (reason === "cancelled" || reason === "stopped") {
+        return { kind: "cancelled" };
+    }
+
+    const failures: Partial<Record<HostReplyReason, string>> = {
+        interrupted: "The agent was cut off when the computer restarted.",
+        revoked: "The computer was removed, so the agent stopped.",
+        timeout: "The agent stopped reporting and the turn timed out.",
+    };
+
+    return { error: failures[reason] ?? (error?.trim() || "The agent stopped with an error."), kind: "failed" };
+};
+
+/**
+ * A host turn ended: if a worker run sent it, that run ends with it, through the same `finishRun` a cloud run ends
+ * through (so the lead gets the per-run post, a failure included, and the worker's next queued message starts).
+ * A turn nobody dispatched finishes nothing. `functions.ts` is loaded only when a run is waiting, so the ingest
+ * does not carry the sub-agent module on every turn, and the two modules do not import each other at load.
+ */
+export const settleWorkerRun = async (ctx: MutationCtx, stream: Stream, outcome: SubAgentOutcome): Promise<void> => {
+    const run = await findRunningHostRun(ctx, stream);
+
+    if (!run) {
+        return;
+    }
+
+    const { finishRun } = await import("../../sub-agents/functions");
+
+    await finishRun(ctx, run._id, outcome);
+};
+
 /**
  * Saves the reply and ends the stream, whoever ends it. A stream that already ended is left alone (false). The
- * session is not touched: the caller knows whether it goes idle (a turn's end) or is already ended (a revoke).
+ * session goes idle only when the caller says so (`idle`: a turn's end), not for a revoke, which has ended it. A worker run
+ * that sent the turn ends after that, so the line it holds can start the next message on a session that is free.
  */
 export const endHostTurn = async (
     ctx: MutationCtx,
     stream: Stream,
-    end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
+    end: { changes?: HostChanges; error?: string; idle?: boolean; reason: HostReplyReason },
     now: number,
 ): Promise<boolean> => {
     if (!isLiveStream(stream)) {
         return false;
     }
 
-    await saveHostReply(ctx, stream, end.reason, end.error, end.changes);
+    const text = await saveHostReply(ctx, stream, end.reason, end.error, end.changes);
+
     await withdrawPermissionAnswers(ctx, stream, now);
 
-    return await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
+    if (!(await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now))) {
+        return false;
+    }
+
+    if (end.idle) {
+        const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
+
+        if (session) {
+            await touchSession(ctx, session, "idle", now);
+        }
+    }
+
+    await settleWorkerRun(ctx, stream, workerOutcomeOf(end.reason, end.error, text));
+
+    return true;
 };
 
 /** The host's `turn_end` or Stop: {@link endHostTurn}, then the session is free again. */
@@ -210,19 +260,7 @@ export const finishHostTurn = async (
     stream: Stream,
     end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
     now: number,
-): Promise<boolean> => {
-    const ended = await endHostTurn(ctx, stream, end, now);
-
-    if (ended) {
-        const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
-
-        if (session) {
-            await touchSession(ctx, session, "idle", now);
-        }
-    }
-
-    return ended;
-};
+): Promise<boolean> => await endHostTurn(ctx, stream, { ...end, idle: true }, now);
 
 /** Live host streams read per pass by {@link endLiveHostTurns}. A thread runs one turn at a time, so a pass is rarely more than one. */
 export const LIVE_STREAM_BATCH = 50;
@@ -297,4 +335,16 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
     if (await finishHostTurn(ctx, stream, { reason: "stopped" }, now)) {
         await sendHostCancel(ctx, stream, now);
     }
+};
+
+/**
+ * Ends a live host turn from the Neore side, for a worker run that was stopped or failed while its turn ran: a prompt the
+ * computer has not acknowledged is withdrawn so it cannot start later, what the agent wrote is kept, and the computer is told to cancel.
+ */
+export const cancelHostTurnNow = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
+    if (stream.hostState === "accepted") {
+        await withdrawSend(ctx, stream, now);
+    }
+
+    await stopHostTurn(ctx, stream, now);
 };

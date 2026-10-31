@@ -25,3 +25,6 @@ export const vWorkerPolicy = v.object({
     hostDispatch: v.literal("ask"),
     maxDispatchesPerHour: v.optional(v.number()),
 });
+
+/** A new host worker's runner as a caller asks for it: the computer and the (agent, folder) pair it offered. */
+export const vHostRunnerRequest = v.object({ agentKey: v.string().max(128), deviceId: v.string().max(128), folderId: v.string().max(128) });
