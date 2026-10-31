@@ -387,6 +387,15 @@ const startQueuedRun = async (ctx: MutationCtx, run: Pick<RunDoc, "_id" | "mode"
  * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
  * lead hears a failure like any other and the queue moves on. Nothing waits on a job that could be lost.
  */
+/** Whether a run's computer may still be used in its lead conversation's project (the device tools' scope rule). */
+const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThreadId" | "runner" | "userId">): Promise<boolean> => {
+    const deviceId = run.runner?.kind === "host" ? ctx.db.normalizeId("devices", run.runner.deviceId) : null;
+    const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: run.userId } }) : null;
+    const lead = await systemDb(ctx).get(run.parentThreadId as Id<"threads">);
+
+    return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
+};
+
 const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const claimed = await claimQueuedRun(ctx, runId);
 
@@ -397,6 +406,13 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
     // A message that waited in line is sent under the rule it was admitted by: the lead may have been shared since.
     if (!(await loadEligibleThread({ db: systemDb(ctx) }, claimed.parentThreadId as Id<"threads">, claimed.userId))) {
         await finishRun(ctx, runId, { error: HOST_NEEDS_OWN_CONVERSATION, kind: "failed" });
+
+        return;
+    }
+
+    // ...and the computer's projects may have changed, or the lead moved to another project.
+    if (!(await isHostInLeadScope(ctx, claimed))) {
+        await finishRun(ctx, runId, { error: HOST_OUT_OF_SCOPE, kind: "failed" });
 
         return;
     }

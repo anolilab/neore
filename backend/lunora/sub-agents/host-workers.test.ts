@@ -878,6 +878,26 @@ describe("a host run that waits while the lead changes", () => {
         expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(REFUSED_THREAD), status: "failed" });
         expect(await sendCalls()).toHaveLength(1);
     });
+
+    it("fails the queued run when the computer was limited to other projects in the meantime, sending nothing", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+        await run(async (context) => {
+            const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: OWNER });
+
+            await context.db.patch(device.deviceId, { projectIds: [project] });
+        });
+        await finishTurn(device, receipt.workerId);
+
+        expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(HOST_OUT_OF_SCOPE), status: "failed" });
+        expect(await sendCalls()).toHaveLength(1);
+    });
 });
 
 describe("a worker that is deleted or loses its prompt", () => {
