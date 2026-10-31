@@ -49,10 +49,10 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
          * Each call is its own transaction; a retried step starts over, which is
          * safe because every batch step is idempotent.
          */
-        const drain = async (name: string, run: () => Promise<unknown>): Promise<void> => {
+        const drain = async (name: string, run: (round: number) => Promise<unknown>): Promise<void> => {
             await context.step.do(name, async () => {
                 for (let round = 0; round < MAX_DRAIN_ROUNDS; round += 1) {
-                    const { hasMore } = (await run()) as { hasMore: boolean };
+                    const { hasMore } = (await run(round)) as { hasMore: boolean };
 
                     if (!hasMore) {
                         return round + 1;
@@ -244,6 +244,26 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain("delete-user-devices", async () => await context.run(internal.devices.gdpr.deleteUserDevices, { userId: args.userId }));
         await drain("delete-user-acp-sessions", async () => await context.run(internal.acp.gdpr.deleteUserAcpSessions, { userId: args.userId }));
         await drain("delete-user-review-drafts", async () => await context.run(internal.source_control.gdpr.deleteUserReviewDrafts, { userId: args.userId }));
+        await drain(
+            "delete-user-pull-request-guides",
+            async (round) =>
+                await context.run(
+                    internal.source_control.gdpr.deleteUserGuides,
+                    { userId: args.userId },
+                    { dedupId: `delete-pull-request-guides:${args.requestId}:${String(round)}` },
+                ),
+        );
+        // Its own dispatch id per batch: a replay skips the finished steps' callbacks, so the body's positional ids
+        // drift and a call could be answered with an earlier call's cached result, leaving the rows in place.
+        await drain(
+            "delete-user-watched-repositories",
+            async (round) =>
+                await context.run(
+                    internal.source_control.gdpr.deleteUserWatchedRepositories,
+                    { userId: args.userId },
+                    { dedupId: `delete-watched-repositories:${args.requestId}:${String(round)}` },
+                ),
+        );
         await drain("anonymise-gateway-usage-deductions", async () => await context.run(steps.anonymiseGatewayUsageDeductions, { userId: args.userId }));
         await context.step.do(
             "delete-user-browser-data",

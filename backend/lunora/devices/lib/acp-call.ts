@@ -21,7 +21,8 @@ import {
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
-import { type DeviceTaintSource, mergeTaint } from "./taint";
+import type { DeviceTaintSource } from "./taint";
+import { mergeTaint } from "./taint";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
@@ -36,7 +37,7 @@ export const createAcpCall = async (
         deviceId: Id<"devices">;
         input: Record<string, string>;
         kind: AcpCallKind;
-        /** Untrusted content the command's text carries (a takeover's handoff): signed into the envelope like any call's. */
+        /** Untrusted content the call's text carries (`lib/taint.ts`); signed into the envelope. Absent = the user's own words. */
         taintedBy?: ReadonlyArray<DeviceTaintSource>;
         threadId: Id<"threads">;
         userId: string;

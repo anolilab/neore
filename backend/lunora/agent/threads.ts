@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
+import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
 
@@ -505,6 +506,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // So do the values `requestSecret` saved for its replies: nobody can spend them once the thread is gone.
+        await deleteThreadSecrets(context, { threadId: args.threadId });
 
         // A goal is about this thread; a queued review or round must find it ended, not point at a deleted chat.
         await deleteGoalsForThread(context, args.threadId);

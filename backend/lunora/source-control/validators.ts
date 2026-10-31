@@ -1,6 +1,6 @@
 /**
- * The review draft's column validators, declared once: `schema.ts` builds the
- * `reviewDrafts` table from them and the procedures reuse them for outputs.
+ * The column validators of Develop's tables, declared once: `schema.ts` builds the
+ * `reviewDrafts` and `watchedRepositories` tables from them and the procedures reuse them for outputs.
  *
  * Inline `v.union(...)` / `v.object({...})` literals only: codegen resolves an
  * inline validator expression, not one built by a call or a spread const.
@@ -22,6 +22,26 @@ export const vDraftComment = v.object({
     startLine: v.union(v.number(), v.null()),
 });
 
+/** A pull request that asks the user for a review, as a watched repository's cached list keeps it. */
+export const vCachedRequest = v.object({
+    authorLogin: v.string(),
+    number: v.number(),
+    title: v.string(),
+    updatedAt: v.number(),
+    url: v.string(),
+});
+
+/** How the last poll of a watched repository ended: `ok` (including a 304), or what a person can act on. */
+export const vPollStatus = v.union(
+    v.literal("ok"),
+    v.literal("forbidden"),
+    v.literal("host_error"),
+    v.literal("needs_reconnect"),
+    v.literal("not_connected"),
+    v.literal("not_found"),
+    v.literal("rate_limited"),
+);
+
 /** What a person can act on when a host call does not succeed. */
 export const vFailed = v.object({
     status: v.union(
@@ -42,3 +62,53 @@ export const vWriteFailed = v.union(
 );
 
 export const vMergeMethod = v.union(v.literal("merge"), v.literal("rebase"), v.literal("squash"));
+
+// ─── Guides ─────────────────────────────────────────────────────────────────
+
+export const vGuideStatus = v.union(v.literal("failed"), v.literal("generating"), v.literal("ready"));
+
+export const vGuideSource = v.union(v.literal("cloud"), v.literal("host"));
+
+/** Why a guide did not finish; a code the page words, never the model's or the host's own text. */
+export const vGuideFailure = v.union(
+    v.literal("abandoned"),
+    v.literal("head_moved"),
+    v.literal("host_error"),
+    v.literal("model_error"),
+    v.literal("no_answer"),
+    v.literal("not_connected"),
+    v.literal("quota"),
+    v.literal("too_large"),
+);
+
+/** A place to read: lines of a file, on one side of the diff. */
+export const vGuideRange = v.object({ end: v.number(), side: v.union(v.literal("new"), v.literal("old")), start: v.number() });
+
+export const vGuideStop = v.object({
+    explanation: v.string(),
+    files: v.array(v.object({ path: v.string(), ranges: v.array(vGuideRange) })),
+    id: v.string(),
+    kind: v.union(v.literal("core"), v.literal("dependent"), v.literal("mechanical"), v.literal("uncovered")),
+    title: v.string(),
+});
+
+/** What the guide suggests doing. Only `comment` can be applied, and applying it writes the review DRAFT, not the host. */
+export const vGuideProposal = v.union(
+    v.object({
+        body: v.string(),
+        id: v.string(),
+        kind: v.literal("comment"),
+        line: v.number(),
+        path: v.string(),
+        side: v.union(v.literal("new"), v.literal("old")),
+        startLine: v.union(v.number(), v.null()),
+        status: v.union(v.literal("applied"), v.literal("dismissed"), v.literal("proposed")),
+    }),
+    v.object({
+        id: v.string(),
+        kind: v.literal("label"),
+        name: v.string(),
+        reason: v.string(),
+        status: v.union(v.literal("applied"), v.literal("dismissed"), v.literal("proposed")),
+    }),
+);

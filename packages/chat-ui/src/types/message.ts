@@ -30,8 +30,12 @@ export interface FilePart {
 export interface ToolPart {
     /** Present once the tool call went through human approval (`needsApproval`). */
     approval?: { approved?: boolean; id: string; reason?: string };
-    /** `neore` carries an MCP call's real server and tool names, when the backend labelled it. */
-    callProviderMetadata?: { neore?: { mcpServerName?: unknown; mcpToolName?: unknown } };
+
+    /**
+     * `neore` carries an MCP call's real server and tool names, when the backend labelled it, and `autoApproval` when the
+     * user's quick check let the call run without asking (`utils/auto-approval.ts`).
+     */
+    callProviderMetadata?: { neore?: { autoApproval?: unknown; mcpServerName?: unknown; mcpToolName?: unknown } };
     errorText?: string;
     input?: unknown;
     output?: unknown;

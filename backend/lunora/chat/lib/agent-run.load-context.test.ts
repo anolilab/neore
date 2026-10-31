@@ -138,4 +138,28 @@ describe(loadRunContext, () => {
         expect(result.memoryEnabled).toBe(false);
         expect(result.retrievedMemories).toStrictEqual([]);
     });
+
+    it("reports untrusted context when retrieved knowledge went into the prompt", async () => {
+        const { ctx } = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
+
+        const result = await loadRunContext(ctx, args);
+
+        expect(result.untrustedContext).toBe(true);
+    });
+
+    it("reports untrusted context for project context alone", async () => {
+        const { ctx } = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve({ projectId: "p1" }));
+
+        const result = await loadRunContext(ctx, { ...args, promptText: undefined });
+
+        expect(result.untrustedContext).toBe(true);
+    });
+
+    it("reports none when nothing was retrieved", async () => {
+        const { ctx } = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
+
+        const result = await loadRunContext(ctx, { ...args, promptText: undefined });
+
+        expect(result.untrustedContext).toBe(false);
+    });
 });

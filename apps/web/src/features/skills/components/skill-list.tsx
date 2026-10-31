@@ -6,7 +6,7 @@ import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { useMutation } from "@tanstack/react-query";
-import { FileUp, Plus, Search, Wand2 } from "lucide-react";
+import { FileDown, FileUp, Package, Plus, Search, Wand2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -29,6 +29,8 @@ import SkillItem from "./skill-item";
 
 // Opened on demand; it pulls the SKILL.md parser and, for a .zip, JSZip.
 const SkillImportDialog = lazy(() => import("./skill-import-dialog"));
+const BundleImportDialog = lazy(() => import("./bundle-import-dialog"));
+const BundleExportDialog = lazy(() => import("./bundle-export-dialog"));
 
 type SortOption = "recent" | "mostUsed" | "alphabetical";
 
@@ -56,6 +58,8 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     // Bumped after every write so the effect below refetches the list.
     const [localReloadKey, setLocalReloadKey] = useState(0);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isBundleImportOpen, setIsBundleImportOpen] = useState(false);
+    const [isBundleExportOpen, setIsBundleExportOpen] = useState(false);
     const { mutateAsync: exportSkill } = useMutation(useLunoraActionOptions(api.skills.io.exportSkill));
 
     // Auth
@@ -278,6 +282,20 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
                     <SkillImportDialog onClose={() => setIsImportOpen(false)} onImported={() => setLocalReloadKey((key) => key + 1)} open={isImportOpen} />
                 </Suspense>
             )}
+            {isBundleImportOpen && (
+                <Suspense fallback={null}>
+                    <BundleImportDialog
+                        onClose={() => setIsBundleImportOpen(false)}
+                        onImported={() => setLocalReloadKey((key) => key + 1)}
+                        open={isBundleImportOpen}
+                    />
+                </Suspense>
+            )}
+            {isBundleExportOpen && (
+                <Suspense fallback={null}>
+                    <BundleExportDialog onClose={() => setIsBundleExportOpen(false)} open={isBundleExportOpen} />
+                </Suspense>
+            )}
             <SkillFormDialog
                 canShareWithOrganization={!!activeOrganization}
                 editingSkill={editingSkill}
@@ -332,6 +350,30 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
         </Button>
     );
 
+    const bundleButtons = (
+        <>
+            <Button
+                onClick={() => {
+                    if (isLoggedIn) {
+                        setIsBundleImportOpen(true);
+                    } else {
+                        toast.error(t`Please sign in to create skills`);
+                    }
+                }}
+                variant="outline"
+            >
+                <Package aria-hidden="true" className="mr-2 size-4" />
+                {t`Import bundle`}
+            </Button>
+            {isLoggedIn && (
+                <Button onClick={() => setIsBundleExportOpen(true)} variant="outline">
+                    <FileDown aria-hidden="true" className="mr-2 size-4" />
+                    {t`Export bundle`}
+                </Button>
+            )}
+        </>
+    );
+
     // Show empty state if no skills
     if (skillsBase && skillsBase.length === 0) {
         return (
@@ -341,6 +383,7 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
                     <div className="mt-4 flex justify-center gap-2">
                         {builderButton}
                         {importButton}
+                        {bundleButtons}
                     </div>
                 )}
                 {dialogs}
@@ -367,7 +410,7 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
                         />
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Select onValueChange={(value) => setSortBy(value as SortOption)} value={sortBy}>
                         <SelectTrigger aria-label={t`Sort skills`} className="w-40">
                             <SelectValue />
@@ -380,6 +423,7 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
                     </Select>
                     {builderButton}
                     {importButton}
+                    {bundleButtons}
                     <Button onClick={handleCreateSkill}>
                         <Plus aria-hidden="true" className="mr-2 size-4" />
                         {t`Add Skill`}

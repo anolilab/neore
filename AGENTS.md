@@ -62,7 +62,11 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
 - `vis.config.ts` holds task defaults, `project.json` per-project metadata. In
   `vis.config.ts`, `dependsOn` takes **target names only** — named inputs and
   file globs belong in `inputs`, and vis silently drops them from `dependsOn`,
-  **disabling input tracking without saying so**.
+  **disabling input tracking without saying so**. A cache hit restores files
+  only for declared `outputs`, written `{projectRoot}/dist/**/*` (a bare
+  `dist/**/*` restores nothing): without them `build:packages` said "read from
+  cache" and left a missing or stale `dist` in place. `ai` and `service-sdk`
+  declare theirs for `build` and `build:prod` in `project.json`.
 
 ## ANTI-PATTERNS
 
@@ -428,6 +432,29 @@ written here is what is not.
   refuses edits on a newer head (`head_moved`). A reply and a resolve are written at once (the
   review call has no place for a reply). Viewed marks are the host's, read and written through
   GraphQL; a write is never redirected or replayed by the requester.
+  **Guides** (`guide-*.ts`, table `pullRequestGuides`): a model's or an agent's answer is INPUT, never
+  structure. `assembleGuide` (pure) decides the order (core, dependents, mechanical, not covered), which files are
+  mechanical (by name, not the model's say-so), that every changed file lands somewhere, which line ranges exist in
+  the diff, and which proposals survive (a comment on a diff line, a label). Applying a comment only writes the
+  review DRAFT (`saveDraftCommentFor`); a label has no write. Prompts quote host text with the optimizer's `toJson`
+  inside one JSON evidence block. The cloud job runs on the jobs queue under `runJobOnce` (charged to the daily text
+  quota); a host guide is a coding-agent turn in the user's checkout, started by ONE transaction (`beginHostGuide`:
+  guide row, session, prompt; a refusal throws so none of it stays) and finished by `endHostTurn` →
+  `settleHostGuide` → `finalizeHostGuide`, which re-reads the diff and refuses an answer for another head
+  (`head_moved`). The host prompt is capped in BYTES of the signed call's JSON (`hostPromptBytes`), not characters.
+
+- **Develop freshness** (`backend/lunora/source-control/freshness*.ts`, `webhook.ts`) — the user
+  CHOOSES the repositories (`watchedRepositories`, max 20); only those are polled, through the shard tick
+  (`dispatchDueRepoPolls` in `runShardTick`, plus `shardSweeps()` as backstop), never a global loop.
+  A row is leased by moving `nextPollAt` out; `recordRepoPoll` applies the answer only while the poll's
+  `leasedAt` still matches, so an unwatch (row deleted) or a redelivery records and notifies nothing.
+  Polling reads `GET /repos/{o}/{r}/pulls` with `If-None-Match` (`HostRequestOptions.ifNoneMatch` is the
+  one place a 304 resolves instead of throwing); the login is stored on the row so an unchanged poll is
+  ONE request. The first poll is a silent baseline. The webhook route is `onRoutedShard(…, "watch", id)`;
+  the handler never parses the body and `acceptWatchDelivery` only sets `dirtyAt` — keep it that way, what
+  changed is read from the host with the user's token. `review_request` notifications dedupe on
+  origin + repo + number + the pull request's `updated_at`.
+
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
   `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
@@ -481,6 +508,43 @@ written here is what is not.
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
 
+- **Low-risk quick check** (`chat/lib/low-risk-approval.ts`, `low-risk-check.ts`) — opt-in
+  (`aiUserPreferences.autoApproveLowRisk`, absent = off, set only by `setAutoApproveLowRisk`).
+  An eligible `ask` tool's `needsApproval` becomes a function: taint, then the per-user budget
+  (`chat/toolAutoApprove`), then one utility-model call (no tools, strict `{lowRisk, reason}`, 8 s
+  deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
+  model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
+  defaults to `ask` is a person tool or a delegation), no user override (only the DEFAULT `ask`), no
+  destructive/open-world annotation, not headless, not an API-key run, and the thread must pass
+  `isDeviceEligibleThread` (the owner alone — a collaborator's turn would otherwise replace the
+  owner's consent). **The tool name must START with a read verb** (`READ_VERBS`: get, list, search,
+  read, fetch, find, query, describe, lookup, view — the leading word of the key's tool name, split on
+  `_ - .` or a camelCase boundary), so `create_issue`, `save_issue`, `create_event` and `sendemail` are
+  never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
+  (`get_or_create_user`). An allowlist, not a blocklist: a new write verb is a prompt by default.
+  **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
+  (any tool result or attached file or image), `messagesCarryAttachedText` (`chat/lib/attached-text.ts`: an
+  attached document's extracted text and a captured browser page, which `/chat/start` and the edit path put
+  into the user message as plain TEXT parts that `computeTaint` cannot tell from typing — found by their
+  `[Document: …]` / `[Attached Document]` / `[Web page context]` line label or the page's structural marker,
+  and built through `documentTextPart` so the label and the detector cannot drift) AND `untrustedContext`
+  (retrieved knowledge, memories or project context in the system prompt, plus ANY skill text there:
+  `execute.ts` ORs `injectsSkillText(skillRun)` — an enabled skill's description or an invoked skill's
+  instructions — into `RunContext.untrustedContext`). Skills are all-or-nothing on purpose: `skills.source`
+  is client-supplied at creation, agents write skills from chats that may have read third-party content, and
+  marketplace forks, imports and organisation-shared skills are other people's text, so "this user wrote it"
+  cannot be told cheaply or reliably. A user with any enabled skill therefore never gets the check; narrowing
+  that needs a server-minted authorship marker first. A thread summary records attached text as `files` taint
+  when it folds the rows in (`thread-summaries.ts`); summaries written before that are not repaired. The tools are built while the
+  context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
+  reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
+  thread's sharing are re-read at every call**, in the same mutation that spends the budget unit
+  (`consumeLowRiskCheck`), so switching it off or sharing the thread mid-run holds from the next call
+  (`getLowRiskApprovalContext` at run start only decides whether to build the check). The approval is
+  stamped on the saved call by tool call id (`providerOptions.neore.autoApproval`, next to the MCP
+  label) through `stampSavedToolCalls`, which `finishRun`, `endStoppedRun`, `failRun` and the
+  continuation's failure path all call; a stamp that fails is logged and never changes how the run
+  ended. A `chat.low_risk_check` event is logged per decision.
 - **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
   READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
   nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the
@@ -598,6 +662,16 @@ written here is what is not.
   Outbound media ships only when a reply's assistant rows carry file parts
   (`listReplyMedia`, owner-granted storage only) — so without reply tools
   (`tools: "none"`, the default) nothing ever attaches one.
+
+- **Requested secrets** (`backend/lunora/chat/{request-secret,lib/secret-*}.ts`) — the `requestSecret` card hands a
+  value to the server once; the agent only ever holds a `ref`. A header secret is stored ENCRYPTED in
+  `aiUserPreferences.mcpSecretHeaders`, bound to the server's name AND url, never in `mcpServers[].headers` (plaintext
+  Settings shows and the audit history snapshots); it is joined to its server only in `getMCPServersQuery`,
+  `getMcpSecretHeadersQuery` (connection test), and left out of `redactPreferences`. Settings does not list these
+  headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
+  a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
+  snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
@@ -819,6 +893,24 @@ written here is what is not.
   ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
+  **Coding agents on a server** (`device-core/src/{agent_host,engine/host_agents}.rs`, `apps/desktop/src/acp/{remote-process,servers}.ts`,
+  plans/ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
+  shared with the computer's own agents. The `agent` request streams stdout/stderr as chunk frames (tag 1/2) and takes stdin as
+  chunk frames of the same id; `hello.agents` announces it (no protocol bump), and the host kills the agent's process group on
+  cancel, on its stdin ending and on SIGTERM. A server's agents and approvals live on its `Host` row, the core picks the secret by
+  the DEVICE a payload names (`acp_prepare`/`acp_sign`/`sign_turn`), and a server's poster is its own. `TurnChanges` and media read
+  the desktop's disk, so they are off for a server (`folderIsRemote`): a new reader of the agent's folder must stay off for it too.
+  The agent's environment is built on the server, not copied from the desktop.
+  **No write waits on a pipe** (`device-core/src/outbox.rs`): `neore-host` writes its stdout, and the desktop writes
+  ssh's stdin, through one writer thread with a byte-bounded queue. The host's request reader and the app's synchronous
+  napi calls (`host_agent_write`/`_stop`) only queue, a cancel with extra room (`URGENT_HEADROOM`); a connection too far
+  behind for even that is closed, which makes the host stop every agent. Producers (an agent's output, an archive) wait
+  for room instead, holding the agent back. An agent that does not read its stdin is stopped at `INPUT_BUDGET`
+  (8 MiB), not buffered further. Every thread a launch spawns is joined before its request ends (the pumps `poll`, so a
+  `setsid` descendant holding a pipe cannot keep one). Narrowing a server's shared folders drops the approvals outside
+  them in the core (`apply_update`) and the desktop stops those sessions (`reviewApprovals`); removing a server or
+  unpairing ends its sessions FIRST (`ServerAgents.remove`), because the end of each turn is signed with a secret the
+  core deletes right after. The person's variables can never replace `SSH_AUTH_SOCK`.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

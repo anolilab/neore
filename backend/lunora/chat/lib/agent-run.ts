@@ -33,6 +33,8 @@ import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
+import type { AutoApprovals } from "./low-risk-approval";
+import { injectsUntrustedContext } from "./low-risk-approval";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
@@ -49,6 +51,7 @@ import {
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -236,6 +239,23 @@ export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): voi
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
 export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
+};
+
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
+export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
+    (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * A reply ended for good — drop the ciphertext of that reply's saved secret references (`requestSecret`). Best
+ * effort: it must never fail or delay the end of a run, and what it misses waits for the housekeeping sweep.
+ */
+export const discardRunSecrets = async (ctx: Pick<ActionCtx, "runMutation">, run: { streamId: string; threadId: string }): Promise<void> => {
+    try {
+        await ctx.runMutation(internal.chat.request_secret.discardSecretsOfThread, { streamId: run.streamId, threadId: run.threadId as Id<"threads"> });
+    } catch {
+        // Swept later.
+    }
 };
 
 /** Personalization only when the user set any of it; `undefined` otherwise, so the prompt carries no empty block. */
@@ -455,6 +475,13 @@ export const loadRunContext = async (
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
         threadSettings,
+        /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
+        untrustedContext: injectsUntrustedContext({
+            knowledge: knowledgeContext?.context,
+            memory: memoryContext?.context,
+            project: project?.context,
+            threadPrompt: threadSettings?.customSystemPrompt,
+        }),
         userProviderKeys,
     };
 };
@@ -777,6 +804,37 @@ export const createRunSteering = (
     };
 };
 
+/** What `stampSavedToolCalls` needs of a run: its labels and auto-approvals, and the rows it saved. */
+export interface SavedToolCallStamp {
+    autoApprovals?: AutoApprovals;
+    mcpLabels: McpToolLabels;
+    savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
+    userId: string;
+}
+
+/**
+ * Stamps the run's saved MCP tool calls with their real names and the record of each call the quick check let run
+ * unasked (`labelMcpToolCalls`). Idempotent: a call that is already stamped is left alone, so every end of a run may
+ * call it.
+ */
+export const stampSavedToolCalls = async (ctx: Pick<ActionCtx, "runMutation">, stamp: SavedToolCallStamp): Promise<void> => {
+    const { autoApprovals = {}, mcpLabels, savedMessages, userId } = stamp;
+    const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels, autoApprovals) ? [m._id] : []));
+
+    if (labelledIds.length > 0) {
+        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { autoApprovals, labels: mcpLabels, messageIds: labelledIds, userId });
+    }
+};
+
+/** Stamps like `stampSavedToolCalls` for a run that is ending anyway (a stop or a failure): a failed stamp is logged and never masks how the run ended. */
+const stampSavedToolCallsQuietly = async (ctx: Pick<ActionCtx, "runMutation">, stamp: SavedToolCallStamp): Promise<void> => {
+    try {
+        await stampSavedToolCalls(ctx, stamp);
+    } catch (error) {
+        streamLogger.warn("[AgentRun] Could not stamp the saved tool calls:", error);
+    }
+};
+
 /**
  * The end of a streamed run, in order: MCP tool calls are labelled with their
  * real server and tool (`lib/mcp-tool-labels.ts`), a run that paused on `ask`
@@ -791,6 +849,8 @@ export const createRunSteering = (
 export const finishRun = async (
     ctx: Pick<ActionCtx, "runMutation">,
     args: {
+        /** Calls the quick check let run unasked (`BuildAgentToolsResult.autoApprovals`), stamped onto the saved calls. */
+        autoApprovals?: AutoApprovals;
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
         pending: { reasoning: string; text: string };
@@ -803,21 +863,32 @@ export const finishRun = async (
         userId: string;
     },
 ): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean }> => {
-    const { keepOpenUnlessPaused, mcpLabels, pending, savedMessages, snapshot, streamId, threadId, unsaved = { reasoning: "", text: "" }, userId } = args;
-    const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels) ? [m._id] : []));
+    const {
+        autoApprovals = {},
+        keepOpenUnlessPaused,
+        mcpLabels,
+        pending,
+        savedMessages,
+        snapshot,
+        streamId,
+        threadId,
+        unsaved = { reasoning: "", text: "" },
+        userId,
+    } = args;
 
-    if (labelledIds.length > 0) {
-        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { labels: mcpLabels, messageIds: labelledIds, userId });
-    }
+    await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, savedMessages, userId });
 
     const approvalIds = collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
 
     if (approvalIds.length > 0) {
+        const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
+
         await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
+            ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
             threadId,
             userId,
         });
@@ -837,11 +908,20 @@ export const finishRun = async (
         throw asRefusedWrite(error, { reasoning: unsaved.reasoning + pending.reasoning, text: unsaved.text + pending.text });
     }
 
-    // A question only when every pending call is the askUser tool; any other tool in the set is an approval.
+    // A pause keeps the references (a consumer set to ask resumes the run); only a final end drops them. A group turn that
+    // goes on with the next speaker (`keepOpenUnlessPaused`) is not over either.
+    if (!paused && keepOpenUnlessPaused !== true) {
+        await discardRunSecrets(ctx, { streamId, threadId });
+    }
+
+    // A question when every pending call waits on the person's own input (askUser, or a secret card); any other tool
+    // in the set is an approval.
     let awaitingInput: AwaitingInput | undefined;
 
     if (paused) {
-        awaitingInput = askUserApprovalIds.length === approvalIds.length ? "question" : "approval";
+        const secretPending = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME).length;
+
+        awaitingInput = askUserApprovalIds.length + secretPending === approvalIds.length ? "question" : "approval";
     }
 
     return { awaitingInput, paused };
@@ -864,9 +944,12 @@ export const endStoppedRun = async (
         continuation: boolean;
         order: number | undefined;
         promptMessageId: string | undefined;
-        result: { consumeStream: () => PromiseLike<unknown> };
+        result: { consumeStream: () => PromiseLike<unknown>; savedMessages?: SavedToolCallStamp["savedMessages"] };
+        /** Stamps the run's auto-approved calls (and labels) onto the rows saved before the stop, once the aborted result is drained. */
+        stamp?: Omit<SavedToolCallStamp, "savedMessages">;
         stop: AbortController;
         streamId: string;
+        threadId: string;
     },
 ): Promise<string[]> => {
     if (!isStreamWriteRefused(error)) {
@@ -903,6 +986,11 @@ export const endStoppedRun = async (
     args.stop.abort();
     // Errors are reported on the result, not thrown; the abort ends the stream, so this returns once the save is done.
     await args.result.consumeStream();
+    await discardRunSecrets(ctx, { streamId: args.streamId, threadId: args.threadId });
+
+    if (args.stamp) {
+        await stampSavedToolCallsQuietly(ctx, { ...args.stamp, savedMessages: args.result.savedMessages });
+    }
 
     return stopped.messageId === undefined ? [] : [stopped.messageId];
 };
@@ -931,7 +1019,7 @@ export const endStoppedRun = async (
 export const resumeApprovedRun = async (
     ctx: ActionCtx,
     args: {
-        /** An approved `askUser` call's answer: the resumed tool returns it as its result. */
+        /** An approved `askUser` call's answer, or a saved `requestSecret`'s reference: the resumed tool returns it as its result. */
         answer?: string;
         approvalId: string;
         approved: boolean;
@@ -969,11 +1057,17 @@ export const resumeApprovedRun = async (
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
+            threadId,
+            // The paused run's prompt is reused as it was; a snapshot that does not say counts as carrying such context.
+            untrustedContext: config.untrustedContext ?? true,
             userId,
         }),
         loadUserProviderKeys(ctx, userId),
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
     ]);
+
+    // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.
+    let started: { savedMessages?: SavedToolCallStamp["savedMessages"] } | undefined;
 
     try {
         // Checked against our own state rather than inferred from the agent
@@ -1000,6 +1094,17 @@ export const resumeApprovedRun = async (
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
+        }
+
+        // An answered secret request: the call's result is the stored value's reference, never the value.
+        if (approved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
+            if (answer === undefined) {
+                throw new AgentRunError("stale-approval", "A secret request can only be resumed with a reference");
+            }
+
+            const { createAnsweredRequestSecretTool } = await import("../tools/request-secret");
+
+            toolResult.tools[REQUEST_SECRET_TOOL_NAME] = createAnsweredRequestSecretTool(answer) as (typeof toolResult.tools)[string];
         }
 
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
@@ -1032,6 +1137,8 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
+        setRunStartedBy(ctx, config.startedBy);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1057,6 +1164,8 @@ export const resumeApprovedRun = async (
                   streamTextArgs as never,
                   runOptions,
               );
+
+        started = result;
 
         // The interactive path (`steerable`) does the bookkeeping of an ordinary run (`afterRun`): usage of each reply it
         // saved (a steered continuation saves a second one), timing and memory extraction of the messages steered into
@@ -1099,8 +1208,10 @@ export const resumeApprovedRun = async (
                 order: result.order,
                 promptMessageId: result.promptMessageId,
                 result,
+                stamp: { autoApprovals: toolResult.autoApprovals, mcpLabels: toolResult.mcpLabels, userId },
                 stop: stopping,
                 streamId,
+                threadId,
             });
 
             // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -1135,6 +1246,7 @@ export const resumeApprovedRun = async (
 
         try {
             ({ awaitingInput, paused } = await finishRun(ctx, {
+                autoApprovals: toolResult.autoApprovals,
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
@@ -1152,6 +1264,17 @@ export const resumeApprovedRun = async (
         await recordRun(true);
 
         return { awaitingInput, lastMessageId: messageIds.at(-1), paused, stopped: false };
+    } catch (error) {
+        if (started) {
+            await stampSavedToolCallsQuietly(ctx, {
+                autoApprovals: toolResult.autoApprovals,
+                mcpLabels: toolResult.mcpLabels,
+                savedMessages: started.savedMessages,
+                userId,
+            });
+        }
+
+        throw error;
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }
@@ -1196,9 +1319,16 @@ export const setThreadStatus = async (
  */
 export const failRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
-    args: { safeMessage: string; streamId: string; threadId: string; threadStatus: "active" | "error" },
+    args: {
+        safeMessage: string;
+        /** Stamps the run's auto-approved calls onto the rows it saved before it failed. Best effort: it runs after the run is closed. */
+        stamp?: () => Promise<void>;
+        streamId: string;
+        threadId: string;
+        threadStatus: "active" | "error";
+    },
 ): Promise<void> => {
-    const { safeMessage, streamId, threadId, threadStatus } = args;
+    const { safeMessage, stamp, streamId, threadId, threadStatus } = args;
 
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
     // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
@@ -1258,5 +1388,13 @@ export const failRun = async (
         });
     } catch {
         // The goal's own stall sweep ends it (`reapStalledGoals`).
+    }
+
+    await discardRunSecrets(ctx, { streamId, threadId });
+
+    try {
+        await stamp?.();
+    } catch (error) {
+        streamLogger.warn("[AgentRun] Could not stamp the saved tool calls:", error);
     }
 };

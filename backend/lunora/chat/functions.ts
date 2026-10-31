@@ -62,6 +62,7 @@ import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } fr
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
+import { headersForConnectionTest } from "../auth/lib/mcp-secret-headers";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchBrowserSession } from "../browser/session-writes";
 import { authAction, authMutation, authQuery, liteAuthQuery, optionalAuthQuery, publicQuery, rateLimit } from "../lib/crpc";
@@ -6227,7 +6228,12 @@ export const testMCPServerConnection = authAction
         const { withMcpServerGrants } = await import("../connectors/lib/grant-runtime");
         const { probeRequiresOAuth } = await import("../connectors/lib/mcp-oauth");
 
-        const config: import("./lib/mcp-tools").MCPServerConfig = { enabled: true, ...(headers && { headers }), name, protocol, url };
+        // A saved server's header secrets (`requestSecret`) are server-only, so the form cannot send them: add them here.
+        const secretHeaders = await context
+            .runQuery(internal.auth.functions.getMcpSecretHeadersQuery, { name, url, userId: context.user.userId })
+            .catch(() => []);
+        const allHeaders = headersForConnectionTest(headers, secretHeaders);
+        const config: import("./lib/mcp-tools").MCPServerConfig = { enabled: true, ...(allHeaders.length > 0 && { headers: allHeaders }), name, protocol, url };
         // A saved server the user signed in to is tested WITH its token (same name
         // and url only), never pruning: this is one server, not the whole list.
         const [withGrant] = await withMcpServerGrants(context, context.user.userId, [config]).catch(() => [config]);

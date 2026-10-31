@@ -222,6 +222,16 @@ where the host has none.
 - Acceptance: every changed file appears in the guide; a new head commit marks the guide stale;
   an instruction planted in a PR body does not change the guide's structure or trigger an action
   (test); a proposed comment is posted only after the user applies it.
+- Built as: stops come back from the model or the agent as untrusted JSON and are rebuilt by
+  `assembleGuide` (coverage, order, line ranges and proposals are decided in code). One
+  `pullRequestGuides` row per user, pull request and head commit, three kept; the page reads the
+  newest guide for the head it shows, else an earlier one marked stale. Cloud: a job on the jobs
+  queue, charged to the daily text quota. Host: a coding agent on a paired computer whose approved
+  folder names the repository, started and prompted in one transaction. A proposed comment becomes
+  a review-draft comment on apply and reaches the host only when the review is submitted; a label
+  is shown as a suggestion because no driver declares a label write. The SSH-server path waits for
+  S5 and other hosts for S4/S6/S7: the guide is read through the driver's read members and gated
+  by the `pullRequest.guide` capability, so a later driver plugs in.
 
 **S9 — Work on a pull request.** The Work-on-PR thread, sandbox and host checkouts, pull request
 creation through the adapter on every host, links from pull request to thread.
@@ -233,6 +243,16 @@ request notifications.
 - Acceptance: an unchanged GitHub list costs one 304 per poll; polling stops for a repository the
   user stops watching; a webhook only marks a repository dirty and never carries data the backend
   trusts without reading it from the host.
+- Built as: a `watchedRepositories` row per user and repository holds the cache (page one of the open
+  pull requests that name the user as a requested reviewer), its ETag and login, and the schedule.
+  The shard tick leases each due row (`dispatchDueRepoPolls`, also a `shardSweeps()` backstop) and
+  schedules a poll; an unchanged list is one conditional request, a 304 that changes nothing. The first
+  poll is a baseline and notifies nobody. A webhook (`/source-control/webhook/:watchId`, the repository's
+  own secret, `X-Hub-Signature-256`) is verified over the raw bytes, claimed once, and sets `dirtyAt`
+  only: the body is never parsed. Review teams (`requested_teams`) and repositories with more than 100
+  open pull requests are not covered yet; the poll reads page one. A request's notification key
+  (`requestDedupeKey`) includes the pull request's `updatedAt`, so a request that falls out of the
+  cached page and comes back after an update notifies again.
 
 ## 6. Invariants
 
