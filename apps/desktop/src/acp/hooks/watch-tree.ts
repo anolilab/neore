@@ -11,8 +11,12 @@
 export interface TreeDependencies {
     /** At most this many directories are watched at once; the rest of a very large tree is simply not covered. */
     limit: number;
-    /** The directories and files directly inside a directory, as paths relative to the root, symlinks left out. */
-    list: (relative: string) => Promise<{ directories: string[]; files: string[] }>;
+
+    /**
+     * The directories and files directly inside a directory, as paths relative to the root, symlinks left out;
+     * `undefined` when it could not be read (not when it is gone, which lists as empty).
+     */
+    list: (relative: string) => Promise<{ directories: string[]; files: string[] } | undefined>;
     skip: (relative: string) => boolean;
     /** Watches one directory (`""` is the root). Event names are relative to that directory. */
     watchDirectory: (relative: string, onEvent: (eventType: string, name: string | null) => void, onError: (error: Error) => void) => { close: () => void };
@@ -88,7 +92,13 @@ export const watchTree = (
             return;
         }
 
-        const { directories, files } = await dependencies.list(relative);
+        const listing = await dependencies.list(relative);
+
+        if (listing === undefined) {
+            return;
+        }
+
+        const { directories, files } = listing;
 
         if (announce !== undefined) {
             for (const file of files) {
@@ -118,7 +128,14 @@ export const watchTree = (
                 return;
             }
 
-            const { directories } = await dependencies.list(directory);
+            const listing = await dependencies.list(directory);
+
+            // A listing that failed says nothing about which subfolders are gone: keep their watches.
+            if (listing === undefined) {
+                return;
+            }
+
+            const { directories } = listing;
             const present = new Set(directories);
 
             for (const key of watchers.keys()) {

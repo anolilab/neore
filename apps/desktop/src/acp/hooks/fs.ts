@@ -57,15 +57,19 @@ const orMissing = async <Result>(action: () => Promise<Result>): Promise<Result 
     }
 };
 
-/** The entries of one folder, as paths relative to `root`: symlinks and what `skip` names are left out. */
-const listFolder = async (root: string, relative: string, skip: (relative: string) => boolean): Promise<{ directories: string[]; files: string[] }> => {
+/**
+ * The entries of one folder, as paths relative to `root`: symlinks and what `skip` names are left out. A folder that is
+ * gone lists as empty; one that could not be read is `undefined`, so a caller never takes a read error for its
+ * subfolders having gone.
+ */
+const listFolder = async (root: string, relative: string, skip: (relative: string) => boolean): Promise<{ directories: string[]; files: string[] } | undefined> => {
     const listing: { directories: string[]; files: string[] } = { directories: [], files: [] };
     let entries;
 
     try {
         entries = await readdir(path.join(root, relative), { withFileTypes: true });
-    } catch {
-        return listing;
+    } catch (error) {
+        return missing(error) ? listing : undefined;
     }
 
     for (const entry of entries) {
@@ -202,7 +206,7 @@ export const nodeHookFs: HookFs = {
 
         while (queue.length > 0 && found.length < limit) {
             // eslint-disable-next-line no-await-in-loop -- one folder after another keeps the scan's open handles to one
-            const { directories, files } = await listFolder(root, queue.shift() as string, skip);
+            const { directories, files } = await listFolder(root, queue.shift() as string, skip) ?? { directories: [], files: [] };
 
             queue.push(...directories);
             found.push(...files.slice(0, limit - found.length));

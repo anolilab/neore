@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { nodeTreeDependencies } from "./fs";
 import type { TreeDependencies } from "./watch-tree";
 import { watchTree } from "./watch-tree";
+
+/** Taking the read bit off a folder locks out its owner, but not root, and Windows has no such bit. */
+const canLockFolders = process.platform !== "win32" && process.getuid?.() !== 0;
 
 const ignored = (relative: string): boolean => relative.split("/").some((segment) => segment === "node_modules" || segment === ".git");
 
@@ -141,6 +144,23 @@ describe("watchTree", () => {
         expect(gone.map((watcher) => watcher?.close.mock.calls.length)).toEqual([1, 1]);
     });
 
+    it("keeps the watches below a directory whose listing could not be read", async () => {
+        const { deps, watched } = fakeTree({ "": ["src"], src: ["src/deep"] });
+        const dependencies = deps();
+        const { list } = dependencies;
+
+        watchTree(dependencies, () => {}, () => {});
+        await settle();
+
+        const kept = [watched.get("src"), watched.get("src/deep")];
+
+        dependencies.list = async (relative) => relative === "" ? undefined : list(relative);
+        watched.get("")?.fire("rename", "other");
+        await settle();
+
+        expect(kept.map((watcher) => watcher?.close.mock.calls.length)).toEqual([0, 0]);
+    });
+
     it("reports running out of watches as the watcher failing, but one directory vanishing as nothing", async () => {
         const { deps, watched } = fakeTree({ "": ["a", "b"] });
         const onError = vi.fn();
@@ -173,6 +193,24 @@ describe("watchTree on a real folder", () => {
 
     afterEach(() => {
         rmSync(directory, { force: true, recursive: true });
+    });
+
+    it.skipIf(!canLockFolders)("tells an unreadable directory apart from an empty or vanished one", async () => {
+        const prefix = path.join(tmpdir(), "neore-watch-tree-");
+
+        directory = realpathSync(mkdtempSync(prefix));
+        mkdirSync(path.join(directory, "locked", "inner"), { recursive: true });
+
+        const real = nodeTreeDependencies(directory, ignored, 100);
+
+        chmodSync(path.join(directory, "locked"), 0o300);
+
+        try {
+            await expect(real.list("locked")).resolves.toBeUndefined();
+            await expect(real.list("gone")).resolves.toEqual({ directories: [], files: [] });
+        } finally {
+            chmodSync(path.join(directory, "locked"), 0o700);
+        }
     });
 
     it("hears a nested file, and never puts a watch on node_modules or .git", async () => {
