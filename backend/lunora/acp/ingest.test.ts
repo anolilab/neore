@@ -47,9 +47,9 @@ vi.mock("../lib/cross-shard", () => {
             const registered = reference.kind === undefined ? await import("../_generated/functions") : undefined;
             const kind = reference.kind ?? registered?.LUNORA_FUNCTIONS[reference.__lunoraRef ?? ""]?.kind;
             const runners = httpContext() as unknown as Record<"runAction" | "runMutation" | "runQuery", (r: unknown, a: never) => Promise<unknown>>;
-            const method = kind === "action" ? "runAction" : kind === "mutation" ? "runMutation" : "runQuery";
+            const methods: Record<string, "runAction" | "runMutation"> = { action: "runAction", mutation: "runMutation" };
 
-            return await runners[method](reference, args);
+            return await runners[methods[kind ?? ""] ?? "runQuery"](reference, args);
         },
     };
 });

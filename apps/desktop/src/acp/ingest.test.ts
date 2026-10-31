@@ -9,8 +9,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { HostEvent } from "./ingest";
-import type { PosterOptions } from "./ingest";
+import type { HostEvent, PosterOptions } from "./ingest";
 import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
@@ -94,7 +93,7 @@ class FakeBackend {
     };
 
     public texts(turnId: string): string {
-        return (this.chunks.get(turnId) ?? []).map((event) => ("text" in event && event.kind === "text" ? event.text : "")).join("");
+        return (this.chunks.get(turnId) ?? []).map((event) => "text" in event && event.kind === "text" ? event.text : "").join("");
     }
 }
 
@@ -119,7 +118,7 @@ const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.
         log: (message) => {
             logs.push(message);
         },
-        ...(media && { media }),
+        ...media && { media },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -185,7 +184,7 @@ afterEach(async () => {
 
 describe("a turn's files", () => {
     const UPLOAD_ID = "abcdefghijklmnopqrstu";
-    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
 
     /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
     const withUploads = () => {
@@ -254,6 +253,7 @@ describe("a turn's files", () => {
         host.turnEnded("s1", "t1", "end_turn");
 
         for (let step = 0; step < 4; step += 1) {
+            // eslint-disable-next-line no-await-in-loop -- each tick must run before the next is armed
             await settle(POST_INTERVAL_MS);
         }
 
@@ -285,7 +285,7 @@ describe("a turn's files", () => {
     it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
         const { fetcher, uploads } = withUploads();
         const host = poster(
-            media(async () => ({ kind: "", mime: "", name: "", size: 0, status: "refused" })),
+            media(async () => { return { kind: "", mime: "", name: "", size: 0, status: "refused" }; }),
             fetcher,
         );
 
@@ -397,7 +397,7 @@ describe("pairing after a session opened", () => {
     });
 
     it("posts no turn into a session the backend answers as ended", async () => {
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined;
 
         const host = poster();
 
@@ -411,7 +411,7 @@ describe("pairing after a session opened", () => {
 
 describe("a session that never gets a thread", () => {
     it("ends a turn that started during session_open when the backend refuses the open", async () => {
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined;
 
         const host = poster();
 
@@ -443,7 +443,7 @@ describe("a session and turns the backend started", () => {
     it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
         const host = poster();
 
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined;
         host.sessionOpened("s1", INFO, "thread-1");
         host.turnReceived("s1", "t1", "fix it");
         await settle(POST_INTERVAL_MS);
@@ -878,13 +878,13 @@ describe("a turn", () => {
 
         for (let step = 0; step < 40; step += 1) {
             host.text("s1", "t1", "字".repeat(16_000));
-            host.text("s1", "t1", '"\\'.repeat(4000));
+            host.text("s1", "t1", "\"\\".repeat(4000));
         }
 
         await settle(POST_INTERVAL_MS);
         await settle(POST_INTERVAL_MS * 80);
 
-        const turnBodies = backend.posts.flatMap(({ post }, index) => (post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []));
+        const turnBodies = backend.posts.flatMap(({ post }, index) => post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []);
 
         expect(turnBodies.length).toBeGreaterThan(1);
         expect(Math.max(...turnBodies)).toBeLessThan(256 * 1024);
@@ -1001,7 +1001,7 @@ describe("a computer the backend no longer knows", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => (post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 }));
+        backend.respond = (post) => post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 });
         host.turnStarted("s1", "t1", "go");
         host.turnStarted("s1", "t2", "again");
         await settleInSteps(180_000);
@@ -1111,7 +1111,7 @@ describe("a session that ends locally", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => (post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined);
+        backend.respond = (post) => post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined;
         host.sessionEnded("s1");
         await settleInSteps(600_000);
 
@@ -1154,7 +1154,7 @@ describe("a session that ends locally", () => {
     it("sends no close for a session the backend refused to open", async () => {
         const host = poster();
 
-        backend.respond = (post) => (post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 }));
+        backend.respond = (post) => post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 });
         await open(host);
         host.sessionEnded("s1");
         await settle(60_000);

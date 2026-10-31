@@ -139,9 +139,9 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const startSwitch = async (newModel: string, id: string, row: ThreadRow) => {
         // The user picked again, or opened another thread, while the preview was in flight.
         const isStale = () => {
-            const { selectedModel, selectedModelThreadId } = useModelStore.getState();
+            const picked = useModelStore.getState();
 
-            return selectedModel !== newModel || selectedModelThreadId !== id;
+            return picked.selectedModel !== newModel || picked.selectedModelThreadId !== id;
         };
 
         try {

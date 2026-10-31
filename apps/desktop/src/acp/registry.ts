@@ -163,6 +163,23 @@ const publisherOf = (entry: Record<string, unknown>, repo: string): string => {
 };
 
 /** The agents of a registry file. An entry that does not match the schema is left out, not fatal for the rest. */
+/** The `binary` distribution's targets by platform; a target that does not parse is left out. */
+const parseBinaries = (value: unknown): Record<string, BinaryTarget> => {
+    const binary: Record<string, BinaryTarget> = {};
+
+    if (isRecord(value)) {
+        for (const [platform, entry] of Object.entries(value)) {
+            const target = parseTarget(entry);
+
+            if (target !== undefined) {
+                binary[platform] = target;
+            }
+        }
+    }
+
+    return binary;
+};
+
 export const parseRegistry = (json: unknown): RegistryAgent[] => {
     if (!isRecord(json) || !Array.isArray(json.agents)) {
         throw new Error("The registry answered in a format Neore does not know.");
@@ -184,20 +201,9 @@ export const parseRegistry = (json: unknown): RegistryAgent[] => {
         }
 
         const repo = plainString(entry.repository) ?? "";
-        const binary: Record<string, BinaryTarget> = {};
-
-        if (isRecord(entry.distribution.binary)) {
-            for (const [platform, value] of Object.entries(entry.distribution.binary)) {
-                const target = parseTarget(value);
-
-                if (target !== undefined) {
-                    binary[platform] = target;
-                }
-            }
-        }
 
         agents.push({
-            binary,
+            binary: parseBinaries(entry.distribution.binary),
             description: plainString(entry.description, 600) ?? "",
             distributions: Object.keys(entry.distribution),
             id,
@@ -360,7 +366,7 @@ export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestIni
             throw new Error("A download was redirected with no destination.");
         }
 
-        current = new URL(location, current).toString();
+        current = new URL(location, current).href;
     }
 
     throw new Error("A download was redirected too many times.");
@@ -436,7 +442,6 @@ export class AgentRegistry {
 
             throw new Error(`The registry answered ${String(response.status)}.`);
         }
-
 
         const agents = parseRegistry(JSON.parse(await readCapped(response, MAX_REGISTRY_BYTES)) as unknown);
 

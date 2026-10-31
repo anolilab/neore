@@ -212,19 +212,19 @@ const makeCore = () => {
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
         acpPermissionAnswerRemote: vi.fn(),
-        acpPermissionAsk: vi.fn(async () => '{"outcome":"cancelled"}'),
+        acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
         acpPrepare: vi.fn((): string =>
             JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" }),
         ),
-        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
-            JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
-        ),
         acpReadMedia: vi.fn(async () => {
             return { kind: "", mime: "", name: "", size: 0, status: "refused" };
         }),
+        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
+            JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
+        ),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),
@@ -394,7 +394,7 @@ describe("servers over SSH", () => {
 
         await invoke(DEVICE_CHANNEL.hostPair, siteEvent(), { deviceId: "host-1", secret: "c".repeat(64), spec: { ...spec, identityFile: "/home/me/.ssh/id" } });
 
-        expect(core.hostPair).toHaveBeenCalledWith(expect.stringContaining('"identityFile":"/home/me/.ssh/id"'), "host-1", "c".repeat(64));
+        expect(core.hostPair).toHaveBeenCalledWith(expect.stringContaining("\"identityFile\":\"/home/me/.ssh/id\""), "host-1", "c".repeat(64));
     });
 
     it("reject a malformed server before the core", async () => {
@@ -465,8 +465,6 @@ describe("servers over SSH", () => {
     });
 
     it("download a folder only into a file the person picks in a native dialog", async () => {
-        const { dialog } = await import("electron");
-
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
 
         // The window names the folder; it has no way to name where the archive goes.
@@ -629,7 +627,7 @@ describe("coding-agent channels", () => {
 
     it("let the core's refusal of an always option reach the window", () => {
         core.acpPermissionAnswer.mockImplementationOnce(() => {
-            throw new Error('"Always allow" is not available for coding agents');
+            throw new Error("\"Always allow\" is not available for coding agents");
         });
 
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "always")).toThrow("Always allow");
@@ -972,7 +970,7 @@ describe("registry channels (the device window)", () => {
         registryFetch.mockReset();
         vi.mocked(dialog.showMessageBox).mockClear();
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
-        registryFetch.mockImplementation(async (url: string) => (url === REGISTRY_URL ? registryBody() : new Response("archive bytes")));
+        registryFetch.mockImplementation(async (url: string) => url === REGISTRY_URL ? registryBody() : new Response("archive bytes"));
     });
 
     it("read the registry only when the window searches: loading the view or waiting changes nothing", async () => {

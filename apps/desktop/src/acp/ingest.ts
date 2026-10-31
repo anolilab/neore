@@ -89,6 +89,7 @@ export class HostPoster implements SessionObserver {
 
     /** Sessions that ended locally and wait for their turns to drain before the backend is told. */
     private readonly closing = new Set<string>();
+
     /** What each session shows the backend, to name its agent and folder when a reply's files are read. */
     private readonly infos = new Map<string, HostSessionInfo>();
 
@@ -269,7 +270,7 @@ export class HostPoster implements SessionObserver {
         this.texts.delete(turnId);
 
         // A turn that failed leaves no reply to show files in; one without an image reference has nothing to read.
-        if (endReasonOf(reason) === "failed" || this.stopped || info === undefined || this.options.media === undefined || imageReferences(text).length === 0) {
+        if (info === undefined || this.stopped || this.options.media === undefined || endReasonOf(reason) === "failed" || imageReferences(text).length === 0) {
             channel.end(endReasonOf(reason), error, summary);
 
             return;
@@ -278,47 +279,6 @@ export class HostPoster implements SessionObserver {
         // Never rejects: every failure inside is caught, and the turn ends whatever happens.
         // eslint-disable-next-line unicorn/prefer-await -- turnEnded is synchronous, and the call has no rejection to await
         this.attachMediaThenEnd(channel, info, text, endReasonOf(reason), error, summary).catch(() => {});
-    }
-
-    /**
-     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
-     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
-     * Whatever goes wrong, the turn still ends.
-     */
-    private async attachMediaThenEnd(
-        channel: TurnChannel,
-        info: HostSessionInfo,
-        text: string,
-        reason: "cancelled" | "failed" | "finished",
-        error?: string,
-        summary?: TurnSummary,
-    ): Promise<void> {
-        const { media } = this.options;
-
-        try {
-            if (media !== undefined) {
-                const events = await collectMedia(
-                    {
-                        ...media,
-                        deviceId: this.options.deviceId,
-                        ...(this.options.fetch && { fetch: this.options.fetch }),
-                        ...(this.options.log && { log: this.options.log }),
-                        now: () => this.now(),
-                    },
-                    info.agentKey,
-                    info.folderId,
-                    text,
-                );
-
-                for (const event of events) {
-                    channel.enqueue(event);
-                }
-            }
-        } catch (error_) {
-            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
-        } finally {
-            channel.end(reason, error, summary);
-        }
     }
 
     /** What an import needs to post: the same signing, endpoint and clock the turns use. */
@@ -353,7 +313,7 @@ export class HostPoster implements SessionObserver {
      * message the replay took up again). Call once after the core is up, with what `readLeftovers` returned.
      */
     public async recover(leftovers?: RunningTurn[]): Promise<void> {
-        const left = leftovers ?? (await this.readLeftovers());
+        const left = leftovers ?? await this.readLeftovers();
 
         for (const turn of left) {
             if (this.channels.has(turn.turnId)) {
@@ -399,6 +359,47 @@ export class HostPoster implements SessionObserver {
     }
 
     // ─── Posting ────────────────────────────────────────────────────────────
+
+    /**
+     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
+     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
+     * Whatever goes wrong, the turn still ends.
+     */
+    private async attachMediaThenEnd(
+        channel: TurnChannel,
+        info: HostSessionInfo,
+        text: string,
+        reason: "cancelled" | "failed" | "finished",
+        error?: string,
+        summary?: TurnSummary,
+    ): Promise<void> {
+        const { media } = this.options;
+
+        try {
+            if (media !== undefined) {
+                const events = await collectMedia(
+                    {
+                        ...media,
+                        deviceId: this.options.deviceId,
+                        ...this.options.fetch && { fetch: this.options.fetch },
+                        ...this.options.log && { log: this.options.log },
+                        now: () => this.now(),
+                    },
+                    info.agentKey,
+                    info.folderId,
+                    text,
+                );
+
+                for (const event of events) {
+                    channel.enqueue(event);
+                }
+            }
+        } catch (error_) {
+            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
+        } finally {
+            channel.end(reason, error, summary);
+        }
+    }
 
     /** A session that will not be posted: the turns still waiting on its thread end instead of holding output for ever. */
     private releaseChannels(sessionId: string): void {
@@ -497,8 +498,8 @@ export class HostPoster implements SessionObserver {
                 ended: fields.ended === true,
                 kind: "ok",
                 next: fields.next,
-                ...(typeof fields.existing === "boolean" && { existing: fields.existing }),
-                ...(typeof fields.threadId === "string" && { threadId: fields.threadId }),
+                ...typeof fields.existing === "boolean" && { existing: fields.existing },
+                ...typeof fields.threadId === "string" && { threadId: fields.threadId },
             };
         }
 
@@ -512,8 +513,8 @@ export class HostPoster implements SessionObserver {
         const now = this.now();
         // Retries come at most ~50 s apart (a request timeout plus the longest backoff), so a longer gap (the computer
         // slept, the network was down, a close gave up) ends the streak: only 401s that keep arriving count.
-        const streak =
-            this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
+        const streak
+            = this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
                 ? { count: 1, last: now, reported: false, since: now }
                 : { ...this.unauthorized, count: this.unauthorized.count + 1, last: now };
 

@@ -334,7 +334,7 @@ export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threa
     if (switches[0]) {
         await patchThread(context.db, threadId, {
             activeAgent: switches[0].part.to,
-            ...(switches.some(({ part }) => Boolean(part.handoff)) && { hasHandoff: true }),
+            ...(switches.some(({ part }) => part.handoff) && { hasHandoff: true }),
         });
     }
 };

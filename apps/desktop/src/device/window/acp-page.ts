@@ -37,9 +37,6 @@ const TRAILING_DASH = /-$/u;
 /** Buttons on a bar that just changed stay disabled this long, so a click meant for the old bar cannot land on the new one. */
 const CLICK_THROUGH_GUARD_MS = 800;
 
-/** Counts registry searches: only the answer to the latest one is shown. */
-let searchSerial = 0;
-
 const state: {
     guard?: ReturnType<typeof setTimeout>;
     /** The saved sessions being offered for import, and where they are from. */
@@ -48,11 +45,13 @@ const state: {
     /** What each agent reported at its last start, by key. */
     reports: Record<string, CapabilityReport>;
     requests: PermissionView[];
+    /** Counts registry searches: only the answer to the latest one is shown. */
+    searchSerial: number;
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
     view: AcpView;
-} = { listings: [], reports: {}, requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -606,13 +605,13 @@ export const initAcp = async (): Promise<void> => {
     $("acp-registry-form").addEventListener("submit", (event) => {
         event.preventDefault();
         guarded(async () => {
-            searchSerial += 1;
+            state.searchSerial += 1;
 
-            const mine = searchSerial;
+            const mine = state.searchSerial;
             const found = await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query"));
 
             // A newer search was submitted meanwhile: its answer is the one to show.
-            if (mine !== searchSerial) {
+            if (mine !== state.searchSerial) {
                 return;
             }
 
