@@ -26,7 +26,7 @@ import { scriptedModel, textStep } from "./group/test-models";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const { groupState, modelState, registry, skillState } = vi.hoisted(() => {
+const { groupState, modelState, registry, skillState, toolsState } = vi.hoisted(() => {
     return {
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
@@ -35,6 +35,8 @@ const { groupState, modelState, registry, skillState } = vi.hoisted(() => {
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
+        /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
+        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
     };
 });
 
@@ -70,11 +72,24 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: null,
+                untrustedContext: false,
                 userProviderKeys: undefined,
             };
         }),
         resolveRunModel: vi.fn(async () => {
-            return { allowTools: false, customProvider: undefined };
+            return { allowTools: toolsState.allowTools, customProvider: undefined };
+        }),
+    };
+});
+
+// Only what the run hands the tools is under test here, not the tools.
+vi.mock("./lib/agent-tools", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./lib/agent-tools")>()),
+        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
+            toolsState.options = options;
+
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
         }),
     };
 });
@@ -170,6 +185,8 @@ beforeEach(async () => {
     modelState.model = scriptedModel([textStep("Hello there.")]);
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
+    toolsState.allowTools = false;
+    toolsState.options = undefined;
 
     harness = lunoraTest(schema as never);
 
@@ -385,6 +402,36 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         const [, usageArgs] = vi.mocked(scheduleReplyUsage).mock.calls[0] as [unknown, Record<string, unknown> | undefined];
 
         expect(usageArgs).toMatchObject({ skillName: "/summarise", userId: OWNER });
+    });
+
+    describe("the quick check's view of skill text", () => {
+        const listed = { description: "Summarise a page", name: "Summary", slug: "summarise" };
+
+        it("treats the run as untrusted when any skill is enabled, whoever wrote it", async () => {
+            toolsState.allowTools = true;
+            skillState.answer = { enabledSkills: [listed], invocation: null };
+
+            await run();
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(true);
+        });
+
+        it("treats the run as untrusted when a skill is invoked", async () => {
+            toolsState.allowTools = true;
+            skillState.answer = { enabledSkills: [], invocation: { config: undefined, instructions: "Summarise.", skillId: undefined, slug: "summarise" } };
+
+            await run({ userPrompt: "/summarise the thread" });
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(true);
+        });
+
+        it("control: with no skill text and no injected context the run is trusted", async () => {
+            toolsState.allowTools = true;
+
+            await run();
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(false);
+        });
     });
 
     it("ends the run with the skill's own message when the skill cannot run", async () => {

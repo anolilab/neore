@@ -2809,6 +2809,12 @@
     "aiUserPreferences": {
       "commitOrdered": false,
       "fields": {
+        "autoApproveLowRisk": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "autoDetectComplexity": {
           "kind": "boolean",
           "nullable": false,
@@ -25999,6 +26005,12 @@
                 "optional": false,
                 "unique": false
               }
+            },
+            "untrustedContext": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
             }
           }
         },
