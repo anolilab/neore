@@ -17,7 +17,7 @@ import type { ToolRunConfig } from "./tool-run-config";
 import { admitOwnedThread, resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { throwThreadLocked } from "../../lib/thread-lock";
 
-export type ToolApprovalDecision = "always" | "approve" | "deny";
+export type ToolApprovalDecision = "always" | "approve" | "deny" | "hour" | "today";
 
 export type ClaimResult =
     | { kind: "already-resolved"; status: "approved" | "denied" | "pending"; streamId: string | null }

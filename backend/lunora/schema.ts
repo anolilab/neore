@@ -213,6 +213,9 @@ export const schema = defineSchema({
         showTimestamps: v.optional(v.boolean()),
         // Per-tool permission overrides, keyed `builtin:<tool>` / `mcp:<server>:<tool>`
         // (see chat/lib/tool-permissions.ts). Absent key = the tool's default mode.
+        // Time-boxed allows: permission key -> the epoch ms it lapses (chat/lib/tool-permission-grants.ts).
+        // Server-written only; `auth/fields.ts` deliberately omits it, so no client input can set one.
+        toolPermissionGrants: v.optional(v.record(v.string(), v.number())),
         toolPermissions: v.optional(v.record(v.string(), v.union(v.literal("auto"), v.literal("ask"), v.literal("off")))),
         userId: v.string(),
     })

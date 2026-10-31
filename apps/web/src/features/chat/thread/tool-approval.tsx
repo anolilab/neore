@@ -3,7 +3,10 @@
 /**
  * ToolApproval — rendered in place of a tool call the agent paused on because
  * the tool's permission is `ask`. Approve runs it once, Deny tells the model it
- * was refused, Always allow runs it and stores `auto` for that tool.
+ * was refused, Always allow runs it and stores `auto` for that tool, and Allow for
+ * 1 hour / today runs it and lets that tool run unasked until the time is up (the
+ * allow is the backend's, `chat/lib/tool-permission-grants.ts`). A device tool is
+ * approved again on the device, so it offers neither.
  *
  * Every answer resumes the agent run server-side (`respondToToolApproval`), which
  * opens a fresh stream the thread's streaming placeholder picks up.
@@ -15,10 +18,11 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
+import { resolveDeviceToolName } from "@neore/chat-ui/utils/device-tool-name";
 import { resolveMcpToolName } from "@neore/chat-ui/utils/mcp-tool-name";
 import { Button } from "@neore/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
-import { Check, ShieldAlert, ShieldCheck, X } from "lucide-react";
+import { Check, Clock, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import type { FC } from "react";
 import { useId, useState } from "react";
 
@@ -27,7 +31,7 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-type Decision = "always" | "approve" | "deny";
+type Decision = "always" | "approve" | "deny" | "hour" | "today";
 
 const TOOL_PREFIX_RE = /^tool-/;
 
@@ -47,6 +51,7 @@ const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
     const approvalId = part.approval?.id;
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
+    const canAllowForAPeriod = resolveDeviceToolName(part) === null;
     const isDisabled = !approvalId || !threadId || isPending || submitted !== null;
 
     const respond = (decision: Decision) => {
@@ -123,6 +128,18 @@ const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
                         <ShieldCheck aria-hidden="true" />
                         {t`Always allow`}
                     </Button>
+                    {canAllowForAPeriod && (
+                        <>
+                            <Button aria-label={t`Allow ${tool} for 1 hour`} disabled={isDisabled} onClick={() => respond("hour")} size="sm" variant="ghost">
+                                <Clock aria-hidden="true" />
+                                {t`Allow for 1 hour`}
+                            </Button>
+                            <Button aria-label={t`Allow ${tool} for today`} disabled={isDisabled} onClick={() => respond("today")} size="sm" variant="ghost">
+                                <Clock aria-hidden="true" />
+                                {t`Allow for today`}
+                            </Button>
+                        </>
+                    )}
                 </div>
             )}
         </div>

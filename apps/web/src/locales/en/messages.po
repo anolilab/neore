@@ -439,7 +439,7 @@ msgstr "{0} failed"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:88
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:93
 msgid "{0} for {1}"
 msgstr "{0} for {1}"
 
@@ -873,7 +873,7 @@ msgstr "{label} moved to position {position} of {0} in starred"
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 msgstr "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 
-#: src/features/chat/goal/composer-goal.tsx:70
+#: src/features/chat/goal/composer-goal.tsx:93
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} rounds"
 
@@ -1079,6 +1079,10 @@ msgstr "{selectedCount, plural, one {# thread selected} other {# threads selecte
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} of {MAX_PARALLEL} selected"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+msgid "{server} · until {until}"
+msgstr "{server} · until {until}"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
@@ -2741,13 +2745,29 @@ msgstr "All Types"
 msgid "All Users"
 msgstr "All Users"
 
-#: src/features/chat/thread/tool-approval.tsx:95
+#: src/features/chat/thread/tool-approval.tsx:100
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Allow \"{tool}\" from {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:95
+#: src/features/chat/thread/tool-approval.tsx:100
 msgid "Allow \"{tool}\"?"
 msgstr "Allow \"{tool}\"?"
+
+#: src/features/chat/thread/tool-approval.tsx:133
+msgid "Allow {tool} for 1 hour"
+msgstr "Allow {tool} for 1 hour"
+
+#: src/features/chat/thread/tool-approval.tsx:137
+msgid "Allow {tool} for today"
+msgstr "Allow {tool} for today"
+
+#: src/features/chat/thread/tool-approval.tsx:135
+msgid "Allow for 1 hour"
+msgstr "Allow for 1 hour"
+
+#: src/features/chat/thread/tool-approval.tsx:139
+msgid "Allow for today"
+msgstr "Allow for today"
 
 #. placeholder {0}: osLabels[key]
 #: src/features/local-models/components/local-setup-guide.tsx:115
@@ -2758,6 +2778,11 @@ msgstr "Allow this site ({0})"
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Allowed AI Models"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:193
+msgid "Allowed for a limited time"
+msgstr "Allowed for a limited time"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:224
 msgid "Allowed Providers"
@@ -2783,11 +2808,11 @@ msgstr "Already have an account?"
 msgid "Also viewing"
 msgstr "Also viewing"
 
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:129
 msgid "Always allow"
 msgstr "Always allow"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:127
 msgid "Always allow {tool}"
 msgstr "Always allow {tool}"
 
@@ -3169,16 +3194,16 @@ msgstr "Applying..."
 msgid "approval"
 msgstr "approval"
 
-#: src/features/chat/thread/tool-approval.tsx:116
+#: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/tasks/components/task-detail-dialog.tsx:102
 msgid "Approve"
 msgstr "Approve"
 
-#: src/features/chat/thread/tool-approval.tsx:114
+#: src/features/chat/thread/tool-approval.tsx:119
 msgid "Approve {tool} once"
 msgstr "Approve {tool} once"
 
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:79
 msgid "Approved — running tool"
 msgstr "Approved — running tool"
 
@@ -3379,7 +3404,7 @@ msgstr "Asc"
 msgid "ask"
 msgstr "ask"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Ask"
 msgstr "Ask"
 
@@ -3538,7 +3563,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Auto"
 msgstr "Auto"
 
@@ -3590,7 +3615,7 @@ msgstr "Auto-read replies"
 msgid "Auto-save"
 msgstr "Auto-save"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:305
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 
@@ -4463,8 +4488,8 @@ msgstr "Built-in Canvas Editor"
 msgid "Built-in reasoning before generating"
 msgstr "Built-in reasoning before generating"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:218
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:219
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:313
 #: src/features/settings/lib/settings-keywords.ts:101
 msgid "Built-in tools"
 msgstr "Built-in tools"
@@ -5266,7 +5291,7 @@ msgstr "Choose Search Mode"
 msgid "Choose the camera system for your shot"
 msgstr "Choose the camera system for your shot"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:299
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 
@@ -6454,7 +6479,7 @@ msgstr "Connected to {0}"
 msgid "Connected. You can close this window."
 msgstr "Connected. You can close this window."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:232
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:334
 msgid "Connecting to your MCP servers..."
 msgstr "Connecting to your MCP servers..."
 
@@ -7158,7 +7183,7 @@ msgstr "Could not load the skill breakdown."
 msgid "Could not load this"
 msgstr "Could not load this"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:131
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:137
 msgid "Could not load tools: {error}"
 msgstr "Could not load tools: {error}"
 
@@ -7259,7 +7284,7 @@ msgid "Could not send the message."
 msgstr "Could not send the message."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:83
-#: src/features/chat/thread/tool-approval.tsx:63
+#: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "Could not send your answer. Please try again."
 
@@ -7829,7 +7854,7 @@ msgid "Custom rate limits"
 msgstr "Custom rate limits"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Custom setting (default: {0})"
 msgstr "Custom setting (default: {0})"
 
@@ -8155,7 +8180,7 @@ msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek's experimental advanced chat LLM with thinking"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Default"
 msgstr "Default"
 
@@ -8618,7 +8643,7 @@ msgstr "Demanding tasks where maximum AI capability and refined reasoning matter
 msgid "Denied"
 msgstr "Denied"
 
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:77
 msgid "Denied — continuing without it"
 msgstr "Denied — continuing without it"
 
@@ -8638,11 +8663,11 @@ msgstr "Density"
 msgid "Density updated"
 msgstr "Density updated"
 
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:125
 msgid "Deny"
 msgstr "Deny"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:123
 msgid "Deny {tool}"
 msgstr "Deny {tool}"
 
@@ -8816,7 +8841,7 @@ msgstr "Designers creating logos, icons, and brand assets where text and layout 
 msgid "Desktop"
 msgstr "Desktop"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:66
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:69
 msgid "destructive"
 msgstr "destructive"
 
@@ -11696,6 +11721,10 @@ msgstr "Failed to revoke session"
 msgid "Failed to revoke sessions"
 msgstr "Failed to revoke sessions"
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:266
+msgid "Failed to revoke the allow"
+msgstr "Failed to revoke the allow"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:479
 msgid "Failed to save {providerId} API key"
 msgstr "Failed to save {providerId} API key"
@@ -11928,7 +11957,7 @@ msgstr "Failed to update the case"
 msgid "Failed to update thread visibility"
 msgstr "Failed to update thread visibility"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:174
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
 msgid "Failed to update tool permission"
 msgstr "Failed to update tool permission"
 
@@ -13672,7 +13701,7 @@ msgstr "Go to Vault"
 msgid "Go to your pages"
 msgstr "Go to your pages"
 
-#: src/features/chat/goal/composer-goal.tsx:50
+#: src/features/chat/goal/composer-goal.tsx:73
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:325
@@ -16763,7 +16792,7 @@ msgstr "Loading your overview…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:165
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 #: src/features/settings/components/chat/trigger-settings.tsx:903
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -17365,7 +17394,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:238
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:340
 msgid "MCP server"
 msgstr "MCP server"
 
@@ -17406,8 +17435,8 @@ msgstr "MCP Servers"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:227
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:228
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:329
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:330
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "MCP tools"
 msgstr "MCP tools"
@@ -19225,7 +19254,7 @@ msgstr "No devices paired."
 msgid "No diff data available for this version"
 msgstr "No diff data available for this version"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:235
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:337
 msgid "No enabled MCP servers."
 msgstr "No enabled MCP servers."
 
@@ -19615,7 +19644,7 @@ msgstr "No tier data yet. Tier info is recorded for new requests after the gatew
 msgid "No tools shared yet"
 msgstr "No tools shared yet"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:134
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:140
 msgid "No tools."
 msgstr "No tools."
 
@@ -19762,7 +19791,7 @@ msgstr "Not approved"
 msgid "Not attached:"
 msgstr "Not attached:"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:67
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "not configured"
 msgstr "not configured"
 
@@ -19957,7 +19986,7 @@ msgstr "off"
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:56
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Off"
 msgstr "Off"
 
@@ -23052,7 +23081,7 @@ msgstr "Read the docs"
 msgid "Read what needs you: the description, commits, files, diff and checks of each change."
 msgstr "Read what needs you: the description, commits, files, diff and checks of each change."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:65
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:68
 msgid "read-only"
 msgstr "read-only"
 
@@ -24077,12 +24106,12 @@ msgstr "Resend Verification Email"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:101
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:106
 msgid "Reset"
 msgstr "Reset"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset {0} to default"
 msgstr "Reset {0} to default"
 
@@ -24320,7 +24349,7 @@ msgstr "Review our privacy policy and data processing practices"
 msgid "Review requested on a pull request"
 msgstr "Review requested on a pull request"
 
-#: src/features/chat/goal/composer-goal.tsx:64
+#: src/features/chat/goal/composer-goal.tsx:87
 msgid "Review rounds: {maxRounds}. Change"
 msgstr "Review rounds: {maxRounds}. Change"
 
@@ -24337,7 +24366,7 @@ msgstr "Review the optimized prompt below. You can apply it to update your promp
 msgid "review, security"
 msgstr "review, security"
 
-#: src/features/chat/goal/goal-notes.tsx:129
+#: src/features/chat/goal/goal-notes.tsx:134
 msgid "Review: {reason}"
 msgstr "Review: {reason}"
 
@@ -24347,6 +24376,7 @@ msgstr "Reviewer note"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/pages/components/page-share-dialog.tsx:209
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
 msgid "Revoke"
 msgstr "Revoke"
 
@@ -24357,6 +24387,10 @@ msgstr "Revoke All Sessions"
 #: src/features/auth/components/settings/security/session-cell.tsx:103
 msgid "Revoke Session"
 msgstr "Revoke Session"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+msgid "Revoke the allow for {tool}"
+msgstr "Revoke the allow for {tool}"
 
 #. placeholder {0}: result.revokedCount
 #: src/features/admin/components/user-sessions-dialog.tsx:55
@@ -24577,7 +24611,7 @@ msgstr "Run these in PowerShell."
 msgid "Run this dataset against at least two models to compare them."
 msgstr "Run this dataset against at least two models to compare them."
 
-#: src/features/chat/goal/composer-goal.tsx:55
+#: src/features/chat/goal/composer-goal.tsx:78
 msgid "Run until done"
 msgstr "Run until done"
 
@@ -25973,7 +26007,7 @@ msgstr "Show Timestamps"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Show up to {rowLimit} rows ({byteCount} bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:105
+#: src/features/chat/thread/tool-approval.tsx:110
 msgid "Show what it will send"
 msgstr "Show what it will send"
 
@@ -28805,7 +28839,7 @@ msgstr "The most demanding software engineering tasks requiring OpenAI's maximum
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 
-#: src/features/chat/goal/composer-goal.tsx:75
+#: src/features/chat/goal/composer-goal.tsx:98
 msgid "The most review rounds before it stops"
 msgstr "The most review rounds before it stops"
 
@@ -28988,6 +29022,14 @@ msgstr "These memories were added to the AI's context for this reply because the
 #: src/features/settings/components/chat/model-filter-settings.tsx:250
 msgid "These providers will never be used for your requests."
 msgstr "These providers will never be used for your requests."
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
+msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
+msgstr "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:174
+#~ msgid "These tools run without asking until the time shown. Revoke one to be asked again right away."
+#~ msgstr "These tools run without asking until the time shown. Revoke one to be asked again right away."
 
 #: src/features/chat/thread/composer-draw-dialog.tsx:35
 msgid "Thick"
@@ -29773,7 +29815,7 @@ msgstr "tool calling"
 msgid "Tool Calling"
 msgstr "Tool Calling"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
 #: src/features/settings/lib/settings-navigation.ts:95
 msgid "Tool Permissions"
 msgstr "Tool Permissions"
@@ -30168,7 +30210,7 @@ msgstr "Turkish (Turkey)"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Turn any GitHub repository into a remote MCP endpoint"
 
-#: src/features/chat/goal/composer-goal.tsx:39
+#: src/features/chat/goal/composer-goal.tsx:62
 msgid "Turn off run until done"
 msgstr "Turn off run until done"
 
@@ -30176,7 +30218,7 @@ msgstr "Turn off run until done"
 msgid "Turn on Daily Brief"
 msgstr "Turn on Daily Brief"
 
-#: src/features/chat/goal/composer-goal.tsx:39
+#: src/features/chat/goal/composer-goal.tsx:62
 msgid "Turn on run until done"
 msgstr "Turn on run until done"
 
@@ -30571,6 +30613,10 @@ msgstr "unsupported type"
 #: src/features/pages/components/page-share-dialog.tsx:206
 msgid "until {0}"
 msgstr "until {0}"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+msgid "Until {until}"
+msgstr "Until {until}"
 
 #: src/features/pages/components/page-tree-item.tsx:53
 #: src/features/pages/components/page-view.tsx:390
@@ -31934,7 +31980,7 @@ msgstr "Waiting for the agent…"
 msgid "Waiting for the owner to answer"
 msgstr "Waiting for the owner to answer"
 
-#: src/features/chat/thread/tool-approval.tsx:69
+#: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
@@ -31954,7 +32000,7 @@ msgstr "Waiting for your answer"
 msgid "Waiting for your answer in {0}"
 msgstr "Waiting for your answer in {0}"
 
-#: src/features/chat/thread/tool-approval.tsx:69
+#: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for your approval"
 msgstr "Waiting for your approval"
 
@@ -32868,7 +32914,7 @@ msgstr "Your message:"
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr "Your next chat is temporary. Turn this off in Settings to keep it."
 
-#: src/features/chat/goal/composer-goal.tsx:56
+#: src/features/chat/goal/composer-goal.tsx:79
 msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr "Your next message is a goal. The agent keeps working until a review confirms it is met."
 

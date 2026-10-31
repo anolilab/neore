@@ -74,6 +74,7 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
+    { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },
 ];
 

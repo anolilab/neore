@@ -2926,6 +2926,11 @@
       "to": "table:threadTags"
     },
     {
+      "from": "function:chat_tool_permissions:getToolPermissionGrantsQuery",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
       "from": "function:chat_tool_permissions:getToolPermissionSettings",
       "kind": "read",
       "to": "table:aiUserPreferences"
@@ -2941,12 +2946,17 @@
       "to": "function:auth_functions:getMCPServersQuery"
     },
     {
+      "from": "function:chat_tool_permissions:pruneExpiredToolPermissionGrants",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
       "from": "function:chat_tool_permissions:recordPendingToolApprovals",
       "kind": "write",
       "to": "table:toolApprovalRuns"
     },
     {
-      "from": "function:chat_tool_permissions:respondToToolApproval",
+      "from": "function:chat_tool_permissions:revokeToolPermissionGrant",
       "kind": "read",
       "to": "table:aiUserPreferences"
     },
@@ -10659,6 +10669,13 @@
     },
     {
       "detail": "query",
+      "id": "function:chat_tool_permissions:getToolPermissionGrantsQuery",
+      "kind": "function",
+      "name": "chat.tool_permissions.getToolPermissionGrantsQuery",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
       "id": "function:chat_tool_permissions:getToolPermissionSettings",
       "kind": "function",
       "name": "chat.tool_permissions.getToolPermissionSettings",
@@ -10680,6 +10697,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_tool_permissions:pruneExpiredToolPermissionGrants",
+      "kind": "function",
+      "name": "chat.tool_permissions.pruneExpiredToolPermissionGrants",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
       "id": "function:chat_tool_permissions:recordPendingToolApprovals",
       "kind": "function",
       "name": "chat.tool_permissions.recordPendingToolApprovals",
@@ -10690,6 +10714,13 @@
       "id": "function:chat_tool_permissions:respondToToolApproval",
       "kind": "function",
       "name": "chat.tool_permissions.respondToToolApproval",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_tool_permissions:revokeToolPermissionGrant",
+      "kind": "function",
+      "name": "chat.tool_permissions.revokeToolPermissionGrant",
       "module": "chat"
     },
     {
@@ -17533,25 +17564,25 @@
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 32,
-      "reason": "\"saveAiUserPreferences\" is not a registered function"
-    },
-    {
-      "file": "auth/lib/preference-writes",
-      "kind": "write",
       "line": 34,
       "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 46,
-      "reason": "\"saveUserSettings\" is not a registered function"
+      "line": 36,
+      "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
       "line": 48,
+      "reason": "\"saveUserSettings\" is not a registered function"
+    },
+    {
+      "file": "auth/lib/preference-writes",
+      "kind": "write",
+      "line": 50,
       "reason": "\"saveUserSettings\" is not a registered function"
     },
     {
@@ -18233,6 +18264,12 @@
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
+      "file": "chat/lib/agent-tools",
+      "kind": "call",
+      "line": 126,
+      "reason": "\"buildAgentTools\" is not a registered function"
+    },
+    {
       "file": "chat/lib/daily-limit",
       "kind": "call",
       "line": 76,
@@ -18537,6 +18574,24 @@
       "kind": "write",
       "line": 44,
       "reason": "\"insertPersistentStream\" is not a registered function"
+    },
+    {
+      "file": "chat/tool-permissions",
+      "kind": "read",
+      "line": 227,
+      "reason": "\"recordApprovalPreference\" is not a registered function"
+    },
+    {
+      "file": "chat/tool-permissions",
+      "kind": "read",
+      "line": 268,
+      "reason": "\"recordApprovalPreference\" is not a registered function"
+    },
+    {
+      "file": "chat/tool-permissions",
+      "kind": "read",
+      "line": 413,
+      "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tools/browser",
@@ -19957,31 +20012,31 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 127,
+      "line": 128,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 129,
+      "line": 130,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 147,
+      "line": 148,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 153,
+      "line": 154,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 262,
+      "line": 263,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
