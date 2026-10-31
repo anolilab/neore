@@ -421,36 +421,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
-    const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>, call: AppliedCall): Promise<void> => {
+    const startRequestedSession = async (
+        command: Extract<AcpCommand, { kind: "start" }>,
+        call: AppliedCall,
+        server?: { acp: AcpManager; early: EarlySends },
+    ): Promise<void> => {
         try {
-            const sessionId = await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
+            const sessionId = await (server?.acp ?? requireAcp()).startSession(command.agentKey, command.agentLabel, command.folderPath, {
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });
 
-            requireEarly().opened(sessionId);
+            (server?.early ?? requireEarly()).opened(sessionId);
         } catch (error) {
             console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message);
-            requireEarly().failed(command.sessionId, (error as Error).message);
-        } finally {
-            await state.commands?.finished(call.callId);
-        }
-    };
-
-    /** Opens the session the backend asked for on a server; the receipt stays open until it has opened or failed, like this computer's own. */
-    const startRequestedServerSession = async (deviceId: string, command: Extract<AcpCommand, { kind: "start" }>, call: AppliedCall): Promise<void> => {
-        const runtime = requireServers().get(deviceId);
-
-        try {
-            const sessionId = await runtime.acp.startSession(command.agentKey, command.agentLabel, command.folderPath, {
-                sessionId: command.sessionId,
-                threadId: command.threadId,
-            });
-
-            runtime.early.opened(sessionId);
-        } catch (error) {
-            console.error("[neore-desktop] a requested coding agent did not start on a server:", (error as Error).message);
-            runtime.early.failed(command.sessionId, (error as Error).message);
+            (server?.early ?? requireEarly()).failed(command.sessionId, (error as Error).message);
         } finally {
             await state.commands?.finished(call.callId);
         }
@@ -483,11 +468,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             case "start": {
                 // The agent takes a while to start. The command is accepted now and stays in the receipt log until the
                 // agent has opened (or failed to); the backend learns the session is open from its own `session_open`.
-                if (call.deviceId === undefined) {
-                    startRequestedSession(command, call);
-                } else {
-                    startRequestedServerSession(call.deviceId, command, call);
-                }
+                startRequestedSession(command, call, server);
 
                 return HELD;
             }
