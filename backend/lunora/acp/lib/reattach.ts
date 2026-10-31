@@ -5,7 +5,9 @@ import type { MutationCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
 import { agentSwitchOf } from "../../agent/agent-switch-logic";
 import { walkPath } from "../../agent/branch-rows";
+import type { ReattachFallbackReason } from "../../agent/agent-switch-validators";
 import { patchAgentSwitchRow } from "../../agent/table-writes";
+import { omit } from "../../lib/collections";
 
 type Session = Doc<"acpSessions">;
 
@@ -33,11 +35,32 @@ export const savedSessionFor = (
     );
 
 /**
+ * Whether the agent a session was started for with a saved session id (`session.nativeSessionId`, recorded when the start
+ * was queued) did NOT end up in that session, and why. A computer from before reattach ignores the id, opens a new
+ * session and reports nothing about it, which reads the same as a failed load: only a reported `loaded: true` under
+ * the id asked for is a reattach.
+ */
+export const reattachFailureOf = (
+    requestedNativeSessionId: string,
+    open: { nativeSessionId?: string; reattach?: { loaded: boolean; reason?: string } },
+): ReattachFallbackReason | undefined => {
+    if (open.reattach === undefined) {
+        return "not_reattached";
+    }
+
+    if (!open.reattach.loaded) {
+        return open.reattach.reason === "load_unsupported" ? "load_unsupported" : "load_failed";
+    }
+
+    return open.nativeSessionId !== undefined && open.nativeSessionId !== requestedNativeSessionId ? "other_session" : undefined;
+};
+
+/**
  * The computer opened a session it was asked to resume, and could not load it: the divider that asked is now a `portable`
  * handoff with the reason, so the transcript says what happened and the agent's first prompt carries the handoff
  * (`acp/lib/pending-handoff.ts`). A divider that is not a `native` one, or that already has a reason, is left alone.
  */
-export const markReattachFailed = async (ctx: MutationCtx, threadId: Id<"threads">, reason: string): Promise<void> => {
+export const markReattachFailed = async (ctx: MutationCtx, threadId: Id<"threads">, reason: ReattachFallbackReason): Promise<void> => {
     const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
     const leaf = thread && (await leafRowOf(ctx, thread));
 
@@ -52,7 +75,8 @@ export const markReattachFailed = async (ctx: MutationCtx, threadId: Id<"threads
 
         if (part) {
             if (part.mode === "native" && part.fallbackReason === undefined) {
-                await patchAgentSwitchRow(ctx.db, row._id, { ...part, fallbackReason: reason.slice(0, 500), mode: "portable" });
+                // The portable handoff covers the whole conversation: what the agent was to be caught up on is part of it.
+                await patchAgentSwitchRow(ctx.db, row._id, { ...omit(part, ["catchUp"]), fallbackReason: reason, mode: "portable" });
             }
 
             return;

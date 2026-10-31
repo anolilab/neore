@@ -67,7 +67,7 @@ export interface HostSessionInfo {
     /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
     nativeSessionId?: string;
     /** For a session the backend started with a saved session id (harness switch S4): whether the agent loaded it, and why not. */
-    reattach?: { loaded: boolean; reason?: string };
+    reattach?: { loaded: boolean; reason?: "load_failed" | "load_unsupported" };
 }
 
 /** What an `AgentSession` tells whoever persists its turns. Every method returns at once and never throws. */
@@ -104,7 +104,7 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         folderLabel: info.folderLabel.slice(0, 200),
         ...info.capabilities !== undefined && { capabilities: info.capabilities },
         ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && { nativeSessionId: info.nativeSessionId.slice(0, 256) },
-        ...info.reattach !== undefined && { reattach: { loaded: info.reattach.loaded, ...info.reattach.reason !== undefined && { reason: info.reattach.reason.slice(0, 500) } } },
+        ...info.reattach !== undefined && { reattach: { loaded: info.reattach.loaded, ...info.reattach.reason !== undefined && { reason: info.reattach.reason } } },
     };
 };
 

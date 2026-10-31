@@ -59,8 +59,12 @@ export const HANDOFF_MAX_CHARACTERS = 80_000;
  * summary of older turns, for the divider's note.
  */
 export const vAgentSwitch = v.object({
-    // Why a `native` reattach became `portable`: the agent could not load its saved session.
-    fallbackReason: v.optional(v.string().max(500)),
+    // What a `native` reattach is sent with its first prompt: the turns since the agent left, which its own session lacks.
+    catchUp: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
+    // Why a `native` reattach became `portable`, as a code the transcript words in the reader's language: the agent failed to
+    // load the saved session (`load_failed`), does not load saved sessions (`load_unsupported`), opened a session without
+    // saying it loaded one (`not_reattached`, a computer from before reattach), or opened one under another id (`other_session`).
+    fallbackReason: v.optional(v.union(v.literal("load_failed"), v.literal("load_unsupported"), v.literal("not_reattached"), v.literal("other_session"))),
     from: vSwitchAgentRef,
     handoff: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
     mode: vAgentSwitchMode,
@@ -70,3 +74,5 @@ export const vAgentSwitch = v.object({
 });
 
 export type AgentSwitchPart = Infer<typeof vAgentSwitch>;
+
+export type ReattachFallbackReason = NonNullable<AgentSwitchPart["fallbackReason"]>;

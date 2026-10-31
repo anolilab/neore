@@ -51,9 +51,12 @@ export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
  * is named by its label and folder alone: the computer's id, the agent's key and the folder's id are not for a reader of a
  * thread (a public copy of it included).
  */
-export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
-    const { from, to, ...withHandoff } = part;
-    const rest = Object.fromEntries(Object.entries(withHandoff).filter(([key]) => key !== "handoff")) as Omit<AgentSwitchPart, "from" | "handoff" | "to">;
+export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "catchUp" | "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
+    const { from, to, ...withText } = part;
+    const rest = Object.fromEntries(Object.entries(withText).filter(([key]) => key !== "catchUp" && key !== "handoff")) as Omit<
+        AgentSwitchPart,
+        "catchUp" | "from" | "handoff" | "to"
+    >;
     const labelsOf = (agent: SwitchAgentRef) =>
         agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
 

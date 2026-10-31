@@ -35,9 +35,9 @@ export const pendingHandoffOf = async (ctx: QueryCtx, thread: Doc<"threads">): P
         const part = agentSwitchOf(row);
 
         // A `native` divider stores the handoff for a reattach that fails; until then the agent has its own session, and
-        // no earlier divider's handoff is for it.
+        // no earlier divider's handoff is for it. What it lacks is what happened while it was away (`catchUp`).
         if (part?.mode === "native") {
-            return undefined;
+            return part.catchUp;
         }
 
         if (part?.handoff) {
@@ -50,4 +50,33 @@ export const pendingHandoffOf = async (ctx: QueryCtx, thread: Doc<"threads">): P
     }
 
     return undefined;
+};
+
+/**
+ * Whether the thread is waiting for a coding agent to say if it loaded the saved session the newest divider asked for.
+ * Until it does, nobody knows whether the first prompt must carry the handoff, and a prompt sent now would be saved
+ * (ending the wait for one) before the answer: so none is taken (`/hosts/send`).
+ */
+export const awaitingReattach = async (ctx: QueryCtx, thread: Doc<"threads">): Promise<boolean> => {
+    const leaf = await leafRowOf(ctx, thread);
+
+    if (!leaf) {
+        return false;
+    }
+
+    const { rows } = await walkPath(ctx, thread._id, leaf, { limit: SCAN_ROWS });
+
+    for (const row of rows) {
+        const part = agentSwitchOf(row);
+
+        if (part) {
+            return part.mode === "native";
+        }
+
+        if ((row.message as { role?: string } | undefined)?.role === "user") {
+            return false;
+        }
+    }
+
+    return false;
 };

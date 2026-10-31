@@ -252,10 +252,18 @@ report says it can load a saved session, and only when agent, folder and host al
   no earlier session, so it is always `portable`.
 - The signed `acp_start` carries `nativeSessionId` (Rust bounds it at 256 and refuses a malformed one; the pair is checked as for any start).
   The desktop sends `session/load` only to an agent that advertised it, else opens a new session, and says which in `session_open.reattach`
-  (`{ loaded, reason }`; a fixed phrase, never the agent's own error text).
-- The portable handoff is stored on the `native` divider too. A failed load turns that divider into `portable` with `fallbackReason`, so the
-  transcript says why and the first prompt carries the handoff (`markReattachFailed`); a successful one sends nothing, and no earlier divider's
-  handoff is sent to it.
+  (`{ loaded, reason }`, `reason` a code: `load_failed` or `load_unsupported`, never the agent's own error text).
+- The id asked for is recorded on the new session row. At `session_open` a session that was asked to reattach counts as failed unless the
+  agent reported `reattach.loaded` and, if it named a session, the same id (`reattachFailureOf`): a desktop from before S4 ignores the id and
+  reports nothing, which is a failed load, not a success.
+- The portable handoff is stored on the `native` divider too (left out when it would be too large: a reattach does not need it to be sent). A
+  failed load turns that divider into `portable` with `fallbackReason` (a code the transcript words, `load_failed`, `load_unsupported`,
+  `not_reattached`, `other_session`), so the first prompt carries the handoff (`markReattachFailed`).
+- A prompt is refused (`session_starting`) while the newest divider is `native` and the session is still `starting`: the answer decides whether
+  the first prompt carries a handoff, and a prompt saved before it would end the wait for one.
+- The reattached session has not seen what another agent did while it was away. When some agent ran in between, the divider carries `catchUp`:
+  those turns (since the divider the agent left through, `findDividerLeaving`) as a `delta` handoff, sent in front of the first prompt once
+  the session is loaded; a failed load sends the whole conversation instead. Where that cannot be told, the switch is `portable`.
 
 ## 6. Invariants crossed
 

@@ -77,7 +77,7 @@ describe("a start with a saved session id", () => {
         expect(methods()).not.toContain("session/load");
         expect(methods()).toContain("session/new");
         expect(opened[0]?.reattach?.loaded).toBe(false);
-        expect(opened[0]?.reattach?.reason).toContain("does not load");
+        expect(opened[0]?.reattach?.reason).toBe("load_unsupported");
         expect(opened[0]?.nativeSessionId).toBe("fake-session-1");
     });
 
@@ -87,7 +87,7 @@ describe("a start with a saved session id", () => {
         expect(methods()).toContain("session/load");
         expect(methods()).toContain("session/new");
         expect(opened[0]).toMatchObject({ nativeSessionId: "fake-session-1", reattach: { loaded: false } });
-        expect(opened[0]?.reattach?.reason).toBeTruthy();
+        expect(opened[0]?.reattach?.reason).toBe("load_failed");
     });
 
     it("reports nothing about a reattach on an ordinary start", async () => {

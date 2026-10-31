@@ -354,11 +354,11 @@ export class AgentSession {
 
                 return resumeSessionId;
             } catch {
-                // The agent's own error can quote its environment: the backend is told that it failed, not its text.
-                this.reattach = { loaded: false, reason: "the agent could not load the saved session" };
+                // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
+                this.reattach = { loaded: false, reason: "load_failed" };
             }
         } else {
-            this.reattach = { loaded: false, reason: "the agent does not load its saved sessions" };
+            this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
         return await newSession(this.connection, folder, startupTimeoutMs);
