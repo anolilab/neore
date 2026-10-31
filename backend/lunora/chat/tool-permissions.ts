@@ -30,12 +30,14 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { getConnectorMcpServers, withMcpServerGrants } from "../connectors/lib/grant-runtime";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { checkRateLimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import type { MCPServerConfig } from "./lib/mcp-tools";
 import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
@@ -91,29 +93,52 @@ export const getToolPermissionGrantsQuery = internalQuery
         return prefs?.toolPermissionGrants ?? {};
     });
 
+type QuickCheckCtx = Pick<QueryCtx, "db">;
+
+/** The user's opt-in is on AND the thread is one only they write to (`isDeviceEligibleThread`). */
+const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string): Promise<boolean> => {
+    const prefs = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    if (prefs?.autoApproveLowRisk !== true) {
+        return false;
+    }
+
+    const thread = await ctx.db.get(threadId);
+    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
+
+    return isDeviceEligibleThread(thread, userId, grant !== null);
+};
+
 /**
  * Whether the quick check may judge this run's `ask` calls: the user turned it on AND the thread is one only they
  * can write to (`isDeviceEligibleThread`: not shared, public, a group chat or a messenger conversation). In anyone
  * else's thread the tool would run with the owner's servers and keys on a collaborator's turn, which only the owner
- * may approve.
+ * may approve. Read once at run start; each call re-reads it in {@link consumeLowRiskCheck}.
  */
 export const getLowRiskApprovalContext = internalQuery
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.boolean())
-    .query(async ({ args: { threadId, userId }, ctx }) => {
-        const prefs = await ctx.db
-            .query("aiUserPreferences")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .unique();
+    .query(async ({ args: { threadId, userId }, ctx }) => await quickCheckAllowed(ctx, threadId, userId));
 
-        if (prefs?.autoApproveLowRisk !== true) {
+/**
+ * Spends one unit of the user's quick-check budget for ONE call, after re-reading the setting and the thread's
+ * sharing in the same write — so switching the setting off, or sharing the thread, takes effect on the next call of a
+ * run already under way. `false` (nothing spent) when either no longer holds, or the budget is spent.
+ */
+export const consumeLowRiskCheck = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+        if (!(await quickCheckAllowed(ctx, threadId, userId))) {
             return false;
         }
 
-        const thread = await ctx.db.get(threadId);
-        const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
+        const budget = await checkRateLimit(ctx, "chat/toolAutoApprove", { count: 1, key: userId });
 
-        return isDeviceEligibleThread(thread, userId, grant !== null);
+        return budget.ok;
     });
 
 /**

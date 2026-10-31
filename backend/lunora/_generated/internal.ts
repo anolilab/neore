@@ -309,7 +309,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -411,12 +411,13 @@ export interface InternalApiTypes {
             };
         };
         tool_permissions: {
+            consumeLowRiskCheck: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
             getLowRiskApprovalContext: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, boolean>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -1465,6 +1466,7 @@ export const internal: InternalApiTypes = {
             },
         },
         tool_permissions: {
+            consumeLowRiskCheck: { __lunoraRef: "chat_tool_permissions:consumeLowRiskCheck" },
             getLowRiskApprovalContext: { __lunoraRef: "chat_tool_permissions:getLowRiskApprovalContext" },
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
             getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },

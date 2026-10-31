@@ -8,8 +8,9 @@ import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { generateText, Output } from "ai";
 import z from "zod/v4";
 
+import type { Id } from "../../_generated/dataModel";
+import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
-import { checkRateLimit } from "../../lib/rate-limiter";
 import { gatewayFetch } from "../../lib/services";
 import { getUtilityModel } from "../../lib/utility-model";
 import type { AutoApprovals, LowRiskCheck } from "./low-risk-approval";
@@ -20,8 +21,16 @@ const LOW_RISK_MODEL = DEFAULT_MEMORY_EXTRACTION_MODEL;
 /** The shape the model is asked for; `parseLowRiskVerdict` then judges what came back. */
 const verdictSchema = z.object({ lowRisk: z.boolean(), reason: z.string() }).strict();
 
-export const createRunLowRiskCheck = (ctx: ActionCtx, args: { threadId: string; userId: string }): { approvals: AutoApprovals; check: LowRiskCheck } => {
-    const { threadId, userId } = args;
+export const createRunLowRiskCheck = (
+    ctx: ActionCtx,
+    args: {
+        threadId: string;
+        /** Resolves once the run's prompt is known: whether it carries knowledge, memory or project context (`injectsUntrustedContext`). */
+        untrustedContext: Promise<boolean>;
+        userId: string;
+    },
+): { approvals: AutoApprovals; check: LowRiskCheck } => {
+    const { threadId, untrustedContext, userId } = args;
     const approvals: AutoApprovals = {};
 
     const classify = async (prompt: string): Promise<unknown> => {
@@ -57,11 +66,8 @@ export const createRunLowRiskCheck = (ctx: ActionCtx, args: { threadId: string; 
 
     const check = createLowRiskApprover({
         classify,
-        consumeBudget: async () => {
-            const budget = await checkRateLimit(ctx, "chat/toolAutoApprove", { count: 1, key: userId });
-
-            return budget.ok;
-        },
+        // Re-reads the setting and the thread's sharing, so switching the setting off or sharing the thread mid-run holds from the next call.
+        consumeBudget: async () => await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }),
         model: LOW_RISK_MODEL,
         now: () => Date.now(),
         // An approval is also stamped on the saved call at `finishRun`; this is the trace a run that never gets there leaves.
@@ -74,6 +80,7 @@ export const createRunLowRiskCheck = (ctx: ActionCtx, args: { threadId: string; 
         record: (toolCallId, record) => {
             approvals[toolCallId] = record;
         },
+        untrustedContext: () => untrustedContext,
     });
 
     return { approvals, check };

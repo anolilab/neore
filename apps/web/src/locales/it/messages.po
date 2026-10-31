@@ -3956,8 +3956,12 @@ msgid "Before"
 msgstr "Prima"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:246
-msgid "Before a tool set to Ask pauses the chat, a short model check reads the tool's name and arguments. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Anything else still asks you. Off by default."
+msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result or an attached file. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#~ msgid "Before a tool set to Ask pauses the chat, a short model check reads the tool's name and arguments. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Anything else still asks you. Off by default."
+#~ msgstr ""
 
 #: src/features/workflow/templates/index.ts:126
 msgid "beginner"

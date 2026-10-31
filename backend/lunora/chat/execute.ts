@@ -41,6 +41,7 @@ import {
     setDispatchOrigin,
     setResearchDepth,
     setThreadStatus,
+    stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
@@ -117,6 +118,8 @@ export const runStreamingAgent = internalAction
         const { customSystemPrompt, model: requestedModel, reasoningEffort, statelessMode } = streamingConfig;
         // Reassigned once, when an invoked skill names a preferred model.
         let model = requestedModel;
+        // Set once the run has saved rows: a run that fails still leaves the record of the calls the quick check approved.
+        let stampSavedCalls: (() => Promise<void>) | undefined;
 
         try {
             streamLogger.debug(`[BgAgent] Starting background agent execution`, {
@@ -258,6 +261,8 @@ export const runStreamingAgent = internalAction
                               ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
                               : undefined,
                           threadId,
+                          // The tools are built while the context loads; the quick check reads this at the first call.
+                          untrustedContext: runContextPromise.then((context) => context.untrustedContext).catch(() => true),
                           userId,
                       })
                     : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
@@ -367,6 +372,14 @@ export const runStreamingAgent = internalAction
             const timingStart = Date.now();
             let piped: PipedStream;
 
+            stampSavedCalls = async () =>
+                await stampSavedToolCalls(ctx, {
+                    autoApprovals: toolResult.autoApprovals,
+                    mcpLabels: toolResult.mcpLabels,
+                    savedMessages: result.savedMessages,
+                    userId,
+                });
+
             // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
             const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
                 await afterRun(ctx, {
@@ -389,6 +402,7 @@ export const runStreamingAgent = internalAction
                     order: result.order,
                     promptMessageId: result.promptMessageId,
                     result,
+                    stamp: { autoApprovals: toolResult.autoApprovals, mcpLabels: toolResult.mcpLabels, userId },
                     stop: stopping,
                     streamId,
                 });
@@ -439,6 +453,8 @@ export const runStreamingAgent = internalAction
                         shouldAutoContinue: isAutoContinue,
                         toolNames: Object.keys(tools),
                         toolPermissionKeys: toolResult.permissionKeys,
+                        // A continuation does not reload the context, so the quick check reads this off the snapshot.
+                        untrustedContext: runContext.untrustedContext,
                     },
                     streamId,
                     threadId,
@@ -489,7 +505,7 @@ export const runStreamingAgent = internalAction
                 safeMessage = "The custom endpoint for this model was removed or disabled. Pick another model or re-enable it in Settings → API Keys.";
             }
 
-            await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "error" });
+            await failRun(ctx, { safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
         } finally {
             await closeMCPClients(mcpClients);
         }

@@ -3,7 +3,7 @@
  * no error line and leaves the thread `active`, not `error`. A live stream still
  * gets the error line and the thread's requested status.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { LunoraError } from "lunorash/server";
 
@@ -48,6 +48,32 @@ const fakeCtx = (statuses: (string | Error)[], writeError?: Error) => {
 };
 
 describe(failRun, () => {
+    it("stamps the run's auto-approved calls once the run is closed, even for a stream a stop ended", async () => {
+        const { calls, ctx } = fakeCtx(["done"]);
+        const stamp = vi.fn(async () => {
+            calls.push({ args: {}, ref: "stamp" });
+        });
+
+        await failRun(ctx as never, { ...ARGS, stamp });
+
+        expect(stamp).toHaveBeenCalledOnce();
+        expect(calls.at(-1)?.ref).toBe("stamp");
+    });
+
+    it("does not let a failing stamp undo the close", async () => {
+        const { calls, ctx } = fakeCtx(["streaming"]);
+
+        await expect(
+            failRun(ctx as never, {
+                ...ARGS,
+                stamp: async () => {
+                    throw new Error("label write failed");
+                },
+            }),
+        ).resolves.toBeUndefined();
+        expect(calls.find((call) => call.ref === internal.agent.threads.updateThread)?.args).toMatchObject({ patch: { status: "error" } });
+    });
+
     it("writes no error line and leaves the thread active when the stream was already ended", async () => {
         const { calls, ctx } = fakeCtx(["done"]);
 

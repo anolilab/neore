@@ -5,6 +5,7 @@ import type { AutoApprovalRecord, LowRiskApproverDependencies } from "./low-risk
 import {
     buildLowRiskPrompt,
     createLowRiskApprover,
+    injectsUntrustedContext,
     LOW_RISK_MAX_ARGUMENT_CHARS,
     LOW_RISK_REASON_MAX,
     LOW_RISK_SYSTEM_PROMPT,
@@ -44,6 +45,7 @@ const dependencies = (overrides: Partial<LowRiskApproverDependencies> = {}) => {
         record: (id, record) => {
             records.push([id, record]);
         },
+        untrustedContext: async () => false,
         ...overrides,
     };
 
@@ -114,6 +116,58 @@ describe("lowRiskIneligibleReason", () => {
         expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("outward");
     });
 
+    it.each([
+        "create_issue",
+        "create_or_update_file",
+        "create_event",
+        "save_issue",
+        "create_customer",
+        "update_page",
+        "add_label",
+        "fork_repository",
+        "set_status",
+    ])("never admits the writing tool %s", (tool) => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+    });
+
+    it.each(["assign_issue", "grant_access", "enable_feature", "start_job", "archive_page", "transition_issue", "approve_request"])(
+        "never admits %s: a verb that is not a read verb is out even when no blocklist word is in the name",
+        (tool) => {
+            expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("not-read-verb");
+        },
+    );
+
+    it.each(["sendemail", "createpullrequest", "getissue", "postmessage"])("never admits %s: a read verb must be a word of its own", (tool) => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+    });
+
+    it.each(["get_and_delete_file", "fetch_and_send", "listAndMerge", "get_or_create_user"])(
+        "never admits %s: a read verb up front does not excuse a writing word",
+        (tool) => {
+            expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+        },
+    );
+
+    it.each([
+        "get_issue",
+        "list_files",
+        "searchDocs",
+        "read.page",
+        "fetch-url",
+        "findUsers",
+        "query_postgres",
+        "describe_table",
+        "lookup_zip",
+        "view_file",
+        "get_forecast",
+    ])("admits the read tool %s", (tool) => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBeNull();
+    });
+
+    it("takes the tool's name off its key, so a server name never counts as the verb", () => {
+        expect(lowRiskIneligibleReason(mcpDescriptor("assign_issue", "get_things"), "mcp_get_things__assign_issue", false, interactive)).toBe("not-read-verb");
+    });
+
     it("reads words, not substrings", () => {
         expect(lowRiskIneligibleReason(mcpDescriptor("query_postgres", "Postgres"), "mcp_Postgres__query_postgres", false, interactive)).toBeNull();
     });
@@ -161,6 +215,19 @@ describe("buildLowRiskPrompt", () => {
         circular.self = circular;
         expect(buildLowRiskPrompt("k", circular)).toBeNull();
         expect(buildLowRiskPrompt("k", 10n)).toBeNull();
+    });
+});
+
+describe("injectsUntrustedContext", () => {
+    it("is true once knowledge excerpts, memories or project context were put in the prompt", () => {
+        expect(injectsUntrustedContext({ knowledge: "[1] excerpt" })).toBe(true);
+        expect(injectsUntrustedContext({ memory: "The user likes tea." })).toBe(true);
+        expect(injectsUntrustedContext({ project: "Project notes" })).toBe(true);
+    });
+
+    it("is false when none was injected", () => {
+        expect(injectsUntrustedContext({})).toBe(false);
+        expect(injectsUntrustedContext({ knowledge: "", memory: undefined, project: null })).toBe(false);
     });
 });
 
@@ -223,6 +290,26 @@ describe("createLowRiskApprover", () => {
         // Unknown history is untrusted history.
         await expect(createLowRiskApprover(base)(call({ messages: undefined }))).resolves.toBe(false);
         expect(base.classify).not.toHaveBeenCalled();
+    });
+
+    it("asks the person, without asking the model or spending budget, when knowledge, memory or project context was injected", async () => {
+        const { base } = dependencies({ untrustedContext: async () => true });
+
+        await expect(createLowRiskApprover(base)(call())).resolves.toBe(false);
+        expect(base.classify).not.toHaveBeenCalled();
+        expect(base.consumeBudget).not.toHaveBeenCalled();
+    });
+
+    it("asks the person when it cannot tell whether such context was injected", async () => {
+        const { base, outcomes } = dependencies({
+            untrustedContext: async () => {
+                throw new Error("run context failed");
+            },
+        });
+
+        await expect(createLowRiskApprover(base)(call())).resolves.toBe(false);
+        expect(base.classify).not.toHaveBeenCalled();
+        expect(outcomes).toEqual(["tainted"]);
     });
 
     it("asks the person when an attached file is in the context", async () => {
@@ -340,6 +427,27 @@ describe("applyToolPermissions with the quick check", () => {
         expect(approvesEverything).not.toHaveBeenCalled();
         // The one eligible tool in the same set does go through the check.
         await expect(ask(applied, "mcp_Weather__get_forecast")).resolves.toBe(false);
+    });
+
+    it("keeps a prompt for a writing or outward tool even when the check would approve it", async () => {
+        const approvesEverything = vi.fn(async () => true);
+        const names = [
+            "mcp_GitHub__create_issue",
+            "mcp_GitHub__create_or_update_file",
+            "mcp_Calendar__create_event",
+            "mcp_Linear__save_issue",
+            "mcp_Stripe__create_customer",
+            "mcp_Mail__sendemail",
+            "mcp_GitHub__createpullrequest",
+        ];
+        const { tools: applied } = applyToolPermissions(tools(...names, "mcp_GitHub__get_issue"), describeMcp, {}, { lowRiskCheck: approvesEverything });
+
+        for (const name of names) {
+            expect((applied[name] as { needsApproval: unknown }).needsApproval, name).toBe(true);
+        }
+
+        expect(approvesEverything).not.toHaveBeenCalled();
+        await expect(ask(applied, "mcp_GitHub__get_issue")).resolves.toBe(false);
     });
 
     it("keeps a prompt in a headless or API-key run", () => {

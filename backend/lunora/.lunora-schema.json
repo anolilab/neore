@@ -5561,6 +5561,19 @@
             }
           ]
         },
+        "projectIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "projects"
+          }
+        },
         "revokedAt": {
           "kind": "number",
           "nullable": false,
@@ -21207,6 +21220,12 @@
                 "optional": false,
                 "unique": false
               }
+            },
+            "untrustedContext": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
             }
           }
         },

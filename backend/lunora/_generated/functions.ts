@@ -749,6 +749,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_tags_functions:reorderThreadTags": lunora_chat_tags_functions_73.reorderThreadTags as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:setThreadTagAssigned": lunora_chat_tags_functions_73.setThreadTagAssigned as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:updateThreadTag": lunora_chat_tags_functions_73.updateThreadTag as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:consumeLowRiskCheck": lunora_chat_tool_permissions_74.consumeLowRiskCheck as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getLowRiskApprovalContext": lunora_chat_tool_permissions_74.getLowRiskApprovalContext as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_74.getPendingToolApproval as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionGrantsQuery": lunora_chat_tool_permissions_74.getToolPermissionGrantsQuery as unknown as RegisteredLunoraFunction,
@@ -4195,6 +4196,13 @@ if (typeof source["assigned"] !== "boolean") return DEFER;
 if (typeof source["tagId"] !== "string") return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "assigned": source["assigned"], "tagId": source["tagId"], "threadId": source["threadId"] };
+});
+installCompiledValidatorMap(lunora_chat_tool_permissions_74.consumeLowRiskCheck.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "threadId": source["threadId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_tool_permissions_74.getLowRiskApprovalContext.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8315,7 +8323,7 @@ export interface Caller {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
+            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
             runStreamingAgent: (args: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }) => Promise<void>;
         };
         functions: {
@@ -8529,6 +8537,7 @@ export interface Caller {
             };
         };
         tool_permissions: {
+            consumeLowRiskCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
             getLowRiskApprovalContext: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
             getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
@@ -8536,7 +8545,7 @@ export interface Caller {
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             pruneExpiredToolPermissionGrants: (args?: {}) => Promise<null>;
-            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }) => Promise<null>;
+            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; threadId: string; userId: string }) => Promise<null>;
             respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: (args: { key: string }) => Promise<null>;
             setAutoApproveLowRisk: (args: { enabled: boolean }) => Promise<null>;
@@ -10220,6 +10229,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             },
         },
         tool_permissions: {
+            consumeLowRiskCheck: (args) => callRegistered(context, "chat_tool_permissions:consumeLowRiskCheck", args),
             getLowRiskApprovalContext: (args) => callRegistered(context, "chat_tool_permissions:getLowRiskApprovalContext", args),
             getPendingToolApproval: (args) => callRegistered(context, "chat_tool_permissions:getPendingToolApproval", args),
             getToolPermissionGrantsQuery: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionGrantsQuery", args),

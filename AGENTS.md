@@ -434,12 +434,25 @@ written here is what is not.
   deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
   model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
   defaults to `ask` is a person tool or a delegation), no user override (only the DEFAULT `ask`), no
-  destructive/open-world annotation, no outward/destructive word in the tool name, not headless, not
-  an API-key run, and the thread must pass `isDeviceEligibleThread` (the owner alone — a collaborator's
-  turn would otherwise replace the owner's consent). Taint is `computeTaint(options.messages)`, the
-  device-call signal, so after any web/knowledge/MCP result or attached file in the context the tool
-  asks again. The approval is stamped on the saved call at `finishRun` (`providerOptions.neore.autoApproval`,
-  by tool call id, next to the MCP label), and a `chat.low_risk_check` event is logged per decision.
+  destructive/open-world annotation, not headless, not an API-key run, and the thread must pass
+  `isDeviceEligibleThread` (the owner alone — a collaborator's turn would otherwise replace the
+  owner's consent). **The tool name must START with a read verb** (`READ_VERBS`: get, list, search,
+  read, fetch, find, query, describe, lookup, view — the leading word of the key's tool name, split on
+  `_ - .` or a camelCase boundary), so `create_issue`, `save_issue`, `create_event` and `sendemail` are
+  never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
+  (`get_or_create_user`). An allowlist, not a blocklist: a new write verb is a prompt by default.
+  **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
+  (any tool result or attached file) AND `RunContext.untrustedContext` (retrieved knowledge, memories or
+  project context in the system prompt, which `computeTaint` cannot see). The tools are built while the
+  context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
+  reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
+  thread's sharing are re-read at every call**, in the same mutation that spends the budget unit
+  (`consumeLowRiskCheck`), so switching it off or sharing the thread mid-run holds from the next call
+  (`getLowRiskApprovalContext` at run start only decides whether to build the check). The approval is
+  stamped on the saved call by tool call id (`providerOptions.neore.autoApproval`, next to the MCP
+  label) through `stampSavedToolCalls`, which `finishRun`, `endStoppedRun`, `failRun` and the
+  continuation's failure path all call; a stamp that fails is logged and never changes how the run
+  ended. A `chat.low_risk_check` event is logged per decision.
 
 - **Sub-agents** (`sub-agents/`) — `delegateToSubAgent` admits a
   `subAgentRuns` row (owner of the parent thread only; depth ≤ 2 counted via

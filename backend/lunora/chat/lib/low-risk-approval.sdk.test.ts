@@ -34,7 +34,7 @@ const steps = (): LanguageModelV3StreamPart[][] => [
     ],
 ];
 
-const run = async (classify: () => Promise<unknown>) => {
+const run = async (classify: () => Promise<unknown>, untrusted = false) => {
     const executed = vi.fn(async () => "sunny");
     const classifyMock = vi.fn(classify);
     const records: Record<string, unknown> = {};
@@ -46,6 +46,7 @@ const run = async (classify: () => Promise<unknown>) => {
         record: (id, record) => {
             records[id] = record;
         },
+        untrustedContext: async () => untrusted,
     });
     const { tools } = applyToolPermissions(
         { [NAME]: tool({ description: "forecast", execute: executed, inputSchema: z.object({ city: z.string() }) }) },
@@ -111,6 +112,16 @@ describe("the quick check through streamText", () => {
         expect(types).toContain("tool-approval-request");
         expect(executed).not.toHaveBeenCalled();
         expect(records).toStrictEqual({});
+    });
+
+    it("pauses for a person, without asking the classifier, when knowledge, memory or project context is in the prompt", async () => {
+        const { classifyMock, executed, types } = await run(async () => {
+            return { lowRisk: true, reason: "Reads a forecast." };
+        }, true);
+
+        expect(types).toContain("tool-approval-request");
+        expect(executed).not.toHaveBeenCalled();
+        expect(classifyMock).not.toHaveBeenCalled();
     });
 
     it("pauses for a person when the classifier fails", async () => {

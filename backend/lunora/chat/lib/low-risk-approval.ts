@@ -16,9 +16,15 @@
  * - a call whose context carries untrusted content (`computeTaint`, the signal
  *   that makes a device call always prompt);
  * - a tool the user chose `ask` for themselves — only the DEFAULT `ask` is eligible;
- * - a tool that sends or publishes outward, or whose server declares it
- *   destructive or open-world. Server annotations are untrusted: they only ever
- *   narrow what is eligible.
+ * - a tool whose name does not START with a read verb (`READ_VERBS`: get, list, search, read, fetch, find, query,
+ *   describe, lookup, view). That is an allowlist: `create_issue`, `save_issue`, `create_event` or `sendemail` are never
+ *   eligible, whatever the model would say. A name that starts with a read verb but also carries a writing or outward
+ *   word (`get_or_create_user`, `fetch_and_send`) is out as well (`OUTWARD_WORDS`);
+ * - a tool whose server declares it destructive or open-world. Server annotations are untrusted: they only ever
+ *   narrow what is eligible;
+ * - a call made after knowledge-base excerpts, memories or project context were injected into the prompt, or whose
+ *   history carries a tool result or an attached file (`computeTaint`): the check never runs once the chat has read
+ *   anything it did not write.
  *
  * Pure apart from the injected `classify` and `consumeBudget`, so every rule
  * above is a unit test.
@@ -70,13 +76,22 @@ export type LowRiskCheck = (call: LowRiskCall) => Promise<boolean>;
 // ---------------------------------------------------------------------------
 
 /**
+ * The verbs a tool's name must START with to be put to the quick check. The leading word is compared whole, so
+ * `get_issue`, `get-issue`, `get.issue` and `getIssue` start with `get` while `getissue` and `sendemail` do not.
+ */
+const READ_VERBS: ReadonlySet<string> = new Set(["describe", "fetch", "find", "get", "list", "lookup", "query", "read", "search", "view"]);
+
+/**
  * Words in a tool's name that mean it reaches outward (messages, publishes, pays,
- * merges), changes or destroys something, runs code, or starts another agent. A
- * name containing one is never checked. Compared per word, singular, so
+ * merges), writes, changes or destroys something, runs code, or starts another agent. A
+ * name containing one is never checked, even behind a read verb (`get_or_create_user`).
+ * Compared per word, singular, so
  * `send_email`, `sendEmail` and `emails.send` all match while `postgres` does not.
  */
 const OUTWARD_WORDS: ReadonlySet<string> = new Set([
+    "add",
     "agent",
+    "append",
     "bill",
     "broadcast",
     "buy",
@@ -85,6 +100,8 @@ const OUTWARD_WORDS: ReadonlySet<string> = new Set([
     "checkout",
     "comment",
     "commit",
+    "copy",
+    "create",
     "delegate",
     "delete",
     "deploy",
@@ -92,17 +109,24 @@ const OUTWARD_WORDS: ReadonlySet<string> = new Set([
     "dispatch",
     "donate",
     "drop",
+    "edit",
     "email",
     "exec",
     "execute",
+    "fork",
+    "import",
+    "insert",
     "invite",
     "invoice",
     "kill",
     "mail",
     "merge",
     "message",
+    "modify",
+    "move",
     "notify",
     "order",
+    "patch",
     "pay",
     "payment",
     "payout",
@@ -112,13 +136,18 @@ const OUTWARD_WORDS: ReadonlySet<string> = new Set([
     "pull",
     "purchase",
     "push",
+    "put",
     "refund",
     "release",
     "remove",
+    "rename",
+    "replace",
     "reply",
     "revoke",
     "run",
+    "save",
     "send",
+    "set",
     "share",
     "shell",
     "sms",
@@ -127,10 +156,12 @@ const OUTWARD_WORDS: ReadonlySet<string> = new Set([
     "terminate",
     "transfer",
     "tweet",
+    "update",
     "upload",
     "webhook",
     "wipe",
     "withdraw",
+    "write",
 ]);
 
 const CAMEL_BOUNDARY_RE = /(?<=[a-z0-9])(?=[A-Z])/g;
@@ -143,6 +174,14 @@ const wordsOf = (name: string): string[] =>
         .split(NON_WORD_RE)
         .filter(Boolean)
         .map((word) => word.toLowerCase().replace(TRAILING_S_RE, ""));
+
+/** The tool's own name inside a permission key (`mcp:<server>:<tool>`, `connector:<slug>:<tool>`): what follows the second colon. */
+const toolNameOf = (key: string): string => {
+    const afterSource = key.indexOf(":") + 1;
+    const afterOwner = key.indexOf(":", afterSource) + 1;
+
+    return afterOwner === 0 ? key : key.slice(afterOwner);
+};
 
 /** Why a call to this tool is never put to the quick check, or `null` when it may be. */
 export const lowRiskIneligibleReason = (
@@ -182,8 +221,19 @@ export const lowRiskIneligibleReason = (
         return "outward";
     }
 
+    // An allowlist, taken off the key's tool name so the server's name (and `mcp_<server>__`) never counts as the verb.
+    const leadingWord = toolNameOf(descriptor.key).replaceAll(CAMEL_BOUNDARY_RE, " ").split(NON_WORD_RE).find(Boolean);
+
+    if (leadingWord === undefined || !READ_VERBS.has(leadingWord.toLowerCase())) {
+        return "not-read-verb";
+    }
+
     return null;
 };
+
+/** Whether the system prompt carries text the person did not write in this chat: retrieved knowledge, memories, project context. */
+export const injectsUntrustedContext = (context: { knowledge?: string | null; memory?: string | null; project?: string | null }): boolean =>
+    Boolean(context.knowledge || context.memory || context.project);
 
 // ---------------------------------------------------------------------------
 // The classifier's input and output
@@ -267,6 +317,11 @@ export interface LowRiskApproverDependencies {
     onOutcome?: (outcome: LowRiskOutcome, call: LowRiskCall) => void;
     /** Called once per approval, before the call runs. */
     record: (toolCallId: string, record: AutoApprovalRecord) => void;
+    /**
+     * Whether the prompt carries knowledge-base excerpts, memories or project context (`loadRunContext`): text the person
+     * did not write in this chat, which reaches the model as instructions. A rejection counts as `true`.
+     */
+    untrustedContext: () => Promise<boolean>;
 }
 
 /**
@@ -285,6 +340,11 @@ export const createLowRiskApprover =
         try {
             // Unknown history is untrusted history.
             if (call.messages === undefined || computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0) {
+                return done("tainted");
+            }
+
+            // Not knowing is the same as yes.
+            if (await dependencies.untrustedContext().catch(() => true)) {
                 return done("tainted");
             }
 

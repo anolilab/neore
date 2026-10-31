@@ -84,6 +84,12 @@ export interface BuildAgentToolsOptions {
      * `ask` tool pauses for a person.
      */
     threadId?: string;
+    /**
+     * Resolves to whether the run's prompt carries knowledge, memory or project context (`RunContext.untrustedContext`).
+     * The quick check never runs after any of them; omitted, that is unknown and counts as present. A promise, because
+     * the tools are built while the context loads.
+     */
+    untrustedContext?: Promise<boolean> | boolean;
     userId: string;
 }
 
@@ -120,6 +126,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         skillTools,
         snapshot,
         threadId,
+        untrustedContext = true,
         userId,
     } = options;
 
@@ -219,7 +226,10 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     };
 
     // Built per run: the approvals it records belong to this run's tool calls.
-    const quickCheck = quickCheckOn && threadId !== undefined ? createRunLowRiskCheck(ctx, { threadId, userId }) : undefined;
+    const quickCheck =
+        quickCheckOn && threadId !== undefined
+            ? createRunLowRiskCheck(ctx, { threadId, untrustedContext: Promise.resolve(untrustedContext), userId })
+            : undefined;
 
     const { removed, requiresApproval, tools } = applyToolPermissions(candidates, describe, overrides as ToolPermissionOverrides, {
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),

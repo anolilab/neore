@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import {
+    consumeLowRiskCheck,
     getLowRiskApprovalContext,
     getToolPermissionSettings,
     pruneExpiredToolPermissionGrants,
@@ -260,5 +261,70 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ isPublic: true }))).toBe(false);
         expect(await ask(await THREAD_ARGS({ deleted: true }))).toBe(false);
         expect(await ask(await THREAD_ARGS({ userId: "someone-else" }))).toBe(false);
+    });
+});
+
+describe("consumeLowRiskCheck", () => {
+    const THREAD = async (extra: Record<string, unknown> = {}) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("threads", { title: "t", userId: USER, ...extra }));
+    const consume = async (threadId: unknown): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await ctx.runMutation(consumeLowRiskCheck, { threadId, userId: USER }));
+
+    it("spends one unit while the setting is on and the thread is the user's alone", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        expect(await consume(await THREAD())).toBe(true);
+    });
+
+    it("takes effect on the next call when the setting is switched off mid-run, and spends nothing", async () => {
+        const threadId = await THREAD();
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+        expect(await consume(threadId)).toBe(true);
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: false } as never);
+
+        // Far more refusals than the bucket holds: a refusal that spent a unit would empty it.
+        for (let call = 0; call < 40; call += 1) {
+            expect(await consume(threadId)).toBe(false);
+        }
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+        expect(await consume(threadId)).toBe(true);
+    });
+
+    it("takes effect on the next call when the thread is shared mid-run", async () => {
+        const threadId = await THREAD();
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+        expect(await consume(threadId)).toBe(true);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadAccess", {
+                    grantedAt: NOW,
+                    grantedBy: USER,
+                    ownerId: USER,
+                    permission: "write",
+                    threadId,
+                    userId: "collaborator",
+                } as never),
+        );
+
+        expect(await consume(threadId)).toBe(false);
+    });
+
+    it("answers false once the user's budget is spent", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD();
+        const answers: boolean[] = [];
+
+        for (let call = 0; call < 40; call += 1) {
+            answers.push(await consume(threadId));
+        }
+
+        expect(answers.filter(Boolean).length).toBeGreaterThan(0);
+        expect(answers.at(-1)).toBe(false);
     });
 });
