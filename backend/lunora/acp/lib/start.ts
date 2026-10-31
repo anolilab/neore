@@ -1,4 +1,4 @@
-import type { Doc, Id } from "../../_generated/dataModel";
+import type { Doc } from "../../_generated/dataModel";
 import type { AcpCallResult } from "../../devices/lib/acp-call";
 import { sha256Hex } from "../../lib/crypto";
 

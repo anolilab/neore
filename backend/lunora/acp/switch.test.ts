@@ -65,6 +65,7 @@ const MODEL = "openai/gpt-4.1-mini";
 const OTHER_MODEL = "google/gemini-2.0-flash-001";
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
+const ALREADY_MADE = /already made/u;
 const NOT_IN_PROJECT = /not allowed in this conversation's project/u;
 const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
@@ -693,7 +694,7 @@ describe("a click id that comes back after its claim expired", () => {
             await ctx.db.patch(device.deviceId as never, { lastSeenAt: Date.now() } as never);
         });
 
-        await expect(switchTo(source, hostTarget(device), ownerId, "old-click")).rejects.toThrow(/already made/);
+        await expect(switchTo(source, hostTarget(device), ownerId, "old-click")).rejects.toThrow(ALREADY_MADE);
 
         expect(await rows("acpSessions")).toHaveLength(before.sessions.length);
         expect(await rows("threads")).toHaveLength(before.threads.length);
