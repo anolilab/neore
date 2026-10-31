@@ -1,6 +1,7 @@
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { endHostStream } from "../../chat/streaming/persistent/host";
+import { isWorkerThread } from "../../sub-agents/worker-thread";
 import { LIVE_STREAM_BATCH, sendHostCancel, settleWorkerRun } from "./finish";
 import { isHostRunThread } from "./host-thread";
 import { sessionOfThread } from "./sessions";
@@ -21,6 +22,13 @@ import { sessionOfThread } from "./sessions";
 export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads">, "_id" | "runner">, now: number): Promise<void> => {
     if (!isHostRunThread(thread)) {
         return;
+    }
+
+    // The line behind a worker's current run ends first, or the end of that run would start the next message here.
+    if (await isWorkerThread(ctx, thread._id)) {
+        const { cancelQueuedWorkerRuns } = await import("../../sub-agents/functions");
+
+        await cancelQueuedWorkerRuns(ctx, thread._id);
     }
 
     for (;;) {

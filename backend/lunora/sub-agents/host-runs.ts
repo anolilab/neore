@@ -76,10 +76,15 @@ export const findRunningHostRun = async (
  * permission request. The worker's thread shows no new message while a turn streams (the reply is saved at its end),
  * so the stream's own events are the clock. While it waits on a person it is not stuck, and neither the quiet notice
  * nor the stale clock runs.
+ *
+ * `chunk` reads the newest event, for the reaper. A live query reads `session`, the session's own clock, which moves at
+ * most every `SESSION_TOUCH_MS`: every post writes a chunk, and a view reading it would re-run for every viewer
+ * several times a second.
  */
 export const hostRunActivity = async (
     ctx: Pick<QueryCtx, "db">,
-    run: Pick<RunDoc, "hostTurnId">,
+    run: Pick<RunDoc, "childThreadId" | "hostTurnId">,
+    precision: "chunk" | "session",
 ): Promise<{ at: number | undefined; waitingOnPerson: boolean }> => {
     const stream = run.hostTurnId === undefined ? null : await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: run.hostTurnId } });
 
@@ -87,7 +92,15 @@ export const hostRunActivity = async (
         return { at: undefined, waitingOnPerson: false };
     }
 
+    const waitingOnPerson = isLiveStream(stream) && (stream.hostPendingPermissions?.length ?? 0) > 0;
+
+    if (precision === "session") {
+        const session = await ctx.db.acpSessions.findFirst({ where: { threadId: stream.threadId as Id<"threads"> } });
+
+        return { at: session?.lastEventAt, waitingOnPerson };
+    }
+
     const newest = await ctx.db.persistentChunks.findFirst({ orderBy: [{ seq: "desc" }], where: { streamId: stream._id } });
 
-    return { at: newest?._creationTime, waitingOnPerson: isLiveStream(stream) && (stream.hostPendingPermissions?.length ?? 0) > 0 };
+    return { at: newest?._creationTime, waitingOnPerson };
 };

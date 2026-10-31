@@ -1217,9 +1217,9 @@ export const completeRun = internalMutation
  * that follows), so its thread's newest row keeps this moving. A host run's thread shows nothing until the turn ends,
  * so its activity is its host events ({@link hostRunActivity}), and it may be waiting on a person, which is not being stuck.
  */
-const workerActivity = async (ctx: QueryCtx, run: RunDoc): Promise<{ at: number | undefined; waitingOnPerson: boolean }> => {
+const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "session"): Promise<{ at: number | undefined; waitingOnPerson: boolean }> => {
     if (run.runner?.kind === "host") {
-        return await hostRunActivity(ctx, run);
+        return await hostRunActivity(ctx, run, precision);
     }
 
     const newest = run.childThreadId === undefined ? null : await getMaxMessage(ctx, run.childThreadId as Id<"threads">);
@@ -1243,7 +1243,7 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
         return;
     }
 
-    const activity = await workerActivity(ctx, run);
+    const activity = await workerActivity(ctx, run, "chunk");
     const decision = workerReapDecision({ lastActivityAt: activity.at, now, run, waitingOnPerson: activity.waitingOnPerson });
 
     if (decision.kind === "later") {
@@ -1285,6 +1285,20 @@ export const shouldRunStop = internalQuery
  * ended run is a no-op, so a second cancel changes and posts nothing.
  */
 export const cancelSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => await finishRun(ctx, runId, { kind: "cancelled" });
+
+/**
+ * Cancels the messages queued behind a worker's current run, newest first so ending the head does not start the one
+ * behind it just to cancel that too. For a worker whose thread is going away: a hard delete does not mark the thread
+ * deleted before it ends the host turn, and the line must not start a message on it.
+ */
+export const cancelQueuedWorkerRuns = async (ctx: MutationCtx, threadId: string): Promise<void> => {
+    const runs = await latestWorkerRuns(ctx, threadId);
+    const queued = runs.filter((run) => run.status === "queued");
+
+    for (const run of queued) {
+        await cancelSubAgentRun(ctx, run._id);
+    }
+};
 
 /** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
 const CANCEL_THREAD_MAX = 20;
@@ -1702,7 +1716,7 @@ const progressFields = async (
     working: RunDoc | undefined,
     locked: boolean,
 ): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[]; stopping: boolean }> => {
-    const activity = working?.status === "running" ? await workerActivity(ctx, working) : undefined;
+    const activity = working?.status === "running" ? await workerActivity(ctx, working, "session") : undefined;
 
     return {
         // No quiet notice while the agent waits on a person's answer: that is not being stuck.

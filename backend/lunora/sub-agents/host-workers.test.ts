@@ -582,11 +582,16 @@ describe("a worker's thread that is deleted", () => {
 
         await sessionOpen(device, receipt.workerId);
 
+        const queued = await dispatchFromUser(receipt.workerId, "second");
         const { endHostThread } = await import("../acp/lib/thread-removed");
 
         await run(async (context) => await endHostThread(context, await context.db.get(receipt.workerId), Date.now()));
 
         expect(await runRow(receipt.runId)).toMatchObject({ status: "cancelled" });
+        // The message behind it is not started on a thread that is going: no second send, no new stream.
+        expect(await runRow(queued.runId)).toMatchObject({ status: "cancelled" });
+        expect(await sendCalls()).toHaveLength(1);
+        expect(await table("persistentStreams", { threadId: receipt.workerId })).toHaveLength(1);
         expect((await table("persistentStreams", { threadId: receipt.workerId }))[0]).toMatchObject({ hostState: "ended" });
     });
 });

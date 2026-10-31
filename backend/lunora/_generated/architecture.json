@@ -17380,13 +17380,13 @@
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 52,
+      "line": 60,
       "reason": "\"endHostThread\" is not a registered function"
     },
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 73,
+      "line": 81,
       "reason": "\"restoreHostThread\" is not a registered function"
     },
     {
@@ -21827,6 +21827,12 @@
       "file": "sub-agents/functions",
       "kind": "read",
       "line": 324,
+      "reason": "\"cancelQueuedWorkerRuns\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 324,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
@@ -21852,6 +21858,12 @@
       "kind": "read",
       "line": 333,
       "reason": "\"admitWorkerRun\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 333,
+      "reason": "\"cancelQueuedWorkerRuns\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
@@ -21882,6 +21894,12 @@
       "kind": "read",
       "line": 348,
       "reason": "\"admitWorkerRun\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 348,
+      "reason": "\"cancelQueuedWorkerRuns\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
@@ -21988,7 +22006,7 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1298,
+      "line": 1312,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
