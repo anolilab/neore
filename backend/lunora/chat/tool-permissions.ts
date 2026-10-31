@@ -124,8 +124,9 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
         return false;
     }
 
-    // An imported conversation's rows come from an outside export file, which no taint signal can see.
-    if (thread?.createdBy?.startsWith("import:")) {
+    // An imported conversation's rows come from an outside export file, and an agent switch hands the earlier
+    // conversation over as one quoted message: no taint signal can see inside either.
+    if (thread?.createdBy?.startsWith("import:") || thread?.hasHandoff === true) {
         return false;
     }
 

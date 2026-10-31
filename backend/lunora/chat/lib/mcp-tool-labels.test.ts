@@ -65,3 +65,9 @@ describe("labelMcpToolCalls: auto-approved calls", () => {
         expect(labelMcpToolCalls(stamped, {}, { c1: approval })).toBeUndefined();
     });
 });
+
+describe("labelMcpToolCalls: provider-supplied ids", () => {
+    it("never reads an inherited name such as `constructor` as an approval", () => {
+        expect(labelMcpToolCalls([{ input: {}, toolCallId: "constructor", toolName: "webSearch", type: "tool-call" }], {}, {})).toBeUndefined();
+    });
+});

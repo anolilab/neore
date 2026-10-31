@@ -269,6 +269,12 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ createdBy: "import:chatgpt" }))).toBe(false);
     });
 
+    it("stays false after an agent switch, which hands the earlier conversation over as one quoted message", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        expect(await ask(await THREAD_ARGS({ hasHandoff: true }))).toBe(false);
+    });
+
     it("is false for a tool the user set a mode for themselves, even mid-run", async () => {
         await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
 

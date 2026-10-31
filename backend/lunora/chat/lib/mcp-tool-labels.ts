@@ -52,7 +52,8 @@ export const labelMcpToolCalls = (content: unknown, labels: McpToolLabels, autoA
         }
 
         const label = typeof part.toolName === "string" ? labels[part.toolName] : undefined;
-        const approval = typeof part.toolCallId === "string" ? autoApprovals[part.toolCallId] : undefined;
+        // Ids are the provider's: an inherited name such as `constructor` must never read as a record.
+        const approval = typeof part.toolCallId === "string" && Object.hasOwn(autoApprovals, part.toolCallId) ? autoApprovals[part.toolCallId] : undefined;
 
         if (!label && !approval) {
             return part;

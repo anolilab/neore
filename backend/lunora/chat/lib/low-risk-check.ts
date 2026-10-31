@@ -31,7 +31,8 @@ export const createRunLowRiskCheck = (
     },
 ): { approvals: AutoApprovals; check: LowRiskCheck } => {
     const { threadId, untrustedContext, userId } = args;
-    const approvals: AutoApprovals = {};
+    // No prototype: a provider's tool-call id is stored as an own key, `__proto__` and `constructor` included.
+    const approvals: AutoApprovals = Object.create(null) as AutoApprovals;
 
     const classify = async (prompt: string): Promise<unknown> => {
         const model = await getUtilityModel(gatewayFetch(ctx), { threadId, userId }, LOW_RISK_MODEL);
@@ -77,8 +78,11 @@ export const createRunLowRiskCheck = (
                 threadId,
                 ...(outcome === "approved" && { permissionKey: call.key, toolCallId: call.toolCallId }),
             }),
+        // The first stamp of an id stands: a provider that reuses an id must not relabel a call a person approved.
         record: (toolCallId, record) => {
-            approvals[toolCallId] = record;
+            if (!Object.hasOwn(approvals, toolCallId)) {
+                approvals[toolCallId] = record;
+            }
         },
         stillAllowed: async (call) =>
             await ctx.runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, {
