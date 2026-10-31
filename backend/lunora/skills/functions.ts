@@ -311,6 +311,8 @@ export const createSkill = authMutation
         category: v.optional(v.string().max(MAX_LENGTH.short)),
         config: v.optional(vSkillConfigInput),
         description: v.string().max(MAX_LENGTH.long),
+        /** Defaults to on. `false` creates the skill switched off, so it reaches no system prompt until the user turns it on. */
+        enabled: v.optional(v.boolean()),
         icon: v.optional(v.string().max(MAX_LENGTH.url)),
         instructions: v.string().max(MAX_LENGTH.document),
         name: v.string().max(MAX_LENGTH.short),
@@ -344,7 +346,7 @@ export const createSkill = authMutation
     .output(v.id("skills"))
     .mutation(
         async ({
-            args: { category, config, description, icon, instructions, name, organizationId, slug, source, tags, variables, version, visibility },
+            args: { category, config, description, enabled, icon, instructions, name, organizationId, slug, source, tags, variables, version, visibility },
             ctx,
         }) => {
             const { userId } = ctx.user;
@@ -409,11 +411,11 @@ export const createSkill = authMutation
                 usageCount: 0,
             });
 
-            // Create userSkills entry (auto-enable when created)
+            // Create userSkills entry (enabled unless the caller asked for it off)
             await ctx.db.insert("userSkills", {
                 addedAt: now,
                 autoRun: false,
-                enabled: true,
+                enabled: enabled ?? true,
                 skillId,
                 userId,
             });
@@ -559,6 +561,53 @@ export const updateSkill = authMutation
     );
 
 /**
+ * Removes a skill and everything that hangs off it, for its owner: stats, the
+ * owner's installation, every user's ratings, the imported files. Returns how many
+ * files went. The caller decides who may delete (`deleteSkill`'s owner check; the
+ * bundle rollback's own-rows check) and which rate limit applies.
+ */
+export const deleteSkillRows = async (context: MutationContext, skillId: Id<"skills">, userId: string): Promise<number> => {
+    // Nothing cascades. Stats and the caller's own installation are removed
+    // here; other users' `userSkills` rows live in their shards and are
+    // filtered out on read, because `context.db.get` returns null for them.
+    const [stats, userSkill] = await Promise.all([
+        context.db.skillStats.findFirst({ where: { skillId } }),
+        context.db
+            .query("userSkills")
+            .withIndex("by_user_and_skill", (query) => query.eq("userId", userId).eq("skillId", skillId))
+            .first(),
+    ]);
+
+    // Every user's ratings of this skill go with it — they are only reachable
+    // through `skillId`, so they must be gone before the skill row is.
+    await deleteSkillRatings(context.db, skillId);
+
+    // Imported additional files (`skills/io.ts`): the rows now, their objects once this commits.
+    const { page: files } = await context.db.skillFiles.findMany({ where: { skillId } });
+
+    await Promise.all(files.map((file) => context.db.delete(file._id)));
+    await scheduleObjectDeletion(
+        context,
+        files.map((file) => file.storageId),
+    );
+
+    if (stats) {
+        await context.db.delete(stats._id);
+    }
+
+    if (userSkill) {
+        await context.db.delete(userSkill._id);
+    }
+
+    await context.db.delete(skillId);
+
+    // Invalidate cache
+    await invalidateSkillsCache(context, userId);
+
+    return files.length;
+};
+
+/**
  * Delete a skill
  */
 export const deleteSkill = authMutation
@@ -580,44 +629,9 @@ export const deleteSkill = authMutation
             throw new LunoraError("FORBIDDEN", "Not authorized to delete this skill");
         }
 
-        // Nothing cascades. Stats and the caller's own installation are removed
-        // here; other users' `userSkills` rows live in their shards and are
-        // filtered out on read, because `ctx.db.get` returns null for them.
-        const [stats, userSkill] = await Promise.all([
-            ctx.db.skillStats.findFirst({ where: { skillId } }),
-            ctx.db
-                .query("userSkills")
-                .withIndex("by_user_and_skill", (query) => query.eq("userId", userId).eq("skillId", skillId))
-                .first(),
-        ]);
+        const deletedFileCount = await deleteSkillRows(ctx, skillId, userId);
 
-        // Every user's ratings of this skill go with it — they are only reachable
-        // through `skillId`, so they must be gone before the skill row is.
-        await deleteSkillRatings(ctx.db, skillId);
-
-        // Imported additional files (`skills/io.ts`): the rows now, their objects once this commits.
-        const { page: files } = await ctx.db.skillFiles.findMany({ where: { skillId } });
-
-        await Promise.all(files.map((file) => ctx.db.delete(file._id)));
-        await scheduleObjectDeletion(
-            ctx,
-            files.map((file) => file.storageId),
-        );
-
-        if (stats) {
-            await ctx.db.delete(stats._id);
-        }
-
-        if (userSkill) {
-            await ctx.db.delete(userSkill._id);
-        }
-
-        await ctx.db.delete(skillId);
-
-        // Invalidate cache
-        await invalidateSkillsCache(ctx, userId);
-
-        ctx.log.event("skills.delete", { deletedFileCount: files.length, skillId });
+        ctx.log.event("skills.delete", { deletedFileCount, skillId });
     });
 
 /**
