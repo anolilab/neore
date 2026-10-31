@@ -504,6 +504,43 @@ written here is what is not.
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
 
+- **Low-risk quick check** (`chat/lib/low-risk-approval.ts`, `low-risk-check.ts`) — opt-in
+  (`aiUserPreferences.autoApproveLowRisk`, absent = off, set only by `setAutoApproveLowRisk`).
+  An eligible `ask` tool's `needsApproval` becomes a function: taint, then the per-user budget
+  (`chat/toolAutoApprove`), then one utility-model call (no tools, strict `{lowRisk, reason}`, 8 s
+  deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
+  model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
+  defaults to `ask` is a person tool or a delegation), no user override (only the DEFAULT `ask`), no
+  destructive/open-world annotation, not headless, not an API-key run, and the thread must pass
+  `isDeviceEligibleThread` (the owner alone — a collaborator's turn would otherwise replace the
+  owner's consent). **The tool name must START with a read verb** (`READ_VERBS`: get, list, search,
+  read, fetch, find, query, describe, lookup, view — the leading word of the key's tool name, split on
+  `_ - .` or a camelCase boundary), so `create_issue`, `save_issue`, `create_event` and `sendemail` are
+  never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
+  (`get_or_create_user`). An allowlist, not a blocklist: a new write verb is a prompt by default.
+  **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
+  (any tool result or attached file or image), `messagesCarryAttachedText` (`chat/lib/attached-text.ts`: an
+  attached document's extracted text and a captured browser page, which `/chat/start` and the edit path put
+  into the user message as plain TEXT parts that `computeTaint` cannot tell from typing — found by their
+  `[Document: …]` / `[Attached Document]` / `[Web page context]` line label or the page's structural marker,
+  and built through `documentTextPart` so the label and the detector cannot drift) AND `untrustedContext`
+  (retrieved knowledge, memories or project context in the system prompt, plus ANY skill text there:
+  `execute.ts` ORs `injectsSkillText(skillRun)` — an enabled skill's description or an invoked skill's
+  instructions — into `RunContext.untrustedContext`). Skills are all-or-nothing on purpose: `skills.source`
+  is client-supplied at creation, agents write skills from chats that may have read third-party content, and
+  marketplace forks, imports and organisation-shared skills are other people's text, so "this user wrote it"
+  cannot be told cheaply or reliably. A user with any enabled skill therefore never gets the check; narrowing
+  that needs a server-minted authorship marker first. A thread summary records attached text as `files` taint
+  when it folds the rows in (`thread-summaries.ts`); summaries written before that are not repaired. The tools are built while the
+  context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
+  reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
+  thread's sharing are re-read at every call**, in the same mutation that spends the budget unit
+  (`consumeLowRiskCheck`), so switching it off or sharing the thread mid-run holds from the next call
+  (`getLowRiskApprovalContext` at run start only decides whether to build the check). The approval is
+  stamped on the saved call by tool call id (`providerOptions.neore.autoApproval`, next to the MCP
+  label) through `stampSavedToolCalls`, which `finishRun`, `endStoppedRun`, `failRun` and the
+  continuation's failure path all call; a stamp that fails is logged and never changes how the run
+  ended. A `chat.low_risk_check` event is logged per decision.
 - **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
   READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
   nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the

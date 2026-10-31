@@ -19,7 +19,14 @@ type Database = MutationCtx["db"];
 export type AiUserPreferencesPatch = Partial<
     Pick<
         Doc<"aiUserPreferences">,
-        "browserSettings" | "customAIProviders" | "mcpSecretHeaders" | "mcpServers" | "providerApiKeys" | "toolPermissionGrants" | "toolPermissions"
+        | "autoApproveLowRisk"
+        | "browserSettings"
+        | "customAIProviders"
+        | "mcpSecretHeaders"
+        | "mcpServers"
+        | "providerApiKeys"
+        | "toolPermissionGrants"
+        | "toolPermissions"
     >
 >;
 

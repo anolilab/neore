@@ -217,6 +217,9 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/steer:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     "chat/stream:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/stream:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
+    // The opt-in quick check that approves low-risk tool calls (`chat/lib/low-risk-check.ts`): one utility-model call per
+    // `ask` tool call, per user. Untiered: the check is a guard, and the cap is for runaway loops, not for plans.
+    "chat/toolAutoApprove": Ratelimit.tokenBucket(20, MINUTE, 30),
     // "Translate" on a message: one short utility-model call per cache miss
     // (`chat/translate.ts`); its own family so it does not spend the optimizer's.
     // No `:public` tier: the action requires a session.

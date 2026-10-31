@@ -25318,6 +25318,9 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "autoApproveLowRisk": {
+                      "type": "boolean"
+                    },
                     "builtIn": {
                       "items": {
                         "properties": {
@@ -25394,6 +25397,7 @@
                     }
                   },
                   "required": [
+                    "autoApproveLowRisk",
                     "builtIn",
                     "grants",
                     "overrides"
@@ -25716,6 +25720,67 @@
           }
         },
         "summary": "mutation: chat_tool_permissions:revokeToolPermissionGrant",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_tool_permissions:setAutoApproveLowRisk": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_tool_permissions:setAutoApproveLowRisk` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_tool_permissions:setAutoApproveLowRisk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "enabled"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_tool_permissions:setAutoApproveLowRisk",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_tool_permissions:setAutoApproveLowRisk",
         "tags": [
           "chat"
         ],

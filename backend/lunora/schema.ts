@@ -193,6 +193,9 @@ export const schema = defineSchema({
         .global(),
 
     aiUserPreferences: defineTable({
+        // Opt-in quick check that approves low-risk `ask` tool calls (chat/lib/low-risk-approval.ts). Absent = off.
+        // Server-written only (`chat_tool_permissions.setAutoApproveLowRisk`); `auth/fields.ts` deliberately omits it.
+        autoApproveLowRisk: v.optional(v.boolean()),
         autoDetectComplexity: v.optional(v.boolean()),
         autoMediaEnrichment: v.optional(v.boolean()),
         browserSettings: v.optional(

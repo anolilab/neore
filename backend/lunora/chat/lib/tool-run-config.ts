@@ -62,6 +62,11 @@ export const vToolRunConfig = v.object({
      * (or without the tool) approves once and writes no preference.
      */
     toolPermissionKeys: v.optional(v.record(v.string(), v.string())),
+    /**
+     * The final system prompt carries retrieved knowledge, memories or project context. A continuation never reloads
+     * that context, so the quick check for low-risk calls reads it from here; a row without it counts as `true`.
+     */
+    untrustedContext: v.optional(v.boolean()),
 });
 
 export type ToolRunConfig = Infer<typeof vToolRunConfig>;
