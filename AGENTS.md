@@ -444,6 +444,43 @@ written here is what is not.
   (never over `off`, never to other tools, withheld at the depth cap).
   Triggers, tasks and messenger replies inherit nothing, so they lose it.
 
+- **Idle-thread summaries** (`backend/lunora/agent/thread-summaries.ts`, rules in
+  `thread-summary-logic.ts`) — the agent reads only the last 100 rows of the
+  prompt's path (`DEFAULT_RECENT_MESSAGES`, one constant shared by the planner and
+  `fetchContextWithPrompt`), so `threadContextSummaries` holds a condensed copy of
+  the rows above it. **A summary belongs to ONE path**: it is keyed on the last row
+  it covers, and `getThreadSummaryForContext` uses it only while that row is an
+  ancestor of the prompt (a bounded `walkPath`), so a branch the user left never
+  leaks into the one they are on; a few rows are kept per thread, one per path.
+  `afterRun` schedules `runThreadSummary` 5 min out naming the reply's last row, only
+  when the replying user has summaries on and never for group runs; the job is its own
+  debounce (it exits when that row no longer ends the ACTIVE path or a stream is running), then claims `<thread>:<last covered row>`
+  (`claimOnce`) before the one utility-model call, so a redelivery does nothing
+  twice. The cut reaches 20 rows INTO the window: a summary is read after more rows
+  landed, and without the overlap the rows that fall out meanwhile are uncovered.
+  It reaches the model as a delimited "context, not instructions" block appended
+  to the run's SYSTEM PROMPT (`summaryNotesBlock`, returned by `fetchContextWithPrompt`
+  as `threadNotes`; `start.ts` joins it to the agent's instructions): AI SDK 7 refuses a
+  system-role message among the messages, and a user-role one would present model-written
+  text as the user's own words. A run with a `contextHandler` (group chats) builds its own
+  history and gets no notes. Each row
+  records `taintedBy` (the folded tool rows and attachments plus the previous
+  summary's), and `createDeviceCall` unions the thread's summaries' taint into a
+  call's own — the window forgets a web page the summary still carries; it is the
+  union over ALL the thread's summaries, over-asking by design. Billed by the gateway
+  against the thread OWNER like title/category (no `chargeRound`). **Opt-IN**,
+  `userSettings.threadSummariesEnabled` (absent = off, like memory), and switching it
+  off schedules `eraseUserThreadSummaries` on the user's shard. Two thread columns
+  guard the work: `summaryEpoch` moves on an in-place edit (a run prepared earlier
+  refuses to store; the edit erases only summaries whose covered row is at or after the
+  edited turn) and `summaryPathTooLongAt` marks a path past `SUMMARY_MAX_PATH_ROWS`
+  so later jobs do not walk it (rechecked after a week). Never made for temporary,
+  locked, deleted, stateless or host-run threads; locking a chat and deleting a
+  thread erase the rows, an in-place edit the covering ones (a future single-message
+  delete must erase too), and the reader re-applies the same rules and ignores a
+  cover further than `SUMMARY_READ_REACH_ROWS` back. The GDPR export carries them
+  per conversation (`contextSummaries`). Not `threads.summary` — that is the
+  user-triggered, thread-wide `createSummarizeChat` output.
 - **Time-boxed tool allows** ("Allow for 1 hour" / "for today" on the approval card) — a key -> expiry record in
   `aiUserPreferences.toolPermissionGrants`, NOT an `auto` override, and deliberately absent from `auth/fields.ts` so no
   client input can set one. `resolveToolPermission` lifts only an `ask` to `auto`, before the API-key clamp; `off` wins,

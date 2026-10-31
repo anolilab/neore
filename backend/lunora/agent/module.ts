@@ -25,6 +25,7 @@ export default defineModule({
         "streamingMessages",
         "temporaryThreads",
         "threadAccess",
+        "threadContextSummaries",
         "threadInvites",
         "threadRelationships",
         "threadPasscodes",

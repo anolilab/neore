@@ -109,19 +109,23 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
     ]);
 };
 
-/** One thread's follow-up suggestions and invites, one batch each. `true` when either batch came back full. */
+/** One thread's follow-up suggestions, context summaries and invites, one batch each. `true` when any batch came back full. */
 export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
-    const [suggestions, { page: invites }] = await Promise.all([
+    const [suggestions, summaries, { page: invites }] = await Promise.all([
         ctx.db
             .query("followupSuggestions")
             .withIndex("by_thread", (q) => q.eq("threadId", threadId))
             .take(BATCH),
+        ctx.db
+            .query("threadContextSummaries")
+            .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+            .take(BATCH),
         ctx.db.threadInvites.findMany({ limit: BATCH, where: { threadId } }),
     ]);
 
-    await Promise.all([...suggestions, ...invites].map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all([...suggestions, ...summaries, ...invites].map(async (row) => await ctx.db.delete(row._id)));
 
-    return full(suggestions) || full(invites);
+    return full(suggestions) || full(summaries) || full(invites);
 };
 
 /** The user's projects (`.global()`, read through the ORM facade). */
