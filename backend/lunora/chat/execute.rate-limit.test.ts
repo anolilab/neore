@@ -246,7 +246,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { resume?: string } = {}) =>
+const run = async (extra: { resume?: string; skill?: { rawArgs: string; slug: string } } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -398,6 +398,15 @@ describe("a provider rate limit on the first model call", () => {
         expect(modelState.builtAgents).toBe(2);
         expect(state.rows.filter((row) => row.role === "assistant")).toHaveLength(1);
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("keeps a goal round's skill on the resume it queues", async () => {
+        modelState.model = planned([rateLimited()]);
+
+        await run({ skill: { rawArgs: "the thread", slug: "summarise" } });
+
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.args).toMatchObject({ skill: { rawArgs: "the thread", slug: "summarise" } });
     });
 
     it("ignores a redelivery of the original job while the run is paused", async () => {

@@ -462,7 +462,7 @@ export const runStreamingAgent = internalAction
                             };
                         },
                         reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                        run: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
+                        run: { isAnonymous, messageId, organizationId, origin, ...(goalSkill && { skill: goalSkill }), streamId, streamingConfig, threadId, userId, userPrompt },
                         settle: async () => await result.consumeStream(),
                         streamId,
                     }));
