@@ -460,7 +460,7 @@ describe("the folder boundary", () => {
         runner = new HookRunner({ approvals, folder: ROOT, fs, isIdle: () => true, onChange: () => {}, send: () => {} });
         await runner.start();
 
-        expect(await stateOf()).toBe("none");
+        expect(await stateOf()).toBe("invalid");
     });
 });
 

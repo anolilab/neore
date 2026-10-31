@@ -1,6 +1,7 @@
 /** The file system as the hook runner uses it, so tests can stand in for it and a watcher's timing is theirs to set. */
 import { watch } from "node:fs";
-import { lstat, open, readdir, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 export interface FileInfo {
@@ -10,10 +11,16 @@ export interface FileInfo {
     symlink: boolean;
 }
 
+export type InsideRead = { bytes: Buffer; state: "ok" } | { reason: string; state: "refused" } | { state: "none" };
+
 export interface HookFs {
     lstat: (target: string) => Promise<FileInfo | undefined>;
-    /** At most `maxBytes` of a regular file; `undefined` when it is not there. */
-    read: (target: string, maxBytes: number) => Promise<Buffer | undefined>;
+    /**
+     * At most `maxBytes` of the regular file `relative` (`/`-separated) under `root`, which is a real path. A link
+     * anywhere on the way, a file that is not where its real path says, or anything but a regular file is `refused`.
+     * One open handle is checked and read, so what was checked is what is read.
+     */
+    readInside: (root: string, relative: string, maxBytes: number) => Promise<InsideRead>;
     realpath: (target: string) => Promise<string | undefined>;
     /** Regular files under `root` (relative, `/`-separated), skipping what `skip` says and every symlink, at most `limit`. */
     scan: (root: string, limit: number, skip: (relative: string) => boolean) => Promise<string[]>;
@@ -62,14 +69,68 @@ const listFolder = async (root: string, relative: string, skip: (relative: strin
     return listing;
 };
 
-const readFrom = async (target: string, maxBytes: number): Promise<Buffer> => {
-    const handle = await open(target, "r");
+const refusedRead = (reason: string): InsideRead => {
+    return { reason, state: "refused" };
+};
+
+/** The open handle's own view of the file, compared with what its path says now. */
+const readInside = async (root: string, relative: string, maxBytes: number): Promise<InsideRead> => {
+    const segments = relative.split("/");
+    const target = path.join(root, ...segments);
+    let walked = root;
+
+    // Every folder on the way and the file itself must be real entries, not links.
+    for (const segment of segments) {
+        walked = path.join(walked, segment);
+
+        // eslint-disable-next-line no-await-in-loop -- each step is below the one before
+        const info = await orMissing(() => lstat(walked));
+
+        if (info === undefined) {
+            return { state: "none" };
+        }
+
+        if (info.isSymbolicLink()) {
+            return refusedRead("a link on the way to the file");
+        }
+    }
+
+    let handle;
 
     try {
+        // O_NOFOLLOW refuses a link as the last part of the path; the checks below cover the rest of it.
+        handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+
+        if (missing(error)) {
+            return { state: "none" };
+        }
+
+        if (code === "ELOOP") {
+            return refusedRead("a link on the way to the file");
+        }
+
+        throw error;
+    }
+
+    try {
+        const opened = await handle.stat();
+
+        if (!opened.isFile()) {
+            return refusedRead("not a regular file");
+        }
+
+        const [real, current] = await Promise.all([orMissing(() => realpath(target)), orMissing(() => stat(target))]);
+
+        if (real !== target || current === undefined || current.dev !== opened.dev || current.ino !== opened.ino) {
+            return refusedRead("the file is not where its path says");
+        }
+
         const buffer = Buffer.alloc(maxBytes);
         const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
 
-        return buffer.subarray(0, bytesRead);
+        return { bytes: buffer.subarray(0, bytesRead), state: "ok" };
     } finally {
         await handle.close();
     }
@@ -81,7 +142,7 @@ export const nodeHookFs: HookFs = {
 
         return info === undefined ? undefined : { directory: info.isDirectory(), file: info.isFile(), size: info.size, symlink: info.isSymbolicLink() };
     },
-    read: (target, maxBytes) => orMissing(() => readFrom(target, maxBytes)),
+    readInside,
     realpath: (target) => orMissing(() => realpath(target)),
     scan: async (root, limit, skip) => {
         const found: string[] = [];

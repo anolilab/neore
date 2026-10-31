@@ -1,7 +1,7 @@
 /** An in-memory folder for the runner's tests: files, symlinks and a watcher the test fires by hand. */
 import path from "node:path";
 
-import type { FileInfo, HookFs } from "../hooks/fs";
+import type { FileInfo, HookFs, InsideRead } from "../hooks/fs";
 
 export class FakeFs implements HookFs {
     public readonly files = new Map<string, string>();
@@ -66,10 +66,24 @@ export class FakeFs implements HookFs {
         return this.dirs.has(target) ? { directory: true, file: false, size: 0, symlink: false } : undefined;
     };
 
-    public read = async (target: string, maxBytes: number): Promise<Buffer | undefined> => {
-        const content = this.files.get(target);
+    public readInside = async (root: string, relative: string, maxBytes: number): Promise<InsideRead> => {
+        let walked = root;
 
-        return content === undefined ? undefined : Buffer.from(content).subarray(0, maxBytes);
+        for (const segment of relative.split("/")) {
+            walked = path.join(walked, segment);
+
+            if (this.links.has(walked)) {
+                return { reason: "a link on the way to the file", state: "refused" };
+            }
+        }
+
+        const content = this.files.get(walked);
+
+        if (content !== undefined) {
+            return { bytes: Buffer.from(content).subarray(0, maxBytes), state: "ok" };
+        }
+
+        return this.dirs.has(walked) ? { reason: "not a regular file", state: "refused" } : { state: "none" };
     };
 
     public realpath = async (target: string): Promise<string | undefined> => {

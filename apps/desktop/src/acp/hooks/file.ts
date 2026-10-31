@@ -1,6 +1,5 @@
 /** Reads `.neore/hooks.json` from the approved folder: the bytes, their hash and what they parse to, from one read. */
 import { createHash } from "node:crypto";
-import path from "node:path";
 
 import type { HookFs } from "./fs";
 import type { Hook } from "./schema";
@@ -15,32 +14,21 @@ export type HooksFile
         | { state: "none" };
 
 /**
- * `root` is the folder's real path. The directory and the file must be real (a symlink is refused, so the file cannot be
- * one outside the folder) and the hash is of the bytes that were parsed.
+ * `root` is the folder's real path. Neither the folder nor the file may be a link (so the file cannot be one outside
+ * the folder), and the hash is of the bytes that were parsed: they come from one checked, open file.
  */
 export const loadHooksFile = async (fs: HookFs, root: string): Promise<HooksFile> => {
-    const directory = path.join(root, HOOKS_DIR);
-    const target = path.join(root, HOOKS_PATH);
-    const [folderInfo, info] = await Promise.all([fs.lstat(directory), fs.lstat(target)]);
+    const read = await fs.readInside(root, HOOKS_PATH, MAX_FILE_BYTES + 1);
 
-    if (info === undefined || folderInfo === undefined) {
+    if (read.state === "none") {
         return { state: "none" };
     }
 
-    if (folderInfo.symlink || !folderInfo.directory || info.symlink || !info.file) {
+    if (read.state === "refused") {
         return { error: "the hooks file is not a regular file inside the folder", hash: "", state: "invalid" };
     }
 
-    if (info.size > MAX_FILE_BYTES) {
-        return { error: `the file is larger than ${String(MAX_FILE_BYTES)} bytes`, hash: "", state: "invalid" };
-    }
-
-    const bytes = await fs.read(target, MAX_FILE_BYTES + 1);
-
-    if (bytes === undefined) {
-        return { state: "none" };
-    }
-
+    const { bytes } = read;
     const hash = createHash("sha256").update(bytes).digest("hex");
 
     if (bytes.length > MAX_FILE_BYTES) {
