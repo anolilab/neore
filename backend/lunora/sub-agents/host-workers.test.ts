@@ -127,6 +127,8 @@ const hostWorker = (device: Device, overrides: Row = {}) => {
 
 const HOST_NO_TOOLS_OR_SKILL = /no tool list or skill/u;
 const HOST_OUT_OF_SCOPE = /not allowed in this conversation's project/u;
+const HOST_START_NAME = /hosts\/start:[a-z]+/u;
+const TOO_MANY_HOST_STARTS = /too many agents on your computers/u;
 
 const createHostWorker = async (device: Device, overrides: Row = {}) =>
     (await as(OWNER).mutation(functions.createWorker as never, hostWorker(device, overrides) as never)) as { runId: string; state: string; workerId: string };
@@ -363,6 +365,42 @@ describe("the charge", () => {
         expect(await startLimitRows()).toHaveLength(0);
         await createHostWorker(device);
         expect(await startLimitRows()).not.toHaveLength(0);
+    });
+
+    it("spends no sub-agent start when the computer-start limit refuses the worker", async () => {
+        const device = await pairedDevice();
+        const { createRatelimit } = await import("../lib/rate-limiter");
+
+        await createHostWorker(device);
+
+        const startName = decodeURIComponent((await startLimitRows())[0]!.key as string).match(HOST_START_NAME)![0];
+        const runRows = async () => (await table("rateLimits")).filter((row) => decodeURIComponent(row.key as string).includes("subAgents/run"));
+
+        // Use up the rest of the computer-start budget.
+        await run(async (context) => {
+            for (let index = 0; index < 50; index += 1) {
+                if (!(await createRatelimit(startName, context.db).limit(OWNER)).ok) {
+                    return;
+                }
+            }
+        });
+
+        const before = JSON.stringify(await runRows());
+
+        // The lead's path: a refusal is an answer, not a thrown error, so whatever was spent stays spent.
+        const refused = await run(
+            async (context) =>
+                await functions.dispatchWorkerRun(context, {
+                    parentThreadId: leadId,
+                    runner: { agentKey: "claude", deviceId: device.deviceId, folderId: "f1", kind: "host" },
+                    task: "Second",
+                    toolCallId: "call-second",
+                    userId: OWNER,
+                }),
+        );
+
+        expect(refused).toMatchObject({ error: expect.stringMatching(TOO_MANY_HOST_STARTS) });
+        expect(JSON.stringify(await runRows())).toBe(before);
     });
 
     it("charges a cloud worker's run when it is claimed, which is what the host run skips", async () => {

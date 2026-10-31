@@ -482,6 +482,8 @@ const HOST_NEEDS_OWN_CONVERSATION =
 const HOST_NO_TOOLS_OR_SKILL =
     "A worker on a computer takes no tool list or skill: the coding agent there uses its own tools, each asked for on the computer, and only the task text reaches it.";
 
+const TOO_MANY_HOST_STARTS = "You have started too many agents on your computers recently. Try again later.";
+
 const HOST_OUT_OF_SCOPE = "That computer is not allowed in this conversation's project. Change which projects it may be used in, in its settings.";
 
 const HOST_NOT_APPROVED = "That agent is not approved for that folder on this computer. Approve it in the desktop app first.";
@@ -692,17 +694,27 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse(other(capProblem));
     }
 
+    // Opening a session is starting an agent on a computer, so it spends the budget `startHostSession` spends. It is
+    // read before anything is spent: a refusal here is an answer, not a thrown error, so a spent sub-agent start would stay
+    // spent for a worker that was never created.
+    const startLimit = host ? createRatelimit(`hosts/start:${account.tier}`, ctx.db as never) : null;
+
+    const startsLeft = startLimit ? await startLimit.getRemaining(args.userId) : null;
+
+    if (startsLeft && startsLeft.remaining < 1) {
+        return await refuse({ error: TOO_MANY_HOST_STARTS, kind: "limit" });
+    }
+
     const { ok } = await createRatelimit(`subAgents/run:${account.tier}`, ctx.db as never).limit(args.userId);
 
     if (!ok) {
         return await refuse({ error: "You have started too many sub-agents recently. Try again later.", kind: "limit" });
     }
 
-    // Opening a session is starting an agent on a computer, so it spends the budget `startHostSession` spends.
-    const startBudget = host ? await createRatelimit(`hosts/start:${account.tier}`, ctx.db as never).limit(args.userId) : null;
+    const startSpent = startLimit ? await startLimit.limit(args.userId) : null;
 
-    if (startBudget && !startBudget.ok) {
-        return await refuse({ error: "You have started too many agents on your computers recently. Try again later.", kind: "limit" });
+    if (startSpent && !startSpent.ok) {
+        return await refuse({ error: TOO_MANY_HOST_STARTS, kind: "limit" });
     }
 
     const now = Date.now();
