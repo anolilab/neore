@@ -589,7 +589,7 @@ msgstr "{0} Tools erkannt"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "{0} tools: {1}"
 msgstr "{0} Tools: {1}"
 
@@ -907,11 +907,11 @@ msgstr "vor {minutes} Min."
 msgid "{minutes}m remaining"
 msgstr "{minutes}m verbleibend"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "Modus {modeLabel} – zum Ändern klicken"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/thread/thread.tsx:224
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Frag # Modell irgendwas...} other {Frag # Modelle irgendwas...}}"
 
@@ -1787,7 +1787,7 @@ msgstr "Notiz hinzufügen..."
 msgid "Add a note…"
 msgstr "Notiz hinzufügen…"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:276
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2024,6 +2024,10 @@ msgstr "Zu Favoriten hinzufügen"
 msgid "Add to starred"
 msgstr "Zu Favoriten hinzufügen"
 
+#: src/features/chat/aside/aside-panel.tsx:137
+msgid "Add to thread"
+msgstr ""
+
 #: src/features/prompts/components/thread-variables-config.tsx:195
 msgid "Add variable"
 msgstr ""
@@ -2059,6 +2063,10 @@ msgstr "{added} Dokument(e) hinzugefügt."
 msgid "Added to favorites"
 msgstr "Zu Favoriten hinzugefügt"
 
+#: src/features/chat/aside/aside-panel.tsx:124
+msgid "Added to the thread"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Added:"
 msgstr "Hinzugefügt:"
@@ -2069,7 +2077,7 @@ msgstr "Hinzugefügt:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Dokumente werden hinzugefügt… {0} von {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:258
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2077,7 +2085,7 @@ msgstr ""
 msgid "Adding your earlier replies…"
 msgstr "Deine früheren Antworten werden hinzugefügt…"
 
-#: src/features/devices/components/devices-settings.tsx:269
+#: src/features/devices/components/devices-settings.tsx:289
 msgid "Address"
 msgstr ""
 
@@ -2308,7 +2316,7 @@ msgstr "Nachdem du die Verbindung hier aktiviert hast, erhältst du eine Webhook
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "Nachdem du die Verbindung hier aktiviert hast, erhältst du eine Webhook-URL, die du als Request URL in den Event Subscriptions deiner Slack-App einträgst."
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:205
 msgid "After outside content"
 msgstr "Nach externem Inhalt"
 
@@ -2944,7 +2952,7 @@ msgstr "Anonyme Benutzer"
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "Anonyme Benutzer, die so viele Tage inaktiv sind, können gelöscht werden."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:289
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:292
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr ""
 
@@ -2967,6 +2975,10 @@ msgstr "Beantworte WhatsApp-Nachrichten über deine WhatsApp-Business-Nummer (Me
 #: src/features/chat/thread/ask-user-prompt.tsx:116
 msgid "Answered"
 msgstr "Beantwortet"
+
+#: src/features/chat/aside/aside-panel.tsx:119
+msgid "Answered without the conversation: this chat runs on your computer."
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:63
 msgid "anthropic"
@@ -3376,11 +3388,29 @@ msgstr "Aufst."
 msgid "ask"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "Fragen"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/aside/aside-panel.tsx:248
+msgid "Ask a quick question…"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:24
+msgid "Ask a side question"
+msgstr ""
+
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+msgid "Ask a Side Question"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:35
+msgid "Ask a side question without interrupting the reply"
+msgstr ""
+
+#: src/features/chat/thread/thread.tsx:224
 msgid "Ask all models anything..."
 msgstr "Frag alle Modelle irgendwas..."
 
@@ -3392,9 +3422,13 @@ msgstr "Frag irgendetwas, um einen neuen Chat zu starten…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Stell GPT-4, Claude und Gemini dieselbe Frage. Lass denselben Prompt über FLUX, Imagen und Stable Diffusion laufen. Wähle den Gewinner – nicht den Standard."
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "Frag mich alles..."
+
+#: src/features/chat/aside/aside-panel.tsx:240
+msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
+msgstr ""
 
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
@@ -3471,7 +3505,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -3669,6 +3703,10 @@ msgstr "Verfügbar auf Neore – kostenlos starten, keine Kreditkarte erforderli
 #: src/features/chat/thread/sandbox-files.tsx:229
 msgid "Available once the reply is saved"
 msgstr "Verfügbar, sobald die Antwort gespeichert ist"
+
+#: src/features/chat/aside/aside-panel.tsx:139
+msgid "Available when the reply finishes"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:426
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:119
@@ -5422,8 +5460,8 @@ msgstr "Bereinigung fehlgeschlagen"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:475
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:335
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:338
 msgid "Clear"
 msgstr "Löschen"
 
@@ -5589,7 +5627,7 @@ msgstr ""
 msgid "Close"
 msgstr "Schließen"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
 msgid "Close dialogs and menus"
 msgstr "Dialoge und Menüs schließen"
 
@@ -5884,7 +5922,7 @@ msgstr "Befehl ist erforderlich"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "Der Befehl darf höchstens {SKILL_SLUG_MAX} Zeichen lang sein"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:104
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
 msgstr ""
@@ -6284,7 +6322,7 @@ msgstr "Passwortbestätigung ist erforderlich"
 msgid "Confirm your password"
 msgstr "Passwort bestätigen"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:76
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6324,7 +6362,7 @@ msgstr "Einen Audio-/Datei-Node als Eingabe verbinden"
 msgid "Connect an image node as input"
 msgstr "Einen Bild-Node als Eingabe verbinden"
 
-#: src/features/devices/components/devices-settings.tsx:287
+#: src/features/devices/components/devices-settings.tsx:307
 msgid "Connect and add"
 msgstr ""
 
@@ -6472,6 +6510,10 @@ msgstr "Verbindungsfehler. Bitte prüfe deine Internetverbindung und versuch es 
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:61
 msgid "Connection failed"
 msgstr "Verbindung fehlgeschlagen"
+
+#: src/features/devices/components/devices-settings.tsx:125
+msgid "Connection lost"
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:63
 msgid "Connection Problem"
@@ -6881,7 +6923,7 @@ msgstr "Einladungslink kopieren"
 msgid "Copy it now — it is not shown again."
 msgstr "Kopiere ihn jetzt – er wird nicht noch einmal angezeigt."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
 #: src/features/settings/lib/settings-keywords.ts:41
 msgid "Copy Last Code Block"
 msgstr ""
@@ -6928,7 +6970,7 @@ msgid "Copy the JSON configuration"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:120
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -7029,8 +7071,16 @@ msgstr "Kostensensible Anwendungen, die zuverlässige Google-KI in der günstigs
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:248
+#: src/features/devices/components/devices-settings.tsx:268
 msgid "Could not add the server."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:80
+msgid "Could not add this to the thread. Try again."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:73
+msgid "Could not answer the question. Try again."
 msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:81
@@ -7057,7 +7107,7 @@ msgstr "Der Durchlauf konnte nicht abgebrochen werden."
 msgid "Could not change push notifications. Try again."
 msgstr "Push-Benachrichtigungen konnten nicht geändert werden. Versuch es erneut."
 
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/devices/components/devices-settings.tsx:89
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7171,7 +7221,7 @@ msgstr "Konnte nicht als Seite geöffnet werden"
 msgid "Could not open the pull request."
 msgstr "Der Pull Request konnte nicht geöffnet werden."
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:372
 msgid "Could not pair this computer. Try again."
 msgstr "Dieser Computer konnte nicht gekoppelt werden. Versuche es erneut."
 
@@ -7210,7 +7260,7 @@ msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn 
 msgid "Could not refine the draft. Try again."
 msgstr "Der Entwurf konnte nicht verfeinert werden. Versuche es erneut."
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:153
 msgid "Could not remove the device."
 msgstr "Das Gerät konnte nicht entfernt werden."
 
@@ -7218,7 +7268,7 @@ msgstr "Das Gerät konnte nicht entfernt werden."
 msgid "Could not remove the participant"
 msgstr "Der Teilnehmer konnte nicht entfernt werden"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:110
 msgid "Could not rename the device."
 msgstr "Das Gerät konnte nicht umbenannt werden."
 
@@ -7831,8 +7881,8 @@ msgstr "Eigene Einstellung (Standard: {0})"
 msgid "custom styles"
 msgstr "eigene Stile"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:172
-#: src/features/chat/sidebar/thread-sidebar.tsx:184
+#: src/features/chat/sidebar/thread-sidebar.tsx:174
+#: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "Benutzerdefinierter System-Prompt"
 
@@ -7853,7 +7903,7 @@ msgstr "Anpassung"
 msgid "Customize and regenerate"
 msgstr "Anpassen und neu generieren"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:264
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:267
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "Tastenkürzel für häufige Aktionen anpassen. Klicke auf \"Aufzeichnen\" und drücke die gewünschte Tastenkombination."
 
@@ -8052,7 +8102,7 @@ msgstr "Debatte"
 msgid "Debate rounds"
 msgstr "Debattenrunden"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
 
@@ -8064,7 +8114,7 @@ msgstr "Zerlege das Ziel in einen umsetzbaren Plan."
 msgid "Decrease number of images"
 msgstr "Anzahl der Bilder verringern"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
 #: src/features/settings/lib/settings-keywords.ts:43
 msgid "Decrease Reasoning Effort"
 msgstr ""
@@ -8607,7 +8657,7 @@ msgstr "Anspruchsvolle Aufgaben, die das leistungsstärkste GLM-Frontier-Modell 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Anspruchsvolle Aufgaben, bei denen maximale KI-Leistung und verfeinertes Reasoning am meisten zählen"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Denied"
 msgstr "Abgelehnt"
 
@@ -8889,19 +8939,19 @@ msgstr "Entwickler, die starke Coding- und Allzweckfähigkeiten aus einem Open-S
 msgid "Development"
 msgstr "Entwicklung"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "Device activity"
 msgstr "Geräteaktivität"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:99
 msgid "Device name"
 msgstr "Gerätename"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:156
 msgid "Device removed"
 msgstr "Gerät entfernt"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:382
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Geräte"
@@ -8999,7 +9049,7 @@ msgstr "Wird deaktiviert..."
 msgid "Discard"
 msgstr "Verwerfen"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:79
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9035,6 +9085,7 @@ msgstr "Discord Public Key"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/devices/components/devices-settings.tsx:138
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Verwerfen"
@@ -9054,6 +9105,10 @@ msgstr "Fehler schließen"
 #: src/features/skills/components/skill-builder-setup.tsx:94
 msgid "Dismiss setup suggestions"
 msgstr "Einrichtungsvorschläge ausblenden"
+
+#: src/features/chat/aside/aside-panel.tsx:92
+msgid "Dismiss this side question"
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:725
 msgid "Dismiss webhook secret"
@@ -9173,7 +9228,7 @@ msgstr "Noch kein Konto?"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:189
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9343,7 +9398,7 @@ msgstr "Entwurf"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Ein Anschreiben für eine Stelle als Softwareentwickler entwerfen"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "Eine E-Mail, einen Bericht oder einen Aufsatz entwerfen..."
 
@@ -10385,7 +10440,7 @@ msgstr "Gib dein aktuelles Passwort ein und wähle ein neues"
 msgid "Enter your custom instructions..."
 msgstr "Benutzerdefinierte Anweisungen eingeben..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:197
+#: src/features/chat/sidebar/thread-sidebar.tsx:199
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "Gib hier deinen benutzerdefinierten System-Prompt ein. Dieser wird für jede Nachricht verwendet."
 
@@ -10595,7 +10650,7 @@ msgstr "Fehler: {error}"
 msgid "Errors"
 msgstr "Fehler"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
 msgid "Escape"
 msgstr "Escape"
 
@@ -10977,7 +11032,7 @@ msgid "expired"
 msgstr "abgelaufen"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:191
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "Abgelaufen"
@@ -11026,7 +11081,7 @@ msgstr "Läuft ab: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Läuft bald ab"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "Erkläre ein Konzept in einfachen Worten..."
 
@@ -11221,7 +11276,7 @@ msgstr "fehlgeschlagen"
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:48
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:192
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
@@ -11867,7 +11922,7 @@ msgstr "Favoritenstatus konnte nicht aktualisiert werden"
 msgid "Failed to update filter rules"
 msgstr "Filterregeln konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:154
 msgid "Failed to update keyboard shortcuts"
 msgstr "Tastenkürzel konnten nicht aktualisiert werden"
 
@@ -12699,7 +12754,7 @@ msgstr "Brennweite"
 msgid "Focus search"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr ""
@@ -13276,7 +13331,7 @@ msgid "General-purpose video generation using Alibaba's latest-generation Wan mo
 msgstr "Allgemeine Videogenerierung mit Alibabas Wan-Modell der neuesten Generation"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
@@ -13312,7 +13367,7 @@ msgstr "Ein Bild aus einem Text-Prompt generieren und 4-fach hochskalieren"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generiere ein Bild einer gemütlichen Leseecke mit warmem Licht und Pflanzen."
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "Ein Bild oder Video generieren..."
 
@@ -13427,7 +13482,7 @@ msgid "Generating video..."
 msgstr "Video wird generiert..."
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
 msgid "Generating..."
@@ -14150,7 +14205,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "Hallo {0}! Was möchtest du heute tun?"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:283
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Help"
 msgstr "Hilfe"
 
@@ -14627,7 +14682,7 @@ msgstr "Illustration"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -15089,7 +15144,7 @@ msgstr ""
 msgid "Increase number of images"
 msgstr "Anzahl der Bilder erhöhen"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
 #: src/features/settings/lib/settings-keywords.ts:42
 msgid "Increase Reasoning Effort"
 msgstr ""
@@ -15624,7 +15679,7 @@ msgstr "Bewerter-Score"
 msgid "Judge: {0}"
 msgstr "Bewerter: {0}"
 
-#: src/features/chat/thread/thread.tsx:89
+#: src/features/chat/thread/thread.tsx:90
 msgid "Jump to my last message"
 msgstr ""
 
@@ -15694,7 +15749,7 @@ msgstr "Behalte die Dateien unkategorisiert oder lösche sie zusammen mit der Sa
 msgid "Kenya"
 msgstr "Kenia"
 
-#: src/features/devices/components/devices-settings.tsx:281
+#: src/features/devices/components/devices-settings.tsx:301
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -15706,7 +15761,7 @@ msgstr "Tastenkürzel"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:70
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:262
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:265
 #: src/features/settings/lib/settings-keywords.ts:36
 #: src/features/settings/lib/settings-keywords.ts:37
 #: src/features/settings/lib/settings-keywords.ts:38
@@ -15727,11 +15782,11 @@ msgstr "Tastenkürzel"
 msgid "Keyboard shortcuts (?)"
 msgstr "Tastenkürzel (?)"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:247
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:250
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "Tastenkürzel auf Standardwerte zurückgesetzt"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:165
 msgid "Keyboard shortcuts updated successfully"
 msgstr "Tastenkürzel erfolgreich aktualisiert"
 
@@ -16269,11 +16324,11 @@ msgstr "Weniger"
 msgid "Let replies use tools"
 msgstr "Antworten dürfen Tools nutzen"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:381
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Lass den Agenten über die Neore-Desktop-App Dateien, ein Terminal und lokale MCP-Server auf deinem eigenen Computer nutzen. Jede Aktion fragt dich zuerst auf diesem Computer, und aus geteilten Chats oder Hintergrundaufgaben läuft nichts."
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:439
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -16955,7 +17010,7 @@ msgstr "Niedriger = subtile Änderungen, höher = starke Umwandlung"
 msgid "Lower cost than Wan 2.5"
 msgstr "Günstiger als Wan 2.5"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
 msgid "Lower the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -18394,11 +18449,11 @@ msgstr "Stummschalten"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Linux computer"
 msgstr "Mein Linux-Computer"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Mac"
 msgstr "Mein Mac"
 
@@ -18410,7 +18465,7 @@ msgstr "Mein MCP-Server"
 msgid "My skills"
 msgstr "Meine Skills"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Windows PC"
 msgstr "Mein Windows-PC"
 
@@ -18431,7 +18486,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
+#: src/features/devices/components/devices-settings.tsx:285
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18651,7 +18706,7 @@ msgstr "Neore - KI-Plattform für Text-, Video-, Audio-, Bild- und Dokumenteners
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:656
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore kann Fehler machen. Überprüfe wichtige Informationen."
 
@@ -18783,7 +18838,7 @@ msgstr "Neuer Chat"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:29
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:231
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
 #: src/features/settings/lib/settings-keywords.ts:37
 msgid "New Chat"
 msgstr "Neuer Chat"
@@ -18880,7 +18935,7 @@ msgstr "Neuer Tag"
 msgid "New task"
 msgstr "Neue Aufgabe"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
 #: src/features/settings/lib/settings-keywords.ts:38
 msgid "New Temporary Chat"
 msgstr "Neuer temporärer Chat"
@@ -18952,7 +19007,7 @@ msgstr "Nächster Treffer"
 msgid "Next option"
 msgstr "Nächste Option"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "Nächster Ausgabemodus"
 
@@ -19197,7 +19252,7 @@ msgstr "Keine Beschreibung"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:433
 msgid "No devices paired."
 msgstr "Keine Geräte gekoppelt."
 
@@ -19538,7 +19593,7 @@ msgstr "Keine Sprache erkannt. Freihandmodus beendet."
 msgid "No starred models"
 msgstr "Keine markierten Modelle"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:149
+#: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "No summary available. Click \"Generate\" to create one."
 msgstr "Keine Zusammenfassung verfügbar. Klicke auf \"Generieren\", um eine zu erstellen."
 
@@ -19591,7 +19646,7 @@ msgstr "Noch keine Threads"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "Noch keine Tarifdaten. Tarifinformationen werden nach dem Gateway-Upgrade für neue Anfragen erfasst."
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "No tools shared yet"
 msgstr "Noch keine Tools freigegeben"
 
@@ -19780,8 +19835,8 @@ msgstr "Nicht gekoppelt – der Bot antwortet noch niemandem"
 msgid "Not rated"
 msgstr "Nicht bewertet"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:301
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:306
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:304
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:309
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "Nicht festgelegt"
@@ -19810,7 +19865,7 @@ msgstr "Hinweis: Module werden pro Unterhaltung angewendet, nicht pro Nachricht.
 msgid "Nothing found"
 msgstr "Nichts gefunden"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:184
 msgid "Nothing has run on a device yet."
 msgstr "Auf einem Gerät ist noch nichts gelaufen."
 
@@ -19945,7 +20000,7 @@ msgstr "Aus"
 msgid "Official"
 msgstr "Offiziell"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -20134,7 +20189,7 @@ msgstr "Das Einmalpasswort ist ungültig"
 msgid "One-time password is required"
 msgstr "Das Einmalpasswort ist erforderlich"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 msgid "Online"
 msgstr "Online"
 
@@ -20308,12 +20363,12 @@ msgstr "Menü öffnen"
 msgid "Open messages"
 msgstr "Nachrichten öffnen"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:39
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:386
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Öffne Neore in der Desktop-App, um diesen Computer zu koppeln. Bereits gekoppelte Geräte stehen unten."
 
@@ -20396,7 +20451,7 @@ msgid "Open Tasks"
 msgstr "Aufgaben öffnen"
 
 #. placeholder {0}: defaultShortcut("commandPalette")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:119
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
 msgid "Open the command palette and global search ({0})"
 msgstr ""
 
@@ -20405,7 +20460,7 @@ msgid "Open the Developer tab and start the server."
 msgstr "Öffne den Tab Developer und starte den Server."
 
 #. placeholder {0}: defaultShortcut("openModelPicker")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
 msgid "Open the model picker in the composer ({0})"
 msgstr ""
 
@@ -20413,12 +20468,17 @@ msgstr ""
 msgid "Open the run's conversation"
 msgstr "Unterhaltung des Durchlaufs öffnen"
 
+#. placeholder {0}: defaultShortcut("askAside")
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+msgid "Open the side-question panel without interrupting a running reply ({0})"
+msgstr ""
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
 msgid "Open the sub-agent's thread"
 msgstr "Thread des Sub-Agenten öffnen"
 
 #. placeholder {0}: defaultShortcut("focusSearch")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
 msgid "Open the thread search and focus it. Leave it unbound to keep the browser's find ({0})"
 msgstr ""
 
@@ -20727,7 +20787,7 @@ msgstr "Optimierungsstil"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
-#: src/features/chat/sidebar/thread-sidebar.tsx:178
+#: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
 #: src/features/settings/components/personalization/personalization-settings.tsx:281
@@ -20750,7 +20810,7 @@ msgstr "Prompt optimieren"
 msgid "Optimize system prompt"
 msgstr "System-Prompt optimieren"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:214
+#: src/features/chat/sidebar/thread-sidebar.tsx:216
 msgid "Optimize thread system prompt"
 msgstr "System-Prompt des Threads optimieren"
 
@@ -21014,7 +21074,7 @@ msgstr "Ausgabedateien"
 msgid "Output Format"
 msgstr "Ausgabeformat"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "Ausgabemodus"
 
@@ -21132,11 +21192,11 @@ msgstr "Male über die Bereiche, die du bearbeiten möchtest. Weiße Bereiche we
 msgid "Paired"
 msgstr "Gekoppelt"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:419
 msgid "Paired devices"
 msgstr "Gekoppelte Geräte"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:362
 msgid "Pairing was cancelled on this computer."
 msgstr "Die Kopplung wurde auf diesem Computer abgebrochen."
 
@@ -21666,7 +21726,7 @@ msgstr "Angeheftet"
 msgid "Pinned project"
 msgstr "Angeheftetes Projekt"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:320
+#: src/features/chat/sidebar/thread-sidebar.tsx:331
 msgid "Pins"
 msgstr "Pins"
 
@@ -21690,7 +21750,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Ein Projekt planen oder Ideen sammeln..."
 
@@ -21823,7 +21883,7 @@ msgstr "Polierter Hollywood-Look"
 msgid "Popular"
 msgstr "Beliebt"
 
-#: src/features/devices/components/devices-settings.tsx:277
+#: src/features/devices/components/devices-settings.tsx:297
 msgid "Port"
 msgstr ""
 
@@ -22092,7 +22152,7 @@ msgstr "Enter zum Senden, Shift+Enter für neue Zeile"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Esc beendet den Eingabemodus; danach bearbeitest du mit h j k l, w b, 0 $, i a I A, o O, x, dd, D und u. Enter sendet weiterhin. Standardmäßig aus."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:305
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:308
 msgid "Press keys..."
 msgstr "Tasten drücken..."
 
@@ -22197,7 +22257,7 @@ msgstr "Vorheriger Treffer"
 msgid "Previous option"
 msgstr "Vorherige Option"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "Vorheriger Ausgabemodus"
 
@@ -22328,7 +22388,7 @@ msgstr "Pro-Modelle erfordern einen Pro-Tarif. Im kostenlosen Tarif wird der Lau
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
 msgstr "Eine Textdatei mit KI verarbeiten, um Kernpunkte zu extrahieren, und dann ein Bild auf Basis der Zusammenfassung generieren"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:163
+#: src/features/chat/sidebar/thread-sidebar.tsx:165
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "Jede Nachricht unabhängig verarbeiten, nur mit dem System-Prompt und der aktuellen Eingabe. Ohne Kontext aus dem Chatverlauf."
 
@@ -22614,7 +22674,7 @@ msgstr "Prompt mit optimiertem Inhalt aktualisiert"
 msgid "Prompt Variables"
 msgstr "Prompt-Variablen"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:305
+#: src/features/chat/sidebar/thread-sidebar.tsx:307
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:475
 msgid "Prompts"
@@ -22932,7 +22992,7 @@ msgstr "Radius"
 msgid "rag"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
 msgid "Raise the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -23271,6 +23331,10 @@ msgstr "Neu verbinden"
 msgid "Reconnect {0}"
 msgstr "{0} neu verbinden"
 
+#: src/features/devices/components/devices-settings.tsx:126
+msgid "Reconnecting"
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:25
 msgid "Reconnecting to the server…"
 msgstr "Verbindung zum Server wird wiederhergestellt…"
@@ -23279,8 +23343,8 @@ msgstr "Verbindung zum Server wird wiederhergestellt…"
 msgid "Reconnecting…"
 msgstr "Verbindung wird wiederhergestellt…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 msgid "Record"
 msgstr "Aufzeichnen"
 
@@ -23614,8 +23678,8 @@ msgstr "Angemeldet bleiben"
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:313
 #: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/devices/components/devices-settings.tsx:142
+#: src/features/devices/components/devices-settings.tsx:146
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23632,7 +23696,7 @@ msgid "Remove \"{0}\"?"
 msgstr "\"{0}\" entfernen?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:163
 msgid "Remove “{0}”?"
 msgstr "„{0}“ entfernen?"
 
@@ -24026,7 +24090,7 @@ msgstr "Recherche"
 msgid "Research a topic"
 msgstr "Ein Thema recherchieren"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "Ein Thema ausführlich recherchieren..."
 
@@ -24085,7 +24149,7 @@ msgid "Reset to defaults"
 msgstr "Auf Standard zurücksetzen"
 
 #: src/features/settings/components/chat/models-settings.tsx:379
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:352
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
 msgid "Reset to Defaults"
 msgstr "Auf Standardwerte zurücksetzen"
 
@@ -24237,6 +24301,7 @@ msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/devices/components/devices-settings.tsx:81
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -24758,7 +24823,7 @@ msgstr "Vorlage speichern"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Speichere wiederverwendbare System-Prompts und verknüpfe sie mit bestimmten Modellen. Nutze die Schaltfläche Optimieren, um jede Vorlage mit dem Prompt-Optimierer zu verfeinern."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 msgid "Save Shortcuts"
 msgstr "Tastenkürzel speichern"
 
@@ -24805,7 +24870,7 @@ msgstr "In \"{0}\" gespeichert"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "Wird gespeichert..."
@@ -24899,7 +24964,7 @@ msgstr "Eine Spaltenseite nach links scrollen"
 msgid "Scroll right one page of columns"
 msgstr "Eine Spaltenseite nach rechts scrollen"
 
-#: src/features/chat/thread/thread.tsx:95
+#: src/features/chat/thread/thread.tsx:96
 msgid "Scroll to bottom"
 msgstr "Nach unten scrollen"
 
@@ -25525,7 +25590,7 @@ msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:193
 msgid "Sent"
 msgstr "Gesendet"
 
@@ -25577,7 +25642,7 @@ msgstr "Serbisch (Serbien)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:265
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -25593,7 +25658,7 @@ msgstr "Serverfehler. Bitte versuche es später erneut."
 msgid "Server name is required"
 msgstr "Servername ist erforderlich"
 
-#: src/features/devices/components/devices-settings.tsx:100
+#: src/features/devices/components/devices-settings.tsx:123
 msgid "Server over SSH"
 msgstr ""
 
@@ -25617,7 +25682,7 @@ msgstr "Serverlose Postgres-Datenbank mit Branching"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "Servers over SSH"
 msgstr ""
 
@@ -25754,7 +25819,7 @@ msgstr "geteilt"
 msgid "Shared conversation"
 msgstr "Geteilte Unterhaltung"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:414
 msgid "Shared folders and local servers…"
 msgstr "Freigegebene Ordner und lokale Server …"
 
@@ -25863,7 +25928,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "Folgevorschläge nach Assistentennachrichten anzeigen."
 
 #. placeholder {0}: defaultShortcut("help")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
 msgid "Show help dialog ({0})"
 msgstr "Hilfedialog anzeigen ({0})"
 
@@ -25974,16 +26039,25 @@ msgstr "Zeilen {firstShown} bis {lastShown} von {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Wird dem Assistenten angezeigt, damit er weiß, wann der Skill passt."
 
+#: src/features/chat/aside/aside-panel.tsx:175
+#: src/features/chat/aside/aside-panel.tsx:239
+msgid "Side question"
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:75
+msgid "Side questions are not available for this chat, or the question is too long."
+msgstr ""
+
 #: ../../packages/ui/src/components/sidebar.tsx:273
 msgid "Sidebar"
 msgstr "Seitenleiste"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:116
 #: src/features/settings/lib/settings-keywords.ts:44
 msgid "Sidebar Left"
 msgstr "Linke Seitenleiste"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:117
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "Sidebar Right"
 msgstr "Rechte Seitenleiste"
@@ -26855,7 +26929,11 @@ msgstr "Unterhaltung beginnen"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "Starte eine eigene Unterhaltung mit den neuesten KI-Modellen."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:343
+#: src/features/chat/aside/aside-panel.tsx:176
+msgid "Start a conversation to ask a side question."
+msgstr ""
+
+#: src/features/chat/sidebar/thread-sidebar.tsx:354
 msgid "Start a conversation to configure variables."
 msgstr "Starte eine Konversation, um Variablen zu konfigurieren."
 
@@ -26872,7 +26950,7 @@ msgid "Start a new chat"
 msgstr "Neuen Chat starten"
 
 #. placeholder {0}: defaultShortcut("newChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
 msgid "Start a new chat ({0})"
 msgstr "Neuen Chat starten ({0})"
 
@@ -26885,7 +26963,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "Starte eine neue Unterhaltung, um deinen ersten Thread zu erstellen"
 
 #. placeholder {0}: defaultShortcut("newTemporaryChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
 msgid "Start a new temporary chat ({0})"
 msgstr "Neuen temporären Chat starten ({0})"
 
@@ -27042,7 +27120,7 @@ msgstr "Status:"
 msgid "Stateless"
 msgstr "Zustandslos"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:161
+#: src/features/chat/sidebar/thread-sidebar.tsx:163
 msgid "Stateless Mode"
 msgstr "Zustandsloser Modus"
 
@@ -27111,8 +27189,8 @@ msgstr "Aktien"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -27644,7 +27722,7 @@ msgstr "Geeignet für komplexe Aufgaben: Rolle / Hintergrund / Aufmerksamkeit / 
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "Ein Dokument oder eine URL zusammenfassen..."
 
@@ -27664,7 +27742,7 @@ msgstr "Fasse mein Postfach zusammen und hebe dringende Punkte hervor. Verwende 
 msgid "Summarize the history of the internet"
 msgstr "Die Geschichte des Internets zusammenfassen"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:151
+#: src/features/chat/sidebar/thread-sidebar.tsx:153
 msgid "Summary is only available for text models."
 msgstr "Zusammenfassung ist nur für Textmodelle verfügbar."
 
@@ -28262,7 +28340,7 @@ msgstr "Text"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28415,7 +28493,7 @@ msgstr "Thailand"
 msgid "Thanks for rating"
 msgstr "Danke für deine Bewertung"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:171
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
 
@@ -28435,7 +28513,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "Der 43 Zeichen lange EncodingAESKey (die Nachrichtenverschlüsselung muss auf sicheren Modus gesetzt sein)"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:147
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "Der Agent kann dieses Gerät um nichts mehr bitten. Sein Aktivitätsprotokoll bleibt, bis es abläuft."
 
@@ -28771,6 +28849,14 @@ msgstr "Die Verfeinerung hat kein Feld geändert."
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "Die Region, in der du den Modellzugriff in der Bedrock-Konsole freigeschaltet hast."
 
+#: src/features/chat/aside/aside-panel.tsx:78
+msgid "The reply is still running. Add it when the reply finishes."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:71
+msgid "The reply is still running. Try again when it finishes."
+msgstr ""
+
 #: src/lib/errors/index.ts:184
 msgid "The request timed out but may still complete. Check the conversation before trying again."
 msgstr ""
@@ -28977,6 +29063,7 @@ msgstr "Vision-Language-Modell mit Denkmodus"
 msgid "Thinking..."
 msgstr "Denkt nach..."
 
+#: src/features/chat/aside/aside-panel.tsx:105
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -28995,11 +29082,15 @@ msgstr "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird die Organ
 msgid "This browser cannot receive push notifications here."
 msgstr "Dieser Browser kann hier keine Push-Benachrichtigungen empfangen."
 
+#: src/features/chat/aside/aside-panel.tsx:82
+msgid "This cannot be added to this chat."
+msgstr ""
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
+#: src/features/chat/thread/composer.tsx:585
 msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
@@ -29011,25 +29102,25 @@ msgstr "Diese Sammlung wurde von einem Mitglied deiner Organisation mit dir gete
 msgid "This command name is reserved"
 msgstr "Dieser Befehlsname ist reserviert"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:122
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Dieser Computer"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is not paired yet."
 msgstr "Dieser Computer ist noch nicht gekoppelt."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:407
 msgid "This computer is paired as “{0}”."
 msgstr "Dieser Computer ist als „{0}“ gekoppelt."
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is paired with another account."
 msgstr "Dieser Computer ist mit einem anderen Konto gekoppelt."
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:369
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Dieser Computer ist gekoppelt. Wähle in der Desktop-App, welche Ordner freigegeben werden."
 
@@ -29209,11 +29300,11 @@ msgstr "Diese Vorlage wird dauerhaft entfernt."
 msgid "This preview could not be loaded."
 msgstr "Diese Vorschau konnte nicht geladen werden."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:203
+#: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "Dieser Prompt wird für jede Nachricht zusammen mit dem Konversationsverlauf verwendet."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:202
+#: src/features/chat/sidebar/thread-sidebar.tsx:204
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "Dieser Prompt wird für jede Nachricht verwendet. Jede Nachricht wird unabhängig ohne Chat-Verlauf verarbeitet."
 
@@ -29369,7 +29460,7 @@ msgstr "Ein paar Sekunden nachgedacht"
 msgid "thread"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:298
+#: src/features/chat/sidebar/thread-sidebar.tsx:300
 #: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Thread"
 msgstr "Thread"
@@ -29424,7 +29515,7 @@ msgstr "Thread wiederhergestellt"
 msgid "Thread statistics"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:139
+#: src/features/chat/sidebar/thread-sidebar.tsx:141
 msgid "Thread summary"
 msgstr "Thread-Zusammenfassung"
 
@@ -29577,7 +29668,7 @@ msgid "Toggle interactivity"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarLeft")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
 msgid "Toggle left sidebar ({0})"
 msgstr "Linke Seitenleiste umschalten ({0})"
 
@@ -29596,7 +29687,7 @@ msgid "Toggle property panel"
 msgstr "Eigenschaftenbereich umschalten"
 
 #. placeholder {0}: defaultShortcut("sidebarRight")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
 msgid "Toggle right sidebar ({0})"
 msgstr "Rechte Seitenleiste umschalten ({0})"
 
@@ -29861,7 +29952,7 @@ msgstr "Umgewandeltes Bild"
 msgid "Translate"
 msgstr "Übersetzen"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "Text in eine andere Sprache übersetzen..."
 
@@ -30428,6 +30519,14 @@ msgstr "Knoten entsperren"
 msgid "Unlock this chat"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:79
+msgid "Unlock this chat to add this to the thread."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:72
+msgid "Unlock this chat to ask a side question."
+msgstr ""
+
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:139
 msgid "Unmute"
 msgstr "Stummschaltung aufheben"
@@ -30951,7 +31050,7 @@ msgstr "Die erlaubten Modelle der Organisation verwenden"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Nutze diese Tastenkürzel, um effizienter im Datenraster zu navigieren und damit zu arbeiten."
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:401
 msgid "Use this computer for agent tools"
 msgstr "Diesen Computer für Agenten-Tools nutzen"
 
@@ -30991,7 +31090,7 @@ msgstr "Nutzer"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
+#: src/features/devices/components/devices-settings.tsx:293
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:194
@@ -31160,7 +31259,7 @@ msgstr "Variable Brennweite"
 msgid "Variable name..."
 msgstr "Variablenname..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:312
+#: src/features/chat/sidebar/thread-sidebar.tsx:314
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:70
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -31401,7 +31500,7 @@ msgstr "Video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -31825,7 +31924,7 @@ msgstr "B"
 msgid "Waiting for {device} to pick this up…"
 msgstr "{device}: wartet auf Annahme…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Waiting for approval"
 msgstr "Wartet auf Genehmigung"
 
@@ -32103,7 +32202,7 @@ msgstr "Was soll der Agent tun?"
 msgid "What should the AI call you?"
 msgstr "Wie soll die KI dich nennen?"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 
@@ -32241,7 +32340,7 @@ msgstr "Mit Administratorrechten"
 msgid "With email/password"
 msgstr "Mit E-Mail/Passwort"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:303
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -32334,7 +32433,7 @@ msgstr "Lange Texte direkt neben dem Chat schreiben"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Schreibe lange Texte in einem Canvas-Editor direkt neben dem Chat. Vom Chat zum fertigen Dokument, ohne das Tool zu wechseln."
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "Schreib Code für mich..."
 
@@ -32557,6 +32656,11 @@ msgstr "Du hast noch keine Tags."
 #: src/features/admin/components/impersonation-banner.tsx:39
 msgid "You have returned to your admin account"
 msgstr "Du bist zu deinem Administrator-Konto zurückgekehrt"
+
+#: src/features/chat/aside/aside-panel.tsx:74
+#: src/features/chat/aside/aside-panel.tsx:81
+msgid "You have used today's messages. Try again later."
+msgstr ""
 
 #: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
@@ -32821,6 +32925,10 @@ msgstr "Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich erneut a
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:103
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "Deine Anmeldung liegt zu lange zurück. Bitte melde dich ab und erneut an, um dein Konto zu löschen."
+
+#: src/features/chat/aside/aside-panel.tsx:242
+msgid "Your side question"
+msgstr ""
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:234
 msgid "Your tags"

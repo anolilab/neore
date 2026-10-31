@@ -287,6 +287,9 @@ export interface InternalApiTypes {
         };
     };
     chat: {
+        aside: {
+            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveStreamId?: Id<"persistentStreams">; rows: Array<{ role: "assistant" | "user"; text: string }> }>;
+        };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;
         };
@@ -1330,6 +1333,9 @@ export const internal: InternalApiTypes = {
         },
     },
     chat: {
+        aside: {
+            readAsideSnapshot: { __lunoraRef: "chat_aside:readAsideSnapshot" },
+        },
         autocomplete: {
             isComposerAutocompleteEnabled: { __lunoraRef: "chat_autocomplete:isComposerAutocompleteEnabled" },
         },

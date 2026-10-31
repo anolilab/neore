@@ -589,7 +589,7 @@ msgstr "{0} 個のツールを検出しました"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
@@ -907,11 +907,11 @@ msgstr "{minutes} 分前"
 msgid "{minutes}m remaining"
 msgstr "残り {minutes} 分"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/thread/thread.tsx:224
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {# 個のモデルに何でも質問...}}"
 
@@ -1787,7 +1787,7 @@ msgstr "メモを追加..."
 msgid "Add a note…"
 msgstr "メモを追加…"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:276
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2024,6 +2024,10 @@ msgstr "お気に入りに追加"
 msgid "Add to starred"
 msgstr "スターを付ける"
 
+#: src/features/chat/aside/aside-panel.tsx:137
+msgid "Add to thread"
+msgstr ""
+
 #: src/features/prompts/components/thread-variables-config.tsx:195
 msgid "Add variable"
 msgstr ""
@@ -2059,6 +2063,10 @@ msgstr "{added} 件のドキュメントを追加しました。"
 msgid "Added to favorites"
 msgstr "お気に入りに追加しました"
 
+#: src/features/chat/aside/aside-panel.tsx:124
+msgid "Added to the thread"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Added:"
 msgstr "追加："
@@ -2069,7 +2077,7 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:258
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2077,7 +2085,7 @@ msgstr ""
 msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
 
-#: src/features/devices/components/devices-settings.tsx:269
+#: src/features/devices/components/devices-settings.tsx:289
 msgid "Address"
 msgstr ""
 
@@ -2308,7 +2316,7 @@ msgstr "ここで接続を有効化すると、Discord アプリ設定の Intera
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "ここで接続を有効化すると、Slack アプリの Event Subscriptions の Request URL に設定する Webhook URL が発行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:205
 msgid "After outside content"
 msgstr "外部コンテンツ参照後"
 
@@ -2944,7 +2952,7 @@ msgstr "匿名ユーザー"
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "この日数の間アクティブでない匿名ユーザーは削除の対象になります。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:289
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:292
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr ""
 
@@ -2967,6 +2975,10 @@ msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセ
 #: src/features/chat/thread/ask-user-prompt.tsx:116
 msgid "Answered"
 msgstr "回答済み"
+
+#: src/features/chat/aside/aside-panel.tsx:119
+msgid "Answered without the conversation: this chat runs on your computer."
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:63
 msgid "anthropic"
@@ -3376,11 +3388,29 @@ msgstr "昇順"
 msgid "ask"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "確認"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/aside/aside-panel.tsx:248
+msgid "Ask a quick question…"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:24
+msgid "Ask a side question"
+msgstr ""
+
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+msgid "Ask a Side Question"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:35
+msgid "Ask a side question without interrupting the reply"
+msgstr ""
+
+#: src/features/chat/thread/thread.tsx:224
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
@@ -3392,9 +3422,13 @@ msgstr "何でも質問して新しいチャットを始めましょう…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロンプトを FLUX、Imagen、Stable Diffusion で実行できます。既定ではなく、勝者を選びましょう。"
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
+
+#: src/features/chat/aside/aside-panel.tsx:240
+msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
+msgstr ""
 
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
@@ -3471,7 +3505,7 @@ msgstr "オークランド"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -3669,6 +3703,10 @@ msgstr "Neore で利用可能 — 無料で始められ、クレジットカー�
 #: src/features/chat/thread/sandbox-files.tsx:229
 msgid "Available once the reply is saved"
 msgstr "返信の保存後に利用できます"
+
+#: src/features/chat/aside/aside-panel.tsx:139
+msgid "Available when the reply finishes"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:426
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:119
@@ -5422,8 +5460,8 @@ msgstr "クリーンアップに失敗しました"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:475
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:335
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:338
 msgid "Clear"
 msgstr "クリア"
 
@@ -5589,7 +5627,7 @@ msgstr ""
 msgid "Close"
 msgstr "閉じる"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
 msgid "Close dialogs and menus"
 msgstr "ダイアログとメニューを閉じる"
 
@@ -5884,7 +5922,7 @@ msgstr "コマンドは必須です"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "コマンドは {SKILL_SLUG_MAX} 文字以内で入力してください"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:104
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
 msgstr ""
@@ -6284,7 +6322,7 @@ msgstr "確認用パスワードは必須です"
 msgid "Confirm your password"
 msgstr "パスワードを再入力してください"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:76
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6324,7 +6362,7 @@ msgstr "音声/ファイルノードを入力として接続してください"
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
-#: src/features/devices/components/devices-settings.tsx:287
+#: src/features/devices/components/devices-settings.tsx:307
 msgid "Connect and add"
 msgstr ""
 
@@ -6472,6 +6510,10 @@ msgstr "接続エラーです。インターネット接続を確認して、も
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:61
 msgid "Connection failed"
 msgstr "接続に失敗しました"
+
+#: src/features/devices/components/devices-settings.tsx:125
+msgid "Connection lost"
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:63
 msgid "Connection Problem"
@@ -6881,7 +6923,7 @@ msgstr "招待リンクをコピー"
 msgid "Copy it now — it is not shown again."
 msgstr "今すぐコピーしてください。再表示はされません。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
 #: src/features/settings/lib/settings-keywords.ts:41
 msgid "Copy Last Code Block"
 msgstr ""
@@ -6928,7 +6970,7 @@ msgid "Copy the JSON configuration"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:120
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -7029,8 +7071,16 @@ msgstr "Gemini 2.5 の最下位ティアで信頼性の高い Google AI を必�
 msgid "Costa Rica"
 msgstr "コスタリカ"
 
-#: src/features/devices/components/devices-settings.tsx:248
+#: src/features/devices/components/devices-settings.tsx:268
 msgid "Could not add the server."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:80
+msgid "Could not add this to the thread. Try again."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:73
+msgid "Could not answer the question. Try again."
 msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:81
@@ -7057,7 +7107,7 @@ msgstr "実行をキャンセルできませんでした。"
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
 
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/devices/components/devices-settings.tsx:89
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7171,7 +7221,7 @@ msgstr "ページとして開けませんでした"
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:372
 msgid "Could not pair this computer. Try again."
 msgstr "このコンピューターをペアリングできませんでした。もう一度お試しください。"
 
@@ -7210,7 +7260,7 @@ msgstr "そのチャットを読み込めませんでした。ロックされて
 msgid "Could not refine the draft. Try again."
 msgstr "下書きを改善できませんでした。もう一度お試しください。"
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:153
 msgid "Could not remove the device."
 msgstr "デバイスを削除できませんでした。"
 
@@ -7218,7 +7268,7 @@ msgstr "デバイスを削除できませんでした。"
 msgid "Could not remove the participant"
 msgstr "参加者を削除できませんでした"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:110
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
@@ -7831,8 +7881,8 @@ msgstr "カスタム設定（既定：{0}）"
 msgid "custom styles"
 msgstr "カスタムスタイル"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:172
-#: src/features/chat/sidebar/thread-sidebar.tsx:184
+#: src/features/chat/sidebar/thread-sidebar.tsx:174
+#: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "カスタムシステムプロンプト"
 
@@ -7853,7 +7903,7 @@ msgstr "カスタマイズ"
 msgid "Customize and regenerate"
 msgstr "カスタマイズして再生成"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:264
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:267
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "よく使う操作のキーボードショートカットをカスタマイズします。「記録」をクリックして、使いたいキーの組み合わせを押してください。"
 
@@ -8052,7 +8102,7 @@ msgstr "ディベート"
 msgid "Debate rounds"
 msgstr "ディベートのラウンド数"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
@@ -8064,7 +8114,7 @@ msgstr "目標を実行可能な計画に分解します。"
 msgid "Decrease number of images"
 msgstr "画像の枚数を減らす"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
 #: src/features/settings/lib/settings-keywords.ts:43
 msgid "Decrease Reasoning Effort"
 msgstr ""
@@ -8607,7 +8657,7 @@ msgstr "Z.AI で最も強力かつ高性能なフロンティア GLM モデル�
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最大限の AI 性能と洗練された推論が最も重要となる高負荷なタスク"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Denied"
 msgstr "拒否"
 
@@ -8889,19 +8939,19 @@ msgstr "オープンソースモデルで強力なコーディング能力と汎
 msgid "Development"
 msgstr "開発"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "Device activity"
 msgstr "デバイスのアクティビティ"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:99
 msgid "Device name"
 msgstr "デバイス名"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:156
 msgid "Device removed"
 msgstr "デバイスを削除しました"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:382
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "デバイス"
@@ -8999,7 +9049,7 @@ msgstr "無効化しています..."
 msgid "Discard"
 msgstr "破棄"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:79
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9035,6 +9085,7 @@ msgstr "Discord 公開鍵"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/devices/components/devices-settings.tsx:138
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
@@ -9054,6 +9105,10 @@ msgstr "エラーを閉じる"
 #: src/features/skills/components/skill-builder-setup.tsx:94
 msgid "Dismiss setup suggestions"
 msgstr "セットアップの提案を閉じる"
+
+#: src/features/chat/aside/aside-panel.tsx:92
+msgid "Dismiss this side question"
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:725
 msgid "Dismiss webhook secret"
@@ -9173,7 +9228,7 @@ msgstr "アカウントをお持ちでないですか？"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:189
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9343,7 +9398,7 @@ msgstr "下書き"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "メール、レポート、エッセイなどの下書き..."
 
@@ -10385,7 +10440,7 @@ msgstr "現在のパスワードを入力し、新しいパスワードを設定
 msgid "Enter your custom instructions..."
 msgstr "カスタム指示を入力..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:197
+#: src/features/chat/sidebar/thread-sidebar.tsx:199
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "カスタムシステムプロンプトをここに入力してください。すべてのメッセージで使用されます。"
 
@@ -10595,7 +10650,7 @@ msgstr "エラー: {error}"
 msgid "Errors"
 msgstr "エラー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
 msgid "Escape"
 msgstr "Escape"
 
@@ -10977,7 +11032,7 @@ msgid "expired"
 msgstr "期限切れ"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:191
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "期限切れ"
@@ -11026,7 +11081,7 @@ msgstr "有効期限：{expiresAt}"
 msgid "Expiring soon"
 msgstr "まもなく期限切れ"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
@@ -11221,7 +11276,7 @@ msgstr "不合格"
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:48
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:192
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
@@ -11867,7 +11922,7 @@ msgstr "お気に入りの状態を更新できませんでした"
 msgid "Failed to update filter rules"
 msgstr "フィルタールールを更新できませんでした"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:154
 msgid "Failed to update keyboard shortcuts"
 msgstr "キーボードショートカットを更新できませんでした"
 
@@ -12699,7 +12754,7 @@ msgstr "焦点距離"
 msgid "Focus search"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr ""
@@ -13276,7 +13331,7 @@ msgid "General-purpose video generation using Alibaba's latest-generation Wan mo
 msgstr "Alibaba の最新世代 Wan モデルによる汎用の動画生成"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
@@ -13312,7 +13367,7 @@ msgstr "テキストプロンプトから画像を生成し、4 倍にアップ�
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペースの画像を生成して。"
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
@@ -13427,7 +13482,7 @@ msgid "Generating video..."
 msgstr "動画を生成しています..."
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
 msgid "Generating..."
@@ -14150,7 +14205,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "こんにちは、{0} さん！今日は何をしますか？"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:283
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Help"
 msgstr "ヘルプ"
 
@@ -14627,7 +14682,7 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -15089,7 +15144,7 @@ msgstr ""
 msgid "Increase number of images"
 msgstr "画像の枚数を増やす"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
 #: src/features/settings/lib/settings-keywords.ts:42
 msgid "Increase Reasoning Effort"
 msgstr ""
@@ -15624,7 +15679,7 @@ msgstr "ジャッジスコア"
 msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
-#: src/features/chat/thread/thread.tsx:89
+#: src/features/chat/thread/thread.tsx:90
 msgid "Jump to my last message"
 msgstr ""
 
@@ -15694,7 +15749,7 @@ msgstr "ファイルを未分類として残すか、コレクションと一緒
 msgid "Kenya"
 msgstr "ケニア"
 
-#: src/features/devices/components/devices-settings.tsx:281
+#: src/features/devices/components/devices-settings.tsx:301
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -15706,7 +15761,7 @@ msgstr "キーボードショートカット"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:70
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:262
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:265
 #: src/features/settings/lib/settings-keywords.ts:36
 #: src/features/settings/lib/settings-keywords.ts:37
 #: src/features/settings/lib/settings-keywords.ts:38
@@ -15727,11 +15782,11 @@ msgstr "キーボードショートカット"
 msgid "Keyboard shortcuts (?)"
 msgstr "キーボードショートカット（?）"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:247
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:250
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "キーボードショートカットを既定に戻しました"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:165
 msgid "Keyboard shortcuts updated successfully"
 msgstr "キーボードショートカットを更新しました"
 
@@ -16269,11 +16324,11 @@ msgstr "少ない"
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:381
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:439
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -16955,7 +17010,7 @@ msgstr "低い = 控えめな変化、高い = 大幅な変換"
 msgid "Lower cost than Wan 2.5"
 msgstr "Wan 2.5 より低コスト"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
 msgid "Lower the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -18394,11 +18449,11 @@ msgstr "ミュート"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Linux computer"
 msgstr "マイ Linux コンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Mac"
 msgstr "マイ Mac"
 
@@ -18410,7 +18465,7 @@ msgstr "マイ MCP サーバー"
 msgid "My skills"
 msgstr "マイスキル"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Windows PC"
 msgstr "マイ Windows PC"
 
@@ -18431,7 +18486,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
+#: src/features/devices/components/devices-settings.tsx:285
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18651,7 +18706,7 @@ msgstr "Neore - AI テキスト・動画・音声・画像・ドキュメント�
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:656
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -18783,7 +18838,7 @@ msgstr "新しいチャット"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:29
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:231
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
 #: src/features/settings/lib/settings-keywords.ts:37
 msgid "New Chat"
 msgstr "新しいチャット"
@@ -18880,7 +18935,7 @@ msgstr "新しいタグ"
 msgid "New task"
 msgstr "新しいタスク"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
 #: src/features/settings/lib/settings-keywords.ts:38
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
@@ -18952,7 +19007,7 @@ msgstr "次の一致"
 msgid "Next option"
 msgstr "次のオプション"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "次の出力モード"
 
@@ -19197,7 +19252,7 @@ msgstr "説明なし"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:433
 msgid "No devices paired."
 msgstr "ペアリングされたデバイスはありません。"
 
@@ -19538,7 +19593,7 @@ msgstr "音声が検出されませんでした。ハンズフリーモードを
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:149
+#: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "No summary available. Click \"Generate\" to create one."
 msgstr "要約はありません。「生成」をクリックして作成してください。"
 
@@ -19591,7 +19646,7 @@ msgstr "スレッドはまだありません"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "ティアデータはまだありません。ティア情報はゲートウェイのアップグレード後の新しいリクエストから記録されます。"
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "No tools shared yet"
 msgstr "共有されているツールはまだありません"
 
@@ -19780,8 +19835,8 @@ msgstr "未ペアリング — ボットはまだ誰にも応答しません"
 msgid "Not rated"
 msgstr "未評価"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:301
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:306
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:304
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:309
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未設定"
@@ -19810,7 +19865,7 @@ msgstr "注: モジュールはメッセージ単位ではなく会話単位で�
 msgid "Nothing found"
 msgstr "見つかりません"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:184
 msgid "Nothing has run on a device yet."
 msgstr "デバイスではまだ何も実行されていません。"
 
@@ -19945,7 +20000,7 @@ msgstr "オフ"
 msgid "Official"
 msgstr "公式"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "オフライン"
@@ -20134,7 +20189,7 @@ msgstr "ワンタイムパスワードが無効です"
 msgid "One-time password is required"
 msgstr "ワンタイムパスワードは必須です"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 msgid "Online"
 msgstr "オンライン"
 
@@ -20308,12 +20363,12 @@ msgstr "メニューを開く"
 msgid "Open messages"
 msgstr "メッセージを開く"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:39
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:386
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
 
@@ -20396,7 +20451,7 @@ msgid "Open Tasks"
 msgstr "タスクを開く"
 
 #. placeholder {0}: defaultShortcut("commandPalette")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:119
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
 msgid "Open the command palette and global search ({0})"
 msgstr ""
 
@@ -20405,7 +20460,7 @@ msgid "Open the Developer tab and start the server."
 msgstr "Developer タブを開いてサーバーを起動してください。"
 
 #. placeholder {0}: defaultShortcut("openModelPicker")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
 msgid "Open the model picker in the composer ({0})"
 msgstr ""
 
@@ -20413,12 +20468,17 @@ msgstr ""
 msgid "Open the run's conversation"
 msgstr "実行の会話を開く"
 
+#. placeholder {0}: defaultShortcut("askAside")
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+msgid "Open the side-question panel without interrupting a running reply ({0})"
+msgstr ""
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
 msgid "Open the sub-agent's thread"
 msgstr "サブエージェントのスレッドを開く"
 
 #. placeholder {0}: defaultShortcut("focusSearch")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
 msgid "Open the thread search and focus it. Leave it unbound to keep the browser's find ({0})"
 msgstr ""
 
@@ -20727,7 +20787,7 @@ msgstr "最適化のスタイル"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
-#: src/features/chat/sidebar/thread-sidebar.tsx:178
+#: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
 #: src/features/settings/components/personalization/personalization-settings.tsx:281
@@ -20750,7 +20810,7 @@ msgstr "プロンプトを最適化"
 msgid "Optimize system prompt"
 msgstr "システムプロンプトを最適化"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:214
+#: src/features/chat/sidebar/thread-sidebar.tsx:216
 msgid "Optimize thread system prompt"
 msgstr "スレッドのシステムプロンプトを最適化"
 
@@ -21014,7 +21074,7 @@ msgstr "出力ファイル"
 msgid "Output Format"
 msgstr "出力形式"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "出力モード"
 
@@ -21132,11 +21192,11 @@ msgstr "編集したい領域を塗りつぶしてください。白い領域は
 msgid "Paired"
 msgstr "ペアリング済み"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:419
 msgid "Paired devices"
 msgstr "ペアリング済みのデバイス"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:362
 msgid "Pairing was cancelled on this computer."
 msgstr "このコンピューターでペアリングがキャンセルされました。"
 
@@ -21666,7 +21726,7 @@ msgstr "ピン留め済み"
 msgid "Pinned project"
 msgstr "ピン留めしたプロジェクト"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:320
+#: src/features/chat/sidebar/thread-sidebar.tsx:331
 msgid "Pins"
 msgstr "ピン"
 
@@ -21690,7 +21750,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "プロジェクトの計画やアイデア出しなど..."
 
@@ -21823,7 +21883,7 @@ msgstr "洗練されたハリウッド調"
 msgid "Popular"
 msgstr "人気"
 
-#: src/features/devices/components/devices-settings.tsx:277
+#: src/features/devices/components/devices-settings.tsx:297
 msgid "Port"
 msgstr ""
 
@@ -22092,7 +22152,7 @@ msgstr "Enter で送信、Shift+Enter で改行"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Escape で入力モードを終えると、h j k l、w b、0 $、i a I A、o O、x、dd、D、u で編集できます。Enter は引き続き送信します。既定では無効です。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:305
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:308
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
@@ -22197,7 +22257,7 @@ msgstr "前の一致"
 msgid "Previous option"
 msgstr "前のオプション"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
@@ -22328,7 +22388,7 @@ msgstr "Pro モデルには Pro プランが必要です。無料プランでは
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
 msgstr "AI でテキストファイルを処理して要点を抽出し、その要約に基づいて画像を生成"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:163
+#: src/features/chat/sidebar/thread-sidebar.tsx:165
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "各メッセージを、システムプロンプトと現在の入力のみで個別に処理します。チャット履歴のコンテキストは使いません。"
 
@@ -22614,7 +22674,7 @@ msgstr "最適化した内容でプロンプトを更新しました"
 msgid "Prompt Variables"
 msgstr "プロンプト変数"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:305
+#: src/features/chat/sidebar/thread-sidebar.tsx:307
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:475
 msgid "Prompts"
@@ -22932,7 +22992,7 @@ msgstr "半径"
 msgid "rag"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
 msgid "Raise the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -23271,6 +23331,10 @@ msgstr "再接続"
 msgid "Reconnect {0}"
 msgstr "{0} を再接続"
 
+#: src/features/devices/components/devices-settings.tsx:126
+msgid "Reconnecting"
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:25
 msgid "Reconnecting to the server…"
 msgstr "サーバーに再接続しています…"
@@ -23279,8 +23343,8 @@ msgstr "サーバーに再接続しています…"
 msgid "Reconnecting…"
 msgstr "再接続しています…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 msgid "Record"
 msgstr "記録"
 
@@ -23614,8 +23678,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:313
 #: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/devices/components/devices-settings.tsx:142
+#: src/features/devices/components/devices-settings.tsx:146
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23632,7 +23696,7 @@ msgid "Remove \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:163
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
@@ -24026,7 +24090,7 @@ msgstr "リサーチ"
 msgid "Research a topic"
 msgstr "トピックをリサーチ"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "トピックを深くリサーチ..."
 
@@ -24085,7 +24149,7 @@ msgid "Reset to defaults"
 msgstr "デフォルトに戻す"
 
 #: src/features/settings/components/chat/models-settings.tsx:379
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:352
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
 msgid "Reset to Defaults"
 msgstr "既定に戻す"
 
@@ -24237,6 +24301,7 @@ msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/devices/components/devices-settings.tsx:81
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -24758,7 +24823,7 @@ msgstr "プリセットを保存"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "再利用可能なシステムプロンプトを保存し、特定のモデルに紐付けます。「最適化」ボタンで、プロンプトオプティマイザーを使って各プリセットを改善できます。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 msgid "Save Shortcuts"
 msgstr "ショートカットを保存"
 
@@ -24805,7 +24870,7 @@ msgstr "「{0}」に保存しました"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "保存しています..."
@@ -24899,7 +24964,7 @@ msgstr "列を 1 ページ左にスクロール"
 msgid "Scroll right one page of columns"
 msgstr "列を 1 ページ右にスクロール"
 
-#: src/features/chat/thread/thread.tsx:95
+#: src/features/chat/thread/thread.tsx:96
 msgid "Scroll to bottom"
 msgstr "一番下までスクロール"
 
@@ -25525,7 +25590,7 @@ msgstr "メッセージを送信して返信を待っています"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:193
 msgid "Sent"
 msgstr "送信済み"
 
@@ -25577,7 +25642,7 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:265
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -25593,7 +25658,7 @@ msgstr "サーバーエラーです。しばらくしてからもう一度お試
 msgid "Server name is required"
 msgstr "サーバー名は必須です"
 
-#: src/features/devices/components/devices-settings.tsx:100
+#: src/features/devices/components/devices-settings.tsx:123
 msgid "Server over SSH"
 msgstr ""
 
@@ -25617,7 +25682,7 @@ msgstr "ブランチ機能付きのサーバーレス Postgres データベー�
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "Servers over SSH"
 msgstr ""
 
@@ -25754,7 +25819,7 @@ msgstr "共有"
 msgid "Shared conversation"
 msgstr "共有された会話"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:414
 msgid "Shared folders and local servers…"
 msgstr "共有フォルダーとローカルサーバー…"
 
@@ -25863,7 +25928,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "アシスタントのメッセージの後にフォローアップの提案を表示します。"
 
 #. placeholder {0}: defaultShortcut("help")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
 msgid "Show help dialog ({0})"
 msgstr "ヘルプダイアログを表示（{0}）"
 
@@ -25974,16 +26039,25 @@ msgstr "{totalRows} 行中 {firstShown}〜{lastShown} 行を表示"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "スキルをいつ適用するかを判断できるよう、アシスタントに表示されます。"
 
+#: src/features/chat/aside/aside-panel.tsx:175
+#: src/features/chat/aside/aside-panel.tsx:239
+msgid "Side question"
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:75
+msgid "Side questions are not available for this chat, or the question is too long."
+msgstr ""
+
 #: ../../packages/ui/src/components/sidebar.tsx:273
 msgid "Sidebar"
 msgstr "サイドバー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:116
 #: src/features/settings/lib/settings-keywords.ts:44
 msgid "Sidebar Left"
 msgstr "サイドバーを左に"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:117
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "Sidebar Right"
 msgstr "サイドバーを右に"
@@ -26855,7 +26929,11 @@ msgstr "会話を始める"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "最新の AI モデルで、自分の会話を始めましょう。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:343
+#: src/features/chat/aside/aside-panel.tsx:176
+msgid "Start a conversation to ask a side question."
+msgstr ""
+
+#: src/features/chat/sidebar/thread-sidebar.tsx:354
 msgid "Start a conversation to configure variables."
 msgstr "変数を設定するには会話を始めてください。"
 
@@ -26872,7 +26950,7 @@ msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
 #. placeholder {0}: defaultShortcut("newChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
 msgid "Start a new chat ({0})"
 msgstr "新しいチャットを開始（{0}）"
 
@@ -26885,7 +26963,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "新しい会話を始めて、最初のスレッドを作成しましょう"
 
 #. placeholder {0}: defaultShortcut("newTemporaryChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
 msgid "Start a new temporary chat ({0})"
 msgstr "新しい一時チャットを開始（{0}）"
 
@@ -27042,7 +27120,7 @@ msgstr "状態:"
 msgid "Stateless"
 msgstr "ステートレス"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:161
+#: src/features/chat/sidebar/thread-sidebar.tsx:163
 msgid "Stateless Mode"
 msgstr "ステートレスモード"
 
@@ -27111,8 +27189,8 @@ msgstr "株式"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -27644,7 +27722,7 @@ msgstr "複雑なタスクに適しています：Role / Background / Attention 
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "ドキュメントや URL を要約..."
 
@@ -27664,7 +27742,7 @@ msgstr "受信トレイを要約して、緊急の項目を強調してくださ
 msgid "Summarize the history of the internet"
 msgstr "インターネットの歴史を要約する"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:151
+#: src/features/chat/sidebar/thread-sidebar.tsx:153
 msgid "Summary is only available for text models."
 msgstr "要約はテキストモデルでのみ利用できます。"
 
@@ -28262,7 +28340,7 @@ msgstr "テキスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28415,7 +28493,7 @@ msgstr "タイ"
 msgid "Thanks for rating"
 msgstr "評価ありがとうございます"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:171
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
 
@@ -28435,7 +28513,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モードに設定する必要があります）"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:147
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
@@ -28771,6 +28849,14 @@ msgstr "改善によって変更されたフィールドはありませんでし
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "Bedrock コンソールでモデルアクセスを有効にしたリージョン。"
 
+#: src/features/chat/aside/aside-panel.tsx:78
+msgid "The reply is still running. Add it when the reply finishes."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:71
+msgid "The reply is still running. Try again when it finishes."
+msgstr ""
+
 #: src/lib/errors/index.ts:184
 msgid "The request timed out but may still complete. Check the conversation before trying again."
 msgstr ""
@@ -28977,6 +29063,7 @@ msgstr "思考機能を備えた視覚言語モデル"
 msgid "Thinking..."
 msgstr "考えています..."
 
+#: src/features/chat/aside/aside-panel.tsx:105
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -28995,11 +29082,15 @@ msgstr "この操作は元に戻せません。組織と関連するすべての
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
+#: src/features/chat/aside/aside-panel.tsx:82
+msgid "This cannot be added to this chat."
+msgstr ""
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
+#: src/features/chat/thread/composer.tsx:585
 msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
@@ -29011,25 +29102,25 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:122
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is not paired yet."
 msgstr "このコンピューターはまだペアリングされていません。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:407
 msgid "This computer is paired as “{0}”."
 msgstr "このコンピューターは「{0}」としてペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is paired with another account."
 msgstr "このコンピューターは別のアカウントとペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:369
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
 
@@ -29209,11 +29300,11 @@ msgstr "このプリセットは完全に削除されます。"
 msgid "This preview could not be loaded."
 msgstr "このプレビューを読み込めませんでした。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:203
+#: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "このプロンプトは、会話履歴とともにすべてのメッセージで使用されます。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:202
+#: src/features/chat/sidebar/thread-sidebar.tsx:204
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "このプロンプトはすべてのメッセージで使用されます。各メッセージはチャット履歴なしで個別に処理されます。"
 
@@ -29369,7 +29460,7 @@ msgstr "数秒間思考しました"
 msgid "thread"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:298
+#: src/features/chat/sidebar/thread-sidebar.tsx:300
 #: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Thread"
 msgstr "スレッド"
@@ -29424,7 +29515,7 @@ msgstr "スレッドを復元しました"
 msgid "Thread statistics"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:139
+#: src/features/chat/sidebar/thread-sidebar.tsx:141
 msgid "Thread summary"
 msgstr "スレッドの要約"
 
@@ -29577,7 +29668,7 @@ msgid "Toggle interactivity"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarLeft")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
 msgid "Toggle left sidebar ({0})"
 msgstr "左サイドバーの切り替え（{0}）"
 
@@ -29596,7 +29687,7 @@ msgid "Toggle property panel"
 msgstr "プロパティパネルの表示を切り替え"
 
 #. placeholder {0}: defaultShortcut("sidebarRight")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
 msgid "Toggle right sidebar ({0})"
 msgstr "右サイドバーの切り替え（{0}）"
 
@@ -29861,7 +29952,7 @@ msgstr "変換後の画像"
 msgid "Translate"
 msgstr "翻訳"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
@@ -30428,6 +30519,14 @@ msgstr "ノードのロックを解除"
 msgid "Unlock this chat"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:79
+msgid "Unlock this chat to add this to the thread."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:72
+msgid "Unlock this chat to ask a side question."
+msgstr ""
+
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:139
 msgid "Unmute"
 msgstr "ミュート解除"
@@ -30951,7 +31050,7 @@ msgstr "組織で許可されたモデルを使用"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "これらのキーボードショートカットを使うと、データグリッドをより効率的に移動・操作できます。"
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:401
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
@@ -30991,7 +31090,7 @@ msgstr "ユーザー"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
+#: src/features/devices/components/devices-settings.tsx:293
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:194
@@ -31160,7 +31259,7 @@ msgstr "可変焦点距離"
 msgid "Variable name..."
 msgstr "変数名..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:312
+#: src/features/chat/sidebar/thread-sidebar.tsx:314
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:70
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -31401,7 +31500,7 @@ msgstr "動画"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -31825,7 +31924,7 @@ msgstr "幅"
 msgid "Waiting for {device} to pick this up…"
 msgstr "{device} が受け取るのを待っています…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Waiting for approval"
 msgstr "承認待ち"
 
@@ -32103,7 +32202,7 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
@@ -32241,7 +32340,7 @@ msgstr "管理者権限あり"
 msgid "With email/password"
 msgstr "メールアドレス/パスワード"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:303
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -32334,7 +32433,7 @@ msgstr "チャットと並行して長文コンテンツを作成"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "横並びのキャンバスエディターで長文コンテンツを作成できます。ツールを切り替えずに、チャットから完成したドキュメントまで。"
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "コードを書いて..."
 
@@ -32557,6 +32656,11 @@ msgstr "タグはまだありません。"
 #: src/features/admin/components/impersonation-banner.tsx:39
 msgid "You have returned to your admin account"
 msgstr "管理者アカウントに戻りました"
+
+#: src/features/chat/aside/aside-panel.tsx:74
+#: src/features/chat/aside/aside-panel.tsx:81
+msgid "You have used today's messages. Try again later."
+msgstr ""
 
 #: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
@@ -32821,6 +32925,10 @@ msgstr "セッションの有効期限が切れました。ページを再読み
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:103
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "セッションが最新ではありません。アカウントを削除するには、サインアウトしてから再度サインインしてください。"
+
+#: src/features/chat/aside/aside-panel.tsx:242
+msgid "Your side question"
+msgstr ""
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:234
 msgid "Your tags"

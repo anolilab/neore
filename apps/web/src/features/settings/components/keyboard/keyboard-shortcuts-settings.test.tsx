@@ -87,6 +87,7 @@ describe("KeyboardShortcutsSettings", () => {
         expect(keyboardShortcuts.newChat).toBe("ctrl+j");
         // Only what the page edits is sent, and the backend accepts every value, defaults included.
         expect(Object.keys(keyboardShortcuts).toSorted((a, b) => a.localeCompare(b))).toEqual([
+            "askAside",
             "commandPalette",
             "copyLastCodeBlock",
             "decreaseEffort",

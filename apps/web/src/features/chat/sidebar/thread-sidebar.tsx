@@ -10,10 +10,12 @@ import { Switch } from "@neore/ui/components/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
-import { Braces, FileText, Loader2, MessageSquare, PinIcon, Sparkles } from "lucide-react";
+import { Braces, FileText, Loader2, MessageCircleQuestionIcon, MessageSquare, PinIcon, Sparkles } from "lucide-react";
 import type { FC, MouseEvent as ReactMouseEvent } from "react";
 import { Activity, useEffect, useRef, useState } from "react";
 
+import AsidePanel from "@/features/chat/aside/aside-panel";
+import { ASIDE_TAB } from "@/features/chat/aside/open-aside";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
@@ -314,6 +316,15 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                             {isTextModel && (
                                 <TabsTrigger
                                     className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
+                                    value={ASIDE_TAB}
+                                >
+                                    <MessageCircleQuestionIcon aria-hidden="true" className="mr-1.5 size-3.5" />
+                                    {t`Ask`}
+                                </TabsTrigger>
+                            )}
+                            {isTextModel && (
+                                <TabsTrigger
+                                    className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
                                     value="pins"
                                 >
                                     <PinIcon className="mr-1.5 size-3.5" />
@@ -345,6 +356,13 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                                 )}
                             </TabsContent>
                         </Activity>
+                        {isTextModel && (
+                            <Activity mode={activeRightSidebarTab === ASIDE_TAB ? "visible" : "hidden"}>
+                                <TabsContent className="absolute inset-0 overflow-y-auto" value={ASIDE_TAB}>
+                                    <AsidePanel threadId={threadId} />
+                                </TabsContent>
+                            </Activity>
+                        )}
                         {isTextModel && (
                             <Activity mode={activeRightSidebarTab === "pins" ? "visible" : "hidden"}>
                                 <TabsContent className="absolute inset-0 overflow-y-auto" value="pins">

@@ -1461,6 +1461,36 @@
       "to": "table:changelogCache"
     },
     {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:agent_threads:getThreadInternal"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:auth_functions:getUserAuthFlagsQuery"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:auth_functions:getUserPreferencesQuery"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:chat_aside:readAsideSnapshot"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:chat_functions:gateThreadAction"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:chat_streaming_persistent_library:getStreamText"
+    },
+    {
       "from": "function:chat_autocomplete:isComposerAutocompleteEnabled",
       "kind": "read",
       "to": "table:userSettings"
@@ -9136,6 +9166,27 @@
       "kind": "function",
       "name": "changelog.functions.setCachedChangelogs",
       "module": "changelog"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_aside:addAsideToThread",
+      "kind": "function",
+      "name": "chat.aside.addAsideToThread",
+      "module": "chat"
+    },
+    {
+      "detail": "action",
+      "id": "function:chat_aside:askAside",
+      "kind": "function",
+      "name": "chat.aside.askAside",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
+      "id": "function:chat_aside:readAsideSnapshot",
+      "kind": "function",
+      "name": "chat.aside.readAsideSnapshot",
+      "module": "chat"
     },
     {
       "detail": "mutation",

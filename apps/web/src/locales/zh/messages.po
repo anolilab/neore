@@ -589,7 +589,7 @@ msgstr "发现 {0} 个工具"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
@@ -907,11 +907,11 @@ msgstr "{minutes} 分钟前"
 msgid "{minutes}m remaining"
 msgstr "剩余 {minutes} 分钟"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}模式——点击更改"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/thread/thread.tsx:224
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {向 # 个模型提问任何问题...}}"
 
@@ -1787,7 +1787,7 @@ msgstr "添加备注..."
 msgid "Add a note…"
 msgstr "添加备注…"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:276
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2024,6 +2024,10 @@ msgstr "添加到收藏"
 msgid "Add to starred"
 msgstr "添加到星标"
 
+#: src/features/chat/aside/aside-panel.tsx:137
+msgid "Add to thread"
+msgstr ""
+
 #: src/features/prompts/components/thread-variables-config.tsx:195
 msgid "Add variable"
 msgstr ""
@@ -2059,6 +2063,10 @@ msgstr "已添加 {added} 个文档。"
 msgid "Added to favorites"
 msgstr "已添加到收藏"
 
+#: src/features/chat/aside/aside-panel.tsx:124
+msgid "Added to the thread"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Added:"
 msgstr "新增："
@@ -2069,7 +2077,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:238
+#: src/features/devices/components/devices-settings.tsx:258
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2077,7 +2085,7 @@ msgstr ""
 msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
-#: src/features/devices/components/devices-settings.tsx:269
+#: src/features/devices/components/devices-settings.tsx:289
 msgid "Address"
 msgstr ""
 
@@ -2308,7 +2316,7 @@ msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Discord 
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Slack 应用的 Event Subscriptions 中将其设为 Request URL。"
 
-#: src/features/devices/components/devices-settings.tsx:185
+#: src/features/devices/components/devices-settings.tsx:205
 msgid "After outside content"
 msgstr "在外部内容之后"
 
@@ -2944,7 +2952,7 @@ msgstr "匿名用户"
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "不活跃超过此天数的匿名用户将可被删除。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:289
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:292
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr ""
 
@@ -2967,6 +2975,10 @@ msgstr "通过你的 WhatsApp Business 号码回复 WhatsApp 消息（Meta Cloud
 #: src/features/chat/thread/ask-user-prompt.tsx:116
 msgid "Answered"
 msgstr "已回答"
+
+#: src/features/chat/aside/aside-panel.tsx:119
+msgid "Answered without the conversation: this chat runs on your computer."
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:63
 msgid "anthropic"
@@ -3376,11 +3388,29 @@ msgstr "升序"
 msgid "ask"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "询问"
 
-#: src/features/chat/thread/thread.tsx:223
+#: src/features/chat/aside/aside-panel.tsx:248
+msgid "Ask a quick question…"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:24
+msgid "Ask a side question"
+msgstr ""
+
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+msgid "Ask a Side Question"
+msgstr ""
+
+#: src/features/chat/aside/composer-ask-aside.tsx:35
+msgid "Ask a side question without interrupting the reply"
+msgstr ""
+
+#: src/features/chat/thread/thread.tsx:224
 msgid "Ask all models anything..."
 msgstr "向所有模型提问任何问题..."
 
@@ -3392,9 +3422,13 @@ msgstr "输入任何问题来开始新对话…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "向 GPT-4、Claude 和 Gemini 提出同一个问题。在 FLUX、Imagen 和 Stable Diffusion 上运行同一个提示词。选出最优的——而不是默认的。"
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "问我任何问题..."
+
+#: src/features/chat/aside/aside-panel.tsx:240
+msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
+msgstr ""
 
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
@@ -3471,7 +3505,7 @@ msgstr "奥克兰"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -3669,6 +3703,10 @@ msgstr "已在 Neore 上提供——免费开始，无需信用卡。"
 #: src/features/chat/thread/sandbox-files.tsx:229
 msgid "Available once the reply is saved"
 msgstr "回复保存后可用"
+
+#: src/features/chat/aside/aside-panel.tsx:139
+msgid "Available when the reply finishes"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:426
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:119
@@ -5422,8 +5460,8 @@ msgstr "清理失败"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:475
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:335
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:338
 msgid "Clear"
 msgstr "清除"
 
@@ -5589,7 +5627,7 @@ msgstr ""
 msgid "Close"
 msgstr "关闭"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
 msgid "Close dialogs and menus"
 msgstr "关闭对话框和菜单"
 
@@ -5884,7 +5922,7 @@ msgstr "请输入命令"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:104
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
 msgstr ""
@@ -6284,7 +6322,7 @@ msgstr "请确认密码"
 msgid "Confirm your password"
 msgstr "确认你的密码"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:76
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6324,7 +6362,7 @@ msgstr "连接一个音频/文件节点作为输入"
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
-#: src/features/devices/components/devices-settings.tsx:287
+#: src/features/devices/components/devices-settings.tsx:307
 msgid "Connect and add"
 msgstr ""
 
@@ -6472,6 +6510,10 @@ msgstr "连接错误，请检查网络连接后重试。"
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:61
 msgid "Connection failed"
 msgstr "连接失败"
+
+#: src/features/devices/components/devices-settings.tsx:125
+msgid "Connection lost"
+msgstr ""
 
 #: src/components/error-boundaries/route-error-boundary.tsx:63
 msgid "Connection Problem"
@@ -6881,7 +6923,7 @@ msgstr "复制邀请链接"
 msgid "Copy it now — it is not shown again."
 msgstr "请立即复制——它不会再次显示。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
 #: src/features/settings/lib/settings-keywords.ts:41
 msgid "Copy Last Code Block"
 msgstr ""
@@ -6928,7 +6970,7 @@ msgid "Copy the JSON configuration"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:120
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -7029,8 +7071,16 @@ msgstr "需要以 Gemini 2.5 最低档获得可靠 Google AI 的成本敏感型�
 msgid "Costa Rica"
 msgstr "哥斯达黎加"
 
-#: src/features/devices/components/devices-settings.tsx:248
+#: src/features/devices/components/devices-settings.tsx:268
 msgid "Could not add the server."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:80
+msgid "Could not add this to the thread. Try again."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:73
+msgid "Could not answer the question. Try again."
 msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:81
@@ -7057,7 +7107,7 @@ msgstr "无法取消运行。"
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/devices/components/devices-settings.tsx:89
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7171,7 +7221,7 @@ msgstr "无法作为页面打开"
 msgid "Could not open the pull request."
 msgstr "无法打开拉取请求。"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:372
 msgid "Could not pair this computer. Try again."
 msgstr "无法配对此计算机。请重试。"
 
@@ -7210,7 +7260,7 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 msgid "Could not refine the draft. Try again."
 msgstr "无法优化草稿，请重试。"
 
-#: src/features/devices/components/devices-settings.tsx:133
+#: src/features/devices/components/devices-settings.tsx:153
 msgid "Could not remove the device."
 msgstr "无法移除该设备。"
 
@@ -7218,7 +7268,7 @@ msgstr "无法移除该设备。"
 msgid "Could not remove the participant"
 msgstr "无法移除参与者"
 
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:110
 msgid "Could not rename the device."
 msgstr "无法重命名该设备。"
 
@@ -7831,8 +7881,8 @@ msgstr "自定义设置（默认：{0}）"
 msgid "custom styles"
 msgstr "自定义风格"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:172
-#: src/features/chat/sidebar/thread-sidebar.tsx:184
+#: src/features/chat/sidebar/thread-sidebar.tsx:174
+#: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "自定义系统提示词"
 
@@ -7853,7 +7903,7 @@ msgstr "个性化"
 msgid "Customize and regenerate"
 msgstr "自定义并重新生成"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:264
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:267
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "为常用操作自定义键盘快捷键。点击“录制”并按下你想要的组合键。"
 
@@ -8052,7 +8102,7 @@ msgstr "辩论"
 msgid "Debate rounds"
 msgstr "辩论轮数"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
 
@@ -8064,7 +8114,7 @@ msgstr "将目标分解为可执行的计划。"
 msgid "Decrease number of images"
 msgstr "减少图片数量"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
 #: src/features/settings/lib/settings-keywords.ts:43
 msgid "Decrease Reasoning Effort"
 msgstr ""
@@ -8607,7 +8657,7 @@ msgstr "需要 Z.AI 最强大前沿 GLM 模型的高要求任务"
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 
-#: src/features/devices/components/devices-settings.tsx:170
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Denied"
 msgstr "已拒绝"
 
@@ -8889,19 +8939,19 @@ msgstr "需要开源模型具备强大编程和通用能力的开发者"
 msgid "Development"
 msgstr "开发"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "Device activity"
 msgstr "设备活动"
 
-#: src/features/devices/components/devices-settings.tsx:76
+#: src/features/devices/components/devices-settings.tsx:99
 msgid "Device name"
 msgstr "设备名称"
 
-#: src/features/devices/components/devices-settings.tsx:136
+#: src/features/devices/components/devices-settings.tsx:156
 msgid "Device removed"
 msgstr "设备已移除"
 
-#: src/features/devices/components/devices-settings.tsx:357
+#: src/features/devices/components/devices-settings.tsx:382
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "设备"
@@ -8999,7 +9049,7 @@ msgstr "正在停用..."
 msgid "Discard"
 msgstr "放弃"
 
-#: src/features/devices/components/devices-settings.tsx:118
+#: src/features/devices/components/devices-settings.tsx:79
 #: src/features/settings/connectors/connector-card.tsx:186
 #: src/features/settings/connectors/connector-card.tsx:206
 msgid "Disconnect"
@@ -9035,6 +9085,7 @@ msgstr "Discord 公钥"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/devices/components/devices-settings.tsx:138
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
@@ -9054,6 +9105,10 @@ msgstr "关闭错误提示"
 #: src/features/skills/components/skill-builder-setup.tsx:94
 msgid "Dismiss setup suggestions"
 msgstr "关闭设置建议"
+
+#: src/features/chat/aside/aside-panel.tsx:92
+msgid "Dismiss this side question"
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:725
 msgid "Dismiss webhook secret"
@@ -9173,7 +9228,7 @@ msgstr "还没有账号？"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:189
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9343,7 +9398,7 @@ msgstr "草稿"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "为软件工程师职位起草一封求职信"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "起草邮件、报告或文章..."
 
@@ -10385,7 +10440,7 @@ msgstr "输入当前密码并设置新密码"
 msgid "Enter your custom instructions..."
 msgstr "输入你的自定义指令..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:197
+#: src/features/chat/sidebar/thread-sidebar.tsx:199
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "在此输入你的自定义系统提示词。它将用于每一条消息。"
 
@@ -10595,7 +10650,7 @@ msgstr "错误：{error}"
 msgid "Errors"
 msgstr "错误"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
 msgid "Escape"
 msgstr "Escape"
 
@@ -10977,7 +11032,7 @@ msgid "expired"
 msgstr "已过期"
 
 #: src/features/chat/thread-list/thread-node.tsx:290
-#: src/features/devices/components/devices-settings.tsx:171
+#: src/features/devices/components/devices-settings.tsx:191
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
 msgstr "已过期"
@@ -11026,7 +11081,7 @@ msgstr "过期时间：{expiresAt}"
 msgid "Expiring soon"
 msgstr "即将过期"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "用简单的话解释一个概念..."
 
@@ -11221,7 +11276,7 @@ msgstr "失败"
 #: src/features/chat/thread-list/thread-node.tsx:503
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:48
-#: src/features/devices/components/devices-settings.tsx:172
+#: src/features/devices/components/devices-settings.tsx:192
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:164
@@ -11867,7 +11922,7 @@ msgstr "更新收藏状态失败"
 msgid "Failed to update filter rules"
 msgstr "更新筛选规则失败"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:154
 msgid "Failed to update keyboard shortcuts"
 msgstr "更新键盘快捷键失败"
 
@@ -12699,7 +12754,7 @@ msgstr "焦距"
 msgid "Focus search"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr ""
@@ -13276,7 +13331,7 @@ msgid "General-purpose video generation using Alibaba's latest-generation Wan mo
 msgstr "使用阿里巴巴最新一代 Wan 模型的通用视频生成"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
@@ -13312,7 +13367,7 @@ msgstr "根据文本提示词生成图像并放大 4 倍"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "生成图像或视频..."
 
@@ -13427,7 +13482,7 @@ msgid "Generating video..."
 msgstr "正在生成视频..."
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:258
-#: src/features/chat/sidebar/thread-sidebar.tsx:143
+#: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
 msgid "Generating..."
@@ -14150,7 +14205,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "你好，{0}！今天想做点什么？"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:283
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Help"
 msgstr "帮助"
 
@@ -14627,7 +14682,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -15089,7 +15144,7 @@ msgstr ""
 msgid "Increase number of images"
 msgstr "增加图片数量"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
 #: src/features/settings/lib/settings-keywords.ts:42
 msgid "Increase Reasoning Effort"
 msgstr ""
@@ -15624,7 +15679,7 @@ msgstr "评委得分"
 msgid "Judge: {0}"
 msgstr "评委：{0}"
 
-#: src/features/chat/thread/thread.tsx:89
+#: src/features/chat/thread/thread.tsx:90
 msgid "Jump to my last message"
 msgstr ""
 
@@ -15694,7 +15749,7 @@ msgstr "将文件保留为未分类，或与集合一起删除。使用该集合
 msgid "Kenya"
 msgstr "肯尼亚"
 
-#: src/features/devices/components/devices-settings.tsx:281
+#: src/features/devices/components/devices-settings.tsx:301
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -15706,7 +15761,7 @@ msgstr "键盘快捷键"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:70
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:262
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:265
 #: src/features/settings/lib/settings-keywords.ts:36
 #: src/features/settings/lib/settings-keywords.ts:37
 #: src/features/settings/lib/settings-keywords.ts:38
@@ -15727,11 +15782,11 @@ msgstr "键盘快捷键"
 msgid "Keyboard shortcuts (?)"
 msgstr "键盘快捷键（?）"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:247
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:250
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "键盘快捷键已恢复默认"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:165
 msgid "Keyboard shortcuts updated successfully"
 msgstr "键盘快捷键已更新"
 
@@ -16269,11 +16324,11 @@ msgstr "少"
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:381
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文件、终端和本地 MCP 服务器。每个操作都会先在那台电脑上征求你的同意，共享聊天或后台任务不会运行任何操作。"
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:439
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -16955,7 +17010,7 @@ msgstr "越低 = 细微变化，越高 = 大幅转换"
 msgid "Lower cost than Wan 2.5"
 msgstr "成本低于 Wan 2.5"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
 msgid "Lower the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -18394,11 +18449,11 @@ msgstr "静音"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Linux computer"
 msgstr "我的 Linux 电脑"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Mac"
 msgstr "我的 Mac"
 
@@ -18410,7 +18465,7 @@ msgstr "我的 MCP 服务器"
 msgid "My skills"
 msgstr "我的技能"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:346
 msgid "My Windows PC"
 msgstr "我的 Windows 电脑"
 
@@ -18431,7 +18486,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:265
+#: src/features/devices/components/devices-settings.tsx:285
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -18651,7 +18706,7 @@ msgstr "Neore - AI 文本、视频、音频、图像和文档生成平台"
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:656
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore 可能会出错。请核实重要信息。"
 
@@ -18783,7 +18838,7 @@ msgstr "新聊天"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:29
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:231
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
 #: src/features/settings/lib/settings-keywords.ts:37
 msgid "New Chat"
 msgstr "新聊天"
@@ -18880,7 +18935,7 @@ msgstr "新标签"
 msgid "New task"
 msgstr "新建任务"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
 #: src/features/settings/lib/settings-keywords.ts:38
 msgid "New Temporary Chat"
 msgstr "新建临时聊天"
@@ -18952,7 +19007,7 @@ msgstr "下一个匹配项"
 msgid "Next option"
 msgstr "下一个选项"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "下一个输出模式"
 
@@ -19197,7 +19252,7 @@ msgstr "无描述"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:407
+#: src/features/devices/components/devices-settings.tsx:433
 msgid "No devices paired."
 msgstr "没有已配对的设备。"
 
@@ -19538,7 +19593,7 @@ msgstr "未检测到语音。免提模式已停止。"
 msgid "No starred models"
 msgstr "没有星标模型"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:149
+#: src/features/chat/sidebar/thread-sidebar.tsx:151
 msgid "No summary available. Click \"Generate\" to create one."
 msgstr "暂无摘要。点击“生成”来创建一个。"
 
@@ -19591,7 +19646,7 @@ msgstr "还没有对话"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "暂无套餐等级数据。网关升级后，新请求会记录等级信息。"
 
-#: src/features/devices/components/devices-settings.tsx:95
+#: src/features/devices/components/devices-settings.tsx:118
 msgid "No tools shared yet"
 msgstr "尚未共享任何工具"
 
@@ -19780,8 +19835,8 @@ msgstr "未配对——机器人暂不回复任何人"
 msgid "Not rated"
 msgstr "未评分"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:301
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:306
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:304
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:309
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未设置"
@@ -19810,7 +19865,7 @@ msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模
 msgid "Nothing found"
 msgstr "未找到结果"
 
-#: src/features/devices/components/devices-settings.tsx:164
+#: src/features/devices/components/devices-settings.tsx:184
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
 
@@ -19945,7 +20000,7 @@ msgstr "关闭"
 msgid "Official"
 msgstr "官方"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "离线"
@@ -20134,7 +20189,7 @@ msgstr "一次性密码无效"
 msgid "One-time password is required"
 msgstr "请输入一次性密码"
 
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:124
 msgid "Online"
 msgstr "在线"
 
@@ -20308,12 +20363,12 @@ msgstr "打开菜单"
 msgid "Open messages"
 msgstr "打开消息"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:39
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:361
+#: src/features/devices/components/devices-settings.tsx:386
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "请在桌面应用中打开 Neore 以配对此计算机。之前配对的设备列在下方。"
 
@@ -20396,7 +20451,7 @@ msgid "Open Tasks"
 msgstr "打开任务"
 
 #. placeholder {0}: defaultShortcut("commandPalette")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:119
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:122
 msgid "Open the command palette and global search ({0})"
 msgstr ""
 
@@ -20405,7 +20460,7 @@ msgid "Open the Developer tab and start the server."
 msgstr "打开 Developer 标签页并启动服务器。"
 
 #. placeholder {0}: defaultShortcut("openModelPicker")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
 msgid "Open the model picker in the composer ({0})"
 msgstr ""
 
@@ -20413,12 +20468,17 @@ msgstr ""
 msgid "Open the run's conversation"
 msgstr "打开此次运行的对话"
 
+#. placeholder {0}: defaultShortcut("askAside")
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:121
+msgid "Open the side-question panel without interrupting a running reply ({0})"
+msgstr ""
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
 msgid "Open the sub-agent's thread"
 msgstr "打开子代理的对话"
 
 #. placeholder {0}: defaultShortcut("focusSearch")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
 msgid "Open the thread search and focus it. Leave it unbound to keep the browser's find ({0})"
 msgstr ""
 
@@ -20727,7 +20787,7 @@ msgstr "优化风格"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
-#: src/features/chat/sidebar/thread-sidebar.tsx:178
+#: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
 #: src/features/settings/components/personalization/personalization-settings.tsx:281
@@ -20750,7 +20810,7 @@ msgstr "优化提示词"
 msgid "Optimize system prompt"
 msgstr "优化系统提示词"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:214
+#: src/features/chat/sidebar/thread-sidebar.tsx:216
 msgid "Optimize thread system prompt"
 msgstr "优化对话系统提示词"
 
@@ -21014,7 +21074,7 @@ msgstr "输出文件"
 msgid "Output Format"
 msgstr "输出格式"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "输出模式"
 
@@ -21132,11 +21192,11 @@ msgstr "涂抹你想编辑的区域。白色区域将重新生成，深色区域
 msgid "Paired"
 msgstr "已配对"
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:419
 msgid "Paired devices"
 msgstr "已配对的设备"
 
-#: src/features/devices/components/devices-settings.tsx:337
+#: src/features/devices/components/devices-settings.tsx:362
 msgid "Pairing was cancelled on this computer."
 msgstr "已在此计算机上取消配对。"
 
@@ -21666,7 +21726,7 @@ msgstr "已置顶"
 msgid "Pinned project"
 msgstr "已置顶的项目"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:320
+#: src/features/chat/sidebar/thread-sidebar.tsx:331
 msgid "Pins"
 msgstr "置顶"
 
@@ -21690,7 +21750,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "规划项目或头脑风暴..."
 
@@ -21823,7 +21883,7 @@ msgstr "精致的好莱坞风格"
 msgid "Popular"
 msgstr "热门"
 
-#: src/features/devices/components/devices-settings.tsx:277
+#: src/features/devices/components/devices-settings.tsx:297
 msgid "Port"
 msgstr ""
 
@@ -22092,7 +22152,7 @@ msgstr "按 Enter 发送，Shift+Enter 换行"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "按 Esc 退出输入模式，然后用 h j k l、w b、0 $、i a I A、o O、x、dd、D 和 u 编辑。Enter 仍然发送。默认关闭。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:305
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:308
 msgid "Press keys..."
 msgstr "请按键..."
 
@@ -22197,7 +22257,7 @@ msgstr "上一个匹配项"
 msgid "Previous option"
 msgstr "上一个选项"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "上一个输出模式"
 
@@ -22328,7 +22388,7 @@ msgstr "Pro 模型需要 Pro 套餐。免费套餐下，运行会在开始前停
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
 msgstr "用 AI 处理文本文件提取要点，再根据摘要生成图像"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:163
+#: src/features/chat/sidebar/thread-sidebar.tsx:165
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "仅使用系统提示词和当前输入独立处理每条消息，不带聊天历史上下文。"
 
@@ -22614,7 +22674,7 @@ msgstr "已用优化后的内容更新提示词"
 msgid "Prompt Variables"
 msgstr "提示词变量"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:305
+#: src/features/chat/sidebar/thread-sidebar.tsx:307
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:475
 msgid "Prompts"
@@ -22932,7 +22992,7 @@ msgstr "半径"
 msgid "rag"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
 msgid "Raise the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -23271,6 +23331,10 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
+#: src/features/devices/components/devices-settings.tsx:126
+msgid "Reconnecting"
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:25
 msgid "Reconnecting to the server…"
 msgstr "正在重新连接服务器…"
@@ -23279,8 +23343,8 @@ msgstr "正在重新连接服务器…"
 msgid "Reconnecting…"
 msgstr "正在重新连接…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 msgid "Record"
 msgstr "录制"
 
@@ -23614,8 +23678,8 @@ msgstr "记住我"
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:313
 #: src/features/chat/thread/composer-input.tsx:375
-#: src/features/devices/components/devices-settings.tsx:122
-#: src/features/devices/components/devices-settings.tsx:126
+#: src/features/devices/components/devices-settings.tsx:142
+#: src/features/devices/components/devices-settings.tsx:146
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -23632,7 +23696,7 @@ msgid "Remove \"{0}\"?"
 msgstr "移除“{0}”？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:143
+#: src/features/devices/components/devices-settings.tsx:163
 msgid "Remove “{0}”?"
 msgstr "移除“{0}”？"
 
@@ -24026,7 +24090,7 @@ msgstr "研究"
 msgid "Research a topic"
 msgstr "研究一个主题"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "深入研究一个主题..."
 
@@ -24085,7 +24149,7 @@ msgid "Reset to defaults"
 msgstr "恢复默认"
 
 #: src/features/settings/components/chat/models-settings.tsx:379
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:352
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
 msgid "Reset to Defaults"
 msgstr "恢复默认"
 
@@ -24237,6 +24301,7 @@ msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/devices/components/devices-settings.tsx:81
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -24758,7 +24823,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 msgid "Save Shortcuts"
 msgstr "保存快捷键"
 
@@ -24805,7 +24870,7 @@ msgstr "已保存到“{0}”"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:359
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:362
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "正在保存..."
@@ -24899,7 +24964,7 @@ msgstr "向左滚动一页列"
 msgid "Scroll right one page of columns"
 msgstr "向右滚动一页列"
 
-#: src/features/chat/thread/thread.tsx:95
+#: src/features/chat/thread/thread.tsx:96
 msgid "Scroll to bottom"
 msgstr "滚动到底部"
 
@@ -25525,7 +25590,7 @@ msgstr "正在发送你的消息并等待回复"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:193
 msgid "Sent"
 msgstr "已发送"
 
@@ -25577,7 +25642,7 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:265
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -25593,7 +25658,7 @@ msgstr "服务器错误，请稍后重试。"
 msgid "Server name is required"
 msgstr "请输入服务器名称"
 
-#: src/features/devices/components/devices-settings.tsx:100
+#: src/features/devices/components/devices-settings.tsx:123
 msgid "Server over SSH"
 msgstr ""
 
@@ -25617,7 +25682,7 @@ msgstr "支持分支的 Serverless Postgres 数据库"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "Servers over SSH"
 msgstr ""
 
@@ -25754,7 +25819,7 @@ msgstr "已共享"
 msgid "Shared conversation"
 msgstr "共享的对话"
 
-#: src/features/devices/components/devices-settings.tsx:389
+#: src/features/devices/components/devices-settings.tsx:414
 msgid "Shared folders and local servers…"
 msgstr "共享文件夹和本地服务器…"
 
@@ -25863,7 +25928,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "在助手消息后显示后续建议。"
 
 #. placeholder {0}: defaultShortcut("help")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
 msgid "Show help dialog ({0})"
 msgstr "显示帮助对话框（{0}）"
 
@@ -25974,16 +26039,25 @@ msgstr "显示第 {firstShown} 至 {lastShown} 行，共 {totalRows} 行"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "会展示给助手，让它知道何时适用此技能。"
 
+#: src/features/chat/aside/aside-panel.tsx:175
+#: src/features/chat/aside/aside-panel.tsx:239
+msgid "Side question"
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:75
+msgid "Side questions are not available for this chat, or the question is too long."
+msgstr ""
+
 #: ../../packages/ui/src/components/sidebar.tsx:273
 msgid "Sidebar"
 msgstr "侧边栏"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:116
 #: src/features/settings/lib/settings-keywords.ts:44
 msgid "Sidebar Left"
 msgstr "左侧边栏"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:117
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "Sidebar Right"
 msgstr "右侧边栏"
@@ -26855,7 +26929,11 @@ msgstr "开始对话"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "用最新的 AI 模型开始你自己的对话。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:343
+#: src/features/chat/aside/aside-panel.tsx:176
+msgid "Start a conversation to ask a side question."
+msgstr ""
+
+#: src/features/chat/sidebar/thread-sidebar.tsx:354
 msgid "Start a conversation to configure variables."
 msgstr "开始对话以配置变量。"
 
@@ -26872,7 +26950,7 @@ msgid "Start a new chat"
 msgstr "开始新对话"
 
 #. placeholder {0}: defaultShortcut("newChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
 msgid "Start a new chat ({0})"
 msgstr "开始新聊天（{0}）"
 
@@ -26885,7 +26963,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
 #. placeholder {0}: defaultShortcut("newTemporaryChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
 msgid "Start a new temporary chat ({0})"
 msgstr "开始新的临时聊天（{0}）"
 
@@ -27042,7 +27120,7 @@ msgstr "状态："
 msgid "Stateless"
 msgstr "无状态"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:161
+#: src/features/chat/sidebar/thread-sidebar.tsx:163
 msgid "Stateless Mode"
 msgstr "无状态模式"
 
@@ -27111,8 +27189,8 @@ msgstr "股票"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -27644,7 +27722,7 @@ msgstr "适合复杂任务：Role / Background / Attention / Skills / Goals / Co
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "总结一篇文档或一个 URL..."
 
@@ -27664,7 +27742,7 @@ msgstr "总结我的收件箱并突出紧急事项。使用 {PAYLOAD_TOKEN} 获�
 msgid "Summarize the history of the internet"
 msgstr "总结互联网的发展史"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:151
+#: src/features/chat/sidebar/thread-sidebar.tsx:153
 msgid "Summary is only available for text models."
 msgstr "摘要仅适用于文本模型。"
 
@@ -28262,7 +28340,7 @@ msgstr "文本"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28415,7 +28493,7 @@ msgstr "泰国"
 msgid "Thanks for rating"
 msgstr "感谢你的评分"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:171
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
 
@@ -28435,7 +28513,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 位的 EncodingAESKey（消息加解密方式必须设为安全模式）"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:147
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "智能体将无法再向此设备请求任何操作。其活动日志会保留到过期为止。"
 
@@ -28771,6 +28849,14 @@ msgstr "此次优化没有改变任何字段。"
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "你在 Bedrock 控制台中启用模型访问的区域。"
 
+#: src/features/chat/aside/aside-panel.tsx:78
+msgid "The reply is still running. Add it when the reply finishes."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:71
+msgid "The reply is still running. Try again when it finishes."
+msgstr ""
+
 #: src/lib/errors/index.ts:184
 msgid "The request timed out but may still complete. Check the conversation before trying again."
 msgstr ""
@@ -28977,6 +29063,7 @@ msgstr "支持思考的视觉语言模型"
 msgid "Thinking..."
 msgstr "正在思考..."
 
+#: src/features/chat/aside/aside-panel.tsx:105
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -28995,11 +29082,15 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
+#: src/features/chat/aside/aside-panel.tsx:82
+msgid "This cannot be added to this chat."
+msgstr ""
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
+#: src/features/chat/thread/composer.tsx:585
 msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
@@ -29011,25 +29102,25 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/devices/components/devices-settings.tsx:99
+#: src/features/devices/components/devices-settings.tsx:122
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "此电脑"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is not paired yet."
 msgstr "此计算机尚未配对。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:382
+#: src/features/devices/components/devices-settings.tsx:407
 msgid "This computer is paired as “{0}”."
 msgstr "此计算机已配对为“{0}”。"
 
-#: src/features/devices/components/devices-settings.tsx:366
+#: src/features/devices/components/devices-settings.tsx:391
 msgid "This computer is paired with another account."
 msgstr "此计算机已与另一个账户配对。"
 
-#: src/features/devices/components/devices-settings.tsx:344
+#: src/features/devices/components/devices-settings.tsx:369
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
@@ -29209,11 +29300,11 @@ msgstr "此预设将被永久删除。"
 msgid "This preview could not be loaded."
 msgstr "无法加载此预览。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:203
+#: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "此提示词将与对话历史一起用于每条消息。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:202
+#: src/features/chat/sidebar/thread-sidebar.tsx:204
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "此提示词将用于每条消息。每条消息都独立处理，不带聊天历史。"
 
@@ -29369,7 +29460,7 @@ msgstr "思考了几秒钟"
 msgid "thread"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:298
+#: src/features/chat/sidebar/thread-sidebar.tsx:300
 #: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Thread"
 msgstr "对话"
@@ -29424,7 +29515,7 @@ msgstr "对话已恢复"
 msgid "Thread statistics"
 msgstr ""
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:139
+#: src/features/chat/sidebar/thread-sidebar.tsx:141
 msgid "Thread summary"
 msgstr "对话摘要"
 
@@ -29577,7 +29668,7 @@ msgid "Toggle interactivity"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarLeft")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
 msgid "Toggle left sidebar ({0})"
 msgstr "切换左侧边栏（{0}）"
 
@@ -29596,7 +29687,7 @@ msgid "Toggle property panel"
 msgstr "切换属性面板"
 
 #. placeholder {0}: defaultShortcut("sidebarRight")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
 msgid "Toggle right sidebar ({0})"
 msgstr "切换右侧边栏（{0}）"
 
@@ -29861,7 +29952,7 @@ msgstr "转换后的图像"
 msgid "Translate"
 msgstr "翻译"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "将文本翻译成其他语言..."
 
@@ -30428,6 +30519,14 @@ msgstr "解锁节点"
 msgid "Unlock this chat"
 msgstr ""
 
+#: src/features/chat/aside/aside-panel.tsx:79
+msgid "Unlock this chat to add this to the thread."
+msgstr ""
+
+#: src/features/chat/aside/aside-panel.tsx:72
+msgid "Unlock this chat to ask a side question."
+msgstr ""
+
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:139
 msgid "Unmute"
 msgstr "取消静音"
@@ -30951,7 +31050,7 @@ msgstr "使用组织允许的模型"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "使用这些键盘快捷键更高效地浏览和操作数据表格。"
 
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:401
 msgid "Use this computer for agent tools"
 msgstr "将此计算机用于智能体工具"
 
@@ -30991,7 +31090,7 @@ msgstr "用户"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:273
+#: src/features/devices/components/devices-settings.tsx:293
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:194
@@ -31160,7 +31259,7 @@ msgstr "可变焦距"
 msgid "Variable name..."
 msgstr "变量名..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:312
+#: src/features/chat/sidebar/thread-sidebar.tsx:314
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:70
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -31401,7 +31500,7 @@ msgstr "视频"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -31825,7 +31924,7 @@ msgstr "宽"
 msgid "Waiting for {device} to pick this up…"
 msgstr "等待 {device} 接收…"
 
-#: src/features/devices/components/devices-settings.tsx:168
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Waiting for approval"
 msgstr "等待批准"
 
@@ -32103,7 +32202,7 @@ msgstr "智能体应该做什么？"
 msgid "What should the AI call you?"
 msgstr "AI 应该怎么称呼你？"
 
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
@@ -32241,7 +32340,7 @@ msgstr "拥有管理员权限"
 msgid "With email/password"
 msgstr "使用邮箱/密码"
 
-#: src/features/devices/components/devices-settings.tsx:283
+#: src/features/devices/components/devices-settings.tsx:303
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -32334,7 +32433,7 @@ msgstr "在聊天旁撰写长篇内容"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，无需切换工具。"
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "帮我写点代码..."
 
@@ -32557,6 +32656,11 @@ msgstr "你还没有标签。"
 #: src/features/admin/components/impersonation-banner.tsx:39
 msgid "You have returned to your admin account"
 msgstr "你已返回管理员账号"
+
+#: src/features/chat/aside/aside-panel.tsx:74
+#: src/features/chat/aside/aside-panel.tsx:81
+msgid "You have used today's messages. Try again later."
+msgstr ""
 
 #: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
@@ -32821,6 +32925,10 @@ msgstr "你的会话已过期。请重新加载页面并重新登录。"
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:103
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "你的会话不是最新的。请退出后重新登录，再删除你的账号。"
+
+#: src/features/chat/aside/aside-panel.tsx:242
+msgid "Your side question"
+msgstr ""
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:234
 msgid "Your tags"

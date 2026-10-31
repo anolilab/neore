@@ -65,6 +65,7 @@ const KeyboardShortcutsHandler: React.FC<{
     // Memoize converted shortcuts to prevent unnecessary re-registrations
     const convertedShortcuts = useMemo(() => {
         return {
+            askAside: convertShortcutToHotkeysHook(shortcuts.askAside),
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
@@ -83,6 +84,7 @@ const KeyboardShortcutsHandler: React.FC<{
             sidebarRight: convertShortcutToHotkeysHook(shortcuts.sidebarRight),
         };
     }, [
+        shortcuts.askAside,
         shortcuts.audioRecord,
         shortcuts.copyLastCodeBlock,
         shortcuts.decreaseEffort,
@@ -109,6 +111,18 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("audioRecord", event);
+        },
+        [onShortcut],
+    );
+
+    const handleAskAside = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("askAside", event);
         },
         [onShortcut],
     );
@@ -259,6 +273,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.audioRecord, handleAudioRecord],
+    );
+
+    useHotkeys(
+        convertedShortcuts.askAside,
+        handleAskAside,
+        {
+            description: "Ask a side question",
+            enabled: !!shortcuts.askAside && typeof shortcuts.askAside === "string",
+            // Enabled in fields so the chord works from the composer; a bare key stays with the field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.askAside, handleAskAside],
     );
 
     useHotkeys(
