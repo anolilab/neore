@@ -87,14 +87,11 @@ const ASIDE_TIMEOUT_MS = 60_000;
 
 const ASIDE_DAILY_LIMIT_MESSAGE = "You've reached your daily message limit. Side questions are available again tomorrow.";
 
-/** Rows read per step of a snapshot's walk. */
-const SNAPSHOT_PAGE_ROWS = ASIDE_CONTEXT_ROWS;
-
 /** `data.code` of the refusals the panel words on its own. */
-export const ASIDE_DAILY_LIMIT_CODE = "DAILY_MESSAGE_LIMIT_REACHED";
-export const ASIDE_NO_CREDITS_CODE = "INSUFFICIENT_CREDITS";
-export const ASIDE_RATE_LIMITED_CODE = "UPSTREAM_RATE_LIMITED";
-export const ASIDE_ALREADY_ADDED_CODE = "ASIDE_ALREADY_ADDED";
+const ASIDE_DAILY_LIMIT_CODE = "DAILY_MESSAGE_LIMIT_REACHED";
+const ASIDE_NO_CREDITS_CODE = "INSUFFICIENT_CREDITS";
+const ASIDE_RATE_LIMITED_CODE = "UPSTREAM_RATE_LIMITED";
+const ASIDE_ALREADY_ADDED_CODE = "ASIDE_ALREADY_ADDED";
 
 /**
  * Signs and checks the answer token. This is the secret the unlock proofs use
@@ -114,7 +111,7 @@ const LIVE_STREAM_CANDIDATES = 5;
  * The reply being written in `threadId`: the newest pending or streaming stream that is not past its expiry (one
  * the reaper has not reached yet is dead, and must neither feed a question nor block "Add to thread").
  */
-export const findLiveStream = async (ctx: Reader, threadId: string, now: number) => {
+const findLiveStream = async (ctx: Reader, threadId: string, now: number) => {
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: LIVE_STREAM_CANDIDATES,
         orderBy: [{ _creationTime: "desc" }],
@@ -140,7 +137,7 @@ const usableRowOf = (row: Doc<"messages">): AsideRow | undefined => {
  */
 const readPathRows = async (ctx: QueryCtx, thread: Doc<"threads">, unlockProof: string | undefined): Promise<AsideRow[]> => {
     const paging = (cursor: string | null) => {
-        return { cursor, numItems: SNAPSHOT_PAGE_ROWS };
+        return { cursor, numItems: ASIDE_CONTEXT_ROWS };
     };
     const branched = await listActivePathPage(ctx, thread, paging(null), unlockProof, false);
     const readPage = async (cursor: string | null) =>
