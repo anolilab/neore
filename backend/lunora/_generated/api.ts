@@ -313,7 +313,7 @@ export interface ApiTypes {
         };
         streaming: {
             getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; streamId: Id<"persistentStreams"> } | null>;
-            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
+            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
         };
         tags: {
             functions: {
