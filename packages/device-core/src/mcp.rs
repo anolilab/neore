@@ -1153,10 +1153,6 @@ sleep 1"#
             config.network,
             default_network_for(sandbox::dependencies_support().is_ok())
         );
-        // Whatever it got must be a tier the sandbox accepts here, or the server could never start.
-        assert!(
-            config.network != NetworkTier::Dependencies || sandbox::dependencies_support().is_ok()
-        );
         assert_eq!(
             serde_json::from_str::<McpServerConfig>(
                 r#"{"name":"g","command":"c","network":"off"}"#

@@ -535,11 +535,10 @@ fn first_record_len(buffer: &[u8]) -> Result<Option<usize>, &'static str> {
 /// The server name a ClientHello `record` asks for. Refuses a hello that hides it (Encrypted ClientHello), names
 /// none, names several, or does not fit in the one record.
 fn server_name(record: &[u8]) -> Result<String, &'static str> {
-    let bad = || BAD_HELLO;
     let mut record = Cursor(record);
 
     // Record header: handshake, a 3.x version, the length first_record_len read.
-    record.take(5).ok_or_else(bad)?;
+    record.take(5).ok_or(BAD_HELLO)?;
 
     let mut handshake = Cursor(record.0);
 
@@ -547,13 +546,13 @@ fn server_name(record: &[u8]) -> Result<String, &'static str> {
         return Err(NOT_TLS);
     }
 
-    let mut hello = Cursor(handshake.prefixed(3).ok_or_else(bad)?);
+    let mut hello = Cursor(handshake.prefixed(3).ok_or(BAD_HELLO)?);
 
     // client_version, random, session id, cipher suites, compression methods.
-    hello.take(2 + 32).ok_or_else(bad)?;
-    hello.prefixed(1).ok_or_else(bad)?;
-    hello.prefixed(2).ok_or_else(bad)?;
-    hello.prefixed(1).ok_or_else(bad)?;
+    hello.take(2 + 32).ok_or(BAD_HELLO)?;
+    hello.prefixed(1).ok_or(BAD_HELLO)?;
+    hello.prefixed(2).ok_or(BAD_HELLO)?;
+    hello.prefixed(1).ok_or(BAD_HELLO)?;
 
     let mut extensions = Cursor(
         hello
@@ -563,8 +562,8 @@ fn server_name(record: &[u8]) -> Result<String, &'static str> {
     let mut name: Option<String> = None;
 
     while !extensions.0.is_empty() {
-        let kind = extensions.number(2).ok_or_else(bad)?;
-        let mut body = Cursor(extensions.prefixed(2).ok_or_else(bad)?);
+        let kind = extensions.number(2).ok_or(BAD_HELLO)?;
+        let mut body = Cursor(extensions.prefixed(2).ok_or(BAD_HELLO)?);
 
         if ENCRYPTED_NAME_EXTENSIONS.contains(&kind) {
             return Err("the TLS ClientHello hides its server name (Encrypted ClientHello)");
@@ -578,11 +577,11 @@ fn server_name(record: &[u8]) -> Result<String, &'static str> {
             return Err(BAD_HELLO);
         }
 
-        let mut list = Cursor(body.prefixed(2).ok_or_else(bad)?);
+        let mut list = Cursor(body.prefixed(2).ok_or(BAD_HELLO)?);
 
         while !list.0.is_empty() {
-            let kind = list.number(1).ok_or_else(bad)?;
-            let entry = list.prefixed(2).ok_or_else(bad)?;
+            let kind = list.number(1).ok_or(BAD_HELLO)?;
+            let entry = list.prefixed(2).ok_or(BAD_HELLO)?;
 
             // Only `host_name` (0) is defined; one entry, ASCII.
             if kind != 0 || name.is_some() || !entry.is_ascii() {
