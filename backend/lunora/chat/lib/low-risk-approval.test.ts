@@ -99,6 +99,10 @@ describe("lowRiskIneligibleReason", () => {
     it("never admits a tool its server calls destructive or open-world", () => {
         expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { destructiveHint: true } }, "x_get", false, interactive)).toBe("annotated-risky");
         expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { openWorldHint: true } }, "x_get", false, interactive)).toBe("annotated-risky");
+        // A server that says the tool is not read-only is believed, whatever its name.
+        expect(lowRiskIneligibleReason({ ...mcpDescriptor("get_invoice"), annotations: { readOnlyHint: false } }, "x_get_invoice", false, interactive)).toBe(
+            "annotated-risky",
+        );
     });
 
     it.each([

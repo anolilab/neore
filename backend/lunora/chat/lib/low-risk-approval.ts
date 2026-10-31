@@ -216,7 +216,8 @@ export const lowRiskIneligibleReason = (
         return "user-choice";
     }
 
-    if (descriptor.annotations?.destructiveHint === true || descriptor.annotations?.openWorldHint === true) {
+    // A server that says the tool writes (`readOnlyHint: false`), destroys or reaches the open world is believed over its name.
+    if (descriptor.annotations?.destructiveHint === true || descriptor.annotations?.openWorldHint === true || descriptor.annotations?.readOnlyHint === false) {
         return "annotated-risky";
     }
 
