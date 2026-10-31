@@ -311,6 +311,35 @@ describe("importBundle", () => {
         }
     });
 
+    it("keeps an imported group chat the person has written in meanwhile, and removes an untouched one", async () => {
+        const skillIds = [await createSkill(OWNER, "alpha"), await createSkill(OWNER, "beta")];
+        const used = await createGroup(OWNER, skillIds);
+        const untouched = await createGroup(OWNER, skillIds);
+
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: { content: "hello", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                text: "hello",
+                threadId: used,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+
+        for (const id of [used, untouched]) {
+            await run(async (context) => await context.runMutation(procedureAt("skills_bundle", "removeImportedItem"), { id, kind: "group", userId: OWNER }));
+        }
+
+        const threads = await rows("threads");
+        const left = threads.filter((thread) => thread.deleted !== true).map((thread) => thread._id);
+
+        expect(left).toContain(used);
+        expect(left).not.toContain(untouched);
+    });
+
     it("imports once per importId: a retry of the same id is refused, a new id is not, and a failed import frees its id", async () => {
         const markdown = bundleOf([skill("alpha")]);
 

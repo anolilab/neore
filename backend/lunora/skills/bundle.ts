@@ -560,7 +560,9 @@ export const removeImportedItem = internalMutation
                 return forbidden();
             }
 
-            if (thread) {
+            // An imported group starts empty. One with a message in it has been used meanwhile (another tab): keep it
+            // rather than delete the person's conversation with the rollback.
+            if (thread && !(await ctx.db.messages.findFirst({ where: { threadId: thread._id } }))) {
                 await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id });
             }
         }
