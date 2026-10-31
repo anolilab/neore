@@ -26,7 +26,7 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { claimSecretAnswer, secretResumeArgs } from "./lib/request-secret-claim";
 import { consumeAsMcpHeader, consumeAsProviderKey } from "./lib/secret-consumers";
-import { sweepExpiredSecrets } from "./lib/secret-requests";
+import { discardThreadSecrets, sweepExpiredSecrets } from "./lib/secret-requests";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { SECRET_HEADER_VALUE_MAX, SECRET_REF_MAX } from "./tools/request-secret-constants";
 
@@ -41,6 +41,8 @@ const vConsumeResult = v.union(
 
 const vConsumeArgs = {
     ref: v.string().max(SECRET_REF_MAX),
+    /** Who started the turn that is spending the reference; the owner's own turns only (a continuation runs as the owner whoever started it). */
+    startedBy: v.string().max(MAX_LENGTH.id),
     threadId: v.string().max(MAX_LENGTH.id),
     userId: v.string().max(MAX_LENGTH.id),
 };
@@ -103,6 +105,20 @@ export const consumeSecretAsMcpHeader = internalMutation
     .input(vConsumeArgs)
     .output(vConsumeResult)
     .mutation(async ({ args, ctx }) => await consumeAsMcpHeader(ctx, { ...args, now: ctx.now }));
+
+/**
+ * A reply ended for good (finished, failed or stopped — never at a pause): drop the ciphertext of the thread's saved
+ * references. The rows stay, so a late spend reads `used`. Best effort from the caller; whatever it misses waits for
+ * the sweep below, which runs per shard when the shard was active.
+ */
+export const discardSecretsOfThread = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args: { threadId }, ctx }) => {
+        await discardThreadSecrets(ctx, { threadId });
+
+        return null;
+    });
 
 /** Housekeeping sweep (`shardSweeps()`): drops references past their 24 hours, spent or not. */
 export const sweepRequestedSecrets = internalMutation

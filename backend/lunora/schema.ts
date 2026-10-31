@@ -178,6 +178,14 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        /**
+         * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
+         * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from
+         * `mcpServers[].headers` on purpose: that list is plaintext the Settings page shows and writes back,
+         * and the audit history snapshots it; this column is server-only, left out of the client view
+         * (`redactPreferences`) and read only where a run builds its servers (`getMCPServersQuery`).
+         */
+        mcpSecretHeaders: v.optional(v.array(v.object({ encryptedValue: v.string(), header: v.string(), server: v.string(), url: v.string() }))),
         mcpServers: v.optional(
             v.array(
                 v.object({
@@ -2023,7 +2031,7 @@ export const schema = defineSchema({
         status: v.union(v.literal("saved"), v.literal("used")),
         threadId: v.string(),
         use: v.union(
-            v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string() }),
+            v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
             v.object({ kind: v.literal("provider_key"), provider: v.string() }),
         ),
         userId: v.string(),
@@ -2031,6 +2039,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_ref", ["ref"])
         .index("by_expiresAt", ["expiresAt"])
+        .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
 
     sandboxActions: defineTable({

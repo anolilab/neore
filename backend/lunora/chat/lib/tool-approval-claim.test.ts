@@ -223,3 +223,30 @@ describe("a collaborator's paused turn", () => {
         await expect(claim(OWNER, "approve", "approval-2")).resolves.toMatchObject({ kind: "claimed", ownerId: OWNER });
     });
 });
+
+describe("what a pause notifies as", () => {
+    const notifications = async () => await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
+
+    it("is a tool approval for an ordinary call, a question for askUser and its own type for a secret request", async () => {
+        const record = async (approvalIds: string[], extra: { askUserApprovalIds?: string[]; secretApprovalIds?: string[] }) =>
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(recordPendingToolApprovals, { approvalIds, config: CONFIG, threadId, userId: OWNER, ...extra }),
+            );
+
+        await record(["plain-1"], {});
+        await record(["ask-1"], { askUserApprovalIds: ["ask-1"] });
+        await record(["secret-1", "plain-2"], { secretApprovalIds: ["secret-1"] });
+
+        const rows = (await notifications()) as { dedupeKey: string; type: string }[];
+
+        expect(rows.map((row) => row.type).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["ask_user", "secret_request", "tool_approval"]);
+        expect(rows.find((row) => row.type === "secret_request")?.dedupeKey).toBe("secret_request:secret-1");
+    });
+
+    it("words the push for a secret request, and sends it urgently like the other things a run waits on", async () => {
+        const { pushTitle, pushUrgency } = await import("../../notifications/push-text");
+
+        expect(pushTitle("secret_request", undefined)).toBe("The assistant is asking for a secret");
+        expect(pushUrgency("secret_request")).toBe("high");
+    });
+});

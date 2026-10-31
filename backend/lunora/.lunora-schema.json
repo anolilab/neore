@@ -2871,6 +2871,44 @@
           "optional": true,
           "unique": false
         },
+        "mcpSecretHeaders": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "encryptedValue": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "header": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "server": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "url": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
         "mcpServers": {
           "kind": "array",
           "nullable": false,
@@ -10610,6 +10648,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"secret_request\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"sub_agent\""
             },
             {
@@ -16783,6 +16828,12 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false
+                },
+                "url": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
                 }
               }
             },
@@ -16826,6 +16877,12 @@
         "by_ref": {
           "fields": [
             "ref"
+          ],
+          "unique": false
+        },
+        "by_threadId": {
+          "fields": [
+            "threadId"
           ],
           "unique": false
         },
@@ -21149,6 +21206,12 @@
               "kind": "boolean",
               "nullable": false,
               "optional": false,
+              "unique": false
+            },
+            "startedBy": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
               "unique": false
             },
             "toolNames": {

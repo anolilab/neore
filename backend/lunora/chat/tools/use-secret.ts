@@ -5,9 +5,10 @@
  *
  * The destination was fixed on the card, so these take no destination of their
  * own; the mutation behind them checks the reference belongs to this user and
- * this thread, has not expired or been used, and was requested for this kind of
- * destination — the checks a manual save in Settings has by being the user's
- * own session.
+ * this thread, has not expired or been used, was requested for this kind of
+ * destination, and that the turn spending it was started by the owner (a
+ * continuation runs as the owner whoever started the turn it resumes) — the
+ * checks a manual save in Settings has by being the user's own session.
  */
 import z from "zod/v4";
 
@@ -30,7 +31,7 @@ const refusal = (message: string): UseSecretOutput => {
 
 export const saveSecretAsProviderKeyTool = createTool<UseSecretInput, UseSecretOutput, ToolContext>({
     description: `Save a secret the user gave you with requestSecret (use.kind "provider_key") as their own API key for the provider they approved.
-Takes the reference only; the value stays on the server. A reference works once and for 24 hours.`,
+Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.`,
     execute: async (context, input) => {
         if (!context.userId || !context.threadId) {
             return refusal("Sign in to use a requested secret.");
@@ -38,6 +39,7 @@ Takes the reference only; the value stays on the server. A reference works once 
 
         const result = await context.runMutation(internal.chat.request_secret.consumeSecretAsProviderKey, {
             ref: input.ref,
+            startedBy: context.startedBy ?? "",
             threadId: context.threadId,
             userId: context.userId,
         });
@@ -50,7 +52,7 @@ Takes the reference only; the value stays on the server. A reference works once 
 
 export const setMcpServerSecretTool = createTool<UseSecretInput, UseSecretOutput, ToolContext>({
     description: `Set a secret the user gave you with requestSecret (use.kind "mcp_header") as a header on the saved MCP server they approved.
-Takes the reference only; the value stays on the server. A reference works once and for 24 hours.`,
+Takes the reference only; the value stays on the server. A reference works once, in the reply that received it.`,
     execute: async (context, input) => {
         if (!context.userId || !context.threadId) {
             return refusal("Sign in to use a requested secret.");
@@ -58,6 +60,7 @@ Takes the reference only; the value stays on the server. A reference works once 
 
         const result = await context.runMutation(internal.chat.request_secret.consumeSecretAsMcpHeader, {
             ref: input.ref,
+            startedBy: context.startedBy ?? "",
             threadId: context.threadId,
             userId: context.userId,
         });

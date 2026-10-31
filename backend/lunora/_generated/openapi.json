@@ -28051,6 +28051,10 @@
                                 "type": "string"
                               },
                               {
+                                "const": "secret_request",
+                                "type": "string"
+                              },
+                              {
                                 "const": "trigger",
                                 "type": "string"
                               },
@@ -31734,6 +31738,10 @@
                               },
                               {
                                 "const": "ask_user",
+                                "type": "string"
+                              },
+                              {
+                                "const": "secret_request",
                                 "type": "string"
                               },
                               {

@@ -6209,7 +6209,13 @@ export const testMCPServerConnection = authAction
         const { withMcpServerGrants } = await import("../connectors/lib/grant-runtime");
         const { probeRequiresOAuth } = await import("../connectors/lib/mcp-oauth");
 
-        const config: import("./lib/mcp-tools").MCPServerConfig = { enabled: true, ...(headers && { headers }), name, protocol, url };
+        // A saved server's header secrets (`requestSecret`) are server-only, so the form cannot send them: add them here.
+        const secretHeaders = await context
+            .runQuery(internal.auth.functions.getMcpSecretHeadersQuery, { name, url, userId: context.user.userId })
+            .catch(() => []);
+        const sent = (headers ?? []).filter((header) => secretHeaders.every((secret) => secret.key.toLowerCase() !== header.key.toLowerCase()));
+        const allHeaders = [...sent, ...secretHeaders];
+        const config: import("./lib/mcp-tools").MCPServerConfig = { enabled: true, ...(allHeaders.length > 0 && { headers: allHeaders }), name, protocol, url };
         // A saved server the user signed in to is tested WITH its token (same name
         // and url only), never pruning: this is one server, not the whole list.
         const [withGrant] = await withMcpServerGrants(context, context.user.userId, [config]).catch(() => [config]);

@@ -13,8 +13,8 @@
  *   the value into `requestedSecrets`; the run resumes with only the opaque
  *   reference, which {@link createAnsweredRequestSecretTool} returns as the
  *   tool result. Declining is a denial with a reason the model reads.
- * - The agent spends the reference with a consumer tool (`use-secret.ts`)
- *   within 24 hours, once.
+ * - The agent spends the reference with a consumer tool (`use-secret.ts`),
+ *   once, before the reply ends (the ciphertext is dropped then; at most 24 hours).
  *
  * Headless runs never see it (`person-tools.ts`), and a time-boxed allow never
  * covers it: it waits for a person. Its name and limits live in
@@ -27,6 +27,7 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import type { RequestSecretInput, RequestSecretOutput } from "./request-secret-constants";
 import {
+    isForbiddenSecretHeader,
     SECRET_HEADER_NAME_MAX,
     SECRET_HEADER_NAME_RE,
     SECRET_LABEL_MAX,
@@ -54,6 +55,7 @@ const inputSchema = z
                             .min(1)
                             .max(SECRET_HEADER_NAME_MAX)
                             .regex(SECRET_HEADER_NAME_RE)
+                            .refine((name) => !isForbiddenSecretHeader(name), { error: "The transport owns that header" })
                             .meta({ description: 'The header name, e.g. "Authorization"' }),
                         kind: z.literal("mcp_header"),
                         server: z.string().min(1).max(SECRET_SERVER_NAME_MAX).meta({ description: "The name of one of the user's saved MCP servers" }),
@@ -65,7 +67,7 @@ const inputSchema = z
     .strict();
 
 const DESCRIPTION = `Ask the user for a secret (an API key or token) you need, on a card that keeps the value out of the chat.
-Use it instead of asking the user to paste a key into the conversation. You never see the value: the tool returns a reference, which you spend with exactly one consumer tool within 24 hours.
+Use it instead of asking the user to paste a key into the conversation. You never see the value: the tool returns a reference, which you spend with exactly one consumer tool, in the reply that receives it (a reference does not outlive the reply).
 - label: what the secret is.
 - purpose: optional one line on why you need it.
 - use: where it will go. { kind: "provider_key", provider } saves it as the user's own API key for that provider (then use saveSecretAsProviderKey); { kind: "mcp_header", server, header } sets a header on one of their saved MCP servers (then use setMcpServerSecret). It cannot be used anywhere else.

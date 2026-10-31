@@ -39,6 +39,7 @@ import {
     resolveRunModel,
     resumeApprovedRun,
     setDispatchOrigin,
+    setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
 } from "./lib/agent-run";
@@ -269,6 +270,8 @@ export const runStreamingAgent = internalAction
 
             setResearchDepth(ctx, effectiveResearchDepth);
             setDispatchOrigin(ctx, origin ?? "lead");
+            // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
+            setRunStartedBy(ctx, userId);
 
             // Build agent
             const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -388,6 +391,7 @@ export const runStreamingAgent = internalAction
                     result,
                     stop: stopping,
                     streamId,
+                    threadId,
                 });
 
                 // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -433,6 +437,7 @@ export const runStreamingAgent = internalAction
                         researchDepth: effectiveResearchDepth,
                         searchMode: effectiveSearchMode,
                         shouldAutoContinue: isAutoContinue,
+                        startedBy: userId,
                         toolNames: Object.keys(tools),
                         toolPermissionKeys: toolResult.permissionKeys,
                     },

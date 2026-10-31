@@ -20,7 +20,7 @@ import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { KeyRound, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
@@ -34,6 +34,8 @@ import { showError } from "@/lib/toast";
 const VALUE_MAX = 10_000;
 
 type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
+
+type Server = { kind: "ambiguous" } | { host: string; kind: "found" } | { kind: "loading" } | { kind: "missing" };
 
 interface RequestSecretInput {
     label?: string;
@@ -52,6 +54,29 @@ const PROVIDER_NAMES: Record<string, string> = {
     xai: "xAI",
 };
 
+const hostOf = (url: string): string => {
+    try {
+        return new URL(url).host;
+    } catch {
+        return url;
+    }
+};
+
+/** Which of the user's saved MCP servers the card names. The answer binds the value to that server's address, so the card shows where that is. */
+const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | undefined, name: string): Server => {
+    if (!servers) {
+        return { kind: "loading" };
+    }
+
+    const matches = servers.filter((server) => server.name === name);
+
+    if (matches.length > 1) {
+        return { kind: "ambiguous" };
+    }
+
+    return matches[0] ? { host: hostOf(matches[0].url), kind: "found" } : { kind: "missing" };
+};
+
 const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -65,7 +90,10 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
-    const { isPending, mutate, reset } = useMutation(crpc.chat.request_secret.answerSecretRequest.mutationOptions());
+    // The mutation cache holds a mutation's variables for five minutes after it settles; `gcTime: 0` drops them (the value) at once.
+    const { isPending, mutate, reset } = useMutation({ ...crpc.chat.request_secret.answerSecretRequest.mutationOptions(), gcTime: 0 });
+    // The same query the composer and Settings read, so it is already in the cache; no extra subscription.
+    const { data: preferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as RequestSecretInput;
     const label = input.label ?? "";
@@ -73,6 +101,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null;
+    const server = input.use?.kind === "mcp_header" ? resolveServer(preferences?.mcpServers, input.use.server) : undefined;
+    // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
+    const destinationReady = server === undefined || server.kind === "found";
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
 
     let destination = "";
@@ -82,9 +113,30 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         destination = t`Saved as your ${provider} API key`;
     } else if (input.use?.kind === "mcp_header") {
-        const { header, server } = input.use;
+        const { header, server: serverName } = input.use;
 
-        destination = t`Set as the ${header} header on your ${server} MCP server`;
+        switch (server?.kind) {
+            case "ambiguous": {
+                destination = t`More than one of your MCP servers is named ${serverName}. Rename one in Settings first, or decline.`;
+
+                break;
+            }
+            case "found": {
+                const { host } = server;
+
+                destination = t`Set as the ${header} header on your ${serverName} MCP server (${host})`;
+
+                break;
+            }
+            case "missing": {
+                destination = t`You have no saved MCP server named ${serverName}. Add it in Settings first, or decline.`;
+
+                break;
+            }
+            default: {
+                destination = t`Set as the ${header} header on your ${serverName} MCP server`;
+            }
+        }
     }
 
     const send = (reply: Submitted) => {
@@ -114,7 +166,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (draft.trim().length > 0 && canAnswer) {
+        if (draft.trim().length > 0 && canAnswer && destinationReady) {
             send("save");
         }
     };
@@ -124,7 +176,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     if (part.state === "output-denied" || submitted === "decline") {
         statusText = t`Declined — continuing without it`;
     } else if (part.state === "output-available") {
-        statusText = t`Saved — the assistant can use it once`;
+        statusText = t`Saved — the assistant can use it once, in this reply`;
     } else if (submitted || part.state === "approval-responded") {
         statusText = t`Saved — continuing`;
     } else if (part.state === "input-streaming" || part.state === "input-available") {
@@ -174,7 +226,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         value={draft}
                     />
                     <div className="flex flex-wrap gap-2">
-                        <Button disabled={draft.trim().length === 0} size="sm" type="submit">
+                        <Button disabled={draft.trim().length === 0 || !destinationReady} size="sm" type="submit">
                             <KeyRound aria-hidden="true" />
                             {t`Save`}
                         </Button>

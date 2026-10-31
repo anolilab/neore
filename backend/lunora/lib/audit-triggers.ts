@@ -43,13 +43,38 @@ const REDACTED_FIELDS = new Set([
 
 type Row = Record<string, unknown> | null | undefined;
 
+/**
+ * `aiUserPreferences.mcpServers[].headers[].value`: what the Settings page stores for a header a person typed,
+ * usually a bearer token. The snapshot keeps the header's name and the server, not its value.
+ */
+const withoutHeaderValues = (servers: unknown): unknown => {
+    if (!Array.isArray(servers)) {
+        return servers;
+    }
+
+    return servers.map((server: unknown) => {
+        const headers = (server as { headers?: unknown } | null)?.headers;
+
+        return Array.isArray(headers)
+            ? {
+                  ...(server as object),
+                  headers: headers.map((header: object) => {
+                      return { ...header, value: "" };
+                  }),
+              }
+            : server;
+    });
+};
+
 /** A shallow copy with the secret-shaped fields removed. */
 const redact = (document: Row): Record<string, unknown> | undefined => {
     if (!document) {
         return undefined;
     }
 
-    return Object.fromEntries(Object.entries(document).filter(([key]) => !REDACTED_FIELDS.has(key)));
+    const kept = Object.fromEntries(Object.entries(document).filter(([key]) => !REDACTED_FIELDS.has(key)));
+
+    return "mcpServers" in kept ? { ...kept, mcpServers: withoutHeaderValues(kept.mcpServers) } : kept;
 };
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);

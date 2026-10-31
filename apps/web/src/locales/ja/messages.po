@@ -33,7 +33,7 @@ msgstr "-- 挿入 --"
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
-#: src/features/notifications/components/notification-list.tsx:108
+#: src/features/notifications/components/notification-list.tsx:110
 msgid ", unread"
 msgstr "、未読"
 
@@ -1493,7 +1493,7 @@ msgstr ""
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "引用符の外のプレースホルダーまたは @メンションはここでは null として扱われるため、実行時に値が入るまでこのエラーが出ることがあります"
 
-#: src/features/notifications/lib/notification-labels.ts:27
+#: src/features/notifications/lib/notification-labels.ts:38
 msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
 
@@ -1522,7 +1522,7 @@ msgstr "スキルとは、スラッシュコマンドで実行できる再利用
 msgid "A template adds its participants to your skills, where you can edit them."
 msgstr "テンプレートは参加者をスキルに追加します。スキルから編集できます。"
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "A tool call needs your approval"
 msgstr "ツールの呼び出しに承認が必要です"
 
@@ -1534,7 +1534,7 @@ msgstr "同じツールを追加と無効化の両方に指定することはで
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "このトリガーを作成すると、固有の Webhook URL とシークレットが生成されます。この URL を外部サービス（Zapier、n8n、独自のコードなど）の送信先として使用してください。"
 
-#: src/features/notifications/lib/notification-labels.ts:57
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "A usage alert was triggered"
 msgstr ""
 
@@ -5078,11 +5078,11 @@ msgstr "チャットを Markdown としてクリップボードにコピーし�
 msgid "Chat Import"
 msgstr "チャットのインポート"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import failed"
 msgstr "チャットのインポートに失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import finished"
 msgstr "チャットのインポートが完了しました"
 
@@ -5744,11 +5744,11 @@ msgstr "コーディング"
 msgid "Coding agent log"
 msgstr "コーディングエージェントのログ"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run failed"
 msgstr "コーディングエージェントの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run finished"
 msgstr "コーディングエージェントの実行が完了しました"
 
@@ -7276,7 +7276,7 @@ msgstr "{label} の新しい順序を保存できませんでした"
 msgid "Could not save the page"
 msgstr "ページを保存できませんでした"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:106
+#: src/features/chat/thread/request-secret-prompt.tsx:147
 msgid "Could not save. Please try again."
 msgstr ""
 
@@ -8019,7 +8019,7 @@ msgstr "データアクセスの概要"
 msgid "Data Export"
 msgstr "データのエクスポート"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Data export failed"
 msgstr "データのエクスポートに失敗しました"
 
@@ -8089,11 +8089,11 @@ msgstr "ディベートのラウンド数"
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:183
+#: src/features/chat/thread/request-secret-prompt.tsx:224
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:125
+#: src/features/chat/thread/request-secret-prompt.tsx:166
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -10673,11 +10673,11 @@ msgstr "エストニア語（エストニア）"
 msgid "European Union"
 msgstr "欧州連合"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run failed"
 msgstr "評価の実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run finished"
 msgstr "評価の実行が完了しました"
 
@@ -18203,6 +18203,10 @@ msgstr "ステップ数が多い = 高品質、生成に時間がかかる"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "単なるプロキシではなく、アプリとすべての LLM プロバイダーの間にあるインテリジェントなレイヤーです。"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:125
+msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:956
 msgid "Most advanced extended reasoning in the Claude family"
 msgstr "Claude ファミリーで最も高度な拡張推論"
@@ -19884,7 +19888,7 @@ msgstr "対応待ちのものはありません。"
 msgid "Nothing to stop: that run had already ended."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:60
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "Notification"
 msgstr "通知"
 
@@ -21402,7 +21406,7 @@ msgstr "画像 URL を貼り付け"
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:170
+#: src/features/chat/thread/request-secret-prompt.tsx:211
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -22058,7 +22062,7 @@ msgstr "プレミアムクラスの推論の透明性"
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:131
+#: src/features/chat/thread/request-secret-prompt.tsx:172
 msgid "Preparing a request…"
 msgstr ""
 
@@ -24745,7 +24749,7 @@ msgstr "サウジアラビア"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:179
+#: src/features/chat/thread/request-secret-prompt.tsx:220
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24851,19 +24855,23 @@ msgstr "ワークフローを保存"
 msgid "Saved"
 msgstr "保存済み"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:129
+#: src/features/chat/thread/request-secret-prompt.tsx:170
 msgid "Saved — continuing"
 msgstr ""
 
 #: src/features/chat/thread/request-secret-prompt.tsx:127
-msgid "Saved — the assistant can use it once"
+#~ msgid "Saved — the assistant can use it once"
+#~ msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:168
+msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "プリセットとして保存しました"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:83
+#: src/features/chat/thread/request-secret-prompt.tsx:114
 msgid "Saved as your {provider} API key"
 msgstr ""
 
@@ -25250,7 +25258,7 @@ msgstr "シート/月"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:160
+#: src/features/chat/thread/request-secret-prompt.tsx:201
 msgid "Secret"
 msgstr ""
 
@@ -25723,7 +25731,15 @@ msgid "Set a password for your account"
 msgstr "アカウントのパスワードを設定します"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:87
-msgid "Set as the {header} header on your {server} MCP server"
+#~ msgid "Set as the {header} header on your {server} MCP server"
+#~ msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:127
+msgid "Set as the {header} header on your {serverName} MCP server"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:121
+msgid "Set as the {header} header on your {serverName} MCP server ({host})"
 msgstr ""
 
 #: ../../packages/ui/src/components/color-picker.tsx:194
@@ -27640,11 +27656,11 @@ msgstr "スタイライズされたアニメーション"
 msgid "Sub-agent"
 msgstr "サブエージェント"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent failed"
 msgstr "サブエージェントが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
@@ -28055,11 +28071,11 @@ msgstr "タスクのメールをオフにしました"
 msgid "Task emails turned on"
 msgstr "タスクのメールをオンにしました"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task failed"
 msgstr "タスクが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task finished"
 msgstr "タスクが完了しました"
 
@@ -28553,7 +28569,11 @@ msgstr "アーカイブに含まれるファイルが多すぎます。"
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:142
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "The assistant is asking for a secret"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:183
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -30043,11 +30063,11 @@ msgstr "トリガーを有効にしました"
 msgid "Trigger name is required"
 msgstr "トリガー名は必須です"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run failed"
 msgstr "トリガーの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run finished"
 msgstr "トリガーの実行が完了しました"
 
@@ -31942,7 +31962,7 @@ msgstr "出力を待っています…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:133
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -31961,7 +31981,7 @@ msgstr "オーナーの承認を待っています"
 msgid "Waiting for uploads to complete…"
 msgstr "アップロードの完了を待っています…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:133
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Waiting for you"
 msgstr ""
 
@@ -32659,6 +32679,10 @@ msgstr "評価データセットはまだありません。"
 msgid "You have no indexed knowledge files yet."
 msgstr "インデックス済みのナレッジファイルはまだありません。"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:123
+msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
+msgstr ""
+
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:232
 msgid "You have no tags yet."
 msgstr "タグはまだありません。"
@@ -32699,7 +32723,7 @@ msgstr "サインイン後、このページに戻ります。"
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "確認コードを生成するには、Google Authenticator や Authy などの認証アプリが必要です。"
 
-#: src/features/notifications/components/notification-list.tsx:77
+#: src/features/notifications/components/notification-list.tsx:79
 msgid "You're all caught up."
 msgstr "すべて確認済みです。"
 
@@ -32816,11 +32840,11 @@ msgstr "会話は非公開のまま"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "現在の匿名セッションは永続的なアカウントに変換されます。"
 
-#: src/features/notifications/lib/notification-labels.ts:36
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Your daily brief"
 msgstr "あなたの Daily Brief"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your data export is ready"
 msgstr "データのエクスポートの準備ができました"
 

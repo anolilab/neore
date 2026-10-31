@@ -11,6 +11,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     daily_brief: { success: "Your daily brief" },
     data_export: { failure: "Data export failed", success: "Your data export is ready" },
     eval: { failure: "Eval run failed", success: "Eval run finished" },
+    secret_request: { success: "The assistant is asking for a secret" },
     sub_agent: { failure: "Sub-agent failed", success: "Sub-agent finished" },
     task: { failure: "Task failed", success: "Task finished" },
     tool_approval: { success: "A tool call needs your approval" },
@@ -29,8 +30,10 @@ export const pushTitle = (type: string, outcome: "failure" | "success" | undefin
 };
 
 /**
- * A run blocked on the user (a tool call to approve, a question to answer) is
+ * A run blocked on the user (a tool call to approve, a question to answer, a secret to give) is
  * pushed `high`, so a dozing phone wakes for it; everything else waits for the
  * device's next convenient moment.
  */
-export const pushUrgency = (type: string): "high" | "normal" => (type === "tool_approval" || type === "ask_user" ? "high" : "normal");
+const WAITING_ON_A_PERSON: ReadonlySet<string> = new Set(["ask_user", "secret_request", "tool_approval"]);
+
+export const pushUrgency = (type: string): "high" | "normal" => (WAITING_ON_A_PERSON.has(type) ? "high" : "normal");

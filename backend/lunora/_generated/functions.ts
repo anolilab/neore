@@ -481,6 +481,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_functions:getDecryptedMessengerKeysQuery": lunora_auth_functions_28.getDecryptedMessengerKeysQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getDecryptedProviderKeysQuery": lunora_auth_functions_28.getDecryptedProviderKeysQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getDecryptedToolKeysQuery": lunora_auth_functions_28.getDecryptedToolKeysQuery as unknown as RegisteredLunoraFunction,
+    "auth_functions:getMcpSecretHeadersQuery": lunora_auth_functions_28.getMcpSecretHeadersQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getMCPServersQuery": lunora_auth_functions_28.getMCPServersQuery as unknown as RegisteredLunoraFunction,
     "auth_functions:getPaidModelAccess": lunora_auth_functions_28.getPaidModelAccess as unknown as RegisteredLunoraFunction,
     "auth_functions:getSearchDomainBlocklistQuery": lunora_auth_functions_28.getSearchDomainBlocklistQuery as unknown as RegisteredLunoraFunction,
@@ -693,6 +694,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_request_secret:answerSecretRequest": lunora_chat_request_secret_63.answerSecretRequest as unknown as RegisteredLunoraFunction,
     "chat_request_secret:consumeSecretAsMcpHeader": lunora_chat_request_secret_63.consumeSecretAsMcpHeader as unknown as RegisteredLunoraFunction,
     "chat_request_secret:consumeSecretAsProviderKey": lunora_chat_request_secret_63.consumeSecretAsProviderKey as unknown as RegisteredLunoraFunction,
+    "chat_request_secret:discardSecretsOfThread": lunora_chat_request_secret_63.discardSecretsOfThread as unknown as RegisteredLunoraFunction,
     "chat_request_secret:sweepRequestedSecrets": lunora_chat_request_secret_63.sweepRequestedSecrets as unknown as RegisteredLunoraFunction,
     "chat_resume:latestResumableThread": lunora_chat_resume_64.latestResumableThread as unknown as RegisteredLunoraFunction,
     "chat_sharing:acceptThreadInvite": lunora_chat_sharing_65.acceptThreadInvite as unknown as RegisteredLunoraFunction,
@@ -3823,6 +3825,12 @@ __val1 = source["cursor"];
 __has1 = true;
 }
 return { ...(__has1 ? { "cursor": __val1 } : {}) };
+});
+installCompiledValidatorMap(lunora_chat_request_secret_63.discardSecretsOfThread.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_chat_sharing_65.getPublicThreadOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8153,6 +8161,7 @@ export interface Caller {
             getDecryptedMessengerKeysQuery: (args: { userId: string }) => Promise<Record<string, string>>;
             getDecryptedProviderKeysQuery: (args: { userId: string }) => Promise<Record<string, string>>;
             getDecryptedToolKeysQuery: (args: { userId: string }) => Promise<Record<string, string>>;
+            getMcpSecretHeadersQuery: (args: { name: string; url: string; userId: string }) => Promise<Array<{ key: string; value: string }>>;
             getMCPServersQuery: (args: { userId: string }) => Promise<Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getPaidModelAccess: (args?: {}) => Promise<{ canRunPaidModels: boolean }>;
             getSearchDomainBlocklistQuery: (args: { userId: string }) => Promise<Array<string>>;
@@ -8289,7 +8298,7 @@ export interface Caller {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
+            continueAfterToolApproval: (args: { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }) => Promise<void>;
             runStreamingAgent: (args: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }) => Promise<void>;
         };
         functions: {
@@ -8425,8 +8434,9 @@ export interface Caller {
         };
         request_secret: {
             answerSecretRequest: (args: { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
-            consumeSecretAsMcpHeader: (args: { ref: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
-            consumeSecretAsProviderKey: (args: { ref: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            consumeSecretAsMcpHeader: (args: { ref: string; startedBy: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            consumeSecretAsProviderKey: (args: { ref: string; startedBy: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            discardSecretsOfThread: (args: { threadId: Id<"threads"> }) => Promise<null>;
             sweepRequestedSecrets: (args?: {}) => Promise<null>;
         };
         resume: {
@@ -8515,7 +8525,7 @@ export interface Caller {
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             pruneExpiredToolPermissionGrants: (args?: {}) => Promise<null>;
-            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }) => Promise<null>;
+            recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }) => Promise<null>;
             respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: (args: { key: string }) => Promise<null>;
             setToolPermission: (args: { key: string; mode: "auto" | "ask" | "off" | null }) => Promise<null>;
@@ -8821,7 +8831,7 @@ export interface Caller {
     };
     home: {
         overview: {
-            getHomeOverview: (args?: {}) => Promise<{ approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
+            getHomeOverview: (args?: {}) => Promise<{ approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
         };
     };
     init: {
@@ -9058,9 +9068,9 @@ export interface Caller {
             writeDailyBrief: (args: { localDay: string; summary: string; userId: string }) => Promise<null>;
         };
         functions: {
-            createNotification: (args: { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }) => Promise<null>;
-            createNotifications: (args: { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }> }) => Promise<null>;
-            getNotificationInbox: (args?: {}) => Promise<{ items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
+            createNotification: (args: { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }) => Promise<null>;
+            createNotifications: (args: { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }> }) => Promise<null>;
+            getNotificationInbox: (args?: {}) => Promise<{ items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
             markAllNotificationsRead: (args?: {}) => Promise<{ hasMore: boolean }>;
             markNotificationRead: (args: { notificationId: Id<"notifications"> }) => Promise<null>;
             pruneOldNotifications: (args?: {}) => Promise<null>;
@@ -9839,6 +9849,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             getDecryptedMessengerKeysQuery: (args) => callRegistered(context, "auth_functions:getDecryptedMessengerKeysQuery", args),
             getDecryptedProviderKeysQuery: (args) => callRegistered(context, "auth_functions:getDecryptedProviderKeysQuery", args),
             getDecryptedToolKeysQuery: (args) => callRegistered(context, "auth_functions:getDecryptedToolKeysQuery", args),
+            getMcpSecretHeadersQuery: (args) => callRegistered(context, "auth_functions:getMcpSecretHeadersQuery", args),
             getMCPServersQuery: (args) => callRegistered(context, "auth_functions:getMCPServersQuery", args),
             getPaidModelAccess: (args) => callRegistered(context, "auth_functions:getPaidModelAccess", args),
             getSearchDomainBlocklistQuery: (args) => callRegistered(context, "auth_functions:getSearchDomainBlocklistQuery", args),
@@ -10113,6 +10124,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             answerSecretRequest: (args) => callRegistered(context, "chat_request_secret:answerSecretRequest", args),
             consumeSecretAsMcpHeader: (args) => callRegistered(context, "chat_request_secret:consumeSecretAsMcpHeader", args),
             consumeSecretAsProviderKey: (args) => callRegistered(context, "chat_request_secret:consumeSecretAsProviderKey", args),
+            discardSecretsOfThread: (args) => callRegistered(context, "chat_request_secret:discardSecretsOfThread", args),
             sweepRequestedSecrets: (args) => callRegistered(context, "chat_request_secret:sweepRequestedSecrets", args),
         },
         resume: {

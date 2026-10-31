@@ -15,6 +15,7 @@ import { decryptKey, encryptKey } from "../../lib/encryption";
 import { patchRow } from "../../lib/patch";
 import type { SecretFailure, SecretUse } from "../tools/request-secret-constants";
 import {
+    isForbiddenSecretHeader,
     SECRET_HEADER_NAME_MAX,
     SECRET_HEADER_NAME_RE,
     SECRET_HEADER_VALUE_MAX,
@@ -54,9 +55,11 @@ export const invalidSecretUse = (use: SecretUse): string | undefined => {
         return "Name the MCP server";
     }
 
-    return use.header.length > 0 && use.header.length <= SECRET_HEADER_NAME_MAX && SECRET_HEADER_NAME_RE.test(use.header)
-        ? undefined
-        : "Not a valid header name";
+    if (use.header.length === 0 || use.header.length > SECRET_HEADER_NAME_MAX || !SECRET_HEADER_NAME_RE.test(use.header)) {
+        return "Not a valid header name";
+    }
+
+    return isForbiddenSecretHeader(use.header) ? `A secret cannot be sent as the ${use.header} header` : undefined;
 };
 
 /** Store `value` for `row.userId`'s thread and return the reference that stands for it. The caller stamps `userId` from the claimed run, never from a client. */
@@ -95,7 +98,7 @@ type DestinationCheck = (use: SecretUse) => boolean;
  */
 export const takeRequestedSecret = async (
     ctx: Database,
-    args: { kind: SecretUse["kind"]; now: number; ref: string; threadId: string; userId: string },
+    args: { kind: SecretUse["kind"]; now: number; ref: string; startedBy: string; threadId: string; userId: string },
     destinationExists: DestinationCheck = () => true,
 ): Promise<TakenSecret> => {
     const row = await ctx.db
@@ -106,6 +109,11 @@ export const takeRequestedSecret = async (
     // One answer for a missing ref and for someone else's, so a ref's existence is not revealed.
     if (!row || row.userId !== args.userId || row.threadId !== args.threadId) {
         return { ok: false, status: "not_found" };
+    }
+
+    // The spending turn must be one the owner started: a continuation runs as the owner whoever started the turn it resumes.
+    if (args.startedBy !== row.userId) {
+        return { ok: false, status: "wrong_run" };
     }
 
     if (isSecretExpired(row, args.now)) {
@@ -141,6 +149,25 @@ export const takeRequestedSecret = async (
     await patchRow(ctx.db, row, { encryptedValue: undefined, status: "used" });
 
     return { ok: true, use: row.use, value };
+};
+
+/**
+ * Drop the ciphertext of every reference still saved for `threadId`, keeping the rows (a later spend reads `used`).
+ * Called when a reply ends for good — finished, failed or stopped, never at a pause — so a value does not wait out
+ * its 24 hours once the reply that received it is over. Returns how many it dropped.
+ */
+export const discardThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
+    const rows = await ctx.db
+        .query("requestedSecrets")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+    const live = rows.filter((row) => row.encryptedValue !== undefined);
+
+    for (const row of live) {
+        await patchRow(ctx.db, row, { encryptedValue: undefined });
+    }
+
+    return live.length;
 };
 
 /** Delete the rows on this shard whose reference lapsed, whatever their status. Returns how many. */

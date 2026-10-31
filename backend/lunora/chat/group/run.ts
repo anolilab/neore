@@ -51,7 +51,9 @@ import {
     loadRunContext,
     resolveRunModel,
     resumeApprovedRun,
+    discardRunSecrets,
     setDispatchOrigin,
+    setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
     toResearchDepth,
@@ -163,6 +165,8 @@ interface TurnContext {
     researchDepth: ResearchDepth;
     searchMode: string;
     shouldAutoContinue: boolean;
+    /** Who started the turn: the user it runs as, or on a resumed turn the one its snapshot names (`ToolCtx.startedBy`). */
+    startedBy: string | undefined;
     streamId: string;
     threadId: string;
     turnStartedAt: number;
@@ -254,6 +258,7 @@ const runSpeaker = async (
 
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
+        setRunStartedBy(ctx, turn.startedBy);
 
         const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
@@ -378,6 +383,7 @@ const runSpeaker = async (
                 result,
                 stop: stopping,
                 streamId: turn.streamId,
+                threadId: turn.threadId,
             });
 
             await markSpeaker([...stoppedIds, ...(result.savedMessages ?? []).map((m) => m._id as string)]);
@@ -414,6 +420,7 @@ const runSpeaker = async (
             researchDepth: turn.researchDepth,
             searchMode,
             shouldAutoContinue: turn.shouldAutoContinue,
+            ...(turn.startedBy !== undefined && { startedBy: turn.startedBy }),
             toolNames: Object.keys(toolResult.tools),
             toolPermissionKeys: toolResult.permissionKeys,
         };
@@ -565,6 +572,8 @@ const runQueue = async (
     });
 
     await setThreadStatus(ctx, turn.threadId, "active");
+    // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
+    await discardRunSecrets(ctx, turn.threadId);
 
     void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId: turn.threadId, userId: turn.userId });
 };
@@ -587,6 +596,7 @@ const loadTurnContext = async (
         researchDepth: ResearchDepth;
         searchMode: string;
         shouldAutoContinue: boolean;
+        startedBy: string | undefined;
         streamId: string;
         threadId: string;
         turnStartedAt: number;
@@ -624,6 +634,7 @@ const loadTurnContext = async (
         researchDepth: runContext.researchDepth,
         searchMode: args.searchMode,
         shouldAutoContinue: args.shouldAutoContinue,
+        startedBy: args.startedBy,
         streamId: args.streamId,
         threadId,
         turnStartedAt: args.turnStartedAt,
@@ -663,6 +674,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         researchDepth: toResearchDepth(streamingConfig.researchDepth),
         searchMode: streamingConfig.searchMode || "chat",
         shouldAutoContinue: streamingConfig.shouldAutoContinue === true,
+        startedBy: userId,
         streamId: input.streamId,
         threadId,
         turnStartedAt,
@@ -803,6 +815,7 @@ export const continueGroupAfterToolApproval = async (
         researchDepth: config.researchDepth,
         searchMode: config.searchMode,
         shouldAutoContinue: config.shouldAutoContinue,
+        startedBy: config.startedBy,
         streamId,
         threadId,
         turnStartedAt: group.turnStartedAt,

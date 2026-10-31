@@ -27,7 +27,9 @@ vi.mock("../../agent/client", () => {
 const { default: schema } = await import("../../schema");
 const { claimSecretAnswer, secretResumeArgs } = await import("./request-secret-claim");
 const { consumeAsMcpHeader, consumeAsProviderKey } = await import("./secret-consumers");
-const { storeRequestedSecret, sweepExpiredSecrets, takeRequestedSecret } = await import("./secret-requests");
+const { discardThreadSecrets, invalidSecretUse, storeRequestedSecret, sweepExpiredSecrets, takeRequestedSecret } = await import("./secret-requests");
+const { mcpServersWithSecretHeaders } = await import("../../auth/lib/mcp-secret-headers");
+const { redactPreferences } = await import("../../auth/lib/byok-keys");
 const { claimAskUserAnswer } = await import("./ask-user-claim");
 const { collectApprovalRequestIds } = await import("./tool-approval-claim");
 const { SECRET_DECLINED_REASON, SECRET_TTL_MS } = await import("../tools/request-secret-constants");
@@ -48,6 +50,9 @@ const STRANGER = "other-user";
 const SECRET = "sk-live-0123456789-supersecret";
 const PROVIDER_USE = { kind: "provider_key", provider: "openai" } as const;
 const HEADER_USE = { header: "Authorization", kind: "mcp_header", server: "Files" } as const;
+/** What the answer stores: the card's destination plus the URL of the server it named at that moment. */
+const FILES_URL = "https://files.example.com/mcp";
+const STORED_HEADER_USE = { ...HEADER_USE, url: FILES_URL } as const;
 
 const CONFIG = {
     autoMediaEnrichment: false,
@@ -107,23 +112,33 @@ const statuses = async () =>
 
 const secretRows = async () => await harness.run(async (ctx: any) => await ctx.db.query("requestedSecrets").collect());
 
-const takeProvider = async (ref: string, options: { callerId?: string; now?: number; thread?: string } = {}) =>
+const takeProvider = async (ref: string, options: { callerId?: string; now?: number; startedBy?: string; thread?: string } = {}) =>
     await harness.run(
         async (ctx: any) =>
             await consumeAsProviderKey(ctx, {
                 now: options.now ?? Date.now(),
                 ref,
+                startedBy: options.startedBy ?? options.callerId ?? OWNER,
                 threadId: options.thread ?? threadId,
                 userId: options.callerId ?? OWNER,
             }),
     );
 
-const takeHeader = async (ref: string, options: { callerId?: string; now?: number } = {}) =>
-    await harness.run(async (ctx: any) => await consumeAsMcpHeader(ctx, { now: options.now ?? Date.now(), ref, threadId, userId: options.callerId ?? OWNER }));
+const takeHeader = async (ref: string, options: { callerId?: string; now?: number; startedBy?: string } = {}) =>
+    await harness.run(
+        async (ctx: any) =>
+            await consumeAsMcpHeader(ctx, {
+                now: options.now ?? Date.now(),
+                ref,
+                startedBy: options.startedBy ?? options.callerId ?? OWNER,
+                threadId,
+                userId: options.callerId ?? OWNER,
+            }),
+    );
 
 const preferences = async () => await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").first());
 
-const storeSecret = async (use: typeof HEADER_USE | typeof PROVIDER_USE = PROVIDER_USE, now = Date.now()) =>
+const storeSecret = async (use: typeof PROVIDER_USE | typeof STORED_HEADER_USE = PROVIDER_USE, now = Date.now()) =>
     await harness.run(
         async (ctx: any) =>
             await storeRequestedSecret(ctx, { approvalId: "sec-x", label: "L", now, threadId: threadId as never, use, userId: OWNER, value: SECRET }),
@@ -132,7 +147,16 @@ const storeSecret = async (use: typeof HEADER_USE | typeof PROVIDER_USE = PROVID
 /** Every row of every table the feature can touch, as text. */
 const everythingStored = async () =>
     await harness.run(async (ctx: any) => {
-        const tables = ["messages", "toolApprovalRuns", "requestedSecrets", "persistentChunks", "persistentStreams", "aiUserPreferences", "threads"] as const;
+        const tables = [
+            "messages",
+            "toolApprovalRuns",
+            "requestedSecrets",
+            "persistentChunks",
+            "persistentStreams",
+            "aiUserPreferences",
+            "threads",
+            "documentHistory",
+        ] as const;
         const rows = await Promise.all(tables.map(async (table) => await ctx.db.query(table).collect()));
 
         return JSON.stringify(rows);
@@ -143,6 +167,9 @@ const NOT_A_SECRET = /not a secret request/iu;
 const NOT_A_QUESTION = /not a question/iu;
 const REF_SHAPE = /^sec_[\w-]{32}$/u;
 const BAD_VALUE = /Provide a value/iu;
+const NO_SERVER = /no saved MCP server/iu;
+const AMBIGUOUS_SERVER = /more than one/iu;
+const BAD_HEADER_VALUE = /line break|control/iu;
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -256,6 +283,10 @@ describe("claimSecretAnswer", () => {
     });
 
     it("lets a header value be longer than a provider key", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", { mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }], userId: OWNER }),
+        );
         await insertMessage(2, { content: "and the files server", role: "user" });
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
@@ -277,6 +308,10 @@ describe("claimSecretAnswer", () => {
         await insertRun("other-1");
 
         await expect(save(SECRET, { approvalId: "other-1" })).rejects.toThrow(NOT_A_SECRET);
+
+        // The claim of the other call is rolled back with the refusal, not left approved.
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+        expect(await secretRows()).toHaveLength(0);
     });
 
     it("is refused by the question procedure, which answers askUser requests only", async () => {
@@ -357,13 +392,17 @@ describe("resuming the run", () => {
 });
 
 describe("a reference", () => {
-    const take = async (ref: string, options: { callerId?: string; kind?: "mcp_header" | "provider_key"; now?: number; thread?: string } = {}) =>
+    const take = async (
+        ref: string,
+        options: { callerId?: string; kind?: "mcp_header" | "provider_key"; now?: number; startedBy?: string; thread?: string } = {},
+    ) =>
         await harness.run(
             async (ctx: any) =>
                 await takeRequestedSecret(ctx, {
                     kind: options.kind ?? "provider_key",
                     now: options.now ?? Date.now(),
                     ref,
+                    startedBy: options.startedBy ?? options.callerId ?? OWNER,
                     threadId: options.thread ?? threadId,
                     userId: options.callerId ?? OWNER,
                 }),
@@ -498,67 +537,442 @@ describe("consuming as a provider key", () => {
     });
 
     it("refuses a reference requested for an MCP header", async () => {
-        expect(await takeProvider(await storeSecret(HEADER_USE))).toMatchObject({ status: "wrong_use" });
+        expect(await takeProvider(await storeSecret(STORED_HEADER_USE))).toMatchObject({ status: "wrong_use" });
         expect(await preferences()).toBeNull();
     });
 });
 
 describe("consuming as an MCP server header", () => {
-    const server = (name: string, headers?: { key: string; value: string }[]) => {
-        return { enabled: true, ...(headers && { headers }), name, protocol: "http" as const, url: `https://${name.toLowerCase()}.example.com/mcp` };
+    const server = (name: string, headers?: { key: string; value: string }[], url = `https://${name.toLowerCase()}.example.com/mcp`) => {
+        return { enabled: true, ...(headers && { headers }), name, protocol: "http" as const, url };
     };
 
     const withServers = async (...mcpServers: ReturnType<typeof server>[]) =>
         await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { mcpServers, userId: OWNER }));
 
-    it("sets the header on the named server and leaves the rest alone", async () => {
+    it("stores the header encrypted beside the server, never in the server's own header list", async () => {
         await withServers(server("Files", [{ key: "X-Team", value: "a" }]), server("Other"));
 
-        const result = await takeHeader(await storeSecret(HEADER_USE));
+        const result = await takeHeader(await storeSecret(STORED_HEADER_USE));
 
         expect(result).toMatchObject({ header: "Authorization", server: "Files", status: "saved" });
         expect(JSON.stringify(result)).not.toContain(SECRET);
 
-        const { mcpServers } = await preferences();
+        const { mcpSecretHeaders, mcpServers } = await preferences();
 
-        expect(mcpServers[0].headers).toStrictEqual([
-            { key: "X-Team", value: "a" },
-            { key: "Authorization", value: SECRET },
-        ]);
+        expect(mcpServers[0].headers).toStrictEqual([{ key: "X-Team", value: "a" }]);
         expect(mcpServers[1]).toStrictEqual(server("Other"));
+        expect(mcpSecretHeaders).toHaveLength(1);
+        expect(mcpSecretHeaders[0]).toMatchObject({ header: "Authorization", server: "Files", url: FILES_URL });
+        expect(mcpSecretHeaders[0].encryptedValue).not.toContain(SECRET);
+        expect(await decryptKey(mcpSecretHeaders[0].encryptedValue, "mcp-headers")).toBe(SECRET);
     });
 
-    it("replaces a header of the same name, whatever its case", async () => {
-        await withServers(server("Files", [{ key: "authorization", value: "old" }]));
-        await takeHeader(await storeSecret(HEADER_USE));
+    it("leaves the plaintext in no row at all, the audit history included", async () => {
+        await withServers(server("Files"));
+        await takeHeader(await storeSecret(STORED_HEADER_USE));
 
-        const { mcpServers } = await preferences();
+        const history = await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect());
 
-        expect(mcpServers[0].headers).toStrictEqual([{ key: "Authorization", value: SECRET }]);
+        // The write was audited (a snapshot of the preferences row exists), and it holds only ciphertext.
+        expect(history.some((row: { tableName: string }) => row.tableName === "aiUserPreferences")).toBe(true);
+        expect(await everythingStored()).not.toContain(SECRET);
+    });
+
+    it("replaces a secret header of the same name, whatever its case, on the same server", async () => {
+        await withServers(server("Files"));
+        await takeHeader(await storeSecret({ ...STORED_HEADER_USE, header: "authorization" } as never));
+
+        const second = await storeSecret(STORED_HEADER_USE);
+
+        await takeHeader(second);
+
+        const { mcpSecretHeaders } = await preferences();
+
+        expect(mcpSecretHeaders).toHaveLength(1);
+        expect(mcpSecretHeaders[0].header).toBe("Authorization");
     });
 
     it("leaves the reference unused when the server does not exist", async () => {
         await withServers(server("Other"));
 
-        const ref = await storeSecret(HEADER_USE);
+        const ref = await storeSecret(STORED_HEADER_USE);
 
         expect(await takeHeader(ref)).toMatchObject({ status: "destination_missing" });
 
-        // The reference survived: it is still the user's to spend once the server is there.
         const [row] = await secretRows();
 
         expect(row.status).toBe("saved");
         expect(row.encryptedValue).toBeDefined();
     });
 
+    it("refuses when the server of that name now lives at another URL, or two servers match", async () => {
+        await withServers(server("Files", undefined, "https://elsewhere.example.com/mcp"));
+
+        const ref = await storeSecret(STORED_HEADER_USE);
+
+        expect(await takeHeader(ref)).toMatchObject({ status: "destination_missing" });
+        expect(((await preferences()) as { mcpSecretHeaders?: unknown[] }).mcpSecretHeaders ?? []).toHaveLength(0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.query("aiUserPreferences").first();
+
+            await ctx.db.patch(row._id, { mcpServers: [server("Files"), server("Files")] });
+        });
+
+        expect(await takeHeader(ref)).toMatchObject({ status: "destination_missing" });
+        expect(await secretRows()).toHaveLength(1);
+        const kept = await secretRows();
+
+        expect(kept.map((row: { encryptedValue?: string }) => row.encryptedValue)).not.toContain(undefined);
+    });
+
+    it("refuses a reference stored without the server's URL", async () => {
+        await withServers(server("Files"));
+
+        expect(await takeHeader(await storeSecret(HEADER_USE as never))).toMatchObject({ status: "destination_missing" });
+    });
+
     it("works once, and not for another user or a reference meant for a provider", async () => {
         await withServers(server("Files"));
 
-        const ref = await storeSecret(HEADER_USE);
+        const ref = await storeSecret(STORED_HEADER_USE);
 
         expect(await takeHeader(ref, { callerId: STRANGER })).toMatchObject({ status: "not_found" });
         expect(await takeHeader(ref)).toMatchObject({ status: "saved" });
         expect(await takeHeader(ref)).toMatchObject({ status: "used" });
         expect(await takeHeader(await storeSecret(PROVIDER_USE))).toMatchObject({ status: "wrong_use" });
+    });
+});
+
+describe("the turn that spends a reference", () => {
+    it("is refused when it was not started by the owner, writing nothing", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { userId: OWNER }));
+
+        const ref = await storeSecret();
+
+        // A collaborator's fresh turn runs as the collaborator; a continuation runs as the owner but keeps who started it.
+        expect(await takeProvider(ref, { callerId: STRANGER })).toMatchObject({ status: "not_found" });
+        expect(await takeProvider(ref, { startedBy: STRANGER })).toMatchObject({ status: "wrong_run" });
+        const unchanged = await preferences();
+
+        expect(unchanged).not.toHaveProperty("providerApiKeys");
+        expect(await takeProvider(ref)).toMatchObject({ status: "saved" });
+    });
+
+    it("is refused for a header too", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await takeHeader(await storeSecret(STORED_HEADER_USE), { startedBy: STRANGER })).toMatchObject({ status: "wrong_run" });
+    });
+});
+
+describe("what the preferences row shows a client", () => {
+    it("drops the encrypted headers of saved secrets and keeps the server list", () => {
+        const doc: Record<string, unknown> = {
+            mcpSecretHeaders: [{ encryptedValue: "v1:abc", header: "Authorization", server: "Files", url: FILES_URL }],
+            mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+        };
+
+        redactPreferences(doc);
+
+        expect(JSON.stringify(doc)).not.toContain("v1:abc");
+        expect(doc.mcpServers).toHaveLength(1);
+    });
+});
+
+describe("the runtime's view of the servers", () => {
+    type Entry = { enabled: boolean; headers?: { key: string; value: string }[]; name: string; protocol: "http"; url: string };
+
+    const servers: Entry[] = [
+        { enabled: true, headers: [{ key: "X-Team", value: "a" }], name: "Files", protocol: "http", url: FILES_URL },
+        { enabled: true, name: "Other", protocol: "http", url: "https://other.example.com/mcp" },
+    ];
+
+    it("adds a saved secret to its own server only, as a plain header the client builds the request from", async () => {
+        const { encryptKey: encrypt } = await import("../../lib/encryption");
+        const secret = { encryptedValue: await encrypt(SECRET, "mcp-headers"), header: "Authorization", server: "Files", url: FILES_URL };
+        const out = await mcpServersWithSecretHeaders(servers, [secret]);
+
+        expect(out[0]?.headers).toStrictEqual([
+            { key: "X-Team", value: "a" },
+            { key: "Authorization", value: SECRET },
+        ]);
+        expect(out[1]?.headers).toBeUndefined();
+    });
+
+    it("lets a secret replace a manual header of the same name, and skips one it cannot read", async () => {
+        const { encryptKey } = await import("../../lib/encryption");
+        const manual: Entry[] = [{ ...servers[0]!, headers: [{ key: "authorization", value: "old" }] }];
+        const out = await mcpServersWithSecretHeaders(manual, [
+            { encryptedValue: await encryptKey(SECRET, "mcp-headers"), header: "Authorization", server: "Files", url: FILES_URL },
+            { encryptedValue: "v1:garbage", header: "X-Bad", server: "Files", url: FILES_URL },
+        ]);
+
+        expect(out[0]?.headers).toStrictEqual([{ key: "Authorization", value: SECRET }]);
+    });
+
+    it("ignores a secret whose server changed URL", async () => {
+        const { encryptKey } = await import("../../lib/encryption");
+        const out = await mcpServersWithSecretHeaders(servers, [
+            { encryptedValue: await encryptKey(SECRET, "mcp-headers"), header: "Authorization", server: "Files", url: "https://evil.example.com/mcp" },
+        ]);
+
+        expect(JSON.stringify(out)).not.toContain(SECRET);
+    });
+});
+
+describe("the audit history of the preferences row", () => {
+    it("blanks the value of a header saved by hand, which the Settings page stores as plaintext", async () => {
+        const id = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [
+                        { enabled: true, headers: [{ key: "Authorization", value: "manual-token-0123" }], name: "Files", protocol: "http", url: FILES_URL },
+                    ],
+                    userId: OWNER,
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch(id, {
+                    mcpServers: [
+                        { enabled: false, headers: [{ key: "Authorization", value: "rotated-token-4567" }], name: "Files", protocol: "http", url: FILES_URL },
+                    ],
+                }),
+        );
+
+        const history = JSON.stringify(await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect()));
+
+        expect(history).toContain("Files");
+        expect(history).not.toContain("manual-token-0123");
+        expect(history).not.toContain("rotated-token-4567");
+    });
+});
+
+describe("what a request may name", () => {
+    it("refuses header names the transport owns, whatever their case", () => {
+        for (const header of ["Host", "cookie", "CONNECTION", "Transfer-Encoding", "content-length", "Upgrade", "Proxy-Authorization", "proxy-anything"]) {
+            expect(invalidSecretUse({ header, kind: "mcp_header", server: "Files" })).toBeDefined();
+        }
+
+        expect(invalidSecretUse({ header: "Authorization", kind: "mcp_header", server: "Files" })).toBeUndefined();
+        expect(invalidSecretUse({ header: "X-Api-Key", kind: "mcp_header", server: "Files" })).toBeUndefined();
+    });
+
+    it("is refused at the tool's own schema too", async () => {
+        const { default: requestSecretTool } = await import("../tools/request-secret");
+        const { inputSchema } = requestSecretTool as unknown as ToolDefinition;
+
+        expect(inputSchema.safeParse({ label: "T", use: { ...HEADER_USE, header: "Host" } }).success).toBe(false);
+        expect(inputSchema.safeParse({ label: "T", use: { ...HEADER_USE, header: "Proxy-Authorization" } }).success).toBe(false);
+        expect(inputSchema.safeParse({ label: "T", use: HEADER_USE }).success).toBe(true);
+    });
+});
+
+describe("answering for an MCP server", () => {
+    const answerHeader = async (value: string | null) => {
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        return await save(value, { approvalId: "sec-2" });
+    };
+
+    const servers = async (...mcpServers: { name: string; url: string }[]) =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: mcpServers.map((entry) => {
+                        return { enabled: true, protocol: "http", ...entry };
+                    }),
+                    userId: OWNER,
+                }),
+        );
+
+    it("records the server's URL at that moment in the stored destination", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await answerHeader(SECRET);
+
+        const [row] = await secretRows();
+
+        expect(row.use).toStrictEqual(STORED_HEADER_USE);
+    });
+
+    it("refuses, rolling the claim back, when the user has no server of that name or more than one", async () => {
+        await expect(answerHeader(SECRET)).rejects.toThrow(NO_SERVER);
+        expect(await secretRows()).toHaveLength(0);
+
+        await servers({ name: "Files", url: FILES_URL }, { name: "Files", url: "https://dup.example.com/mcp" });
+        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(AMBIGUOUS_SERVER);
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+    });
+
+    it("refuses a value that could split the header or smuggle another", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        for (const value of ["tok\r\nX-Evil: 1", "tok\nen", "to\0ken", "a\rb"]) {
+            await expect(save(value, { approvalId: "sec-2" })).rejects.toThrow(BAD_HEADER_VALUE);
+        }
+
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+    });
+});
+
+describe("when a run ends", () => {
+    it("drops the ciphertext of the thread's saved references and keeps their rows", async () => {
+        const ref = await storeSecret();
+
+        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }))).toBe(1);
+
+        const [row] = await secretRows();
+
+        expect(row).toMatchObject({ ref, status: "saved" });
+        expect(row.encryptedValue).toBeUndefined();
+        expect(await takeProvider(ref)).toMatchObject({ status: "used" });
+    });
+
+    it("leaves other threads' references alone, and a second pass finds nothing", async () => {
+        await storeSecret();
+
+        const other = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "O", userId: OWNER }));
+        const otherRef = await harness.run(
+            async (ctx: any) =>
+                await storeRequestedSecret(ctx, {
+                    approvalId: "sec-o",
+                    label: "L",
+                    now: Date.now(),
+                    threadId: other,
+                    use: PROVIDER_USE,
+                    userId: OWNER,
+                    value: SECRET,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }));
+
+        expect(await harness.run(async (ctx: any) => await discardThreadSecrets(ctx, { threadId: threadId as never }))).toBe(0);
+        expect(await takeProvider(otherRef, { thread: other })).toMatchObject({ status: "saved" });
+    });
+});
+
+describe("the consumer tools", () => {
+    /** A tool ctx whose `runMutation` runs the real consumer against the harness, as the queue would. */
+    const toolContext = (overrides: Record<string, unknown> = {}, consume: typeof consumeAsProviderKey = consumeAsProviderKey) => {
+        const calls: Record<string, unknown>[] = [];
+
+        return {
+            calls,
+            context: {
+                runMutation: async (_reference: unknown, args: any) => {
+                    calls.push(args);
+
+                    return await harness.run(async (ctx: any) => await consume(ctx, { ...args, now: Date.now() }));
+                },
+                startedBy: OWNER,
+                threadId,
+                userId: OWNER,
+                ...overrides,
+            },
+        };
+    };
+
+    const tools = async () => await import("../tools/use-secret");
+
+    it("pass the run's user, thread and starter with the reference, and nothing else", async () => {
+        const { saveSecretAsProviderKeyTool } = await tools();
+        const { calls, context } = toolContext();
+        const ref = await storeSecret();
+
+        const output = await (saveSecretAsProviderKeyTool as unknown as ToolDefinition).execute(context, { ref }, {});
+
+        expect(output).toStrictEqual({ provider: "openai", status: "saved" });
+        expect(calls).toStrictEqual([{ ref, startedBy: OWNER, threadId, userId: OWNER }]);
+        expect(JSON.stringify(output)).not.toContain(SECRET);
+    });
+
+    it("spend a header reference on the named server", async () => {
+        const { setMcpServerSecretTool } = await tools();
+        const { context } = toolContext({}, consumeAsMcpHeader);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", { mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }], userId: OWNER }),
+        );
+
+        const output = await (setMcpServerSecretTool as unknown as ToolDefinition).execute(context, { ref: await storeSecret(STORED_HEADER_USE) }, {});
+
+        expect(output).toStrictEqual({ header: "Authorization", server: "Files", status: "saved" });
+        expect(((await preferences()) as { mcpSecretHeaders?: unknown[] }).mcpSecretHeaders).toHaveLength(1);
+    });
+
+    it("fail closed in a turn a collaborator started, even though the continuation runs as the owner", async () => {
+        const { saveSecretAsProviderKeyTool } = await tools();
+        const ref = await storeSecret();
+
+        // Fresh turn of a write collaborator: the run's user is the collaborator.
+        const fresh = toolContext({ startedBy: STRANGER, userId: STRANGER });
+
+        expect(await (saveSecretAsProviderKeyTool as unknown as ToolDefinition).execute(fresh.context, { ref }, {})).toMatchObject({
+            error: expect.any(String),
+            status: "not_found",
+        });
+
+        // Its continuation after the owner answered some other card: the run's user is the owner, the starter is not.
+        const continued = toolContext({ startedBy: STRANGER });
+
+        expect(await (saveSecretAsProviderKeyTool as unknown as ToolDefinition).execute(continued.context, { ref }, {})).toMatchObject({ status: "wrong_run" });
+
+        // A run that never said who started it (headless, an old snapshot) is refused the same way.
+        const unknown = toolContext({ startedBy: undefined });
+
+        expect(await (saveSecretAsProviderKeyTool as unknown as ToolDefinition).execute(unknown.context, { ref }, {})).toMatchObject({ status: "wrong_run" });
+        expect(await preferences()).toBeNull();
+        expect(await secretRows()).toHaveLength(1);
+        const kept = await secretRows();
+
+        expect(kept.map((row: { encryptedValue?: string }) => row.encryptedValue)).not.toContain(undefined);
+    });
+
+    it("refuse a context with no user or thread without touching the reference", async () => {
+        const { setMcpServerSecretTool } = await tools();
+        const { calls, context } = toolContext({ threadId: undefined });
+
+        expect(await (setMcpServerSecretTool as unknown as ToolDefinition).execute(context, { ref: "sec_x" }, {})).toMatchObject({ status: "failed" });
+        expect(calls).toHaveLength(0);
+    });
+});
+
+describe("the header secrets of one server, for a connection test", () => {
+    it("come back decrypted for that server only, and only at the address they were approved for", async () => {
+        const { getMcpSecretHeadersQuery } = await import("../../auth/functions");
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+        await takeHeader(await storeSecret(STORED_HEADER_USE));
+
+        const read = async (name: string, url: string) =>
+            await harness.query(async (ctx: any) => await ctx.runQuery(getMcpSecretHeadersQuery, { name, url, userId: OWNER }));
+
+        expect(await read("Files", FILES_URL)).toStrictEqual([{ key: "Authorization", value: SECRET }]);
+        expect(await read("Files", "https://evil.example.com/mcp")).toStrictEqual([]);
+        expect(await read("Other", FILES_URL)).toStrictEqual([]);
     });
 });

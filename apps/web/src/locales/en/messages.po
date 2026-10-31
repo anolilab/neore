@@ -32,7 +32,7 @@ msgstr "-- INSERT --"
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
-#: src/features/notifications/components/notification-list.tsx:108
+#: src/features/notifications/components/notification-list.tsx:110
 msgid ", unread"
 msgstr ", unread"
 
@@ -1492,7 +1492,7 @@ msgstr "A passcode keeps this chat closed to anyone using a browser you are alre
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 
-#: src/features/notifications/lib/notification-labels.ts:27
+#: src/features/notifications/lib/notification-labels.ts:38
 msgid "A question is waiting for you"
 msgstr "A question is waiting for you"
 
@@ -1521,7 +1521,7 @@ msgstr "A skill is a reusable set of instructions you can run with a slash comma
 msgid "A template adds its participants to your skills, where you can edit them."
 msgstr "A template adds its participants to your skills, where you can edit them."
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "A tool call needs your approval"
 msgstr "A tool call needs your approval"
 
@@ -1533,7 +1533,7 @@ msgstr "A tool cannot be both added and disabled"
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 
-#: src/features/notifications/lib/notification-labels.ts:57
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "A usage alert was triggered"
 msgstr "A usage alert was triggered"
 
@@ -5077,11 +5077,11 @@ msgstr "Chat copied to clipboard as Markdown"
 msgid "Chat Import"
 msgstr "Chat Import"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import failed"
 msgstr "Chat import failed"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import finished"
 msgstr "Chat import finished"
 
@@ -5743,11 +5743,11 @@ msgstr "Coding"
 msgid "Coding agent log"
 msgstr "Coding agent log"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run failed"
 msgstr "Coding agent run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run finished"
 msgstr "Coding agent run finished"
 
@@ -7275,7 +7275,7 @@ msgstr "Could not save the new order for {label}"
 msgid "Could not save the page"
 msgstr "Could not save the page"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:106
+#: src/features/chat/thread/request-secret-prompt.tsx:147
 msgid "Could not save. Please try again."
 msgstr "Could not save. Please try again."
 
@@ -8018,7 +8018,7 @@ msgstr "Data Access Summary"
 msgid "Data Export"
 msgstr "Data Export"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Data export failed"
 msgstr "Data export failed"
 
@@ -8088,11 +8088,11 @@ msgstr "Debate rounds"
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:183
+#: src/features/chat/thread/request-secret-prompt.tsx:224
 msgid "Decline"
 msgstr "Decline"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:125
+#: src/features/chat/thread/request-secret-prompt.tsx:166
 msgid "Declined — continuing without it"
 msgstr "Declined — continuing without it"
 
@@ -10672,11 +10672,11 @@ msgstr "Estonian (Estonia)"
 msgid "European Union"
 msgstr "European Union"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run failed"
 msgstr "Eval run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run finished"
 msgstr "Eval run finished"
 
@@ -18202,6 +18202,10 @@ msgstr "More steps = higher quality, longer generation"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "More than a proxy — an intelligent layer between your app and every LLM provider."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:125
+msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
+msgstr "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
+
 #: src/features/marketing/data/models-data.ts:956
 msgid "Most advanced extended reasoning in the Claude family"
 msgstr "Most advanced extended reasoning in the Claude family"
@@ -19883,7 +19887,7 @@ msgstr "Nothing is waiting on you."
 msgid "Nothing to stop: that run had already ended."
 msgstr "Nothing to stop: that run had already ended."
 
-#: src/features/notifications/lib/notification-labels.ts:60
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "Notification"
 msgstr "Notification"
 
@@ -21401,7 +21405,7 @@ msgstr "Paste image URL"
 msgid "Paste image URL..."
 msgstr "Paste image URL..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:170
+#: src/features/chat/thread/request-secret-prompt.tsx:211
 msgid "Paste it here — it is not shown in the chat"
 msgstr "Paste it here — it is not shown in the chat"
 
@@ -22057,7 +22061,7 @@ msgstr "Premium-tier reasoning transparency"
 msgid "Preparing a question…"
 msgstr "Preparing a question…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:131
+#: src/features/chat/thread/request-secret-prompt.tsx:172
 msgid "Preparing a request…"
 msgstr "Preparing a request…"
 
@@ -24744,7 +24748,7 @@ msgstr "Saudi Arabia"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:179
+#: src/features/chat/thread/request-secret-prompt.tsx:220
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24850,19 +24854,23 @@ msgstr "Save workflow"
 msgid "Saved"
 msgstr "Saved"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:129
+#: src/features/chat/thread/request-secret-prompt.tsx:170
 msgid "Saved — continuing"
 msgstr "Saved — continuing"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:127
-msgid "Saved — the assistant can use it once"
-msgstr "Saved — the assistant can use it once"
+#~ msgid "Saved — the assistant can use it once"
+#~ msgstr "Saved — the assistant can use it once"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:168
+msgid "Saved — the assistant can use it once, in this reply"
+msgstr "Saved — the assistant can use it once, in this reply"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "Saved as preset"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:83
+#: src/features/chat/thread/request-secret-prompt.tsx:114
 msgid "Saved as your {provider} API key"
 msgstr "Saved as your {provider} API key"
 
@@ -25249,7 +25257,7 @@ msgstr "seat/mo"
 msgid "secret"
 msgstr "secret"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:160
+#: src/features/chat/thread/request-secret-prompt.tsx:201
 msgid "Secret"
 msgstr "Secret"
 
@@ -25722,8 +25730,16 @@ msgid "Set a password for your account"
 msgstr "Set a password for your account"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:87
-msgid "Set as the {header} header on your {server} MCP server"
-msgstr "Set as the {header} header on your {server} MCP server"
+#~ msgid "Set as the {header} header on your {server} MCP server"
+#~ msgstr "Set as the {header} header on your {server} MCP server"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:127
+msgid "Set as the {header} header on your {serverName} MCP server"
+msgstr "Set as the {header} header on your {serverName} MCP server"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:121
+msgid "Set as the {header} header on your {serverName} MCP server ({host})"
+msgstr "Set as the {header} header on your {serverName} MCP server ({host})"
 
 #: ../../packages/ui/src/components/color-picker.tsx:194
 msgid "Set color to {color}"
@@ -27639,11 +27655,11 @@ msgstr "stylized animation"
 msgid "Sub-agent"
 msgstr "Sub-agent"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent failed"
 msgstr "Sub-agent failed"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent finished"
 msgstr "Sub-agent finished"
 
@@ -28054,11 +28070,11 @@ msgstr "Task emails turned off"
 msgid "Task emails turned on"
 msgstr "Task emails turned on"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task failed"
 msgstr "Task failed"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task finished"
 msgstr "Task finished"
 
@@ -28552,7 +28568,11 @@ msgstr "The archive holds too many files."
 msgid "The assistant has a question"
 msgstr "The assistant has a question"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:142
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "The assistant is asking for a secret"
+msgstr "The assistant is asking for a secret"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:183
 msgid "The assistant needs a secret"
 msgstr "The assistant needs a secret"
 
@@ -30042,11 +30062,11 @@ msgstr "Trigger enabled"
 msgid "Trigger name is required"
 msgstr "Trigger name is required"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run failed"
 msgstr "Trigger run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run finished"
 msgstr "Trigger run finished"
 
@@ -31941,7 +31961,7 @@ msgstr "Waiting for output…"
 msgid "Waiting for the agent…"
 msgstr "Waiting for the agent…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:133
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
 
@@ -31960,7 +31980,7 @@ msgstr "Waiting for the owner to approve"
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:133
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Waiting for you"
 msgstr "Waiting for you"
 
@@ -32658,6 +32678,10 @@ msgstr "You have no eval datasets yet."
 msgid "You have no indexed knowledge files yet."
 msgstr "You have no indexed knowledge files yet."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:123
+msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
+msgstr "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
+
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:232
 msgid "You have no tags yet."
 msgstr "You have no tags yet."
@@ -32698,7 +32722,7 @@ msgstr "You'll be redirected back here after signing in."
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 
-#: src/features/notifications/components/notification-list.tsx:77
+#: src/features/notifications/components/notification-list.tsx:79
 msgid "You're all caught up."
 msgstr "You're all caught up."
 
@@ -32815,11 +32839,11 @@ msgstr "Your conversations stay private"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "Your current anonymous session will be converted to a permanent account."
 
-#: src/features/notifications/lib/notification-labels.ts:36
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Your daily brief"
 msgstr "Your daily brief"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your data export is ready"
 msgstr "Your data export is ready"
 

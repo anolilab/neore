@@ -238,6 +238,23 @@ export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => 
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
+export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
+    (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * A reply ended for good — drop the ciphertext of the thread's saved secret references (`requestSecret`). Best
+ * effort: it must never fail or delay the end of a run, and what it misses waits for the housekeeping sweep.
+ */
+export const discardRunSecrets = async (ctx: Pick<ActionCtx, "runMutation">, threadId: string): Promise<void> => {
+    try {
+        await ctx.runMutation(internal.chat.request_secret.discardSecretsOfThread, { threadId: threadId as Id<"threads"> });
+    } catch {
+        // Swept later.
+    }
+};
+
 /** Personalization only when the user set any of it; `undefined` otherwise, so the prompt carries no empty block. */
 export const toPersonalization = (prefs: {
     aboutMe?: string;
@@ -794,11 +811,13 @@ export const finishRun = async (
 
     if (approvalIds.length > 0) {
         const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
+        const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
 
         await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
+            ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
             threadId,
             userId,
         });
@@ -816,6 +835,12 @@ export const finishRun = async (
     } catch (error) {
         // A stop can end the stream between the pipe and this write: what was owed is then the unsaved text plus `pending`.
         throw asRefusedWrite(error, { reasoning: unsaved.reasoning + pending.reasoning, text: unsaved.text + pending.text });
+    }
+
+    // A pause keeps the references (a consumer set to ask resumes the run); only a final end drops them. A group turn that
+    // goes on with the next speaker (`keepOpenUnlessPaused`) is not over either.
+    if (!paused && keepOpenUnlessPaused !== true) {
+        await discardRunSecrets(ctx, threadId);
     }
 
     return { paused };
@@ -841,6 +866,7 @@ export const endStoppedRun = async (
         result: { consumeStream: () => PromiseLike<unknown> };
         stop: AbortController;
         streamId: string;
+        threadId: string;
     },
 ): Promise<string[]> => {
     if (!isStreamWriteRefused(error)) {
@@ -877,6 +903,7 @@ export const endStoppedRun = async (
     args.stop.abort();
     // Errors are reported on the result, not thrown; the abort ends the stream, so this returns once the save is done.
     await args.result.consumeStream();
+    await discardRunSecrets(ctx, args.threadId);
 
     return stopped.messageId === undefined ? [] : [stopped.messageId];
 };
@@ -1016,6 +1043,8 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
+        setRunStartedBy(ctx, config.startedBy);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1084,6 +1113,7 @@ export const resumeApprovedRun = async (
                 result,
                 stop: stopping,
                 streamId,
+                threadId,
             });
 
             // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -1191,4 +1221,6 @@ export const failRun = async (
     } catch {
         // Ignore cleanup errors
     }
+
+    await discardRunSecrets(ctx, threadId);
 };

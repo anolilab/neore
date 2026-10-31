@@ -7,14 +7,16 @@
  * the claimed request must be a `requestSecret` call, and a saved value must be
  * non-empty and fit the destination the agent named. A throw rolls the claim
  * back. Saving encrypts the value into `requestedSecrets` and hands back only the
- * reference; declining stores nothing.
+ * reference; declining stores nothing. A header's destination also gets the URL of
+ * the named server as it is now, so the value goes to that server later and not to
+ * another that takes the name.
  */
 import { LunoraError } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import type { SecretUse } from "../tools/request-secret-constants";
-import { REQUEST_SECRET_TOOL_NAME, SECRET_DECLINED_REASON, SECRET_LABEL_MAX } from "../tools/request-secret-constants";
+import { REQUEST_SECRET_TOOL_NAME, SECRET_DECLINED_REASON, SECRET_HEADER_VALUE_FORBIDDEN_RE, SECRET_LABEL_MAX } from "../tools/request-secret-constants";
 import { invalidSecretUse, secretValueMax, storeRequestedSecret } from "./secret-requests";
 import type { ClaimResult } from "./tool-approval-claim";
 import { claimToolApproval, findPendingRequestOnLatestTurn } from "./tool-approval-claim";
@@ -46,6 +48,29 @@ const asUse = (value: unknown): SecretUse | undefined => {
     return undefined;
 };
 
+/** The destination with the address of the server it names, which must be exactly one of the owner's saved ones. */
+const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use: SecretUse): Promise<SecretUse> => {
+    if (use.kind !== "mcp_header") {
+        return use;
+    }
+
+    const preferences = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", ownerId))
+        .unique();
+    const matches = (preferences?.mcpServers ?? []).filter((server) => server.name === use.server);
+
+    if (matches.length === 0) {
+        throw new LunoraError("BAD_REQUEST", `There is no saved MCP server named "${use.server}"; add it in Settings first`);
+    }
+
+    if (matches.length > 1) {
+        throw new LunoraError("BAD_REQUEST", `More than one saved MCP server is named "${use.server}"; rename one in Settings first`);
+    }
+
+    return { ...use, url: matches[0]!.url };
+};
+
 export const claimSecretAnswer = async (
     ctx: Pick<MutationCtx, "db">,
     args: { approvalId: string; callerId: string; now: number; reply: SecretReply; threadId: Id<"threads">; unlockProof?: string | null },
@@ -74,17 +99,23 @@ export const claimSecretAnswer = async (
     // The call's own input names the destination: the card showed it, and the value is bound to it.
     const requested = await findPendingRequestOnLatestTurn(ctx, threadId, approvalId);
     const input = (isRecord(requested?.input) ? requested.input : {}) as StoredRequest;
-    const use = asUse(input.use);
+    const asked = asUse(input.use);
 
-    if (use === undefined || invalidSecretUse(use) !== undefined) {
+    if (asked === undefined || invalidSecretUse(asked) !== undefined) {
         throw new LunoraError("BAD_REQUEST", "This secret request has no valid destination");
     }
 
     const value = reply.value.trim();
 
-    if (value.length === 0 || value.length > secretValueMax(use)) {
+    if (value.length === 0 || value.length > secretValueMax(asked)) {
         throw new LunoraError("BAD_REQUEST", "Provide a value that fits where it is going");
     }
+
+    if (asked.kind === "mcp_header" && SECRET_HEADER_VALUE_FORBIDDEN_RE.test(value)) {
+        throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break or a control character");
+    }
+
+    const use = await withServerUrl(ctx, claim.ownerId, asked);
 
     const label = typeof input.label === "string" ? input.label.slice(0, SECRET_LABEL_MAX) : "Secret";
     const ref = await storeRequestedSecret(ctx, { approvalId, label, now, threadId, use, userId: claim.ownerId, value });

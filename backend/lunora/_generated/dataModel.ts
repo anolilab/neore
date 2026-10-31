@@ -82,6 +82,7 @@ export interface Doc_aiUserPreferences {
     enableKnowledge?: boolean;
     enablePlanner?: boolean;
     generalProviders?: unknown;
+    mcpSecretHeaders?: Array<{ encryptedValue: string; header: string; server: string; url: string }>;
     mcpServers?: Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>;
     messengerKeys?: unknown;
     modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean };
@@ -974,7 +975,7 @@ export interface Doc_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
+    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -1309,7 +1310,7 @@ export interface Doc_requestedSecrets {
     ref: string;
     status: "saved" | "used";
     threadId: string;
-    use: { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
+    use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;
 }
 
@@ -1764,7 +1765,7 @@ export interface Doc_toolApprovalRuns {
     _id: Id<"toolApprovalRuns">;
     _creationTime: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
@@ -2327,7 +2328,7 @@ export interface IndexNamesByTable {
     prompts: "by_organization_and_favorite" | "by_user_and_favorite";
     rateLimit: "key";
     rateLimits: "by_key";
-    requestedSecrets: "by_userId" | "by_expiresAt" | "by_ref";
+    requestedSecrets: "by_userId" | "by_threadId" | "by_expiresAt" | "by_ref";
     sandboxActions: "by_sessionId_timestamp";
     sandboxSessions: "by_status" | "by_userId" | "by_botId_status" | "by_threadId_status";
     session: "userId" | "token" | "expiresAt_userId";
@@ -2882,6 +2883,7 @@ export interface Insert_aiUserPreferences {
     enableKnowledge?: boolean;
     enablePlanner?: boolean;
     generalProviders?: unknown;
+    mcpSecretHeaders?: Array<{ encryptedValue: string; header: string; server: string; url: string }>;
     mcpServers?: Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>;
     messengerKeys?: unknown;
     modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean };
@@ -3774,7 +3776,7 @@ export interface Insert_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
+    type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -4109,7 +4111,7 @@ export interface Insert_requestedSecrets {
     ref: string;
     status: "saved" | "used";
     threadId: string;
-    use: { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
+    use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;
 }
 
@@ -4564,7 +4566,7 @@ export interface Insert_toolApprovalRuns {
     _id?: Id<"toolApprovalRuns">;
     _creationTime?: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
+    config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> };
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;

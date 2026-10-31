@@ -37,6 +37,12 @@ export const vToolRunConfig = v.object({
     researchDepth: v.union(v.literal("speed"), v.literal("balanced"), v.literal("thorough")),
     searchMode: v.string(),
     shouldAutoContinue: v.boolean(),
+    /**
+     * Who started the turn that paused, when it is not necessarily the thread's owner (a write collaborator's
+     * turn). The continuation runs as the owner, so this is what `setMcpServerSecret` checks before it spends
+     * the owner's secret. Absent on a snapshot written before it existed, which reads as nobody.
+     */
+    startedBy: v.optional(v.string()),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they
