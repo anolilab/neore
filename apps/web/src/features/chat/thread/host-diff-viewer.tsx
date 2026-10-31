@@ -106,8 +106,11 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
         }
     };
 
+    // The selection is commented when the focus is inside it; once the focus has left it, the focused line is.
     const startComment = (index: number) => {
-        setSelection({ anchor: mine?.anchor ?? index, composing: true, file: fileIndex, head: mine?.head ?? index });
+        const inside = mine !== undefined && index >= lo && index <= hi;
+
+        setSelection({ anchor: inside ? mine.anchor : index, composing: true, file: fileIndex, head: inside ? mine.head : index });
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLLIElement>, index: number) => {
@@ -195,7 +198,14 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
         <section aria-label={t`Changes to ${file.path}`} className="border-border rounded-md border">
             <div className="bg-muted/50 flex items-center justify-between gap-2 px-3 py-1">
                 <h3 className="min-w-0 truncate font-mono text-xs font-medium">{file.path}</h3>
-                <Button aria-label={t`Comment on the whole file ${file.path}`} onClick={() => setFileForm(true)} ref={fileFormOpener} size="xs" type="button" variant="ghost">
+                <Button
+                    aria-label={t`Comment on the whole file ${file.path}`}
+                    onClick={() => setFileForm(true)}
+                    ref={fileFormOpener}
+                    size="xs"
+                    type="button"
+                    variant="ghost"
+                >
                     <MessageSquarePlusIcon aria-hidden="true" className="size-3.5" />
                     <Trans>Comment on file</Trans>
                 </Button>

@@ -168,6 +168,20 @@ describe("commenting on a turn's diff", () => {
         expect(statuses.some((node) => node.textContent === "1 comment ready to send to the agent")).toBe(true);
     });
 
+    it("comments on the focused line, not on a selection the focus has left", async () => {
+        mount(PATCH);
+        fireEvent.click(screen.getByRole("button", { name: "Open diff" }));
+
+        const first = await screen.findByRole("option", { name: NEW_LINE });
+
+        act(() => first.focus());
+        fireEvent.keyDown(first, { key: " " });
+        fireEvent.keyDown(first, { key: "ArrowDown" });
+        fireEvent.keyDown(screen.getByRole("option", { name: ANOTHER_LINE }), { key: "Enter" });
+
+        expect(await screen.findByLabelText("Comment on src/a.ts, lines 5")).toBeDefined();
+    });
+
     it("only selects lines of one file, and never a header or hunk line", async () => {
         mount(PATCH);
         fireEvent.click(screen.getByRole("button", { name: "Open diff" }));
