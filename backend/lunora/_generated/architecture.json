@@ -17352,31 +17352,31 @@
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 137,
+      "line": 142,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 505,
+      "line": 510,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 514,
+      "line": 519,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 556,
+      "line": 561,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 562,
+      "line": 567,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
@@ -18306,7 +18306,7 @@
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 83,
+      "line": 84,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
@@ -18546,19 +18546,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 292,
+      "line": 297,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 351,
+      "line": 356,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 496,
+      "line": 501,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {

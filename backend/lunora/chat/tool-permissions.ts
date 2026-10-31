@@ -101,13 +101,18 @@ type QuickCheckCtx = Pick<QueryCtx, "db">;
  * summaries folded in untrusted content: a summary reaches the model as notes in its system prompt, so a web page or
  * tool result that scrolled out of the window still shapes the call (`agent/thread-summary-taint.ts`).
  */
-const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string): Promise<boolean> => {
+const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string, permissionKey?: string): Promise<boolean> => {
     const prefs = await ctx.db
         .query("aiUserPreferences")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .unique();
 
     if (prefs?.autoApproveLowRisk !== true) {
+        return false;
+    }
+
+    // A mode the user set for this tool themselves is theirs to answer, also when they set it while the run was going.
+    if (permissionKey !== undefined && prefs.toolPermissions?.[permissionKey] !== undefined) {
         return false;
     }
 
@@ -130,9 +135,9 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
  * may approve. Read once at run start; each call re-reads it in {@link consumeLowRiskCheck}.
  */
 export const getLowRiskApprovalContext = internalQuery
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    .input({ permissionKey: v.optional(v.string().max(MAX_KEY_LENGTH)), threadId: v.id("threads"), userId: v.string() })
     .output(v.boolean())
-    .query(async ({ args: { threadId, userId }, ctx }) => await quickCheckAllowed(ctx, threadId, userId));
+    .query(async ({ args: { permissionKey, threadId, userId }, ctx }) => await quickCheckAllowed(ctx, threadId, userId, permissionKey));
 
 /**
  * Spends one unit of the user's quick-check budget for ONE call, after re-reading the setting and the thread's

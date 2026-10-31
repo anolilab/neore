@@ -80,7 +80,12 @@ export const createRunLowRiskCheck = (
         record: (toolCallId, record) => {
             approvals[toolCallId] = record;
         },
-        stillAllowed: async () => await ctx.runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, { threadId: threadId as Id<"threads">, userId }),
+        stillAllowed: async (call) =>
+            await ctx.runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, {
+                permissionKey: call.key,
+                threadId: threadId as Id<"threads">,
+                userId,
+            }),
         untrustedContext: () => untrustedContext,
     });
 

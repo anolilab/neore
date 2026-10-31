@@ -263,6 +263,22 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ userId: "someone-else" }))).toBe(false);
     });
 
+    it("is false for a tool the user set a mode for themselves, even mid-run", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const askFor = async (permissionKey: string): Promise<boolean> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey, threadId, userId: USER }));
+
+        expect(await askFor(KEY)).toBe(true);
+
+        await as().mutation(setToolPermission as never, { key: KEY, mode: "ask" } as never);
+
+        expect(await askFor(KEY)).toBe(false);
+        // Another tool is still eligible.
+        expect(await askFor(`${KEY}-other`)).toBe(true);
+    });
+
     it("is false once a context summary of the thread folded in untrusted content", async () => {
         await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
 

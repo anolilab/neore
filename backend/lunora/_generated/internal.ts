@@ -412,7 +412,7 @@ export interface InternalApiTypes {
         };
         tool_permissions: {
             consumeLowRiskCheck: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
-            getLowRiskApprovalContext: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, boolean>;
+            getLowRiskApprovalContext: FunctionReference<"query", { permissionKey?: string; threadId: Id<"threads">; userId: string }, boolean>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;

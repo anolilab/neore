@@ -334,7 +334,7 @@ export interface LowRiskApproverDependencies {
      * Re-reads the setting and the thread's sharing right before an approval: the classifier takes seconds, and a switch
      * made meanwhile must hold for this call. A rejection counts as `false`.
      */
-    stillAllowed: () => Promise<boolean>;
+    stillAllowed: (call: LowRiskCall) => Promise<boolean>;
     /**
      * Whether the prompt carries knowledge-base excerpts, memories, project context or skill text (`loadRunContext`, `injectsSkillText`): text the person
      * did not write in this chat, which reaches the model as instructions. A rejection counts as `true`.
@@ -392,7 +392,7 @@ export const createLowRiskApprover =
                 return done("kept-for-person");
             }
 
-            if (!(await dependencies.stillAllowed().catch(() => false))) {
+            if (!(await dependencies.stillAllowed(call).catch(() => false))) {
                 return done("kept-for-person");
             }
 

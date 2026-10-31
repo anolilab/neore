@@ -4204,13 +4204,6 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_tool_permissions_74.getLowRiskApprovalContext.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "threadId": source["threadId"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_chat_tool_permissions_74.getPendingToolApproval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8538,7 +8531,7 @@ export interface Caller {
         };
         tool_permissions: {
             consumeLowRiskCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
-            getLowRiskApprovalContext: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
+            getLowRiskApprovalContext: (args: { permissionKey?: string; threadId: Id<"threads">; userId: string }) => Promise<boolean>;
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
             getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
             getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
