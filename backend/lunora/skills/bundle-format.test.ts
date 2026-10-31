@@ -73,6 +73,9 @@ const parseOk = (markdown: string) => {
 
 const items = (markdown: string): (BundleItem | undefined)[] => parseOk(markdown).entries.map((entry) => entry.item);
 
+/** A problem that names an over-long field. */
+const LONGER_THAN = /longer than/u;
+
 describe("bundle format round trip", () => {
     it("reproduces skills, triggers and group chats", () => {
         const critic = { ...SKILL, name: "Critic", slug: "critic" };
@@ -145,7 +148,7 @@ describe("hand-edited fields", () => {
         );
         const [entry] = parseOk(markdown).entries;
 
-        expect(entry?.problems.join(" ")).toMatch(/longer than/);
+        expect(entry?.problems.join(" ")).toMatch(LONGER_THAN);
     });
 });
 
