@@ -46,6 +46,20 @@ describe("messageTexts", () => {
     });
 });
 
+describe("a coding agent's image links", () => {
+    const markdown = "see ![chart](out/a.png) and [docs](https://x.dev/y)";
+
+    it("counts the written form of an image the host reply shows literally, and the alt text elsewhere", () => {
+        expect(visibleText(markdown, true)).toBe("see ![chart](out/a.png) and docs");
+        expect(visibleText(markdown)).toBe("see chart and docs");
+
+        const host = { providerMetadata: { neore: { runner: "host" } }, text: markdown, type: "text" };
+
+        expect(findMatches([{ id: "m", parts: [host], role: "assistant" }], "out/a.png")).toEqual([{ messageId: "m", occurrence: 0 }]);
+        expect(findMatches([{ id: "m", parts: [{ text: markdown, type: "text" }], role: "assistant" }], "out/a.png")).toEqual([]);
+    });
+});
+
 describe("visibleText", () => {
     it("drops markdown syntax and keeps what is rendered", () => {
         expect(visibleText("# Title\n**bold** and _it_ and `code`\n- item\n> quote")).toBe("Title\nbold and it and code\nitem\nquote");

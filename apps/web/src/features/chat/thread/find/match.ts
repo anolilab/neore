@@ -3,12 +3,14 @@
  * the list has not mounted (windowed, or not scrolled to) still counts.
  */
 
+import { isHostRunText } from "@neore/chat-ui/utils/host-run-text";
+
 /** The longest query searched; a pasted paragraph is not a search. */
 export const MAX_FIND_QUERY_LENGTH = 200;
 
 export interface FindableMessage {
     id: string;
-    parts: ReadonlyArray<{ text?: string; type: string }>;
+    parts: ReadonlyArray<{ providerMetadata?: unknown; text?: string; type: string }>;
     role: string;
     status?: string;
 }
@@ -19,14 +21,26 @@ export interface FindMatch {
     occurrence: number;
 }
 
+const IMAGE = /!\[[^\]]*\]\([^()]*\)/gu;
+
 const isFenceLine = (line: string): boolean => line.trimStart().startsWith("```") || line.trimStart().startsWith("~~~");
 
 /**
  * The text a reader sees of one markdown part: link targets, code fences, emphasis marks and line prefixes
  * are syntax, not text, so a query is not counted against them.
  */
-export const visibleText = (markdown: string): string =>
-    markdown
+export const visibleText = (markdown: string, literalImages = false): string => {
+    // A coding agent's reply shows its Markdown images as written (`hostMarkdownComponents`): set them aside whole.
+    const images: string[] = [];
+    const source = literalImages
+        ? markdown.replaceAll(IMAGE, (image) => {
+              images.push(image);
+
+              return `\u{E000}${String(images.length - 1)}\u{E001}`;
+          })
+        : markdown;
+
+    return source
         .split("\n")
         .map((line) => (isFenceLine(line) ? "" : line))
         .join("\n")
@@ -40,11 +54,13 @@ export const visibleText = (markdown: string): string =>
         .replaceAll(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/gu, "$2")
         .replaceAll(/\*(?=\S)([^*]+)(?<=\S)\*/gu, "$1")
         .replaceAll(/\b_(?=\S)([^_]+)(?<=\S)_\b/gu, "$1")
-        .replaceAll(/~~(.+?)~~/gu, "$1");
+        .replaceAll(/~~(.+?)~~/gu, "$1")
+        .replaceAll(/\u{E000}(\d+)\u{E001}/gu, (_, index: string) => images[Number(index)] ?? "");
+};
 
 /** What a reader sees of a message, one entry per text part: reasoning, tools and files are not searched. */
 export const messageTexts = (message: FindableMessage): string[] =>
-    message.parts.flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [visibleText(part.text)] : []));
+    message.parts.flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [visibleText(part.text, isHostRunText(part))] : []));
 
 const REGEXP_SPECIALS = /[$()*+.?[\\\]^{|}]/g;
 
