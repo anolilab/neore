@@ -263,6 +263,7 @@ interface RunState {
     pause: { from: string; id: string; provider?: string; reason: string; retryAt: number; status: number } | undefined;
     pausedSteps: string[] | undefined;
     rows: { id: string; order: number; parent: string | undefined; role: string; status: string; stepOrder: number }[];
+    steers: { id: string; status: string; text?: string }[] | undefined;
     streamStatus: string | undefined;
     threadStatus: string | undefined;
 }
@@ -294,6 +295,7 @@ const readState = async (): Promise<RunState> =>
                     stepOrder: row.stepOrder,
                 };
             }),
+            steers: stream?.steers,
             streamStatus: stream?.status,
             threadStatus: thread?.status,
         };
@@ -736,6 +738,33 @@ describe("one reply, however many pauses", () => {
         expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ replyKey: state.rows[1]!.id, tokens: 24 });
     });
 
+    it("still records the whole reply when the resumed run fails after saving a step", async () => {
+        modelState.withTools = true;
+        modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), toolCallStep("echo", "call-2"), new Error("the provider fell over")]);
+
+        await run();
+
+        const paused = await readState();
+
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+        const { calls } = vi.mocked(scheduleReplyUsage).mock;
+
+        // The resume saved the second tool step, then failed on the next call (its row is the failed one at the end).
+        expect(state.rows.map((row) => [row.role, row.status])).toStrictEqual([
+            ["user", "success"],
+            ["assistant", "success"],
+            ["tool", "success"],
+            ["assistant", "success"],
+            ["tool", "success"],
+            ["assistant", "failed"],
+        ]);
+        expect(calls).toHaveLength(1);
+        // One reply keyed on the row it began with, counting the step saved before the pause and the one saved after it.
+        expect(calls[0]![1]).toMatchObject({ replyKey: paused.rows[1]!.id, tokens: 16 });
+    });
+
     it("records the finished steps once when the run is stopped after its resume", async () => {
         modelState.withTools = true;
         modelState.model = planned([toolCallStep("echo", "call-1"), rateLimited(), rateLimited()]);
@@ -861,6 +890,10 @@ describe("a pause that never resumes", () => {
 
         const paused = await readState();
 
+        // A follow-up typed during the pause is still queued on the stream, and nothing will ever take it.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(ids.streamId, { steers: [{ id: "steer-1", status: "queued", text: "also add a joke" }] });
+        });
         // A later reply to the same prompt got its own stream, and has finished since.
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("persistentStreams", {
@@ -881,6 +914,7 @@ describe("a pause that never resumes", () => {
         expect(state.threadStatus).toBe("active");
         expect(state.rows.map((row) => row.role)).toStrictEqual(["user", "assistant", "tool"]);
         expect(state.chunkText).not.toContain("All done.");
+        expect(state.steers).toStrictEqual([{ id: "steer-1", status: "queued" }]);
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 

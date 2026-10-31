@@ -121,6 +121,8 @@ export const runStreamingAgent = internalAction
 
         const startTime = Date.now();
         let mcpClients: import("@ai-sdk/mcp").MCPClient[] = [];
+        // The rows this invocation has saved so far, for a failure that reaches the outer catch before `recordRun`.
+        let savedSoFar: () => typeof priorRows = () => [];
 
         const { customSystemPrompt, model: requestedModel, reasoningEffort, statelessMode } = streamingConfig;
         // Reassigned once, when an invoked skill names a preferred model.
@@ -383,6 +385,8 @@ export const runStreamingAgent = internalAction
                 takeSteer: steering.takeSteer,
             });
 
+            savedSoFar = () => result.savedMessages ?? [];
+
             // Write chunks to persistent storage (DB only, no HTTP response)
             const timingStart = Date.now();
             let piped: PipedStream;
@@ -539,13 +543,15 @@ export const runStreamingAgent = internalAction
 
             await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "error" });
 
-            // A run that failed after its pause still answered with the steps from before it: those are its reply.
-            scheduleRepliesUsage(ctx.scheduler as never, priorRows, {
-                at: Date.now(),
-                userId,
-                ...(before.skill && { skill: before.skill }),
-                ...(before.timeZone && { timeZone: before.timeZone }),
-            });
+            // A run that failed after its pause still answered with the steps from before it, and with any it saved since: those are its reply.
+            if (priorRows.length > 0) {
+                scheduleRepliesUsage(ctx.scheduler as never, [...priorRows, ...savedSoFar()], {
+                    at: Date.now(),
+                    userId,
+                    ...(before.skill && { skill: before.skill }),
+                    ...(before.timeZone && { timeZone: before.timeZone }),
+                });
+            }
         } finally {
             await closeMCPClients(mcpClients);
         }

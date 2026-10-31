@@ -28,6 +28,18 @@ describe("GatewayLanguageModel carries a provider rate limit", () => {
         });
     });
 
+    it("the same for a call made with the user's own key (BYOK)", async () => {
+        const model = new GatewayLanguageModel({
+            gateway: async () => Response.json({ error: { message: "slow down", rateLimit: { retryAt: RETRY_AT, status: 429 } } }, { status: 502 }),
+            modelApiId: "m",
+            modelId: "m",
+            provider: "anthropic",
+            providerApiKey: "sk-user",
+        });
+
+        await expect(model.doGenerate(OPTIONS)).rejects.toMatchObject({ rateLimit: { provider: "anthropic", retryAt: RETRY_AT, status: 429 } });
+    });
+
     it("from an error event sent after the 200", async () => {
         const body = `data: ${JSON.stringify({ error: "slow down", fallbackReason: "infra", rateLimit: { retryAt: RETRY_AT, status: 429 }, type: "error" })}\n\n`;
         const { stream } = await modelAnswering(new Response(body, { status: 200 })).doStream(OPTIONS);

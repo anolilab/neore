@@ -677,7 +677,10 @@ const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
 const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
     await recordPausedRunUsage(ctx, stream);
-    await patchRow(ctx.db, stream, { pausedRun: undefined, status: "done" });
+    // No run will take a follow-up typed during the pause: its text goes, as on every other end of a stream.
+    const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
+    await patchRow(ctx.db, stream, { pausedRun: undefined, status: "done", ...(steers && { steers }) });
 
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: 2,
