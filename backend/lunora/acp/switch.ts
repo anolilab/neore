@@ -28,7 +28,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import { leafRowOf, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
 import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agent/agent-switch-validators";
-import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError } from "../agent/handoff";
+import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
 import { collectHandoffSource } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -56,7 +56,7 @@ import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
-import { HOST_HANDOFF_MAX_BYTES } from "./lib/pending-handoff";
+import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, startHostSessionIn, webSessionId } from "./lib/start";
 import { liveHostStream } from "./remote";
@@ -128,14 +128,18 @@ const currentAgent = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<
 /** The newest turns of the thread as the handoff text of a switch to `target`; empty when the thread has no turn with text. */
 const handoffFor = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<"messages">, target: ResolvedTarget): Promise<string> => {
     const source = await collectHandoffSource(ctx, thread._id, leaf);
-
-    if (source.turns.length === 0) {
-        return "";
-    }
-
     // A cloud thread is sent its handoff as a message of its own, with the room a cloud handoff has anywhere; a computer is
     // sent it in front of the prompt, inside the signed call.
     const maxBytes = target.kind === "host" ? HOST_HANDOFF_MAX_BYTES : HANDOFF_BUDGET_TOKENS * CHARACTERS_PER_TOKEN;
+
+    if (source.turns.length === 0) {
+        // A thread that took over and has said nothing since holds the conversation only in its own handoff: pass that on.
+        const carried = (await pendingHandoffOf(ctx, thread)) ?? "";
+
+        return jsonBytes(carried) <= maxBytes
+            ? carried
+            : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
+    }
 
     try {
         return composeTailHandoff(source.turns, maxBytes, source.omittedEarlier);
@@ -164,36 +168,100 @@ const insertFirstDivider = async (
     return messageId;
 };
 
+/** Continuation relationships read per page when a repeated click looks for its thread, and the pages it may read. */
+const CLICK_LOOKUP_PAGE = 50;
+const CLICK_LOOKUP_PAGES = 20;
+
 /** The thread a repeated click already made, for a switch that forks. */
 const forkOfEarlierClick = async (
     ctx: MutationCtx,
-    args: { claimedAt: number; clientId: string; target: ResolvedTarget; thread: Doc<"threads">; userId: string },
+    args: { claimedAt: number; clientId: string; target: SwitchArgs["target"]; thread: Doc<"threads">; userId: string },
 ): Promise<string | undefined> => {
     if (args.target.kind === "host") {
         const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.thread._id });
-        const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: args.target.device._id, hostSessionId } });
+        const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: args.target.hostId, hostSessionId } });
 
         return first?.threadId as string | undefined;
     }
 
-    // The claim is taken last, in the transaction that made the thread: the newest child at or before it is this click's.
-    const { page } = await ctx.db.threadRelationships.findMany({
-        limit: 10,
-        orderBy: [{ _creationTime: "desc" }],
-        where: { branchType: "continuation", parentThreadId: args.thread._id },
-    });
+    // The claim is taken last, in the transaction that made the thread: the newest child at or before it is this click's,
+    // however many later switches from the same thread sit in front of it.
+    let cursor: string | undefined;
 
-    return page.find((relationship) => relationship._creationTime <= args.claimedAt)?.threadId as string | undefined;
+    for (let pages = 0; pages < CLICK_LOOKUP_PAGES; pages += 1) {
+        const { continueCursor, isDone, page } = await ctx.db.threadRelationships.findMany({
+            cursor,
+            limit: CLICK_LOOKUP_PAGE,
+            orderBy: [{ _creationTime: "desc" }],
+            where: { branchType: "continuation", parentThreadId: args.thread._id },
+        });
+        const hit = page.find((relationship) => relationship._creationTime <= args.claimedAt);
+
+        if (hit) {
+            return hit.threadId as string;
+        }
+
+        if (isDone) {
+            return undefined;
+        }
+
+        cursor = continueCursor ?? undefined;
+    }
+
+    return undefined;
 };
-
-export interface HostSwitchArgs extends SwitchArgs {
-    unlockProof?: string;
-}
 
 /** What a repeated click answers: nothing more happened. */
 const ALREADY = (agent: SwitchAgentRef, forkedThreadId?: string): SwitchResult => {
     return { agent, coldStartCostly: false, messageId: null, switched: false, ...(forkedThreadId !== undefined && { forkedThreadId }) };
 };
+
+/**
+ * What a repeated click answers: nothing more happened. A switch that forked is answered with the thread it made and the
+ * agent that thread runs, read back from the thread itself, so a computer that has since gone offline, or lost the offer,
+ * does not turn a retry into a refusal. A click id reused for another agent is refused rather than answered with the
+ * first one's thread.
+ */
+const answerRepeatedClick = async (
+    ctx: MutationCtx,
+    args: {
+        claimedAt: number;
+        clientId: string;
+        current: SwitchAgentRef;
+        forks: boolean;
+        target: SwitchArgs["target"];
+        thread: Doc<"threads">;
+        userId: string;
+    },
+): Promise<SwitchResult> => {
+    const forkedThreadId = args.forks ? await forkOfEarlierClick(ctx, args) : undefined;
+
+    if (forkedThreadId === undefined) {
+        return ALREADY(args.current);
+    }
+
+    const forkId = ctx.db.normalizeId("threads", forkedThreadId);
+    const session = args.target.kind === "host" && forkId ? await sessionOfThread(ctx, forkId) : null;
+    const fork = forkId ? await ctx.db.threads.findFirst({ where: { _id: forkId } }) : null;
+
+    if (args.target.kind === "model") {
+        if (fork?.activeAgent?.model !== args.target.model) {
+            return refuse(AGENT_SWITCH_UNSUPPORTED, "That switch was already made for a different agent");
+        }
+
+        return ALREADY({ kind: "model", model: args.target.model }, forkedThreadId);
+    }
+
+    if (!session || session.agentKey !== args.target.agentKey || session.folderId !== args.target.folderId || session.deviceId !== args.target.hostId) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "That switch was already made for a different agent");
+    }
+
+    return ALREADY(sessionRefOf(session), forkedThreadId);
+};
+
+export interface HostSwitchArgs extends SwitchArgs {
+    unlockProof?: string;
+}
 
 /** `commitHostSwitch`'s body, with the caller passed in so the harness can drive it. */
 export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitchArgs): Promise<SwitchResult> => {
@@ -218,7 +286,6 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         return refuse(AGENT_SWITCH_UNSUPPORTED, hasFixedAgent(thread) ? "This chat runs on a fixed agent" : "Not a coding-agent switch");
     }
 
-    const target = await resolveTarget(ctx, args, now);
     const leaf = await leafRowOf(ctx, thread);
     const current = leaf ? await currentAgent(ctx, thread, leaf) : null;
 
@@ -228,18 +295,26 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
 
     const claimKey = claimKeyOf(args);
     const claimedAt = await claimedAtOf(ctx, "switch", claimKey);
-    const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
     // Across the runner, as opposed to host to host, which stays in the thread.
-    const toHost = target.kind === "host";
+    const toHost = args.target.kind === "host";
     const forks = fromHost !== toHost;
 
-    // A click already answered: the same answer, not a second thread.
+    // A click already answered: the same answer, not a second thread. Before the target is looked up, which needs the
+    // computer to be online and to still offer the pair.
     if (claimedAt !== null) {
-        return ALREADY(
-            current.agent,
-            forks ? await forkOfEarlierClick(ctx, { claimedAt, clientId: args.clientId, target, thread, userId: args.userId }) : undefined,
-        );
+        return await answerRepeatedClick(ctx, {
+            claimedAt,
+            clientId: args.clientId,
+            current: current.agent,
+            forks,
+            target: args.target,
+            thread,
+            userId: args.userId,
+        });
     }
+
+    const target = await resolveTarget(ctx, args, now);
+    const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
 
     if (fromHost) {
         if (await liveHostStream(ctx, thread._id)) {

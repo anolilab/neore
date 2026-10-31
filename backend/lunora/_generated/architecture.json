@@ -31,11 +31,6 @@
       "to": "table:persistentStreams"
     },
     {
-      "from": "function:acp_remote:startHostSession",
-      "kind": "write",
-      "to": "table:acpSessions"
-    },
-    {
       "from": "function:acp_upload:finalizeHostUpload",
       "kind": "call",
       "to": "function:lib_action_cache:get"
@@ -7515,6 +7510,20 @@
       "id": "function:acp_send:sendToHost",
       "kind": "function",
       "name": "acp.send.sendToHost",
+      "module": "acp"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:acp_switch:commitHostSwitch",
+      "kind": "function",
+      "name": "acp.switch.commitHostSwitch",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
+      "id": "function:acp_switch:isHostSwitchSource",
+      "kind": "function",
+      "name": "acp.switch.isHostSwitchSource",
       "module": "acp"
     },
     {
@@ -17455,8 +17464,14 @@
     {
       "file": "acp/lib/sessions",
       "kind": "write",
-      "line": 25,
+      "line": 29,
       "reason": "\"touchSession\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/start",
+      "kind": "write",
+      "line": 42,
+      "reason": "\"startHostSessionIn\" is not a registered function"
     },
     {
       "file": "acp/lib/thread-removed",
@@ -17473,8 +17488,14 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 208,
+      "line": 220,
       "reason": "\"hostSendHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/switch",
+      "kind": "write",
+      "line": 433,
+      "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
       "file": "acp/upload-http",
@@ -18325,7 +18346,7 @@
     {
       "file": "agent/thread-summary-taint",
       "kind": "read",
-      "line": 17,
+      "line": 19,
       "reason": "\"threadSummaryTaint\" is not a registered function"
     },
     {
@@ -18661,37 +18682,49 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 541,
+      "line": 556,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 559,
+      "line": 575,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 570,
+      "line": 576,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 589,
+      "line": 585,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 612,
+      "line": 596,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 615,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 638,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 613,
+      "line": 639,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -20137,19 +20170,19 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 73,
+      "line": 83,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 103,
+      "line": 113,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "schedule",
-      "line": 105,
+      "line": 115,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {

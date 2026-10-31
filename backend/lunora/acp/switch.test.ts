@@ -63,6 +63,7 @@ const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
+const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -593,6 +594,72 @@ describe("the session id of a switch", () => {
         // A repeat of either click is answered with its own thread.
         expect((await switchTo(sourceA, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(first.forkedThreadId);
         expect((await switchTo(sourceB, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(second.forkedThreadId);
+    });
+});
+
+describe("a repeated click", () => {
+    const takeOffline = async (device: Device) => {
+        await run(async (ctx) => {
+            await ctx.db.patch(device.deviceId as never, { lastSeenAt: 1 } as never);
+        });
+    };
+
+    it("is answered with the thread and the agent the first one made, whatever became of the computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const first = await switchTo(source, hostTarget(device), ownerId, "retry");
+
+        await takeOffline(device);
+
+        const again = await switchTo(source, hostTarget(device), ownerId, "retry");
+
+        expect(again).toMatchObject({ agent: { agentKey: "codex", kind: "host" }, forkedThreadId: first.forkedThreadId, switched: false });
+    });
+
+    it("names the model it switched to, for a thread that leaves a computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const first = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "retry");
+        const again = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "retry");
+
+        expect(again).toMatchObject({ agent: { kind: "model", model: OTHER_MODEL }, forkedThreadId: first.forkedThreadId, switched: false });
+    });
+
+    it("still finds its thread after more than a page of later switches from the same source", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const first = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "old-click");
+
+        for (let index = 0; index < 12; index += 1) {
+            await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, `later-${String(index)}`);
+        }
+
+        expect((await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "old-click")).forkedThreadId).toBe(first.forkedThreadId);
+    });
+
+    it("is refused when the same click id comes back for another agent", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await switchTo(source, hostTarget(device, CODEX), ownerId, "reused");
+        await expect(switchTo(source, hostTarget(device, CLAUDE), ownerId, "reused")).rejects.toThrow(DIFFERENT_AGENT);
+        expect(await rows("threads")).toHaveLength(2);
+    });
+});
+
+describe("a handoff carried through a thread with no turns of its own", () => {
+    it("keeps the conversation when a thread taken over from a model hands on before its agent has said anything", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+
+        await openStartedSession(device, forkedThreadId as string);
+
+        const back = await switchTo(forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const [divider] = await dividers(back.forkedThreadId as string);
+
+        expect(divider?.handoff).toContain("question 0");
+        expect(divider?.handoff).toContain("answer 2");
     });
 });
 
