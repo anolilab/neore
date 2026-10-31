@@ -37,7 +37,13 @@ const vWatched = v.object({
 });
 
 const rowFor = async (ctx: Pick<QueryCtx, "db">, userId: string, repo: string): Promise<Doc<"watchedRepositories"> | null> => {
-    const wanted = repo.toLowerCase();
+    // The same text `watchRepo` accepts (a URL, a `.git` suffix); text that is no repository matches no row.
+    const wanted = DEVELOP_DRIVER.normalizeRepository(repo)?.toLowerCase();
+
+    if (wanted === undefined) {
+        return null;
+    }
+
     const rows = await ctx.db
         .query("watchedRepositories")
         .withIndex("by_user_and_repository", (q) => q.eq("userId", userId).eq("hostOrigin", DEVELOP_DRIVER.webOrigin))
@@ -151,7 +157,12 @@ export const unwatchRepo = authMutation
 export const enableWatchWebhook = authMutation
     .use(rateLimit("sourceControl/watch"))
     .input({ repository: v.string().max(MAX_LENGTH.short) })
-    .output(v.union(v.object({ id: v.string(), secret: v.string(), status: v.literal("ok") }), v.object({ status: v.union(v.literal("not_found"), v.literal("unsupported")) })))
+    .output(
+        v.union(
+            v.object({ id: v.string(), secret: v.string(), status: v.literal("ok") }),
+            v.object({ status: v.union(v.literal("not_found"), v.literal("unsupported")) }),
+        ),
+    )
     .mutation(async ({ args, ctx }) => {
         // A host whose deliveries we cannot verify has no webhook to set up.
         if (DEVELOP_DRIVER.webhookScheme === null) {

@@ -12,7 +12,7 @@ const { calls, state } = vi.hoisted(() => {
     return {
         calls: { disableWebhook: vi.fn(), enableWebhook: vi.fn(), unwatch: vi.fn(), watch: vi.fn() },
         state: {
-            current: { data: undefined, isPending: false } as { data?: unknown; isPending: boolean },
+            current: { data: undefined, isPending: false } as { data?: unknown; isError?: boolean; isPending: boolean },
             results: {} as Record<string, unknown>,
         },
     };
@@ -100,6 +100,15 @@ describe("WatchedRepositories", () => {
         fireEvent.click(screen.getByText("Fix it"));
 
         expect(onSelect).toHaveBeenCalledWith("octo/hello", 7);
+    });
+
+    it("says so when the list cannot be loaded, instead of showing nothing", () => {
+        state.current = { data: undefined, isError: true, isPending: false };
+
+        render(<WatchedRepositories onSelect={vi.fn()} webhooks />);
+
+        expect(screen.getByRole("alert").textContent).toBe("Your watched repositories could not be loaded.");
+        expect(screen.queryByText("You are not watching any repository.")).toBeNull();
     });
 
     it("watches the typed repository and stops one by name", () => {

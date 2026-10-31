@@ -21,10 +21,17 @@ import {
 import { POLL_INTERVAL_MS, POLL_INTERVAL_WITH_WEBHOOK_MS, POLL_LEASE_MS } from "./freshness-logic";
 import { hostPoll, runRepoPoll } from "./freshness-poll";
 import { disableWatchWebhook, enableWatchWebhook, listWatchedRepositories, unwatchRepo, watchRepo } from "./freshness";
-import { handleWatchWebhook } from "./webhook";
+import { runShardTick } from "../lib/shard-housekeeping";
+import { handleWatchWebhook, routeWatchWebhook } from "./webhook";
 
-const { noteShardDue, registry } = vi.hoisted(() => {
-    return { noteShardDue: vi.fn(async (..._arguments: unknown[]) => undefined), registry: new Map<string, unknown>() };
+const { checkRateLimit, noteShardDue, registry } = vi.hoisted(() => {
+    return {
+        checkRateLimit: vi.fn(async (..._arguments: unknown[]): Promise<{ ok: boolean }> => {
+            return { ok: true };
+        }),
+        noteShardDue: vi.fn(async (..._arguments: unknown[]) => undefined),
+        registry: new Map<string, unknown>(),
+    };
 });
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -36,12 +43,20 @@ const { sessionFrom } = vi.hoisted(() => {
 
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
+// The shard crossing is its own suite's business: here the handler simply runs on the context it is given.
+vi.mock("../lib/http-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/http-shard")>()),
+        onRoutedShard: async (context: unknown, _kind: string, _value: string, handler: (shardCtx: unknown) => Promise<unknown>) => await handler(context),
+    };
+});
+
 vi.mock("../lib/shard-housekeeping", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/shard-housekeeping")>()), noteShardDue };
 });
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), checkRateLimit: async () => {return { ok: true }} };
+    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), checkRateLimit };
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -63,6 +78,10 @@ vi.mock("../auth", async (importOriginal) => {
 
 beforeAll(async () => {
     registerModule(registry, "source_control_freshness_internal", await import("./freshness-internal"));
+    registerModule(registry, "triggers_schedule", await import("../triggers/schedule"));
+    registerModule(registry, "triggers_functions", await import("../triggers/functions"));
+    registerModule(registry, "triggers_events", await import("../triggers/events"));
+    registerModule(registry, "acp_ingest", await import("../acp/ingest"));
 });
 
 const NOW = 1_800_000_000_000;
@@ -75,6 +94,7 @@ let harness: ReturnType<typeof lunoraTest>;
 beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     noteShardDue.mockClear();
+    checkRateLimit.mockClear();
     harness = lunoraTest(schema as never);
 });
 
@@ -146,7 +166,12 @@ const fakeHost = () => {
     };
 };
 
-const TOKEN = { accessToken: "t", renew: async () => {return { problem: "expired" as const }} };
+const TOKEN = {
+    accessToken: "t",
+    renew: async () => {
+        return { problem: "expired" as const };
+    },
+};
 
 // ─── Driving a repository the way the shard does ─────────────────────────────
 
@@ -299,7 +324,12 @@ describe("a repository the user stops watching", () => {
             async (ctx: any) =>
                 await ctx.runMutation(recordRepoPoll, {
                     lease,
-                    outcome: { etag: 'W/"9"', kind: "changed", login: "me", requested: [{ authorLogin: "a", number: 5, title: "T", updatedAt: 1, url: "https://github.com/o/r/pull/5" }] },
+                    outcome: {
+                        etag: 'W/"9"',
+                        kind: "changed",
+                        login: "me",
+                        requested: [{ authorLogin: "a", number: 5, title: "T", updatedAt: 1, url: "https://github.com/o/r/pull/5" }],
+                    },
                     watchId,
                 }),
         );
@@ -439,7 +469,11 @@ describe("a webhook", () => {
     const deliver = async (watchId: string, body: string, signature: string | null): Promise<Response> =>
         await handleWatchWebhook(
             context as never,
-            new Request(`https://x/source-control/webhook/${watchId}`, { body, headers: signature === null ? {} : { [SECRET_HEADER]: signature }, method: "POST" }),
+            new Request(`https://x/source-control/webhook/${watchId}`, {
+                body,
+                headers: signature === null ? {} : { [SECRET_HEADER]: signature },
+                method: "POST",
+            }),
             watchId,
         );
 
@@ -568,12 +602,97 @@ describe("a webhook", () => {
         expect((await rowOf()).nextPollAt).toBe(NOW + POLL_LEASE_MS);
 
         advance(NOW + 200);
-        await harness.run(
-            async (ctx: any) => await ctx.runMutation(recordRepoPoll, { lease, outcome: { kind: "not_modified" }, watchId }),
-        );
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordRepoPoll, { lease, outcome: { kind: "not_modified" }, watchId }));
 
         expect(await rowOf()).toMatchObject({ dirtyAt: NOW + 100, nextPollAt: NOW + 200 });
         expect(host.calls).toEqual([]);
+    });
+
+    it("stops reading a body that runs past the cap, whatever it says about its length", async () => {
+        const { id, secret } = await enable();
+        const chunk = new Uint8Array(256 * 1024);
+        let pulled = 0;
+        // No Content-Length (a chunked body): only counting while reading can stop it.
+        const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                pulled += chunk.byteLength;
+                controller.enqueue(chunk);
+            },
+        });
+        const response = await handleWatchWebhook(
+            context as never,
+            new Request(`https://x/source-control/webhook/${id}`, {
+                body,
+                duplex: "half",
+                headers: { [SECRET_HEADER]: await hmac(secret, "{}") },
+                method: "POST",
+            } as RequestInit),
+            id,
+        );
+
+        expect(response.status).toBe(413);
+        // The cap is 1 MiB; the reader may hold a few chunks past it, never the stream.
+        expect(pulled).toBeLessThanOrEqual(8 * 1024 * 1024);
+    });
+
+    it("refuses a missing signature before it reads any of the body", async () => {
+        const { id } = await enable();
+        let pulled = false;
+        const body = new ReadableStream<Uint8Array>(
+            {
+                pull(controller) {
+                    pulled = true;
+                    controller.enqueue(new Uint8Array(16));
+                    controller.close();
+                },
+            },
+            { highWaterMark: 0 },
+        );
+        const response = await handleWatchWebhook(
+            context as never,
+            new Request(`https://x/source-control/webhook/${id}`, { body, duplex: "half", method: "POST" } as RequestInit),
+            id,
+        );
+
+        expect(response.status).toBe(401);
+        expect(pulled).toBe(false);
+    });
+
+    it("is charged to the sender's address before the watch is read, so an unproven caller costs the owner's shard nothing", async () => {
+        const { id, secret } = await enable();
+        const reads: unknown[] = [];
+        const counting = {
+            ...context,
+            runQuery: async (reference: unknown, args: unknown) => {
+                reads.push(reference);
+
+                return await context.runQuery(reference, args);
+            },
+        };
+        const body = "{}";
+        const send = async (): Promise<Response> =>
+            await routeWatchWebhook(
+                counting as never,
+                new Request(`https://x/source-control/webhook/${id}`, {
+                    body,
+                    headers: { "cf-connecting-ip": "203.0.113.9", [SECRET_HEADER]: await hmac(secret, body) },
+                    method: "POST",
+                }),
+                id,
+            );
+
+        checkRateLimit.mockResolvedValueOnce({ ok: false });
+
+        const refused = await send();
+
+        expect(refused.status).toBe(429);
+        expect(reads).toEqual([]);
+        expect(checkRateLimit).toHaveBeenCalledWith(counting, "sourceControl/webhookIp", expect.objectContaining({ key: "203.0.113.9" }));
+
+        // Under the limit it goes on to the handler, which still charges the watch once the sender is proven.
+        expect((await send()).status).toBe(202);
+        expect(reads.length).toBeGreaterThan(0);
+        expect(checkRateLimit).toHaveBeenCalledWith(expect.anything(), "sourceControl/webhook", expect.objectContaining({ key: id }));
     });
 
     it("stores the secret encrypted and returns it only when it is issued", async () => {
@@ -599,7 +718,7 @@ describe("watching", () => {
     it("is the caller's own: another user's row is invisible and cannot be removed", async () => {
         await watch(REPO, USER);
 
-        expect((await as(OTHER).query(listWatchedRepositories as never, {} as never) as any).watched).toEqual([]);
+        expect(((await as(OTHER).query(listWatchedRepositories as never, {} as never)) as any).watched).toEqual([]);
         expect(await as(OTHER).mutation(unwatchRepo as never, { repository: REPO } as never)).toEqual({ removed: false });
         expect(await rowOf()).toBeDefined();
     });
@@ -618,6 +737,17 @@ describe("watching", () => {
 
         expect(await harness.run(async (ctx: any) => await ctx.db.query("watchedRepositories").collect())).toHaveLength(20);
         expect(await as(USER).mutation(watchRepo as never, { repository: "octo/one-more" } as never)).toEqual({ status: "limit" });
+    });
+
+    it("accepts the same text everywhere: padding around the address still reaches the row watchRepo stored", async () => {
+        await watch("octo/hello");
+
+        const issued: any = await as(USER).mutation(enableWatchWebhook as never, { repository: " Octo/hello " } as never);
+
+        expect(issued.status).toBe("ok");
+        expect(await as(USER).mutation(disableWatchWebhook as never, { repository: "octo/hello\n" } as never)).toEqual({ disabled: true });
+        expect(await as(USER).mutation(unwatchRepo as never, { repository: "  OCTO/hello" } as never)).toEqual({ removed: true });
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("watchedRepositories").collect())).toEqual([]);
     });
 
     it("arms the shard so the first poll happens at the next tick", async () => {
@@ -697,12 +827,117 @@ describe("a host that cannot be read", () => {
     });
 });
 
+describe("the shard tick", () => {
+    it("polls a watched repository: the tick dispatches it, and the poll it scheduled reads and records the row", async () => {
+        const host = fakeHost();
+
+        await watch();
+        advance(NOW);
+        await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {}));
+
+        const jobs = harness.scheduler.list().filter((job) => (job.args as { watchId?: string }).watchId !== undefined);
+
+        // One poll was scheduled by the tick itself, not by any call in this test.
+        expect(jobs).toHaveLength(1);
+
+        const { lease, watchId } = jobs[0]!.args as { lease: number; watchId: string };
+
+        await runRepoPoll(
+            {
+                fetch: hostPoll(githubDriver, TOKEN, host.via),
+                read: async () => await harness.run(async (ctx: any) => await ctx.runQuery(getWatchForPoll, { watchId })),
+                record: async (outcome) => await harness.run(async (ctx: any) => await ctx.runMutation(recordRepoPoll, { lease, outcome, watchId })),
+            },
+            lease,
+        );
+
+        expect(await rowOf()).toMatchObject({ etag: 'W/"1"', leasedAt: 0, seeded: true });
+        expect(host.calls.map((call) => call.path)).toEqual(["/user", "/repos/octo/hello/pulls"]);
+    });
+});
+
+describe("a poll that throws something other than a host error", () => {
+    it("is recorded as a host error, so the others still poll and the failed one backs off", async () => {
+        const host = fakeHost();
+
+        await watch("octo/hello");
+        await watch("octo/second");
+        advance(NOW);
+        await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueRepoPolls, {}));
+
+        const polled: string[] = [];
+
+        for (const job of harness.scheduler.list()) {
+            const { lease, watchId } = job.args as { lease: number; watchId: string };
+
+            await runRepoPoll(
+                {
+                    fetch: async (target) => {
+                        polled.push(target.repository);
+
+                        // What a driver's response parser throws on a body of the wrong shape: not a HostApiError.
+                        if (target.repository === "octo/hello") {
+                            throw new TypeError("not the shape we expected");
+                        }
+
+                        return await hostPoll(githubDriver, TOKEN, host.via)(target);
+                    },
+                    read: async () => await harness.run(async (ctx: any) => await ctx.runQuery(getWatchForPoll, { watchId })),
+                    record: async (outcome) => await harness.run(async (ctx: any) => await ctx.runMutation(recordRepoPoll, { lease, outcome, watchId })),
+                },
+                lease,
+            );
+        }
+
+        const failed = await rowOf("octo/hello");
+
+        expect(polled.toSorted((a, b) => a.localeCompare(b))).toEqual(["octo/hello", "octo/second"]);
+        expect(failed).toMatchObject({ lastStatus: "host_error", leasedAt: 0 });
+        expect(failed.nextPollAt).toBeGreaterThan(NOW + POLL_INTERVAL_MS);
+        expect(await rowOf("octo/second")).toMatchObject({ lastStatus: "ok", seeded: true });
+    });
+
+    it("does not stop a refresh at the first repository that throws", async () => {
+        await watch("octo/hello");
+        await watch("octo/second");
+
+        const leased: { lease: number; watchId: string }[] = await harness.run(
+            async (ctx: any) => await ctx.runMutation(leaseWatchedRepositoriesForRefresh, { userId: USER }),
+        );
+        const recorded: unknown[] = [];
+
+        for (const { lease, watchId } of leased) {
+            await runRepoPoll(
+                {
+                    fetch: async (target) => {
+                        if (target.repository === "octo/hello") {
+                            throw new TypeError("not the shape we expected");
+                        }
+
+                        return { poll: { status: "not_modified" }, status: "ok" } as never;
+                    },
+                    read: async () => await harness.run(async (ctx: any) => await ctx.runQuery(getWatchForPoll, { watchId })),
+                    record: async (outcome) => {
+                        recorded.push(outcome);
+                    },
+                },
+                lease,
+            );
+        }
+
+        expect(recorded).toEqual(expect.arrayContaining([{ kind: "failed", status: "host_error" }, { kind: "not_modified" }]));
+        expect(recorded).toHaveLength(2);
+    });
+});
+
 describe("acceptWatchDelivery", () => {
     it("is not found for a row without a webhook", async () => {
         await watch();
 
         const row = await rowOf();
 
-        expect(await harness.run(async (ctx: any) => await ctx.runMutation(acceptWatchDelivery, { signature: "a".repeat(64), watchId: row._id }))).toBe("not_found");
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(acceptWatchDelivery, { signature: "a".repeat(64), watchId: row._id }))).toBe(
+            "not_found",
+        );
     });
 });

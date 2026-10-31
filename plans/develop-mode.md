@@ -240,7 +240,9 @@ request notifications.
   poll is a baseline and notifies nobody. A webhook (`/source-control/webhook/:watchId`, the repository's
   own secret, `X-Hub-Signature-256`) is verified over the raw bytes, claimed once, and sets `dirtyAt`
   only: the body is never parsed. Review teams (`requested_teams`) and repositories with more than 100
-  open pull requests are not covered yet; the poll reads page one.
+  open pull requests are not covered yet; the poll reads page one. A request's notification key
+  (`requestDedupeKey`) includes the pull request's `updatedAt`, so a request that falls out of the
+  cached page and comes back after an update notifies again.
 
 ## 6. Invariants
 

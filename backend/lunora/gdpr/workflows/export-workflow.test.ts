@@ -16,6 +16,7 @@ const PARAMS = { requestId: "request-1", userEmail: "user@example.com", userId: 
 
 interface Call {
     args: Record<string, unknown>;
+    dedupId?: string;
     ref: string;
 }
 
@@ -27,10 +28,10 @@ const refOf = (reference: unknown): string => (reference as { __lunoraRef: strin
 const execute = async (): Promise<void> => {
     const context = {
         params: PARAMS,
-        run: async (reference: unknown, args: Record<string, unknown>) => {
+        run: async (reference: unknown, args: Record<string, unknown>, options?: { dedupId?: string }) => {
             const ref = refOf(reference);
 
-            calls.push({ args, ref });
+            calls.push({ args, dedupId: options?.dedupId, ref });
 
             return ref === "gdpr_steps:generateExportFile" ? generate() : [];
         },
@@ -114,5 +115,16 @@ describe("data export workflow: failure", () => {
         expect(progressWith("completed")[0]?.args).toMatchObject({ storageId: "storage-1" });
         expect(ran("notifications_functions:createNotification")[0]?.args).toMatchObject({ outcome: "success" });
         expect(ran("gdpr_steps:sendExportReadyEmail")).toHaveLength(1);
+    });
+});
+
+describe("data export workflow: watched repositories", () => {
+    it("collects them under an id of its own, so a replay cannot answer it with another call's cached result", async () => {
+        await execute();
+
+        const [collect, ...rest] = ran("source_control_gdpr:collectWatchedRepositoriesForExport");
+
+        expect(rest).toEqual([]);
+        expect(collect?.dedupId).toContain(PARAMS.requestId);
     });
 });

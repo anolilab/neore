@@ -84,7 +84,13 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         });
         const watchedRepositories = await context.step.do(
             "collect-watched-repositories",
-            async () => await context.run(internal.source_control.gdpr.collectWatchedRepositoriesForExport, { userId }),
+            // An id of its own: a replay skips finished steps, which shifts the body's positional dispatch ids.
+            async () =>
+                await context.run(
+                    internal.source_control.gdpr.collectWatchedRepositoriesForExport,
+                    { userId },
+                    { dedupId: `collect-watched-repositories:${requestId}` },
+                ),
         );
         const bots = await context.step.do("collect-bots", async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }));
         const codingAgentRuns = await context.step.do(

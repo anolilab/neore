@@ -508,8 +508,10 @@ export const RATE_LIMIT_CONFIGS = {
     // Watching a repository, stopping, and the webhook secret: a handful of clicks, each a small write.
     "sourceControl/watch:free": Ratelimit.fixedWindow(30, MINUTE),
     "sourceControl/watch:premium": Ratelimit.fixedWindow(60, MINUTE),
-    // Inbound repository webhook deliveries per watched repository (the HMAC check comes first).
+    // Inbound repository webhook deliveries per watched repository, charged once the signature is proven.
     "sourceControl/webhook": Ratelimit.fixedWindow(60, MINUTE),
+    // The same route per client address, charged on the root shard BEFORE the owner's shard reads anything.
+    "sourceControl/webhookIp": Ratelimit.fixedWindow(120, MINUTE),
     "sourceControl/write:free": Ratelimit.fixedWindow(60, MINUTE),
     "sourceControl/write:premium": Ratelimit.fixedWindow(120, MINUTE),
 

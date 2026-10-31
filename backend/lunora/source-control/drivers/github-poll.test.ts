@@ -72,7 +72,12 @@ describe("githubDriver.pollReviewRequests", () => {
         expect(poll.etag).toBe('W/"one"');
         // A draft is not a request yet; the login compares without case, as GitHub's own logins do.
         expect(poll.requested.map((item) => item.number)).toEqual([1, 4]);
-        expect(poll.requested[0]).toMatchObject({ authorLogin: "alice", repository: "octo/hello", title: "Pull 1", url: "https://github.com/octo/hello/pull/1" });
+        expect(poll.requested[0]).toMatchObject({
+            authorLogin: "alice",
+            repository: "octo/hello",
+            title: "Pull 1",
+            url: "https://github.com/octo/hello/pull/1",
+        });
         expect(host.calls.map((call) => call.path)).toEqual(["/user", "/repos/octo/hello/pulls"]);
         expect(host.calls[1]!.query).toMatchObject({ per_page: GITHUB_POLL_PAGE_SIZE, sort: "updated", state: "open" });
     });

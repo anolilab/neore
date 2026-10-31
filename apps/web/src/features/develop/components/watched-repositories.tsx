@@ -25,7 +25,7 @@ const WebhookSetup = ({ watched }: { watched: Watched }) => {
         <div className="space-y-2 text-xs">
             {issued && (
                 <div className="bg-muted space-y-1 rounded-md p-2" role="status">
-                    <p>{t`Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once.`}</p>
+                    <p>{t`Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once.`}</p>
                     <p className="break-all">
                         <span className="font-medium">{t`URL`}:</span> {webhookUrl(issued.id)}
                     </p>
@@ -158,6 +158,11 @@ const WatchedRepositories = ({ onSelect, webhooks }: { onSelect: (repo: string, 
             {rejected && (
                 <p className="text-destructive text-xs" role="status">
                     {watch.data?.status === "limit" ? t`You are watching as many repositories as is allowed.` : t`That is not a repository address.`}
+                </p>
+            )}
+            {list.isError && !list.data && (
+                <p className="text-destructive text-sm" role="alert">
+                    {t`Your watched repositories could not be loaded.`}
                 </p>
             )}
             {list.isPending && <Skeleton aria-label={t`Loading`} className="h-12 w-full" role="status" />}

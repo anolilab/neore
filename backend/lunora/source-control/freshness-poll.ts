@@ -36,6 +36,20 @@ export interface PollPorts {
     record: (outcome: RecordedPoll) => Promise<unknown>;
 }
 
+/**
+ * A read that throws something that is not a host error (a response that fails to parse) is this repository's
+ * failure alone: recorded, so it backs off like any other and the repositories after it still poll.
+ */
+const askHost = async (ports: PollPorts, target: PollTarget): ReturnType<PollPorts["fetch"]> => {
+    try {
+        return await ports.fetch(target);
+    } catch (error) {
+        console.error(`[Develop] Polling ${target.repository} failed:`, error);
+
+        return { status: "host_error" };
+    }
+};
+
 /** Polls the repository the lease was taken on; answers whether anything was asked of the host. */
 export const runRepoPoll = async (ports: PollPorts, lease: number): Promise<{ fetched: boolean }> => {
     const target = await ports.read();
@@ -45,7 +59,7 @@ export const runRepoPoll = async (ports: PollPorts, lease: number): Promise<{ fe
         return { fetched: false };
     }
 
-    const outcome = await ports.fetch(target);
+    const outcome = await askHost(ports, target);
 
     if (outcome.status !== "ok") {
         await ports.record({ kind: "failed", status: outcome.status });
@@ -65,26 +79,30 @@ export const runRepoPoll = async (ports: PollPorts, lease: number): Promise<{ fe
 };
 
 /** Asks the host through the user's connector token. The token stays in this call. */
-export const hostPoll = (driver: HostDriver, token: Parameters<typeof readFromHost>[1], via?: Parameters<typeof readFromHost>[3]) => async (target: PollTarget) =>
-    await readFromHost(
-        driver,
-        token,
-        async (request) => {
-            return { poll: await driver.pollReviewRequests(request, target.repository, { etag: target.etag, login: target.login }) };
-        },
-        via,
-    );
+export const hostPoll =
+    (driver: HostDriver, token: Parameters<typeof readFromHost>[1], via?: Parameters<typeof readFromHost>[3]) => async (target: PollTarget) =>
+        await readFromHost(
+            driver,
+            token,
+            async (request) => {
+                return { poll: await driver.pollReviewRequests(request, target.repository, { etag: target.etag, login: target.login }) };
+            },
+            via,
+        );
 
 /** The poll the shard tick scheduled (`dispatchDueRepoPolls`), and the one a refresh on open runs for each repository it leased. */
 export const pollWatchedRepo = internalAction
     .input({ lease: v.number(), watchId: v.id("watchedRepositories") })
     .output(v.object({ fetched: v.boolean() }))
-    .action(async ({ args, ctx }) => await runRepoPoll(
-            {
-                fetch: async (target) => await hostPoll(DEVELOP_DRIVER, await resolveGithubToken(ctx, target.userId))(target),
-                read: async () => await ctx.runQuery(internal.source_control.freshness_internal.getWatchForPoll, { watchId: args.watchId }),
-                record: async (outcome) =>
-                    await ctx.runMutation(internal.source_control.freshness_internal.recordRepoPoll, { lease: args.lease, outcome, watchId: args.watchId }),
-            },
-            args.lease,
-        ));
+    .action(
+        async ({ args, ctx }) =>
+            await runRepoPoll(
+                {
+                    fetch: async (target) => await hostPoll(DEVELOP_DRIVER, await resolveGithubToken(ctx, target.userId))(target),
+                    read: async () => await ctx.runQuery(internal.source_control.freshness_internal.getWatchForPoll, { watchId: args.watchId }),
+                    record: async (outcome) =>
+                        await ctx.runMutation(internal.source_control.freshness_internal.recordRepoPoll, { lease: args.lease, outcome, watchId: args.watchId }),
+                },
+                args.lease,
+            ),
+    );

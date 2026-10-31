@@ -2207,7 +2207,11 @@ msgid "Add Text"
 msgstr "添加文本"
 
 #: src/features/develop/components/watched-repositories.tsx:28
-msgid "Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once."
+#~ msgid "Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once."
+#~ msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:28
+msgid "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
 msgstr ""
 
 #: src/features/canvas/components/canvas-toolbar.tsx:64
@@ -17324,7 +17328,7 @@ msgstr ""
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
 #: src/features/develop/components/pull-request-view.tsx:51
-#: src/features/develop/components/watched-repositories.tsx:163
+#: src/features/develop/components/watched-repositories.tsx:168
 msgid "Loading"
 msgstr "加载中"
 
@@ -34252,7 +34256,7 @@ msgstr "你正在以访客身份浏览。请登录你的账号以连接扩展。
 msgid "You are currently impersonating a user"
 msgstr "你当前正在模拟登录某个用户"
 
-#: src/features/develop/components/watched-repositories.tsx:164
+#: src/features/develop/components/watched-repositories.tsx:169
 msgid "You are not watching any repository."
 msgstr ""
 
@@ -34659,6 +34663,10 @@ msgstr "你账号的唯一用户名"
 #: src/features/pages/components/page-kept-draft.tsx:21
 msgid "Your unsaved version"
 msgstr "你未保存的版本"
+
+#: src/features/develop/components/watched-repositories.tsx:165
+msgid "Your watched repositories could not be loaded."
+msgstr ""
 
 #: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "YouTube"

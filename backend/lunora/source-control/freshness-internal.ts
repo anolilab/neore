@@ -35,7 +35,17 @@ const vRecorded = v.union(
         login: v.string().max(MAX_LENGTH.short),
         requested: v.array(vCachedRequest),
     }),
-    v.object({ kind: v.literal("failed"), status: v.union(v.literal("forbidden"), v.literal("host_error"), v.literal("needs_reconnect"), v.literal("not_connected"), v.literal("not_found"), v.literal("rate_limited")) }),
+    v.object({
+        kind: v.literal("failed"),
+        status: v.union(
+            v.literal("forbidden"),
+            v.literal("host_error"),
+            v.literal("needs_reconnect"),
+            v.literal("not_connected"),
+            v.literal("not_found"),
+            v.literal("rate_limited"),
+        ),
+    }),
 );
 
 /** A poll lease is live while it has not run out: a lapsed one means the poll died and the repository is polled again. */

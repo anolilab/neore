@@ -21,8 +21,8 @@ import {
 } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 
-import type { NotificationType } from "../lib/notification-labels";
 import linkTarget from "../lib/link-target";
+import type { NotificationType } from "../lib/notification-labels";
 import useNotificationHeadline from "../lib/notification-labels";
 import { formatRelativeTime } from "../lib/relative-time";
 
