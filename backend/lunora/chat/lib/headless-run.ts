@@ -37,6 +37,7 @@ import {
     resolveRunModel,
     retrieveMemoryContext,
     setDispatchOrigin,
+    setHeadlessRun,
     setResearchDepth,
     toPersonalization,
 } from "./agent-run";
@@ -185,6 +186,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
     try {
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
+        setHeadlessRun(ctx);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";

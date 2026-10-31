@@ -57,6 +57,8 @@ const SYSTEM_DB_IMPORTERS = [
     "agent/files.ts",
     "gdpr/functions.ts",
     "skills/functions.ts",
+    // Whether the lead is shared at all, before a worker is allowed to reach the owner's computer: a refusal, never rows.
+    "sub-agents/functions.ts",
     "skills/marketplace.ts",
 ].toSorted(byName);
 

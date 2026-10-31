@@ -62,7 +62,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
 import { sessionOfThread } from "./lib/sessions";
-import { offerOf, startFailureMessage, startHostSessionIn, webSessionId } from "./lib/start";
+import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
+import { openHostSession } from "./lib/start-session";
 import { liveHostStream } from "./remote";
 
 type Device = Doc<"devices">;
@@ -420,7 +421,7 @@ const startOn = async (
     },
 ) => {
     const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.sourceThreadId });
-    const call = await startHostSessionIn(
+    const call = await openHostSession(
         ctx,
         { device: args.device, hostSessionId, offer: args.offer, taintedBy: args.taintedBy, threadId: args.threadId, userId: args.userId },
         args.now,

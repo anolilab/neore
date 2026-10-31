@@ -241,6 +241,11 @@ export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => 
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `headless`; the action ctx has no such field. */
+export const setHeadlessRun = (ctx: object): void => {
+    (ctx as { headless?: boolean }).headless = true;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;

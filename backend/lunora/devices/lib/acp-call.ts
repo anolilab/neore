@@ -35,7 +35,7 @@ export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
     args: {
         deviceId: Id<"devices">;
-        input: Record<string, string>;
+        input: Record<string, boolean | string>;
         kind: AcpCallKind;
         /** Untrusted content the call's text carries (`lib/taint.ts`); signed into the envelope. Absent = the user's own words. */
         taintedBy?: ReadonlyArray<DeviceTaintSource>;
@@ -122,14 +122,16 @@ export type AcpCancelResult = { callId: string } | { error: "busy" | "ineligible
 
 export const createAcpCancelCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
-    args: { deviceId: Id<"devices">; hostSessionId: string; threadId: Id<"threads">; turnId: string; userId: string },
+    args: { deviceId: Id<"devices">; hostSessionId: string; keepQueue?: boolean; threadId: Id<"threads">; turnId: string; userId: string },
     now: number,
 ): Promise<AcpCancelResult> => {
     const result = await createAcpCall(
         ctx,
         {
             deviceId: args.deviceId,
-            input: { sessionId: args.hostSessionId, turnId: args.turnId },
+            // `keepQueue` rides inside the signed envelope: only a worker run's stop sets it, so the prompts the person
+            // typed in the desktop window are still dropped by every other Stop.
+            input: { sessionId: args.hostSessionId, turnId: args.turnId, ...(args.keepQueue === true && { keepQueue: true }) },
             kind: "acp_cancel",
             threadId: args.threadId,
             userId: args.userId,

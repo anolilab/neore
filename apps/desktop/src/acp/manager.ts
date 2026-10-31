@@ -254,8 +254,8 @@ export class AcpManager {
     }
 
     /** Stops the turn the backend named, if that session still runs it. A turn that already ended is not an error. */
-    public cancelTurn(sessionId: string, turnId: string): boolean {
-        return this.sessions.get(sessionId)?.cancelTurn(turnId) ?? false;
+    public cancelTurn(sessionId: string, turnId: string, options: { keepQueue?: boolean } = {}): boolean {
+        return this.sessions.get(sessionId)?.cancelTurn(turnId, options) ?? false;
     }
 
     public async close(sessionId: string): Promise<void> {

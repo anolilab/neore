@@ -292,4 +292,17 @@ describe("time-boxed grants", () => {
         expect(needsApproval()).toBe(true);
         clock.mockRestore();
     });
+
+    it("never lifts a tool's own approval check, whatever the grant says", async () => {
+        const own = vi.fn(async (input: { host: boolean }) => input.host);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", needsApproval: own } } as unknown as ToolSet;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, undefined, { timedGrants: { [mcp.key]: Date.now() + 60_000 } });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: { host: boolean }, options: object) => Promise<boolean> | boolean;
+        };
+
+        expect(await needsApproval({ host: true }, {})).toBe(true);
+        expect(await needsApproval({ host: false }, {})).toBe(false);
+        expect(own).toHaveBeenCalledTimes(2);
+    });
 });

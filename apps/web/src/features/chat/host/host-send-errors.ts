@@ -19,6 +19,7 @@ const useHostSendErrorMessages = (): Record<HostSendError, string> => {
         too_large: t`That message is too long to send from here.`,
         turn_running: t`The agent is still working on the last message.`,
         unreachable: t`Could not reach the server. Try again.`,
+        worker_thread: t`This chat belongs to a worker. Send it messages from its own message box.`,
     };
 };
 

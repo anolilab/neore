@@ -44,7 +44,7 @@ const MAX_RECEIPTS = 1000;
 const UNREADABLE_LOG_WAIT_MS = 5 * 60_000 + KEEP_AFTER_EXPIRY_MS;
 
 export type AcpCommand
-    = | { kind: "cancel"; sessionId: string; turnId: string }
+    = | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
         | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
         | { kind: "send"; sessionId: string; text: string; turnId: string }
         | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };

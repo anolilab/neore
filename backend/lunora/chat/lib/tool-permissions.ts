@@ -220,10 +220,14 @@ export const resolveToolPermissionWithGrant = (
 export const readMcpAnnotations = (tool: unknown): ToolAnnotationHints | undefined =>
     (tool as { metadata?: { annotations?: ToolAnnotationHints } } | undefined)?.metadata?.annotations;
 
+type OwnApproval = ToolSet[string]["needsApproval"];
+
 interface NeedsApprovalOptions {
     messages?: ReadonlyArray<unknown>;
     toolCallId: string;
 }
+
+type AfterLapse = (input: unknown, options: NeedsApprovalOptions) => boolean | Promise<boolean>;
 
 /** A `needsApproval` that asks, unless the quick check clears the call. It never throws: a check that fails asks. */
 const needsApprovalUnless =
@@ -235,6 +239,30 @@ const needsApprovalUnless =
             return true;
         }
     };
+
+/**
+ * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
+ * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
+ * computer), and neither a grant nor the quick check lifts that.
+ */
+const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse): OwnApproval => {
+    if (own === true) {
+        return true;
+    }
+
+    const lapsed = (input: unknown, options: NeedsApprovalOptions): boolean | Promise<boolean> => Date.now() >= expiresAt && afterLapse(input, options);
+
+    if (typeof own !== "function") {
+        return lapsed as OwnApproval;
+    }
+
+    return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
+        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+
+        return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
+    } as OwnApproval;
+};
 
 /**
  * Apply permissions to a tool set.
@@ -281,12 +309,9 @@ export const applyToolPermissions = (
 
         // Tools are built once per run and a run can outlast the grant, so the lapse is checked at every call.
         if (timedUntil !== undefined) {
-            const lapsed = check ? needsApprovalUnless(check, descriptor.key) : () => true;
+            const afterLapse: AfterLapse = check ? needsApprovalUnless(check, descriptor.key) : () => true;
 
-            result[name] = {
-                ...tool,
-                needsApproval: (input: unknown, callOptions: NeedsApprovalOptions) => Date.now() >= timedUntil && lapsed(input, callOptions),
-            } as ToolSet[string];
+            result[name] = { ...tool, needsApproval: withLapse(tool.needsApproval, timedUntil, afterLapse) } as ToolSet[string];
             continue;
         }
 
