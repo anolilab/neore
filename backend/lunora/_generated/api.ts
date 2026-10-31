@@ -310,7 +310,7 @@ export interface ApiTypes {
         };
         streaming: {
             getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; streamId: Id<"persistentStreams"> } | null>;
-            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
+            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
         };
         tags: {
             functions: {
@@ -322,9 +322,10 @@ export interface ApiTypes {
             };
         };
         tool_permissions: {
-            getToolPermissionSettings: FunctionReference<"query", {}, { builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: FunctionReference<"query", {}, { builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             listMcpToolPermissions: FunctionReference<"action", {}, { servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
-            respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            revokeToolPermissionGrant: FunctionReference<"mutation", { key: string }, null>;
             setToolPermission: FunctionReference<"mutation", { key: string; mode: "auto" | "ask" | "off" | null }, null>;
         };
         translate: {
@@ -1098,6 +1099,7 @@ export const api: ApiTypes = {
             getToolPermissionSettings: { __lunoraRef: "chat_tool_permissions:getToolPermissionSettings" },
             listMcpToolPermissions: { __lunoraRef: "chat_tool_permissions:listMcpToolPermissions" },
             respondToToolApproval: { __lunoraRef: "chat_tool_permissions:respondToToolApproval" },
+            revokeToolPermissionGrant: { __lunoraRef: "chat_tool_permissions:revokeToolPermissionGrant" },
             setToolPermission: { __lunoraRef: "chat_tool_permissions:setToolPermission" },
         },
         translate: {

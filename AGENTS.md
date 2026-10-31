@@ -452,9 +452,9 @@ written here is what is not.
   it covers, and `getThreadSummaryForContext` uses it only while that row is an
   ancestor of the prompt (a bounded `walkPath`), so a branch the user left never
   leaks into the one they are on; a few rows are kept per thread, one per path.
-  `afterRun` schedules `runThreadSummary` 5 min out naming the reply's last row;
-  the job is its own debounce (it exits when that row is no longer the thread's
-  latest or a stream is running), then claims `<thread>:<last covered row>`
+  `afterRun` schedules `runThreadSummary` 5 min out naming the reply's last row, only
+  when the replying user has summaries on and never for group runs; the job is its own
+  debounce (it exits when that row no longer ends the ACTIVE path or a stream is running), then claims `<thread>:<last covered row>`
   (`claimOnce`) before the one utility-model call, so a redelivery does nothing
   twice. The cut reaches 20 rows INTO the window: a summary is read after more rows
   landed, and without the overlap the rows that fall out meanwhile are uncovered.
@@ -481,6 +481,15 @@ written here is what is not.
   cover further than `SUMMARY_READ_REACH_ROWS` back. The GDPR export carries them
   per conversation (`contextSummaries`). Not `threads.summary` — that is the
   user-triggered, thread-wide `createSummarizeChat` output.
+- **Time-boxed tool allows** ("Allow for 1 hour" / "for today" on the approval card) — a key -> expiry record in
+  `aiUserPreferences.toolPermissionGrants`, NOT an `auto` override, and deliberately absent from `auth/fields.ts` so no
+  client input can set one. `resolveToolPermission` lifts only an `ask` to `auto`, before the API-key clamp; `off` wins,
+  a headless run ignores grants (it does not even read them — the same "inherits nothing" rule as every other consent),
+  and `device:` keys and `builtin:askUser` never take one (the device approves again, with taint known only there;
+  `respondToToolApproval` refuses it). A tool built under a grant gets `needsApproval: () => Date.now() >= expiresAt`,
+  so a long run notices the lapse at the next call. "Today" ends at the user's next local midnight from
+  `userSettings.timezone` (UTC when unset). Lapsed entries are pruned on every grant write and by the
+  `pruneExpiredToolPermissionGrants` housekeeping sweep. The MCP-app proxy (`lib/mcp-apps.ts`) does not honour grants.
 
 - **Auto-continue ("Deep Work")** — raises the agent loop from 5 to 25
   `maxSteps`. All triggers use it by default.

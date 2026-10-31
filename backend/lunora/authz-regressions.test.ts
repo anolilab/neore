@@ -523,6 +523,25 @@ describe("streams", () => {
         expect(viewer).toMatchObject({ reasoning: "", text: "hello" });
         expect(owner).toMatchObject({ reasoning: "private chain of thought", text: "hello" });
     });
+
+    it("a public thread's viewer does not see which tools are running", async () => {
+        const { streamId } = await seedStream({ isPublic: true });
+
+        await run(async (context) => {
+            await context.db.insert("persistentChunks", {
+                seq: 0,
+                streamId,
+                text: "",
+                toolProgress: { message: "Reading the private wiki", progress: 1, serverName: "Wiki", toolCallId: "call_1", toolName: "read" },
+            });
+        });
+
+        const viewer = (await as(STRANGER).query(procedureAt("chat_streaming", "getStreamBody"), { streamId } as never)) as { toolProgress?: unknown };
+        const owner = (await as(OWNER).query(procedureAt("chat_streaming", "getStreamBody"), { streamId } as never)) as { toolProgress?: unknown };
+
+        expect(viewer.toolProgress).toBeUndefined();
+        expect(owner.toolProgress).toHaveLength(1);
+    });
 });
 
 describe("vault", () => {
