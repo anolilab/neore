@@ -7717,7 +7717,7 @@ msgstr "No se pudo descargar {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "Could not reach the server. Try again."
 msgstr ""
 
@@ -7752,6 +7752,10 @@ msgstr "No se pudo cambiar el nombre de la página"
 #: src/features/pages/components/page-view.tsx:283
 msgid "Could not restore this version"
 msgstr "No se pudo restaurar esta versión"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Could not resume its own session, so the conversation was handed over"
+msgstr ""
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
@@ -14728,7 +14732,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr ""
 
@@ -16238,6 +16242,10 @@ msgstr "Puede que se haya eliminado o que ya no tengas acceso."
 #: src/features/pages/components/page-invite-accept.tsx:44
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Puede que haya caducado, se haya revocado o ya se haya usado. Pide un enlace nuevo."
+
+#: src/features/chat/thread/agent-switch-divider.tsx:21
+msgid "It opened a different session than its own, so the conversation was handed over"
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:377
 msgid "It will be visible once approved by a moderator"
@@ -20858,7 +20866,7 @@ msgstr "Modelo cinematográfico de generación anterior con mayor consistencia"
 msgid "Older"
 msgstr "Anteriores"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -25310,6 +25318,10 @@ msgstr "Reanudar importación"
 #: src/features/settings/components/account/account-settings.tsx:446
 msgid "Resume your latest chat"
 msgstr "Retomar tu último chat"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:26
+msgid "Resumed its own session"
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
@@ -29779,7 +29791,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -29799,7 +29811,11 @@ msgstr "La EncodingAESKey de 43 caracteres (el cifrado de mensajes debe estar en
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "El agente ya no podrá pedirle nada a este dispositivo. Su registro de actividad se conserva hasta que caduque."
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:19
+msgid "The agent is still opening its session. Try again in a moment."
+msgstr ""
+
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "The agent is still working on the last message."
 msgstr ""
 
@@ -30433,6 +30449,10 @@ msgstr "Esta acción no se puede deshacer. Se quitarán todos los miembros del e
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "Esta acción no se puede deshacer. Se eliminarán de forma permanente la organización y todos sus datos asociados."
 
+#: src/features/chat/thread/agent-switch-divider.tsx:19
+msgid "This agent cannot resume its own session, so the conversation was handed over"
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr ""
@@ -30478,6 +30498,10 @@ msgstr "Este nombre de comando está reservado"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Este ordenador"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:20
+msgid "This computer did not resume its own session, so the conversation was handed over"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:444
 msgid "This computer is not paired yet."

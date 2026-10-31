@@ -72,10 +72,18 @@ pub enum AcpCommand {
         folder_id: String,
         folder_label: String,
         folder_path: String,
+        /// The agent's own id of a saved session to load instead of opening a new one (harness switch S4). The
+        /// host loads it only when the agent said it can; it is the backend's record of this same agent, folder and
+        /// computer, and it never widens what the pair is approved for.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        native_session_id: Option<String>,
         session_id: String,
         thread_id: String,
     },
 }
+
+/// An agent's own session ids are longer than the ids the backend mints.
+const NATIVE_ID_MAX: usize = 256;
 
 /// The outcome of step 1. Exactly one of `command` and `refusal` is set.
 #[derive(Debug, Serialize)]
@@ -231,6 +239,11 @@ impl DeviceState {
         ) else {
             return refusal("a start names a session, a thread, an agent and a folder");
         };
+        let native_session_id = match input.get("nativeSessionId") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(id)) if (1..=NATIVE_ID_MAX).contains(&id.len()) => Some(id.clone()),
+            Some(_) => return refusal("a start's saved session id is not valid"),
+        };
         let settings = self.settings();
         let agent = settings
             .acp_agents
@@ -248,6 +261,7 @@ impl DeviceState {
                 folder_id,
                 folder_label: consent.folder_label.clone(),
                 folder_path: consent.folder_path.clone(),
+                native_session_id,
                 session_id,
                 thread_id,
             }),
@@ -427,11 +441,52 @@ mod tests {
                 folder_id: "f1".into(),
                 folder_label: "neore".into(),
                 folder_path: "/home/me/neore".into(),
+                native_session_id: None,
                 session_id: "s1".into(),
                 thread_id: "t1".into(),
             })
         );
         assert_eq!(prepared.call_id, "c1");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_start_may_name_a_saved_session_but_only_a_valid_one() {
+        let (state, dir, _) = state("native");
+        let mut input = start_input("claude", "f1");
+
+        input["nativeSessionId"] = json!("sess_1");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(matches!(
+            prepared.command,
+            Some(AcpCommand::Start { native_session_id: Some(ref id), .. }) if id == "sess_1"
+        ));
+
+        for bad in [json!(""), json!("x".repeat(257)), json!(7)] {
+            let mut input = start_input("claude", "f1");
+
+            input["nativeSessionId"] = bad;
+
+            let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+            assert!(prepared.command.is_none());
+            assert_eq!(
+                prepared.refusal.as_deref(),
+                Some("a start's saved session id is not valid")
+            );
+        }
+
+        // The pair is checked all the same: a saved session id opens nothing for an unapproved pair.
+        let mut input = start_input("claude", "elsewhere");
+
+        input["nativeSessionId"] = json!("sess_1");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(prepared.command.is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

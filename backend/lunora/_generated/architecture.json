@@ -17470,7 +17470,7 @@
     {
       "file": "acp/lib/start",
       "kind": "write",
-      "line": 42,
+      "line": 44,
       "reason": "\"startHostSessionIn\" is not a registered function"
     },
     {
@@ -17488,13 +17488,13 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 233,
+      "line": 241,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 442,
+      "line": 566,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {

@@ -17542,6 +17542,27 @@
                   "optional": true,
                   "unique": false,
                   "refined": true
+                },
+                "reattach": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "loaded": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "reason": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
                 }
               }
             },

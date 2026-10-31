@@ -57,6 +57,10 @@ describe("sendHostMessage", () => {
             error: "turn_running",
             ok: false,
         });
+        await expect(sendHostMessage(INPUT, { fetch: answering(409, { error: "session_starting" }) as never })).resolves.toEqual({
+            error: "session_starting",
+            ok: false,
+        });
         await expect(sendHostMessage(INPUT, { fetch: answering(500, { error: "something new" }) as never })).resolves.toEqual({
             error: "unreachable",
             ok: false,

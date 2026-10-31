@@ -31,6 +31,7 @@ import {
     nextHostSeq,
     updateHostStream,
 } from "../chat/streaming/persistent/host";
+import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
@@ -39,6 +40,7 @@ import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
+import { markReattachFailed, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
 import { vHostEvent } from "./validators";
@@ -102,8 +104,26 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
-        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
-        const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
+
+        // A session the backend started with a saved session id (`startHostSessionIn` records it on the row) that the agent
+        // did not end up in: the thread says so and hands the conversation over instead. An agent that cannot say it
+        // loaded the session counts as one that did not.
+        const requestedNativeId = opened ? existing.nativeSessionId : undefined;
+        const reattachFailure = requestedNativeId === undefined ? undefined : reattachFailureOf(requestedNativeId, open);
+
+        if (reattachFailure !== undefined) {
+            await markReattachFailed(ctx, existing.threadId, reattachFailure);
+
+            // An agent that reported no id of its own leaves the asked-for one on the row, which would send a later switch
+            // back to the same session that just failed to load.
+            if (open.nativeSessionId === undefined) {
+                await patchRow(ctx.db, existing, { nativeSessionId: undefined });
+            }
+        }
+
+        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once. One the agent
+        // did not load is not the session it opened, so the id it opened replaces it.
+        const learnedNativeId = existing.nativeSessionId === undefined || reattachFailure !== undefined ? open.nativeSessionId : undefined;
         // A message sent while the agent was still starting (§4.6) is waiting for it: the session opens already busy.
         const opening =
             opened &&
