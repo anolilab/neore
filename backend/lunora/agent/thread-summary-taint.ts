@@ -51,6 +51,13 @@ const PATH_TAINT_ROWS = 3000;
 const PATH_TAINT_PAGE = 100;
 
 /**
+ * A file attached to a row is untrusted whatever the row's own parts look like: a document's text reaches the model as
+ * text, and the file is named only by `fileIds`. Only the assistant's own rows (generated media) are left out.
+ */
+const attachmentTaint = (rows: ReadonlyArray<Pick<Doc<"messages">, "fileIds" | "message">>): DeviceTaintSource[] =>
+    rows.some((row) => (row.fileIds?.length ?? 0) > 0 && (row.message as { role?: unknown } | undefined)?.role !== "assistant") ? ["files"] : [];
+
+/**
  * What an agent that takes over from a thread has read when it is handed that thread's turns: the tool results and
  * attachments on its active path up to `leaf` (the handoff keeps only the text, but that text was written from them),
  * the summaries that folded older rows, and a takeover the thread itself was. A path longer than the read counts as
@@ -64,7 +71,7 @@ export const threadPathTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"t
     while (cursor && rowsRead < PATH_TAINT_ROWS) {
         const { next, rows } = await walkPath(ctx, threadId, cursor, { limit: PATH_TAINT_PAGE });
 
-        read.push(computeTaint(rows.map((row) => row.message as { content?: unknown; role?: unknown })));
+        read.push(computeTaint(rows.map((row) => row.message as { content?: unknown; role?: unknown })), attachmentTaint(rows));
         rowsRead += rows.length;
         cursor = next;
     }

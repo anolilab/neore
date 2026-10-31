@@ -596,6 +596,35 @@ describe("what a takeover carries into a command on the computer", () => {
         expect(await sendTaints()).toEqual([["web"], ["web"]]);
     });
 
+    it("counts a file attached to a message as untrusted, though its text is not a file part of the row", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const fileId = (await run(
+            async (ctx) =>
+                await ctx.db.chatFiles.insert({
+                    contentType: "application/pdf",
+                    createdAt: 0,
+                    filename: "notes.pdf",
+                    size: 10,
+                    storageKey: "k",
+                    userId: ownerId,
+                } as never),
+        )) as string;
+
+        await run(async (ctx) => {
+            const [prompt] = (await ctx.db.messages.findMany({ where: { order: 0, stepOrder: 0, threadId: source } })).page;
+
+            await ctx.db.patch(prompt._id, { fileIds: [fileId] });
+        });
+
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+        expect((await sendText(forked, "go")).outcome).toBe("sent");
+        expect(await sendTaints()).toEqual([["files"]]);
+    });
+
     it("signs none for a source that read nothing untrusted", async () => {
         const device = await pairedDevice(ownerId);
         const { forkedThreadId } = await switchTo(await cloudThread(), hostTarget(device));
@@ -1052,7 +1081,10 @@ describe("what a chat must be to be handed to a computer", () => {
         const published = await cloudThread();
         const collaborator = await insertUser();
 
-        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "read", threadId: shared, userId: collaborator }));
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "read", threadId: shared, userId: collaborator }),
+        );
         await run(async (ctx) => await ctx.db.patch(published as never, { isPublic: true }));
 
         await expect(switchTo(shared, hostTarget(device))).rejects.toThrow(SHARED_OR_PUBLIC);
@@ -1120,7 +1152,16 @@ describe("what a continuation keeps of its source", () => {
             });
         }
 
-        const unlock = kind === "host" ? proof : (await mintUnlockProof({ epoch: (await rows("threadPasscodes", { threadId: source }))[0]?.epoch, threadId: source, userId: ownerId }, SECRET, Date.now())).proof;
+        const unlock =
+            kind === "host"
+                ? proof
+                : (
+                      await mintUnlockProof(
+                          { epoch: (await rows("threadPasscodes", { threadId: source }))[0]?.epoch, threadId: source, userId: ownerId },
+                          SECRET,
+                          Date.now(),
+                      )
+                  ).proof;
         const target = kind === "host" ? hostTarget(device) : { kind: "model", model: OTHER_MODEL };
         const result = await switchWithProof(source, target, unlock);
         const fork = await row(result.forkedThreadId as string);
@@ -1146,7 +1187,10 @@ describe("what a reader who is not the owner is sent of a divider's rows", () =>
         const fork = forkedThreadId as string;
         const collaborator = await insertUser();
 
-        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "write", threadId: fork, userId: collaborator }));
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "write", threadId: fork, userId: collaborator }),
+        );
 
         const read = async (userId: string) =>
             JSON.stringify(await as(userId).query(listMessagesByThreadId as never, { order: "asc", threadId: fork } as never));
