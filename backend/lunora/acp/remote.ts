@@ -113,7 +113,7 @@ export const startHostSession = authMutation
         }
 
         // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
-        const hostSessionId = await webSessionId(userId, args.clientId, "start");
+        const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
 
         if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
             // The first try's answer may have been lost: hand back the session it made.

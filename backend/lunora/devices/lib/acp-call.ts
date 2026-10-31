@@ -21,6 +21,7 @@ import {
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
+import { type DeviceTaintSource, mergeTaint } from "./taint";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
@@ -31,10 +32,19 @@ const CHECK_SLACK_MS = 1000;
 
 export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
-    args: { deviceId: Id<"devices">; input: Record<string, string>; kind: AcpCallKind; threadId: Id<"threads">; userId: string },
+    args: {
+        deviceId: Id<"devices">;
+        input: Record<string, string>;
+        kind: AcpCallKind;
+        /** Untrusted content the command's text carries (a takeover's handoff): signed into the envelope like any call's. */
+        taintedBy?: ReadonlyArray<DeviceTaintSource>;
+        threadId: Id<"threads">;
+        userId: string;
+    },
     now: number,
 ): Promise<AcpCallResult> => {
     const { deviceId, kind, threadId, userId } = args;
+    const taintedBy = mergeTaint(args.taintedBy);
     const device = await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } });
 
     if (!device?.encryptedSecret) {
@@ -79,7 +89,7 @@ export const createAcpCall = async (
         input,
         signature: "",
         status: "pending",
-        taintedBy: [],
+        taintedBy,
         threadId,
         toolName: kind,
         userId,
@@ -92,7 +102,7 @@ export const createAcpCall = async (
         issuedAt: now,
         kind: "call",
         nonce: crypto.randomUUID(),
-        taintedBy: [],
+        taintedBy,
         threadId,
         threadTitle: (thread?.title ?? "").slice(0, 200),
         tool: kind,

@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation as useReactQueryMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 import type { ThreadRow } from "@/features/chat/core/context/chat-context-types";
@@ -34,6 +35,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const { getPendingSettings, loadThreadData, selectedModel, setPendingSettings, setSelectedModel } = useModelStore();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
+    const router = useRouter();
     // A switch on a long conversation waits here for the user to see what it costs.
     // It belongs to the thread it was asked on: shown on another one it is gone, and confirming it there switches nothing.
     const [asked, setPendingSwitch] = useState<{ pending: PendingAgentSwitch; threadId: string } | null>(null);
@@ -118,6 +120,14 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             }
 
             if (!isLatestPick() || !isOnThread()) {
+                return true;
+            }
+
+            // A pick that crosses the runner (a coding agent's thread to a model) makes a new thread and leaves this one as it
+            // was: the next send belongs there.
+            if (result.forkedThreadId) {
+                await router.navigate({ params: { threadId: result.forkedThreadId }, search: {}, to: "/chat/$threadId" });
+
                 return true;
             }
 

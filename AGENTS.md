@@ -261,6 +261,22 @@ written here is what is not.
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
 
+- **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
+  a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
+  headers/body (`services/llm-gateway/src/lib/retry-after.ts`) and sends `rateLimit: { status, retryAt }` beside
+  `fallbackReason` — on the 502 body, an in-band error part and a mid-read throw — only while the step has produced nothing
+  visible; the backend decides on that field alone, never on message text, and a bare 429 with no field still fails. The
+  stream stays `pending|streaming` with `persistentStreams.pause` set (so stop, the live query and the expiry sweep need no
+  new status; `expiresAt` moves past `retryAt`), the rejected step's empty placeholder row is deleted, and the resume is the
+  SAME `runStreamingAgent` job re-enqueued with `resume: <pause id>` at `retryAt` (the pause stores the job's input).
+  `claimRunResume` claims by pause id, so a redelivery, "Retry now" (`chat/rate-limit-retry.ts`, which queues the same
+  resume for now) and a stale delayed job all no-op after the first; the resume streams from the last row the run saved
+  (`pause.from`), not from the user message — `failPendingSteps` plus a user-message prompt would make a mid-run resume a
+  sibling reply. Caps: a pause ≤ 10 min, one per step (keyed on `from`), 3 per run; past them, or with a delivered steer, or
+  stateless, or in a group turn / approval continuation, the run fails as before. Nothing waits in an action or a queue
+  invocation. The AI SDK never retries these (`GatewayLanguageModel` throws a plain `Error`, not an `APICallError`), so the
+  pause is the only retry. The countdown in the chat is `aria-hidden`; a polite status region speaks every 30 s.
+
 - **Video render queue** — `POST /v1/videos` enqueues and returns 202; the
   Worker's `queue()` handler consumes it. **Cross-config invariant:**
   `VIDEO_RENDER_MAX_ATTEMPTS = 3` in the consumer MUST equal `maxRetries: 2`
@@ -464,6 +480,21 @@ written here is what is not.
   (`BUILTIN_TOOLS_NEEDING_A_PERSON`). Its constants live in
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
+
+- **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
+  READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
+  nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the
+  thread, falling back to the utility model for a non-text model or a plan that lapsed. A thread on a
+  custom endpoint the caller cannot reach (deleted, a collaborator's account, `local-browser`, a malformed
+  id) is refused, never rerouted to a hosted model; a host-run thread sends the QUESTION ALONE (its
+  messages never reach a cloud model, as with follow-up suggestions). Billed like translate
+  (`chargeDailyLimit` "Text" right before the model call, gateway meters it); an aside on the thread's own
+  model is also recorded with `scheduleReplyUsage` under `aside:<entryId>`, a utility-model or host-run one
+  is not, and the usage backfill skips the added "Side question" row. The answer arrives whole: an action returns
+  once and an HTTP action has no service binding, so token streaming needs a chunk table. "Add to
+  thread" (`addAsideToThread`) writes ONE assistant row (`agentName` "Side question") and is refused
+  while a reply runs, because a row landing after the run's pending row would split the reply across
+  branches. `parseCustomModelId` returns `null`, not `undefined`, for a non-custom id.
 
 - **Sub-agents** (`sub-agents/`) — `delegateToSubAgent` admits a
   `subAgentRuns` row (owner of the parent thread only; depth ≤ 2 counted via
@@ -816,6 +847,31 @@ written here is what is not.
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
+- **Mobile offline cache** (`apps/mobile/src/offline/`, plans/mobile-acp-and-remote-control.md §3.5) — read-only
+  `expo-sqlite` copy of the thread list, the last 50 messages of the 20 newest threads, and host/worker status. Every
+  row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
+  copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
+  delete either). There is deliberately no outbox table: offline, `write-gate.ts` disables the composer, send,
+  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(`/`.action(` call
+  in the app must pass `onlineOnly: true`, or the client queues it and replays it on reconnect (`reconnect.test.ts`
+  scans for it). The cache is bound to one account (`bindOwner`; a different id empties it) and `clear()` runs on
+  sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
+  server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
+  and a chat the server refuses (`FORBIDDEN`/`NOT_FOUND`/`THREAD_LOCKED`, not a lapsed sign-in) is forgotten with its
+  statuses and cleared from the screen (`message-read.ts`). A cold start with no network signs the stored user in
+  without a JWT (`auth-context.tsx`) so the saved chats can open; that state counts as offline.
+  **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
+  screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
+  a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
+  prunes. **Writes:** `canWrite` stays false after the network reports back until a request has answered, so the
+  controls are off during the transition. Reachability is `isConnected` only (Android's `isInternetReachable` reads
+  false until its probe ends) and a successful request overrides a no-network hint. Only fetch's own errors and the
+  client's transport errors/timeouts are network failures (`isNetworkFailure`); other `TypeError`s are bugs. **The file
+  lives in the cache directory** (`database-path.ts`), not expo-sqlite's default folder, which iOS backs up to iCloud;
+  Android Auto Backup never copies the cache directory, so no backup rule is needed (the secure-store plugin owns the
+  app's backup rules). `PRAGMA user_version` (`SCHEMA_VERSION` in `cache.ts`) drops and recreates the tables on a
+  mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
+
 - **Host-run threads** (`backend/lunora/acp/`, `apps/desktop/src/acp/`,
   plans/acp-agent-host.md) — a coding agent runs on a paired computer and the
   thread is `threads.runner = "host"` (`acp/lib/host-thread.ts`; deliberately
@@ -868,7 +924,12 @@ written here is what is not.
   The size caps and the type list are PROVISIONAL (not measured) — one pair of
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
-  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  Host turns write no usage row and charge no credit.
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+  and a hook can only send a prompt to the already-open session. The watcher drops events
+  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.

@@ -60,6 +60,12 @@ describe("groupReplies", () => {
         expect(ids(groupReplies(rows))).toStrictEqual([["a", "a-tool"], ["b"]]);
     });
 
+    it("leaves out a side question's row: it was recorded live, and carries no usage of its own", () => {
+        const rows = [row(0, "user", { _id: "p0" }), row(0, "assistant", { _id: "a" }), row(1, "assistant", { _id: "aside", agentName: "Side question" })];
+
+        expect(ids(groupReplies(rows))).toStrictEqual([["a"]]);
+    });
+
     it("names the prompt's author only for replies in the prompt's order", () => {
         const groups = groupReplies([row(0, "user", { userId: "collaborator" }), row(0, "assistant"), row(1, "assistant")]);
 

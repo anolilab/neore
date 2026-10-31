@@ -56,6 +56,7 @@ export interface Doc_acpSessions {
     lastEventAt?: number;
     nativeSessionId?: string;
     status: "starting" | "idle" | "busy" | "offline" | "ended";
+    taintedBy?: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     updatedAt: number;
     userId: string;
@@ -1162,6 +1163,7 @@ export interface Doc_persistentChunks {
 export interface Doc_persistentStreams {
     _id: Id<"persistentStreams">;
     _creationTime: number;
+    earlySteps?: Array<string>;
     expiresAt: number;
     hostEndReason?: "finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped";
     hostPendingPermissions?: Array<string>;
@@ -1169,6 +1171,9 @@ export interface Doc_persistentStreams {
     hostState?: "accepted" | "received" | "running" | "ended";
     hostTurnId?: string;
     messageId: string;
+    pause?: { from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number };
+    pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
+    pausedSteps?: Array<string>;
     producer?: "host";
     runClaimedAt?: number;
     status: string;
@@ -2922,6 +2927,7 @@ export interface Insert_acpSessions {
     lastEventAt?: number;
     nativeSessionId?: string;
     status: "starting" | "idle" | "busy" | "offline" | "ended";
+    taintedBy?: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     updatedAt: number;
     userId: string;
@@ -4028,6 +4034,7 @@ export interface Insert_persistentChunks {
 export interface Insert_persistentStreams {
     _id?: Id<"persistentStreams">;
     _creationTime?: number;
+    earlySteps?: Array<string>;
     expiresAt: number;
     hostEndReason?: "finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped";
     hostPendingPermissions?: Array<string>;
@@ -4035,6 +4042,9 @@ export interface Insert_persistentStreams {
     hostState?: "accepted" | "received" | "running" | "ended";
     hostTurnId?: string;
     messageId: string;
+    pause?: { from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number };
+    pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
+    pausedSteps?: Array<string>;
     producer?: "host";
     runClaimedAt?: number;
     status: string;

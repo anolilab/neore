@@ -63,6 +63,7 @@ const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
+const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -219,6 +220,53 @@ const lastStart = async (): Promise<Row> => {
     const starts = (await rows("deviceCalls", { toolName: "acp_start" })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
 
     return JSON.parse(starts[0]?.input as string) as Row;
+};
+
+/** A tool result the thread's model read at `order`, between two turns (a tool row sits after the reply that asked for it). */
+const addToolResult = async (threadId: string, order: number, toolName: string) =>
+    await run(
+        async (ctx) =>
+            await ctx.db.insert("messages", {
+                message: { content: [{ output: { type: "text", value: "page text" }, toolCallId: "call-1", toolName, type: "tool-result" }], role: "tool" },
+                order,
+                status: "success",
+                stepOrder: 2,
+                threadId,
+                tool: true,
+                userId: ownerId,
+            }),
+    );
+
+/** The computer reports the turn it was sent as finished, which frees the session for the next prompt. */
+const finishSentTurn = async (device: Device, threadId: string) => {
+    const [call] = (await rows("deviceCalls", { toolName: "acp_send" })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
+    const { sessionId, turnId } = JSON.parse(call?.input as string) as { sessionId: string; turnId: string };
+
+    await run(
+        async (ctx) =>
+            await ctx.runMutation(applyHostEvents, {
+                deviceId: device.deviceId,
+                events: [
+                    { kind: "turn_start", text: "x" },
+                    { kind: "turn_end", reason: "finished" },
+                ],
+                firstSeq: 0,
+                sessionId,
+                threadId,
+                turnId,
+            }),
+    );
+};
+
+/** The taint an `acp_send` was signed with: the stored list and the one inside the signed envelope, which must agree. */
+const sendTaints = async (): Promise<string[][]> => {
+    const sent = (await rows("deviceCalls", { toolName: "acp_send" })).toSorted((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+
+    return sent.map((call) => {
+        expect((JSON.parse(call.envelope) as { taintedBy: string[] }).taintedBy).toEqual(call.taintedBy);
+
+        return call.taintedBy as string[];
+    });
 };
 
 /** The computer's agent opens the session a switch queued, as its `session_open` does; `reattach` is what it says of the saved session. */
@@ -507,6 +555,141 @@ describe("host to cloud", () => {
         expect(again.switched).toBe(false);
         expect(again.forkedThreadId).toBe(first.forkedThreadId);
         expect(await rows("threads")).toHaveLength(2);
+    });
+});
+
+describe("what a takeover carries into a command on the computer", () => {
+    it("signs the source thread's taint onto every prompt sent to the agent that took over", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await addToolResult(source, 1, "webSearch");
+
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+        expect((await sendText(forked, "now fix the failing test")).outcome).toBe("sent");
+        await finishSentTurn(device, forked);
+        expect((await sendText(forked, "and the next one")).outcome).toBe("sent");
+
+        expect(await sendTaints()).toEqual([["web"], ["web"]]);
+    });
+
+    it("signs none for a source that read nothing untrusted", async () => {
+        const device = await pairedDevice(ownerId);
+        const { forkedThreadId } = await switchTo(await cloudThread(), hostTarget(device));
+
+        await openStartedSession(device, forkedThreadId as string);
+        expect((await sendText(forkedThreadId as string, "go")).outcome).toBe("sent");
+
+        expect(await sendTaints()).toEqual([[]]);
+    });
+
+    it("keeps what a thread read when the next agent takes over from the one before it", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await addToolResult(source, 1, "mcp_notes_read");
+
+        const { forkedThreadId } = await switchTo(source, hostTarget(device, CLAUDE));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+        await converse(forked, 1, 40, 5);
+        await switchTo(forked, hostTarget(device, CODEX));
+        await openStartedSession(device, forked);
+        expect((await sendText(forked, "carry on")).outcome).toBe("sent");
+
+        // The first agent's own commands read pages and files that are in none of this thread's rows: the list says so too.
+        expect(await sendTaints()).toEqual([["web", "mcp", "device"]]);
+    });
+});
+
+describe("the session id of a switch", () => {
+    it("is its own for each thread, so one clientId on two threads makes two sessions", async () => {
+        const device = await pairedDevice(ownerId);
+        const sourceA = await cloudThread();
+        const sourceB = await cloudThread();
+        const first = await switchTo(sourceA, hostTarget(device), ownerId, "shared-id");
+        const second = await switchTo(sourceB, hostTarget(device), ownerId, "shared-id");
+
+        expect(second.forkedThreadId).not.toBe(first.forkedThreadId);
+
+        const sessions = await rows("acpSessions");
+
+        expect(sessions).toHaveLength(2);
+        expect(new Set(sessions.map((session) => session.hostSessionId)).size).toBe(2);
+
+        // A repeat of either click is answered with its own thread.
+        expect((await switchTo(sourceA, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(first.forkedThreadId);
+        expect((await switchTo(sourceB, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(second.forkedThreadId);
+    });
+});
+
+describe("a repeated click", () => {
+    const takeOffline = async (device: Device) => {
+        await run(async (ctx) => {
+            await ctx.db.patch(device.deviceId as never, { lastSeenAt: 1 } as never);
+        });
+    };
+
+    it("is answered with the thread and the agent the first one made, whatever became of the computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const first = await switchTo(source, hostTarget(device), ownerId, "retry");
+
+        await takeOffline(device);
+
+        const again = await switchTo(source, hostTarget(device), ownerId, "retry");
+
+        expect(again).toMatchObject({ agent: { agentKey: "codex", kind: "host" }, forkedThreadId: first.forkedThreadId, switched: false });
+    });
+
+    it("names the model it switched to, for a thread that leaves a computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const first = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "retry");
+        const again = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "retry");
+
+        expect(again).toMatchObject({ agent: { kind: "model", model: OTHER_MODEL }, forkedThreadId: first.forkedThreadId, switched: false });
+    });
+
+    it("still finds its thread after more than a page of later switches from the same source", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const first = await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "old-click");
+
+        for (let index = 0; index < 12; index += 1) {
+            await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, `later-${String(index)}`);
+        }
+
+        expect((await switchTo(source, { kind: "model", model: OTHER_MODEL }, ownerId, "old-click")).forkedThreadId).toBe(first.forkedThreadId);
+    });
+
+    it("is refused when the same click id comes back for another agent", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await switchTo(source, hostTarget(device, CODEX), ownerId, "reused");
+        await expect(switchTo(source, hostTarget(device, CLAUDE), ownerId, "reused")).rejects.toThrow(DIFFERENT_AGENT);
+        expect(await rows("threads")).toHaveLength(2);
+    });
+});
+
+describe("a handoff carried through a thread with no turns of its own", () => {
+    it("keeps the conversation when a thread taken over from a model hands on before its agent has said anything", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+
+        await openStartedSession(device, forkedThreadId as string);
+
+        const back = await switchTo(forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const [divider] = await dividers(back.forkedThreadId as string);
+
+        expect(divider?.handoff).toContain("question 0");
+        expect(divider?.handoff).toContain("answer 2");
     });
 });
 

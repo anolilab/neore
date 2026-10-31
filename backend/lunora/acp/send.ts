@@ -117,6 +117,8 @@ export const sendToHost = internalMutation
                 deviceId: session.deviceId,
                 input: { sessionId: session.hostSessionId, text: handoff ? `${handoff}\n\n${args.text}` : args.text, turnId },
                 kind: "acp_send",
+                // What the agent took over from another thread is in its context for as long as the session lasts.
+                taintedBy: session.taintedBy,
                 threadId,
                 userId,
             },
