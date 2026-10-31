@@ -56,6 +56,12 @@ const messageOf = (body: string | undefined): string | undefined => {
 };
 
 export interface HostRequestOptions {
+    /**
+     * A conditional read: the ETag of the answer the caller already holds. A `304` then RESOLVES (its status is the
+     * "unchanged" answer, and the host does not count it against the rate limit); without this a `304` is an error,
+     * since nobody asked for it. GET only: a conditional write has no meaning here.
+     */
+    ifNoneMatch?: string;
     /** A JSON body. Sent only with a non-GET method, and never replayed after a redirect. */
     json?: unknown;
     /** `GET` unless a write says otherwise. */
@@ -108,6 +114,11 @@ export const createBoundRequester = ({
         }
 
         const method = options.method ?? "GET";
+
+        if (options.ifNoneMatch !== undefined && method !== "GET") {
+            throw new HostApiError("Only a read can be conditional", 0);
+        }
+
         const body = method === "GET" || options.json === undefined ? undefined : JSON.stringify(options.json);
         let url = new URL(path, boundOrigin);
 
@@ -124,7 +135,12 @@ export const createBoundRequester = ({
 
             const response = await fetchWithDeadline(url, {
                 body,
-                headers: { ...headers, ...(body !== undefined && { "Content-Type": "application/json" }), Authorization: `Bearer ${token}` },
+                headers: {
+                    ...headers,
+                    ...(body !== undefined && { "Content-Type": "application/json" }),
+                    ...(options.ifNoneMatch !== undefined && { "If-None-Match": options.ifNoneMatch }),
+                    Authorization: `Bearer ${token}`,
+                },
                 method,
                 // Followed by hand below, so a Location header cannot carry the token elsewhere.
                 redirect: "manual",
@@ -133,6 +149,12 @@ export const createBoundRequester = ({
             }).catch(() => {
                 throw new HostApiError("The host could not be reached", 0, false, { unconfirmed: method !== "GET" });
             });
+
+            if (response.status === 304 && options.ifNoneMatch !== undefined) {
+                await response.body?.cancel().catch(() => undefined);
+
+                return response;
+            }
 
             if (!REDIRECT_STATUSES.has(response.status)) {
                 try {

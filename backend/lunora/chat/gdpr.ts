@@ -36,13 +36,14 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
 };
 
 /**
- * Tool-approval snapshots and goals, then a stream per reply and every chunk of it. The
- * approval snapshots carry the run's final system prompt, which can hold memory
- * and personalisation text; a goal carries the goal text and every verdict. One
- * batch of each per call.
+ * Tool-approval snapshots, requested secrets (ciphertext the user handed the
+ * agent) and goals, then a stream per reply and every chunk of it. The approval
+ * snapshots carry the run's final system prompt, which can hold memory and
+ * personalisation text; a goal carries the goal text and every verdict. One batch
+ * of each per call.
  */
 export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [streams, approvalRuns, goals] = await Promise.all([
+    const [streams, approvalRuns, secrets, goals] = await Promise.all([
         ctx.db
             .query("persistentStreams")
             .withIndex("by_userId_status", (q) => q.eq("userId", userId))
@@ -52,12 +53,16 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .withIndex("by_userId_status_createdAt", (q) => q.eq("userId", userId))
             .take(BATCH),
         ctx.db
+            .query("requestedSecrets")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(BATCH),
+        ctx.db
             .query("threadGoals")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .take(BATCH),
     ]);
 
-    await Promise.all([...approvalRuns, ...goals].map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all([...approvalRuns, ...secrets, ...goals].map(async (row) => await ctx.db.delete(row._id)));
 
     const streamsLeft = await deleteParentsWithChildren(
         ctx,
@@ -69,7 +74,7 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
                 .take(BATCH),
     );
 
-    return { hasMore: streamsLeft || approvalRuns.length >= BATCH || goals.length >= BATCH };
+    return { hasMore: streamsLeft || approvalRuns.length >= BATCH || secrets.length >= BATCH || goals.length >= BATCH };
 };
 
 /** The user's presentations, each after its slides. */

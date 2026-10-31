@@ -19,6 +19,8 @@ export type ToolCtx = ActionContext & {
     messageId?: string;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
+    /** Who started the turn this run belongs to; a continuation runs as the thread's owner whoever that was. Unset when the run never said. */
+    startedBy?: string;
     threadId?: string;
     userId?: string;
     /** Caller-supplied user tier ("free" | "premium" | "ultra" | "public" | "anonymous"). Tools fall back to "free" when absent. */

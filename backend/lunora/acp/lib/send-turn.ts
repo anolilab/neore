@@ -5,6 +5,7 @@ import type { MutationCtx } from "../../_generated/server";
 import { addMessagesHandler } from "../../agent/messages";
 import { createHostStream } from "../../chat/streaming/persistent/host";
 import { createAcpCall, type AcpCallResult } from "../../devices/lib/acp-call";
+import type { DeviceTaintSource } from "../../devices/lib/taint";
 import { touchSession } from "./sessions";
 
 /**
@@ -17,14 +18,21 @@ import { touchSession } from "./sessions";
  */
 export const queueHostTurn = async (
     ctx: MutationCtx,
-    args: { session: Doc<"acpSessions">; text: string; threadId: Id<"threads">; userId: string },
+    args: {
+        session: Doc<"acpSessions">;
+        /** Untrusted content the text carries; signed into the call so the computer never offers "Always allow" for the turn. */
+        taintedBy?: ReadonlyArray<DeviceTaintSource>;
+        text: string;
+        threadId: Id<"threads">;
+        userId: string;
+    },
     now: number,
 ): Promise<{ error: Extract<AcpCallResult, { error: string }>["error"] } | { messageId: string; streamId: Id<"persistentStreams">; turnId: string }> => {
-    const { session, text, threadId, userId } = args;
+    const { session, taintedBy, text, threadId, userId } = args;
     const turnId = crypto.randomUUID();
     const call = await createAcpCall(
         ctx,
-        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text, turnId }, kind: "acp_send", threadId, userId },
+        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text, turnId }, kind: "acp_send", taintedBy, threadId, userId },
         now,
     );
 

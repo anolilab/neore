@@ -45,7 +45,17 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
-import { vDraftComment, vReviewVerdict } from "./source-control/validators";
+import {
+    vCachedRequest,
+    vDraftComment,
+    vGuideFailure,
+    vGuideProposal,
+    vGuideSource,
+    vGuideStatus,
+    vGuideStop,
+    vPollStatus,
+    vReviewVerdict,
+} from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
@@ -196,6 +206,14 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        /**
+         * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
+         * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from
+         * `mcpServers[].headers` on purpose: that list is plaintext the Settings page shows and writes back,
+         * and the audit history snapshots it; this column is server-only, left out of the client view
+         * (`redactPreferences`) and read only where a run builds its servers (`getMCPServersQuery`).
+         */
+        mcpSecretHeaders: v.optional(v.array(v.object({ encryptedValue: v.string(), header: v.string(), server: v.string(), url: v.string() }))),
         mcpServers: v.optional(
             v.array(
                 v.object({
@@ -2038,6 +2056,40 @@ export const schema = defineSchema({
         })
         .triggers((t) => auditTriggersFor(t, "prompts", AUDIT_TABLES["prompts"]!)),
 
+    // Develop mode (`source-control/`): the AI guide of a pull request, one row per (user, host origin,
+    // repository, number, head commit). A guide is about the head it was built for; a pull request that has
+    // moved on reads it as stale. Written by the generation job and the host turn's finalizer only; the page
+    // changes nothing but a proposal's status.
+    pullRequestGuides: defineTable({
+        createdAt: v.number(),
+        // Why it did not finish, when `status` is `failed`.
+        failure: v.optional(vGuideFailure),
+        // 0 until the guide is ready.
+        generatedAt: v.number(),
+        headSha: v.string(),
+        hostOrigin: v.string(),
+        // The user's review instructions this guide was written under; a regenerate starts from them.
+        instructions: v.string(),
+        // The queue job's claim key (cloud); ties a dead delivery to this row.
+        jobId: v.optional(v.string()),
+        // Changed files the host would not list, so the guide cannot name them.
+        leftOut: v.number(),
+        number: v.number(),
+        proposals: v.array(vGuideProposal),
+        repository: v.string(),
+        source: vGuideSource,
+        status: vGuideStatus,
+        stops: v.array(vGuideStop),
+        summary: v.string(),
+        // The coding-agent thread that writes a host guide.
+        threadId: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
+        .index("by_threadId", ["threadId"]),
+
     /**
      * better-auth's own rate-limit store.
      *
@@ -2082,6 +2134,37 @@ export const schema = defineSchema({
         .externallyManaged()
         .index("by_key", ["key"]),
 
+    /**
+     * A value the agent asked the user for with `requestSecret` (an API key, a token),
+     * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
+     * ciphertext (`lib/encryption.ts`, `provider-keys`); it exists only while the
+     * row is `saved` and is removed in the same write that marks it `used`
+     * (`chat/lib/secret-requests.ts`). `use` is the destination the user approved
+     * on the card, so a consumer cannot send the value anywhere else. The
+     * housekeeping sweep deletes a row once `expiresAt` has passed.
+     */
+    requestedSecrets: defineTable({
+        approvalId: v.string(),
+        createdAt: v.number(),
+        encryptedValue: v.optional(v.string()),
+        expiresAt: v.number(),
+        label: v.string(),
+        ref: v.string(),
+        // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
+        replyKey: v.optional(v.string()),
+        status: v.union(v.literal("saved"), v.literal("used")),
+        threadId: v.string(),
+        use: v.union(
+            v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
+            v.object({ kind: v.literal("provider_key"), provider: v.string() }),
+        ),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_ref", ["ref"])
+        .index("by_expiresAt", ["expiresAt"])
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
@@ -2657,6 +2740,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -2692,7 +2776,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3302,6 +3385,33 @@ export const schema = defineSchema({
         .index("expiresAt", ["expiresAt"])
         .index("identifier", ["identifier"])
         .triggers((t) => auditTriggersFor(t, "verification", AUDIT_TABLES["verification"]!)),
+
+    // Develop mode: a repository the user chose to keep fresh (`source-control/freshness.ts`). One row per
+    // user and repository holds the list cache (the open, non-draft pull requests that ask the user for a review),
+    // its ETag, and the poll schedule. `nextPollAt` > 0 is the lease or the next poll the shard tick reads (0 never
+    // armed); `leasedAt` stamps the poll in flight, and a result is applied only while it still matches. `dirtyAt`
+    // is all a webhook ever writes. The webhook secret is encrypted and is never returned.
+    watchedRepositories: defineTable({
+        checkedAt: v.number(),
+        createdAt: v.number(),
+        dirtyAt: v.number(),
+        etag: v.union(v.string(), v.null()),
+        hostOrigin: v.string(),
+        lastStatus: vPollStatus,
+        leasedAt: v.number(),
+        login: v.union(v.string(), v.null()),
+        nextPollAt: v.number(),
+        repository: v.string(),
+        requested: v.array(vCachedRequest),
+        // False until the first successful poll: that one is the baseline and notifies nothing.
+        seeded: v.boolean(),
+        userId: v.string(),
+        webhookSecret: v.optional(v.string()),
+        webhookSeenAt: v.number(),
+    })
+        .shardBy("userId")
+        .index("by_nextPollAt", ["nextPollAt"])
+        .index("by_user_and_repository", ["userId", "hostOrigin", "repository"]),
 
     workflowExecutions: defineTable({
         completedAt: v.optional(v.number()),

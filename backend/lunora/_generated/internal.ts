@@ -252,6 +252,7 @@ export interface InternalApiTypes {
             getDecryptedMessengerKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedProviderKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedToolKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
+            getMcpSecretHeadersQuery: FunctionReference<"query", { name: string; url: string; userId: string }, Array<{ key: string; value: string }>>;
             getMCPServersQuery: FunctionReference<"query", { userId: string }, Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getSearchDomainBlocklistQuery: FunctionReference<"query", { userId: string }, Array<string>>;
             getUserAuthFlagsQuery: FunctionReference<"query", { sessionId?: string; userId: string }, { isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
@@ -340,7 +341,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -418,6 +419,12 @@ export interface InternalApiTypes {
         media_stale: {
             failStaleMediaRows: FunctionReference<"mutation", { cursor?: string }, { failed: number }>;
         };
+        request_secret: {
+            consumeSecretAsMcpHeader: FunctionReference<"mutation", { ref: string; startedBy: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            consumeSecretAsProviderKey: FunctionReference<"mutation", { ref: string; startedBy: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            discardSecretsOfThread: FunctionReference<"mutation", { streamId: string; threadId: Id<"threads"> }, null>;
+            sweepRequestedSecrets: FunctionReference<"mutation", {}, null>;
+        };
         sharing: {
             checkThreadAccess: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, boolean>;
             checkThreadAccessWithData: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, { hasAccess: true; permission: "read" | "write" | "admin"; thread: { category?: string; createdBy?: string; customSystemPrompt?: string; deleted?: boolean; deletedAt?: number; dictationLanguage?: string; enabledFeatures?: Array<string>; externalThreadId?: string; isPublic?: boolean; isTemporary?: boolean; language?: string; lastCompressionStartedAt?: number; messengerConnectionId?: string; mode?: "text" | "image" | "video"; model?: string; multiChat?: boolean; organizationId?: string; parentThreadIds?: Array<string>; pinnedAt?: number; projectId?: string; publicAccessToken?: string; reasoningEffort?: number; source?: string; statelessMode?: boolean; summary?: string; tags?: Array<string>; teamId?: string; title?: string; updatedAt?: number; userId?: string; _creationTime: number; _id: string; activeAgent?: { kind: "model"; model: string }; activeLeafMessageId?: string; awaitingInput?: "approval" | "question"; botId?: string; createdAt?: number; groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }; hasHandoff?: boolean; lastReplyAt?: number; lastUserMessageAt?: number; lastViewedAt?: number; lockedAt?: number; order?: number; runner?: "host"; snoozedUntil?: number; status: "active" | "archived" | "running" | "abort" | "error" | "finish"; summaryEpoch?: number; summaryPathTooLongAt?: number; tagIds?: Array<string>; workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number } } } | { hasAccess: false; permission: null; thread: null }>;
@@ -469,7 +476,7 @@ export interface InternalApiTypes {
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -648,7 +655,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -802,7 +809,7 @@ export interface InternalApiTypes {
             runShardTick: FunctionReference<"mutation", {}, null>;
         };
         shard_routes: {
-            getRouteOwner: FunctionReference<"query", { kind: "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger"; value: string }, string | null>;
+            getRouteOwner: FunctionReference<"query", { kind: "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch"; value: string }, string | null>;
         };
         storage_cleanup: {
             deleteObjects: FunctionReference<"action", { keys: Array<string> }, void>;
@@ -888,8 +895,8 @@ export interface InternalApiTypes {
             writeDailyBrief: FunctionReference<"mutation", { localDay: string; summary: string; userId: string }, null>;
         };
         functions: {
-            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }, null>;
-            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }> }, null>;
+            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
+            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
@@ -1014,9 +1021,40 @@ export interface InternalApiTypes {
         };
     };
     source_control: {
+        freshness_internal: {
+            acceptWatchDelivery: FunctionReference<"mutation", { signature: string; watchId: Id<"watchedRepositories"> }, "accepted" | "duplicate" | "not_found">;
+            dispatchDueRepoPolls: FunctionReference<"mutation", {}, { dispatched: number }>;
+            getWatchForPoll: FunctionReference<"query", { watchId: Id<"watchedRepositories"> }, null | { etag: string | null; leasedAt: number; login: string | null; repository: string; userId: string }>;
+            getWatchForWebhook: FunctionReference<"query", { watchId: Id<"watchedRepositories"> }, null | { webhookSecret: string }>;
+            leaseWatchedRepositoriesForRefresh: FunctionReference<"mutation", { userId: string }, Array<{ lease: number; watchId: Id<"watchedRepositories"> }>>;
+            recordRepoPoll: FunctionReference<"mutation", { lease: number; outcome: { kind: "not_modified" } | { etag: string | null; kind: "changed"; login: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }> } | { kind: "failed"; status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }; watchId: Id<"watchedRepositories"> }, { applied: boolean; notified: number }>;
+        };
+        freshness_poll: {
+            pollWatchedRepo: FunctionReference<"action", { lease: number; watchId: Id<"watchedRepositories"> }, { fetched: boolean }>;
+        };
         gdpr: {
+            collectGuidesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; guides: Array<{ createdAt: number; generatedAt: number; headSha: string; hostOrigin: string; instructions: string; number: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; repository: string; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string }> }>;
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            collectWatchedRepositoriesForExport: FunctionReference<"query", { userId: string }, { watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
+            deleteUserGuides: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+            deleteUserWatchedRepositories: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+        };
+        guide_host: {
+            beginHostGuide: FunctionReference<"mutation", { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
+            finalizeHostGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
+            queueHostGuideFinalize: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
+            readHostGuideAnswer: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null | { answer: string | null; headSha: string; number: number; repository: string }>;
+        };
+        guide_internal: {
+            beginGuide: FunctionReference<"mutation", { number: number; repository: string; userId: string; headSha: string; instructions: string; jobId?: string; source: "cloud" | "host" }, { guideId: Id<"pullRequestGuides">; status: "started" } | { status: "running" }>;
+            failAbandonedGuide: FunctionReference<"mutation", { claimKey: string; guideId: Id<"pullRequestGuides">; userId: string }, boolean>;
+            failGuide: FunctionReference<"mutation", { failure: "abandoned" | "head_moved" | "host_error" | "model_error" | "no_answer" | "not_connected" | "quota" | "too_large"; guideId: Id<"pullRequestGuides">; userId: string }, boolean>;
+            readGuideForJob: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; userId: string }, null | { headSha: string; instructions: string; number: number; repository: string }>;
+            saveGuide: FunctionReference<"mutation", { guideId: Id<"pullRequestGuides">; headSha: string; leftOut: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string; userId: string }, boolean>;
+        };
+        guide_job: {
+            runCloudGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; jobId?: string; userId: string }, null>;
         };
         review_internal: {
             claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
@@ -1382,6 +1420,7 @@ export const internal: InternalApiTypes = {
             getDecryptedMessengerKeysQuery: { __lunoraRef: "auth_functions:getDecryptedMessengerKeysQuery" },
             getDecryptedProviderKeysQuery: { __lunoraRef: "auth_functions:getDecryptedProviderKeysQuery" },
             getDecryptedToolKeysQuery: { __lunoraRef: "auth_functions:getDecryptedToolKeysQuery" },
+            getMcpSecretHeadersQuery: { __lunoraRef: "auth_functions:getMcpSecretHeadersQuery" },
             getMCPServersQuery: { __lunoraRef: "auth_functions:getMCPServersQuery" },
             getSearchDomainBlocklistQuery: { __lunoraRef: "auth_functions:getSearchDomainBlocklistQuery" },
             getUserAuthFlagsQuery: { __lunoraRef: "auth_functions:getUserAuthFlagsQuery" },
@@ -1547,6 +1586,12 @@ export const internal: InternalApiTypes = {
         },
         media_stale: {
             failStaleMediaRows: { __lunoraRef: "chat_media_stale:failStaleMediaRows" },
+        },
+        request_secret: {
+            consumeSecretAsMcpHeader: { __lunoraRef: "chat_request_secret:consumeSecretAsMcpHeader" },
+            consumeSecretAsProviderKey: { __lunoraRef: "chat_request_secret:consumeSecretAsProviderKey" },
+            discardSecretsOfThread: { __lunoraRef: "chat_request_secret:discardSecretsOfThread" },
+            sweepRequestedSecrets: { __lunoraRef: "chat_request_secret:sweepRequestedSecrets" },
         },
         sharing: {
             checkThreadAccess: { __lunoraRef: "chat_sharing:checkThreadAccess" },
@@ -2144,9 +2189,40 @@ export const internal: InternalApiTypes = {
         },
     },
     source_control: {
+        freshness_internal: {
+            acceptWatchDelivery: { __lunoraRef: "source_control_freshness_internal:acceptWatchDelivery" },
+            dispatchDueRepoPolls: { __lunoraRef: "source_control_freshness_internal:dispatchDueRepoPolls" },
+            getWatchForPoll: { __lunoraRef: "source_control_freshness_internal:getWatchForPoll" },
+            getWatchForWebhook: { __lunoraRef: "source_control_freshness_internal:getWatchForWebhook" },
+            leaseWatchedRepositoriesForRefresh: { __lunoraRef: "source_control_freshness_internal:leaseWatchedRepositoriesForRefresh" },
+            recordRepoPoll: { __lunoraRef: "source_control_freshness_internal:recordRepoPoll" },
+        },
+        freshness_poll: {
+            pollWatchedRepo: { __lunoraRef: "source_control_freshness_poll:pollWatchedRepo" },
+        },
         gdpr: {
+            collectGuidesForExport: { __lunoraRef: "source_control_gdpr:collectGuidesForExport" },
             collectReviewDraftsForExport: { __lunoraRef: "source_control_gdpr:collectReviewDraftsForExport" },
+            collectWatchedRepositoriesForExport: { __lunoraRef: "source_control_gdpr:collectWatchedRepositoriesForExport" },
+            deleteUserGuides: { __lunoraRef: "source_control_gdpr:deleteUserGuides" },
             deleteUserReviewDrafts: { __lunoraRef: "source_control_gdpr:deleteUserReviewDrafts" },
+            deleteUserWatchedRepositories: { __lunoraRef: "source_control_gdpr:deleteUserWatchedRepositories" },
+        },
+        guide_host: {
+            beginHostGuide: { __lunoraRef: "source_control_guide_host:beginHostGuide" },
+            finalizeHostGuide: { __lunoraRef: "source_control_guide_host:finalizeHostGuide" },
+            queueHostGuideFinalize: { __lunoraRef: "source_control_guide_host:queueHostGuideFinalize" },
+            readHostGuideAnswer: { __lunoraRef: "source_control_guide_host:readHostGuideAnswer" },
+        },
+        guide_internal: {
+            beginGuide: { __lunoraRef: "source_control_guide_internal:beginGuide" },
+            failAbandonedGuide: { __lunoraRef: "source_control_guide_internal:failAbandonedGuide" },
+            failGuide: { __lunoraRef: "source_control_guide_internal:failGuide" },
+            readGuideForJob: { __lunoraRef: "source_control_guide_internal:readGuideForJob" },
+            saveGuide: { __lunoraRef: "source_control_guide_internal:saveGuide" },
+        },
+        guide_job: {
+            runCloudGuide: { __lunoraRef: "source_control_guide_job:runCloudGuide" },
         },
         review_internal: {
             claimDraftForSubmit: { __lunoraRef: "source_control_review_internal:claimDraftForSubmit" },

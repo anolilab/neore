@@ -36,6 +36,19 @@ export interface InboxPage {
     total: number;
 }
 
+/** What a conditional poll of one repository found. `not_modified` carries nothing: the caller keeps what it holds. */
+export type RepoPoll =
+    | { status: "not_modified" }
+    | {
+          /** The validator to send next time; `null` when the host sent none, so every poll then reads the list in full. */
+          etag: string | null;
+          /** The signed-in login the list was matched against: stored by the caller, so a poll that finds nothing new never asks for it. */
+          login: string;
+          /** Open pull requests, not drafts, that name the signed-in user as a requested reviewer (page one of the host's list). */
+          requested: PullRequestSummary[];
+          status: "changed";
+      };
+
 export interface PullRequestDetail extends PullRequestRef {
     additions: number;
     authorLogin: string;
