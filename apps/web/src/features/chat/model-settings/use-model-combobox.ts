@@ -35,7 +35,13 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     // A switch on a long conversation waits here for the user to see what it costs.
-    const [pendingSwitch, setPendingSwitch] = useState<PendingAgentSwitch | null>(null);
+    // It belongs to the thread it was asked on: shown on another one it is gone, and confirming it there switches nothing.
+    const [asked, setPendingSwitch] = useState<{ pending: PendingAgentSwitch; threadId: string } | null>(null);
+    const pendingSwitch = asked && asked.threadId === threadId ? asked.pending : null;
+
+    useEffect(() => {
+        setPendingSwitch((current) => (current?.threadId === threadId ? current : null));
+    }, [threadId]);
 
     // Get thread data if we have a threadId
     const { data: thread } = useQuery(crpc.chat.functions.getThread.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
@@ -157,7 +163,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             }
 
             if (preview.coldStartCostly) {
-                setPendingSwitch({ model: newModel, preview });
+                setPendingSwitch({ pending: { model: newModel, preview }, threadId: id });
 
                 return true;
             }

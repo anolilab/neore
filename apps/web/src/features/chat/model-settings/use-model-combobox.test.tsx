@@ -267,6 +267,30 @@ describe("useModelCombobox: the confirmation step", () => {
         expect(hoisted.switchAgent).not.toHaveBeenCalled();
     });
 
+    it("drops an open confirmation when another thread is shown, so confirming it switches nothing there", async () => {
+        hoisted.preview.mockResolvedValue({ coldStartCostly: true, contextTokens: 1000, defaultMode: "full", handoffTokens: 100 });
+        hoisted.switchAgent.mockResolvedValue({ agent: { kind: "model", model: B }, coldStartCostly: false, messageId: "m", switched: true });
+
+        const { rerender, result } = renderHook(({ id }) => useModelCombobox({ threadId: id }), { initialProps: { id: "t1" } });
+
+        await act(async () => {
+            await result.current.changeModel(B);
+        });
+
+        expect(result.current.pendingSwitch).toMatchObject({ model: B });
+
+        hoisted.thread.current = { _id: "t2", mode: "text", model: A };
+        rerender({ id: "t2" });
+
+        expect(result.current.pendingSwitch).toBeNull();
+
+        await act(async () => {
+            await result.current.confirmSwitch("full");
+        });
+
+        expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
+
     it("drops a preview that lands after the user opened another thread on the same model", async () => {
         let controls = { resolve: (_value: unknown) => {} };
 
