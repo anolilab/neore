@@ -6,6 +6,7 @@ const ORIGIN = "https://api.github.com";
 
 interface Seen {
     authorization: string | null;
+    ifNoneMatch?: string | null;
     url: string;
 }
 
@@ -15,7 +16,9 @@ const transport = (answer: (url: string) => Response) => {
     const via = async (input: Request | string | URL, init?: RequestInit): Promise<Response> => {
         const url = String(input);
 
-        seen.push({ authorization: new Headers(init?.headers).get("authorization"), url });
+        const headers = new Headers(init?.headers);
+
+        seen.push({ authorization: headers.get("authorization"), ...(headers.has("if-none-match") && { ifNoneMatch: headers.get("if-none-match") }), url });
 
         expect(init?.redirect).toBe("manual");
 
@@ -34,6 +37,27 @@ describe("createBoundRequester", () => {
         await createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r/pulls", { query: { page: 2 } });
 
         expect(seen).toEqual([{ authorization: "Bearer tkn", url: "https://api.github.com/repos/o/r/pulls?page=2" }]);
+    });
+
+    it("sends the etag a conditional read names, and resolves the 304 instead of throwing", async () => {
+        const { seen, via } = transport(() => new Response(null, { status: 304 }));
+        const response = await createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r/pulls", { ifNoneMatch: 'W/"abc"' });
+
+        expect(response.status).toBe(304);
+        expect(seen).toEqual([{ authorization: "Bearer tkn", ifNoneMatch: 'W/"abc"', url: "https://api.github.com/repos/o/r/pulls" }]);
+    });
+
+    it("still throws a 304 nobody asked for, and refuses a conditional write", async () => {
+        const plain = transport(() => new Response(null, { status: 304 }));
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via: plain.via })("/repos/o/r/pulls")).rejects.toMatchObject({ status: 304 });
+
+        const write = transport(() => Response.json({}));
+
+        await expect(
+            createBoundRequester({ origin: ORIGIN, token: "tkn", via: write.via })("/repos/o/r/pulls/1/merge", { ifNoneMatch: '"x"', json: {}, method: "PUT" }),
+        ).rejects.toMatchObject({ status: 0 });
+        expect(write.seen).toHaveLength(0);
     });
 
     it("keeps the host error contract when a redirect body fails to cancel", async () => {

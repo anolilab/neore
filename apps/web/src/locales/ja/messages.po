@@ -33,7 +33,7 @@ msgstr "-- 挿入 --"
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
-#: src/features/notifications/components/notification-list.tsx:108
+#: src/features/notifications/components/notification-list.tsx:111
 msgid ", unread"
 msgstr "、未読"
 
@@ -1566,6 +1566,10 @@ msgstr "9:16 比率"
 msgid "99.99% SLA"
 msgstr "99.99% の SLA"
 
+#: src/features/develop/components/watched-repositories.tsx:72
+msgid "a change is waiting to be read"
+msgstr ""
+
 #: src/features/home/components/home-page.tsx:158
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
@@ -1662,7 +1666,7 @@ msgstr "引用符の外のプレースホルダーまたは @メンションは�
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:27
+#: src/features/notifications/lib/notification-labels.ts:38
 msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
 
@@ -1703,7 +1707,7 @@ msgstr "テンプレートは参加者をスキルに追加します。スキル
 msgid "A thread gets a reply"
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "A tool call needs your approval"
 msgstr "ツールの呼び出しに承認が必要です"
 
@@ -1715,8 +1719,12 @@ msgstr "同じツールを追加と無効化の両方に指定することはで
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "このトリガーを作成すると、固有の Webhook URL とシークレットが生成されます。この URL を外部サービス（Zapier、n8n、独自のコードなど）の送信先として使用してください。"
 
-#: src/features/notifications/lib/notification-labels.ts:57
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "A usage alert was triggered"
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:38
+msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
 msgstr ""
 
 #: src/features/prompts/components/prompt-list.tsx:544
@@ -2197,6 +2205,14 @@ msgstr "チームメンバーを追加"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:588
 msgid "Add Text"
 msgstr "テキストを追加"
+
+#: src/features/develop/components/watched-repositories.tsx:28
+#~ msgid "Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once."
+#~ msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:28
+msgid "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
+msgstr ""
 
 #: src/features/canvas/components/canvas-toolbar.tsx:64
 msgid "Add title text"
@@ -5413,11 +5429,11 @@ msgstr "チャットを Markdown としてクリップボードにコピーし�
 msgid "Chat Import"
 msgstr "チャットのインポート"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import failed"
 msgstr "チャットのインポートに失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import finished"
 msgstr "チャットのインポートが完了しました"
 
@@ -5521,6 +5537,10 @@ msgstr "インターネット接続を確認して、もう一度お試しくだ
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:24
 msgid "Checkbox"
 msgstr "チェックボックス"
+
+#: src/features/develop/components/watched-repositories.tsx:73
+msgid "Checked"
+msgstr ""
 
 #: src/features/skills/components/skill-builder-review.tsx:251
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
@@ -6129,11 +6149,11 @@ msgstr "コーディング"
 msgid "Coding agent log"
 msgstr "コーディングエージェントのログ"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run failed"
 msgstr "コーディングエージェントの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run finished"
 msgstr "コーディングエージェントの実行が完了しました"
 
@@ -6848,6 +6868,10 @@ msgstr "Telegram、Slack、Discord のボットを接続して、メッセージ
 #: src/routes/auth/extension.tsx:132
 msgid "Connect the Anole browser extension"
 msgstr "Anole ブラウザー拡張機能を接続"
+
+#: src/features/develop/components/watched-repositories.tsx:67
+msgid "Connect the host to keep this fresh."
+msgstr ""
 
 #: src/features/settings/connectors/connectors-page.tsx:41
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
@@ -8547,7 +8571,7 @@ msgstr "データアクセスの概要"
 msgid "Data Export"
 msgstr "データのエクスポート"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Data export failed"
 msgstr "データのエクスポートに失敗しました"
 
@@ -9406,7 +9430,7 @@ msgstr "すべての回答が合格すべき決定的なチェック。"
 msgid "Deterministic, consistent"
 msgstr "決定的で一貫性がある"
 
-#: src/features/develop/components/develop-page.tsx:42
+#: src/features/develop/components/develop-page.tsx:44
 #: src/features/layout/components/sidebar-shortcut.tsx:117
 msgid "Develop"
 msgstr ""
@@ -11222,11 +11246,11 @@ msgstr "エストニア語（エストニア）"
 msgid "European Union"
 msgstr "欧州連合"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run failed"
 msgstr "評価の実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run finished"
 msgstr "評価の実行が完了しました"
 
@@ -15765,7 +15789,7 @@ msgstr "非アクティブのしきい値"
 msgid "Inactivity threshold (days)"
 msgstr "非アクティブのしきい値（日）"
 
-#: src/features/develop/components/develop-page.tsx:47
+#: src/features/develop/components/develop-page.tsx:49
 msgid "Inbox"
 msgstr ""
 
@@ -16213,6 +16237,10 @@ msgstr "5G が健康被害を引き起こすという主張は科学的に裏付
 #: src/features/chat/core/utils/language-utilities.ts:364
 msgid "Israel"
 msgstr "イスラエル"
+
+#: src/features/develop/components/watched-repositories.tsx:43
+msgid "Issue a new secret"
+msgstr ""
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:83
 msgid "Issue assigned"
@@ -16702,6 +16730,10 @@ msgstr "最新のエラー"
 #: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "最後のフレーム"
+
+#: src/features/develop/components/watched-repositories.tsx:39
+msgid "Last heard from it"
+msgstr ""
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
@@ -17293,9 +17325,10 @@ msgstr ""
 #~ msgstr ""
 
 #: ../../packages/ui/src/components/spinner.tsx:8
-#: src/features/develop/components/develop-page.tsx:26
+#: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
 #: src/features/develop/components/pull-request-view.tsx:51
+#: src/features/develop/components/watched-repositories.tsx:168
 msgid "Loading"
 msgstr "読み込み中"
 
@@ -19517,6 +19550,10 @@ msgstr "Neore Gateway は OpenAI (GPT-4o、o1、o3、DALL-E)、Google (Gemini 2.
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore には 30 以上のモデルが含まれています。チャットには GPT-4、Claude、Gemini、DeepSeek、画像には FLUX、Imagen、Stable Diffusion、Recraft、動画には Runway、Luma、Kling、Pika。会話の途中でいつでも切り替えられます。"
 
+#: src/features/develop/components/watched-repositories.tsx:145
+msgid "Neore keeps these up to date and tells you when someone asks for your review."
+msgstr ""
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:230
 #: src/routes/(public)/models/$modelSlug.tsx:111
@@ -19874,6 +19911,10 @@ msgstr "いいえ"
 
 #: src/features/develop/components/failure-notice.tsx:15
 msgid "No access"
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:64
+msgid "No access to this repository."
 msgstr ""
 
 #: src/components/settings/session-freshness-dialog.tsx:46
@@ -20638,6 +20679,10 @@ msgstr "未評価"
 msgid "Not re-run"
 msgstr ""
 
+#: src/features/develop/components/watched-repositories.tsx:73
+msgid "Not read yet."
+msgstr ""
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:307
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:312
 #: src/features/settings/components/privacy/data-access.tsx:36
@@ -20700,7 +20745,7 @@ msgstr "対応待ちのものはありません。"
 msgid "Nothing to stop: that run had already ended."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:60
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "Notification"
 msgstr "通知"
 
@@ -22020,6 +22065,10 @@ msgstr "自分の内容で上書き"
 msgid "Owner"
 msgstr "オーナー"
 
+#: src/features/develop/components/watched-repositories.tsx:151
+msgid "owner/name"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:89
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
@@ -22571,7 +22620,7 @@ msgstr ""
 msgid "Pick color"
 msgstr "色を選択"
 
-#: src/features/develop/components/develop-page.tsx:67
+#: src/features/develop/components/develop-page.tsx:77
 msgid "Pick one from the inbox to read it."
 msgstr ""
 
@@ -24900,6 +24949,10 @@ msgstr "タグ {tag} を削除"
 msgid "Remove the comment on {0}"
 msgstr ""
 
+#: src/features/develop/components/watched-repositories.tsx:52
+msgid "Remove the webhook"
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:407
 msgid "Remove These Files"
 msgstr "これらのファイルを削除"
@@ -25044,6 +25097,10 @@ msgstr "リポジトリ、Issue、PR、コード検索"
 #: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "Repository"
 msgstr "リポジトリ"
+
+#: src/features/develop/components/watched-repositories.tsx:148
+msgid "Repository to watch"
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:64
 msgid "Request changes"
@@ -25426,6 +25483,11 @@ msgstr "プライバシーポリシーとデータ処理の方針を確認しま
 msgid "Review requested on a pull request"
 msgstr ""
 
+#. placeholder {0}: watched.repository
+#: src/features/develop/components/watched-repositories.tsx:96
+msgid "Review requests in {0}"
+msgstr ""
+
 #: src/features/chat/goal/composer-goal.tsx:87
 msgid "Review rounds: {maxRounds}. Change"
 msgstr ""
@@ -25443,7 +25505,7 @@ msgstr "タスクを確認：{0}"
 msgid "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 msgstr "以下の最適化されたプロンプトを確認してください。適用してプロンプトを更新するか、拒否してやり直すことができます。"
 
-#: src/features/develop/components/develop-page.tsx:43
+#: src/features/develop/components/develop-page.tsx:45
 msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
 msgstr ""
 
@@ -26355,6 +26417,10 @@ msgstr "シート/月"
 msgid "secret"
 msgstr ""
 
+#: src/features/develop/components/watched-repositories.tsx:33
+msgid "Secret"
+msgstr ""
+
 #: src/features/settings/components/chat/native-providers-settings.tsx:341
 msgid "Secret access key"
 msgstr "シークレットアクセスキー"
@@ -26595,7 +26661,7 @@ msgstr "自分のメッセージを選択"
 #~ msgid "Selected {0}"
 #~ msgstr ""
 
-#: src/features/develop/components/develop-page.tsx:56
+#: src/features/develop/components/develop-page.tsx:66
 msgid "Selected {requestNoun}"
 msgstr ""
 
@@ -26876,6 +26942,10 @@ msgstr "ローカルモデルサーバーをセットアップ"
 #: src/features/settings/components/chat/trigger-settings.tsx:205
 msgid "Set up a new automated agent execution"
 msgstr "新しい自動エージェント実行を設定します"
+
+#: src/features/develop/components/watched-repositories.tsx:43
+msgid "Set up a webhook"
+msgstr ""
 
 #: src/features/marketing/components/tutorials-page.tsx:88
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
@@ -27254,6 +27324,10 @@ msgstr ""
 #: src/routes/(chat)/workflow/shared/$token.tsx:140
 msgid "Sign in to fork this workflow"
 msgstr "このワークフローをフォークするにはサインインしてください"
+
+#: src/features/develop/components/watched-repositories.tsx:66
+msgid "Sign in to the host again to keep this fresh."
+msgstr ""
 
 #: src/routes/auth/extension.tsx:132
 msgid "Sign in to the Neore desktop app"
@@ -28399,6 +28473,7 @@ msgstr "株式"
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:203
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+#: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -28453,6 +28528,11 @@ msgstr "6 つの AI ツールにお金を払うのはもう終わり。"
 #: src/features/chat/thread/read-aloud-action.tsx:131
 msgid "Stop reading"
 msgstr "読み上げを停止"
+
+#. placeholder {0}: watched.repository
+#: src/features/develop/components/watched-repositories.tsx:80
+msgid "Stop watching {0}"
+msgstr ""
 
 #: src/features/chat/goal/goal-notes.tsx:65
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
@@ -28876,11 +28956,11 @@ msgstr "スタイライズされたアニメーション"
 msgid "Sub-agent"
 msgstr "サブエージェント"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent failed"
 msgstr "サブエージェントが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
@@ -29317,11 +29397,11 @@ msgstr "タスクのメールをオフにしました"
 msgid "Task emails turned on"
 msgstr "タスクのメールをオンにしました"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task failed"
 msgstr "タスクが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task finished"
 msgstr "タスクが完了しました"
 
@@ -29767,6 +29847,10 @@ msgstr "評価ありがとうございます"
 msgid "That comment is already gone."
 msgstr ""
 
+#: src/features/develop/components/watched-repositories.tsx:160
+msgid "That is not a repository address."
+msgstr ""
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:174
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
@@ -30002,8 +30086,16 @@ msgstr "目標は削除されます。タスクは目標なしの状態で残り
 msgid "The highest-quality AI video model available"
 msgstr "利用可能な最高品質の AI 動画モデル"
 
-#: src/features/develop/components/develop-page.tsx:30
+#: src/features/develop/components/develop-page.tsx:32
 msgid "The host"
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:65
+msgid "The host did not answer. Trying again later."
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:69
+msgid "The host is limiting requests. Trying again later."
 msgstr ""
 
 #: src/features/develop/components/commits-tab.tsx:34
@@ -30702,6 +30794,10 @@ msgstr "このプロンプトで設定される内容："
 #: src/features/local-models/components/ollama-model-manager.tsx:337
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "コンピューターからモデルファイルを削除します。後で再度取得できます。"
+
+#: src/features/develop/components/watched-repositories.tsx:68
+msgid "This repository was not found."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:58
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
@@ -31463,11 +31559,11 @@ msgstr "トリガーを有効にしました"
 msgid "Trigger name is required"
 msgstr "トリガー名は必須です"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run failed"
 msgstr "トリガーの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run finished"
 msgstr "トリガーの実行が完了しました"
 
@@ -32385,6 +32481,7 @@ msgid "Urdu (Pakistan)"
 msgstr "ウルドゥー語（パキスタン）"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:32
+#: src/features/develop/components/watched-repositories.tsx:30
 #: src/features/settings/components/chat/mcp/server-form.tsx:229
 msgid "URL"
 msgstr "URL"
@@ -33487,8 +33584,17 @@ msgstr "待機対象：{0}"
 msgid "Want to continue from here?"
 msgstr "ここから続けますか？"
 
+#: src/features/develop/components/watched-repositories.tsx:155
+msgid "Watch"
+msgstr ""
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:228
 msgid "Watch only this part (optional)"
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:143
+#: src/features/develop/components/watched-repositories.tsx:144
+msgid "Watched repositories"
 msgstr ""
 
 #: src/features/chat/core/context/chat-context.tsx:693
@@ -34150,6 +34256,10 @@ msgstr "ゲストとして閲覧中です。拡張機能を接続するには、
 msgid "You are currently impersonating a user"
 msgstr "現在ユーザーになりすましています"
 
+#: src/features/develop/components/watched-repositories.tsx:169
+msgid "You are not watching any repository."
+msgstr ""
+
 #: src/features/connection/components/connection-banner.tsx:23
 msgid "You are offline."
 msgstr "オフラインです。"
@@ -34160,6 +34270,10 @@ msgstr "オフラインです。ネットワークが戻ると Neore が再接�
 
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "You are sending too fast. Wait a moment."
+msgstr ""
+
+#: src/features/develop/components/watched-repositories.tsx:160
+msgid "You are watching as many repositories as is allowed."
 msgstr ""
 
 #: src/features/pages/components/page-view.tsx:482
@@ -34255,7 +34369,7 @@ msgstr "サインイン後、このページに戻ります。"
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "確認コードを生成するには、Google Authenticator や Authy などの認証アプリが必要です。"
 
-#: src/features/notifications/components/notification-list.tsx:77
+#: src/features/notifications/components/notification-list.tsx:80
 msgid "You're all caught up."
 msgstr "すべて確認済みです。"
 
@@ -34393,11 +34507,11 @@ msgstr "会話は非公開のまま"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "現在の匿名セッションは永続的なアカウントに変換されます。"
 
-#: src/features/notifications/lib/notification-labels.ts:36
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Your daily brief"
 msgstr "あなたの Daily Brief"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your data export is ready"
 msgstr "データのエクスポートの準備ができました"
 
@@ -34510,6 +34624,10 @@ msgstr ""
 msgid "Your review is kept."
 msgstr ""
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "Your review was requested"
+msgstr ""
+
 #: src/lib/toast.ts:248
 msgid "Your session has expired"
 msgstr "セッションの有効期限が切れました"
@@ -34545,6 +34663,10 @@ msgstr "アカウントの一意のユーザー名"
 #: src/features/pages/components/page-kept-draft.tsx:21
 msgid "Your unsaved version"
 msgstr "未保存のバージョン"
+
+#: src/features/develop/components/watched-repositories.tsx:165
+msgid "Your watched repositories could not be loaded."
+msgstr ""
 
 #: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "YouTube"

@@ -32,7 +32,7 @@ msgstr "-- INSERT --"
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
-#: src/features/notifications/components/notification-list.tsx:108
+#: src/features/notifications/components/notification-list.tsx:111
 msgid ", unread"
 msgstr ", unread"
 
@@ -1565,6 +1565,10 @@ msgstr "9:16 ratio"
 msgid "99.99% SLA"
 msgstr "99.99% SLA"
 
+#: src/features/develop/components/watched-repositories.tsx:72
+msgid "a change is waiting to be read"
+msgstr "a change is waiting to be read"
+
 #: src/features/home/components/home-page.tsx:158
 msgid "A chat is waiting for your answer"
 msgstr "A chat is waiting for your answer"
@@ -1661,7 +1665,7 @@ msgstr "A placeholder or @mention outside quotes is read as null here, so this e
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 
-#: src/features/notifications/lib/notification-labels.ts:27
+#: src/features/notifications/lib/notification-labels.ts:38
 msgid "A question is waiting for you"
 msgstr "A question is waiting for you"
 
@@ -1702,7 +1706,7 @@ msgstr "A template adds its participants to your skills, where you can edit them
 msgid "A thread gets a reply"
 msgstr "A thread gets a reply"
 
-#: src/features/notifications/lib/notification-labels.ts:51
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "A tool call needs your approval"
 msgstr "A tool call needs your approval"
 
@@ -1714,9 +1718,13 @@ msgstr "A tool cannot be both added and disabled"
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 
-#: src/features/notifications/lib/notification-labels.ts:57
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "A usage alert was triggered"
 msgstr "A usage alert was triggered"
+
+#: src/features/develop/components/watched-repositories.tsx:38
+msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
+msgstr "A webhook only tells Neore to look again sooner. Polling keeps working without one."
 
 #: src/features/prompts/components/prompt-list.tsx:544
 msgid "A-Z"
@@ -2196,6 +2204,14 @@ msgstr "Add Team Member"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:588
 msgid "Add Text"
 msgstr "Add Text"
+
+#: src/features/develop/components/watched-repositories.tsx:28
+#~ msgid "Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once."
+#~ msgstr "Add this as a webhook on the repository (content type JSON, push and pull request events). The secret is shown once."
+
+#: src/features/develop/components/watched-repositories.tsx:28
+msgid "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
+msgstr "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
 
 #: src/features/canvas/components/canvas-toolbar.tsx:64
 msgid "Add title text"
@@ -5412,11 +5428,11 @@ msgstr "Chat copied to clipboard as Markdown"
 msgid "Chat Import"
 msgstr "Chat Import"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import failed"
 msgstr "Chat import failed"
 
-#: src/features/notifications/lib/notification-labels.ts:30
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "Chat import finished"
 msgstr "Chat import finished"
 
@@ -5520,6 +5536,10 @@ msgstr "Check your internet connection and try again."
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:24
 msgid "Checkbox"
 msgstr "Checkbox"
+
+#: src/features/develop/components/watched-repositories.tsx:73
+msgid "Checked"
+msgstr "Checked"
 
 #: src/features/skills/components/skill-builder-review.tsx:251
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
@@ -6128,11 +6148,11 @@ msgstr "Coding"
 msgid "Coding agent log"
 msgstr "Coding agent log"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run failed"
 msgstr "Coding agent run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:33
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Coding agent run finished"
 msgstr "Coding agent run finished"
 
@@ -6847,6 +6867,10 @@ msgstr "Connect Telegram, Slack, or Discord bots to chat with AI directly from y
 #: src/routes/auth/extension.tsx:132
 msgid "Connect the Anole browser extension"
 msgstr "Connect the Anole browser extension"
+
+#: src/features/develop/components/watched-repositories.tsx:67
+msgid "Connect the host to keep this fresh."
+msgstr "Connect the host to keep this fresh."
 
 #: src/features/settings/connectors/connectors-page.tsx:41
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
@@ -8546,7 +8570,7 @@ msgstr "Data Access Summary"
 msgid "Data Export"
 msgstr "Data Export"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Data export failed"
 msgstr "Data export failed"
 
@@ -9405,7 +9429,7 @@ msgstr "Deterministic checks every answer must pass."
 msgid "Deterministic, consistent"
 msgstr "Deterministic, consistent"
 
-#: src/features/develop/components/develop-page.tsx:42
+#: src/features/develop/components/develop-page.tsx:44
 #: src/features/layout/components/sidebar-shortcut.tsx:117
 msgid "Develop"
 msgstr "Develop"
@@ -11221,11 +11245,11 @@ msgstr "Estonian (Estonia)"
 msgid "European Union"
 msgstr "European Union"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run failed"
 msgstr "Eval run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:42
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Eval run finished"
 msgstr "Eval run finished"
 
@@ -15764,7 +15788,7 @@ msgstr "Inactivity threshold"
 msgid "Inactivity threshold (days)"
 msgstr "Inactivity threshold (days)"
 
-#: src/features/develop/components/develop-page.tsx:47
+#: src/features/develop/components/develop-page.tsx:49
 msgid "Inbox"
 msgstr "Inbox"
 
@@ -16212,6 +16236,10 @@ msgstr "Is the claim about 5G causing health issues supported by science?"
 #: src/features/chat/core/utils/language-utilities.ts:364
 msgid "Israel"
 msgstr "Israel"
+
+#: src/features/develop/components/watched-repositories.tsx:43
+msgid "Issue a new secret"
+msgstr "Issue a new secret"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:83
 msgid "Issue assigned"
@@ -16701,6 +16729,10 @@ msgstr "Last error"
 #: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "Last frame"
+
+#: src/features/develop/components/watched-repositories.tsx:39
+msgid "Last heard from it"
+msgstr "Last heard from it"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
@@ -17292,9 +17324,10 @@ msgstr "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 #~ msgstr "Loaded {0} of {1} files…"
 
 #: ../../packages/ui/src/components/spinner.tsx:8
-#: src/features/develop/components/develop-page.tsx:26
+#: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
 #: src/features/develop/components/pull-request-view.tsx:51
+#: src/features/develop/components/watched-repositories.tsx:168
 msgid "Loading"
 msgstr "Loading"
 
@@ -19516,6 +19549,10 @@ msgstr "Neore Gateway supports OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 
+#: src/features/develop/components/watched-repositories.tsx:145
+msgid "Neore keeps these up to date and tells you when someone asks for your review."
+msgstr "Neore keeps these up to date and tells you when someone asks for your review."
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:230
 #: src/routes/(public)/models/$modelSlug.tsx:111
@@ -19874,6 +19911,10 @@ msgstr "No"
 #: src/features/develop/components/failure-notice.tsx:15
 msgid "No access"
 msgstr "No access"
+
+#: src/features/develop/components/watched-repositories.tsx:64
+msgid "No access to this repository."
+msgstr "No access to this repository."
 
 #: src/components/settings/session-freshness-dialog.tsx:46
 msgid "No active session found. Please sign in again."
@@ -20637,6 +20678,10 @@ msgstr "Not rated"
 msgid "Not re-run"
 msgstr "Not re-run"
 
+#: src/features/develop/components/watched-repositories.tsx:73
+msgid "Not read yet."
+msgstr "Not read yet."
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:307
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:312
 #: src/features/settings/components/privacy/data-access.tsx:36
@@ -20699,7 +20744,7 @@ msgstr "Nothing is waiting on you."
 msgid "Nothing to stop: that run had already ended."
 msgstr "Nothing to stop: that run had already ended."
 
-#: src/features/notifications/lib/notification-labels.ts:60
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "Notification"
 msgstr "Notification"
 
@@ -22019,6 +22064,10 @@ msgstr "Overwrite with mine"
 msgid "Owner"
 msgstr "Owner"
 
+#: src/features/develop/components/watched-repositories.tsx:151
+msgid "owner/name"
+msgstr "owner/name"
+
 #: src/features/settings/components/account/account-settings.tsx:89
 msgid "Pacific Time (US & Canada)"
 msgstr "Pacific Time (US & Canada)"
@@ -22570,7 +22619,7 @@ msgstr "Pick a thread"
 msgid "Pick color"
 msgstr "Pick color"
 
-#: src/features/develop/components/develop-page.tsx:67
+#: src/features/develop/components/develop-page.tsx:77
 msgid "Pick one from the inbox to read it."
 msgstr "Pick one from the inbox to read it."
 
@@ -24899,6 +24948,10 @@ msgstr "Remove tag {tag}"
 msgid "Remove the comment on {0}"
 msgstr "Remove the comment on {0}"
 
+#: src/features/develop/components/watched-repositories.tsx:52
+msgid "Remove the webhook"
+msgstr "Remove the webhook"
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:407
 msgid "Remove These Files"
 msgstr "Remove These Files"
@@ -25043,6 +25096,10 @@ msgstr "Repos, issues, PRs, and code search"
 #: src/features/tasks/components/task-form-dialog.tsx:263
 msgid "Repository"
 msgstr "Repository"
+
+#: src/features/develop/components/watched-repositories.tsx:148
+msgid "Repository to watch"
+msgstr "Repository to watch"
 
 #: src/features/develop/components/review-panel.tsx:64
 msgid "Request changes"
@@ -25425,6 +25482,11 @@ msgstr "Review our privacy policy and data processing practices"
 msgid "Review requested on a pull request"
 msgstr "Review requested on a pull request"
 
+#. placeholder {0}: watched.repository
+#: src/features/develop/components/watched-repositories.tsx:96
+msgid "Review requests in {0}"
+msgstr "Review requests in {0}"
+
 #: src/features/chat/goal/composer-goal.tsx:87
 msgid "Review rounds: {maxRounds}. Change"
 msgstr "Review rounds: {maxRounds}. Change"
@@ -25442,7 +25504,7 @@ msgstr "Review task: {0}"
 msgid "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 msgstr "Review the optimized prompt below. You can apply it to update your prompt or reject it to try again."
 
-#: src/features/develop/components/develop-page.tsx:43
+#: src/features/develop/components/develop-page.tsx:45
 msgid "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
 msgstr "Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it."
 
@@ -26354,6 +26416,10 @@ msgstr "seat/mo"
 msgid "secret"
 msgstr "secret"
 
+#: src/features/develop/components/watched-repositories.tsx:33
+msgid "Secret"
+msgstr "Secret"
+
 #: src/features/settings/components/chat/native-providers-settings.tsx:341
 msgid "Secret access key"
 msgstr "Secret access key"
@@ -26594,7 +26660,7 @@ msgstr "Select your message"
 #~ msgid "Selected {0}"
 #~ msgstr "Selected {0}"
 
-#: src/features/develop/components/develop-page.tsx:56
+#: src/features/develop/components/develop-page.tsx:66
 msgid "Selected {requestNoun}"
 msgstr "Selected {requestNoun}"
 
@@ -26875,6 +26941,10 @@ msgstr "Set up a local model server"
 #: src/features/settings/components/chat/trigger-settings.tsx:205
 msgid "Set up a new automated agent execution"
 msgstr "Set up a new automated agent execution"
+
+#: src/features/develop/components/watched-repositories.tsx:43
+msgid "Set up a webhook"
+msgstr "Set up a webhook"
 
 #: src/features/marketing/components/tutorials-page.tsx:88
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
@@ -27253,6 +27323,10 @@ msgstr "Sign in to {label} again"
 #: src/routes/(chat)/workflow/shared/$token.tsx:140
 msgid "Sign in to fork this workflow"
 msgstr "Sign in to fork this workflow"
+
+#: src/features/develop/components/watched-repositories.tsx:66
+msgid "Sign in to the host again to keep this fresh."
+msgstr "Sign in to the host again to keep this fresh."
 
 #: src/routes/auth/extension.tsx:132
 msgid "Sign in to the Neore desktop app"
@@ -28398,6 +28472,7 @@ msgstr "Stocks"
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:203
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
+#: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -28452,6 +28527,11 @@ msgstr "Stop paying for six AI tools."
 #: src/features/chat/thread/read-aloud-action.tsx:131
 msgid "Stop reading"
 msgstr "Stop reading"
+
+#. placeholder {0}: watched.repository
+#: src/features/develop/components/watched-repositories.tsx:80
+msgid "Stop watching {0}"
+msgstr "Stop watching {0}"
 
 #: src/features/chat/goal/goal-notes.tsx:65
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
@@ -28875,11 +28955,11 @@ msgstr "stylized animation"
 msgid "Sub-agent"
 msgstr "Sub-agent"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent failed"
 msgstr "Sub-agent failed"
 
-#: src/features/notifications/lib/notification-labels.ts:45
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Sub-agent finished"
 msgstr "Sub-agent finished"
 
@@ -29316,11 +29396,11 @@ msgstr "Task emails turned off"
 msgid "Task emails turned on"
 msgstr "Task emails turned on"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task failed"
 msgstr "Task failed"
 
-#: src/features/notifications/lib/notification-labels.ts:48
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Task finished"
 msgstr "Task finished"
 
@@ -29766,6 +29846,10 @@ msgstr "Thanks for rating"
 msgid "That comment is already gone."
 msgstr "That comment is already gone."
 
+#: src/features/develop/components/watched-repositories.tsx:160
+msgid "That is not a repository address."
+msgstr "That is not a repository address."
+
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:174
 msgid "That key combination cannot be used as a shortcut"
 msgstr "That key combination cannot be used as a shortcut"
@@ -30001,9 +30085,17 @@ msgstr "The goal is removed; its tasks stay, without a goal."
 msgid "The highest-quality AI video model available"
 msgstr "The highest-quality AI video model available"
 
-#: src/features/develop/components/develop-page.tsx:30
+#: src/features/develop/components/develop-page.tsx:32
 msgid "The host"
 msgstr "The host"
+
+#: src/features/develop/components/watched-repositories.tsx:65
+msgid "The host did not answer. Trying again later."
+msgstr "The host did not answer. Trying again later."
+
+#: src/features/develop/components/watched-repositories.tsx:69
+msgid "The host is limiting requests. Trying again later."
+msgstr "The host is limiting requests. Trying again later."
 
 #: src/features/develop/components/commits-tab.tsx:34
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
@@ -30701,6 +30793,10 @@ msgstr "This prompt will configure:"
 #: src/features/local-models/components/ollama-model-manager.tsx:337
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "This removes the model files from your computer. You can pull it again later."
+
+#: src/features/develop/components/watched-repositories.tsx:68
+msgid "This repository was not found."
+msgstr "This repository was not found."
 
 #: src/features/chat/host/host-composer.tsx:58
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
@@ -31462,11 +31558,11 @@ msgstr "Trigger enabled"
 msgid "Trigger name is required"
 msgstr "Trigger name is required"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run failed"
 msgstr "Trigger run failed"
 
-#: src/features/notifications/lib/notification-labels.ts:54
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Trigger run finished"
 msgstr "Trigger run finished"
 
@@ -32384,6 +32480,7 @@ msgid "Urdu (Pakistan)"
 msgstr "Urdu (Pakistan)"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:32
+#: src/features/develop/components/watched-repositories.tsx:30
 #: src/features/settings/components/chat/mcp/server-form.tsx:229
 msgid "URL"
 msgstr "URL"
@@ -33486,9 +33583,18 @@ msgstr "Waits on: {0}"
 msgid "Want to continue from here?"
 msgstr "Want to continue from here?"
 
+#: src/features/develop/components/watched-repositories.tsx:155
+msgid "Watch"
+msgstr "Watch"
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:228
 msgid "Watch only this part (optional)"
 msgstr "Watch only this part (optional)"
+
+#: src/features/develop/components/watched-repositories.tsx:143
+#: src/features/develop/components/watched-repositories.tsx:144
+msgid "Watched repositories"
+msgstr "Watched repositories"
 
 #: src/features/chat/core/context/chat-context.tsx:693
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
@@ -34149,6 +34255,10 @@ msgstr "You are browsing as a guest. Sign in with your account to connect the ex
 msgid "You are currently impersonating a user"
 msgstr "You are currently impersonating a user"
 
+#: src/features/develop/components/watched-repositories.tsx:169
+msgid "You are not watching any repository."
+msgstr "You are not watching any repository."
+
 #: src/features/connection/components/connection-banner.tsx:23
 msgid "You are offline."
 msgstr "You are offline."
@@ -34160,6 +34270,10 @@ msgstr "You are offline. Neore will reconnect when the network is back."
 #: src/features/chat/host/host-send-errors.ts:17
 msgid "You are sending too fast. Wait a moment."
 msgstr "You are sending too fast. Wait a moment."
+
+#: src/features/develop/components/watched-repositories.tsx:160
+msgid "You are watching as many repositories as is allowed."
+msgstr "You are watching as many repositories as is allowed."
 
 #: src/features/pages/components/page-view.tsx:482
 msgid "You can comment on this page but not edit it."
@@ -34254,7 +34368,7 @@ msgstr "You'll be redirected back here after signing in."
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 
-#: src/features/notifications/components/notification-list.tsx:77
+#: src/features/notifications/components/notification-list.tsx:80
 msgid "You're all caught up."
 msgstr "You're all caught up."
 
@@ -34392,11 +34506,11 @@ msgstr "Your conversations stay private"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "Your current anonymous session will be converted to a permanent account."
 
-#: src/features/notifications/lib/notification-labels.ts:36
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Your daily brief"
 msgstr "Your daily brief"
 
-#: src/features/notifications/lib/notification-labels.ts:39
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your data export is ready"
 msgstr "Your data export is ready"
 
@@ -34509,6 +34623,10 @@ msgstr "Your review is being submitted. Wait for it to finish."
 msgid "Your review is kept."
 msgstr "Your review is kept."
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "Your review was requested"
+msgstr "Your review was requested"
+
 #: src/lib/toast.ts:248
 msgid "Your session has expired"
 msgstr "Your session has expired"
@@ -34544,6 +34662,10 @@ msgstr "Your unique username for your account"
 #: src/features/pages/components/page-kept-draft.tsx:21
 msgid "Your unsaved version"
 msgstr "Your unsaved version"
+
+#: src/features/develop/components/watched-repositories.tsx:165
+msgid "Your watched repositories could not be loaded."
+msgstr "Your watched repositories could not be loaded."
 
 #: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "YouTube"
