@@ -237,3 +237,52 @@ describe("answerSecretRequest", () => {
         expect(queued).toHaveLength(1);
     });
 });
+
+describe("the Settings save and a stored header secret", () => {
+    const save = async (args: Record<string, unknown>) => {
+        const { updateAIUserPreferences } = await import("../auth/functions");
+
+        return await harness.withIdentity({ userId: OWNER } as never).mutation(updateAIUserPreferences as never, args as never);
+    };
+    const secrets = async () => {
+        const preferences = (await rows("aiUserPreferences")) as { mcpSecretHeaders?: unknown[] }[];
+
+        return preferences[0]?.mcpSecretHeaders ?? [];
+    };
+
+    it("keeps them across a save that sends no server list and drops those whose server it moves or removes", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpSecretHeaders: [{ encryptedValue: "v1:x", header: "Authorization", server: "Files", url: FILES_URL }],
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+
+        await save({ enableKnowledge: true });
+        expect(await secrets()).toHaveLength(1);
+
+        await save({ mcpServers: [{ enabled: false, name: "Files", protocol: "http", url: FILES_URL }] });
+        expect(await secrets()).toHaveLength(1);
+
+        await save({ mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: "https://moved.example.com/mcp" }] });
+        expect(await secrets()).toHaveLength(0);
+    });
+
+    it("drops the secret when the user types that header by hand", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpSecretHeaders: [{ encryptedValue: "v1:x", header: "Authorization", server: "Files", url: FILES_URL }],
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+
+        await save({
+            mcpServers: [{ enabled: true, headers: [{ key: "authorization", value: "typed-by-hand" }], name: "Files", protocol: "http", url: FILES_URL }],
+        });
+        expect(await secrets()).toHaveLength(0);
+    });
+});

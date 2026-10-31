@@ -15,6 +15,9 @@
  * internal: the tool passes the run's own user and thread, so a reference is
  * spent for the user and thread that asked, and by nobody else.
  *
+ * A reference is spent during the reply that received it: the ciphertext is dropped when a reply ends for good
+ * (`discardSecretsOfThread`; see `discardThreadSecrets` for what a missed end leaves until the sweep).
+ *
  * The value is an argument of exactly one client procedure — this one — and is
  * never passed to a log call, an event or a job.
  */

@@ -20,7 +20,7 @@ import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { KeyRound, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
@@ -92,8 +92,6 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const groupRef = useRef<HTMLDivElement>(null);
     // The mutation cache holds a mutation's variables for five minutes after it settles; `gcTime: 0` drops them (the value) at once.
     const { isPending, mutate, reset } = useMutation({ ...crpc.chat.request_secret.answerSecretRequest.mutationOptions(), gcTime: 0 });
-    // The same query the composer and Settings read, so it is already in the cache; no extra subscription.
-    const { data: preferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as RequestSecretInput;
     const label = input.label ?? "";
@@ -101,7 +99,12 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null;
-    const server = input.use?.kind === "mcp_header" ? resolveServer(preferences?.mcpServers, input.use.server) : undefined;
+    // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
+    // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
+    const { data: preferences } = useQuery(
+        crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && input.use?.kind === "mcp_header" ? {} : skipToken),
+    );
+    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(preferences?.mcpServers, input.use.server) : undefined;
     // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
     const destinationReady = server === undefined || server.kind === "found";
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;

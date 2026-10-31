@@ -493,6 +493,16 @@ written here is what is not.
   (`listReplyMedia`, owner-granted storage only) — so without reply tools
   (`tools: "none"`, the default) nothing ever attaches one.
 
+- **Requested secrets** (`backend/lunora/chat/{request-secret,lib/secret-*}.ts`) — the `requestSecret` card hands a
+  value to the server once; the agent only ever holds a `ref`. A header secret is stored ENCRYPTED in
+  `aiUserPreferences.mcpSecretHeaders`, bound to the server's name AND url, never in `mcpServers[].headers` (plaintext
+  Settings shows and the audit history snapshots); it is joined to its server only in `getMCPServersQuery`,
+  `getMcpSecretHeadersQuery` (connection test), and left out of `redactPreferences`. Settings does not list these
+  headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
+  a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
+  snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
+
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
   `lib/crypto.ts` (`timingSafeEqual`, HMAC/digest helpers, the one

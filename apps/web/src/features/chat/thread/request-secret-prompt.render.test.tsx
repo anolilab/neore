@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 
 import type { ToolPart } from "@neore/chat-ui/types";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import RequestSecretPrompt from "./request-secret-prompt";
 
 const SECRET = "sk-live-0123456789-supersecret";
 
-const { answer, servers } = vi.hoisted(() => {
+const { answer, readPreferences, servers, thread } = vi.hoisted(() => {
     return {
+        readPreferences: vi.fn(),
+        thread: { current: { userId: "owner" } },
         answer: vi.fn(async (_variables: unknown) => {
             return { alreadyResolved: false, streamId: null };
         }),
@@ -50,7 +52,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
 vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatThread: () => {
-            return { thread: { userId: "owner" }, threadId: "thread-1" };
+            return { thread: thread.current, threadId: "thread-1" };
         },
     };
 });
@@ -61,11 +63,17 @@ vi.mock("@/lib/lunora/crpc", () => {
                 auth: {
                     functions: {
                         getAIUserPreferences: {
-                            queryOptions: () => {
+                            // A real cRPC `queryOptions` turns `skipToken` into a query that never runs.
+                            queryOptions: (args: unknown) => {
                                 return {
-                                    queryFn: async () => {
-                                        return { mcpServers: servers.current };
-                                    },
+                                    queryFn:
+                                        args === skipToken
+                                            ? skipToken
+                                            : async () => {
+                                                  readPreferences();
+
+                                                  return { mcpServers: servers.current };
+                                              },
                                     queryKey: ["getAIUserPreferences"],
                                 };
                             },
@@ -113,6 +121,11 @@ const mountCard = (use: unknown, children?: ReactNode) => {
 };
 
 describe("the secret request card", () => {
+    beforeEach(() => {
+        thread.current = { userId: "owner" };
+        readPreferences.mockClear();
+    });
+
     it("keeps the value out of the mutation cache once the answer is sent", async () => {
         servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
 
@@ -156,5 +169,16 @@ describe("the secret request card", () => {
 
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole("button", { name: DECLINE }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("shows a viewer who is not the owner neither the owner's servers nor a missing-server line, and reads nothing", () => {
+        thread.current = { userId: "someone-else" };
+        servers.current = [{ name: "Other", url: "https://other.example.com/mcp" }];
+        mountCard(header);
+
+        expect(screen.getByText("Set as the Authorization header on your Files MCP server")).toBeTruthy();
+        expect(screen.queryByText(NO_SERVER)).toBeNull();
+        expect(screen.queryByPlaceholderText("Paste it here — it is not shown in the chat")).toBeNull();
+        expect(readPreferences).not.toHaveBeenCalled();
     });
 });

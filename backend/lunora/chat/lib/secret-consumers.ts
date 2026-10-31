@@ -105,7 +105,14 @@ export const consumeAsMcpHeader = async (ctx: Pick<MutationCtx, "db">, args: Con
     );
     const mcpSecretHeaders = [...others, { encryptedValue: await encryptKey(value, "mcp-headers"), header: use.header, server: use.server, url }];
 
-    await saveAiUserPreferences(ctx.db, existing, args.userId, { mcpSecretHeaders });
+    // The secret takes effect over a header of the same name typed by hand, so that one goes (Settings does not list the secret).
+    const mcpServers = servers.map((server) =>
+        server.name === use.server && server.url === url
+            ? { ...server, headers: (server.headers ?? []).filter((header) => !sameHeaderName(header.key, use.header)) }
+            : server,
+    );
+
+    await saveAiUserPreferences(ctx.db, existing, args.userId, { mcpSecretHeaders, mcpServers });
 
     return { header: use.header, server: use.server, status: "saved" };
 };

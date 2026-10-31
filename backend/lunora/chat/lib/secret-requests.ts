@@ -155,6 +155,11 @@ export const takeRequestedSecret = async (
  * Drop the ciphertext of every reference still saved for `threadId`, keeping the rows (a later spend reads `used`).
  * Called when a reply ends for good — finished, failed or stopped, never at a pause — so a value does not wait out
  * its 24 hours once the reply that received it is over. Returns how many it dropped.
+ *
+ * What remains: the row itself (status, label, destination, ref, approvalId, expiresAt) until the sweep; and the
+ * ciphertext of a reply that never reached an end — a worker killed mid-continuation, or a stream the timeout reaper
+ * closed, which does not call this — until its `expiresAt` passes and the housekeeping sweep (every 10 minutes on a
+ * shard that was active, else daily for 30 days) deletes the row. A decline stores nothing at all.
  */
 export const discardThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
     const rows = await ctx.db

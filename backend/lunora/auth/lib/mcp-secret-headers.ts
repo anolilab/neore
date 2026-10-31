@@ -17,7 +17,7 @@ export interface McpSecretHeader {
     url: string;
 }
 
-interface McpServerHeaders {
+export interface McpServerHeaders {
     headers?: { key: string; value: string }[];
     name: string;
     url: string;
@@ -25,6 +25,18 @@ interface McpServerHeaders {
 
 /** Whether two header names are the same field (names are case-insensitive). */
 export const sameHeaderName = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/**
+ * The secrets that still belong to a saved server: one whose server was deleted or moved to another address is dropped
+ * (re-adding the same name and URL must not bring it back), and so is one for a header the user now sets by hand
+ * in Settings (the typed value is the deliberate, later choice).
+ */
+export const pruneMcpSecretHeaders = (secrets: McpSecretHeader[], servers: McpServerHeaders[]): McpSecretHeader[] =>
+    secrets.filter((secret) => {
+        const server = servers.find((candidate) => candidate.name === secret.server && candidate.url === secret.url);
+
+        return server !== undefined && (server.headers ?? []).every((header) => !sameHeaderName(header.key, secret.header));
+    });
 
 /**
  * `servers` with each saved secret added as a plain header on the server it was approved for.

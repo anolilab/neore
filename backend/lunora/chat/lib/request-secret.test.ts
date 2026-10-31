@@ -28,7 +28,7 @@ const { default: schema } = await import("../../schema");
 const { claimSecretAnswer, secretResumeArgs } = await import("./request-secret-claim");
 const { consumeAsMcpHeader, consumeAsProviderKey } = await import("./secret-consumers");
 const { discardThreadSecrets, invalidSecretUse, storeRequestedSecret, sweepExpiredSecrets, takeRequestedSecret } = await import("./secret-requests");
-const { mcpServersWithSecretHeaders } = await import("../../auth/lib/mcp-secret-headers");
+const { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } = await import("../../auth/lib/mcp-secret-headers");
 const { redactPreferences } = await import("../../auth/lib/byok-keys");
 const { claimAskUserAnswer } = await import("./ask-user-claim");
 const { collectApprovalRequestIds } = await import("./tool-approval-claim");
@@ -568,6 +568,22 @@ describe("consuming as an MCP server header", () => {
         expect(await decryptKey(mcpSecretHeaders[0].encryptedValue, "mcp-headers")).toBe(SECRET);
     });
 
+    it("removes a manual header of the same name from that server, so the secret is the one in effect", async () => {
+        await withServers(
+            server("Files", [
+                { key: "authorization", value: "old-manual-token" },
+                { key: "X-Team", value: "a" },
+            ]),
+            server("Other", [{ key: "Authorization", value: "other" }]),
+        );
+        await takeHeader(await storeSecret(STORED_HEADER_USE));
+
+        const { mcpServers } = await preferences();
+
+        expect(mcpServers[0].headers).toStrictEqual([{ key: "X-Team", value: "a" }]);
+        expect(mcpServers[1].headers).toStrictEqual([{ key: "Authorization", value: "other" }]);
+    });
+
     it("leaves the plaintext in no row at all, the audit history included", async () => {
         await withServers(server("Files"));
         await takeHeader(await storeSecret(STORED_HEADER_USE));
@@ -670,6 +686,33 @@ describe("the turn that spends a reference", () => {
         );
 
         expect(await takeHeader(await storeSecret(STORED_HEADER_USE), { startedBy: STRANGER })).toMatchObject({ status: "wrong_run" });
+    });
+});
+
+describe("keeping the stored header secrets in step with the server list", () => {
+    const secret = (server: string, url: string, header = "Authorization") => {
+        return { encryptedValue: "v1:x", header, server, url };
+    };
+    const entry = (name: string, url: string, headers?: { key: string; value: string }[]) => {
+        return { enabled: true, ...(headers && { headers }), name, protocol: "http" as const, url };
+    };
+
+    it("drops a secret whose server was deleted or moved, or whose header the user now sets by hand", () => {
+        const kept = pruneMcpSecretHeaders(
+            [
+                secret("Files", FILES_URL),
+                secret("Gone", "https://gone.example.com/mcp"),
+                secret("Moved", "https://old.example.com/mcp"),
+                secret("Typed", "https://typed.example.com/mcp"),
+            ],
+            [
+                entry("Files", FILES_URL, [{ key: "X-Team", value: "a" }]),
+                entry("Moved", "https://new.example.com/mcp"),
+                entry("Typed", "https://typed.example.com/mcp", [{ key: "authorization", value: "typed-by-hand" }]),
+            ],
+        );
+
+        expect(kept).toStrictEqual([secret("Files", FILES_URL)]);
     });
 });
 

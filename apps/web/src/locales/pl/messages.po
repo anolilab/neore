@@ -7276,7 +7276,7 @@ msgstr "Nie udało się zapisać nowej kolejności dla {label}"
 msgid "Could not save the page"
 msgstr "Nie udało się zapisać strony"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:147
+#: src/features/chat/thread/request-secret-prompt.tsx:161
 msgid "Could not save. Please try again."
 msgstr ""
 
@@ -8089,11 +8089,11 @@ msgstr "Rundy debaty"
 msgid "Debug an error or review my code..."
 msgstr "Zdebuguj błąd lub przejrzyj mój kod..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:224
+#: src/features/chat/thread/request-secret-prompt.tsx:238
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:166
+#: src/features/chat/thread/request-secret-prompt.tsx:180
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -18203,7 +18203,7 @@ msgstr "Więcej kroków = wyższa jakość, dłuższe generowanie"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Więcej niż proxy — inteligentna warstwa między twoją aplikacją a każdym dostawcą LLM."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:125
+#: src/features/chat/thread/request-secret-prompt.tsx:123
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -21406,7 +21406,7 @@ msgstr "Wklej URL obrazu"
 msgid "Paste image URL..."
 msgstr "Wklej URL obrazu..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:211
+#: src/features/chat/thread/request-secret-prompt.tsx:225
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -22062,7 +22062,7 @@ msgstr "Przejrzystość rozumowania klasy premium"
 msgid "Preparing a question…"
 msgstr "Przygotowywanie pytania…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:172
+#: src/features/chat/thread/request-secret-prompt.tsx:186
 msgid "Preparing a request…"
 msgstr ""
 
@@ -24749,7 +24749,7 @@ msgstr "Arabia Saudyjska"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:220
+#: src/features/chat/thread/request-secret-prompt.tsx:234
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24855,7 +24855,7 @@ msgstr "Zapisz przepływ pracy"
 msgid "Saved"
 msgstr "Zapisano"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:170
+#: src/features/chat/thread/request-secret-prompt.tsx:184
 msgid "Saved — continuing"
 msgstr ""
 
@@ -24863,7 +24863,7 @@ msgstr ""
 #~ msgid "Saved — the assistant can use it once"
 #~ msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:168
+#: src/features/chat/thread/request-secret-prompt.tsx:182
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -24871,7 +24871,7 @@ msgstr ""
 msgid "Saved as preset"
 msgstr "Zapisano jako ustawienie wstępne"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:114
+#: src/features/chat/thread/request-secret-prompt.tsx:117
 msgid "Saved as your {provider} API key"
 msgstr ""
 
@@ -25258,7 +25258,7 @@ msgstr "stanowisko/mies."
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:201
+#: src/features/chat/thread/request-secret-prompt.tsx:215
 msgid "Secret"
 msgstr ""
 
@@ -25734,11 +25734,11 @@ msgstr "Ustaw hasło do konta"
 #~ msgid "Set as the {header} header on your {server} MCP server"
 #~ msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:127
+#: src/features/chat/thread/request-secret-prompt.tsx:140
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:121
+#: src/features/chat/thread/request-secret-prompt.tsx:130
 msgid "Set as the {header} header on your {serverName} MCP server ({host})"
 msgstr ""
 
@@ -28573,7 +28573,7 @@ msgstr "Asystent ma pytanie"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:183
+#: src/features/chat/thread/request-secret-prompt.tsx:197
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -31962,7 +31962,7 @@ msgstr "Oczekiwanie na wynik…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:174
+#: src/features/chat/thread/request-secret-prompt.tsx:188
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -31981,7 +31981,7 @@ msgstr "Oczekiwanie na zatwierdzenie przez właściciela"
 msgid "Waiting for uploads to complete…"
 msgstr "Oczekiwanie na zakończenie przesyłania…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:174
+#: src/features/chat/thread/request-secret-prompt.tsx:188
 msgid "Waiting for you"
 msgstr ""
 
@@ -32679,7 +32679,7 @@ msgstr "Nie masz jeszcze zbiorów danych do ewaluacji."
 msgid "You have no indexed knowledge files yet."
 msgstr "Nie masz jeszcze zindeksowanych plików wiedzy."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:123
+#: src/features/chat/thread/request-secret-prompt.tsx:135
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 

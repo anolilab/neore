@@ -17266,25 +17266,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 153,
+      "line": 154,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 271,
+      "line": 282,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 291,
+      "line": 302,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 787,
+      "line": 798,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {
@@ -18208,19 +18208,19 @@
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 160,
+      "line": 165,
       "reason": "\"discardThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 175,
+      "line": 180,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 181,
+      "line": 186,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
