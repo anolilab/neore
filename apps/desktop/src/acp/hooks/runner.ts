@@ -1,7 +1,7 @@
 /**
  * File-event hooks for one running session (plans/acp-agent-host.md; `.neore/hooks.json`).
  *
- * The hooks file is repository content, so everything here is built to do as little as possible with it:
+ * The hooks file is repository content, so everything here is built to do as little as possible with it.
  *
  * A hook does one thing, **send a prompt to this session** through its normal prompt path (so the agent's own tool
  * permissions and approvals apply). It never runs a command, starts a session or widens the folder.

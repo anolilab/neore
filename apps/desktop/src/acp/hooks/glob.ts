@@ -4,7 +4,7 @@
  * segment, never one big regular expression, so a hostile pattern cannot take the main process's time.
  */
 
-export const MAX_GLOB = 200;
+const MAX_GLOB = 200;
 const MAX_ALTERNATIVES = 16;
 const MAX_WILDCARDS_PER_SEGMENT = 4;
 const MAX_EXPANSIONS = 32;
