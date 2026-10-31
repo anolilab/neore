@@ -109,7 +109,7 @@ const ThreadListScreen = () => {
                         </Pressable>
                     </Link>
                     <Link asChild href="/projects">
-                        <Pressable accessibilityLabel="Projects" accessibilityRole="link" style={{ padding: 16 }}>
+                        <Pressable accessibilityRole="link" style={{ padding: 16 }}>
                             <Text style={{ fontWeight: "600" }}>Projects</Text>
                         </Pressable>
                     </Link>

@@ -47,10 +47,9 @@ const ProjectsScreen = () => {
             ListEmptyComponent={rows === undefined ? <Text accessibilityRole="progressbar" style={{ padding: 16 }}>Loading projects...</Text> : <Text style={{ padding: 16 }}>No projects yet.</Text>}
             ListHeaderComponent={(
                 <View style={{ gap: 8, padding: 16 }}>
-                    <Text nativeID="project-name-label" style={{ fontWeight: "600" }}>New project</Text>
+                    <Text style={{ fontWeight: "600" }}>New project</Text>
                     <TextInput
                         accessibilityLabel="Project name"
-                        accessibilityLabelledBy="project-name-label"
                         editable={!creating}
                         onChangeText={setName}
                         onSubmitEditing={create}
