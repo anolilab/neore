@@ -407,7 +407,9 @@ export interface InternalApiTypes {
         };
         tool_permissions: {
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
+            getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
+            pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
             recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
         };
         tools: {
@@ -1453,7 +1455,9 @@ export const internal: InternalApiTypes = {
         },
         tool_permissions: {
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
+            getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },
             getToolPermissionsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionsQuery" },
+            pruneExpiredToolPermissionGrants: { __lunoraRef: "chat_tool_permissions:pruneExpiredToolPermissionGrants" },
             recordPendingToolApprovals: { __lunoraRef: "chat_tool_permissions:recordPendingToolApprovals" },
         },
         tools: {

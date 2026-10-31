@@ -15,7 +15,8 @@
  *    names with their permission keys, final system prompt) per request.
  *    An `askUser` question is such a request too, but is answered through
  *    `chat/ask-user.ts` (`answerAskUser`); this procedure refuses it.
- * 2. The thread OWNER clicks Approve / Deny / Always allow → `respondToToolApproval`
+ * 2. The thread OWNER clicks Approve / Deny / Always allow / Allow for 1 hour /
+ *    Allow for today → `respondToToolApproval`
  *    claims the snapshot (see `lib/tool-approval-claim.ts`), opens a NEW
  *    persistent stream on the thread (the client's streaming placeholder picks it
  *    up through `getActiveStreamForThread`) and schedules
@@ -37,6 +38,9 @@ import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { notifyQuietly } from "../notifications/notify";
 import type { MCPServerConfig } from "./lib/mcp-tools";
 import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
+import type { ToolPermissionGrants } from "./lib/tool-permission-grants";
+import { activeGrants, grantExpiry, isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import type { ToolApprovalDecision } from "./lib/tool-approval-claim";
 import { claimToolApproval, findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
 import { purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
@@ -48,10 +52,14 @@ import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
+/** Permission key -> epoch ms the time-boxed allow lapses. */
+const vToolPermissionGrants = v.record(v.string(), v.number());
 
 /** Keys are short identifiers, never free text; cap them so the record cannot bloat. */
 const MAX_KEY_LENGTH = 256;
 const MAX_OVERRIDES = 500;
+/** Preference rows one sweep looks at; a user shard holds the one row of its user. */
+const PRUNE_BATCH = 50;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -67,6 +75,19 @@ export const getToolPermissionsQuery = internalQuery
             .unique();
 
         return prefs?.toolPermissions ?? {};
+    });
+
+/** The user's time-boxed allows, lapsed ones included — the resolver judges them against the clock. */
+export const getToolPermissionGrantsQuery = internalQuery
+    .input({ userId: v.string() })
+    .output(vToolPermissionGrants)
+    .query(async ({ args: { userId }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        return prefs?.toolPermissionGrants ?? {};
     });
 
 /**
@@ -86,6 +107,8 @@ export const getToolPermissionSettings = authQuery
                     name: v.string(),
                 }),
             ),
+            // Time-boxed allows still in force. A live query does not re-run when one lapses, so the page also hides by `expiresAt`.
+            grants: vToolPermissionGrants,
             overrides: vToolPermissions,
         }),
     )
@@ -99,6 +122,7 @@ export const getToolPermissionSettings = authQuery
             builtIn: listBuiltInTools().map(({ available, category, name }) => {
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
+            grants: activeGrants(prefs?.toolPermissionGrants, Date.now()),
             overrides: prefs?.toolPermissions ?? {},
         };
     });
@@ -195,8 +219,10 @@ export const listMcpToolPermissions = authAction
 // Writes
 // ---------------------------------------------------------------------------
 
+type PreferenceCtx = Pick<AuthMutationCtx, "db" | "now" | "user">;
+
 /** Patches ONE key, so concurrent writes to different tools do not clobber each other. */
-const writeToolPermission = async (ctx: AuthMutationCtx, key: string, mode: ToolPermissionMode | null): Promise<void> => {
+const writeToolPermission = async (ctx: PreferenceCtx, key: string, mode: ToolPermissionMode | null): Promise<void> => {
     const { userId } = ctx.user;
     const prefs = await ctx.db
         .query("aiUserPreferences")
@@ -228,8 +254,77 @@ export const setToolPermission = authMutation
     .output(v.null())
     .mutation(async ({ args: { key, mode }, ctx }) => {
         await writeToolPermission(ctx, key, mode);
+        // An explicit choice replaces a time-boxed allow: picking "Ask" must ask, not wait out the allow.
+        await writeToolGrant(ctx, key, null);
 
         ctx.log.event("chat.set_tool_permission", { cleared: mode === null });
+
+        return null;
+    });
+
+/** Records (or, with `expiresAt: null`, drops) ONE time-boxed allow, pruning lapsed ones in the same write. */
+const writeToolGrant = async (ctx: PreferenceCtx, key: string, expiresAt: number | null): Promise<void> => {
+    const { userId } = ctx.user;
+    const prefs = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    const next: ToolPermissionGrants = activeGrants(prefs?.toolPermissionGrants, ctx.now);
+
+    if (expiresAt === null) {
+        delete next[key];
+    } else {
+        next[key] = expiresAt;
+    }
+
+    // At the cap the allow that ends soonest makes room, so the approval the user just gave never fails on it.
+    const byExpiry = Object.entries(next)
+        .filter(([grantKey]) => grantKey !== key)
+        .toSorted(([, left], [, right]) => left - right);
+
+    while (Object.keys(next).length > MAX_TOOL_GRANTS && byExpiry.length > 0) {
+        const [soonest] = byExpiry.shift()!;
+
+        delete next[soonest];
+    }
+
+    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next });
+};
+
+/** End a time-boxed allow early: the tool asks again from the next message (a run already going keeps the allow it started with). */
+export const revokeToolPermissionGrant = authMutation
+    .use(rateLimit("chat/update"))
+    .input({
+        key: v.string().check((value) => value.length > 0 && value.length <= MAX_KEY_LENGTH, { message: "Invalid tool key" }),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { key }, ctx }) => {
+        await writeToolGrant(ctx, key, null);
+
+        ctx.log.event("chat.revoke_tool_permission_grant", {});
+
+        return null;
+    });
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): drops lapsed time-boxed allows from the
+ * rows on this shard. A lapsed one is already ignored, so this only keeps the
+ * record small.
+ */
+export const pruneExpiredToolPermissionGrants = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const rows = await ctx.db.query("aiUserPreferences").take(PRUNE_BATCH);
+
+        for (const row of rows) {
+            const grants = row.toolPermissionGrants;
+
+            if (grants && Object.values(grants).some((expiresAt) => expiresAt <= ctx.now)) {
+                await saveAiUserPreferences(ctx.db, row, row.userId, { toolPermissionGrants: activeGrants(grants, ctx.now) });
+            }
+        }
 
         return null;
     });
@@ -290,6 +385,41 @@ export const recordPendingToolApprovals = internalMutation
     });
 
 /**
+ * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed
+ * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
+ * "always" answer once and stores nothing rather than guessing, and refuses `hour` / `today`, which it could not keep.
+ */
+export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: ToolApprovalDecision, key: string | undefined): Promise<void> => {
+    if (!key) {
+        // Approving once and storing nothing would leave the user believing the tool is allowed for the period.
+        // The throw rolls the claim back.
+        if (decision === "hour" || decision === "today") {
+            throw new LunoraError("BAD_REQUEST", "This call can only be approved once");
+        }
+
+        return;
+    }
+
+    if (decision === "always") {
+        await writeToolPermission(ctx, key, "auto");
+        await writeToolGrant(ctx, key, null);
+    } else if (decision === "hour" || decision === "today") {
+        // A device call is approved again on the device, with taint only known there, so no allow covers it here.
+        // The throw rolls the claim back.
+        if (!isGrantableKey(key)) {
+            throw new LunoraError("BAD_REQUEST", "This tool cannot be allowed for a period");
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await writeToolGrant(ctx, key, grantExpiry(decision, ctx.now, settings?.timezone));
+    }
+};
+
+/**
  * Answer a pending tool-approval request and resume the agent run.
  *
  * - Caller must OWN the thread: the tool runs with the owner's MCP servers and
@@ -306,7 +436,7 @@ export const respondToToolApproval = authMutation
     .use(rateLimit("chat/stream"))
     .input({
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
-        decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always")),
+        decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always"), v.literal("hour"), v.literal("today")),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
@@ -331,9 +461,7 @@ export const respondToToolApproval = authMutation
         // approves this call and writes no preference, rather than guessing.
         const key = toolName ? config.toolPermissionKeys?.[toolName] : undefined;
 
-        if (decision === "always" && key) {
-            await writeToolPermission(ctx, key, "auto");
-        }
+        await recordApprovalPreference(ctx, decision, key);
 
         const streamId = await resumeClaimedRun(ctx, { approvalId, approved: decision !== "deny", config, ownerId, runId, threadId });
 

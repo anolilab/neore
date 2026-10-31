@@ -456,6 +456,16 @@ written here is what is not.
   (never over `off`, never to other tools, withheld at the depth cap).
   Triggers, tasks and messenger replies inherit nothing, so they lose it.
 
+- **Time-boxed tool allows** ("Allow for 1 hour" / "for today" on the approval card) — a key -> expiry record in
+  `aiUserPreferences.toolPermissionGrants`, NOT an `auto` override, and deliberately absent from `auth/fields.ts` so no
+  client input can set one. `resolveToolPermission` lifts only an `ask` to `auto`, before the API-key clamp; `off` wins,
+  a headless run ignores grants (it does not even read them — the same "inherits nothing" rule as every other consent),
+  and `device:` keys and `builtin:askUser` never take one (the device approves again, with taint known only there;
+  `respondToToolApproval` refuses it). A tool built under a grant gets `needsApproval: () => Date.now() >= expiresAt`,
+  so a long run notices the lapse at the next call. "Today" ends at the user's next local midnight from
+  `userSettings.timezone` (UTC when unset). Lapsed entries are pruned on every grant write and by the
+  `pruneExpiredToolPermissionGrants` housekeeping sweep. The MCP-app proxy (`lib/mcp-apps.ts`) does not honour grants.
+
 - **Auto-continue ("Deep Work")** — raises the agent loop from 5 to 25
   `maxSteps`. All triggers use it by default.
 
