@@ -585,6 +585,31 @@ describe("addAsideToThread", () => {
         await expect(addToThread()).resolves.toHaveProperty("messageId");
     });
 
+    it("is refused while an older reply still runs behind several newer dead streams", async () => {
+        for (let index = 0; index < 6; index += 1) {
+            await insertStream({ expiresAt: Date.now() - 1000 });
+        }
+
+        await expect(addToThread()).rejects.toThrow("Wait for the reply");
+    });
+
+    it("is refused while an edit is still streaming its reply", async () => {
+        await finishReply();
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("streamingMessages", {
+                    order: 1,
+                    state: { kind: "streaming", lastHeartbeat: Date.now() },
+                    stateKind: "streaming",
+                    stepOrder: 0,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(addToThread()).rejects.toThrow("Wait for the reply");
+    });
+
     it("writes exactly one assistant message once the reply has finished", async () => {
         await finishReply();
 

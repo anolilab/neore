@@ -40,7 +40,7 @@ import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
@@ -112,14 +112,22 @@ const LIVE_STREAM_CANDIDATES = 5;
  * the reaper has not reached yet is dead, and must neither feed a question nor block "Add to thread").
  */
 const findLiveStream = async (ctx: Reader, threadId: string, now: number) => {
+    // Expiry is part of the query: dead streams the reaper has not reached must not crowd a live one out of the page.
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: LIVE_STREAM_CANDIDATES,
         orderBy: [{ _creationTime: "desc" }],
-        where: { status: { in: ["pending", "streaming"] }, threadId },
+        where: { expiresAt: { gt: now }, status: { in: ["pending", "streaming"] }, threadId },
     });
 
-    return page.find((stream) => stream.expiresAt > now);
+    return page[0];
 };
+
+/** Whether an edit of the thread is still streaming its reply (edits run on `streamingMessages`, not a persistent stream). */
+const hasStreamingEdit = async (ctx: Reader, threadId: string): Promise<boolean> =>
+    (await ctx.db
+        .query("streamingMessages")
+        .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId as Id<"threads">).eq("stateKind", "streaming"))
+        .first()) !== null;
 
 /** A finished text row of the user or the assistant, as the snapshot carries it; tool traffic and unfinished rows are not. */
 const usableRowOf = (row: Doc<"messages">): AsideRow | undefined => {
@@ -469,7 +477,7 @@ export const addAsideToThread = authMutation
         }
 
         // A row that lands after a running reply's pending row would split that reply across two branches.
-        if (await findLiveStream(ctx, threadId, ctx.now)) {
+        if ((await findLiveStream(ctx, threadId, ctx.now)) || (await hasStreamingEdit(ctx, threadId))) {
             throw new LunoraError("CONFLICT", "Wait for the reply to finish before adding this to the thread");
         }
 
