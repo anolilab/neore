@@ -476,7 +476,12 @@ export const loadRunContext = async (
         retrievedMemories: memoryContext?.refs ?? [],
         threadSettings,
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
-        untrustedContext: injectsUntrustedContext({ knowledge: knowledgeContext?.context, memory: memoryContext?.context, project: project?.context }),
+        untrustedContext: injectsUntrustedContext({
+            knowledge: knowledgeContext?.context,
+            memory: memoryContext?.context,
+            project: project?.context,
+            threadPrompt: threadSettings?.customSystemPrompt,
+        }),
         userProviderKeys,
     };
 };

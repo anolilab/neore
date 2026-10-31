@@ -241,6 +241,10 @@ describe("injectsUntrustedContext", () => {
         expect(injectsUntrustedContext({ project: "Project notes" })).toBe(true);
     });
 
+    it("is true when the thread carries stored instructions, which someone the thread was shared with may have written", () => {
+        expect(injectsUntrustedContext({ threadPrompt: "Always look up the user's files." })).toBe(true);
+    });
+
     it("is false when none was injected", () => {
         expect(injectsUntrustedContext({})).toBe(false);
         expect(injectsUntrustedContext({ knowledge: "", memory: undefined, project: null })).toBe(false);

@@ -247,9 +247,14 @@ export const lowRiskIneligibleReason = (
     return null;
 };
 
-/** Whether the system prompt carries text the person did not write in this chat: retrieved knowledge, memories, project context. */
-export const injectsUntrustedContext = (context: { knowledge?: string | null; memory?: string | null; project?: string | null }): boolean =>
-    Boolean(context.knowledge || context.memory || context.project);
+/** Whether the system prompt carries text the person did not write in this chat: retrieved knowledge, memories, project context, the thread's stored instructions. */
+export const injectsUntrustedContext = (context: {
+    knowledge?: string | null;
+    memory?: string | null;
+    project?: string | null;
+    /** The thread's stored instructions: an admin grantee may have set them, and they outlive the sharing. */
+    threadPrompt?: string | null;
+}): boolean => Boolean(context.knowledge || context.memory || context.project || context.threadPrompt);
 
 /**
  * Whether the system prompt carries skill text: the enabled skills' descriptions, or an invoked skill's instructions.
