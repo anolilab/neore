@@ -5,7 +5,7 @@ import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import env from "@/lib/env";
 
@@ -124,6 +124,7 @@ const WatchedRepositories = ({ onSelect, webhooks }: { onSelect: (repo: string, 
     const list = useWatchedRepositories(true);
     const { watch } = useWatchMutations();
     const [repo, setRepo] = useState("");
+    const errorId = useId();
 
     useRefreshWatchedOnOpen(true);
 
@@ -145,6 +146,8 @@ const WatchedRepositories = ({ onSelect, webhooks }: { onSelect: (repo: string, 
             <p className="text-muted-foreground text-xs">{t`Neore keeps these up to date and tells you when someone asks for your review.`}</p>
             <form className="flex gap-2" onSubmit={submit}>
                 <Input
+                    aria-describedby={rejected ? errorId : undefined}
+                    aria-invalid={rejected}
                     aria-label={t`Repository to watch`}
                     maxLength={200}
                     onChange={(event) => setRepo(event.target.value)}
@@ -156,7 +159,7 @@ const WatchedRepositories = ({ onSelect, webhooks }: { onSelect: (repo: string, 
                 </Button>
             </form>
             {rejected && (
-                <p className="text-destructive text-xs" role="status">
+                <p className="text-destructive text-xs" id={errorId} role="alert">
                     {watch.data?.status === "limit" ? t`You are watching as many repositories as is allowed.` : t`That is not a repository address.`}
                 </p>
             )}

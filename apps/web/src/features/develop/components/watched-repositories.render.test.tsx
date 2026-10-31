@@ -131,6 +131,23 @@ describe("WatchedRepositories", () => {
         expect(screen.getByText("You are watching as many repositories as is allowed.")).toBeTruthy();
     });
 
+    it("ties the refusal to the field, so a screen reader hears it there", () => {
+        state.results.watch = { status: "invalid" };
+
+        render(<WatchedRepositories onSelect={vi.fn()} webhooks />);
+
+        const field = screen.getByLabelText("Repository to watch");
+
+        fireEvent.change(field, { target: { value: "not a repo" } });
+        fireEvent.click(screen.getByText("Watch"));
+
+        const message = screen.getByRole("alert");
+
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(field.getAttribute("aria-describedby")).toBe(message.id);
+        expect(message.textContent).toBe("That is not a repository address.");
+    });
+
     it("shows the secret in the row that issued it, once it arrives", () => {
         state.results.enableWebhook = { id: "w1", secret: "s3cret", status: "ok" };
 
