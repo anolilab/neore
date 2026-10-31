@@ -25,3 +25,13 @@ export const createReconnectRefresher = (refresh: () => Promise<void> | void): R
         },
     };
 };
+
+/** What a reconnect runs: wait for the token to be renewed, then read again, so no read goes out on a token that lapsed offline. */
+export const renewTokenThenRefresh = ({ refresh, renewToken }: { refresh: () => void; renewToken: () => Promise<void> }) =>
+    async (): Promise<void> => {
+        try {
+            await renewToken();
+        } finally {
+            refresh();
+        }
+    };

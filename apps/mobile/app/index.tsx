@@ -11,7 +11,7 @@ import { mergeRows } from "@/offline/merge";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import type { ThreadPage } from "@/offline/thread-list";
-import { listNotice, loadCachedThreads, persistThreadPage, readLiveThreadList } from "@/offline/thread-list";
+import { combineFirstPage, listNotice, loadCachedThreads, persistThreadPage, readLiveThreadList } from "@/offline/thread-list";
 import type { ShownStatus, ThreadRow } from "@/offline/types";
 import { useHostStatuses } from "@/offline/use-host-statuses";
 
@@ -88,7 +88,8 @@ const ThreadList = () => {
                     setThreads((current) => mergeRows(current, cached));
                 }
 
-                setCacheChecked(true);
+                // Not "checked" while the account's cache is still binding: nothing is known about what is saved yet.
+                setCacheChecked(cache !== undefined);
             }
         };
 
@@ -112,9 +113,17 @@ const ThreadList = () => {
 
             switch (result.kind) {
                 case "page": {
+                    // A complete list is the whole truth (the cache was just pruned to it). A partial first page is only
+                    // the newest 100: the saved rows beyond it stay until later pages replace them.
+                    const shown = result.page.isDone ? result.page.rows : combineFirstPage(result.page.rows, await loadCachedThreads(cache));
+
+                    if (isCancelled) {
+                        return;
+                    }
+
                     hasLiveData.current = true;
                     setIsLive(true);
-                    setThreads(result.page.rows);
+                    setThreads(shown);
                     setCursor(result.page.continueCursor);
                     setIsDone(result.page.isDone);
                     reportRead("succeeded");

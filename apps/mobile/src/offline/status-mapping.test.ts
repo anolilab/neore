@@ -10,10 +10,16 @@ describe("status mapping", () => {
         expect(hostSessionToStatus(base)).toMatchObject({ lastSeenAt: 10, updatedAt: 10 });
     });
 
-    it("stamps a worker run with its start, or its creation while it is queued", () => {
+    it("versions a worker run by its start, or its creation while it is queued", () => {
         const base = { createdAt: 10, name: "Researcher", runId: "r1", status: "running", workerId: "w1" };
 
-        expect(workerRunToStatus({ ...base, startedAt: 30 })).toMatchObject({ id: "worker:r1", kind: "worker", threadId: "w1", updatedAt: 30 });
-        expect(workerRunToStatus({ ...base, startedAt: null })).toMatchObject({ updatedAt: 10 });
+        expect(workerRunToStatus({ ...base, startedAt: 30 }, 99)).toMatchObject({ id: "worker:r1", kind: "worker", threadId: "w1", updatedAt: 30 });
+        expect(workerRunToStatus({ ...base, startedAt: null }, 99)).toMatchObject({ updatedAt: 10 });
+    });
+
+    it("says a worker run was last seen when it was last read, not when it started", () => {
+        const run = { createdAt: 10, name: "Researcher", runId: "r1", startedAt: 30, status: "running", workerId: "w1" };
+
+        expect(workerRunToStatus(run, 99).lastSeenAt).toBe(99);
     });
 });

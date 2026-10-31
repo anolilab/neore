@@ -10,14 +10,14 @@ import { settleQuietly } from "./quietly";
 import { hostSessionToStatus, workerRunToStatus } from "./status-mapping";
 import type { CachedStatus, ShownStatus, StatusRow } from "./types";
 
-const readLiveStatuses = async (): Promise<CachedStatus[]> => {
+const readLiveStatuses = async (observedAt: number): Promise<CachedStatus[]> => {
     const client = getClient();
     const [sessions, workers] = await Promise.all([
         client.query(api.acp.functions.listHostSessions, {}),
         client.query(api.sub_agents.functions.listActiveWorkerRuns, {}),
     ]);
 
-    return [...sessions.map((session) => hostSessionToStatus(session)), ...workers.map((run) => workerRunToStatus(run))];
+    return [...sessions.map((session) => hostSessionToStatus(session)), ...workers.map((run) => workerRunToStatus(run, observedAt))];
 };
 
 /**
@@ -58,7 +58,7 @@ export const useHostStatuses = (): Map<string, ShownStatus> => {
             const startedAt = Date.now();
 
             try {
-                const live = await readLiveStatuses();
+                const live = await readLiveStatuses(startedAt);
 
                 if (!isCancelled) {
                     hasLiveRows.current = true;

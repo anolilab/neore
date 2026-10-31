@@ -36,15 +36,18 @@ export const hostSessionToStatus = (session: HostSessionView): CachedStatus => {
     };
 };
 
-/** A live worker run as a status row on the worker's own thread. */
-export const workerRunToStatus = (run: WorkerRunView): CachedStatus => {
+/**
+ * A live worker run as a status row on the worker's own thread. The run carries no activity time, so it is versioned
+ * by its start and "last seen" is when the phone last read it (`observedAt`), never the start.
+ */
+export const workerRunToStatus = (run: WorkerRunView, observedAt: number): CachedStatus => {
     const updatedAt = run.startedAt ?? run.createdAt;
 
     return {
         id: `worker:${run.runId}`,
         kind: "worker",
         label: run.name,
-        lastSeenAt: updatedAt,
+        lastSeenAt: observedAt,
         status: run.status,
         threadId: run.workerId,
         updatedAt,

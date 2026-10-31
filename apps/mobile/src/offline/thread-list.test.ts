@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createOfflineCache } from "./cache";
 import { createTestDatabase } from "./test-database";
 import type { ThreadPage } from "./thread-list";
-import { listNotice, loadCachedThreads, OFFLINE_EMPTY_NOTICE, persistThreadPage, readLiveThreadList } from "./thread-list";
+import { combineFirstPage, listNotice, loadCachedThreads, OFFLINE_EMPTY_NOTICE, persistThreadPage, readLiveThreadList } from "./thread-list";
 import type { ThreadRow } from "./types";
 
 const open: { close: () => void }[] = [];
@@ -116,6 +116,22 @@ describe("persisting a live page", () => {
         const complete = await loadCachedThreads(scoped);
 
         expect(complete.map((thread) => thread.id)).toEqual(["a"]);
+    });
+});
+
+describe("combineFirstPage", () => {
+    it("keeps saved threads the first live page does not reach, newest first", () => {
+        const combined = combineFirstPage([row("a", 50, 500), row("b", 40, 500)], [row("a", 50, 100), row("old", 5, 100)]);
+
+        expect(combined.map((thread) => thread.id)).toEqual(["a", "b", "old"]);
+    });
+
+    it("prefers the newer copy of a thread, and the live one on a tie", () => {
+        const [first] = combineFirstPage([row("a", 50, 500)], [{ ...row("a", 50, 100), title: "saved" }]);
+        const [second] = combineFirstPage([row("a", 60, 500)], [{ ...row("a", 50, 900), title: "saved" }]);
+
+        expect(first?.title).toBe("Thread a");
+        expect(second?.updatedAt).toBe(60);
     });
 });
 

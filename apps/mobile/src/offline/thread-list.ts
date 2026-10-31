@@ -1,5 +1,6 @@
 import type { ScopedCache } from "./cache";
 import { isNetworkFailure } from "./connectivity";
+import { mergeRows } from "./merge";
 import { settleQuietly } from "./quietly";
 import type { ThreadRow } from "./types";
 
@@ -15,6 +16,13 @@ export interface ThreadPage {
 
 export type LiveThreadListRead
     = { kind: "failed"; message: string } | { kind: "page"; page: ThreadPage; startedAt: number } | { kind: "unreachable" };
+
+/**
+ * The first live page joined with the saved rows it does not reach (the page holds 100; the cache up to 200), the newer
+ * copy of each thread winning. Without this the screen would show 100 rows where it had 200, until more pages load.
+ */
+export const combineFirstPage = (pageRows: ReadonlyArray<ThreadRow>, cachedRows: ReadonlyArray<ThreadRow>): ThreadRow[] =>
+    mergeRows(pageRows, cachedRows).toSorted((a, b) => b.updatedAt - a.updatedAt || b.id.localeCompare(a.id));
 
 /** The saved list. An unreadable cache is an empty one. */
 export const loadCachedThreads = async (cache: ScopedCache | undefined): Promise<ThreadRow[]> => {

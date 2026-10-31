@@ -31,6 +31,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [refreshTick, setRefreshTick] = useState(0);
     const [hasToken, setHasToken] = useState(false);
     const signOutCount = useRef(0);
+    // Callers of `retryToken` waiting for the attempt they asked for to end.
+    const renewalWaiters = useRef<(() => void)[]>([]);
     const [config] = useState(loadConfig);
     const [client] = useState(getClient);
 
@@ -40,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const signOutsAtStart = signOutCount.current;
         const isStale = () => isCancelled || signOutsAtStart !== signOutCount.current;
 
-        const run = async () => {
+        const mint = async () => {
             let jwt: string | null;
 
             try {
@@ -87,6 +89,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };
 
+        const run = async () => {
+            try {
+                await mint();
+            } finally {
+                const waiting = [...renewalWaiters.current];
+
+                renewalWaiters.current.length = 0;
+
+                for (const resolve of waiting) {
+                    resolve();
+                }
+            }
+        };
+
         run();
 
         return () => {
@@ -119,7 +135,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [client, config.lunoraUrl]);
 
-    const retryToken = useCallback(() => setRefreshTick(nextTick), []);
+    const retryToken = useCallback(
+        () =>
+            new Promise<void>((resolve) => {
+                renewalWaiters.current.push(resolve);
+                setRefreshTick(nextTick);
+            }),
+        [],
+    );
 
     const value = useMemo(() => {
         return { hasToken, retryToken, signIn, signOut, status, user };

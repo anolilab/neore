@@ -9,7 +9,7 @@ import type { ScopedCache } from "./cache";
 import { canWrite, INITIAL_CONNECTIVITY, isOffline as isOfflineState, isReachable, reduceConnectivity } from "./connectivity";
 import { getOfflineCache } from "./database";
 import { OfflineContext } from "./offline-context";
-import { createReconnectRefresher } from "./reconnect";
+import { createReconnectRefresher, renewTokenThenRefresh } from "./reconnect";
 
 /** While offline for a reason the device cannot report (a server that does not answer), read again this often. */
 const RETRY_MS = 15_000;
@@ -31,11 +31,14 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
     const isChecking = !isOffline && !canWrite(connectivity);
     const wasOffline = useRef(false);
     // Coming back online reads again, and mints a token first if the one held may have lapsed or was never fetched.
+    const retryTokenRef = useRef(retryToken);
     const refresher = useRef(
-        createReconnectRefresher(() => {
-            retryToken();
-            setRefreshTick(nextTick);
-        }),
+        createReconnectRefresher(
+            renewTokenThenRefresh({
+                refresh: () => setRefreshTick(nextTick),
+                renewToken: () => retryTokenRef.current(),
+            }),
+        ),
     );
 
     useEffect(() => {

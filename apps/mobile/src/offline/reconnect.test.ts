@@ -3,11 +3,50 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createReconnectRefresher } from "./reconnect";
+import { createReconnectRefresher, renewTokenThenRefresh } from "./reconnect";
 import { requireOnline } from "./write-gate";
 
 const SOURCE_FILE = /\.tsx?$/;
 const CLIENT_WRITE = /\.(?:mutation|action)\(/;
+
+describe("renewTokenThenRefresh", () => {
+    it("reads again only once the token has been renewed, so no read runs on a lapsed one", async () => {
+        const calls: string[] = [];
+        let finishRenewal: () => void = () => undefined;
+        const run = renewTokenThenRefresh({
+            refresh: () => {
+                calls.push("refresh");
+            },
+            renewToken: () => new Promise<void>((resolve) => {
+                calls.push("renew");
+                finishRenewal = resolve;
+            }),
+        });
+        const done = run();
+
+        expect(calls).toEqual(["renew"]);
+
+        finishRenewal();
+        await done;
+
+        expect(calls).toEqual(["renew", "refresh"]);
+    });
+
+    it("still reads again when the token could not be renewed", async () => {
+        const refresh = vi.fn();
+
+        const run = renewTokenThenRefresh({
+            refresh,
+            renewToken: async () => {
+                throw new Error("offline");
+            },
+        });
+
+        await expect(run()).rejects.toThrow("offline");
+
+        expect(refresh).toHaveBeenCalledTimes(1);
+    });
+});
 
 describe("reconnect", () => {
     it("refreshes on reconnect and sends nothing that was refused offline", async () => {
