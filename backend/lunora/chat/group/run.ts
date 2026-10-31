@@ -796,6 +796,8 @@ export const continueGroupAfterToolApproval = async (
     if (resumed.paused || resumed.stopped) {
         if (resumed.paused) {
             await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput });
+        } else {
+            await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
         }
 
         return;

@@ -7,7 +7,7 @@ import { internalMutation, internalQuery } from "../../_generated/server";
 import { vHostState } from "../../acp/validators";
 import { patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
-import { publicThread } from "../../agent/threads";
+import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
 import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
@@ -257,11 +257,11 @@ export const streamRunThreadHandler = async (ctx: QueryCtx, args: { streamId: Id
     }
 
     if (access.kind === "full") {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     if (access.kind === "locked" && !lockedAfterCreation(access.thread, stream._creationTime)) {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     return null;

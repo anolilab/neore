@@ -604,6 +604,10 @@ export const continueAfterToolApproval = internalAction
             }
 
             await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput, replied: !resumed.paused && !resumed.stopped });
+
+            if (resumed.stopped) {
+                await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
+            }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
 

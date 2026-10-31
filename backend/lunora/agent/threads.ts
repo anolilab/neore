@@ -8,7 +8,7 @@ import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
-import { deleteGoalsForThread, endActiveGoals } from "../chat/goals/rows";
+import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
 
 /**
  * Thread operations.
@@ -27,7 +27,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
-import { patchesWithoutAwaitingInput } from "./table-writes";
+import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
 import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
@@ -282,6 +282,21 @@ export const updateThread = internalMutation
         // Update aggregates
         // Handle thread orders aggregate
         return publicThread(newThread);
+    });
+
+/**
+ * A continuation the user stopped answers no request any more: the pause it was resumed from ends with it. A newer
+ * run on the thread owns `awaitingInput` now (it may have paused again), so it is left alone then.
+ */
+export const endStoppedPause = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await hasLiveStream(ctx, args.threadId))) {
+            await clearAwaitingInput(ctx.db, args.threadId);
+        }
+
+        return null;
     });
 
 export const searchThreadTitles = query
@@ -1095,7 +1110,7 @@ export const getThreadWithAccess = internalQuery
             return null;
         }
 
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     });
 
 export const checkThreadAccessBatch = internalQuery
@@ -1123,7 +1138,7 @@ export const checkThreadAccessBatchHandler = async (
         return { hasAccess: false as const, permission: null, thread: null };
     }
 
-    return { hasAccess: true as const, permission: access.permission, thread: publicThread(access.thread) };
+    return { hasAccess: true as const, permission: access.permission, thread: threadForViewer(access.thread, args.userId) };
 };
 
 export const searchThreadsByTitleAndSummary = query
