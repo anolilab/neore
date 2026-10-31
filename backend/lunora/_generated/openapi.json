@@ -27193,6 +27193,9 @@
                         "type": "string",
                         "x-lunora-table": "deviceCalls"
                       },
+                      "claimId": {
+                        "type": "string"
+                      },
                       "deviceId": {
                         "description": "Id<\"devices\">",
                         "type": "string",

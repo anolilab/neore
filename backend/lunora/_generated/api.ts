@@ -390,7 +390,7 @@ export interface ApiTypes {
     devices: {
         functions: {
             claimDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; claimId?: string; deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }, { claimed: boolean }>;
-            completeDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { accepted: boolean }>;
+            completeDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; claimId?: string; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { accepted: boolean }>;
             getDeviceCallByToolCall: FunctionReference<"query", { toolCallId: string }, null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }, { paired: boolean }>;
             listDeviceCalls: FunctionReference<"query", { deviceId?: Id<"devices">; limit?: number }, Array<{ _id: string; claimedAt?: number; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
