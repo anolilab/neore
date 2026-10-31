@@ -125,6 +125,8 @@ const hostWorker = (device: Device, overrides: Row = {}) => {
     };
 };
 
+const HOST_NO_TOOLS_OR_SKILL = /no tool list or skill/u;
+
 const createHostWorker = async (device: Device, overrides: Row = {}) =>
     (await as(OWNER).mutation(functions.createWorker as never, hostWorker(device, overrides) as never)) as { runId: string; state: string; workerId: string };
 
@@ -255,6 +257,17 @@ describe("creating a worker on a computer", () => {
         expect(first!.hostTurnId).toBe((await liveStream(receipt.workerId)).hostTurnId);
         // A host run is never put on the jobs queue.
         expect(jobsQueueMessages.filter((queued) => queued.body.functionPath.includes("runSubAgent"))).toHaveLength(0);
+    });
+
+    it("refuses a tool allowlist or a skill, which a coding agent on a computer would never receive", async () => {
+        const device = await pairedDevice();
+
+        await expect(createHostWorker(device, { toolAllowlist: ["webSearch"] })).rejects.toMatchObject({
+            message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL),
+        });
+        await expect(createHostWorker(device, { skill: "summarise" })).rejects.toMatchObject({ message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL) });
+        expect(await table("subAgentRuns")).toHaveLength(0);
+        expect(await table("deviceCalls")).toHaveLength(0);
     });
 
     it("refuses a pair the computer did not offer, creating nothing", async () => {

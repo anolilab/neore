@@ -462,6 +462,9 @@ const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in 
 const HOST_NEEDS_OWN_CONVERSATION =
     "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";
 
+const HOST_NO_TOOLS_OR_SKILL =
+    "A worker on a computer takes no tool list or skill: the coding agent there uses its own tools, each asked for on the computer, and only the task text reaches it.";
+
 const HOST_NOT_APPROVED = "That agent is not approved for that folder on this computer. Approve it in the desktop app first.";
 
 /** The offered pair a new host worker will run, from the caller's own computer; null for a cloud worker. */
@@ -593,6 +596,12 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     // be in the lead's context. The grant lookup decides past RLS: a hidden grant row must not read as "not shared".
     if (runnerKind === "host" && !(await loadEligibleThread({ db: systemDb(ctx) }, parent._id, args.userId))) {
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
+    }
+
+    // Only the task text reaches a coding agent on a computer: a stored tool list or skill would read as a limit that
+    // nothing applies there.
+    if (runnerKind === "host" && ((origin?.toolAllowlist ?? common.allowlist)?.length || (origin?.skillSlug ?? skillSlug) !== undefined)) {
+        return await refuse(other(HOST_NO_TOOLS_OR_SKILL));
     }
 
     const host = origin ? null : await resolveHostRunner(ctx, args);
