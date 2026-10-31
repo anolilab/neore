@@ -45,11 +45,11 @@ const fetchThreadPage = async (cursor: string | null, startedAt: number): Promis
 /** A host or worker status line for a row; any other thread shows one only while it is running. */
 const statusLine = (thread: ThreadRow, tracked: ShownStatus | undefined, isOffline: boolean, isLive: boolean) => {
     if (tracked) {
-        return <Text style={{ fontSize: 12 }}>{displayStatus(tracked.status, { fromCache: tracked.fromCache, isOffline, lastSeenAt: tracked.lastSeenAt })}</Text>;
+        return <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>{displayStatus(tracked.status, { fromCache: tracked.fromCache, isOffline, lastSeenAt: tracked.lastSeenAt })}</Text>;
     }
 
     if (thread.status === "running") {
-        return <Text style={{ fontSize: 12 }}>{displayStatus(thread.status, { fromCache: !isLive, isOffline, lastSeenAt: thread.syncedAt })}</Text>;
+        return <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>{displayStatus(thread.status, { fromCache: !isLive, isOffline, lastSeenAt: thread.syncedAt })}</Text>;
     }
 
     return null;

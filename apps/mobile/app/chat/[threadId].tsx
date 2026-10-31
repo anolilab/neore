@@ -15,7 +15,7 @@ import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
 import { mergeRows } from "@/offline/merge";
-import { createMessageReadGate, readThreadMessages } from "@/offline/message-read";
+import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import type { MessageRow } from "@/offline/types";
@@ -112,6 +112,15 @@ const Chat = () => {
 
     useEffect(() => () => sendAbort.current?.abort(), []);
 
+    // Locked, gone or no longer shared: the saved copy is dropped, and nothing of it stays on screen.
+    const showRefused = useCallback(() => {
+        isRefused.current = true;
+        hasLiveRows.current = false;
+        setRows([]);
+        setOlderCursor(null);
+        setError(REFUSED_MESSAGE);
+    }, []);
+
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(async (id: string) => {
         const result = await readThreadMessages({
@@ -143,12 +152,7 @@ const Chat = () => {
                 break;
             }
             case "refused": {
-                // Locked or gone: the saved copy is dropped, and nothing of it stays on screen.
-                isRefused.current = true;
-                hasLiveRows.current = false;
-                setRows([]);
-                setOlderCursor(null);
-                setError(REFUSED_MESSAGE);
+                showRefused();
                 reportRead("succeeded");
                 break;
             }
@@ -171,7 +175,7 @@ const Chat = () => {
                 break;
             }
         }
-    }, [cache, reportRead]);
+    }, [cache, reportRead, showRefused]);
 
     const loadOlder = async () => {
         if (!threadId || olderCursor === null || isLoadingOlder) {
@@ -181,14 +185,41 @@ const Chat = () => {
         setIsLoadingOlder(true);
 
         try {
-            const page = await fetchMessagePage(threadId, olderCursor);
+            const result = await readOlderMessages({
+                cache,
+                fetchPage: async () => {
+                    const page = await fetchMessagePage(threadId, olderCursor);
+                    const syncedAt = Date.now();
 
-            const syncedAt = Date.now();
+                    return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed() };
+                },
+                gate: readGate.current,
+                threadId,
+            });
 
-            setRows((current) => [...page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed(), ...current]);
-            setOlderCursor(page.isDone ? null : page.continueCursor);
-        } catch (error_: unknown) {
-            setError(error_ instanceof Error ? error_.message : "Could not load messages.");
+            switch (result.kind) {
+                case "failed": {
+                    setError(result.message);
+                    break;
+                }
+                case "page": {
+                    setRows((current) => [...result.rows, ...current]);
+                    setOlderCursor(result.olderCursor);
+                    break;
+                }
+                case "refused": {
+                    showRefused();
+                    break;
+                }
+                case "unreachable": {
+                    setError("Could not load older messages. You appear to be offline.");
+                    break;
+                }
+                default: {
+                    // The screen moved on while the page loaded.
+                    break;
+                }
+            }
         } finally {
             setIsLoadingOlder(false);
         }

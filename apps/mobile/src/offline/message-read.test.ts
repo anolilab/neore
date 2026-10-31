@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createOfflineCache } from "./cache";
-import { createMessageReadGate, readThreadMessages } from "./message-read";
+import { createMessageReadGate, isThreadRefusal, readOlderMessages, readThreadMessages } from "./message-read";
 import { createTestDatabase } from "./test-database";
 import type { MessageRow } from "./types";
 
@@ -179,5 +179,111 @@ describe("overlapping reads", () => {
         const firstResult = await first;
 
         expect(firstResult.kind).toBe("superseded");
+    });
+});
+
+describe("a revoked grant", () => {
+    const revoked = () => Object.assign(new Error("Access denied to this thread"), { code: "UNAUTHORIZED" });
+
+    it("is a refusal, unlike a lapsed sign-in", () => {
+        expect(isThreadRefusal(revoked())).toBe(true);
+
+        const lapsed = Object.assign(new Error("Please sign in to continue"), { code: "UNAUTHORIZED" });
+
+        expect(isThreadRefusal(lapsed)).toBe(false);
+    });
+
+    it("drops the saved copy of a chat that is no longer shared", async () => {
+        const scoped = await setup();
+
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "secret", threadId: "t1" }]);
+
+        const result = await readThreadMessages({
+            cache: scoped,
+            fetchRows: async () => {
+                throw revoked();
+            },
+            gate: createMessageReadGate(),
+            threadId: "t1",
+        });
+
+        expect(result.kind).toBe("refused");
+        expect(await scoped.loadMessages("t1")).toEqual([]);
+    });
+});
+
+describe("an older page", () => {
+    const page = { olderCursor: "c2", rows: [row("m0", 1, 5)] };
+
+    it("is returned while the chat is current", async () => {
+        const scoped = await setup();
+
+        const result = await readOlderMessages({ cache: scoped, fetchPage: async () => page, gate: createMessageReadGate(), threadId: "t1" });
+
+        expect(result).toEqual({ kind: "page", ...page });
+    });
+
+    it("drops the saved copy when the server refuses the chat", async () => {
+        const scoped = await setup();
+
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "secret", threadId: "t1" }]);
+
+        const result = await readOlderMessages({
+            cache: scoped,
+            fetchPage: async () => {
+                throw forbidden();
+            },
+            gate: createMessageReadGate(),
+            threadId: "t1",
+        });
+
+        expect(result.kind).toBe("refused");
+        expect(await scoped.loadMessages("t1")).toEqual([]);
+        expect(await scoped.loadThreads()).toEqual([]);
+    });
+
+    it("keeps the saved copy when the server never answered, and reports a plain failure", async () => {
+        const scoped = await setup();
+
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "kept", threadId: "t1" }]);
+
+        const offline = await readOlderMessages({
+            cache: scoped,
+            fetchPage: async () => {
+                throw new TypeError("Network request failed");
+            },
+            gate: createMessageReadGate(),
+            threadId: "t1",
+        });
+        const broken = await readOlderMessages({
+            cache: scoped,
+            fetchPage: async () => {
+                throw new Error("boom");
+            },
+            gate: createMessageReadGate(),
+            threadId: "t1",
+        });
+
+        expect(offline.kind).toBe("unreachable");
+        expect(broken).toEqual({ kind: "failed", message: "boom" });
+        expect(await scoped.loadMessages("t1")).toHaveLength(1);
+    });
+
+    it("is dropped when the screen moved on while it loaded", async () => {
+        const scoped = await setup();
+        const gate = createMessageReadGate();
+
+        const result = await readOlderMessages({
+            cache: scoped,
+            fetchPage: async () => {
+                gate.invalidate();
+
+                return page;
+            },
+            gate,
+            threadId: "t1",
+        });
+
+        expect(result.kind).toBe("superseded");
     });
 });

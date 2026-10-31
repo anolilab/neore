@@ -5,18 +5,13 @@ import { openDatabaseAsync } from "expo-sqlite";
 import type { OfflineCache } from "./cache";
 import { createOfflineCache } from "./cache";
 import { databaseDirectory } from "./database-path";
+import { createLazyOpen } from "./lazy-open";
 
 const DATABASE_NAME = "neore-offline-cache.db";
 
 let cache: OfflineCache | undefined;
-let opening: Promise<SQLiteDatabase> | undefined;
-
-const database = (): Promise<SQLiteDatabase> => {
-    // eslint-disable-next-line unicorn/no-top-level-assignment-in-function -- opened once, on first use
-    opening ??= openDatabaseAsync(DATABASE_NAME, undefined, databaseDirectory(Paths.cache.uri));
-
-    return opening;
-};
+// A failed open is forgotten, so a later operation retries instead of failing for the rest of the process.
+const database = createLazyOpen((): Promise<SQLiteDatabase> => openDatabaseAsync(DATABASE_NAME, undefined, databaseDirectory(Paths.cache.uri)));
 
 /**
  * The one cache for the app, on a SQLite file in the cache directory (not the default folder, which iOS backs up to
