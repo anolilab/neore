@@ -468,7 +468,12 @@ msgstr "{0} è obbligatorio"
 
 #. placeholder {0}: done.items.length
 #: src/features/skills/components/bundle-import-dialog.tsx:215
-msgid "{0} items were created. Schedules and webhooks are switched off; turn each one on when you are ready."
+#~ msgid "{0} items were created. Schedules and webhooks are switched off; turn each one on when you are ready."
+#~ msgstr ""
+
+#. placeholder {0}: done.items.length
+#: src/features/skills/components/bundle-import-dialog.tsx:215
+msgid "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 msgstr ""
 
 #. placeholder {0}: stats.lines

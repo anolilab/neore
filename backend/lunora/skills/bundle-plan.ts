@@ -118,19 +118,17 @@ export interface PlanView {
 
 export const entryKey = (kind: BundleItemKind, index: number): string => `${kind}:${String(index)}`;
 
-/** The longest a value may be in the create procedures an import goes through (`createSkill`, `createTrigger`): a longer one is blocked here, not at import. */
-const CREATE_CAPS = { long: MAX_LENGTH.long, short: MAX_LENGTH.short } as const;
-
+/** A longer value is blocked here, not at import: `createSkill` caps these at `MAX_LENGTH.short` / `MAX_LENGTH.long`. */
 const skillCapProblems = (skill: SkillMarkdownData): string[] => {
     const problems: string[] = [];
     const tooLong = (value: string | undefined, max: number): boolean => value !== undefined && value.length > max;
 
-    if (tooLong(skill.category, CREATE_CAPS.short) || tooLong(skill.version, CREATE_CAPS.short) || skill.tags?.some((tag) => tooLong(tag, CREATE_CAPS.short))) {
-        problems.push(`The category, version and every tag must be ${String(CREATE_CAPS.short)} characters or less.`);
+    if (tooLong(skill.category, MAX_LENGTH.short) || tooLong(skill.version, MAX_LENGTH.short) || skill.tags?.some((tag) => tooLong(tag, MAX_LENGTH.short))) {
+        problems.push(`The category, version and every tag must be ${String(MAX_LENGTH.short)} characters or less.`);
     }
 
-    if (skill.variables?.some((variable) => tooLong(variable.description, CREATE_CAPS.long))) {
-        problems.push(`A variable's description must be ${String(CREATE_CAPS.long)} characters or less.`);
+    if (skill.variables?.some((variable) => tooLong(variable.description, MAX_LENGTH.long))) {
+        problems.push(`A variable's description must be ${String(MAX_LENGTH.long)} characters or less.`);
     }
 
     return problems;
@@ -426,7 +424,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
 // ─── The import ─────────────────────────────────────────────────────────────
 
-/** The creates and deletes an import is made of; the procedure wires them to `createSkill`, `createGroupChat`, `createTrigger` and the delete procedures. */
+/** The creates and deletes an import is made of; the procedure wires them to `createSkill`, `createImportedGroupChat`, `createTrigger` and the unlimited, owner-only `removeImportedItem`. */
 export interface BundleOps {
     createGroupChat: (args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string }) => Promise<string>;
     createSkill: (args: SkillCreate) => Promise<string>;

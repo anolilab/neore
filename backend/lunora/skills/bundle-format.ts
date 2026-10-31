@@ -38,7 +38,7 @@
 import { parseCustomModelId } from "@neore/ai/models";
 
 import { MAX_LENGTH } from "../lib/validators";
-import { FILTER_OPS, MAX_FILTERS } from "../triggers/filters";
+import { FILTER_OPS, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH } from "../triggers/filters";
 import type { SkillConfigData, SkillMarkdownData, SkillVariableData } from "./markdown";
 import { FRONTMATTER_RE, parseFrontmatterYaml, parseSkillMarkdown, skillToMarkdown, yamlString } from "./markdown";
 
@@ -148,6 +148,9 @@ const byteLength = (text: string): number => new TextEncoder().encode(text).leng
 const singleLine = (text: string, max: number): string => text.replaceAll(WHITESPACE_RE, " ").trim().slice(0, max);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** An icon an export keeps: short and not a URL or path. */
+const isPlainIcon = (icon: string | undefined): icon is string => !!icon && icon.length <= 64 && !NON_ICON_RE.test(icon);
 
 const isCustomModel = (model: string): boolean => model.startsWith("custom:") || parseCustomModelId(model) !== null;
 
@@ -367,6 +370,12 @@ const readFilters = (raw: unknown, problems: string[]): BundleFilter[] | undefin
             return undefined;
         }
 
+        if (record.path.length > MAX_PATH_LENGTH || (typeof record.value === "string" && record.value.length > MAX_FILTER_VALUE_LENGTH)) {
+            problems.push(`"filters" holds a path longer than ${String(MAX_PATH_LENGTH)} or a value longer than ${String(MAX_FILTER_VALUE_LENGTH)} characters`);
+
+            return undefined;
+        }
+
         filters.push({ op, path: record.path, ...(record.value !== undefined && { value: record.value as string }) });
     }
 
@@ -497,12 +506,14 @@ const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
         seenSlugs.add(parsed.skill.slug);
         warnings.push(...parsed.warnings);
 
-        // An export writes no variable default, so a file that carries one was edited by hand: it is not read.
+        // An export writes no variable default and only an emoji-like icon, so a file that carries more was edited by hand: it is not read.
         const variables = parsed.skill.variables?.map(({ description, name, required }) => {
             return { name, ...(description !== undefined && { description }), ...(required !== undefined && { required }) };
         });
 
-        entry.item = { kind: "skill", skill: { ...parsed.skill, ...(variables && { variables }) } };
+        const { icon, ...rest } = parsed.skill;
+
+        entry.item = { kind: "skill", skill: { ...rest, ...(isPlainIcon(icon) && { icon }), ...(variables && { variables }) } };
 
         return entry;
     }
@@ -673,7 +684,7 @@ export const skillItemOf = (
             };
         }),
     );
-    const icon = source.icon && source.icon.length <= 64 && !NON_ICON_RE.test(source.icon) ? source.icon : undefined;
+    const icon = isPlainIcon(source.icon) ? source.icon : undefined;
     const tags = compact(source.tags);
 
     return {

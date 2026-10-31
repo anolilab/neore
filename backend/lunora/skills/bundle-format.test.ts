@@ -130,6 +130,25 @@ describe("variables", () => {
     });
 });
 
+describe("hand-edited fields", () => {
+    it("keeps an emoji icon and drops one that is a URL or path", () => {
+        const read = (icon: string) => items(buildBundleMarkdown(bundleOf([skillItem({ ...SKILL, icon })])))[0];
+
+        expect(read("📄")).toMatchObject({ skill: { icon: "📄" } });
+        expect(read("https://example.com/i.png")).not.toHaveProperty("skill.icon");
+        expect(read("../x.png")).not.toHaveProperty("skill.icon");
+    });
+
+    it("blocks a webhook filter longer than the trigger create accepts, whatever its operator", () => {
+        const markdown = buildBundleMarkdown(
+            bundleOf([{ kind: "trigger", trigger: { ...WEBHOOK, filters: [{ op: "exists", path: "action", value: "v".repeat(501) }] } }]),
+        );
+        const [entry] = parseOk(markdown).entries;
+
+        expect(entry?.problems.join(" ")).toMatch(/longer than/);
+    });
+});
+
 describe("embedded SKILL.md content", () => {
     const hostile: SkillMarkdownData = {
         ...SKILL,

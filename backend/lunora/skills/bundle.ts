@@ -11,9 +11,11 @@
  *   read a skill.
  * - Preview and import both parse the file on the SERVER and plan it against
  *   the caller's current state; the plan is never taken from the client. An
- *   import creates through `createSkill`, `createGroupChat` and `createTrigger`
- *   themselves, so every rule of the editor applies, and triggers are created
- *   disabled by `createTrigger` itself.
+ *   import creates skills through `createSkill` and triggers through
+ *   `createTrigger` themselves, so every rule of the editor applies (and
+ *   `createTrigger` makes triggers disabled). Group chats go through the
+ *   internal `createImportedGroupChat`, which applies the same participant and
+ *   option checks but accepts participants that are switched off.
  * - Imported skills are created SWITCHED OFF: an enabled skill's name and
  *   description go into the system prompt of every chat, so a file from someone
  *   else must not reach them until the user turns the skill on. Triggers are
@@ -77,13 +79,13 @@ const readableSkillIds = async (
     const others = new Set(
         groups.flatMap((thread) => [
             ...(thread.groupChat?.participants.map((participant) => participant.skillId) ?? []),
-            thread.groupChat?.synthesizerSkillId ?? "",
+            ...(thread.groupChat?.synthesizerSkillId ? [thread.groupChat.synthesizerSkillId] : []),
         ]),
     );
     const subject = { organizationId: ctx.user.activeOrganization?.id, userId: ctx.user.userId };
 
     for (const skillId of others) {
-        if (skillId === "" || owned.has(skillId)) {
+        if (owned.has(skillId)) {
             continue;
         }
 

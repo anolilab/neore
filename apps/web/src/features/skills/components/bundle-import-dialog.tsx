@@ -212,7 +212,7 @@ const ImportResult: FC<{ done: Imported; onClose: () => void }> = ({ done, onClo
         <>
             <DialogHeader>
                 <DialogTitle>{t`Bundle imported`}</DialogTitle>
-                <DialogDescription>{t`${done.items.length} items were created. Schedules and webhooks are switched off; turn each one on when you are ready.`}</DialogDescription>
+                <DialogDescription>{t`${done.items.length} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready.`}</DialogDescription>
             </DialogHeader>
             <DialogPanel className="space-y-3">
                 <ul className="space-y-1 text-sm">

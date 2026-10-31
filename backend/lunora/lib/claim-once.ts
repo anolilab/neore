@@ -17,6 +17,7 @@
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
  * | `worker-dispatch`  | `tool:<userId>:<toolCallId>` or `client:<threadId>:<clientId>` | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
+ * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
