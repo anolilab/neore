@@ -192,7 +192,7 @@ msgid "{0, plural, one {# check is still running} other {# checks are still runn
 msgstr ""
 
 #. placeholder {0}: files.length
-#: src/features/chat/thread/host-changes.tsx:44
+#: src/features/chat/thread/host-changes.tsx:53
 msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr ""
 
@@ -771,6 +771,10 @@ msgstr "{count, plural, one {# celda copiada} other {# celdas copiadas}}"
 #: ../../packages/ui/src/hooks/use-data-grid.ts:385
 msgid "{count, plural, one {# cell cut} other {# cells cut}}"
 msgstr "{count, plural, one {# celda cortada} other {# celdas cortadas}}"
+
+#: src/features/chat/host/diff-comments-draft.tsx:39
+msgid "{count, plural, one {# comment ready to send to the agent} other {# comments ready to send to the agent}}"
+msgstr ""
 
 #: src/features/chat/forward/forward-selection-bar.tsx:69
 msgid "{count, plural, one {# message selected} other {# messages selected}}"
@@ -2038,6 +2042,10 @@ msgstr "Añadir comprobación"
 msgid "Add Circle"
 msgstr "Añadir círculo"
 
+#: src/features/chat/host/diff-comment-form.tsx:77
+msgid "Add comment"
+msgstr ""
+
 #: src/features/canvas/components/canvas-toolbar.tsx:40
 msgid "Add comments"
 msgstr "Añadir comentarios"
@@ -2225,6 +2233,10 @@ msgstr ""
 #: src/features/workflow/components/nodes/object-editor-node.tsx:26
 msgid "Add/Replace Object"
 msgstr "Añadir/reemplazar objeto"
+
+#: src/features/chat/thread/host-diff-viewer.tsx:87
+msgid "added"
+msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:66
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
@@ -2977,7 +2989,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:63
+#: src/features/chat/host/host-composer.tsx:64
 msgid "Allow once"
 msgstr ""
 
@@ -5013,6 +5025,7 @@ msgstr "Canadá"
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
+#: src/features/chat/host/diff-comment-form.tsx:80
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5311,8 +5324,13 @@ msgstr ""
 msgid "Changes from the last refinement"
 msgstr "Cambios del último refinamiento"
 
-#: src/features/chat/thread/host-changes.tsx:75
+#: src/features/chat/thread/host-changes.tsx:123
 msgid "Changes in this turn"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:198
+msgid "Changes to {0}"
 msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:129
@@ -6308,10 +6326,35 @@ msgstr "Comentar"
 msgid "Comment color"
 msgstr "Color del comentario"
 
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-changes.tsx:76
+msgid "Comment on {0}"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:268
+msgid "Comment on {0}, lines {rangeLabel}"
+msgstr ""
+
+#: src/features/chat/thread/host-diff-viewer.tsx:210
+msgid "Comment on file"
+msgstr ""
+
 #. placeholder {0}: target.line
 #: src/features/develop/components/review-diff.tsx:169
 #: src/features/develop/components/review-diff.tsx:190
 msgid "Comment on line {0}"
+msgstr ""
+
+#: src/features/chat/thread/host-diff-viewer.tsx:260
+msgid "Comment on lines {rangeLabel}"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-changes.tsx:97
+#: src/features/chat/thread/host-diff-viewer.tsx:202
+#: src/features/chat/thread/host-diff-viewer.tsx:281
+msgid "Comment on the whole file {0}"
 msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:135
@@ -6319,6 +6362,10 @@ msgstr ""
 #: src/features/pages/components/page-view.tsx:439
 msgid "Comments"
 msgstr "Comentarios"
+
+#: src/features/chat/host/diff-comments-draft.tsx:37
+msgid "Comments for the agent"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:58
 #: src/features/marketing/data/models-data.ts:78
@@ -7082,12 +7129,12 @@ msgid "Context-aware generation"
 msgstr "Generación contextual"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:194
+#: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continuar"
 
-#: src/features/chat/host/host-composer.tsx:188
+#: src/features/chat/host/host-composer.tsx:180
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7670,7 +7717,7 @@ msgstr "No se pudo descargar {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:99
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "Could not reach the server. Try again."
 msgstr ""
 
@@ -7740,7 +7787,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:147
+#: src/features/chat/host/host-composer.tsx:138
 msgid "Could not send your answer."
 msgstr ""
 
@@ -8570,7 +8617,7 @@ msgstr "Rondas de debate"
 msgid "Debug an error or review my code..."
 msgstr "Depura un error o revisa mi código..."
 
-#: src/features/chat/host/host-composer.tsx:68
+#: src/features/chat/host/host-composer.tsx:69
 msgid "Decline"
 msgstr ""
 
@@ -9519,6 +9566,10 @@ msgstr "Desactivando..."
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "Descartar"
+
+#: src/features/chat/host/diff-comments-draft.tsx:90
+msgid "Discard comments"
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:275
 msgid "Discard the review"
@@ -13000,7 +13051,7 @@ msgstr "El nombre del archivo no puede estar vacío"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:41
+#: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr ""
 
@@ -15651,7 +15702,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:54
+#: src/features/chat/host/host-composer.tsx:55
 msgid "In {0}"
 msgstr ""
 
@@ -17046,6 +17097,12 @@ msgstr "Línea {line}, columna {column}"
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr "La línea {number} de esta transcripción no es JSON válido, así que la importación se detuvo."
 
+#. placeholder {0}: kindWord[line.kind]
+#. placeholder {1}: line.text
+#: src/features/chat/thread/host-diff-viewer.tsx:228
+msgid "Line {number}, {0}: {1}"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:171
 msgid "LINE Channel Access Token"
 msgstr "Channel Access Token de LINE"
@@ -17074,6 +17131,11 @@ msgstr "Incidencia de Linear {0}"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:25
 msgid "Linear multistep"
 msgstr "Multipaso lineal"
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:213
+msgid "Lines of {0}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:47
 msgid "Lines that are not valid JSON"
@@ -18313,7 +18375,7 @@ msgstr "Entrada de mensaje"
 msgid "Message selection"
 msgstr "Selección de mensajes"
 
-#: src/features/chat/host/host-composer.tsx:206
+#: src/features/chat/host/host-composer.tsx:198
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18325,7 +18387,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:200
+#: src/features/chat/host/host-composer.tsx:192
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -21098,7 +21160,7 @@ msgstr "Abrir la URL actual"
 msgid "Open Develop"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:50
+#: src/features/chat/thread/host-changes.tsx:59
 msgid "Open diff"
 msgstr ""
 
@@ -22399,7 +22461,7 @@ msgstr "Elimina de forma permanente tu cuenta y todos los datos asociados"
 msgid "Permission Level"
 msgstr "Nivel de permiso"
 
-#: src/features/chat/host/host-composer.tsx:160
+#: src/features/chat/host/host-composer.tsx:151
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -23843,6 +23905,10 @@ msgstr "Tarjeta de cita"
 msgid "Quote in reply"
 msgstr ""
 
+#: src/features/chat/host/diff-comments-draft.tsx:69
+msgid "Quoted diff lines will be shortened to fit; your comments are sent in full."
+msgstr ""
+
 #: src/features/chat/thread/text-selection-menu.tsx:426
 msgid "Quoted in composer"
 msgstr ""
@@ -24829,6 +24895,11 @@ msgstr "Quitar ordenación (con el foco)"
 msgid "Remove tag {tag}"
 msgstr "Quitar etiqueta {tag}"
 
+#. placeholder {0}: placeOf(comment, removed)
+#: src/features/chat/host/diff-comments-draft.tsx:51
+msgid "Remove the comment on {0}"
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:407
 msgid "Remove These Files"
 msgstr "Quitar estos archivos"
@@ -24840,6 +24911,11 @@ msgstr "Quitar usuario"
 #. placeholder {0}: variable.name
 #: src/features/prompts/components/variable-definitions.tsx:98
 msgid "Remove variable {0}"
+msgstr ""
+
+#: src/features/chat/host/diff-comments-draft.tsx:34
+#: src/features/chat/thread/host-diff-viewer.tsx:87
+msgid "removed"
 msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:70
@@ -26563,7 +26639,7 @@ msgstr "Modelo semirrealista con buena fidelidad al prompt"
 msgid "Semi-realistic visual style"
 msgstr "Estilo visual semirrealista"
 
-#: src/features/chat/host/host-composer.tsx:222
+#: src/features/chat/host/host-composer.tsx:214
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -26639,6 +26715,10 @@ msgstr ""
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:194
 msgid "Send this to the bot from your account:"
 msgstr "Envía esto al bot desde tu cuenta:"
+
+#: src/features/chat/host/diff-comments-draft.tsx:87
+msgid "Send to agent"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:373
 msgid "Send verification code"
@@ -27159,7 +27239,7 @@ msgstr "Iniciar sesión"
 msgid "Sign In Again"
 msgstr "Volver a iniciar sesión"
 
-#: src/features/chat/host/host-composer.tsx:92
+#: src/features/chat/host/host-send-errors.ts:14
 msgid "Sign in again to send."
 msgstr ""
 
@@ -28205,7 +28285,7 @@ msgstr "Iniciando la importación..."
 msgid "Starting test drive…"
 msgstr "Iniciando la prueba…"
 
-#: src/features/chat/host/host-composer.tsx:174
+#: src/features/chat/host/host-composer.tsx:166
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -28317,7 +28397,7 @@ msgstr "Bolsa"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:211
+#: src/features/chat/host/host-composer.tsx:203
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
@@ -29699,7 +29779,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
-#: src/features/chat/host/host-composer.tsx:97
+#: src/features/chat/host/host-send-errors.ts:19
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -29707,7 +29787,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:141
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -29719,8 +29799,12 @@ msgstr "La EncodingAESKey de 43 caracteres (el cifrado de mensajes debe estar en
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "El agente ya no podrá pedirle nada a este dispositivo. Su registro de actividad se conserva hasta que caduque."
 
-#: src/features/chat/host/host-composer.tsx:98
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "The agent is still working on the last message."
+msgstr ""
+
+#: src/features/chat/host/diff-comments-draft.tsx:74
+msgid "The agent is working. You can send these when it is done."
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:56
@@ -29824,17 +29908,21 @@ msgstr ""
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "La aplicación de escritorio funciona en macOS, Windows y Linux. Los instaladores se adjuntan a una versión de escritorio en GitHub y aparecen allí cuando esa versión se publica."
 
-#: src/features/chat/thread/host-changes.tsx:78
+#: src/features/chat/thread/host-changes.tsx:126
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:67
+#: src/features/chat/thread/host-changes.tsx:115
 msgid "The diff is too large to keep. The files and their line counts are shown."
 msgstr ""
 
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "Los documentos de los que debería recuperarse la respuesta. Se usan para la tasa de aciertos, MRR, precisión y exhaustividad."
+
+#: src/features/chat/host/diff-comment-form.tsx:72
+msgid "The draft is full. Send or remove some comments before adding more."
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:129
 msgid "The edited image is too large to save (>1 MB). Try cropping, downscaling, or applying fewer effects."
@@ -29958,7 +30046,7 @@ msgstr "La última solicitud de eliminación falló. Puedes volver a solicitarla
 msgid "the last time"
 msgstr "la última vez"
 
-#: src/features/chat/host/host-composer.tsx:184
+#: src/features/chat/host/host-composer.tsx:176
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -30232,6 +30320,10 @@ msgstr ""
 msgid "There's a problem with your internet connection or our servers."
 msgstr "Hay un problema con tu conexión a internet o con nuestros servidores."
 
+#: src/features/chat/host/diff-comments-draft.tsx:64
+msgid "These comments are too long to send as one message. Remove or shorten some."
+msgstr ""
+
 #: src/features/chat/thread/memory-usage-action.tsx:43
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "Estos recuerdos se añadieron al contexto de la IA para esta respuesta porque coincidían con tu mensaje."
@@ -30358,12 +30450,16 @@ msgstr "Este navegador no puede recibir notificaciones push aquí."
 msgid "This cannot be added to this chat."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:93
+#: src/features/chat/host/host-send-errors.ts:15
 msgid "This chat could not be found."
 msgstr ""
 
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
+msgstr ""
+
+#: src/features/chat/host/host-send-errors.ts:13
+msgid "This chat is locked. Unlock it to send."
 msgstr ""
 
 #: src/features/chat/thread/composer.tsx:585
@@ -30607,7 +30703,7 @@ msgstr "Este prompt configurará:"
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "Esto elimina los archivos del modelo de tu ordenador. Puedes volver a descargarlo más tarde."
 
-#: src/features/chat/host/host-composer.tsx:57
+#: src/features/chat/host/host-composer.tsx:58
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -30635,8 +30731,8 @@ msgstr "Este servidor requiere iniciar sesión. Guárdalo y luego elige Iniciar 
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "La entrada del registro de este servidor pide los valores de abajo. Completan la URL y los encabezados."
 
-#: src/features/chat/host/host-composer.tsx:96
-#: src/features/chat/host/host-composer.tsx:179
+#: src/features/chat/host/host-composer.tsx:171
+#: src/features/chat/host/host-send-errors.ts:18
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
 
@@ -31755,6 +31851,10 @@ msgstr "Sin categoría ({0})"
 #: src/features/skills/components/skill-item.tsx:142
 msgid "Uncategorized"
 msgstr "Sin categoría"
+
+#: src/features/chat/thread/host-diff-viewer.tsx:87
+msgid "unchanged"
+msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:72
 #: src/features/evals/components/run-comparison.tsx:56
@@ -33607,6 +33707,10 @@ msgstr "¿Qué debería cambiar?"
 msgid "What should happen with these messages?"
 msgstr "¿Qué debe pasar con estos mensajes?"
 
+#: src/features/chat/host/diff-comment-form.tsx:66
+msgid "What should the agent change?"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-dialog.tsx:208
 #: src/features/tasks/components/task-form-dialog.tsx:208
 msgid "What should the agent do?"
@@ -34054,7 +34158,7 @@ msgstr "Estás sin conexión."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Estás sin conexión. Neore se reconectará cuando vuelva la red."
 
-#: src/features/chat/host/host-composer.tsx:95
+#: src/features/chat/host/host-send-errors.ts:17
 msgid "You are sending too fast. Wait a moment."
 msgstr ""
 
@@ -34268,12 +34372,12 @@ msgstr ""
 msgid "your computer"
 msgstr "tu ordenador"
 
-#: src/features/chat/host/host-composer.tsx:91
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:141
+#: src/features/chat/host/host-send-errors.ts:12
 msgid "Your computer is busy. Try again in a moment."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:94
+#: src/features/chat/host/host-send-errors.ts:16
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr ""
 

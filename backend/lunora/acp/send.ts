@@ -1,6 +1,6 @@
 /**
  * `POST /hosts/send` — a message into a coding-agent thread from the web or the phone (plans/acp-agent-host.md
- * §4.6). The caller's bearer token names the owner; the body is `{ requestId, threadId, text }`.
+ * §4.6). The caller's bearer token names the owner; the body is `{ requestId, threadId, text, unlockProof? }`.
  *
  * {@link sendToHost} stores everything in one mutation and returns before anything reaches the computer: the
  * prompt as the user's message, the stream the turn will write (`accepted`), and the signed `acp_send` call. If
@@ -16,12 +16,14 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
+import { isUnlockProofValid } from "../agent/thread-passcode";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import { createHostStream } from "../chat/streaming/persistent/host";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
@@ -42,6 +44,7 @@ const vSendResult = v.union(
     v.object({
         outcome: v.union(
             v.literal("busy"),
+            v.literal("locked"),
             v.literal("not_found"),
             v.literal("offline"),
             v.literal("rate_limited"),
@@ -59,6 +62,8 @@ export const sendToHost = internalMutation
         requestId: v.string().max(MAX_LENGTH.id),
         text: v.string().max(100_000),
         threadId: v.string().max(MAX_LENGTH.id),
+        // The owner's passcode proof for a locked chat, as every other write into a thread takes it.
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(vSendResult)
@@ -87,6 +92,12 @@ export const sendToHost = internalMutation
             const first = page.find((stream) => stream._creationTime <= claimedAt);
 
             return { outcome: "duplicate" as const, ...(first && { messageId: first.messageId, streamId: first._id as string }) };
+        }
+
+        // A locked chat takes a new message only with a live proof of its passcode. This comes after the duplicate
+        // check, so the retry of a message that went out before the lock is still told so.
+        if (isThreadLocked(thread) && !(await isUnlockProofValid(ctx.db, thread, userId, args.unlockProof, now))) {
+            return { outcome: "locked" as const };
         }
 
         const session = await sessionOfThread(ctx, threadId);
@@ -144,6 +155,7 @@ const json = (body: unknown, status: number): Response => Response.json(body, { 
 
 const STATUS: Record<string, number> = {
     busy: 429,
+    locked: 403,
     not_found: 404,
     offline: 409,
     rate_limited: 429,
@@ -174,7 +186,7 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         return json({ error: "malformed" }, 400);
     }
 
-    const { requestId, text, threadId } = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+    const { requestId, text, threadId, unlockProof } = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
 
     if (
         typeof requestId !== "string" ||
@@ -184,7 +196,8 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         requestId.length > MAX_LENGTH.id ||
         threadId.length > MAX_LENGTH.id ||
         text.trim() === "" ||
-        text.length > MAX_SEND_CHARS
+        text.length > MAX_SEND_CHARS ||
+        (unlockProof !== undefined && (typeof unlockProof !== "string" || unlockProof.length > MAX_LENGTH.short))
     ) {
         return json({ error: "malformed" }, 400);
     }
@@ -205,7 +218,7 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
 
     const plan = getUserTier({ plan: user?.plan ?? null }) === "premium" ? "premium" : "free";
 
-    const result = await context.runMutation(internal.acp.send.sendToHost, { plan, requestId, text, threadId, userId });
+    const result = await context.runMutation(internal.acp.send.sendToHost, { plan, requestId, text, threadId, unlockProof, userId });
 
     if (result.outcome === "sent") {
         const streamToken = await createStreamToken(result.streamId, userId, threadId, signingSecret);

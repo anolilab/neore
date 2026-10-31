@@ -8107,7 +8107,7 @@ export interface Caller {
             startHostSession: (args: { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }) => Promise<{ started: boolean; threadId?: string }>;
         };
         send: {
-            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
+            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
         };
         upload: {
             finalizeHostUpload: (args: { filename: string; uploadId: string; userId: string }) => Promise<null | { fileId: string; mediaType: string; storageKey: string }>;

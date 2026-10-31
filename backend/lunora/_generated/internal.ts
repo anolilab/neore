@@ -26,7 +26,7 @@ export interface InternalApiTypes {
             verifyHostPost: FunctionReference<"query", { deviceId: string; now: number; payload: string; signature: string }, null | { userId: string }>;
         };
         send: {
-            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
+            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
         };
         upload: {
             finalizeHostUpload: FunctionReference<"action", { filename: string; uploadId: string; userId: string }, null | { fileId: string; mediaType: string; storageKey: string }>;
