@@ -1,7 +1,7 @@
 /** An in-memory folder for the runner's tests: files, symlinks and a watcher the test fires by hand. */
 import path from "node:path";
 
-import type { FileInfo, HookFs } from "./fs";
+import type { FileInfo, HookFs } from "../hooks/fs";
 
 export class FakeFs implements HookFs {
     public readonly files = new Map<string, string>();
@@ -16,6 +16,8 @@ export class FakeFs implements HookFs {
     public get watching(): boolean {
         return this.listener !== undefined;
     }
+
+    private failure: ((error: Error) => void) | undefined;
 
     private listener: ((eventType: string, filename: string | null) => void) | undefined;
 
@@ -39,6 +41,11 @@ export class FakeFs implements HookFs {
 
     public link(relative: string, target: string): void {
         this.links.set(path.join(this.root, relative), target);
+    }
+
+    /** The watcher reports an error, as it does when the system is out of watches. */
+    public fail(message: string): void {
+        this.failure?.(new Error(message));
     }
 
     public emit(eventType: "change" | "rename", filename: string | null): void {
@@ -82,8 +89,9 @@ export class FakeFs implements HookFs {
         .filter((relative) => !skip(relative))
         .slice(0, limit);
 
-    public watch = (_root: string, listener: (eventType: string, filename: string | null) => void): { close: () => void } => {
+    public watch = (_root: string, listener: (eventType: string, filename: string | null) => void, onError: (error: Error) => void): { close: () => void } => {
         this.listener = listener;
+        this.failure = onError;
 
         return {
             close: () => {

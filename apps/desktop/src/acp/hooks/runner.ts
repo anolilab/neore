@@ -196,11 +196,11 @@ export class HookRunner {
         const file = await loadHooksFile(this.options.fs, root);
 
         if (file.state === "none") {
-            return { hooks: [], state: "none" };
+            return { hooks: [], state: "none", watching: this.watching };
         }
 
         if (file.state === "invalid") {
-            return { error: file.error, hooks: [], state: "invalid" };
+            return { error: file.error, hooks: [], state: "invalid", watching: this.watching };
         }
 
         const approved = this.options.approvals.get(root);
@@ -212,7 +212,7 @@ export class HookRunner {
             state = "unapproved";
         }
 
-        return { hash: file.hash, hooks: file.hooks.map((hook) => viewOf(hook)), state };
+        return { hash: file.hash, hooks: file.hooks.map((hook) => viewOf(hook)), state, watching: this.watching };
     }
 
     /** Approves the file with this hash, if it is still the file on disk. What the person read is what is approved. */

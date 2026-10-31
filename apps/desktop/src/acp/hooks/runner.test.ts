@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FakeFs } from "../testing/hook-fs";
 import { HookApprovals } from "./approvals";
-import { FakeFs } from "./fake-fs";
 import { DEBOUNCE_MS, HOOK_MIN_INTERVAL_MS, HookRunner, MAX_FIRES_PER_HOUR, QUIET_MS } from "./runner";
 
 const ROOT = "/work/project";
@@ -432,6 +432,19 @@ describe("manual hooks", () => {
 });
 
 describe("stopping", () => {
+    it("stops when the watcher fails, and the view says the folder is not being watched", async () => {
+        await setup([review]);
+        const before = await runner.view();
+
+        expect(before.watching).toBe(true);
+        fs.fail("ENOSPC: System limit for number of file watchers reached");
+
+        const view = await runner.view();
+
+        expect(view.watching).toBe(false);
+        expect(fs.closed).toBe(true);
+    });
+
     it("closes the watcher, and nothing fires afterwards", async () => {
         await setup([review]);
         expect(runner.watching).toBe(true);

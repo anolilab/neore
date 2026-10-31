@@ -3,14 +3,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HookApprovals } from "./hooks/approvals";
-import { FakeFs } from "./hooks/fake-fs";
 import { DEBOUNCE_MS } from "./hooks/runner";
+import type { SessionObserver } from "./ingest";
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
 import { Scratch } from "./testing/harness";
+import { FakeFs } from "./testing/hook-fs";
 
 const REVIEW_PROMPT = /^\[Hook "Review"\] Review the file\./u;
 
@@ -18,11 +19,14 @@ let scratch: Scratch;
 let manager: AcpManager;
 let fs: FakeFs;
 let stateFolder: string;
+let observed: SessionObserver;
 
 const hooks = JSON.stringify({
     hooks: [
         { glob: "src/*.ts", id: "review", name: "Review", on: "saved", prompt: "Review the file." },
         { id: "summary", name: "Summary", on: "manual", prompt: "Summarise." },
+        // Matches the same files as "review" but has its own rate limit: only the quiet time after a turn keeps it from firing.
+        { glob: "src/**", id: "second", name: "Second", on: "saved", prompt: "Also this." },
     ],
     version: 1,
 });
@@ -41,6 +45,17 @@ const idle = (id: string) => expect.poll(() => manager.snapshot(id).status, { ti
 beforeEach(() => {
     scratch = new Scratch();
     stateFolder = mkdtempSync(path.join(tmpdir(), "neore-hooks-state-"));
+    observed = {
+        permissionRequested: vi.fn(),
+        permissionResolved: vi.fn(),
+        sessionEnded: vi.fn(),
+        sessionOpened: vi.fn(),
+        text: vi.fn(),
+        thought: vi.fn(),
+        tool: vi.fn(),
+        turnEnded: vi.fn(),
+        turnStarted: vi.fn(),
+    };
     fs = new FakeFs(scratch.work);
     fs.write(".neore/hooks.json", hooks);
     fs.write("src/a.ts");
@@ -48,6 +63,8 @@ beforeEach(() => {
         appVersion: "9.9.9",
         cancelGraceMs: 400,
         hooks: { approvals: new HookApprovals(path.join(stateFolder, "approvals.json")), fs },
+        hostInfo: () => { return { folderId: "folder-1", folderLabel: "project" }; },
+        observer: observed,
         onChange: () => {},
         plan: (_key, folder) => scratch.plan({}, folder),
         spawn: spawnAgent,
@@ -67,7 +84,7 @@ describe("hooks in a session", () => {
         const view = await manager.hooks(id);
 
         expect(view.state).toBe("unapproved");
-        expect(view.hooks.map((hook) => hook.id)).toEqual(["review", "summary"]);
+        expect(view.hooks.map((hook) => hook.id)).toEqual(["review", "summary", "second"]);
 
         await expect(manager.runHook(id, "summary", view.hash as string)).rejects.toThrow("approved");
         await manager.approveHooks(id, view.hash as string);
@@ -98,6 +115,22 @@ describe("hooks in a session", () => {
         });
 
         expect(manager.snapshot(id).turns).toHaveLength(1);
+    });
+
+    it("saves the prompt on the backend as the turn's user message, with the hook's mark, on a session the backend started too", async () => {
+        const id = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "backend-session", threadId: "thread-1" });
+
+        await expect.poll(() => fs.watching, { timeout: 4000 }).toBe(true);
+
+        const view = await manager.hooks(id);
+
+        await manager.approveHooks(id, view.hash as string);
+        await manager.runHook(id, "summary", view.hash as string);
+        await idle(id);
+
+        expect(id).toBe("backend-session");
+        expect(observed.turnStarted).toHaveBeenCalledWith("backend-session", expect.any(String), "[Hook \"Summary\"] Summarise.");
+        expect(observed.turnEnded).toHaveBeenCalled();
     });
 
     it("starts nothing by itself: with no session open there is no watcher and no hook to run", async () => {

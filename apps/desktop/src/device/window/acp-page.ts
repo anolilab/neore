@@ -569,12 +569,21 @@ const hookLine = (view: HooksView, sessionId: string, hook: HooksView["hooks"][n
 
 /** Streamed text re-renders the session many times a second; the file is read again at most this often unless the session or its status changed. */
 const HOOKS_REFRESH_MS = 1500;
-const hooksPanel: { read?: { at: number; id: string; status: string }; serial: number } = { serial: 0 };
+const hooksPanel: { read?: { at: number; id: string; status: string }; serial: number; trailing?: ReturnType<typeof setTimeout> } = { serial: 0 };
 
 const renderHooks = async (snapshot: SessionSnapshot, force = false): Promise<void> => {
     const now = Date.now();
 
     if (!force && hooksPanel.read?.id === snapshot.id && hooksPanel.read.status === snapshot.status && now - hooksPanel.read.at < HOOKS_REFRESH_MS) {
+        // A change that arrives inside the window (the file itself being edited, say) is still read once the window is over.
+        hooksPanel.trailing ??= setTimeout(() => {
+            hooksPanel.trailing = undefined;
+
+            if (state.selected === snapshot.id) {
+                renderHooks(snapshot, true);
+            }
+        }, HOOKS_REFRESH_MS);
+
         return;
     }
 
@@ -585,9 +594,9 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false): Promise<vo
     let view: HooksView;
 
     try {
-        view = snapshot.status === "ended" ? { hooks: [], state: "none" } : await globalThis.neoreDevice.acpHooks(snapshot.id);
+        view = snapshot.status === "ended" ? { hooks: [], state: "none", watching: false } : await globalThis.neoreDevice.acpHooks(snapshot.id);
     } catch {
-        view = { hooks: [], state: "none" };
+        view = { hooks: [], state: "none", watching: false };
     }
 
     // The session on show changed while the file was read.
@@ -598,7 +607,9 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false): Promise<vo
     const panel = $("acp-hooks");
 
     panel.hidden = view.state === "none";
-    $("acp-hooks-state").textContent = view.state === "invalid" ? `${HOOK_STATE_TEXT.invalid} ${view.error ?? ""}` : HOOK_STATE_TEXT[view.state];
+    const unwatched = view.state !== "invalid" && !view.watching ? " The folder is not being watched, so file hooks cannot fire; manual hooks still work." : "";
+
+    $("acp-hooks-state").textContent = `${view.state === "invalid" ? `${HOOK_STATE_TEXT.invalid} ${view.error ?? ""}` : HOOK_STATE_TEXT[view.state]}${unwatched}`;
     $("acp-hooks-list").replaceChildren(...view.hooks.map((hook) => hookLine(view, snapshot.id, hook)));
 
     const actions: HTMLElement[] = [];

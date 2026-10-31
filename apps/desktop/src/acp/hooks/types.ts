@@ -19,4 +19,6 @@ export interface HooksView {
     hash?: string;
     hooks: HookView[];
     state: "approved" | "changed" | "invalid" | "none" | "unapproved";
+    /** False when the folder is not being watched (the watcher failed, for one: the system can be out of watches), so file hooks cannot fire. */
+    watching: boolean;
 }
