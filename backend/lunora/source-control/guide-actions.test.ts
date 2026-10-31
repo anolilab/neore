@@ -339,7 +339,8 @@ describe("finalizeHostGuide", () => {
         const threadId = await run(async (ctx) => await ctx.db.insert("threads", { runner: "host", status: "active", title: "Guide", userId: MEMBER }));
         const guideId = await reserved({ source: "host", threadId });
         const streamId = await run(
-            async (ctx) => await createHostStream(ctx, { hostState: "accepted", messageId: "m1", threadId, turnId: crypto.randomUUID(), userId: MEMBER }, Date.now()),
+            async (ctx) =>
+                await createHostStream(ctx, { hostState: "accepted", messageId: "m1", threadId, turnId: crypto.randomUUID(), userId: MEMBER }, Date.now()),
         );
 
         await run(async (ctx) => await ctx.db.persistentChunks.insert({ seq: 0, streamId, text: answer }));

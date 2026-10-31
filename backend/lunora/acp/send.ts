@@ -123,7 +123,14 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     const turnId = crypto.randomUUID();
     const call = await createAcpCall(
         ctx,
-        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text: args.text, turnId }, kind: "acp_send", taintedBy: args.taintedBy, threadId, userId },
+        {
+            deviceId: session.deviceId,
+            input: { sessionId: session.hostSessionId, text: args.text, turnId },
+            kind: "acp_send",
+            taintedBy: args.taintedBy,
+            threadId,
+            userId,
+        },
         now,
     );
 
