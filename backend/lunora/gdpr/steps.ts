@@ -71,6 +71,7 @@ export const collectSettings = internalQuery
                       ...aiPreferences,
                       customAIProviders: undefined,
                       generalProviders: undefined,
+                      mcpSecretHeaders: undefined,
                       messengerKeys: undefined,
                       providerApiKeys: undefined,
                   }

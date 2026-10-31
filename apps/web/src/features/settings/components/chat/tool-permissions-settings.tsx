@@ -204,7 +204,7 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
                                 <p className="text-muted-foreground truncate text-xs">{server ? t`${server} · until ${until}` : t`Until ${until}`}</p>
                             </div>
                             <Button
-                                aria-label={t`Revoke the allow for ${tool}`}
+                                aria-label={server ? t`Revoke the allow for ${tool} on ${server}` : t`Revoke the allow for ${tool}`}
                                 disabled={isRevoking}
                                 onClick={() => onRevoke(key)}
                                 size="sm"

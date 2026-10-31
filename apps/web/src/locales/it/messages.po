@@ -33,7 +33,7 @@ msgstr "-- INSERISCI --"
 msgid "-- NORMAL --"
 msgstr "-- NORMALE --"
 
-#: src/features/notifications/components/notification-list.tsx:111
+#: src/features/notifications/components/notification-list.tsx:113
 msgid ", unread"
 msgstr ", non letta"
 
@@ -1666,7 +1666,7 @@ msgstr "Un segnaposto o una @menzione fuori dalle virgolette qui viene letto com
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:38
+#: src/features/notifications/lib/notification-labels.ts:39
 msgid "A question is waiting for you"
 msgstr "Una domanda ti aspetta"
 
@@ -1707,7 +1707,7 @@ msgstr "Un modello aggiunge i suoi partecipanti alle tue skill, dove puoi modifi
 msgid "A thread gets a reply"
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:65
+#: src/features/notifications/lib/notification-labels.ts:69
 msgid "A tool call needs your approval"
 msgstr "Una chiamata a uno strumento richiede la tua approvazione"
 
@@ -1719,7 +1719,7 @@ msgstr "Uno strumento non può essere contemporaneamente aggiunto e disattivato"
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "Quando crei questo trigger verranno generati un URL del webhook e un secret univoci. Usa l'URL come destinazione per i servizi esterni (Zapier, n8n, il tuo codice, ecc.)."
 
-#: src/features/notifications/lib/notification-labels.ts:71
+#: src/features/notifications/lib/notification-labels.ts:75
 msgid "A usage alert was triggered"
 msgstr ""
 
@@ -5429,11 +5429,11 @@ msgstr "Chat copiata negli appunti come Markdown"
 msgid "Chat Import"
 msgstr "Importazione chat"
 
-#: src/features/notifications/lib/notification-labels.ts:41
+#: src/features/notifications/lib/notification-labels.ts:42
 msgid "Chat import failed"
 msgstr "Importazione chat non riuscita"
 
-#: src/features/notifications/lib/notification-labels.ts:41
+#: src/features/notifications/lib/notification-labels.ts:42
 msgid "Chat import finished"
 msgstr "Importazione chat completata"
 
@@ -6149,11 +6149,11 @@ msgstr "Coding"
 msgid "Coding agent log"
 msgstr "Log dell'agente di coding"
 
-#: src/features/notifications/lib/notification-labels.ts:44
+#: src/features/notifications/lib/notification-labels.ts:45
 msgid "Coding agent run failed"
 msgstr "Esecuzione dell'agente di coding non riuscita"
 
-#: src/features/notifications/lib/notification-labels.ts:44
+#: src/features/notifications/lib/notification-labels.ts:45
 msgid "Coding agent run finished"
 msgstr "Esecuzione dell'agente di coding completata"
 
@@ -7551,6 +7551,10 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:171
+msgid "Could not answer. Please try again."
+msgstr ""
+
 #: src/features/pages/components/page-agent-dialog.tsx:81
 msgid "Could not apply the changes"
 msgstr "Impossibile applicare le modifiche"
@@ -8571,7 +8575,7 @@ msgstr "Riepilogo dell'accesso ai dati"
 msgid "Data Export"
 msgstr "Esportazione dati"
 
-#: src/features/notifications/lib/notification-labels.ts:50
+#: src/features/notifications/lib/notification-labels.ts:51
 msgid "Data export failed"
 msgstr "Esportazione dei dati non riuscita"
 
@@ -8642,7 +8646,12 @@ msgid "Debug an error or review my code..."
 msgstr "Correggi un errore o rivedi il mio codice..."
 
 #: src/features/chat/host/host-composer.tsx:69
+#: src/features/chat/thread/request-secret-prompt.tsx:261
 msgid "Decline"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:190
+msgid "Declined — continuing without it"
 msgstr ""
 
 #: src/features/chat/prompt-improvement/hooks/use-optimizer-style-labels.ts:50
@@ -11246,11 +11255,11 @@ msgstr "Estone (Estonia)"
 msgid "European Union"
 msgstr "Unione Europea"
 
-#: src/features/notifications/lib/notification-labels.ts:53
+#: src/features/notifications/lib/notification-labels.ts:54
 msgid "Eval run failed"
 msgstr "Esecuzione della valutazione non riuscita"
 
-#: src/features/notifications/lib/notification-labels.ts:53
+#: src/features/notifications/lib/notification-labels.ts:54
 msgid "Eval run finished"
 msgstr "Esecuzione della valutazione completata"
 
@@ -16267,6 +16276,10 @@ msgstr "Potrebbe essere stata eliminata oppure non hai più accesso."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Potrebbe essere scaduto, revocato o già usato. Chiedi un nuovo link."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:171
+msgid "It was not saved. Paste it again and save."
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-content.tsx:377
 msgid "It will be visible once approved by a moderator"
 msgstr "Sarà visibile dopo l'approvazione di un moderatore"
@@ -17328,7 +17341,7 @@ msgstr ""
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
 #: src/features/develop/components/pull-request-view.tsx:51
-#: src/features/develop/components/watched-repositories.tsx:168
+#: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "Caricamento"
 
@@ -18997,6 +19010,10 @@ msgstr "Più passaggi = qualità più alta, generazione più lunga"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Più di un proxy: uno strato intelligente tra la tua app e ogni provider di LLM."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:128
+msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:956
 msgid "Most advanced extended reasoning in the Claude family"
 msgstr "Il ragionamento esteso più avanzato della famiglia Claude"
@@ -19550,7 +19567,7 @@ msgstr "Neore Gateway supporta OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore include oltre 30 modelli: GPT-4, Claude, Gemini e DeepSeek per la chat. FLUX, Imagen, Stable Diffusion e Recraft per le immagini. Runway, Luma, Kling e Pika per i video. Passa dall’uno all’altro anche a metà conversazione."
 
-#: src/features/develop/components/watched-repositories.tsx:145
+#: src/features/develop/components/watched-repositories.tsx:146
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr ""
 
@@ -20745,7 +20762,7 @@ msgstr "Nulla è in attesa di te."
 msgid "Nothing to stop: that run had already ended."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:74
+#: src/features/notifications/lib/notification-labels.ts:78
 msgid "Notification"
 msgstr "Notifica"
 
@@ -22065,7 +22082,7 @@ msgstr "Sovrascrivi con la mia"
 msgid "Owner"
 msgstr "Proprietario"
 
-#: src/features/develop/components/watched-repositories.tsx:151
+#: src/features/develop/components/watched-repositories.tsx:154
 msgid "owner/name"
 msgstr ""
 
@@ -22377,6 +22394,10 @@ msgstr "Incolla l’URL dell’immagine"
 #: src/features/workflow/components/nodes/character-ref-node.tsx:188
 msgid "Paste image URL..."
 msgstr "Incolla l’URL dell’immagine..."
+
+#: src/features/chat/thread/request-secret-prompt.tsx:238
+msgid "Paste it here — it is not shown in the chat"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:123
 msgid "Paste only what fits in the existing rows"
@@ -23050,6 +23071,10 @@ msgstr "Trasparenza del ragionamento di livello premium"
 #: src/features/chat/thread/ask-user-prompt.tsx:122
 msgid "Preparing a question…"
 msgstr "Preparazione di una domanda…"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:196
+msgid "Preparing a request…"
+msgstr ""
 
 #: src/features/knowledge/components/knowledge-import-actions.tsx:111
 msgid "Preparing the import…"
@@ -25098,7 +25123,7 @@ msgstr "Repository, issue, PR e ricerca nel codice"
 msgid "Repository"
 msgstr "Repository"
 
-#: src/features/develop/components/watched-repositories.tsx:148
+#: src/features/develop/components/watched-repositories.tsx:151
 msgid "Repository to watch"
 msgstr ""
 
@@ -25539,6 +25564,10 @@ msgstr "Revoca sessione"
 msgid "Revoke the allow for {tool}"
 msgstr ""
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+msgid "Revoke the allow for {tool} on {server}"
+msgstr ""
+
 #. placeholder {0}: result.revokedCount
 #: src/features/admin/components/user-sessions-dialog.tsx:55
 msgid "Revoked {0} sessions"
@@ -25913,6 +25942,7 @@ msgstr "Arabia Saudita"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/chat/thread/request-secret-prompt.tsx:257
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26018,6 +26048,14 @@ msgstr "Salva workflow"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Saved"
 msgstr "Salvato"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:194
+msgid "Saved — continuing"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:192
+msgid "Saved — the assistant can use it once, in this reply"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
@@ -26417,6 +26455,7 @@ msgstr "postazione/mese"
 msgid "secret"
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:225
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -26917,6 +26956,14 @@ msgstr "Sessioni revocate"
 #: src/features/auth/components/settings/security/change-password-card.tsx:224
 msgid "Set a password for your account"
 msgstr "Imposta una password per il tuo account"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:145
+msgid "Set as the {header} header on your {serverName} MCP server"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:135
+msgid "Set as the {header} header on your {serverName} MCP server ({address})"
+msgstr ""
 
 #: ../../packages/ui/src/components/color-picker.tsx:194
 msgid "Set color to {color}"
@@ -27870,7 +27917,7 @@ msgid "Source"
 msgstr "Fonte"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1177
-#: src/features/chat/thread/message-content.tsx:125
+#: src/features/chat/thread/message-content.tsx:140
 msgid "Source {index}"
 msgstr "Fonte {index}"
 
@@ -28956,11 +29003,11 @@ msgstr "animazione stilizzata"
 msgid "Sub-agent"
 msgstr "Sub-agente"
 
-#: src/features/notifications/lib/notification-labels.ts:59
+#: src/features/notifications/lib/notification-labels.ts:63
 msgid "Sub-agent failed"
 msgstr "Sub-agente non riuscito"
 
-#: src/features/notifications/lib/notification-labels.ts:59
+#: src/features/notifications/lib/notification-labels.ts:63
 msgid "Sub-agent finished"
 msgstr "Sub-agente completato"
 
@@ -29397,11 +29444,11 @@ msgstr "Email delle attività disattivate"
 msgid "Task emails turned on"
 msgstr "Email delle attività attivate"
 
-#: src/features/notifications/lib/notification-labels.ts:62
+#: src/features/notifications/lib/notification-labels.ts:66
 msgid "Task failed"
 msgstr "Attività non riuscita"
 
-#: src/features/notifications/lib/notification-labels.ts:62
+#: src/features/notifications/lib/notification-labels.ts:66
 msgid "Task finished"
 msgstr "Attività completata"
 
@@ -29847,7 +29894,7 @@ msgstr "Grazie per la valutazione"
 msgid "That comment is already gone."
 msgstr ""
 
-#: src/features/develop/components/watched-repositories.tsx:160
+#: src/features/develop/components/watched-repositories.tsx:163
 msgid "That is not a repository address."
 msgstr ""
 
@@ -29919,6 +29966,14 @@ msgstr "L’archivio contiene troppi file."
 #: src/features/chat/thread/ask-user-prompt.tsx:141
 msgid "The assistant has a question"
 msgstr "L'assistente ha una domanda"
+
+#: src/features/notifications/lib/notification-labels.ts:60
+msgid "The assistant is asking for a secret"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:207
+msgid "The assistant needs a secret"
+msgstr ""
 
 #: src/features/settings/components/chat/bots-settings.tsx:191
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
@@ -30702,6 +30757,10 @@ msgstr ""
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 msgid "This is how your organization appears to members"
 msgstr "Così la tua organizzazione appare ai membri"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:251
+msgid "This is too long: up to {valueMax} characters."
+msgstr ""
 
 #: src/features/auth/components/organization/organization-slug-card.tsx:109
 #: src/features/auth/components/organization/organization-slug-card.tsx:159
@@ -31559,11 +31618,11 @@ msgstr "Trigger attivato"
 msgid "Trigger name is required"
 msgstr "Il nome del trigger è obbligatorio"
 
-#: src/features/notifications/lib/notification-labels.ts:68
+#: src/features/notifications/lib/notification-labels.ts:72
 msgid "Trigger run failed"
 msgstr "Esecuzione del trigger non riuscita"
 
-#: src/features/notifications/lib/notification-labels.ts:68
+#: src/features/notifications/lib/notification-labels.ts:72
 msgid "Trigger run finished"
 msgstr "Esecuzione del trigger completata"
 
@@ -33543,6 +33602,10 @@ msgstr "In attesa dell'output…"
 msgid "Waiting for the agent…"
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:198
+msgid "Waiting for the owner"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "In attesa della risposta del proprietario"
@@ -33557,6 +33620,10 @@ msgstr "In attesa dell'approvazione del proprietario"
 #: src/features/chat/thread/composer-input-area.tsx:397
 msgid "Waiting for uploads to complete…"
 msgstr "In attesa del completamento dei caricamenti…"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:198
+msgid "Waiting for you"
+msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
@@ -33584,7 +33651,7 @@ msgstr "In attesa di: {0}"
 msgid "Want to continue from here?"
 msgstr "Vuoi continuare da qui?"
 
-#: src/features/develop/components/watched-repositories.tsx:155
+#: src/features/develop/components/watched-repositories.tsx:158
 msgid "Watch"
 msgstr ""
 
@@ -33592,8 +33659,8 @@ msgstr ""
 msgid "Watch only this part (optional)"
 msgstr ""
 
-#: src/features/develop/components/watched-repositories.tsx:143
 #: src/features/develop/components/watched-repositories.tsx:144
+#: src/features/develop/components/watched-repositories.tsx:145
 msgid "Watched repositories"
 msgstr ""
 
@@ -33964,6 +34031,10 @@ msgstr "Ampiamente affidabile per i carichi di lavoro di produzione"
 msgid "Width"
 msgstr "Larghezza"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:122
+msgid "Will be saved as your {provider} API key"
+msgstr ""
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
 msgstr "Windows"
@@ -34256,7 +34327,7 @@ msgstr "Stai navigando come ospite. Accedi con il tuo account per collegare l'es
 msgid "You are currently impersonating a user"
 msgstr "Stai impersonando un utente"
 
-#: src/features/develop/components/watched-repositories.tsx:169
+#: src/features/develop/components/watched-repositories.tsx:172
 msgid "You are not watching any repository."
 msgstr ""
 
@@ -34272,7 +34343,7 @@ msgstr "Sei offline. Neore si riconnetterà quando la rete tornerà disponibile.
 msgid "You are sending too fast. Wait a moment."
 msgstr ""
 
-#: src/features/develop/components/watched-repositories.tsx:160
+#: src/features/develop/components/watched-repositories.tsx:163
 msgid "You are watching as many repositories as is allowed."
 msgstr ""
 
@@ -34324,6 +34395,10 @@ msgstr "Non hai ancora file di conoscenza indicizzati."
 msgid "You have no projects yet."
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:140
+msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
+msgstr ""
+
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:232
 msgid "You have no tags yet."
 msgstr "Non hai ancora tag."
@@ -34369,7 +34444,7 @@ msgstr "Dopo l'accesso verrai reindirizzato qui."
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "Ti servirà un'app di autenticazione come Google Authenticator o Authy per generare i codici di verifica."
 
-#: src/features/notifications/components/notification-list.tsx:80
+#: src/features/notifications/components/notification-list.tsx:82
 msgid "You're all caught up."
 msgstr "Sei in pari."
 
@@ -34507,11 +34582,11 @@ msgstr "Le tue conversazioni restano private"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "La tua sessione anonima attuale verrà convertita in un account permanente."
 
-#: src/features/notifications/lib/notification-labels.ts:47
+#: src/features/notifications/lib/notification-labels.ts:48
 msgid "Your daily brief"
 msgstr "Il tuo Daily Brief"
 
-#: src/features/notifications/lib/notification-labels.ts:50
+#: src/features/notifications/lib/notification-labels.ts:51
 msgid "Your data export is ready"
 msgstr "La tua esportazione dei dati è pronta"
 
@@ -34624,7 +34699,7 @@ msgstr ""
 msgid "Your review is kept."
 msgstr ""
 
-#: src/features/notifications/lib/notification-labels.ts:56
+#: src/features/notifications/lib/notification-labels.ts:57
 msgid "Your review was requested"
 msgstr ""
 
@@ -34664,7 +34739,7 @@ msgstr "Il tuo nome utente univoco"
 msgid "Your unsaved version"
 msgstr "La tua versione non salvata"
 
-#: src/features/develop/components/watched-repositories.tsx:165
+#: src/features/develop/components/watched-repositories.tsx:168
 msgid "Your watched repositories could not be loaded."
 msgstr ""
 

@@ -252,6 +252,7 @@ export interface InternalApiTypes {
             getDecryptedMessengerKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedProviderKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedToolKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
+            getMcpSecretHeadersQuery: FunctionReference<"query", { name: string; url: string; userId: string }, Array<{ key: string; value: string }>>;
             getMCPServersQuery: FunctionReference<"query", { userId: string }, Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getSearchDomainBlocklistQuery: FunctionReference<"query", { userId: string }, Array<string>>;
             getUserAuthFlagsQuery: FunctionReference<"query", { sessionId?: string; userId: string }, { isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
@@ -340,7 +341,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -418,6 +419,12 @@ export interface InternalApiTypes {
         media_stale: {
             failStaleMediaRows: FunctionReference<"mutation", { cursor?: string }, { failed: number }>;
         };
+        request_secret: {
+            consumeSecretAsMcpHeader: FunctionReference<"mutation", { ref: string; startedBy: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            consumeSecretAsProviderKey: FunctionReference<"mutation", { ref: string; startedBy: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            discardSecretsOfThread: FunctionReference<"mutation", { streamId: string; threadId: Id<"threads"> }, null>;
+            sweepRequestedSecrets: FunctionReference<"mutation", {}, null>;
+        };
         sharing: {
             checkThreadAccess: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, boolean>;
             checkThreadAccessWithData: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, { hasAccess: true; permission: "read" | "write" | "admin"; thread: { category?: string; createdBy?: string; customSystemPrompt?: string; deleted?: boolean; deletedAt?: number; dictationLanguage?: string; enabledFeatures?: Array<string>; externalThreadId?: string; isPublic?: boolean; isTemporary?: boolean; language?: string; lastCompressionStartedAt?: number; messengerConnectionId?: string; mode?: "text" | "image" | "video"; model?: string; multiChat?: boolean; organizationId?: string; parentThreadIds?: Array<string>; pinnedAt?: number; projectId?: string; publicAccessToken?: string; reasoningEffort?: number; source?: string; statelessMode?: boolean; summary?: string; tags?: Array<string>; teamId?: string; title?: string; updatedAt?: number; userId?: string; _creationTime: number; _id: string; activeAgent?: { kind: "model"; model: string }; activeLeafMessageId?: string; awaitingInput?: "approval" | "question"; botId?: string; createdAt?: number; groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }; hasHandoff?: boolean; lastReplyAt?: number; lastUserMessageAt?: number; lastViewedAt?: number; lockedAt?: number; order?: number; runner?: "host"; snoozedUntil?: number; status: "active" | "archived" | "running" | "abort" | "error" | "finish"; summaryEpoch?: number; summaryPathTooLongAt?: number; tagIds?: Array<string>; workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number } } } | { hasAccess: false; permission: null; thread: null }>;
@@ -469,7 +476,7 @@ export interface InternalApiTypes {
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -888,8 +895,8 @@ export interface InternalApiTypes {
             writeDailyBrief: FunctionReference<"mutation", { localDay: string; summary: string; userId: string }, null>;
         };
         functions: {
-            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
-            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
+            createNotification: FunctionReference<"mutation", { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }, null>;
+            createNotifications: FunctionReference<"mutation", { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request"; userId: string }> }, null>;
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
@@ -1393,6 +1400,7 @@ export const internal: InternalApiTypes = {
             getDecryptedMessengerKeysQuery: { __lunoraRef: "auth_functions:getDecryptedMessengerKeysQuery" },
             getDecryptedProviderKeysQuery: { __lunoraRef: "auth_functions:getDecryptedProviderKeysQuery" },
             getDecryptedToolKeysQuery: { __lunoraRef: "auth_functions:getDecryptedToolKeysQuery" },
+            getMcpSecretHeadersQuery: { __lunoraRef: "auth_functions:getMcpSecretHeadersQuery" },
             getMCPServersQuery: { __lunoraRef: "auth_functions:getMCPServersQuery" },
             getSearchDomainBlocklistQuery: { __lunoraRef: "auth_functions:getSearchDomainBlocklistQuery" },
             getUserAuthFlagsQuery: { __lunoraRef: "auth_functions:getUserAuthFlagsQuery" },
@@ -1558,6 +1566,12 @@ export const internal: InternalApiTypes = {
         },
         media_stale: {
             failStaleMediaRows: { __lunoraRef: "chat_media_stale:failStaleMediaRows" },
+        },
+        request_secret: {
+            consumeSecretAsMcpHeader: { __lunoraRef: "chat_request_secret:consumeSecretAsMcpHeader" },
+            consumeSecretAsProviderKey: { __lunoraRef: "chat_request_secret:consumeSecretAsProviderKey" },
+            discardSecretsOfThread: { __lunoraRef: "chat_request_secret:discardSecretsOfThread" },
+            sweepRequestedSecrets: { __lunoraRef: "chat_request_secret:sweepRequestedSecrets" },
         },
         sharing: {
             checkThreadAccess: { __lunoraRef: "chat_sharing:checkThreadAccess" },

@@ -45,6 +45,7 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     enableKnowledge: integer("enableKnowledge", { mode: "boolean" }),
     enablePlanner: integer("enablePlanner", { mode: "boolean" }),
     generalProviders: text("generalProviders"),
+    mcpSecretHeaders: text("mcpSecretHeaders", { mode: "json" }).$type<Array<{ encryptedValue: string; header: string; server: string; url: string }>>(),
     mcpServers: text("mcpServers", { mode: "json" }).$type<Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>(),
     messengerKeys: text("messengerKeys"),
     modelFilterRules: text("modelFilterRules", { mode: "json" }).$type<{ allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }>(),
@@ -897,7 +898,7 @@ export const notifications = sqliteTable("notifications", {
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1138,6 +1139,27 @@ export const rateLimits = sqliteTable("rateLimits", {
     value: real("value").notNull(),
 }, (t) => ({
     by_key: index("by_key").on(t.key),
+}));
+
+export const requestedSecrets = sqliteTable("requestedSecrets", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId").notNull(),
+    createdAt: real("createdAt").notNull(),
+    encryptedValue: text("encryptedValue"),
+    expiresAt: real("expiresAt").notNull(),
+    label: text("label").notNull(),
+    ref: text("ref").notNull(),
+    replyKey: text("replyKey"),
+    status: text("status", { mode: "json" }).$type<"saved" | "used">().notNull(),
+    threadId: text("threadId").notNull(),
+    use: text("use", { mode: "json" }).$type<{ header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string }>().notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_ref: index("by_ref").on(t.ref),
 }));
 
 export const reviewDrafts = sqliteTable("reviewDrafts", {
@@ -1583,7 +1605,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }>().notNull(),
     createdAt: real("createdAt").notNull(),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),

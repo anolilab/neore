@@ -35,7 +35,9 @@ import musicGenerationTool from "./music-generation";
 import peopleSearchTool from "./people-search";
 import redditSearchTool from "./reddit-search";
 import renderUITool from "./render-ui";
+import requestSecretTool from "./request-secret";
 import retrieveTool from "./retrieve";
+import { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
 import searchMemoryTool from "./search-memory";
 import shellExecutionTool from "./shell-execution";
 import spotifySearchTool from "./spotify-search";
@@ -105,6 +107,8 @@ export type { RedditPost } from "./reddit-search";
 export { default as redditSearchTool } from "./reddit-search";
 export type { RenderUIOutput } from "./render-ui";
 export { default as renderUITool } from "./render-ui";
+export type { RequestSecretInput, RequestSecretOutput } from "./request-secret";
+export { default as requestSecretTool } from "./request-secret";
 export type { RetrievedContent } from "./retrieve";
 export { default as retrieveTool } from "./retrieve";
 export { default as searchMemoryTool } from "./search-memory";
@@ -123,6 +127,7 @@ export { trendingMoviesTool, trendingTvTool } from "./trending-media";
 export { default as updateDesignTool } from "./update-design";
 export { default as updateDocumentTool } from "./update-document";
 export { default as updateSlideTool } from "./update-slide";
+export { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
 // Utils
 export {
     batchArray,
@@ -222,10 +227,15 @@ export enum ToolName {
     // Generative UI Tools
     RenderUI = "renderUI",
 
+    // Asking the user for a secret, and spending it
+    RequestSecret = "requestSecret",
+
     // Content Tools
     Retrieve = "retrieve",
+    SaveSecretAsProviderKey = "saveSecretAsProviderKey",
     // Memory Tools
     SearchMemory = "searchMemory",
+    SetMcpServerSecret = "setMcpServerSecret",
 
     // Sandbox Tools
     ShellExecution = "shellExecution",
@@ -330,8 +340,11 @@ export const getAllTools = () => {
         [ToolName.PeopleSearch]: peopleSearchTool,
         [ToolName.RedditSearch]: redditSearchTool,
         [ToolName.RenderUI]: renderUITool,
+        [ToolName.RequestSecret]: requestSecretTool,
         [ToolName.Retrieve]: retrieveTool,
+        [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
         [ToolName.SearchMemory]: searchMemoryTool,
+        [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
         [ToolName.ShellExecution]: shellExecutionTool,
         [ToolName.SpotifySearch]: spotifySearchTool,
         [ToolName.StockChart]: stockChartTool,

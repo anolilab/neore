@@ -9,6 +9,7 @@ export type NotificationType =
     | "data_export"
     | "eval"
     | "review_request"
+    | "secret_request"
     | "sub_agent"
     | "task"
     | "tool_approval"
@@ -54,6 +55,9 @@ const useNotificationHeadline = (): ((notification: NotificationLike) => string)
                 }
                 case "review_request": {
                     return t`Your review was requested`;
+                }
+                case "secret_request": {
+                    return t`The assistant is asking for a secret`;
                 }
                 case "sub_agent": {
                     return failed ? t`Sub-agent failed` : t`Sub-agent finished`;

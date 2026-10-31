@@ -22516,6 +22516,110 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_request_secret:answerSecretRequest": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_request_secret:answerSecretRequest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_request_secret:answerSecretRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "approvalId": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "writeOnly": true,
+                            "format": "password"
+                          },
+                          {
+                            "type": "null",
+                            "writeOnly": true
+                          }
+                        ],
+                        "writeOnly": true
+                      }
+                    },
+                    "required": [
+                      "approvalId",
+                      "threadId",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_request_secret:answerSecretRequest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "alreadyResolved": {
+                      "type": "boolean"
+                    },
+                    "streamId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "alreadyResolved",
+                    "streamId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_request_secret:answerSecretRequest",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_resume:latestResumableThread": {
       "post": {
         "description": "Invoke the `query` `chat_resume:latestResumableThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -31160,6 +31264,10 @@
                                 "type": "string"
                               },
                               {
+                                "const": "secret_request",
+                                "type": "string"
+                              },
+                              {
                                 "const": "trigger",
                                 "type": "string"
                               },
@@ -34847,6 +34955,10 @@
                               },
                               {
                                 "const": "ask_user",
+                                "type": "string"
+                              },
+                              {
+                                "const": "secret_request",
                                 "type": "string"
                               },
                               {

@@ -79,6 +79,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
+    // References the agent was never able to spend within their 24 hours (`chat/request-secret.ts`).
+    { name: "sweepRequestedSecrets", ref: internal.chat.request_secret.sweepRequestedSecrets },
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },
 ];
 

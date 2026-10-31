@@ -196,6 +196,14 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        /**
+         * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
+         * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from
+         * `mcpServers[].headers` on purpose: that list is plaintext the Settings page shows and writes back,
+         * and the audit history snapshots it; this column is server-only, left out of the client view
+         * (`redactPreferences`) and read only where a run builds its servers (`getMCPServersQuery`).
+         */
+        mcpSecretHeaders: v.optional(v.array(v.object({ encryptedValue: v.string(), header: v.string(), server: v.string(), url: v.string() }))),
         mcpServers: v.optional(
             v.array(
                 v.object({
@@ -2082,6 +2090,37 @@ export const schema = defineSchema({
         .externallyManaged()
         .index("by_key", ["key"]),
 
+    /**
+     * A value the agent asked the user for with `requestSecret` (an API key, a token),
+     * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
+     * ciphertext (`lib/encryption.ts`, `provider-keys`); it exists only while the
+     * row is `saved` and is removed in the same write that marks it `used`
+     * (`chat/lib/secret-requests.ts`). `use` is the destination the user approved
+     * on the card, so a consumer cannot send the value anywhere else. The
+     * housekeeping sweep deletes a row once `expiresAt` has passed.
+     */
+    requestedSecrets: defineTable({
+        approvalId: v.string(),
+        createdAt: v.number(),
+        encryptedValue: v.optional(v.string()),
+        expiresAt: v.number(),
+        label: v.string(),
+        ref: v.string(),
+        // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
+        replyKey: v.optional(v.string()),
+        status: v.union(v.literal("saved"), v.literal("used")),
+        threadId: v.string(),
+        use: v.union(
+            v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
+            v.object({ kind: v.literal("provider_key"), provider: v.string() }),
+        ),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_ref", ["ref"])
+        .index("by_expiresAt", ["expiresAt"])
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,

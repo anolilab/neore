@@ -80,7 +80,13 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
  */
-export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set(["askUser", "delegateToCodingAgent", "delegateToSubAgent", "messageWorker"]);
+export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
+    "askUser",
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "messageWorker",
+    "requestSecret",
+]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
 

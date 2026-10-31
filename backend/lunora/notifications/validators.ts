@@ -9,6 +9,7 @@ export const vNotificationType = v.union(
     v.literal("task"),
     v.literal("tool_approval"),
     v.literal("ask_user"),
+    v.literal("secret_request"),
     v.literal("trigger"),
     v.literal("coding_agent"),
     v.literal("eval"),
