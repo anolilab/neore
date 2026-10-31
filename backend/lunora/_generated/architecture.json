@@ -2416,6 +2416,11 @@
       "to": "table:userSkills"
     },
     {
+      "from": "function:chat_group_functions:createImportedGroupChat",
+      "kind": "read",
+      "to": "table:userSkills"
+    },
+    {
       "from": "function:chat_group_functions:getGroupChat",
       "kind": "read",
       "to": "table:userSkills"
@@ -5998,12 +6003,17 @@
     {
       "from": "function:skills_bundle:importBundle",
       "kind": "call",
-      "to": "function:chat_functions:deleteThread"
+      "to": "function:chat_group_functions:createImportedGroupChat"
     },
     {
       "from": "function:skills_bundle:importBundle",
       "kind": "call",
-      "to": "function:chat_group_functions:createGroupChat"
+      "to": "function:lib_claim_once:claimKey"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:lib_claim_once:releaseKey"
     },
     {
       "from": "function:skills_bundle:importBundle",
@@ -6013,22 +6023,17 @@
     {
       "from": "function:skills_bundle:importBundle",
       "kind": "call",
+      "to": "function:skills_bundle:removeImportedItem"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
       "to": "function:skills_functions:createSkill"
     },
     {
       "from": "function:skills_bundle:importBundle",
       "kind": "call",
-      "to": "function:skills_functions:deleteSkill"
-    },
-    {
-      "from": "function:skills_bundle:importBundle",
-      "kind": "call",
       "to": "function:triggers_functions:createTrigger"
-    },
-    {
-      "from": "function:skills_bundle:importBundle",
-      "kind": "call",
-      "to": "function:triggers_functions:deleteTrigger"
     },
     {
       "from": "function:skills_bundle:listBundleCandidates",
@@ -6044,6 +6049,21 @@
       "from": "function:skills_bundle:previewBundle",
       "kind": "call",
       "to": "function:skills_bundle:loadImportContext"
+    },
+    {
+      "from": "function:skills_bundle:removeImportedItem",
+      "kind": "call",
+      "to": "function:agent_threads:deleteAllForThreadIdAsync"
+    },
+    {
+      "from": "function:skills_bundle:removeImportedItem",
+      "kind": "read",
+      "to": "table:skillHistory"
+    },
+    {
+      "from": "function:skills_bundle:removeImportedItem",
+      "kind": "write",
+      "to": "table:skillHistory"
     },
     {
       "from": "function:skills_executor:resolveSkillsForRun",
@@ -6092,31 +6112,6 @@
     },
     {
       "from": "function:skills_functions:createSkill",
-      "kind": "write",
-      "to": "table:userSkills"
-    },
-    {
-      "from": "function:skills_functions:deleteSkill",
-      "kind": "read",
-      "to": "table:userSkills"
-    },
-    {
-      "from": "function:skills_functions:deleteSkill",
-      "kind": "write",
-      "to": "table:skillFiles"
-    },
-    {
-      "from": "function:skills_functions:deleteSkill",
-      "kind": "write",
-      "to": "table:skills"
-    },
-    {
-      "from": "function:skills_functions:deleteSkill",
-      "kind": "write",
-      "to": "table:skillStats"
-    },
-    {
-      "from": "function:skills_functions:deleteSkill",
       "kind": "write",
       "to": "table:userSkills"
     },
@@ -6642,26 +6637,6 @@
     },
     {
       "from": "function:triggers_functions:createTrigger",
-      "kind": "write",
-      "to": "table:triggers"
-    },
-    {
-      "from": "function:triggers_functions:deleteTrigger",
-      "kind": "read",
-      "to": "table:triggerExecutions"
-    },
-    {
-      "from": "function:triggers_functions:deleteTrigger",
-      "kind": "schedule",
-      "to": "function:lib_claim_once:purgeClaimsWithPrefix"
-    },
-    {
-      "from": "function:triggers_functions:deleteTrigger",
-      "kind": "write",
-      "to": "table:triggerExecutions"
-    },
-    {
-      "from": "function:triggers_functions:deleteTrigger",
       "kind": "write",
       "to": "table:triggers"
     },
@@ -10019,6 +9994,13 @@
       "id": "function:chat_group_functions:createGroupChatFromTemplate",
       "kind": "function",
       "name": "chat.group.functions.createGroupChatFromTemplate",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_group_functions:createImportedGroupChat",
+      "kind": "function",
+      "name": "chat.group.functions.createImportedGroupChat",
       "module": "chat"
     },
     {
@@ -14203,6 +14185,13 @@
       "id": "function:skills_bundle:previewBundle",
       "kind": "function",
       "name": "skills.bundle.previewBundle",
+      "module": "skills"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:skills_bundle:removeImportedItem",
+      "kind": "function",
+      "name": "skills.bundle.removeImportedItem",
       "module": "skills"
     },
     {
@@ -20692,6 +20681,36 @@
       "reason": "\"getEnabledSkillsForSystemPrompt\" is not a registered function"
     },
     {
+      "file": "skills/functions",
+      "kind": "read",
+      "line": 575,
+      "reason": "\"deleteSkillRows\" is not a registered function"
+    },
+    {
+      "file": "skills/functions",
+      "kind": "write",
+      "line": 588,
+      "reason": "\"deleteSkillRows\" is not a registered function"
+    },
+    {
+      "file": "skills/functions",
+      "kind": "write",
+      "line": 595,
+      "reason": "\"deleteSkillRows\" is not a registered function"
+    },
+    {
+      "file": "skills/functions",
+      "kind": "write",
+      "line": 599,
+      "reason": "\"deleteSkillRows\" is not a registered function"
+    },
+    {
+      "file": "skills/functions",
+      "kind": "write",
+      "line": 602,
+      "reason": "\"deleteSkillRows\" is not a registered function"
+    },
+    {
       "file": "skills/gdpr",
       "kind": "read",
       "line": 21,
@@ -21062,6 +21081,30 @@
       "kind": "read",
       "line": 75,
       "reason": "\"loadUserTasks\" is not a registered function"
+    },
+    {
+      "file": "triggers/functions",
+      "kind": "read",
+      "line": 638,
+      "reason": "\"deleteTriggerRows\" is not a registered function"
+    },
+    {
+      "file": "triggers/functions",
+      "kind": "write",
+      "line": 645,
+      "reason": "\"deleteTriggerRows\" is not a registered function"
+    },
+    {
+      "file": "triggers/functions",
+      "kind": "write",
+      "line": 648,
+      "reason": "\"deleteTriggerRows\" is not a registered function"
+    },
+    {
+      "file": "triggers/functions",
+      "kind": "schedule",
+      "line": 653,
+      "reason": "\"deleteTriggerRows\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",

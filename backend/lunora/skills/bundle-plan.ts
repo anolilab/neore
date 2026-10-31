@@ -19,6 +19,7 @@ import type { BundleFilter, BundleGroup, BundleItemKind, BundleTrigger, ParsedBu
 import type { SkillMarkdownData } from "./markdown";
 import { planSkillImport } from "./import-plan";
 import { FREE_SKILL_LIMIT } from "./constants";
+import { MAX_LENGTH } from "../lib/validators";
 import { pickFreeSlug } from "./slug";
 
 export interface PlanEnv {
@@ -91,7 +92,17 @@ export interface PlanEntry {
 
 export interface PlanView {
     group?: { debateRounds?: number; mode: string; model: string; participants: string[]; synthesizer?: string };
-    skill?: { description: string; disabledTools: string[]; droppedTools: string[]; model?: string; name: string; slug: string; tools: string[] };
+    skill?: {
+        description: string;
+        disabledTools: string[];
+        droppedTools: string[];
+        /** The whole text the skill would run on: what the user is asked to approve. */
+        instructions: string;
+        model?: string;
+        name: string;
+        slug: string;
+        tools: string[];
+    };
     trigger?: {
         description?: string;
         filters: string[];
@@ -107,14 +118,22 @@ export interface PlanView {
 
 export const entryKey = (kind: BundleItemKind, index: number): string => `${kind}:${String(index)}`;
 
-const EXCERPT = 600;
+/** The longest a value may be in the create procedures an import goes through (`createSkill`, `createTrigger`): a longer one is blocked here, not at import. */
+const CREATE_CAPS = { long: MAX_LENGTH.long, short: MAX_LENGTH.short } as const;
 
-const excerpt = (text: string | undefined): string | undefined => {
-    if (text === undefined || text.length <= EXCERPT) {
-        return text;
+const skillCapProblems = (skill: SkillMarkdownData): string[] => {
+    const problems: string[] = [];
+    const tooLong = (value: string | undefined, max: number): boolean => value !== undefined && value.length > max;
+
+    if (tooLong(skill.category, CREATE_CAPS.short) || tooLong(skill.version, CREATE_CAPS.short) || skill.tags?.some((tag) => tooLong(tag, CREATE_CAPS.short))) {
+        problems.push(`The category, version and every tag must be ${String(CREATE_CAPS.short)} characters or less.`);
     }
 
-    return `${text.slice(0, EXCERPT)}…`;
+    if (skill.variables?.some((variable) => tooLong(variable.description, CREATE_CAPS.long))) {
+        problems.push(`A variable's description must be ${String(CREATE_CAPS.long)} characters or less.`);
+    }
+
+    return problems;
 };
 
 const describeFilter = (filter: BundleFilter): string =>
@@ -127,8 +146,8 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
         ...(trigger.description !== undefined && { description: trigger.description }),
         filters: (trigger.filters ?? []).map((filter) => describeFilter(filter)),
         model: trigger.model,
-        ...(trigger.systemPrompt !== undefined && { systemPrompt: excerpt(trigger.systemPrompt) }),
-        ...(trigger.inputTemplate !== undefined && { task: excerpt(trigger.inputTemplate) }),
+        ...(trigger.systemPrompt !== undefined && { systemPrompt: trigger.systemPrompt }),
+        ...(trigger.inputTemplate !== undefined && { task: trigger.inputTemplate }),
         type: trigger.type,
     };
 
@@ -153,7 +172,9 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
         if (isHourlyOrSlowerCronExpression(cron)) {
             const next = findNextCronTime(cron, env.now, timezone);
 
-            if (next !== undefined) {
+            if (next === undefined) {
+                problems.push(`"${cron}" never fires, so the schedule could not be turned on.`);
+            } else {
                 view.nextRunAt = next;
             }
         } else {
@@ -229,6 +250,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
             title = entry.item.skill.name;
             warnings.push(...planned.warnings);
+            problems.push(...skillCapProblems(entry.item.skill));
 
             // The quota is a property of a chosen set: the review screen (nothing chosen yet) lets the user pick within it.
             if (selected !== undefined && isSelected(key)) {
@@ -259,6 +281,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
                 description: planned.description,
                 disabledTools: planned.config?.disabledTools ?? [],
                 droppedTools: planned.droppedTools,
+                instructions: planned.instructions,
                 ...(planned.config?.preferredModel && { model: planned.config.preferredModel }),
                 name: planned.name,
                 slug,
@@ -488,7 +511,7 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
  * Creates the selected entries (already checked ready by `assertSelectionImportable`) — skills, then the group chats that
  * need them, then triggers — and removes everything created so far when one
  * of them fails. Removal is best effort (each create is its own mutation): an
- * item it cannot remove is named in the error, and it stays disabled.
+ * item it cannot remove is named in the error; a skill and a trigger stay switched off, a group chat starts nothing.
  */
 export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selected: ReadonlySet<string>, ops: BundleOps): Promise<ImportedItem[]> => {
     const created: ImportedItem[] = [];
@@ -500,12 +523,20 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
 
     const rollback = async (): Promise<string[]> => {
         const failed: string[] = [];
+        let groupLeft = false;
 
         for (const item of created.toReversed()) {
+            // A group chat that is still there names the skills created before it: they stay, or it would point at nothing.
+            if (item.kind === "skill" && groupLeft) {
+                failed.push(item.title);
+                continue;
+            }
+
             try {
                 await removeCreated(item, ops);
             } catch {
                 failed.push(item.title);
+                groupLeft ||= item.kind === "group";
             }
         }
 
@@ -522,7 +553,7 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
             throw new BundleImportError(
                 leftBehind.length === 0
                     ? `"${entry.title}" could not be imported (${reason}). Nothing was imported.`
-                    : `"${entry.title}" could not be imported (${reason}), and these could not be removed again: ${leftBehind.join(", ")}. They are disabled; delete them by hand.`,
+                    : `"${entry.title}" could not be imported (${reason}), and these could not be removed again: ${leftBehind.join(", ")}. They were created switched off; delete them by hand.`,
                 leftBehind,
             );
         }

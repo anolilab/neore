@@ -22,6 +22,8 @@ const RE_11 = /could not be removed again: alpha/;
 const RE_12 = /Weekly/;
 const RE_13 = /not in this bundle/;
 const RE_14 = /at least one/;
+const RE_16 = /switched off/;
+const RE_17 = /never fires|no next run/i;
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
 
@@ -69,10 +71,6 @@ describe("limits", () => {
         expect(BUNDLE_LIMITS.skills).toBeLessThan(rate("skills/create"));
         expect(BUNDLE_LIMITS.triggers).toBeLessThan(rate("triggers/create"));
         expect(BUNDLE_LIMITS.groupChats).toBeLessThan(rate("chat/create"));
-        // Rolling a full import back goes through the matching delete procedures.
-        expect(BUNDLE_LIMITS.skills).toBeLessThanOrEqual(rate("skills/delete"));
-        expect(BUNDLE_LIMITS.triggers).toBeLessThanOrEqual(rate("triggers/delete"));
-        expect(BUNDLE_LIMITS.groupChats).toBeLessThanOrEqual(rate("chat/delete"));
     });
 
     it("names the group chat modes the app has", () => {
@@ -128,6 +126,47 @@ describe("the dry run", () => {
         expect(zone?.problems.join(" ")).toMatch(RE_3);
         expect(model?.problems.join(" ")).toMatch(RE_4);
         expect([cron, zone, model].every((entry) => entry?.plan === undefined)).toBe(true);
+    });
+
+    it("carries the full text the user is asked to approve: a skill's instructions and a trigger's prompts, untruncated", () => {
+        const instructions = `Always ${"obey the file. ".repeat(400)}END-OF-INSTRUCTIONS`;
+        const systemPrompt = `${"system ".repeat(300)}END-OF-SYSTEM`;
+        const inputTemplate = `${"task ".repeat(300)}END-OF-TASK`;
+        const [skillEntry, triggerEntry] = plan([
+            { kind: "skill", skill: { description: "d", instructions, name: "alpha", slug: "alpha" } },
+            { kind: "trigger", trigger: { ...SCHEDULE, inputTemplate, systemPrompt } },
+        ]);
+
+        expect(skillEntry?.view.skill?.instructions).toBe(instructions);
+        expect(triggerEntry?.view.trigger?.systemPrompt).toBe(systemPrompt);
+        expect(triggerEntry?.view.trigger?.task).toBe(inputTemplate);
+    });
+
+    it("blocks what the create procedures would refuse, so the preview never says ready for it", () => {
+        const [trigger, category, tag, variable, ok] = plan([
+            { kind: "trigger", trigger: { ...SCHEDULE, description: "x".repeat(10_001) } },
+            { kind: "skill", skill: { category: "c".repeat(501), description: "d", instructions: "i", name: "a", slug: "a" } },
+            { kind: "skill", skill: { description: "d", instructions: "i", name: "b", slug: "b", tags: ["t".repeat(501)] } },
+            {
+                kind: "skill",
+                skill: { description: "d", instructions: "i", name: "c", slug: "c", variables: [{ description: "v".repeat(10_001), name: "V" }] },
+            },
+            { kind: "trigger", trigger: { ...SCHEDULE, description: "x".repeat(10_000) } },
+        ]);
+
+        for (const entry of [trigger, category, tag, variable]) {
+            expect(entry?.problems.length, entry?.title).toBeGreaterThan(0);
+            expect(entry?.plan).toBeUndefined();
+        }
+
+        expect(ok?.problems).toStrictEqual([]);
+    });
+
+    it("blocks a schedule that never fires, instead of reporting it ready", () => {
+        const [entry] = plan([{ kind: "trigger", trigger: { ...SCHEDULE, cronExpression: "0 0 31 2 *" } }]);
+
+        expect(entry?.problems.join(" ")).toMatch(RE_17);
+        expect(entry?.plan).toBeUndefined();
     });
 
     it("describes a webhook by its filters and blocks an invalid one", () => {
@@ -283,6 +322,21 @@ describe("the import", () => {
         ]);
     });
 
+    it("keeps the skills a group chat it could not remove still names", async () => {
+        const { ops } = fakeOps({
+            createTrigger: vi.fn(async () => {
+                throw new Error("boom");
+            }),
+            deleteGroupChat: vi.fn(async () => {
+                throw new Error("gone wrong");
+            }),
+        });
+        const error = (await runBundleImport(plan(items), ALL, ops).catch((error_: unknown) => error_)) as BundleImportError;
+
+        expect(ops.deleteSkill).not.toHaveBeenCalled();
+        expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+    });
+
     it("names what it could not remove again", async () => {
         const { ops } = fakeOps({
             createTrigger: vi.fn(async () => {
@@ -299,6 +353,8 @@ describe("the import", () => {
         expect(error).toBeInstanceOf(BundleImportError);
         expect(error.leftBehind).toStrictEqual(["alpha"]);
         expect(error.message).toMatch(RE_11);
+        expect(error.message).toMatch(RE_16);
+        expect(error.message).not.toContain("They are disabled");
         expect(ops.deleteSkill).toHaveBeenCalledTimes(2);
     });
 });

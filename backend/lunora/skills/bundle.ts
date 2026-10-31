@@ -14,17 +14,24 @@
  *   import creates through `createSkill`, `createGroupChat` and `createTrigger`
  *   themselves, so every rule of the editor applies, and triggers are created
  *   disabled by `createTrigger` itself.
+ * - Imported skills are created SWITCHED OFF: an enabled skill's name and
+ *   description go into the system prompt of every chat, so a file from someone
+ *   else must not reach them until the user turns the skill on. Triggers are
+ *   created disabled, and a group chat starts nothing.
  * - The three creates are separate mutations, so "all or nothing" is best
- *   effort: a failure removes what was created (`runBundleImport`), and a crash
- *   in the middle can leave disabled items behind.
+ *   effort: a failure removes what was created (`removeImportedItem`, a hard
+ *   delete no rate limit can refuse), and a crash in the middle can leave
+ *   switched-off items behind.
+ * - One `importId` imports once (`lib/claim-once.ts`): a client that retries after
+ *   a timeout is told the import already happened instead of importing twice.
  */
 import { MODEL_LOOKUP } from "@neore/ai/models";
 import { LunoraError, v } from "lunorash/server";
 
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
-import { internalQuery } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import type { BundleItem, SkillSource } from "./bundle-format";
@@ -33,6 +40,9 @@ import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
 import { isSelectableTextModel } from "./builder-logic";
 import { getToolRegistry } from "./jit-tool-loader";
+import { deleteTriggerRows } from "../triggers/functions";
+import { deleteSkillRows } from "./functions";
+import { canReadSkill } from "./access";
 import { toSkillSlug } from "./markdown";
 import { pickFreeSlug } from "./slug";
 
@@ -50,6 +60,42 @@ const knownToolNames = (): Set<string> => new Set(getToolRegistry().map((tool) =
 const vKind = v.union(v.literal("skill"), v.literal("trigger"), v.literal("group"));
 
 // ─── Choosing what to export ────────────────────────────────────────────────
+
+/**
+ * The skills the groups name that the caller may read: their own, plus the others `exportBundle` would get through
+ * `getSkill` (an organization-shared one). A deleted or no-longer-shared participant is not among them.
+ */
+const readableSkillIds = async (
+    ctx: {
+        db: { skills: { findFirst: (query: { where: { _id: Id<"skills"> } }) => Promise<Doc<"skills"> | null> } };
+        user: { activeOrganization?: { id: string } | null; userId: string };
+    },
+    groups: ReadonlyArray<{ groupChat?: { participants: ReadonlyArray<{ skillId: string }>; synthesizerSkillId?: string } }>,
+    owned: ReadonlySet<string>,
+): Promise<Set<string>> => {
+    const readable = new Set(owned);
+    const others = new Set(
+        groups.flatMap((thread) => [
+            ...(thread.groupChat?.participants.map((participant) => participant.skillId) ?? []),
+            thread.groupChat?.synthesizerSkillId ?? "",
+        ]),
+    );
+    const subject = { organizationId: ctx.user.activeOrganization?.id, userId: ctx.user.userId };
+
+    for (const skillId of others) {
+        if (skillId === "" || owned.has(skillId)) {
+            continue;
+        }
+
+        const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
+
+        if (skill && canReadSkill(skill, subject)) {
+            readable.add(skillId);
+        }
+    }
+
+    return readable;
+};
 
 /** The caller's own skills, schedules / webhooks and group chats, for the export dialog. */
 export const listBundleCandidates = authQuery
@@ -96,15 +142,13 @@ export const listBundleCandidates = authQuery
                 .take(GROUP_SCAN_LIMIT),
         ]);
 
+        const groups = threads.flatMap((thread) => (thread.groupChat && thread.groupChat.participants.length > 0 && thread.deleted !== true ? [thread] : []));
+        const readable = await readableSkillIds(ctx, groups, new Set(skills.map((skill) => skill._id as string)));
+
         return {
-            groupChats: threads.flatMap((thread) => {
-                const group = thread.groupChat;
-
-                if (!group || group.participants.length === 0 || thread.deleted === true) {
-                    return [];
-                }
-
-                const result = groupItemOf({ groupChat: group, model: thread.model, title: thread.title }, (id) => id);
+            groupChats: groups.flatMap((thread) => {
+                const group = thread.groupChat!;
+                const result = groupItemOf({ groupChat: group, model: thread.model, title: thread.title }, (id) => (readable.has(id) ? id : undefined));
 
                 return [
                     {
@@ -466,6 +510,67 @@ export const exportBundle = authAction
 
 // ─── Import ─────────────────────────────────────────────────────────────────
 
+/**
+ * Hard-deletes one item an import created, for the rollback of a failed import. Owner only, and no
+ * rate limit: the deletes of `deleteSkill` / `deleteTrigger` / `deleteThread` are limited per minute
+ * and soft-fail an import that is already half done. An item that is already gone is a success.
+ */
+export const removeImportedItem = internalMutation
+    .input({ id: v.string().max(MAX_LENGTH.id), kind: vKind, userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args: { id, kind, userId }, ctx }) => {
+        const forbidden = (): never => {
+            throw new LunoraError("FORBIDDEN", "Not authorized to remove this item");
+        };
+
+        if (kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ where: { _id: id as Id<"skills"> } });
+
+            if (skill && skill.userId !== userId) {
+                return forbidden();
+            }
+
+            if (skill) {
+                // The history rows are this import's own, written by `createSkill`; `deleteSkill` keeps them.
+                const history = await ctx.db
+                    .query("skillHistory")
+                    .withIndex("by_skill_version", (q) => q.eq("skillId", skill._id))
+                    .collect();
+
+                await Promise.all(history.map(async (row) => await ctx.db.delete(row._id)));
+                await deleteSkillRows(ctx, skill._id, userId);
+            }
+        } else if (kind === "trigger") {
+            const trigger = await ctx.db.get(id as Id<"triggers">);
+
+            if (trigger && trigger.userId !== userId) {
+                return forbidden();
+            }
+
+            if (trigger) {
+                await deleteTriggerRows(ctx, trigger._id);
+            }
+        } else {
+            const thread = await ctx.db.get(id as Id<"threads">);
+
+            if (thread && (thread.userId !== userId || !thread.groupChat)) {
+                return forbidden();
+            }
+
+            if (thread) {
+                await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id });
+            }
+        }
+
+        return null;
+    });
+
+/** `lib/claim-once.ts` scope of an import's `importId`. */
+const IMPORT_CLAIM_SCOPE = "bundle-import";
+
+/** How long a retry of the same `importId` is recognised. */
+const IMPORT_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
 /** What the dry run needs to know about the caller's skills. */
 export const loadImportContext = internalQuery
     .input({ userId: v.string() })
@@ -534,6 +639,7 @@ export const previewBundle = authAction
                             description: v.string(),
                             disabledTools: v.array(v.string()),
                             droppedTools: v.array(v.string()),
+                            instructions: v.string(),
                             model: v.optional(v.string()),
                             name: v.string(),
                             slug: v.string(),
@@ -588,14 +694,16 @@ export const previewBundle = authAction
 /**
  * Imports the picked items of a bundle. The file is parsed and planned again
  * here; a blocked pick refuses the whole import before anything is created,
- * and a failure while creating removes what was created. Triggers come out
- * disabled (`createTrigger`), group chats start nothing, and a new webhook's
+ * and a failure while creating removes what was created. Skills come out
+ * switched off and triggers disabled, group chats start nothing, and a new webhook's
  * signing secret is returned ONCE, in this result — only its encrypted form is
  * stored.
  */
 export const importBundle = authAction
     .use(rateLimit("skills/bundle"))
     .input({
+        /** Minted by the client per attempt (and kept across a retry of it): an id that was imported already is refused. */
+        importId: v.string().max(MAX_LENGTH.id),
         markdown: v.string().max(MAX_LENGTH.document),
         selected: v.array(v.string().max(MAX_LENGTH.short)),
     })
@@ -622,16 +730,35 @@ export const importBundle = authAction
 
         assertSelectionImportable(entries, selected);
 
+        // Taken once the pick is known to be importable, so a refused pick leaves the id free.
+        const claimId = `${ctx.user.userId}:${args.importId}`;
+        const claimed = await ctx.runMutation(internal.lib.claim_once.claimKey, {
+            key: claimId,
+            scope: IMPORT_CLAIM_SCOPE,
+            ttlMs: IMPORT_CLAIM_TTL_MS,
+            userId: ctx.user.userId,
+        });
+
+        if (!claimed) {
+            throw new LunoraError("CONFLICT", "This bundle was already imported. Check your skills, schedules and group chats before importing it again.");
+        }
+
+        const { userId } = ctx.user;
+        const remove = async (kind: "group" | "skill" | "trigger", id: string): Promise<null> =>
+            await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id, kind, userId });
+
         try {
             const items = await runBundleImport(entries, selected, {
                 createGroupChat: async (group) => {
-                    const { threadId } = await ctx.runMutation(api.chat.group.functions.createGroupChat, {
+                    const { threadId } = await ctx.runMutation(internal.chat.group.functions.createImportedGroupChat, {
                         ...(group.debateRounds !== undefined && { debateRounds: group.debateRounds }),
                         mode: group.mode,
                         model: group.model,
+                        ...(ctx.user.activeOrganization?.id && { organizationId: ctx.user.activeOrganization.id }),
                         skillIds: group.skillIds,
                         ...(group.synthesizerSkillId !== undefined && { synthesizerSkillId: group.synthesizerSkillId }),
                         title: group.title,
+                        userId,
                     });
 
                     return threadId;
@@ -639,13 +766,14 @@ export const importBundle = authAction
                 createSkill: async (skill) =>
                     await ctx.runMutation(api.skills.functions.createSkill, {
                         ...skill,
+                        enabled: false,
                         source: { filename: "bundle.md", type: "upload", uploadedAt: Date.now() },
                         visibility: "private",
                     }),
                 createTrigger: async (trigger) => await ctx.runMutation(api.triggers.functions.createTrigger, trigger),
-                deleteGroupChat: async (threadId) => await ctx.runMutation(api.chat.functions.deleteThread, { threadId: threadId as Id<"threads"> }),
-                deleteSkill: async (skillId) => await ctx.runMutation(api.skills.functions.deleteSkill, { skillId: skillId as Id<"skills"> }),
-                deleteTrigger: async (triggerId) => await ctx.runMutation(api.triggers.functions.deleteTrigger, { triggerId: triggerId as Id<"triggers"> }),
+                deleteGroupChat: async (threadId) => await remove("group", threadId),
+                deleteSkill: async (skillId) => await remove("skill", skillId),
+                deleteTrigger: async (triggerId) => await remove("trigger", triggerId),
             });
 
             // Counts only: the result carries a webhook secret, which must not reach a log.
@@ -660,6 +788,9 @@ export const importBundle = authAction
                 warnings: entries.filter((entry) => selected.has(entry.key)).flatMap((entry) => entry.warnings.map((warning) => `${entry.title}: ${warning}`)),
             };
         } catch (error) {
+            // The import is over and rolled back (or reported what it could not remove): a retry of the same id is a new attempt.
+            await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimId, scope: IMPORT_CLAIM_SCOPE }).catch(() => undefined);
+
             throw error instanceof BundleImportError ? new LunoraError("BAD_REQUEST", error.message) : error;
         }
     });

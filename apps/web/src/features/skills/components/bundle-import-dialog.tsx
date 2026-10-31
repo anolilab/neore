@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useMutation } from "@tanstack/react-query";
 import { CopyIcon, FileUpIcon, Loader2Icon, ShieldAlertIcon } from "lucide-react";
 import type { ChangeEvent, FC } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -22,6 +22,8 @@ import { defaultSelection, fitsSkillSlots, selectedCount, toggleSelection } from
 const MAX_BUNDLE_BYTES = 512 * 1024;
 
 interface BundleImportDialogProps {
+    /** Tells the dialog that an import is running, so it cannot be dismissed before its result (and a webhook secret) is shown. */
+    onBusyChange?: (busy: boolean) => void;
     onClose: () => void;
     onImported: () => void;
     open: boolean;
@@ -59,8 +61,49 @@ const List: FC<{ items: string[]; label: string; tone?: "warning" }> = ({ items,
     </p>
 );
 
+/** A text longer than this (or with more lines than {@link COLLAPSED_LINES}) gets an expand control. */
+const COLLAPSED_CHARS = 200;
+const COLLAPSED_LINES = 3;
+
+/**
+ * Text the user is asked to approve, shown whole: a few lines at first, and the
+ * entire text in a read-only text area once expanded, which the keyboard can
+ * focus and scroll natively.
+ */
+const FullText: FC<{ label: string; text: string }> = ({ label, text }) => {
+    const { t } = useLingui();
+    const [expanded, setExpanded] = useState(false);
+    const textId = useId();
+    const long = text.length > COLLAPSED_CHARS || text.split("\n").length > COLLAPSED_LINES;
+
+    return (
+        <div className="space-y-1">
+            <p className="text-xs font-medium">{label}</p>
+            <div id={textId}>
+                {expanded ? (
+                    <textarea aria-label={label} className="bg-muted h-64 w-full resize-y rounded p-2 text-xs whitespace-pre-wrap" readOnly value={text} />
+                ) : (
+                    <div className="text-muted-foreground line-clamp-3 text-xs whitespace-pre-wrap">{text}</div>
+                )}
+            </div>
+            {long && (
+                <Button
+                    aria-controls={textId}
+                    aria-expanded={expanded}
+                    onClick={() => setExpanded((current) => !current)}
+                    size="xs"
+                    type="button"
+                    variant="ghost"
+                >
+                    {expanded ? t`Show less` : t`Show all`}
+                </Button>
+            )}
+        </div>
+    );
+};
+
 /** What importing one item will do, in the words of the person reading it. */
-const EntryDetails: FC<{ entry: BundleReviewEntry }> = ({ entry }) => {
+const EntryDetails: FC<{ entry: BundleReviewEntry; problemsId: string }> = ({ entry, problemsId }) => {
     const { t } = useLingui();
     const { group, skill, trigger } = entry;
 
@@ -68,7 +111,8 @@ const EntryDetails: FC<{ entry: BundleReviewEntry }> = ({ entry }) => {
         <div className="space-y-0.5">
             {skill && (
                 <>
-                    <p className="text-muted-foreground line-clamp-2 text-xs">{skill.description}</p>
+                    <FullText label={t`Description`} text={skill.description} />
+                    <FullText label={t`Instructions`} text={skill.instructions} />
                     {skill.tools.length > 0 ? (
                         <List items={skill.tools} label={t`Adds these tools:`} />
                     ) : (
@@ -96,10 +140,9 @@ const EntryDetails: FC<{ entry: BundleReviewEntry }> = ({ entry }) => {
                     {trigger.filters.length > 0 && <List items={trigger.filters} label={t`Only when:`} />}
                 </>
             )}
-            {trigger?.task && <p className="text-muted-foreground line-clamp-3 text-xs whitespace-pre-wrap">{t`Task: ${trigger.task}`}</p>}
-            {trigger?.systemPrompt && (
-                <p className="text-muted-foreground line-clamp-3 text-xs whitespace-pre-wrap">{t`Instructions: ${trigger.systemPrompt}`}</p>
-            )}
+            {trigger?.description && <FullText label={t`Description`} text={trigger.description} />}
+            {trigger?.task && <FullText label={t`Task`} text={trigger.task} />}
+            {trigger?.systemPrompt && <FullText label={t`Instructions`} text={trigger.systemPrompt} />}
             {trigger && <p className="text-muted-foreground text-xs">{t`Created switched off.`}</p>}
             {group && (
                 <>
@@ -107,11 +150,15 @@ const EntryDetails: FC<{ entry: BundleReviewEntry }> = ({ entry }) => {
                     <List items={group.participants} label={t`Participants:`} />
                 </>
             )}
-            {entry.problems.map((problem) => (
-                <p className="text-destructive text-xs" key={problem}>
-                    {problem}
-                </p>
-            ))}
+            {entry.problems.length > 0 && (
+                <div id={problemsId}>
+                    {entry.problems.map((problem) => (
+                        <p className="text-destructive text-xs" key={problem}>
+                            {problem}
+                        </p>
+                    ))}
+                </div>
+            )}
             {entry.warnings.map((warning) => (
                 <p className="text-xs text-amber-600 dark:text-amber-400" key={warning}>
                     {warning}
@@ -203,7 +250,7 @@ const ImportResult: FC<{ done: Imported; onClose: () => void }> = ({ done, onClo
  * once). The review is the safety boundary: nothing runs until the user turns
  * it on, and the server re-checks all of it on import.
  */
-const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onClose, onImported }) => {
+const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onBusyChange, onClose, onImported }) => {
     const { t } = useLingui();
     const kindLabel = useKindLabel();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -216,6 +263,14 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
     const [error, setError] = useState<string | null>(null);
     const { isPending: isReading, mutateAsync: previewBundle } = useMutation(useLunoraActionOptions(api.skills.bundle.previewBundle));
     const { isPending: isImporting, mutateAsync: importBundle } = useMutation(useLunoraActionOptions(api.skills.bundle.importBundle));
+    // One id per dialog: a retry of the same import (after a timeout) is recognised by the server and not imported twice.
+    const importId = useRef(crypto.randomUUID());
+    // Which file selection is current; a slower, earlier one must not replace it.
+    const selection = useRef(0);
+
+    useEffect(() => {
+        onBusyChange?.(isImporting);
+    }, [isImporting, onBusyChange]);
 
     if (done) {
         return <ImportResult done={done} onClose={onClose} />;
@@ -231,8 +286,15 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
             return;
         }
 
+        selection.current += 1;
+
+        const { current } = selection;
+
         setError(null);
         setReview(null);
+        setMarkdown("");
+        setFilename("");
+        setSelected(new Set());
 
         if (file.size > MAX_BUNDLE_BYTES) {
             setError(t`The file is larger than ${MAX_BUNDLE_BYTES / 1024} KB, which is more than a bundle can be.`);
@@ -244,18 +306,24 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
             const text = await file.text();
             const next = await previewBundle({ markdown: text });
 
+            if (current !== selection.current) {
+                return;
+            }
+
             setMarkdown(text);
             setFilename(file.name);
             setReview(next);
             setSelected(defaultSelection(next.entries));
         } catch (error_) {
-            setError(errorText(error_, t`This file could not be read as a bundle.`));
+            if (current === selection.current) {
+                setError(errorText(error_, t`This file could not be read as a bundle.`));
+            }
         }
     };
 
     const handleImport = async () => {
         try {
-            const result = await importBundle({ markdown, selected: [...selected] });
+            const result = await importBundle({ importId: importId.current, markdown, selected: [...selected] });
 
             setDone(result);
             onImported();
@@ -304,7 +372,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
                             <ShieldAlertIcon aria-hidden="true" />
                             <AlertTitle>{t`This bundle came from someone else`}</AlertTitle>
                             <AlertDescription>
-                                {t`Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills only run when you use them. A skill adds the tools listed for it, and your own tool permissions still apply.`}
+                                {t`Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply.`}
                             </AlertDescription>
                         </Alert>
                         <div>
@@ -317,11 +385,13 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
                         <ul className="space-y-3">
                             {review.entries.map((entry) => {
                                 const inputId = `${headingId}-${entry.key}`;
+                                const problemsId = `${inputId}-problems`;
                                 const blocked = entry.problems.length > 0;
 
                                 return (
                                     <li className="flex items-start gap-2 rounded-md border p-3" key={entry.key}>
                                         <Checkbox
+                                            aria-describedby={blocked ? problemsId : undefined}
                                             checked={selected.has(entry.key)}
                                             className="mt-0.5"
                                             disabled={blocked}
@@ -333,7 +403,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
                                                 {entry.title}
                                                 <span className="text-muted-foreground ml-2 text-xs font-normal">{kindLabel(entry.kind)}</span>
                                             </Label>
-                                            <EntryDetails entry={entry} />
+                                            <EntryDetails entry={entry} problemsId={problemsId} />
                                         </div>
                                     </li>
                                 );
@@ -348,7 +418,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
                 )}
             </DialogPanel>
             <DialogFooter>
-                <Button onClick={onClose} type="button" variant="outline">
+                <Button disabled={isImporting} onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>
                 <Button disabled={!canImport} onClick={handleImport} type="button">
@@ -360,10 +430,14 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
     );
 };
 
-const BundleImportDialog: FC<BundleImportDialogProps> = ({ open, ...props }) => (
-    <Dialog onOpenChange={(next) => !next && props.onClose()} open={open}>
-        <DialogContent className="sm:max-w-2xl">{open && <BundleImportDialogBody {...props} />}</DialogContent>
-    </Dialog>
-);
+const BundleImportDialog: FC<BundleImportDialogProps> = ({ open, ...props }) => {
+    const [busy, setBusy] = useState(false);
+
+    return (
+        <Dialog onOpenChange={(next) => !next && !busy && props.onClose()} open={open}>
+            <DialogContent className="sm:max-w-2xl">{open && <BundleImportDialogBody {...props} onBusyChange={setBusy} />}</DialogContent>
+        </Dialog>
+    );
+};
 
 export default BundleImportDialog;

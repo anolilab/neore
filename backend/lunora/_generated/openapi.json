@@ -39342,6 +39342,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "importId": {
+                        "type": "string"
+                      },
                       "markdown": {
                         "type": "string"
                       },
@@ -39353,6 +39356,7 @@
                       }
                     },
                     "required": [
+                      "importId",
                       "markdown",
                       "selected"
                     ],
@@ -39770,6 +39774,9 @@
                                 },
                                 "type": "array"
                               },
+                              "instructions": {
+                                "type": "string"
+                              },
                               "model": {
                                 "type": "string"
                               },
@@ -39790,6 +39797,7 @@
                               "description",
                               "disabledTools",
                               "droppedTools",
+                              "instructions",
                               "name",
                               "slug",
                               "tools"
@@ -39951,6 +39959,9 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "enabled": {
+                        "type": "boolean"
                       },
                       "icon": {
                         "type": "string"

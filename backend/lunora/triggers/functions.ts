@@ -629,6 +629,35 @@ export const setTriggerEnabled = authMutation
         context.log.event("triggers.set_trigger_enabled", { enabled: args.enabled });
     });
 
+/**
+ * Removes a trigger the caller has already been checked to own: its execution logs, its claims and its shard route.
+ * Returns how many execution logs went. `deleteTrigger` rate-limits first; the bundle rollback does not.
+ */
+export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
+    // Delete associated execution logs
+    const executions = await context.db
+        .query("triggerExecutions")
+        .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
+        .collect();
+
+    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
+    await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
+
+    // Delete the trigger
+    await context.db.delete(triggerId);
+
+    const deliveryPrefix = `${triggerId}:`;
+
+    if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
+        await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
+    }
+
+    await deleteShardRoute(context, "trigger", triggerId);
+
+    return executions.length;
+};
+
 /** Delete a trigger */
 export const deleteTrigger = authMutation
     .use(rateLimit("triggers/delete"))
@@ -643,28 +672,9 @@ export const deleteTrigger = authMutation
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
-        // Delete associated execution logs
-        const executions = await context.db
-            .query("triggerExecutions")
-            .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
-            .collect();
+        const executionsDeleted = await deleteTriggerRows(context, args.triggerId as Id<"triggers">);
 
-        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
-        // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
-        await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
-
-        // Delete the trigger
-        await context.db.delete(args.triggerId as Id<"triggers">);
-
-        const deliveryPrefix = `${args.triggerId}:`;
-
-        if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
-            await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
-        }
-
-        await deleteShardRoute(context, "trigger", args.triggerId);
-
-        context.log.event("triggers.delete_trigger", { executionsDeleted: executions.length });
+        context.log.event("triggers.delete_trigger", { executionsDeleted });
     });
 
 /** Get execution history for a trigger */

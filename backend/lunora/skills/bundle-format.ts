@@ -37,6 +37,7 @@
  */
 import { parseCustomModelId } from "@neore/ai/models";
 
+import { MAX_LENGTH } from "../lib/validators";
 import { FILTER_OPS, MAX_FILTERS } from "../triggers/filters";
 import type { SkillConfigData, SkillMarkdownData, SkillVariableData } from "./markdown";
 import { FRONTMATTER_RE, parseFrontmatterYaml, parseSkillMarkdown, skillToMarkdown, yamlString } from "./markdown";
@@ -140,7 +141,7 @@ const NON_ICON_RE = /[:/@\\]/;
 const KINDS: ReadonlyArray<BundleItemKind> = ["skill", "trigger", "group"];
 
 /** Strings a trigger or group carries, with the longest the file may hold. */
-const FIELD_CAPS = { cron: 200, label: 500, model: 200, short: 500, text: 60_000, timezone: 100 } as const;
+const FIELD_CAPS = { cron: 200, description: MAX_LENGTH.long, label: 500, model: 200, short: 500, text: 60_000, timezone: 100 } as const;
 
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 
@@ -395,7 +396,7 @@ const readTrigger = (raw: unknown, problems: string[]): BundleTrigger | undefine
     const before = problems.length;
     const name = textField(raw, "name", FIELD_CAPS.label, problems, true);
     const model = textField(raw, "model", FIELD_CAPS.model, problems, true);
-    const description = textField(raw, "description", FIELD_CAPS.text, problems);
+    const description = textField(raw, "description", FIELD_CAPS.description, problems);
     const inputTemplate = textField(raw, "inputTemplate", FIELD_CAPS.text, problems);
     const systemPrompt = textField(raw, "systemPrompt", FIELD_CAPS.text, problems);
     const searchMode = textField(raw, "searchMode", FIELD_CAPS.short, problems);
@@ -495,7 +496,13 @@ const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
 
         seenSlugs.add(parsed.skill.slug);
         warnings.push(...parsed.warnings);
-        entry.item = { kind: "skill", skill: parsed.skill };
+
+        // An export writes no variable default, so a file that carries one was edited by hand: it is not read.
+        const variables = parsed.skill.variables?.map(({ description, name, required }) => {
+            return { name, ...(description !== undefined && { description }), ...(required !== undefined && { required }) };
+        });
+
+        entry.item = { kind: "skill", skill: { ...parsed.skill, ...(variables && { variables }) } };
 
         return entry;
     }

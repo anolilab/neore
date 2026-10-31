@@ -13,7 +13,17 @@ export interface BundleReviewEntry {
     problems: string[];
     /** Keys of the skills a group chat needs in the same selection. */
     requires: string[];
-    skill?: { description: string; disabledTools: string[]; droppedTools: string[]; model?: string; name: string; slug: string; tools: string[] };
+    skill?: {
+        description: string;
+        disabledTools: string[];
+        droppedTools: string[];
+        /** The whole text the skill runs on. */
+        instructions: string;
+        model?: string;
+        name: string;
+        slug: string;
+        tools: string[];
+    };
     title: string;
     trigger?: {
         description?: string;

@@ -118,6 +118,18 @@ describe("bundle format round trip", () => {
     });
 });
 
+describe("variables", () => {
+    it("reads a variable's name, description and required flag, never a default a hand-edited file carries", () => {
+        const markdown = buildBundleMarkdown(
+            bundleOf([skillItem({ ...SKILL, variables: [{ defaultValue: "planted default", description: "d", name: "TOKEN", required: true }] })]),
+        );
+        const [item] = items(markdown);
+
+        expect(markdown).toContain("planted default");
+        expect(item?.kind === "skill" && item.skill.variables).toStrictEqual([{ description: "d", name: "TOKEN", required: true }]);
+    });
+});
+
 describe("embedded SKILL.md content", () => {
     const hostile: SkillMarkdownData = {
         ...SKILL,

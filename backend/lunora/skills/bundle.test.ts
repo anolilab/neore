@@ -13,9 +13,10 @@ import { schemaWithShardedTables } from "../lib/test-schema";
 import type { Bundle, BundleItem } from "./bundle-format";
 import { buildBundleMarkdown } from "./bundle-format";
 import { isSelectableTextModel } from "./builder-logic";
+import { getEnabledSkillsForSystemPrompt } from "./executor";
 
 const RE_1 = /alpha-2/;
-const RE_2 = /Panel.*could not be imported.*Nothing was imported/;
+const RE_2 = /Weekly.*could not be imported.*Nothing was imported/;
 const RE_3 = /Too often/;
 const RE_4 = /beta.*not selected/;
 const RE_5 = /version/i;
@@ -23,12 +24,15 @@ const RE_6 = /KB/;
 const RE_7 = /not found/i;
 const RE_8 = /schedules and webhooks/;
 const RE_9 = /custom endpoint/;
+const RE_10 = /already imported/i;
+const RE_11 = /Weekly.*could not be imported/;
+const RE_12 = /no longer available/;
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 const limits = vi.hoisted(() => {
-    return { failFamily: undefined as string | undefined };
+    return { failFamilies: new Set<string>() };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -54,7 +58,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
         rateLimitGuard: async (context: { rateLimitKey: string }) => {
-            if (context.rateLimitKey === limits.failFamily) {
+            if (limits.failFamilies.has(context.rateLimitKey)) {
                 throw new Error(`Rate limit exceeded for ${context.rateLimitKey}`);
             }
         },
@@ -71,9 +75,11 @@ vi.mock("../lib/shard-routes", async (importOriginal) => {
 });
 
 const MODULES = {
+    agent_threads: async () => await import("../agent/threads"),
     bots_functions: async () => await import("../bots/functions"),
     chat_custom_providers: async () => await import("../chat/custom-providers"),
     chat_group_functions: async () => await import("../chat/group/functions"),
+    lib_claim_once: async () => await import("../lib/claim-once"),
     skills_bundle: async () => await import("./bundle"),
     skills_functions: async () => await import("./functions"),
     triggers_functions: async () => await import("../triggers/functions"),
@@ -120,7 +126,7 @@ const as = (userId: string) => harness.withIdentity({ userId } as never);
 const run = async <T>(body: (context: any) => Promise<T>): Promise<T> => await harness.run(body);
 
 beforeEach(() => {
-    limits.failFamily = undefined;
+    limits.failFamilies.clear();
     harness = lunoraTest(schemaWithShardedTables(["skills", "skillStats", "skillFiles"]) as never);
 });
 
@@ -170,8 +176,8 @@ const exportBundle = async (userId: string, args: { groupChatIds?: string[]; ski
         markdown: string;
     };
 
-const importBundle = async (userId: string, markdown: string, selected: string[]) =>
-    (await as(userId).action(procedureAt("skills_bundle", "importBundle"), { markdown, selected } as never)) as {
+const importBundle = async (userId: string, markdown: string, selected: string[], importId: string = crypto.randomUUID()) =>
+    (await as(userId).action(procedureAt("skills_bundle", "importBundle"), { importId, markdown, selected } as never)) as {
         items: { id: string; key: string; kind: string; title: string; webhookSecret?: string }[];
         warnings: string[];
     };
@@ -248,7 +254,7 @@ describe("importBundle", () => {
     });
 
     it("leaves nothing behind when a later item is refused", async () => {
-        limits.failFamily = "chat/create";
+        limits.failFamilies.add("triggers/create");
 
         await expect(importBundle(OWNER, bundleOf(FULL), ALL)).rejects.toThrow(RE_2);
 
@@ -272,6 +278,56 @@ describe("importBundle", () => {
     it("refuses a group chat whose participants are not all selected", async () => {
         await expect(importBundle(OWNER, bundleOf(FULL), ["skill:0", "group:4"])).rejects.toThrow(RE_4);
         expect(await rows("skills")).toHaveLength(0);
+    });
+
+    it("imports every skill switched off, so none reaches the system prompt of a chat", async () => {
+        await importBundle(OWNER, bundleOf(FULL), ALL);
+
+        const links = await rows("userSkills");
+
+        expect(links).toHaveLength(2);
+        expect(links.every((link) => link.enabled === false && link.userId === OWNER)).toBe(true);
+        expect(await run(async (context) => await getEnabledSkillsForSystemPrompt(context, OWNER))).toStrictEqual([]);
+
+        // A skill the user made by hand is not affected.
+        await createSkill(OWNER, "mine");
+
+        const enabled = await run(async (context) => await getEnabledSkillsForSystemPrompt(context, OWNER));
+
+        expect(enabled.map((entry) => entry.slug)).toStrictEqual(["mine"]);
+    });
+
+    it("rolls back through paths that no rate limit can refuse, leaving no row behind", async () => {
+        // The trigger is created last, so the skills and the group chat exist when it fails.
+        limits.failFamilies.add("triggers/create");
+        limits.failFamilies.add("skills/delete");
+        limits.failFamilies.add("chat/delete");
+        limits.failFamilies.add("triggers/delete");
+
+        await expect(importBundle(OWNER, bundleOf(FULL), ALL)).rejects.toThrow(RE_11);
+
+        for (const table of ["skills", "skillStats", "userSkills", "skillHistory", "triggers", "threads"]) {
+            expect(await rows(table), table).toHaveLength(0);
+        }
+    });
+
+    it("imports once per importId: a retry of the same id is refused, a new id is not, and a failed import frees its id", async () => {
+        const markdown = bundleOf([skill("alpha")]);
+
+        await importBundle(OWNER, markdown, ["skill:0"], "import-1");
+        await expect(importBundle(OWNER, markdown, ["skill:0"], "import-1")).rejects.toThrow(RE_10);
+        expect(await rows("skills")).toHaveLength(1);
+
+        await expect(importBundle(OWNER, markdown, ["skill:0"], "import-2")).resolves.toHaveProperty("items");
+        expect(await rows("skills")).toHaveLength(2);
+
+        // The same id by someone else is a different import.
+        await expect(importBundle(OTHER, markdown, ["skill:0"], "import-1")).resolves.toHaveProperty("items");
+
+        limits.failFamilies.add("triggers/create");
+        await expect(importBundle(OWNER, bundleOf(FULL), ALL, "import-3")).rejects.toThrow(RE_2);
+        limits.failFamilies.clear();
+        await expect(importBundle(OWNER, bundleOf(FULL), ALL, "import-3")).resolves.toHaveProperty("items");
     });
 
     it("refuses an unknown version and an oversized file", async () => {
@@ -431,6 +487,45 @@ describe("exportBundle", () => {
 });
 
 describe("listBundleCandidates", () => {
+    const pickCandidates = async (userId: string) =>
+        (await as(userId).query(procedureAt("skills_bundle", "listBundleCandidates"), {} as never)) as {
+            groupChats: { exportable: boolean; reason?: string }[];
+            skills: { slug: string }[];
+        };
+
+    it("lists every skill of the caller, however many there are", async () => {
+        const slugs = Array.from({ length: 30 }, (_, index) => `skill-${String(index).padStart(2, "0")}`);
+
+        for (const slug of slugs) {
+            await createSkill(OWNER, slug);
+        }
+
+        const listed = await pickCandidates(OWNER);
+
+        expect(listed.skills.map((row) => row.slug).toSorted(byText)).toStrictEqual(slugs);
+    });
+
+    it("does not offer a group chat whose participant was deleted", async () => {
+        const first = await createSkill(OWNER, "alpha");
+        const second = await createSkill(OWNER, "beta");
+
+        await createGroup(OWNER, [first, second]);
+
+        const before = await pickCandidates(OWNER);
+
+        expect(before.groupChats[0]?.exportable).toBe(true);
+
+        await run(async (context) => {
+            await context.db.delete(second);
+        });
+
+        const after = await pickCandidates(OWNER);
+        const [group] = after.groupChats;
+
+        expect(group?.exportable).toBe(false);
+        expect(group?.reason).toMatch(RE_12);
+    });
+
     it("lists only the caller's own items", async () => {
         const mine = await createSkill(OWNER, "alpha");
         const second = await createSkill(OWNER, "beta");
