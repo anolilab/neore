@@ -846,6 +846,8 @@ impl DeviceState {
                         "[device-core] MCP server {} not started: {error}",
                         server.name
                     );
+                    // One started under the old settings keeps no access the new ones refuse.
+                    self.mcp.stop(&server.name);
                     continue;
                 }
             };

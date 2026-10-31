@@ -739,6 +739,19 @@ impl McpManager {
         });
     }
 
+    /// Stops one server, keeping its private folder: its launch is refused now (a setting changed), so the
+    /// process started under the old rules must not keep running with them.
+    pub fn stop(&self, name: &str) {
+        let removed = self.processes.lock().unwrap().remove(name);
+
+        if let Some(process) = removed {
+            process
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .kill();
+        }
+    }
+
     pub fn stop_all(&self) {
         self.processes.lock().unwrap().clear();
     }
@@ -1106,8 +1119,15 @@ sleep 1"#
         assert!(refused
             .unwrap_err()
             .contains("local MCP servers must run sandboxed"));
+        // Allowed to run unsandboxed, it still may not take "dependencies only": there is no proxy without the
+        // sandbox, so that tier is refused instead of becoming the whole network.
+        assert!(
+            sandbox::policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None)
+                .unwrap_err()
+                .contains("Common dependencies only")
+        );
         assert_eq!(
-            sandbox::policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None),
+            sandbox::policy_for_mcp(&missing, true, NetworkTier::Off, &roots, None),
             Ok(None)
         );
     }
@@ -1214,6 +1234,29 @@ sleep 1"#
         assert!(manager.process(&broken, None).is_err());
         assert!(manager.processes.lock().unwrap().is_empty());
         assert!(pid_gone(pid), "the old server is still running");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stopping_a_refused_server_kills_it_and_keeps_its_folder() {
+        let root = temp_root("refused");
+        let manager = McpManager::new(root.clone());
+        let old = manager.process(&idle_server("svc"), None).unwrap();
+        let folder = root.join(sanitize("svc"));
+
+        std::fs::create_dir_all(&folder).unwrap();
+        let pid = old.lock().unwrap().child.id() as libc::pid_t;
+
+        assert!(!pid_gone(pid));
+
+        manager.stop("svc");
+
+        assert!(manager.processes.lock().unwrap().is_empty());
+        assert!(pid_gone(pid), "the refused server is still running");
+        // Its folder (caches) stays: only forgetting a server deletes it.
+        assert!(folder.exists());
+        // Stopping one that is not running is a no-op.
+        manager.stop("svc");
     }
 
     #[cfg(unix)]

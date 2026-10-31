@@ -856,6 +856,11 @@ fn plan_call(
                 ..Policy::for_roots(roots, home)
             })),
         },
+        // No sandbox means no proxy: "dependencies only" is refused rather than run with the whole network.
+        Support::Unavailable(reason) if allow_unsandboxed && network == NetworkTier::Dependencies => Err(format!(
+            "\"Common dependencies only\" needs the sandbox, and {reason}. Choose Off or On in {}.",
+            subject.network_setting()
+        )),
         Support::Unavailable(_) if allow_unsandboxed => Ok(None),
         Support::Unavailable(reason) => Err(format!(
             "{what} must run sandboxed, and {reason}. To run them without a sandbox, \
@@ -1258,8 +1263,20 @@ mod tests {
         assert!(error.starts_with("local MCP servers must run sandboxed"));
         assert!(error.contains("no Landlock"));
         assert!(error.contains("Require sandbox for shell commands and local MCP servers"));
+        // Without a sandbox there is no proxy, so "dependencies only" is refused even where unsandboxed runs are
+        // allowed: it must never quietly become "everything".
+        assert!(
+            policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None)
+                .unwrap_err()
+                .contains("Common dependencies only")
+        );
+        assert!(
+            policy_for_call(&missing, true, NetworkTier::Dependencies, &roots, None)
+                .unwrap_err()
+                .contains("Common dependencies only")
+        );
         assert_eq!(
-            policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None),
+            policy_for_mcp(&missing, true, NetworkTier::Off, &roots, None),
             Ok(None)
         );
         assert!(
