@@ -272,24 +272,17 @@ const CommentableDiff: FC<{ messageId: string; patch: string; threadId: string }
         const ids = new Set<string>();
 
         for (const comment of drafts) {
-            const file = files.find((entry) => entry.path === comment.path);
-
-            if (comment.messageId !== messageId || !comment.range || !file) {
+            if (comment.messageId !== messageId || !comment.range) {
                 continue;
             }
 
-            for (const line of file.lines) {
-                const number = line.newNumber ?? line.oldNumber;
-                const side = line.newNumber === undefined ? "old" : "new";
-
-                if (line.selectable && side === comment.range.side && number !== undefined && number >= comment.range.from && number <= comment.range.to) {
-                    ids.add(`${file.path}\u{0}${line.id}`);
-                }
+            for (const id of comment.range.lineIds) {
+                ids.add(`${comment.path}\u{0}${id}`);
             }
         }
 
         return ids;
-    }, [drafts, files, messageId]);
+    }, [drafts, messageId]);
 
     // A patch with no file header in it has nothing to attach a comment to.
     if (files.length === 0) {

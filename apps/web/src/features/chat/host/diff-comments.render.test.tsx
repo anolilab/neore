@@ -144,7 +144,7 @@ describe("commenting on a turn's diff", () => {
                 id: expect.any(String),
                 messageId: "m1",
                 path: "src/a.ts",
-                range: { from: 4, hunk: "@@ -3,3 +3,4 @@", quoted: ["+new line", "+another new line"], side: "new", to: 5 },
+                range: { from: 4, hunk: "@@ -3,3 +3,4 @@", lineIds: ["line-5", "line-6"], quoted: ["+new line", "+another new line"], side: "new", to: 5 },
                 text: "Why two lines?",
             },
         ]);
@@ -179,12 +179,13 @@ describe("commenting on a turn's diff", () => {
         await waitFor(() => expect(harness.calls).toHaveLength(2));
         await waitFor(() => expect(useDiffCommentStore.getState().drafts["thread-1"]).toBeUndefined());
 
-        const [first, second] = harness.calls as [string, { requestId: string; text: string; threadId: string }][];
+        const sent = harness.calls.map(([, input]) => input as { requestId: string; text: string; threadId: string });
+        const [first, second] = sent;
 
         // The same comments are the same message: a retry finds the first try instead of starting a second turn.
-        expect(second[1].requestId).toBe(first[1].requestId);
-        expect(second[1].threadId).toBe("thread-1");
-        expect(second[1].text).toContain("Comment 1 on src/a.ts, lines 4-5:\n```diff\n@@ -3,3 +3,4 @@\n+new line\n+another new line\n```\nWhy two lines?");
+        expect(second?.requestId).toBe(first?.requestId);
+        expect(second?.threadId).toBe("thread-1");
+        expect(second?.text).toContain("Comment 1 on src/a.ts, lines 4-5:\n```diff\n@@ -3,3 +3,4 @@\n+new line\n+another new line\n```\nWhy two lines?");
         // Nothing but the host send left the page: no procedure, no other request.
         expect(harness.calls.map(([name]) => name)).toEqual(["send", "send"]);
     });

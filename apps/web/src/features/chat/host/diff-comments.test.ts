@@ -29,7 +29,7 @@ const comment = (fields: Partial<DiffComment> & { text: string }): DiffComment =
 };
 
 const lineComment = (quoted: string[], text = "please check", path = "src/a.ts"): DiffComment =>
-    comment({ path, range: { from: 4, hunk: "@@ -3,3 +3,4 @@", quoted, side: "new", to: 4 + quoted.length - 1 }, text });
+    comment({ path, range: { from: 4, hunk: "@@ -3,3 +3,4 @@", lineIds: [], quoted, side: "new", to: 4 + quoted.length - 1 }, text });
 
 const OMITTED = /… \d+ more diff lines not shown/u;
 
@@ -67,8 +67,31 @@ describe("rangeOf", () => {
                 ?.lines.filter((line) => line.selectable)
                 .slice(2, 4) ?? [];
 
-        expect(rangeOf(lines)).toEqual({ from: 4, hunk: "@@ -3,3 +3,4 @@", quoted: ["+new line", "+another new line"], side: "new", to: 5 });
+        expect(rangeOf(lines)).toEqual({
+            from: 4,
+            hunk: "@@ -3,3 +3,4 @@",
+            lineIds: ["line-5", "line-6"],
+            quoted: ["+new line", "+another new line"],
+            side: "new",
+            to: 5,
+        });
         expect(rangeOf([])).toBeUndefined();
+    });
+
+    it("counts a selection that runs from a removal to an addition on the new side only", () => {
+        const [file] = parsePatchFiles(PATCH);
+        const lines = file?.lines.filter((line) => line.selectable).slice(1, 4) ?? [];
+
+        // -old line (old 4), +new line (new 4), +another new line (new 5): the removal has no new number and is quoted, not counted.
+        expect(rangeOf(lines)).toMatchObject({ from: 4, quoted: ["-old line", "+new line", "+another new line"], side: "new", to: 5 });
+    });
+
+    it("does not mix an old number into a new-side range when the selection ends on a removal", () => {
+        const [file] = parsePatchFiles(PATCH);
+        const lines = file?.lines.filter((line) => line.selectable).slice(0, 2) ?? [];
+
+        // keep one (new 3), -old line (old 4): only the unchanged line has a number on the new side.
+        expect(rangeOf(lines)).toMatchObject({ from: 3, quoted: [" keep one", "-old line"], side: "new", to: 3 });
     });
 
     it("counts a removed line on the old side and says so", () => {
@@ -85,7 +108,11 @@ describe("composeDiffComments", () => {
     it("quotes the path, the lines and the hunk of each comment, then what was said", () => {
         const result = composeDiffComments([
             lineComment(["+new line", "+another new line"], "Why two lines?"),
-            comment({ path: "docs/b.md", range: { from: 1, hunk: "@@ -0,0 +1,2 @@", quoted: ["+# Title"], side: "new", to: 1 }, text: "Rename it" }),
+            comment({
+                path: "docs/b.md",
+                range: { from: 1, hunk: "@@ -0,0 +1,2 @@", lineIds: ["line-0"], quoted: ["+# Title"], side: "new", to: 1 },
+                text: "Rename it",
+            }),
         ]);
 
         expect(result).toMatchObject({ ok: true, truncated: false });

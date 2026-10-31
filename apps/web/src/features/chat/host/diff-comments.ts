@@ -17,6 +17,8 @@ export interface DiffLineRange {
     from: number;
     /** The hunk header the lines sit under, so the agent can place them. */
     hunk: string;
+    /** The ids of the selected lines in the turn's patch, to mark them again in the diff. */
+    lineIds: string[];
     /** The selected patch lines, with their `+`, `-` or space. */
     quoted: string[];
     side: DiffSide;
@@ -140,22 +142,33 @@ export const parsePatchFiles = (patch: string): DiffFile[] => {
     return files;
 };
 
-/** The number a line is known by in a range: where it stands in the new file, or in the old one for a removal. */
-const numberOf = (line: DiffLine): { number: number; side: DiffSide } =>
-    line.newNumber === undefined ? { number: line.oldNumber ?? 0, side: "old" } : { number: line.newNumber, side: "new" };
-
-/** The range a comment on `lines` (consecutive selectable lines of one hunk or several) covers, or undefined when there are none. */
+/**
+ * The range a comment on `lines` (consecutive selectable lines of a file) covers, or undefined when there are none.
+ * Numbers count on one side only: the new file when any selected line is in it, the old file for a selection of
+ * removals alone. The quoted lines still show everything selected, removals included.
+ */
 export const rangeOf = (lines: ReadonlyArray<DiffLine>): DiffLineRange | undefined => {
     const first = lines[0];
-    const last = lines.at(-1);
 
-    if (first === undefined || last === undefined) {
+    if (first === undefined) {
         return undefined;
     }
 
-    const start = numberOf(first);
+    const side: DiffSide = lines.some((line) => line.newNumber !== undefined) ? "new" : "old";
+    const numbers = lines.flatMap((line) => {
+        const number = side === "new" ? line.newNumber : line.oldNumber;
 
-    return { from: start.number, hunk: first.hunk ?? "", quoted: lines.map((line) => line.text), side: start.side, to: numberOf(last).number };
+        return number === undefined ? [] : [number];
+    });
+
+    return {
+        from: Math.min(...numbers),
+        hunk: first.hunk ?? "",
+        lineIds: lines.map((line) => line.id),
+        quoted: lines.map((line) => line.text),
+        side,
+        to: Math.max(...numbers),
+    };
 };
 
 /** A range as it is written: `12`, `12-15`, with the side said for removed lines. */
@@ -282,7 +295,7 @@ export const composeDiffComments = (comments: ReadonlyArray<DiffComment>): Compo
     const marks = quotes.map((quote) => (quote.length === 0 ? 0 : weigh(omitted(quote.length)) + 2));
     const budgets = quotes.map(() => 0);
     let left = room;
-    let pending = quotes.map((quote, index) => index).filter((index) => quotes[index]?.length);
+    let pending = quotes.map((_quote, index) => index).filter((index) => quotes[index]?.length);
 
     for (;;) {
         const share = pending.length === 0 ? 0 : Math.floor(left / pending.length);
