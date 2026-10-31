@@ -5,6 +5,7 @@
  */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { HooksView } from "../../acp/hooks/types";
 import type { RegistryListing } from "../../acp/registry";
 import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
 import { canImportSessions } from "./import-control";
@@ -532,6 +533,94 @@ const renderSession = (snapshot: SessionSnapshot | undefined): void => {
     $<HTMLButtonElement>("acp-end").textContent = ended ? "Remove session" : "End session";
 };
 
+const HOOK_STATE_TEXT: Record<HooksView["state"], string> = {
+    approved: "Approved. File events and the manual hooks below can prompt this session.",
+    changed: "This file changed since you approved it. Nothing fires until you approve it again.",
+    invalid: "This file is not a valid hooks file, so nothing fires.",
+    none: "",
+    unapproved: "Not approved. Nothing fires until you approve this file.",
+};
+
+const hookWhen = (hook: HooksView["hooks"][number]): string => hook.event === "manual" ? "Run by a button" : `When a file matching ${hook.glob ?? ""} is ${hook.event}`;
+
+const hookLine = (view: HooksView, sessionId: string, hook: HooksView["hooks"][number]): HTMLLIElement => {
+    const li = document.createElement("li");
+    const title = document.createElement("strong");
+    const when = document.createElement("span");
+    const prompt = document.createElement("pre");
+
+    title.textContent = hook.name;
+    when.className = "muted";
+    when.textContent = ` — ${hookWhen(hook)}. Sends:`;
+    prompt.textContent = hook.prompt;
+    li.append(title, when, prompt);
+
+    if (hook.event === "manual" && view.state === "approved" && view.hash !== undefined) {
+        const { hash } = view;
+
+        li.append(button("Run", `Run the hook ${hook.name}`, () => guarded(async () => {
+            await globalThis.neoreDevice.acpHookRun(sessionId, hook.id, hash);
+            $("acp-notice").textContent = `${hook.name} sent to the agent.`;
+        })));
+    }
+
+    return li;
+};
+
+/** Streamed text re-renders the session many times a second; the file is read again at most this often unless the session or its status changed. */
+const HOOKS_REFRESH_MS = 1500;
+const hooksPanel: { read?: { at: number; id: string; status: string }; serial: number } = { serial: 0 };
+
+const renderHooks = async (snapshot: SessionSnapshot, force = false): Promise<void> => {
+    const now = Date.now();
+
+    if (!force && hooksPanel.read?.id === snapshot.id && hooksPanel.read.status === snapshot.status && now - hooksPanel.read.at < HOOKS_REFRESH_MS) {
+        return;
+    }
+
+    hooksPanel.read = { at: now, id: snapshot.id, status: snapshot.status };
+    hooksPanel.serial += 1;
+
+    const mine = hooksPanel.serial;
+    let view: HooksView;
+
+    try {
+        view = snapshot.status === "ended" ? { hooks: [], state: "none" } : await globalThis.neoreDevice.acpHooks(snapshot.id);
+    } catch {
+        view = { hooks: [], state: "none" };
+    }
+
+    // The session on show changed while the file was read.
+    if (mine !== hooksPanel.serial) {
+        return;
+    }
+
+    const panel = $("acp-hooks");
+
+    panel.hidden = view.state === "none";
+    $("acp-hooks-state").textContent = view.state === "invalid" ? `${HOOK_STATE_TEXT.invalid} ${view.error ?? ""}` : HOOK_STATE_TEXT[view.state];
+    $("acp-hooks-list").replaceChildren(...view.hooks.map((hook) => hookLine(view, snapshot.id, hook)));
+
+    const actions: HTMLElement[] = [];
+    const { hash } = view;
+
+    if (hash !== undefined && (view.state === "unapproved" || view.state === "changed")) {
+        actions.push(button("Approve these hooks", "Approve the hooks file shown above", () => guarded(async () => {
+            await globalThis.neoreDevice.acpHooksApprove(snapshot.id, hash);
+            await renderHooks(snapshot, true);
+        })));
+    }
+
+    if (view.state === "approved" || view.state === "changed") {
+        actions.push(button("Revoke approval", "Revoke the approval of this hooks file", () => guarded(async () => {
+            await globalThis.neoreDevice.acpHooksRevoke(snapshot.id);
+            await renderHooks(snapshot, true);
+        })));
+    }
+
+    $("acp-hooks-actions").replaceChildren(...actions);
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
@@ -555,7 +644,13 @@ const refreshSessions = async (): Promise<void> => {
             }),
     );
 
-    renderSession(state.selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(state.selected));
+    const snapshot = state.selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(state.selected);
+
+    renderSession(snapshot);
+
+    if (snapshot !== undefined) {
+        await renderHooks(snapshot);
+    }
 };
 
 const selectedId = (): string => {

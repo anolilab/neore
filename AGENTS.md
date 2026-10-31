@@ -868,7 +868,12 @@ written here is what is not.
   The size caps and the type list are PROVISIONAL (not measured) — one pair of
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
-  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  Host turns write no usage row and charge no credit.
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+  and a hook can only send a prompt to the already-open session. The watcher drops events
+  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.
