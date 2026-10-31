@@ -12747,6 +12747,9 @@
                       "answer": {
                         "type": "string"
                       },
+                      "entryId": {
+                        "type": "string"
+                      },
                       "question": {
                         "type": "string"
                       },
@@ -12755,14 +12758,19 @@
                         "type": "string",
                         "x-lunora-table": "threads"
                       },
+                      "token": {
+                        "type": "string"
+                      },
                       "unlockProof": {
                         "type": "string"
                       }
                     },
                     "required": [
                       "answer",
+                      "entryId",
                       "question",
-                      "threadId"
+                      "threadId",
+                      "token"
                     ],
                     "type": "object"
                   },
@@ -12826,6 +12834,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "entryId": {
+                        "type": "string"
+                      },
                       "question": {
                         "type": "string"
                       },
@@ -12839,6 +12850,7 @@
                       }
                     },
                     "required": [
+                      "entryId",
                       "question",
                       "threadId"
                     ],
@@ -12871,12 +12883,16 @@
                     "answer": {
                       "type": "string"
                     },
+                    "token": {
+                      "type": "string"
+                    },
                     "withThread": {
                       "type": "boolean"
                     }
                   },
                   "required": [
                     "answer",
+                    "token",
                     "withThread"
                   ],
                   "type": "object"

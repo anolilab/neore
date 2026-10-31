@@ -1486,11 +1486,6 @@
       "to": "function:chat_functions:gateThreadAction"
     },
     {
-      "from": "function:chat_aside:askAside",
-      "kind": "call",
-      "to": "function:chat_streaming_persistent_library:getStreamText"
-    },
-    {
       "from": "function:chat_autocomplete:isComposerAutocompleteEnabled",
       "kind": "read",
       "to": "table:userSettings"
@@ -18374,7 +18369,7 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 412,
+      "line": 413,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
@@ -19652,79 +19647,79 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 121,
+      "line": 128,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 121,
+      "line": 128,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 121,
+      "line": 128,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 121,
+      "line": 128,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 121,
+      "line": 128,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 140,
+      "line": 147,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 140,
+      "line": 147,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 143,
+      "line": 150,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 143,
+      "line": 150,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 197,
+      "line": 204,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 220,
+      "line": 227,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 225,
+      "line": 232,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 342,
+      "line": 349,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

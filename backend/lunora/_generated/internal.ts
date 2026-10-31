@@ -288,7 +288,7 @@ export interface InternalApiTypes {
     };
     chat: {
         aside: {
-            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveStreamId?: Id<"persistentStreams">; rows: Array<{ role: "assistant" | "user"; text: string }> }>;
+            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
         };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;

@@ -28,13 +28,28 @@ const errorCodeOf = (error: unknown): string | undefined => {
     return typeof value === "string" ? value : undefined;
 };
 
+type AsideErrorKind = "added" | "busy" | "credits" | "forbidden" | "locked" | "other" | "quota" | "slow" | "unavailable";
+
 /** What a failed question or add says, from the server's code (`chat/aside.ts`). */
-const asideErrorKind = (error: unknown): "busy" | "forbidden" | "locked" | "other" | "quota" | "unavailable" => {
+const asideErrorKind = (error: unknown): AsideErrorKind => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
     const codes = new Set([code, data?.code]);
 
-    if (codes.has("TOO_MANY_REQUESTS")) {
+    if (codes.has("ASIDE_ALREADY_ADDED")) {
+        return "added";
+    }
+
+    if (codes.has("DAILY_MESSAGE_LIMIT_REACHED")) {
         return "quota";
+    }
+
+    if (codes.has("INSUFFICIENT_CREDITS")) {
+        return "credits";
+    }
+
+    // The per-minute budget or a busy model: not the day's allowance.
+    if (codes.has("TOO_MANY_REQUESTS") || codes.has("UPSTREAM_RATE_LIMITED")) {
+        return "slow";
     }
 
     if (codes.has("THREAD_LOCKED")) {
@@ -72,19 +87,25 @@ interface AsideItemProps {
 const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) => {
     const { t } = useLingui();
     const errors = {
+        added: t`This is already in the thread.`,
         busy: t`The reply is still running. Try again when it finishes.`,
+        credits: t`There are no credits left to answer this. Add credits and try again.`,
         forbidden: t`You cannot ask a side question in this chat.`,
         locked: t`Unlock this chat to ask a side question.`,
         other: t`Could not answer the question. Try again.`,
         quota: t`You have used today's messages. Try again later.`,
+        slow: t`Too many requests right now. Try again in a moment.`,
         unavailable: t`Side questions are not available for this chat, or the question is too long.`,
     };
     const addErrors = {
+        added: t`This is already in the thread.`,
         busy: t`The reply is still running. Add it when the reply finishes.`,
+        credits: t`This cannot be added to this chat.`,
         forbidden: t`Only the owner of a chat can add to it from here.`,
         locked: t`Unlock this chat to add this to the thread.`,
         other: t`Could not add this to the thread. Try again.`,
         quota: t`You have used today's messages. Try again later.`,
+        slow: t`Too many requests right now. Try again in a moment.`,
         unavailable: t`This cannot be added to this chat.`,
     };
     const errorKind = asideErrorKind({ code: entry.errorCode });
@@ -95,7 +116,11 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
             <div className="flex items-start gap-2">
                 <p className="text-foreground grow font-medium break-words whitespace-pre-line">{entry.question}</p>
                 <Button
-                    aria-label={t`Dismiss this side question`}
+                    aria-label={
+                        entry.status === "pending"
+                            ? t`Hide this side question. It is already being answered and still counts as a message.`
+                            : t`Dismiss this side question`
+                    }
                     className="size-6 shrink-0"
                     onClick={() => onDismiss(entry.id)}
                     size="icon-sm"
@@ -133,14 +158,14 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
                         <div className="flex items-center gap-2">
                             <Button
                                 className="h-7 gap-1.5 px-2 text-xs"
-                                disabled={isRunning}
+                                disabled={isRunning || entry.adding === true}
                                 onClick={() => onAdd(entry)}
                                 size="sm"
                                 type="button"
                                 variant="outline"
                             >
                                 <MessageSquarePlusIcon aria-hidden="true" className="size-3.5" />
-                                {t`Add to thread`}
+                                {entry.adding === true ? t`Adding…` : t`Add to thread`}
                             </Button>
                             {isRunning && <span className="text-muted-foreground text-xs">{t`Available when the reply finishes`}</span>}
                         </div>
@@ -198,10 +223,15 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
         add(threadId, { id, question: text, status: "pending" });
         setQuestion("");
         setAnnouncement(t`Thinking…`);
-        askAside({ question: text, threadId: threadId as Id<"threads">, unlockProof })
-            .then(({ answer, withThread }) => {
-                update(threadId, id, { answer, status: "answered", withThread });
-                setAnnouncement(answer);
+        askAside({ entryId: id, question: text, threadId: threadId as Id<"threads">, unlockProof })
+            .then(({ answer, token, withThread }) => {
+                update(threadId, id, { answer, status: "answered", token, withThread });
+
+                // The answer is one call, not a stream, and stays readable in the list: the region only says it arrived.
+                // A question hidden meanwhile is not announced.
+                if (useAsideStore.getState().byThread[threadId]?.some((candidate) => candidate.id === id)) {
+                    setAnnouncement(t`Answer ready`);
+                }
 
                 return undefined;
             })
@@ -225,19 +255,36 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
     };
 
     const handleAdd = (entry: AsideEntry) => {
-        if (entry.answer === undefined) {
+        const current = useAsideStore.getState().byThread[threadId]?.find((candidate) => candidate.id === entry.id);
+
+        if (entry.answer === undefined || entry.token === undefined || current?.adding === true) {
             return;
         }
 
-        addAside({ answer: entry.answer, question: entry.question, threadId: threadId as Id<"threads">, unlockProof })
+        update(threadId, entry.id, { adding: true });
+        addAside({
+            answer: entry.answer,
+            entryId: entry.id,
+            question: entry.question,
+            threadId: threadId as Id<"threads">,
+            token: entry.token,
+            unlockProof,
+        })
             .then(() => {
-                update(threadId, entry.id, { addErrorCode: undefined, status: "added" });
+                update(threadId, entry.id, { addErrorCode: undefined, adding: false, status: "added" });
                 setAnnouncement(t`Added to the thread`);
 
                 return undefined;
             })
             .catch((error: unknown) => {
-                update(threadId, entry.id, { addErrorCode: errorCodeOf(error) ?? "UNKNOWN" });
+                // A second add of the same question is the first one having landed: it is in the thread.
+                if (asideErrorKind(error) === "added") {
+                    update(threadId, entry.id, { addErrorCode: undefined, adding: false, status: "added" });
+
+                    return;
+                }
+
+                update(threadId, entry.id, { addErrorCode: errorCodeOf(error) ?? "UNKNOWN", adding: false });
             });
     };
 

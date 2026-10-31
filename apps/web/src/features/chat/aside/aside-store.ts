@@ -11,12 +11,16 @@ export type AsideStatus = "added" | "answered" | "failed" | "pending";
 export interface AsideEntry {
     /** Why "Add to thread" was refused, when it was; the answer stays so it can be tried again. */
     addErrorCode?: string;
+    /** "Add to thread" is on its way: the button waits, so one click posts once. */
+    adding?: boolean;
     answer?: string;
     /** Why `failed`: the server's code, for wording the panel can act on. */
     errorCode?: string;
     id: string;
     question: string;
     status: AsideStatus;
+    /** What the server signed the answer with: "Add to thread" posts nothing without it. */
+    token?: string;
     /** False when the model saw the question alone (a coding agent's thread). */
     withThread?: boolean;
 }

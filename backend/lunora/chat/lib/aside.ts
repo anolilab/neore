@@ -4,6 +4,8 @@
  * writes.
  */
 
+import { hmacSha256Hex, timingSafeEqual } from "../../lib/crypto";
+
 /** A question is a quick one; anything longer belongs in the thread. */
 export const MAX_ASIDE_QUESTION_CHARS = 4000;
 
@@ -26,6 +28,12 @@ export const ASIDE_MAX_OUTPUT_TOKENS = 1024;
 
 /** `agentName` of the row "Add to thread" writes: a reader of a shared thread can tell it from the model's own reply. */
 export const ASIDE_AGENT_NAME = "Side question";
+
+/** Chunks read from the end of a running stream: far more than `ASIDE_LIVE_REPLY_CHARS` needs, a bound on the read. */
+export const ASIDE_LIVE_CHUNK_ROWS = 200;
+
+/** The newest rows of a branched path one snapshot walks past (tool, pending and failed rows included) looking for `ASIDE_CONTEXT_ROWS` usable ones. */
+export const ASIDE_MAX_WALKED_ROWS = 200;
 
 export interface AsideRow {
     role: "assistant" | "user";
@@ -61,6 +69,91 @@ export const fitAsideRows = (rows: ReadonlyArray<AsideRow>): AsideRow[] => {
     }
 
     return kept.toReversed();
+};
+
+/** The slice of a stream chunk the live reply is read from. */
+export interface LiveChunk {
+    restart?: boolean;
+    speaker?: unknown;
+    text: string;
+}
+
+/**
+ * The end of the reply being written, from its chunks NEWEST FIRST: read back
+ * until `ASIDE_LIVE_REPLY_CHARS` are held or a chunk that starts the current
+ * reply (a group speaker's turn, a steered restart; the same markers
+ * `getStreamText` cuts at). `undefined` when nothing has been written.
+ */
+export const liveReplyTail = (chunksNewestFirst: ReadonlyArray<LiveChunk>): string | undefined => {
+    const pieces: string[] = [];
+    let held = 0;
+
+    for (const chunk of chunksNewestFirst) {
+        pieces.push(chunk.text);
+        held += chunk.text.length;
+
+        if (chunk.restart || chunk.speaker || held >= ASIDE_LIVE_REPLY_CHARS) {
+            break;
+        }
+    }
+
+    const text = pieces.toReversed().join("");
+
+    return text.trim() ? text : undefined;
+};
+
+export interface AsideAnswerClaim {
+    answer: string;
+    question: string;
+    threadId: string;
+    userId: string;
+}
+
+/** The signed message is a JSON array, so no field can borrow another's text by containing a delimiter. */
+const asideAnswerMessage = ({ answer, question, threadId, userId }: AsideAnswerClaim): string =>
+    JSON.stringify(["aside-answer.v1", userId, threadId, question, answer]);
+
+/**
+ * Proof that `askAside` produced this answer for this question in this thread
+ * for this user. "Add to thread" posts the answer as the assistant's own row, so
+ * the text must be one the server wrote, not whatever the client sends back.
+ */
+export const signAsideAnswer = async (claim: AsideAnswerClaim, secret: string): Promise<string> => {
+    if (!secret) {
+        throw new Error("No secret to sign a side-question answer with");
+    }
+
+    return await hmacSha256Hex(secret, asideAnswerMessage(claim));
+};
+
+export const verifyAsideAnswer = async (claim: AsideAnswerClaim, token: string, secret: string): Promise<boolean> =>
+    secret !== "" && timingSafeEqual(token, await signAsideAnswer(claim, secret));
+
+export type AsideFailure = "credits" | "other" | "rate-limited";
+
+/**
+ * What a failed model call means for the user. The gateway answers 402 when the
+ * account has no credits and 429 when it is throttled; the AI SDK carries the
+ * status on the error or, once retries are spent, on a wrapped one.
+ */
+export const classifyAsideFailure = (error: unknown): AsideFailure => {
+    let current: unknown = error;
+
+    for (let depth = 0; depth < 4 && typeof current === "object" && current !== null; depth += 1) {
+        const { cause, lastError, statusCode } = current as { cause?: unknown; lastError?: unknown; statusCode?: unknown };
+
+        if (statusCode === 402) {
+            return "credits";
+        }
+
+        if (statusCode === 429) {
+            return "rate-limited";
+        }
+
+        current = lastError ?? cause;
+    }
+
+    return "other";
 };
 
 export const ASIDE_SYSTEM_PROMPT = [

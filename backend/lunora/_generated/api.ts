@@ -178,8 +178,8 @@ export interface ApiTypes {
     };
     chat: {
         aside: {
-            addAsideToThread: FunctionReference<"mutation", { answer: string; question: string; threadId: Id<"threads">; unlockProof?: string }, { messageId: string }>;
-            askAside: FunctionReference<"action", { question: string; threadId: Id<"threads">; unlockProof?: string }, { answer: string; withThread: boolean }>;
+            addAsideToThread: FunctionReference<"mutation", { answer: string; entryId: string; question: string; threadId: Id<"threads">; token: string; unlockProof?: string }, { messageId: string }>;
+            askAside: FunctionReference<"action", { entryId: string; question: string; threadId: Id<"threads">; unlockProof?: string }, { answer: string; token: string; withThread: boolean }>;
         };
         ask_user: {
             answerAskUser: FunctionReference<"mutation", { answer: string | null; approvalId: string; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;

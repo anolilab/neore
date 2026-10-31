@@ -277,13 +277,15 @@ const SidebarResizeHandle: FC = () => {
 
 const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
     const { t } = useLingui();
-    const activeRightSidebarTab = useChatUIStore((state) => state.activeRightSidebarTab);
+    const storedRightSidebarTab = useChatUIStore((state) => state.activeRightSidebarTab);
     const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const flaggedModels = useFeatureFlaggedModels();
     const modelsMap = new Map(flaggedModels.map((m) => [m.id, m]));
 
     const { thread } = useModelCombobox({ threadId });
     const isTextModel = !thread?.model || (modelsMap.get(thread.model)?.mode ?? "text") === "text";
+    // The Ask and Pins tabs exist for text models only: a thread switched to another model falls back to the summary tab.
+    const activeRightSidebarTab = !isTextModel && (storedRightSidebarTab === ASIDE_TAB || storedRightSidebarTab === "pins") ? "summary" : storedRightSidebarTab;
 
     return (
         <Sidebar className="py-1 [&>div]:rounded-l-xl" collapsible="offcanvas" name="right" side="right" variant="inset">
