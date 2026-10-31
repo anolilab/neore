@@ -401,6 +401,7 @@ export interface InternalApiTypes {
         };
         group: {
             functions: {
+                createImportedGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
                 getGroupHistory: FunctionReference<"query", { threadId: string; userId: string }, Array<{ agentName?: string; id: string; role: "user" | "assistant"; speakerSkillId?: string; text: string }>>;
                 getGroupRunConfig: FunctionReference<"query", { organizationId?: string; threadId: string; userId: string }, null | { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string; voice?: string }; description: string; instructions: string; name: string; skillId: string; slug: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>;
                 isGroupStopRequested: FunctionReference<"query", { since: number; threadId: string }, boolean>;
@@ -999,6 +1000,11 @@ export interface InternalApiTypes {
         builder: {
             searchMarketplaceForBuilder: FunctionReference<"query", { queries: Array<string> }, Array<{ query: string; skills: Array<{ _id: Id<"skills">; description: string; name: string; rating: number; ratingCount: number; slug: string; usageCount: number }> }>>;
         };
+        bundle: {
+            loadBundleSources: FunctionReference<"query", { groupChatIds: Array<Id<"threads">>; skillIds: Array<Id<"skills">>; triggerIds: Array<Id<"triggers">>; userId: string }, { groupChats: Array<{ groupChat: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ skillId: string }>; synthesizerSkillId?: string }; id: string; model?: string; title?: string }>; skills: Array<{ category?: string; config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string }; description: string; icon?: string; id: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: Array<{ description?: string; name: string; required?: boolean }>; version?: string }>; triggers: Array<{ cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; id: string; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: string; webhookSignatureScheme?: string }> }>;
+            loadImportContext: FunctionReference<"query", { userId: string }, { skillCount: number; slugs: Array<string> }>;
+            removeImportedItem: FunctionReference<"mutation", { id: string; kind: "skill" | "trigger" | "group"; userId: string }, null>;
+        };
         executor: {
             getEnabledSkillsForSystemPromptQuery: FunctionReference<"query", { organizationId?: string; userId: string }, Array<{ description: string; name: string; slug: string }>>;
             loadSkillForInvocationQuery: FunctionReference<"query", { organizationId?: string; rawArgs: string; skillSlug: string; userId: string }, null | { config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string; voice?: string }; instructions: string; resolvedVariables?: unknown; skillId: Id<"skills"> }>;
@@ -1569,6 +1575,7 @@ export const internal: InternalApiTypes = {
         },
         group: {
             functions: {
+                createImportedGroupChat: { __lunoraRef: "chat_group_functions:createImportedGroupChat" },
                 getGroupHistory: { __lunoraRef: "chat_group_functions:getGroupHistory" },
                 getGroupRunConfig: { __lunoraRef: "chat_group_functions:getGroupRunConfig" },
                 isGroupStopRequested: { __lunoraRef: "chat_group_functions:isGroupStopRequested" },
@@ -2166,6 +2173,11 @@ export const internal: InternalApiTypes = {
         },
         builder: {
             searchMarketplaceForBuilder: { __lunoraRef: "skills_builder:searchMarketplaceForBuilder" },
+        },
+        bundle: {
+            loadBundleSources: { __lunoraRef: "skills_bundle:loadBundleSources" },
+            loadImportContext: { __lunoraRef: "skills_bundle:loadImportContext" },
+            removeImportedItem: { __lunoraRef: "skills_bundle:removeImportedItem" },
         },
         executor: {
             getEnabledSkillsForSystemPromptQuery: { __lunoraRef: "skills_executor:getEnabledSkillsForSystemPromptQuery" },
