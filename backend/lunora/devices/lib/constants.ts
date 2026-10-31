@@ -53,3 +53,6 @@ export const DEVICE_CALL_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 /** Poll backoff while a tool waits for its call. */
 export const DEVICE_POLL_INITIAL_MS = 250;
 export const DEVICE_POLL_MAX_MS = 2000;
+
+/** Projects one device can be limited to. */
+export const MAX_DEVICE_SCOPE_PROJECTS = 50;

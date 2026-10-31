@@ -24951,6 +24951,12 @@
                           }
                         ]
                       },
+                      "projectIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "toolNames": {
                         "items": {
                           "type": "string"
@@ -25472,6 +25478,107 @@
           }
         },
         "summary": "mutation: devices_functions:revokeDevice",
+        "tags": [
+          "devices"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#devices_functions:setDeviceProjectScope": {
+      "post": {
+        "description": "Invoke the `mutation` `devices_functions:setDeviceProjectScope` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "devices_functions:setDeviceProjectScope",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "deviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
+                      "scope": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "any",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "projects",
+                                "type": "string"
+                              },
+                              "projectIds": {
+                                "items": {
+                                  "description": "Id<\"projects\">",
+                                  "type": "string",
+                                  "x-lunora-table": "projects"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "projectIds"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "deviceId",
+                      "scope"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "devices_functions:setDeviceProjectScope",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: devices_functions:setDeviceProjectScope",
         "tags": [
           "devices"
         ],
