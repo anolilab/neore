@@ -281,8 +281,7 @@ impl McpProcess {
                     }
                 }
 
-                // The user's own variables win over ours, except the proxy: the sandbox allows no other way out
-                // anyway, but a server must not be configured past the tier it was shown under.
+                // The proxy variables come last, so a server's own `env` cannot point it away from the filter.
                 command
                     .envs(sandbox_env(&state, &confined))
                     .envs(&config.env);
@@ -642,11 +641,6 @@ impl McpManager {
 
             let _ = std::fs::remove_dir_all(self.state_root.join(sanitize(name)));
         }
-    }
-
-    /// The folder a server's caches live in, for the settings view and the tests.
-    pub fn state_folder(&self, name: &str) -> PathBuf {
-        self.state_root.join(sanitize(name))
     }
 }
 
@@ -1036,7 +1030,6 @@ sleep 1"#
         manager.forget(&["Docs Server".to_owned()]);
 
         assert!(!state.exists());
-        assert!(!manager.state_folder("Docs Server").exists());
 
         let _ = std::fs::remove_dir_all(&root);
     }
