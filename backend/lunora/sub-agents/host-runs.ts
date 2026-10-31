@@ -6,11 +6,15 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { queueHostTurn } from "../acp/lib/send-turn";
+import type { DeviceTaintSource } from "../devices/lib/taint";
 import { sessionOfThread } from "../acp/lib/sessions";
 import { isLiveStream } from "../chat/streaming/persistent/host";
 import { buildSubAgentPrompt } from "./logic";
 
 type RunDoc = Doc<"subAgentRuns">;
+
+/** Every untrusted source: the lead's run is not traced call by call, so its task is treated as having read all of them. */
+const LEAD_TASK_TAINT: ReadonlyArray<DeviceTaintSource> = ["web", "knowledge", "mcp", "device", "files"];
 
 /** What a worker run is sent to the agent as: the person's own words as written, a lead's task framed as a delegation. */
 const promptOf = (run: Pick<RunDoc, "clientId" | "task">): string => (run.clientId === undefined ? buildSubAgentPrompt(run.task) : run.task);
@@ -57,7 +61,10 @@ export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number
         return { error: "The agent is busy with another turn on that computer.", retry: true };
     }
 
-    const queued = await queueHostTurn(ctx, { session, text: promptOf(run), threadId: session.threadId, userId: run.userId }, now);
+    // A task the lead wrote is model output, shaped by whatever the lead's run read: mark it untrusted on every count,
+    // so the computer never offers "Always allow" for that turn. One the person typed (`clientId`) is theirs.
+    const taintedBy = run.clientId === undefined ? LEAD_TASK_TAINT : undefined;
+    const queued = await queueHostTurn(ctx, { session, taintedBy, text: promptOf(run), threadId: session.threadId, userId: run.userId }, now);
 
     if ("error" in queued) {
         return { error: REFUSALS[queued.error], retry: queued.error === "busy" };
