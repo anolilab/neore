@@ -36,7 +36,7 @@ import { isTaskModelAllowed } from "../tasks/logic";
 import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
 import type { RunOutcome } from "./failure-streak";
 import { armEventTrigger, assertThreadWatchable, assertWatcherCapacity } from "./events";
-import { normalizeEventSource, watchesSomethingElse } from "./event-sources";
+import { normalizeEventSource, sameEventSource, watchesSomethingElse } from "./event-sources";
 import type { EventSourceConfig, WebhookSignatureScheme } from "./validators";
 import { vEventSource, vWebhookSignatureScheme } from "./validators";
 
@@ -587,8 +587,15 @@ export const updateTrigger = authMutation
 
         // An event trigger's next check is its own: editing the condition re-arms a switched-on watcher, anything else leaves it.
         const isEvent = trigger.type === "event";
-        const eventSource =
-            isEvent && args.eventSource !== undefined ? await checkedEventSource(context, args.eventSource, trigger.type, userId, context.now) : undefined;
+        // A condition sent back unchanged is kept as stored, not checked again: a moment that has passed since (a completed
+        // time watcher) must not block renaming it.
+        let eventSource: EventSourceConfig | undefined;
+
+        if (isEvent && args.eventSource !== undefined) {
+            const unchanged = trigger.eventSource !== undefined && sameEventSource(trigger.eventSource, args.eventSource);
+
+            eventSource = unchanged ? trigger.eventSource : await checkedEventSource(context, args.eventSource, trigger.type, userId, context.now);
+        }
 
         if (!isEvent && args.eventSource !== undefined) {
             throw new LunoraError("INVALID_ARGUMENT", "Only an event trigger has an event source.");
@@ -646,7 +653,8 @@ export const updateTrigger = authMutation
             ...(args.description === null && { description: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
-            ...((args.cronExpression !== undefined || zoneChanged || (!isSchedule && !isEvent)) && { nextTriggerAt }),
+            // An event trigger's next check is its own and is never touched here.
+            ...((((args.cronExpression !== undefined || zoneChanged) && isSchedule) || (!isSchedule && !isEvent)) && { nextTriggerAt }),
             ...(eventSource !== undefined && { eventSource }),
             // A new condition forgets the baseline of the old one; a switched-on watcher looks again at once.
             ...(sourceChanged && { eventState: eventRearm?.eventState ?? {} }),
@@ -964,9 +972,11 @@ export const releaseQuietWindow = internalMutation
  * A moment in time fires once, so whatever consumes its firing is its last act: switch it off. It is called when
  * the run it started settles, and when that run is skipped instead (a quiet-run skip, a filtered delivery), which
  * leaves no run to settle. Not before: the run still has to be admitted, and admission needs the trigger enabled.
+ * `firing` names the firing that run came from: only the run of the moment's CURRENT firing disarms it, so a manual
+ * run (which has none) or a run left over from an earlier arming cannot switch off a moment it never consumed.
  */
-const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">): Promise<void> => {
-    if (trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt !== undefined) {
+const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">, firing: number | undefined): Promise<void> => {
+    if (firing !== undefined && trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt === firing) {
         await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
     }
 };
@@ -977,20 +987,20 @@ const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">):
  * would hold one of its owner's watcher slots for good. A moment that has not fired, or is already off, is left alone.
  */
 export const switchOffConsumedMoment = internalMutation
-    .input({ triggerId: v.id("triggers") })
+    .input({ firing: v.optional(v.number()), triggerId: v.id("triggers") })
     .output(v.null())
-    .mutation(async ({ args: { triggerId }, ctx }) => {
+    .mutation(async ({ args: { firing, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
         if (trigger) {
-            await switchOffFiredMoment(ctx, trigger);
+            await switchOffFiredMoment(ctx, trigger, firing);
         }
 
         return null;
     });
 
 /** The write behind {@link recordFilteredExecution}: the trigger's ONE filtered (skipped) row, created or moved to the front. */
-const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string): Promise<void> => {
+const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string, firing: number | undefined): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
     const trigger = await ctx.db.get(triggerId);
@@ -999,7 +1009,7 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
         return;
     }
 
-    await switchOffFiredMoment(ctx, trigger);
+    await switchOffFiredMoment(ctx, trigger, firing);
 
     const latest = await ctx.db
         .query("triggerExecutions")
@@ -1099,7 +1109,7 @@ export const admitTriggerRun = internalMutation
             if (!verdict.matched) {
                 const reason = verdict.reason.slice(0, 500);
 
-                await recordFiltered(ctx, triggerId, reason);
+                await recordFiltered(ctx, triggerId, reason, undefined);
 
                 const running = executionId ? await ctx.db.get(executionId) : null;
 
@@ -1140,12 +1150,15 @@ export const admitTriggerRun = internalMutation
 
 export const createExecution = internalMutation
     .input({
+        // The firing of an event trigger this run came from; a manual run has none.
+        firing: v.optional(v.number()),
         payload: v.optional(v.string()),
         triggerId: v.id("triggers"),
     })
     .output(v.id("triggerExecutions"))
-    .mutation(async ({ args: { payload, triggerId }, ctx }) => {
+    .mutation(async ({ args: { firing, payload, triggerId }, ctx }) => {
         const insertedId = await ctx.db.insert("triggerExecutions", {
+            firing,
             payload,
             startedAt: ctx.now,
             status: "running",
@@ -1169,12 +1182,14 @@ export const createExecution = internalMutation
  */
 export const recordFilteredExecution = internalMutation
     .input({
+        // The firing of an event trigger whose run this skip consumes.
+        firing: v.optional(v.number()),
         reason: v.string().max(MAX_LENGTH.short),
         triggerId: v.id("triggers"),
     })
     .output(v.null())
-    .mutation(async ({ args: { reason, triggerId }, ctx }) => {
-        await recordFiltered(ctx, triggerId, reason);
+    .mutation(async ({ args: { firing, reason, triggerId }, ctx }) => {
+        await recordFiltered(ctx, triggerId, reason, firing);
 
         return null;
     });
@@ -1270,7 +1285,7 @@ export const updateExecution = internalMutation
 
         // The run it started is its last: switch it off, now that it no longer needs to be admitted.
         if (settling) {
-            await switchOffFiredMoment(ctx, trigger);
+            await switchOffFiredMoment(ctx, trigger, execution.firing);
         }
 
         // Sent again on a redelivery: `notify` is idempotent on the key, so this only restores a notice that was lost.

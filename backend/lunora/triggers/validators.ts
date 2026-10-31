@@ -44,6 +44,9 @@ export type EventSourceConfig = Infer<typeof vEventSource>;
  * (thread); the scheduler owns the rest. An empty object means "no baseline yet": the first check records one.
  */
 export const vEventState = v.object({
+    // When the watcher was last switched on or pointed at something else. A check carries it and is dropped if it changed
+    // (`recordEventCheck`): a quick off/on leaves no other mark an old, in-flight check could be told apart by.
+    armedAt: v.optional(v.number()),
     checkedAt: v.optional(v.number()),
     // Consecutive failed checks whose cause the owner can fix; at `TRIGGER_PAUSE_AFTER_FAILURES` the watcher pauses.
     checkFailures: v.optional(v.number()),

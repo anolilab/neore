@@ -30,7 +30,8 @@ export const pageSource: EventSource<{ contains?: string; kind: "page"; selector
 
         const hash = await sha256Hex(text);
         const matched = config.contains === undefined ? undefined : text.toLowerCase().includes(config.contains.toLowerCase());
-        const next = { ...state, hash, matched };
+        // `matched` is left out, not `undefined`, without a phrase: a patch refuses a nested `undefined`.
+        const next = { ...state, hash, ...(matched !== undefined && { matched }) };
 
         // No baseline yet: remember how the page looks now and say nothing.
         if (state.hash === undefined) {

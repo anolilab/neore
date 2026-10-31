@@ -1339,6 +1339,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "triggers_events:latestThreadReply": lunora_triggers_events_174.latestThreadReply as unknown as RegisteredLunoraFunction,
     "triggers_events:recordEventCheck": lunora_triggers_events_174.recordEventCheck as unknown as RegisteredLunoraFunction,
     "triggers_events:runEventCheck": lunora_triggers_events_174.runEventCheck as unknown as RegisteredLunoraFunction,
+    "triggers_events:startEventRun": lunora_triggers_events_174.startEventRun as unknown as RegisteredLunoraFunction,
     "triggers_execute:default": lunora_triggers_execute_175.default as unknown as RegisteredLunoraFunction,
     "triggers_execute:executeTrigger": lunora_triggers_execute_175.executeTrigger as unknown as RegisteredLunoraFunction,
     "triggers_functions:admitTriggerRun": lunora_triggers_functions_176.admitTriggerRun as unknown as RegisteredLunoraFunction,
@@ -7489,13 +7490,20 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
 let __val1;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val1 = source["payload"];
+if (source["firing"] !== undefined) {
+if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
+__val1 = source["firing"];
 __has1 = true;
 }
+let __has2 = false;
+let __val2;
+if (source["payload"] !== undefined) {
+if (typeof source["payload"] !== "string") return DEFER;
+__val2 = source["payload"];
+__has2 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "payload": __val1 } : {}), "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "firing": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_176.deleteTrigger.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7559,8 +7567,15 @@ return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 installCompiledValidatorMap(lunora_triggers_functions_176.switchOffConsumedMoment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["firing"] !== undefined) {
+if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
+__val1 = source["firing"];
+__has1 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "firing": __val1 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_176.updateExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9377,28 +9392,29 @@ export interface Caller {
         events: {
             dispatchDueEventTriggers: (args?: {}) => Promise<{ dispatched: number }>;
             latestThreadReply: (args: { after?: { order: number; stepOrder: number }; now: number; threadId: string; userId: string }) => Promise<{ accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; transient?: boolean; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
+            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; transient?: boolean; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
             runEventCheck: (args: { triggerId: Id<"triggers"> }) => Promise<null>;
+            startEventRun: (args: { firing: number; payload: string; triggerId: Id<"triggers">; userId: string }) => Promise<null>;
         };
         execute: {
-            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
-            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
+            default: (args: { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
+            executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
             admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" }>;
-            createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
+            createExecution: (args: { firing?: number; payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "event" | "schedule" | "webhook"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
             getDueScheduleTriggers: (args: { now: number }) => Promise<import("./dataModel.js").Doc_triggers[]>;
             getTriggerExecutions: (args: { limit?: number; triggerId: Id<"triggers"> }) => Promise<({} & { _id: string; completedAt: number | null; error: string | null; startedAt: number; status: string; threadId: string | null; })[]>;
             getTriggerInternal: (args: { triggerId: Id<"triggers"> }) => Promise<import("./dataModel.js").Doc_triggers | null>;
             getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; eventSource: ({ contains?: string | undefined; cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; selector?: string | undefined; } & { kind: "page"; url: string; }) | ({} & { at: number; kind: "time"; }) | ({ cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; } & { kind: "thread"; threadId: string; }) | null; eventStatus: ({} & { checkedAt: number | null; checkFailures: number; firedAt: number | null; }) | null; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; quietWhenEmpty: boolean; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
-            recordFilteredExecution: (args: { reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
+            recordFilteredExecution: (args: { firing?: number; reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
             releaseQuietWindow: (args: { expected?: number; triggerId: Id<"triggers"> }) => Promise<null>;
             reserveQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<boolean>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
-            switchOffConsumedMoment: (args: { triggerId: Id<"triggers"> }) => Promise<null>;
+            switchOffConsumedMoment: (args: { firing?: number; triggerId: Id<"triggers"> }) => Promise<null>;
             testRunTrigger: (args: { testPayload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
             updateExecution: (args: { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }) => Promise<null>;
             updateTrigger: (args: { botComputer?: boolean; botId?: string | null; cronExpression?: string; description?: string | null; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model?: string; name?: string; quietWhenEmpty?: boolean; requireDisabled?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; triggerId: Id<"triggers"> }) => Promise<void>;
@@ -11063,6 +11079,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             latestThreadReply: (args) => callRegistered(context, "triggers_events:latestThreadReply", args),
             recordEventCheck: (args) => callRegistered(context, "triggers_events:recordEventCheck", args),
             runEventCheck: (args) => callRegistered(context, "triggers_events:runEventCheck", args),
+            startEventRun: (args) => callRegistered(context, "triggers_events:startEventRun", args),
         },
         execute: {
             default: (args) => callRegistered(context, "triggers_execute:default", args),

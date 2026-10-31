@@ -153,6 +153,21 @@ export const watchesSomethingElse = (before: EventSourceConfig | undefined, afte
     return (before as TimeConfig).at !== after.at;
 };
 
+/**
+ * Whether `after` is `before`, settings included — what an edit that changes nothing sends back. A moment is compared to the
+ * minute, the precision of the form that sends it back.
+ */
+export const sameEventSource = (before: EventSourceConfig, after: EventSourceConfig): boolean => {
+    if (before.kind === "time" && after.kind === "time") {
+        return Math.floor(before.at / MINUTE_MS) === Math.floor(after.at / MINUTE_MS);
+    }
+
+    const left = before as Record<string, unknown>;
+    const right = after as Record<string, unknown>;
+
+    return [...new Set([...Object.keys(left), ...Object.keys(right)])].every((key) => left[key] === right[key]);
+};
+
 /** How long after a check the next one is due; a moment in time is due when it arrives. */
 export const checkIntervalMs = (config: EventSourceConfig): number =>
     config.kind === "time" ? 0 : (config.intervalMinutes ?? EVENT_DEFAULT_INTERVAL_MINUTES) * MINUTE_MS;

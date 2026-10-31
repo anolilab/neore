@@ -6441,6 +6441,11 @@
       "to": "table:messages"
     },
     {
+      "from": "function:triggers_events:recordEventCheck",
+      "kind": "schedule",
+      "to": "function:triggers_events:startEventRun"
+    },
+    {
       "from": "function:triggers_events:runEventCheck",
       "kind": "call",
       "to": "function:agent_sharing:getGrantOwner"
@@ -14662,6 +14667,13 @@
     },
     {
       "detail": "action",
+      "id": "function:triggers_events:startEventRun",
+      "kind": "function",
+      "name": "triggers.events.startEventRun",
+      "module": "triggers"
+    },
+    {
+      "detail": "action",
       "id": "function:triggers_execute:default",
       "kind": "function",
       "name": "triggers.execute.default",
@@ -20828,19 +20840,19 @@
     {
       "file": "triggers/events",
       "kind": "read",
-      "line": 82,
+      "line": 84,
       "reason": "\"assertWatcherCapacity\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 296,
+      "line": 298,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 304,
+      "line": 306,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {

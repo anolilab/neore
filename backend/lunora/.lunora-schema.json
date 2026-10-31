@@ -21132,6 +21132,12 @@
           "optional": true,
           "unique": false
         },
+        "firing": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "pausedTrigger": {
           "kind": "boolean",
           "nullable": false,
@@ -21397,6 +21403,12 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "armedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "checkFailures": {
               "kind": "number",
               "nullable": false,

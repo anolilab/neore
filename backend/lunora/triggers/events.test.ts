@@ -9,8 +9,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { HttpError } from "../lib/fetch-timeout";
 import schema from "../schema";
-import { createExecution, recordFilteredExecution, switchOffConsumedMoment, updateExecution } from "./functions";
-import { EVENT_CHECK_LEASE_MS, EVENT_FIRE_CLAIM_TTL_MS, dispatchDueEventTriggers, latestThreadReply, performEventCheck, recordEventCheck } from "./events";
+import { createExecution, recordFilteredExecution, setTriggerEnabledInternal, switchOffConsumedMoment, updateExecution } from "./functions";
+import {
+    EVENT_CHECK_LEASE_MS,
+    EVENT_FIRE_CLAIM_TTL_MS,
+    dispatchDueEventTriggers,
+    latestThreadReply,
+    performEventCheck,
+    recordEventCheck,
+    queueEventRun,
+} from "./events";
 import type { EventCheckContext } from "./event-sources/types";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { assertWatcherCapacity } from "./events";
@@ -69,6 +77,13 @@ const insertWatcher = async (overrides: Record<string, unknown> = {}): Promise<s
 
 const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
 
+/** The runs a check scheduled for its firings: they are sent to the queue only after the claiming mutation committed. */
+const scheduledRuns = (): any[] =>
+    harness.scheduler
+        .list()
+        .filter((job) => "firing" in job.args)
+        .map((job) => job.args);
+
 /** One check as the action performs it, with the page the fake network serves. */
 const check = async (triggerId: string, html: string, now = NOW): Promise<void> => {
     const trigger = await readTrigger(triggerId);
@@ -120,6 +135,8 @@ describe("a page watcher", () => {
         const row = await readTrigger(id);
 
         expect(row.eventState.hash).toMatch(HEX_SHA256_RE);
+        // A phrase-less watcher has no `matched`: a patch refuses a nested `undefined`.
+        expect(Object.hasOwn(row.eventState, "matched")).toBe(false);
     });
 
     it("starts exactly one run when the page changes, and none while it stays the same", async () => {
@@ -132,13 +149,14 @@ describe("a page watcher", () => {
 
         await check(id, "<p>v2</p>");
 
-        expect(enqueueJob).toHaveBeenCalledTimes(1);
-        expect(enqueueJob.mock.calls[0]?.[1]).toMatchObject({ payload: expect.stringContaining("The page changed: https://example.com/news"), triggerId: id });
-        expect(enqueueJob.mock.calls[0]?.[2]).toMatchObject({ once: { userId: USER }, shardKey: USER });
+        expect(enqueueJob).not.toHaveBeenCalled();
+        expect(scheduledRuns()).toEqual([
+            { firing: NOW, payload: expect.stringContaining("The page changed: https://example.com/news"), triggerId: id, userId: USER },
+        ]);
 
         await check(id, "<p>v2</p>");
 
-        expect(enqueueJob).toHaveBeenCalledTimes(1);
+        expect(scheduledRuns()).toHaveLength(1);
     });
 
     it("keeps watching after a fire, once the cooldown has passed", async () => {
@@ -174,7 +192,7 @@ describe("a page watcher", () => {
 
         expect(await record()).toEqual({ fired: true });
         expect(await record()).toEqual({ fired: false });
-        expect(enqueueJob).toHaveBeenCalledTimes(1);
+        expect(scheduledRuns()).toHaveLength(1);
     });
 
     it("lets the same occurrence fire again once the claim has expired", async () => {
@@ -236,8 +254,8 @@ describe("a time watcher", () => {
 
         const row = await readTrigger(id);
 
-        expect(enqueueJob).toHaveBeenCalledTimes(1);
-        expect(enqueueJob.mock.calls[0]?.[1]).toMatchObject({ payload: expect.stringContaining("The time has come") });
+        expect(scheduledRuns()).toHaveLength(1);
+        expect(scheduledRuns()[0]).toMatchObject({ firing: AT, payload: expect.stringContaining("The time has come") });
         expect(row.enabled).toBe(true);
         expect(row.nextTriggerAt).toBeUndefined();
     });
@@ -248,7 +266,7 @@ describe("a time watcher", () => {
         vi.setSystemTime(AT);
         await check(id, "", AT);
 
-        const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { triggerId: id }));
+        const executionId = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { firing: AT, triggerId: id }));
 
         const beforeSettle = await readTrigger(id);
 
@@ -266,7 +284,7 @@ describe("a time watcher", () => {
 
         vi.setSystemTime(AT);
         await check(id, "", AT);
-        await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, { reason: "Nothing to report", triggerId: id }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, { firing: AT, reason: "Nothing to report", triggerId: id }));
 
         const row = await readTrigger(id);
 
@@ -284,7 +302,7 @@ describe("a time watcher", () => {
 
         vi.setSystemTime(AT);
         await check(id, "", AT);
-        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { triggerId: id }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { firing: AT, triggerId: id }));
 
         const fired = await readTrigger(id);
 
@@ -310,6 +328,130 @@ describe("a time watcher", () => {
         const row = await readTrigger(id);
 
         expect(row.enabled).toBe(true);
+    });
+
+    it("is not switched off by a manual run that settles after it has fired", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+
+        // "Run now" carries no firing, so it must not consume the one that is still on its way.
+        const manual = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { triggerId: id }));
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId: manual, status: "completed" }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { triggerId: id }));
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(true);
+    });
+
+    it("is not switched off by the run of an earlier firing after it was armed for a new moment", async () => {
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+
+        const oldRun = await harness.run(async (ctx: any) => await ctx.runMutation(createExecution, { firing: AT, triggerId: id }));
+
+        // The owner re-arms it for a new moment while the first run is still in flight; that moment fires too.
+        const next = AT + 120_000;
+
+        await harness.run(
+            async (ctx: any) => await ctx.db.patch(id, { enabled: true, eventSource: { at: next, kind: "time" }, eventState: {}, nextTriggerAt: next }),
+        );
+        vi.setSystemTime(next);
+        await check(id, "", next);
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId: oldRun, status: "completed" }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, { firing: AT, reason: "Nothing to report", triggerId: id }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { firing: AT, triggerId: id }));
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(true);
+    });
+});
+
+describe("handing a firing to the queue", () => {
+    it("schedules the send from the claiming mutation, so a mutation that does not commit sends nothing", async () => {
+        const id = await insertWatcher();
+        const record = async (): Promise<unknown> =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordEventCheck, {
+                        fire: { key: "k", summary: "x" },
+                        read: { source: PAGE },
+                        state: {},
+                        triggerId: id,
+                    }),
+            );
+
+        await record();
+
+        expect(enqueueJob).not.toHaveBeenCalled();
+        expect(scheduledRuns()).toHaveLength(1);
+    });
+
+    it("enqueues under an id taken from the firing, so a repeated send is one run", async () => {
+        const id = await insertWatcher();
+        const args = { firing: NOW, payload: "x", triggerId: id, userId: USER };
+
+        await queueEventRun(args as never);
+        await queueEventRun(args as never);
+
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(enqueueJob.mock.calls[0]?.[1]).toEqual({ firing: NOW, payload: "x", triggerId: id });
+        expect(enqueueJob.mock.calls[0]?.[2]).toMatchObject({ once: { jobId: `event:${id}:${NOW}`, userId: USER }, shardKey: USER });
+        expect(enqueueJob.mock.calls[1]?.[2]).toEqual(enqueueJob.mock.calls[0]?.[2]);
+    });
+});
+
+describe("a send that fails", () => {
+    it("is thrown to the scheduler to run again, and leaves the firing recorded", async () => {
+        const id = await insertWatcher({ eventSource: { at: NOW + 1000, kind: "time" }, nextTriggerAt: NOW + 1000 });
+
+        vi.setSystemTime(NOW + 1000);
+        await check(id, "", NOW + 1000);
+        enqueueJob.mockRejectedValueOnce(new Error("queue unavailable"));
+
+        const [args] = scheduledRuns();
+
+        await expect(queueEventRun(args)).rejects.toThrow("queue unavailable");
+        await queueEventRun(args);
+
+        const row = await readTrigger(id);
+
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(row).toMatchObject({ enabled: true, eventState: { firedAt: NOW + 1000 } });
+    });
+});
+
+describe("re-arming a watcher", () => {
+    it("drops the answer of a check that started before it was switched off and on again", async () => {
+        const id = await insertWatcher();
+        const stale = await readTrigger(id);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: false, triggerId: id }));
+        vi.setSystemTime(NOW + 1000);
+        await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: true, triggerId: id }));
+
+        const checkContext: EventCheckContext = {
+            fetchPage: async () => {
+                return { text: "<p>old look</p>", truncated: false };
+            },
+            now: NOW,
+            scanThread: async () => {
+                return {};
+            },
+        };
+
+        await harness.run(async (ctx: any) => await performEventCheck(ctx, stale, checkContext));
+
+        const row = await readTrigger(id);
+
+        expect(row.eventState.hash).toBeUndefined();
+        expect(row.eventState.checkedAt).toBeUndefined();
     });
 });
 

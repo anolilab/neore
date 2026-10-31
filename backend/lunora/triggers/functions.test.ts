@@ -556,9 +556,42 @@ describe("event triggers", () => {
 
         const after = await readTrigger(triggerId);
 
-        expect(after.eventState).toEqual({});
+        expect(after.eventState).toEqual({ armedAt: NOW });
         expect(after.nextTriggerAt).toBe(NOW);
         expect(after.eventSource.url).toBe("https://example.com/other");
+    });
+
+    it("can be renamed once their moment has passed, because the unchanged moment is not checked again", async () => {
+        // Saved with seconds (the API allows it); the form sends it back to the minute.
+        const at = NOW + 90_000;
+        const sentBack = NOW + 60_000;
+        const triggerId = await create({ at, kind: "time" });
+
+        vi.setSystemTime(at + 1);
+        await as().mutation(updateTrigger as never, { eventSource: { at: sentBack, kind: "time" }, name: "Renamed", triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toMatchObject({ eventSource: { at, kind: "time" }, name: "Renamed" });
+
+        // A different moment is still held to the future.
+        await expect(as().mutation(updateTrigger as never, { eventSource: { at: at - 120_000, kind: "time" }, triggerId } as never)).rejects.toThrow("future");
+    });
+
+    it("keep their next check when a zone or an expression is sent with an edit", async () => {
+        const triggerId = await create(PAGE);
+
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: NOW + 900_000 }));
+        await as().mutation(updateTrigger as never, { timezone: "Europe/Berlin", triggerId } as never);
+
+        const afterZone = await readTrigger(triggerId);
+
+        expect(afterZone.nextTriggerAt).toBe(NOW + 900_000);
+
+        await as().mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
+
+        const afterCron = await readTrigger(triggerId);
+
+        expect(afterCron.nextTriggerAt).toBe(NOW + 900_000);
     });
 
     it("are listed with their condition and how the watching is going", async () => {

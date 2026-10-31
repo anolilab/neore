@@ -10,7 +10,8 @@
  * - {@link runEventCheck} (an action: pages and other users' threads are outbound calls) asks the source whether
  *   the condition just became true. No model is involved.
  * - {@link recordEventCheck} stores the new baseline, counts failures and, when the condition fired, claims
- *   that occurrence once (`lib/claim-once.ts`) and enqueues the ordinary trigger run (`executeTrigger`) on the jobs queue.
+ *   that occurrence once (`lib/claim-once.ts`) and schedules {@link startEventRun}, which puts the ordinary
+ *   trigger run (`executeTrigger`) on the jobs queue.
  *
  * Sources live in `event-sources/`; this file knows none of their details.
  */
@@ -74,7 +75,8 @@ export const armEventTrigger = (trigger: Doc<"triggers">, now: number): { eventS
         throw new LunoraError("BAD_REQUEST", "That moment has already passed. Pick a new one.");
     }
 
-    return { eventState: {}, nextTriggerAt: firstCheckAt(config, now) };
+    // `armedAt` is the generation of this arming: a check that began under an earlier one is dropped (`recordEventCheck`).
+    return { eventState: { armedAt: now }, nextTriggerAt: firstCheckAt(config, now) };
 };
 
 /** A user keeps at most {@link MAX_ACTIVE_EVENT_WATCHERS} watchers switched on: each is checked every few minutes. */
@@ -288,7 +290,7 @@ export const performEventCheck = async (
     const triggerId = trigger._id;
 
     // What the check was asked about: an answer for anything else is dropped (`recordEventCheck`).
-    const read = { checkedAt: trigger.eventState?.checkedAt, source: trigger.eventSource! };
+    const read = { armedAt: trigger.eventState?.armedAt, checkedAt: trigger.eventState?.checkedAt, source: trigger.eventSource! };
 
     try {
         const result = await checkEvent(checkContext, trigger.eventSource!, trigger.eventState ?? {});
@@ -350,9 +352,49 @@ export const runEventCheck = internalAction
     });
 
 /**
+ * Puts the run of one firing on the jobs queue. It is scheduled by the mutation that claimed the firing
+ * ({@link recordEventCheck}), so it exists only if that mutation committed: a queue send made inside the
+ * mutation is not undone when the mutation fails, and would start a run for a firing that was never recorded.
+ * The job id is taken from the firing, so a repeat of this send — the scheduler re-runs an action that throws,
+ * with backoff — is the same run, claimed once (`lib/job-once.ts`). A send that keeps failing past the scheduler's
+ * retries loses that firing: the claim and the baseline are already recorded.
+ */
+export const queueEventRun = async ({
+    firing,
+    payload,
+    triggerId,
+    userId,
+}: {
+    firing: number;
+    payload: string;
+    triggerId: Id<"triggers">;
+    userId: string;
+}): Promise<void> => {
+    await enqueueJob(
+        internal.triggers.execute.executeTrigger,
+        { firing, payload, triggerId },
+        { once: { jobId: `event:${triggerId}:${String(firing)}`, userId }, shardKey: userId },
+    );
+};
+
+export const startEventRun = internalAction
+    .input({
+        firing: v.number(),
+        payload: v.string().max(MAX_LENGTH.text),
+        triggerId: v.id("triggers"),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .action(async ({ args }) => {
+        await queueEventRun(args);
+
+        return null;
+    });
+
+/**
  * Stores what a check found. A condition that fired starts one run, once: the occurrence is claimed
  * (`claimOnce` on the trigger and the source's key), so a duplicate tick or a retried check that saw the same
- * thing starts nothing; the run itself rides the jobs queue under its own claim (`enqueueJob({ once })`).
+ * thing starts nothing; the run itself is handed to {@link startEventRun} and rides the jobs queue under its own claim.
  * A failed check counts toward pausing the watcher only if its cause is the owner's to fix; an outage backs it off instead.
  */
 export const recordEventCheck = internalMutation
@@ -365,8 +407,8 @@ export const recordEventCheck = internalMutation
                 summary: v.string().max(MAX_LENGTH.long),
             }),
         ),
-        // What the check read: the condition and the time of the check before it. An answer is kept only if both still hold.
-        read: v.object({ checkedAt: v.optional(v.number()), source: vEventSource }),
+        // What the check read: the arming, the condition and the time of the check before it. An answer is kept only if all still hold.
+        read: v.object({ armedAt: v.optional(v.number()), checkedAt: v.optional(v.number()), source: vEventSource }),
         state: v.optional(vEventState),
         // The failure heals on its own (a timeout, an outage): it backs the watcher off and never pauses it.
         transient: v.optional(v.boolean()),
@@ -382,6 +424,7 @@ export const recordEventCheck = internalMutation
             trigger.enabled !== true ||
             !trigger.eventSource ||
             watchesSomethingElse(trigger.eventSource, read.source) ||
+            trigger.eventState?.armedAt !== read.armedAt ||
             trigger.eventState?.checkedAt !== read.checkedAt
         ) {
             return { fired: false };
@@ -445,12 +488,13 @@ export const recordEventCheck = internalMutation
         }
 
         if (claimed && fire) {
-            // Last: a send that fails rolls the claim and the baseline back, and the lease retries the check.
-            await enqueueJob(
-                internal.triggers.execute.executeTrigger,
-                { payload: buildEventPayload(fire.summary, fire.excerpt), triggerId },
-                { once: { userId: trigger.userId }, shardKey: trigger.userId },
-            );
+            // Scheduled, not sent: a job scheduled by a mutation is dropped with it if it fails, a queue send is not.
+            await ctx.scheduler.runAfter(0, internal.triggers.events.startEventRun, {
+                firing: now,
+                payload: buildEventPayload(fire.summary, fire.excerpt),
+                triggerId,
+                userId: trigger.userId,
+            });
         }
 
         return { fired: claimed };

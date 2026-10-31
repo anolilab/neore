@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HttpError } from "../../lib/fetch-timeout";
 import { isOwnerFixableCheckFailure } from "./check-failure";
-import { fetchWatchedPage } from "./fetch-page";
+import { PAGE_MAX_BYTES, fetchWatchedPage } from "./fetch-page";
 import { buildEventPayload, checkEvent, eventInputMessage, normalizeEventSource, watchesSomethingElse } from "./index";
 import { pageComparableText, parsePageSelector, selectElementHtml } from "./page-extract";
 import { scanThreadRows } from "./thread-scan";
@@ -109,6 +109,14 @@ describe("page source", () => {
 
         expect(arrived.fired).toBe(true);
         expect(still.fired).toBe(false);
+    });
+
+    it("keeps no `matched` in the baseline of a watcher with no phrase", async () => {
+        const base = await checkEvent(contextFor(["<p>a</p>"]), PAGE, {});
+        const changed = await checkEvent(contextFor(["<p>b</p>"]), PAGE, base.state);
+
+        expect(Object.hasOwn(base.state, "matched")).toBe(false);
+        expect(Object.hasOwn(changed.state, "matched")).toBe(false);
     });
 
     it("gives the same fire key to two checks that saw the same page", async () => {
@@ -270,6 +278,22 @@ describe("page extraction", () => {
         expect(parsePageSelector("a > b")).toBeUndefined();
         expect(parsePageSelector("")).toBeUndefined();
     });
+
+    it("does not count tag-like text inside a quoted attribute of a child", () => {
+        const html = '<div id="target"><span data-note="<div>">inside</span></div><p>outside</p>';
+        const single = "<div id=\"target\"><span data-note='</div>'>inside</span></div><p>outside</p>";
+
+        expect(selectElementHtml(html, parsePageSelector("#target")!)).toBe('<div id="target"><span data-note="<div>">inside</span></div>');
+        expect(pageComparableText(single, parsePageSelector("#target")!)).toBe("inside");
+    });
+
+    it("matches an id and a class written without quotes", () => {
+        const html = "<div id=main class=price>10</div><p>x</p>";
+
+        expect(pageComparableText(html, parsePageSelector("#main")!)).toBe("10");
+        expect(pageComparableText(html, parsePageSelector(".price")!)).toBe("10");
+        expect(pageComparableText("<section class=a\nid=main>y</section>", parsePageSelector("section#main")!)).toBe("y");
+    });
 });
 
 describe("what the run is told", () => {
@@ -331,6 +355,53 @@ describe("which failed checks the owner can fix", () => {
         vi.stubGlobal("fetch", async () => new Response("down", { status: 502 }));
 
         await expect(fetchWatchedPage("https://example.com/")).rejects.not.toSatisfy(isOwnerFixableCheckFailure);
+    });
+
+    it("cuts a chunk that crosses the cap before it is decoded, however large it is", async () => {
+        vi.stubGlobal("fetch", async () => new Response("a".repeat(PAGE_MAX_BYTES * 2), { headers: { "content-type": "text/html" } }));
+
+        const page = await fetchWatchedPage("https://example.com/");
+
+        expect(page.truncated).toBe(true);
+        expect(page.text).toHaveLength(PAGE_MAX_BYTES);
+    });
+
+    it("gives every redirect hop the one deadline of the check", async () => {
+        const timeout = vi.spyOn(AbortSignal, "timeout");
+        const answers = [
+            new Response(null, { headers: { location: "https://example.com/b" }, status: 302 }),
+            new Response(null, { headers: { location: "https://example.com/c" }, status: 302 }),
+            new Response("<p>done</p>", { headers: { "content-type": "text/html" } }),
+        ];
+
+        vi.stubGlobal("fetch", async () => answers.shift()!);
+
+        await expect(fetchWatchedPage("https://example.com/a")).resolves.toMatchObject({ text: "<p>done</p>" });
+        expect(timeout).toHaveBeenCalledTimes(1);
+
+        timeout.mockRestore();
+    });
+
+    it("gives up on a redirect once the deadline is spent, and does not count that against the owner", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+
+        const calls: string[] = [];
+
+        vi.stubGlobal("fetch", async (url: string) => {
+            calls.push(url);
+            vi.setSystemTime(Date.now() + 16_000);
+
+            return new Response(null, { headers: { location: "https://example.com/b" }, status: 302 });
+        });
+
+        const failure = await fetchWatchedPage("https://example.com/a").catch((error: unknown) => error);
+
+        vi.useRealTimers();
+
+        expect(calls).toEqual(["https://example.com/a"]);
+        expect(failure).toBeInstanceOf(Error);
+        expect((failure as Error).message).toContain("timeout");
+        expect(isOwnerFixableCheckFailure(failure)).toBe(false);
     });
 
     it("counts a selector that matches nothing", async () => {

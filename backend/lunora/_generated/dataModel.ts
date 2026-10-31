@@ -1763,6 +1763,7 @@ export interface Doc_triggerExecutions {
     _creationTime: number;
     completedAt?: number;
     error?: string;
+    firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;
@@ -1785,7 +1786,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
@@ -4544,6 +4545,7 @@ export interface Insert_triggerExecutions {
     _creationTime?: number;
     completedAt?: number;
     error?: string;
+    firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;
@@ -4566,7 +4568,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;

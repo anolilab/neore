@@ -462,9 +462,9 @@ describe("a delivery that ends before it has an execution row", () => {
         state.trigger = { ...state.trigger, ...firedMoment };
         state.createExecutionError = new Error("database unavailable");
 
-        await expect(run()).rejects.toThrow("database unavailable");
+        await expect(run({ firing: 900 })).rejects.toThrow("database unavailable");
 
-        expect(state.mutations.find((entry) => entry.name === "switchOffConsumedMoment")?.args).toEqual({ triggerId: "trigger-1" });
+        expect(state.mutations.find((entry) => entry.name === "switchOffConsumedMoment")?.args).toEqual({ firing: 900, triggerId: "trigger-1" });
     });
 
     it("leaves the moment to its real firing when the failed run was a manual test", async () => {

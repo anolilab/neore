@@ -13,7 +13,7 @@ import type { FetchedPage } from "./types";
  * on the form). The cap is what bounds a check's memory and time.
  */
 export const PAGE_MAX_BYTES = 1024 * 1024;
-/** The whole request, body included. */
+/** The whole check — every redirect hop and the body — shares this one deadline. */
 const PAGE_DEADLINE_MS = 15_000;
 const MAX_REDIRECTS = 3;
 const TEXT_TYPE_RE = /^(?:text\/|application\/(?:xhtml\+xml|xml|json))/iu;
@@ -37,8 +37,11 @@ const readCapped = async (response: Response): Promise<FetchedPage> => {
             return { text: text + decoder.decode(), truncated: false };
         }
 
-        bytes += value.byteLength;
-        text += decoder.decode(value, { stream: true });
+        // Cut at the budget before decoding: one chunk may be far larger than what is left.
+        const chunk = value.byteLength > PAGE_MAX_BYTES - bytes ? value.subarray(0, PAGE_MAX_BYTES - bytes) : value;
+
+        bytes += chunk.byteLength;
+        text += decoder.decode(chunk, { stream: true });
 
         if (bytes >= PAGE_MAX_BYTES) {
             await reader.cancel();
@@ -50,19 +53,25 @@ const readCapped = async (response: Response): Promise<FetchedPage> => {
 
 export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
     let target = url;
+    const deadline = Date.now() + PAGE_DEADLINE_MS;
+    // One signal for all hops, so the body read is bounded by what is left too.
+    const signal = AbortSignal.timeout(PAGE_DEADLINE_MS);
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
         if (!isSafeUrl(target)) {
             throw new EventCheckError("That address cannot be watched: it is not a public http or https URL.");
         }
 
+        const remaining = deadline - Date.now();
+
+        if (remaining <= 0) {
+            throw new Error(`Request timeout after ${String(PAGE_DEADLINE_MS)}ms`);
+        }
+
         const response = await fetchWithTimeout(
             target,
-            {
-                headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.8", "user-agent": "NeoreWatcher/1.0" },
-                signal: AbortSignal.timeout(PAGE_DEADLINE_MS),
-            },
-            PAGE_DEADLINE_MS,
+            { headers: { accept: "text/html,application/xhtml+xml,text/plain;q=0.8", "user-agent": "NeoreWatcher/1.0" }, signal },
+            remaining,
         );
 
         if (REDIRECT_STATUSES.has(response.status)) {

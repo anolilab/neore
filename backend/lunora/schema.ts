@@ -2777,6 +2777,9 @@ export const schema = defineSchema({
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
+        // The firing of an event trigger that started this run (its `eventState.firedAt`); absent on every other run, a manual one included.
+        // A moment in time is switched off only by the run of its own firing (`switchOffFiredMoment`).
+        firing: v.optional(v.number()),
         // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
         pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
