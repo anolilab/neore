@@ -5,7 +5,7 @@ import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/dialog";
 import { FileDiffIcon, MessageSquarePlusIcon } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import DiffCommentForm from "@/features/chat/host/diff-comment-form";
 import DiffCommentsDraft from "@/features/chat/host/diff-comments-draft";
@@ -38,6 +38,13 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
     const removed = files.reduce((sum, file) => sum + file.removed, 0);
     const commentable = threadId !== undefined && messageId !== undefined;
     const full = useDiffDraftFull(threadId ?? "");
+    // The button that opened each file's comment box: closing the box hands keyboard focus back to it.
+    const openers = useRef(new Map<string, HTMLButtonElement>());
+
+    const closeComment = (path: string): void => {
+        setCommenting(undefined);
+        openers.current.get(path)?.focus();
+    };
 
     return (
         <section aria-label={t`Files changed by this turn`} className="border-border my-2 rounded-md border text-sm" data-testid="host-changes">
@@ -68,6 +75,13 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
                                         aria-expanded={commenting === file.path}
                                         aria-label={t`Comment on ${file.path}`}
                                         onClick={() => setCommenting(commenting === file.path ? undefined : file.path)}
+                                        ref={(element) => {
+                                            if (element) {
+                                                openers.current.set(file.path, element);
+                                            } else {
+                                                openers.current.delete(file.path);
+                                            }
+                                        }}
                                         size="icon-sm"
                                         type="button"
                                         variant="ghost"
@@ -81,12 +95,12 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
                             <DiffCommentForm
                                 full={full}
                                 label={t`Comment on the whole file ${file.path}`}
-                                onCancel={() => setCommenting(undefined)}
+                                onCancel={() => closeComment(file.path)}
                                 onSubmit={(text) => {
                                     const stored = useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
 
                                     if (stored) {
-                                        setCommenting(undefined);
+                                        closeComment(file.path);
                                     }
 
                                     return stored;

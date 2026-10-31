@@ -244,6 +244,23 @@ describe("commenting on a turn's diff", () => {
         expect((harness.calls[0]?.[1] as { text: string }).text).toContain("Comment 1 on src/a.ts (the whole file):\nSplit it");
     });
 
+    it("returns focus to the button that opened a file comment when the box closes", async () => {
+        mount({ tooLarge: true });
+
+        const opener = screen.getByRole("button", { name: "Comment on src/a.ts" });
+
+        fireEvent.click(opener);
+        fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(opener);
+
+        fireEvent.click(opener);
+        fireEvent.change(await screen.findByLabelText("Comment on the whole file src/a.ts"), { target: { value: "Split it" } });
+        fireEvent.click(screen.getByRole("button", { name: "Add comment" }));
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(opener);
+    });
+
     it("holds the send while a turn is running", async () => {
         harness.data["chat.streaming.getActiveStreamForThread"] = { _id: "s1" };
         mount({ tooLarge: true });

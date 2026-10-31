@@ -76,6 +76,12 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
     const [stop, setStop] = useState(() => selectableAt(file, 0, 1) ?? 0);
     const elements = useRef(new Map<number, HTMLLIElement>());
     const [fileForm, setFileForm] = useState(false);
+    const fileFormOpener = useRef<HTMLButtonElement>(null);
+
+    const closeFileForm = (): void => {
+        setFileForm(false);
+        fileFormOpener.current?.focus();
+    };
     const selected = mine ? linesBetween(file, mine) : [];
     const range = rangeOf(selected);
     const kindWord: Record<PatchLineKind, string> = { add: t`added`, context: t`unchanged`, header: "", hunk: "", remove: t`removed` };
@@ -189,7 +195,7 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
         <section aria-label={t`Changes to ${file.path}`} className="border-border rounded-md border">
             <div className="bg-muted/50 flex items-center justify-between gap-2 px-3 py-1">
                 <h3 className="min-w-0 truncate font-mono text-xs font-medium">{file.path}</h3>
-                <Button aria-label={t`Comment on the whole file ${file.path}`} onClick={() => setFileForm(true)} size="xs" type="button" variant="ghost">
+                <Button aria-label={t`Comment on the whole file ${file.path}`} onClick={() => setFileForm(true)} ref={fileFormOpener} size="xs" type="button" variant="ghost">
                     <MessageSquarePlusIcon aria-hidden="true" className="size-3.5" />
                     <Trans>Comment on file</Trans>
                 </Button>
@@ -263,12 +269,12 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
                     <DiffCommentForm
                         full={full}
                         label={t`Comment on the whole file ${file.path}`}
-                        onCancel={() => setFileForm(false)}
+                        onCancel={closeFileForm}
                         onSubmit={(text) => {
                             const stored = useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
 
                             if (stored) {
-                                setFileForm(false);
+                                closeFileForm();
                             }
 
                             return stored;
