@@ -263,7 +263,6 @@ const ChatScreen = () => {
         </Pressable>
         );
 
-    // When these messages were last synced: the newest sync among the rows that came from the server.
     const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 

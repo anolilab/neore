@@ -188,7 +188,6 @@ const ThreadListScreen = () => {
         }
     };
 
-    // When the list was last synced: the newest sync among its rows.
     const syncedAt = threads.length === 0 ? undefined : Math.max(...threads.map((thread) => thread.syncedAt));
 
     return (
