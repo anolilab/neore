@@ -75,8 +75,12 @@ export const runStreamingAgent = internalAction
                 // Full access, or a locked chat the stream was started under (`streamRunThread`).
                 ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }),
                 // Group chat: its participants take the turn (`group/run.ts`) — unless
-                // the user invoked one skill directly with `/<slug>`.
-                isSkillCommand ? null : ctx.runQuery(internal.chat.group.functions.getGroupRunConfig, { organizationId, threadId, userId }),
+                // the user invoked one skill directly with `/<slug>`, or this job resumes a
+                // paused run, which finishes the one agent's reply even if the chat became a
+                // group chat meanwhile (a group turn would answer the prompt a second time).
+                isSkillCommand || resume !== undefined
+                    ? null
+                    : ctx.runQuery(internal.chat.group.functions.getGroupRunConfig, { organizationId, threadId, userId }),
                 // Raw row: the stream above was admitted under the thread's lock state (`streamRunThread`).
                 ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] }),
                 ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),

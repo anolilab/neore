@@ -18,13 +18,14 @@ import { z } from "zod";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
+import { runGroupTurn } from "./group/run";
 import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
 import { RATE_LIMIT_RESUME_SLACK_MS } from "./lib/rate-limit-pause";
 
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, unknown>; delayMs: number | undefined }[],
-        modelState: { builtAgents: 0, model: undefined as unknown, withTools: false },
+        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, withTools: false },
         registry: new Map<string, unknown>(),
     };
 });
@@ -182,7 +183,9 @@ beforeAll(async () => {
 
     registry.set(
         "chat_group_functions:getGroupRunConfig",
-        internalQuery.input({ organizationId: v.optional(v.string()), threadId: v.string(), userId: v.string() }).query(async () => null as never),
+        internalQuery
+            .input({ organizationId: v.optional(v.string()), threadId: v.string(), userId: v.string() })
+            .query(async () => modelState.groupConfig as never),
     );
     registry.set(
         "auth_functions:getAgentModulePreferencesQuery",
@@ -213,6 +216,8 @@ beforeEach(async () => {
     enqueued.length = 0;
     modelState.builtAgents = 0;
     modelState.withTools = false;
+    modelState.groupConfig = null;
+    vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
 
     harness = lunoraTest(schema as never);
@@ -379,6 +384,27 @@ describe("a provider rate limit on the first model call", () => {
         expect(state.streamStatus).toBe("done");
         expect(state.threadStatus).toBe("active");
         expect(state.pause).toBeUndefined();
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("finishes the paused reply as the one agent it was, even if the chat became a group chat meanwhile", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const paused = await readState();
+
+        modelState.groupConfig = { participants: [] };
+
+        await run({ resume: paused.pause!.id });
+
+        const state = await readState();
+
+        expect(runGroupTurn).not.toHaveBeenCalled();
+        expect(state.rows.map((row) => [row.role, row.status])).toStrictEqual([
+            ["user", "success"],
+            ["assistant", "success"],
+        ]);
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 
