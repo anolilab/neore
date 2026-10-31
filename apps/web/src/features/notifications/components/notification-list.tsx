@@ -10,6 +10,7 @@ import {
     CheckCircle2,
     FileDown,
     FlaskConical,
+    GitPullRequest,
     HelpCircle,
     Import,
     ListChecks,
@@ -21,6 +22,7 @@ import {
 import type { ComponentType, FC, ReactNode } from "react";
 
 import type { NotificationType } from "../lib/notification-labels";
+import linkTarget from "../lib/link-target";
 import useNotificationHeadline from "../lib/notification-labels";
 import { formatRelativeTime } from "../lib/relative-time";
 
@@ -42,6 +44,7 @@ const TYPE_ICONS: Record<NotificationType, ComponentType<{ className?: string }>
     daily_brief: Sparkles,
     data_export: FileDown,
     eval: FlaskConical,
+    review_request: GitPullRequest,
     sub_agent: Workflow,
     task: ListChecks,
     tool_approval: ShieldQuestion,
@@ -116,7 +119,12 @@ const NotificationList: FC<NotificationListProps> = ({ emptyLabel, items, onOpen
                 return (
                     <li key={item._id}>
                         {item.link ? (
-                            <Link className={rowClass} onClick={() => onOpen(item)} to={item.link as never}>
+                            <Link
+                                className={rowClass}
+                                onClick={() => onOpen(item)}
+                                search={linkTarget(item.link).search as never}
+                                to={linkTarget(item.link).to as never}
+                            >
                                 {content}
                             </Link>
                         ) : (

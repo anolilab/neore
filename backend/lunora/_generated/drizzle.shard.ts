@@ -897,7 +897,7 @@ export const notifications = sqliteTable("notifications", {
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1794,6 +1794,29 @@ export const userSkills = sqliteTable("userSkills", {
     by_skillId: index("by_skillId").on(t.skillId),
     by_user_and_enabled: index("by_user_and_enabled").on(t.userId, t.enabled),
     by_user_and_skill: index("by_user_and_skill").on(t.userId, t.skillId),
+}));
+
+export const watchedRepositories = sqliteTable("watchedRepositories", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    checkedAt: real("checkedAt").notNull(),
+    createdAt: real("createdAt").notNull(),
+    dirtyAt: real("dirtyAt").notNull(),
+    etag: text("etag", { mode: "json" }).$type<string | null>().notNull(),
+    hostOrigin: text("hostOrigin").notNull(),
+    lastStatus: text("lastStatus", { mode: "json" }).$type<"ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited">().notNull(),
+    leasedAt: real("leasedAt").notNull(),
+    login: text("login", { mode: "json" }).$type<string | null>().notNull(),
+    nextPollAt: real("nextPollAt").notNull(),
+    repository: text("repository").notNull(),
+    requested: text("requested", { mode: "json" }).$type<Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>>().notNull(),
+    seeded: integer("seeded", { mode: "boolean" }).notNull(),
+    userId: text("userId").notNull(),
+    webhookSecret: text("webhookSecret"),
+    webhookSeenAt: real("webhookSeenAt").notNull(),
+}, (t) => ({
+    by_user_and_repository: index("by_user_and_repository").on(t.userId, t.hostOrigin, t.repository),
+    by_nextPollAt: index("by_nextPollAt").on(t.nextPollAt),
 }));
 
 export const workflowExecutions = sqliteTable("workflowExecutions", {

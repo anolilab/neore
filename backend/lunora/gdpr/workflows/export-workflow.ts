@@ -82,6 +82,10 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
 
             return await context.step.do(name, async () => await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }));
         });
+        const watchedRepositories = await context.step.do(
+            "collect-watched-repositories",
+            async () => await context.run(internal.source_control.gdpr.collectWatchedRepositoriesForExport, { userId }),
+        );
         const bots = await context.step.do("collect-bots", async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }));
         const codingAgentRuns = await context.step.do(
             "collect-coding-agent-runs",
@@ -145,6 +149,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         threadTags,
                         userEmail,
                         userId,
+                        watchedRepositories,
                     }),
             )) as Id<"_storage"> | undefined;
         } catch (error) {

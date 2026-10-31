@@ -45,7 +45,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
-import { vDraftComment, vReviewVerdict } from "./source-control/validators";
+import { vCachedRequest, vDraftComment, vPollStatus, vReviewVerdict } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
@@ -2651,6 +2651,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -2686,7 +2687,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3296,6 +3296,33 @@ export const schema = defineSchema({
         .index("expiresAt", ["expiresAt"])
         .index("identifier", ["identifier"])
         .triggers((t) => auditTriggersFor(t, "verification", AUDIT_TABLES["verification"]!)),
+
+    // Develop mode: a repository the user chose to keep fresh (`source-control/freshness.ts`). One row per
+    // user and repository holds the list cache (the open, non-draft pull requests that ask the user for a review),
+    // its ETag, and the poll schedule. `nextPollAt` > 0 is the lease or the next poll the shard tick reads (0 never
+    // armed); `leasedAt` stamps the poll in flight, and a result is applied only while it still matches. `dirtyAt`
+    // is all a webhook ever writes. The webhook secret is encrypted and is never returned.
+    watchedRepositories: defineTable({
+        checkedAt: v.number(),
+        createdAt: v.number(),
+        dirtyAt: v.number(),
+        etag: v.union(v.string(), v.null()),
+        hostOrigin: v.string(),
+        lastStatus: vPollStatus,
+        leasedAt: v.number(),
+        login: v.union(v.string(), v.null()),
+        nextPollAt: v.number(),
+        repository: v.string(),
+        requested: v.array(vCachedRequest),
+        // False until the first successful poll: that one is the baseline and notifies nothing.
+        seeded: v.boolean(),
+        userId: v.string(),
+        webhookSecret: v.optional(v.string()),
+        webhookSeenAt: v.number(),
+    })
+        .shardBy("userId")
+        .index("by_nextPollAt", ["nextPollAt"])
+        .index("by_user_and_repository", ["userId", "hostOrigin", "repository"]),
 
     workflowExecutions: defineTable({
         completedAt: v.optional(v.number()),

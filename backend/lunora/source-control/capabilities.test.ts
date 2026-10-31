@@ -8,6 +8,8 @@ import { GITHUB_CAPABILITIES } from "./drivers/github";
 const KEYS: Record<HostCapabilityKey, true> = {
     "checks.requiredState": true,
     "checks.rerun": true,
+    "freshness.conditionalPolling": true,
+    "freshness.webhooks": true,
     "inbox.drafts": true,
     "inbox.mine": true,
     "inbox.needsMyReview": true,

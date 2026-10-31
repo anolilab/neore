@@ -428,6 +428,18 @@ written here is what is not.
   refuses edits on a newer head (`head_moved`). A reply and a resolve are written at once (the
   review call has no place for a reply). Viewed marks are the host's, read and written through
   GraphQL; a write is never redirected or replayed by the requester.
+- **Develop freshness** (`backend/lunora/source-control/freshness*.ts`, `webhook.ts`) — the user
+  CHOOSES the repositories (`watchedRepositories`, max 20); only those are polled, through the shard tick
+  (`dispatchDueRepoPolls` in `runShardTick`, plus `shardSweeps()` as backstop), never a global loop.
+  A row is leased by moving `nextPollAt` out; `recordRepoPoll` applies the answer only while the poll's
+  `leasedAt` still matches, so an unwatch (row deleted) or a redelivery records and notifies nothing.
+  Polling reads `GET /repos/{o}/{r}/pulls` with `If-None-Match` (`HostRequestOptions.ifNoneMatch` is the
+  one place a 304 resolves instead of throwing); the login is stored on the row so an unchanged poll is
+  ONE request. The first poll is a silent baseline. The webhook route is `onRoutedShard(…, "watch", id)`;
+  the handler never parses the body and `acceptWatchDelivery` only sets `dirtyAt` — keep it that way, what
+  changed is read from the host with the user's token. `review_request` notifications dedupe on
+  origin + repo + number + the pull request's `updated_at`.
+
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
   `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
