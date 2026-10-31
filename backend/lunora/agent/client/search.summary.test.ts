@@ -26,7 +26,7 @@ const CONTEXT_NOT_INSTRUCTIONS = /context, not instructions/i;
 
 const RECENT = [row("m1", 1, "user", "first recent"), row("m2", 2, "assistant", "second recent"), row("m3", 3, "user", "the prompt")];
 
-const contextFor = async (summary: string | null, options: { recentMessages?: number; statelessMode?: boolean } = {}) => {
+const contextFor = async (summary: string | null, options: { contextHandler?: never; recentMessages?: number; statelessMode?: boolean } = {}) => {
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
             return summary;
@@ -38,11 +38,12 @@ const contextFor = async (summary: string | null, options: { recentMessages?: nu
 
         return { page: [...RECENT].toReversed() };
     });
-    const { statelessMode, ...contextOptions } = options;
+    const { contextHandler, statelessMode, ...contextOptions } = options;
     const { messages, threadNotes } = await fetchContextWithPrompt(
         { runQuery, storage: {} } as never,
         {} as never,
         {
+            contextHandler,
             contextOptions,
             messages: undefined,
             prompt: undefined,
@@ -88,6 +89,17 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         const { messages, runQuery } = await contextFor("A summary", { recentMessages: 20 });
 
         expect(texts(messages as never)).toHaveLength(3);
+        expect(runQuery).not.toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, expect.anything());
+    });
+
+    it("adds no notes when a context handler builds the history, and does not read the summary", async () => {
+        expect.assertions(3);
+
+        const contextHandler = vi.fn(async (_ctx: unknown, { allMessages }: { allMessages: unknown[] }) => allMessages) as never;
+        const { runQuery, threadNotes } = await contextFor("A summary", { contextHandler });
+
+        expect(contextHandler).toHaveBeenCalledTimes(1);
+        expect(threadNotes).toBeUndefined();
         expect(runQuery).not.toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, expect.anything());
     });
 

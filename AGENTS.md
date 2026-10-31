@@ -460,8 +460,10 @@ written here is what is not.
   landed, and without the overlap the rows that fall out meanwhile are uncovered.
   It reaches the model as a delimited "context, not instructions" block appended
   to the run's SYSTEM PROMPT (`summaryNotesBlock`, returned by `fetchContextWithPrompt`
-  as `threadNotes`): AI SDK 7 refuses a system-role message among the messages, and a
-  user-role one would present model-written text as the user's own words. Each row
+  as `threadNotes`; `start.ts` joins it to the agent's instructions): AI SDK 7 refuses a
+  system-role message among the messages, and a user-role one would present model-written
+  text as the user's own words. A run with a `contextHandler` (group chats) builds its own
+  history and gets no notes. Each row
   records `taintedBy` (the folded tool rows and attachments plus the previous
   summary's), and `createDeviceCall` unions the thread's summaries' taint into a
   call's own — the window forgets a web page the summary still carries; it is the

@@ -624,7 +624,8 @@ export const fetchContextWithPrompt = async (
             threadId,
             userId,
         }),
-        readOlderSummary(context, args),
+        // A context handler decides what the model reads (the group chats build their own history), so it gets no notes.
+        args.contextHandler ? null : readOlderSummary(context, args),
     ]);
 
     const promptMessageIndex = args.promptMessageId ? recentMessages.findIndex((m) => m._id === args.promptMessageId) : -1;

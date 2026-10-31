@@ -16725,19 +16725,19 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 668,
-      "reason": "\"fetchContextWithPrompt\" is not a registered function"
-    },
-    {
-      "file": "agent/client/search",
-      "kind": "call",
       "line": 669,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 738,
+      "line": 670,
+      "reason": "\"fetchContextWithPrompt\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 739,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
