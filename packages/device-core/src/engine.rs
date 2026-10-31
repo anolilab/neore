@@ -1550,13 +1550,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The next prompt a worker thread raises. Bounded: a call that is refused before it asks (a computer without
+    /// the sandbox the test assumed) raises none, and the sender lives in `state`, so an unbounded `recv` would
+    /// block until CI's job timeout instead of failing the test.
+    fn next_prompt(received: &std::sync::mpsc::Receiver<Event>) -> Prompt {
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+
+        loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+
+            match received.recv_timeout(left) {
+                Ok(Event::Prompt { prompt }) => return prompt,
+                Ok(_) => continue,
+                Err(_) => {
+                    panic!("no prompt was raised within 30 s: the call was refused before it asked")
+                }
+            }
+        }
+    }
+
     fn server(name: &str, command: &str) -> McpServerConfig {
         McpServerConfig {
             args: Vec::new(),
             command: command.to_owned(),
             env: Default::default(),
             name: name.to_owned(),
-            network: NetworkTier::Dependencies,
+            // What a server saved without a tier gets here: "dependencies only" exists on macOS alone, so a
+            // fixed tier would differ from the one a settings update parses on Linux and Windows.
+            network: mcp::default_network(),
         }
     }
 
@@ -2123,12 +2144,7 @@ mod tests {
 
                 std::thread::spawn(move || state.execute(&signed))
             };
-            let prompt = loop {
-                match received.recv().unwrap() {
-                    Event::Prompt { prompt } => break prompt,
-                    _ => continue,
-                }
-            };
+            let prompt = next_prompt(&received);
 
             state.prompt_answer(prompt.id, answer).unwrap();
 
@@ -2282,11 +2298,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         state
             .settings_update(serde_json::from_str(r#"{"roots":[]}"#).unwrap())
@@ -2324,6 +2336,8 @@ mod tests {
                     device_id: "dev1".into(),
                     secret: secret.clone(),
                 }),
+                // Windows has no sandbox: the call only gets as far as asking if it may run without one.
+                allow_unsandboxed_shell: true,
                 mcp_servers: vec![server("git", "git-mcp")],
                 ..Settings::default()
             },
@@ -2359,11 +2373,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         state
             .settings_update(
@@ -2511,11 +2521,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         (state, worker, prompt.id, dir)
     }
@@ -2687,11 +2693,7 @@ mod tests {
 
             std::thread::spawn(move || state.pair("dev-repair", &"b".repeat(64), "me"))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
         state.prompt_answer(prompt.id, "once").unwrap();
         assert!(worker.join().unwrap().unwrap());
 
@@ -2713,6 +2715,8 @@ mod tests {
         store::save(
             &dir.join("device.json"),
             &Settings {
+                // Windows has no sandbox: planning a call to a server needs leave to run it without one.
+                allow_unsandboxed_shell: true,
                 mcp_servers: vec![server("x", "x-mcp")],
                 ..Settings::default()
             },

@@ -71,7 +71,7 @@ pub struct McpServerConfig {
     pub network: NetworkTier,
 }
 
-fn default_network() -> NetworkTier {
+pub(crate) fn default_network() -> NetworkTier {
     default_network_for(sandbox::dependencies_support().is_ok())
 }
 
