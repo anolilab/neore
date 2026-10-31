@@ -401,6 +401,32 @@ describe("sign-out and account switch", () => {
     });
 });
 
+describe("leaving nothing behind in the file", () => {
+    it("overwrites deleted rows and compacts the file when it is cleared", async () => {
+        const database = createTestDatabase();
+        const executed: string[] = [];
+        const recording = {
+            ...database,
+            execAsync: async (source: string) => {
+                executed.push(source.trim());
+                await database.execAsync(source);
+            },
+        };
+        const cache = createOfflineCache(recording);
+
+        await cache.bindOwner("user-a");
+
+        const [secureDelete] = await database.getAllAsync<{ secure_delete: number }>("PRAGMA secure_delete");
+
+        expect(secureDelete?.secure_delete).toBe(1);
+
+        await cache.clear();
+
+        expect(executed).toContain("VACUUM");
+        database.close();
+    });
+});
+
 describe("schema setup", () => {
     it("tries again after a failed setup instead of failing every later call, clear() included", async () => {
         const database = createTestDatabase();

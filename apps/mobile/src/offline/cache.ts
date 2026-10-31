@@ -155,6 +155,10 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
     };
 
     const setUp = async () => {
+        // Deleted rows are overwritten, not left in free pages: a signed-out account's chats must not be recoverable
+        // from the file. Per connection, so it is set on every open.
+        await database.execAsync("PRAGMA secure_delete = ON");
+
         const [stored] = await database.getAllAsync<{ user_version: number }>("PRAGMA user_version");
 
         if (stored?.user_version !== SCHEMA_VERSION) {
@@ -423,6 +427,9 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                 owner = undefined;
                 await open();
                 await wipe();
+                // Outside the wipe's transaction (VACUUM cannot run in one): rewrites the file so it keeps no page of
+                // the old account.
+                await database.execAsync("VACUUM");
             });
         },
         forOwner,
