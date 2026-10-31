@@ -220,6 +220,10 @@ upload route, with the phone's own session, as in §3.8.
 - Acceptance: a project created on the phone appears on web within the live-query
   window; a file written by a host agent appears in the thread and downloads through
   a signed URL that expires; no mutation argument carries file bytes (test).
+- Known gap, M7a first slice: `createProject` and `createThread` accept no request id, so
+  the phone cannot send one (§6). Both writes are `onlineOnly` and the buttons are disabled
+  while a write is in flight, so a retry is a deliberate second tap, but a lost reply can
+  still leave a duplicate. Closing it needs a claim-once request id on both procedures.
 
 ## 6. Invariants
 
