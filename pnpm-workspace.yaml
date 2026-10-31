@@ -18,11 +18,7 @@ auditConfig:
     # braces <=3.0.3, via micromatch/fast-glob (28 paths). No patched release exists.
     - GHSA-vfj7-8cjw-p6xm
     # sprintf-js <=1.1.3, via argparse 1 under `mammoth`. No patched release exists.
-    # node-forge <=1.4.0, reached only through apps/mobile's expo-auth-session chain
-    # (@expo/code-signing-certificates). No patched release exists; revisit when Expo
-    # moves off it.
     - GHSA-86w9-cpqp-85rv
-    - GHSA-hp3w-g68c-fv3c
     # zod <4.6.6 has no patched 3.x release. The only zod 3 copy left is the one
     # eslint-plugin-react-compiler calls through its zod 3 API (it breaks on zod 4),
     # and it runs at lint time only. The MCP packages and the product use zod 4.6.7.
@@ -30,6 +26,12 @@ auditConfig:
     # deepmerge >=4.2.0 <=4.3.1, via @lunora/mail > @react-email/render > html-to-text.
     # No patched release exists; it merges the renderer's own option objects, not input.
     - GHSA-gcqx-w48m-w2h4
+    # minimatch <11.0.1 and glob >=9 <=14.0.1 are fixed only in new majors (minimatch
+    # 11, glob 14). Their consumers ask for minimatch 3/9/10 (3 kept CJS on purpose,
+    # see the overrides) and glob 10–13 through rimraf, workbox-build and commitizen,
+    # all build or dev time. Drop these once those dependencies move up.
+    - GHSA-g3hv-75wg-m249
+    - GHSA-3g3m-2fjr-6pw4
 
 # OFF: auto-installing peers materialised Next.js — which nothing here uses — as
 # the peer of fumadocs, geist, better-auth, @visulima/pail and friends, and its
@@ -544,6 +546,10 @@ overrides:
   # 8.x and split that arrangement.
   "@babel/core@<7.29.6": 7.29.7
   "@babel/plugin-transform-modules-systemjs@>=7.12.0 <=7.29.3": ">=7.29.4"
+  # node-forge <=1.4.0 (PEM ReDoS, PKCS#12 MAC forgery, TLS DoS, basicConstraints
+  # bypass, AES-GCM tag length, among others), all fixed in 1.4.1. Reached only
+  # through apps/mobile's Expo CLI chain (@expo/code-signing-certificates).
+  "node-forge@<=1.4.0": 1.4.1
   # Babel 7's traverse gets the Babel 7 types it was built for. The React
   # Compiler checks patterns with `path.isLVal()`, which @babel/traverse answers
   # from ITS @babel/types; under the global 8.0.4 override that dropped
