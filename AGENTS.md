@@ -66,7 +66,7 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
   only for declared `outputs`, written `{projectRoot}/dist/**/*` (a bare
   `dist/**/*` restores nothing): without them `build:packages` said "read from
   cache" and left a missing or stale `dist` in place. `ai` and `service-sdk`
-  declare theirs in `project.json`.
+  declare theirs for `build` and `build:prod` in `project.json`.
 
 ## ANTI-PATTERNS
 
