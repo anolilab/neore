@@ -122,7 +122,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             }
 
             // The thread decides the agent from here on, so a branch switch can move it: no local pick to keep.
-            loadThreadData({ mode: row.mode, model: result.agent.model }, id);
+            loadThreadData({ mode: row.mode, model: result.agent.kind === "model" ? result.agent.model : newModel }, id);
 
             return true;
         } catch (error) {

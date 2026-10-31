@@ -26,7 +26,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
-import { type AgentRef, HANDOFF_MAX_CHARACTERS, vAgentRef, vAgentSwitchMode } from "../agent/agent-switch-validators";
+import { type AgentRef, HANDOFF_MAX_CHARACTERS, type SwitchAgentRef, vAgentRef, vAgentSwitchMode, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import {
     assertWithinBudget,
     capSummary,
@@ -95,12 +95,15 @@ export const AGENT_SWITCH_LIMIT = "AGENT_SWITCH_LIMIT";
 export const AGENT_SWITCH_BUSY = "AGENT_SWITCH_BUSY";
 /** Too many summaries in a short while (`chat/agentSwitchSummary`). */
 export const AGENT_SWITCH_RATE_LIMITED = "AGENT_SWITCH_RATE_LIMITED";
+/** The (agent, folder, computer) a switch names is not one the user approved on that computer (`devices.acpOffers`). */
+export const AGENT_SWITCH_NOT_OFFERED = "AGENT_SWITCH_NOT_OFFERED";
+export const AGENT_SWITCH_HOST_OFFLINE = "AGENT_SWITCH_HOST_OFFLINE";
 
 /**
  * A `clientId` is remembered this long. A double tap is over in seconds; the rest is for a stale
  * click replayed after later switches, which must not undo them.
  */
-const AGENT_SWITCH_CLAIM_TTL_MS = 10 * 60 * 1000;
+export const AGENT_SWITCH_CLAIM_TTL_MS = 10 * 60 * 1000;
 
 /** A summary call takes seconds; the claim outlasts a slow one and frees the thread soon after an action that died holding it. */
 const AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS = 2 * 60 * 1000;
@@ -109,7 +112,7 @@ const SUMMARY_CLAIM_SCOPE = "switch-summary";
 /** The preview counts a conversation up to this many tokens; past it the figure is "at least". */
 const PREVIEW_TOKEN_CAP = 250_000;
 
-const refuse = (code: string, message: string): never => {
+export const refuse = (code: string, message: string): never => {
     throw new LunoraError("BAD_REQUEST", message, { data: { code } });
 };
 
@@ -120,17 +123,19 @@ const limitReached = (): LunoraError =>
         { data: { code: AGENT_SWITCH_LIMIT } },
     );
 
-interface SwitchResult {
-    agent: AgentRef;
+export interface SwitchResult {
+    agent: SwitchAgentRef;
     /** The conversation is long enough that the next reply re-reads it without the provider's cache (`PROMPT_CACHE_COLD_START_TOKENS`). */
     coldStartCostly: boolean;
+    /** A switch between a cloud model and a host agent makes a new thread that takes over from this one; this is it. */
+    forkedThreadId?: string;
     messageId: string | null;
     switched: boolean;
 }
 
-type SwitchTarget = { kind: "host" } | { kind: "model"; model: string };
+export type SwitchTarget = { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" } | { kind: "model"; model: string };
 
-interface SwitchArgs {
+export interface SwitchArgs {
     clientId: string;
     target: SwitchTarget;
     threadId: Id<"threads">;
@@ -150,15 +155,33 @@ interface StoredHandoff {
 /** The part of a switch the user can ask for; the server decides between `portable` and `delta`. */
 type RequestedMode = "full" | "portable";
 
-const vSwitchTarget = v.union(
+export const vSwitchTarget = v.union(
     v.object({ kind: v.literal("model"), model: v.string().max(MAX_LENGTH.short) }),
-    // Offered host agents arrive with the host slices; the shape is accepted so a refusal can be typed.
-    v.object({ kind: v.literal("host") }),
+    // An (agent, folder) pair a computer offers (`devices.acpOffers`): checked against the offer list when the switch is made.
+    v.object({ agentKey: v.string().max(128), folderId: v.string().max(128), hostId: v.id("devices"), kind: v.literal("host") }),
 );
 
 const vRequestedMode = v.union(v.literal("full"), v.literal("portable"));
 
 type Checked = { agent: AgentRef; kind: "same" } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
+
+/**
+ * A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's, and a
+ * media thread has no model to swap: none of them has an agent a switch could replace.
+ */
+export const hasFixedAgent = (thread: Doc<"threads">): boolean =>
+    Boolean(thread.botId || thread.groupChat || thread.multiChat || thread.messengerConnectionId || (thread.mode !== undefined && thread.mode !== "text"));
+
+/** A hard rule, so a transcript never has two agents writing at once: refuses while a reply streams or a request waits for an answer. */
+export const assertNotStreaming = async (ctx: QueryCtx, thread: Doc<"threads">): Promise<void> => {
+    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+
+    if (await hasOpenApproval(ctx, thread._id)) {
+        throw new LunoraError("CONFLICT", "Answer the pending request before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+};
 
 /** Everything that decides whether a switch may happen, before anything is claimed or written. */
 const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> => {
@@ -172,20 +195,13 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Guests run on the free model");
     }
 
+    // A host agent is not a cloud model: a switch to or from one is `acp/switch.ts`'s, routed before this runs.
     if (args.target.kind !== "model") {
-        return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a host agent is not available yet");
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a coding agent is not a model switch");
     }
 
-    // A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's,
-    // a coding-agent thread on its host, and a media thread has no model to swap.
-    if (
-        thread.botId ||
-        thread.groupChat ||
-        thread.multiChat ||
-        thread.messengerConnectionId ||
-        isHostRunThread(thread) ||
-        (thread.mode !== undefined && thread.mode !== "text")
-    ) {
+    // A coding-agent thread runs on its host: `acp/switch.ts` takes it over into a new thread.
+    if (hasFixedAgent(thread) || isHostRunThread(thread)) {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat runs on a fixed agent");
     }
 
@@ -200,14 +216,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         await assertPaidModel(ctx, thread.userId, definition);
     }
 
-    // A hard rule, so a transcript never has two agents writing at once.
-    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
-        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
-
-    if (await hasOpenApproval(ctx, thread._id)) {
-        throw new LunoraError("CONFLICT", "Answer the pending request before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
+    await assertNotStreaming(ctx, thread);
 
     const leaf = await leafRowOf(ctx, thread);
     const from = leaf && (await resolvePathAgent(ctx, thread, leaf));
@@ -234,7 +243,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
 };
 
 /** The claim key of one click: the caller's, not the thread's — the claims table is shared and a `clientId` is client-chosen. */
-const claimKeyOf = (args: Pick<SwitchArgs, "clientId" | "threadId" | "userId">): string => `${args.userId}:${args.threadId}:${args.clientId}`;
+export const claimKeyOf = (args: Pick<SwitchArgs, "clientId" | "threadId" | "userId">): string => `${args.userId}:${args.threadId}:${args.clientId}`;
 
 /**
  * `switchThreadAgent`'s write, with the caller passed in so the harness can drive it. With no `handoff` the
@@ -419,7 +428,13 @@ export const planAgentSwitch = internalQuery
     .output(vPlan)
     .query(async ({ args, ctx }) => await planAgentSwitchHandler(ctx, args));
 
-const vSwitchResult = v.object({ agent: vAgentRef, coldStartCostly: v.boolean(), messageId: v.union(v.string(), v.null()), switched: v.boolean() });
+const vSwitchResult = v.object({
+    agent: vSwitchAgentRef,
+    coldStartCostly: v.boolean(),
+    forkedThreadId: v.optional(v.string()),
+    messageId: v.union(v.string(), v.null()),
+    switched: v.boolean(),
+});
 
 /** Step three: the one transaction that claims the click, charges the summary and writes the divider. */
 export const commitAgentSwitch = internalMutation
@@ -556,6 +571,17 @@ const buildHandoff = async (
  * builds the handoff (the summary first, fenced but not yet charged), then commits in one mutation.
  */
 export const runAgentSwitch = async (ctx: SwitchRunner, args: SwitchArgs & { mode?: RequestedMode }, summarise: Summarise): Promise<SwitchResult> => {
+    // To or from a coding agent: no summary and no charge, and a different runner means a new thread (acp/switch.ts).
+    if (args.target.kind === "host" || (await ctx.runQuery(internal.acp.switch.isHostSwitchSource, { threadId: args.threadId }))) {
+        return (await ctx.runMutation(internal.acp.switch.commitHostSwitch, {
+            clientId: args.clientId,
+            target: args.target,
+            threadId: args.threadId,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        })) as SwitchResult;
+    }
+
     const plan = (await ctx.runQuery(internal.chat.agent_switch.planAgentSwitch, args)) as Plan;
 
     if (!plan.leafId || !plan.mode) {

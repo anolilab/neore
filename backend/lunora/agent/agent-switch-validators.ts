@@ -10,13 +10,33 @@ import { v } from "lunorash/server";
 
 import { MAX_LENGTH } from "../lib/validators";
 
-/** A cloud model. The host variant `{ kind: "host", … }` joins this union with host switches. */
+/** A cloud model: what `threads.activeAgent` caches. A host agent never does; a host thread's agent is its session's. */
 export const vAgentRef = v.object({
     kind: v.literal("model"),
     model: v.string().max(MAX_LENGTH.short),
 });
 
 export type AgentRef = Infer<typeof vAgentRef>;
+
+/**
+ * A coding agent on a paired computer, in one folder: the triple a session is bound to, plus the two labels the
+ * divider shows (never a path or a command line, which stay on the desktop).
+ */
+export const vHostAgentRef = v.object({
+    agentKey: v.string().max(128),
+    agentLabel: v.string().max(MAX_LENGTH.short),
+    folderId: v.string().max(128),
+    folderLabel: v.string().max(MAX_LENGTH.short),
+    hostId: v.string().max(MAX_LENGTH.id),
+    kind: v.literal("host"),
+});
+
+export type HostAgentRef = Infer<typeof vHostAgentRef>;
+
+/** Either side of a divider: a cloud model or a host agent. */
+export const vSwitchAgentRef = v.union(vAgentRef, vHostAgentRef);
+
+export type SwitchAgentRef = Infer<typeof vSwitchAgentRef>;
 
 /**
  * What the new agent was given. `full`: the whole active path, as before the switch.
@@ -38,12 +58,12 @@ export const HANDOFF_MAX_CHARACTERS = 80_000;
  * summary of older turns, for the divider's note.
  */
 export const vAgentSwitch = v.object({
-    from: vAgentRef,
+    from: vSwitchAgentRef,
     handoff: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
     mode: vAgentSwitchMode,
     startMessageId: v.string().max(MAX_LENGTH.id),
     summarized: v.optional(v.boolean()),
-    to: vAgentRef,
+    to: vSwitchAgentRef,
 });
 
 export type AgentSwitchPart = Infer<typeof vAgentSwitch>;

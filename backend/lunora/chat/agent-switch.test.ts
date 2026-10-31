@@ -225,9 +225,17 @@ describe("a switch in a thread that never branched", () => {
         expect(await switchRows()).toHaveLength(0);
     });
 
-    it("refuses a host target with a typed error, and a model that is not an enabled chat model", async () => {
+    it("refuses a host target here with a typed error (it is routed to the coding-agent switch), and a model that is not an enabled chat model", async () => {
         await expect(
-            run(async (ctx) => await switchThreadAgentHandler(ctx, { clientId: "c", target: { kind: "host" }, threadId: threadId as never, userId: OWNER })),
+            run(
+                async (ctx) =>
+                    await switchThreadAgentHandler(ctx, {
+                        clientId: "c",
+                        target: { agentKey: "claude", folderId: "f1", hostId: "device" as never, kind: "host" },
+                        threadId: threadId as never,
+                        userId: OWNER,
+                    }),
+            ),
         ).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
         await expect(switchTo("no/such-model", "c2")).rejects.toThrow(NOT_ENABLED);
         await expect(switchTo("openai/gpt-image-1", "c3")).rejects.toThrow(NOT_ENABLED);

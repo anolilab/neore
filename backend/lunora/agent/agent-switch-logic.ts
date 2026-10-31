@@ -4,7 +4,7 @@
  * it, and the transcript shows it as a divider. Its payload rides in `providerMetadata`,
  * which already holds opaque per-row facts (`neoreJob`) and is nobody's model input.
  */
-import { type AgentRef, type AgentSwitchPart, vAgentSwitch } from "./agent-switch-validators";
+import { type AgentSwitchPart, type SwitchAgentRef, vAgentSwitch } from "./agent-switch-validators";
 
 import { AGENT_SWITCH_KEY } from "./agent-switch-shape";
 
@@ -31,7 +31,14 @@ export const agentSwitchRowContent = (
     return { message: { content: "", role: "system" }, providerMetadata: { [AGENT_SWITCH_KEY]: checked } };
 };
 
-export const sameAgent = (a: AgentRef, b: AgentRef): boolean => a.kind === b.kind && a.model === b.model;
+/**
+ * The string that tells agents apart where a map or a comparison needs one: a model's id, or the host triple.
+ * A model keeps its bare id, so callers that hold only a model id compare against it directly.
+ */
+export const agentKeyOf = (agent: SwitchAgentRef): string =>
+    agent.kind === "model" ? agent.model : `host:${agent.hostId}:${agent.agentKey}:${agent.folderId}`;
+
+export const sameAgent = (a: SwitchAgentRef, b: SwitchAgentRef): boolean => agentKeyOf(a) === agentKeyOf(b);
 
 /** The newest switch among `rows` (newest first, as a path walk returns them), if any. */
 export const lastAgentSwitch = (rows: ReadonlyArray<{ providerMetadata?: unknown }>): AgentSwitchPart | undefined =>

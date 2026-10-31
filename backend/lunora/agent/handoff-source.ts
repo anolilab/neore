@@ -8,7 +8,7 @@ import type { ModelMessage } from "ai";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { walkPath } from "./branch-rows";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
@@ -205,7 +205,7 @@ const findDivider = async (
 
 /** The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread through its `startMessageId`. */
 export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => part.from.model === model);
+    await findDivider(context, threadId, from, (part) => agentKeyOf(part.from) === model);
 
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>

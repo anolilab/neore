@@ -90,7 +90,7 @@ export const deleteSessionsOfThread = internalMutation
         return null;
     });
 
-/** The caller's coding-agent sessions, newest first. */
+/** The caller's coding-agent sessions, newest first: one per thread, since a switch to another agent ends a thread's session and opens the next. */
 export const listHostSessions = authQuery
     .input({})
     .output(v.array(vHostSessionView))
@@ -101,7 +101,15 @@ export const listHostSessions = authQuery
             where: { userId: ctx.user.userId },
         });
 
-        return page.map((row) => toView(row));
+        const newestOfThread = new Map<string, (typeof page)[number]>();
+
+        for (const row of page) {
+            if (!newestOfThread.has(row.threadId as string)) {
+                newestOfThread.set(row.threadId as string, row);
+            }
+        }
+
+        return [...newestOfThread.values()].map((row) => toView(row));
     });
 
 /** The session a host thread runs in, or null for a thread that is not one, or is not the caller's. */
@@ -110,7 +118,9 @@ export const getHostSession = authQuery
     .output(v.union(v.null(), vHostSessionDetail))
     .query(async ({ args, ctx }) => {
         const threadId = ctx.db.normalizeId("threads", args.threadId);
-        const row = threadId ? await ctx.db.acpSessions.findFirst({ where: { threadId, userId: ctx.user.userId } }) : null;
+        const row = threadId
+            ? await ctx.db.acpSessions.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { threadId, userId: ctx.user.userId } })
+            : null;
 
         if (!row || !threadId) {
             return null;
@@ -154,7 +164,10 @@ export const getThreadCapabilities = authQuery
             return null;
         }
 
-        const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
+        const session = await ctx.db.acpSessions.findFirst({
+            orderBy: [{ _creationTime: "desc" }],
+            where: { threadId: access.thread._id, userId: ctx.user.userId },
+        });
 
         return session?.capabilities ?? unknownCapabilityReport(0);
     });
