@@ -2,7 +2,7 @@
  * The `MOCK_LLM` provider: its gate, its prompt markers, its structured output,
  * and that the real proxy route streams it with usage and a cost.
  */
-import type { JSONSchema7, LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3StreamPart } from "@ai-sdk/provider";
+import type { JSONSchema7, LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3Prompt, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { describe, expect, it } from "vitest";
 
 import type { AppEnv } from "../env.js";
@@ -141,6 +141,28 @@ describe("mock LLM responses", () => {
 
         expect(followUp.kind).toBe("text");
         expect(planMockResponse(options({ text, tools: [] })).kind).toBe("text");
+    });
+
+    it("calls several marked tools in order, one per step", () => {
+        expect.assertions(3);
+
+        const tools: LanguageModelV3CallOptions["tools"] = [
+            { inputSchema: { type: "object" }, name: "getWeather", type: "function" },
+            { inputSchema: { type: "object" }, name: "getTime", type: "function" },
+        ];
+        const text = 'plan [[tool:getWeather {"city":"Berlin"}]] [[tool:getTime {"zone":"CET"}]]';
+        const weatherStep: LanguageModelV3Prompt = [
+            { content: [{ input: { city: "Berlin" }, toolCallId: "c1", toolName: "getWeather", type: "tool-call" }], role: "assistant" },
+            { content: [{ output: { type: "text", value: "sunny" }, toolCallId: "c1", toolName: "getWeather", type: "tool-result" }], role: "tool" },
+        ];
+        const timeStep: LanguageModelV3Prompt = [
+            { content: [{ input: { zone: "CET" }, toolCallId: "c2", toolName: "getTime", type: "tool-call" }], role: "assistant" },
+            { content: [{ output: { type: "text", value: "noon" }, toolCallId: "c2", toolName: "getTime", type: "tool-result" }], role: "tool" },
+        ];
+
+        expect(planMockResponse(options({ text, tools }))).toMatchObject({ input: '{"city":"Berlin"}', toolName: "getWeather" });
+        expect(planMockResponse({ prompt: [...userPrompt(text), ...weatherStep], tools })).toMatchObject({ input: '{"zone":"CET"}', toolName: "getTime" });
+        expect(planMockResponse({ prompt: [...userPrompt(text), ...weatherStep, ...timeStep], tools }).kind).toBe("text");
     });
 
     it("returns a schema-valid minimal object for JSON mode", async () => {

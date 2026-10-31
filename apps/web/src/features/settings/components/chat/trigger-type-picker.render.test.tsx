@@ -24,12 +24,11 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 describe("TriggerTypePicker", () => {
-    it("offers schedule and webhook, and no event type", () => {
+    it("offers schedule, webhook and event", () => {
         render(<TriggerTypePicker onSelect={vi.fn()} value="schedule" />);
 
-        expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Schedule", "Webhook"]);
-        expect(screen.queryByText("Event")).toBeNull();
-        expect(SELECTABLE_TRIGGER_TYPES).not.toContain("event");
+        expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Schedule", "Webhook", "Event"]);
+        expect(SELECTABLE_TRIGGER_TYPES).toContain("event");
     });
 
     it("reports the chosen type", () => {

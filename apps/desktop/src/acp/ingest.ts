@@ -27,8 +27,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver } from "./host-events";
-import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, endReasonOf } from "./host-events";
+import type { ChildEvent } from "./children";
+import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, TurnSummary } from "./host-events";
+import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
+import type { ImportIo } from "./import-post";
+import type { MediaOptions } from "./media";
+import { collectMedia, imageReferences } from "./media";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
@@ -38,18 +42,24 @@ export type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionReque
 export { KEEPALIVE_MS, POST_INTERVAL_MS } from "./turn-channel";
 
 const REQUEST_TIMEOUT_MS = 20_000;
+/** The most of a turn's text kept for its references; a reply is capped at the same length on the backend. */
+const MAX_TURN_TEXT_CHARS = 256_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
 
 export interface PosterOptions {
+    /** Stops a turn the backend ended while this computer's agent was still on it (`AcpManager.cancelTurn`). */
+    cancelTurn?: (sessionId: string, turnId: string) => void;
     /** This computer's paired device id; undefined while it is not paired. */
     deviceId: () => string | undefined;
     /** `&lt;backend origin>/hosts/ingest`. */
     endpoint: URL;
     fetch?: typeof fetch;
     log?: (message: string) => void;
+    /** The files a turn's reply refers to (`media.ts`). Without it, a reply's images are text. */
+    media?: Omit<MediaOptions, "deviceId" | "fetch" | "log" | "now">;
     now?: () => number;
     random?: () => number;
     /** `DeviceCore.signTurn`. */
@@ -63,6 +73,13 @@ const settledAfter = async (previous: Promise<void>, read: Promise<unknown>): Pr
     await read;
 };
 
+/** A turn recorded on disk while it runs. */
+export interface RunningTurn {
+    sessionId: string;
+    threadId: string;
+    turnId: string;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 export class HostPoster implements SessionObserver {
@@ -73,20 +90,31 @@ export class HostPoster implements SessionObserver {
     /** Sessions that ended locally and wait for their turns to drain before the backend is told. */
     private readonly closing = new Set<string>();
 
+    /** What each session shows the backend, to name its agent and folder when a reply's files are read. */
+    private readonly infos = new Map<string, HostSessionInfo>();
+
     private readonly sessions = new Map<string, SessionLink>();
+
+    /** The text of each running turn, kept for the references its reply makes (capped). */
+    private readonly texts = new Map<string, string>();
 
     private stopped = false;
 
     /** The run of consecutive 401s, if any: its length, when it began and when the latest came. */
     private unauthorized: { count: number; last: number; reported: boolean; since: number } | undefined;
 
+    /** What the last run left running, until `recover` has ended it. */
+    private unrecovered: RunningTurn[] = [];
+
     /** Serialises writes of the state file; a write never overtakes the one before it. */
     private writing: Promise<void> = Promise.resolve();
 
     public constructor(private readonly options: PosterOptions) {
         this.channelHost = {
+            endedByBackend: (channel) => this.options.cancelTurn?.(channel.sessionId, channel.turnId),
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
+                this.texts.delete(channel.turnId);
                 this.persist();
                 this.closeWhenDrained(channel.sessionId);
             },
@@ -100,9 +128,11 @@ export class HostPoster implements SessionObserver {
 
     // ─── From the sessions ──────────────────────────────────────────────────
 
-    public sessionOpened(sessionId: string, info: HostSessionInfo): void {
+    public sessionOpened(sessionId: string, info: HostSessionInfo, threadId?: string): void {
+        this.infos.set(sessionId, info);
+
         const link = new SessionLink(sessionId, capSessionInfo(info), {
-            bound: (id, threadId) => this.bindThread(id, threadId),
+            bound: (id, thread) => this.bindThread(id, thread),
             deviceId: () => this.options.deviceId(),
             now: () => this.now(),
             random: () => this.random(),
@@ -119,6 +149,8 @@ export class HostPoster implements SessionObserver {
             return;
         }
 
+        // A session the backend started already has its thread; the open still goes out, to turn it from starting to idle.
+        link.threadId = threadId;
         link.open();
     }
 
@@ -135,10 +167,43 @@ export class HostPoster implements SessionObserver {
         this.closeWhenDrained(sessionId);
     }
 
+    public turnReceived(sessionId: string, turnId: string, user: string): void {
+        this.turnStarted(sessionId, turnId, user);
+    }
+
+    /**
+     * A message for a session that is not open yet (`early-sends.ts`): the thread comes with the command, so the turn
+     * is posted now. It reaches the backend as `received` and keeps its reaper window moving while it waits.
+     */
+    public turnHeld(sessionId: string, turnId: string, user: string, threadId: string): void {
+        if (this.stopped || this.options.deviceId() === undefined || this.channels.has(turnId)) {
+            return;
+        }
+
+        const channel = new TurnChannel(this.channelHost, sessionId, turnId, threadId, false);
+
+        this.channels.set(turnId, channel);
+        channel.enqueue({ kind: "turn_start", text: capPrompt(user) });
+        this.persist();
+    }
+
+    /** Ends a turn whose message was held while the app went down: a stream waiting for it ends with the reason instead of reaping as silent. */
+    public endLapsedTurn(sessionId: string, turnId: string, threadId: string, end: { error?: string; reason: "failed" | "interrupted" }): void {
+        if (this.stopped || this.channels.has(turnId)) {
+            return;
+        }
+
+        const channel = new TurnChannel(this.channelHost, sessionId, turnId, threadId, true);
+
+        this.channels.set(turnId, channel);
+        channel.end(end.reason, end.error);
+    }
+
+    /** The first call for a turn opens its channel with the user's prompt; a later one (the turn it was queued for now running) finds it open. */
     public turnStarted(sessionId: string, turnId: string, user: string): void {
         const link = this.sessions.get(sessionId);
 
-        if (link === undefined || link.threadId === null || this.stopped) {
+        if (link === undefined || link.threadId === null || this.stopped || this.channels.has(turnId)) {
             return;
         }
 
@@ -150,7 +215,22 @@ export class HostPoster implements SessionObserver {
     }
 
     public text(_sessionId: string, turnId: string, delta: string): void {
-        this.channels.get(turnId)?.append("text", delta);
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        channel.append("text", delta);
+
+        if (this.options.media !== undefined) {
+            const kept = this.texts.get(turnId) ?? "";
+
+            // Past the cap nothing more is kept, so a long turn costs nothing more per delta.
+            if (kept.length < MAX_TURN_TEXT_CHARS) {
+                this.texts.set(turnId, (kept + delta).slice(0, MAX_TURN_TEXT_CHARS));
+            }
+        }
     }
 
     public thought(_sessionId: string, turnId: string, delta: string): void {
@@ -158,7 +238,15 @@ export class HostPoster implements SessionObserver {
     }
 
     public tool(_sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }): void {
-        this.channels.get(turnId)?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+        this.channels
+            .get(turnId)
+            ?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+    }
+
+    public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {
+        for (const posted of childHostEvents(spawnId, event)) {
+            this.channels.get(turnId)?.enqueue(posted);
+        }
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {
@@ -169,31 +257,76 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.enqueue({ kind: "permission_resolved", outcome, requestId: capRequestId(requestId) });
     }
 
-    public turnEnded(_sessionId: string, turnId: string, reason: StopReason | "failed", error?: string): void {
-        this.channels.get(turnId)?.end(endReasonOf(reason), error);
+    public turnEnded(sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary): void {
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        const text = this.texts.get(turnId) ?? "";
+        const info = this.infos.get(sessionId);
+
+        this.texts.delete(turnId);
+
+        // A turn that failed leaves no reply to show files in; one without an image reference has nothing to read.
+        if (info === undefined || this.stopped || this.options.media === undefined || endReasonOf(reason) === "failed" || imageReferences(text).length === 0) {
+            channel.end(endReasonOf(reason), error, summary);
+
+            return;
+        }
+
+        // Never rejects: every failure inside is caught, and the turn ends whatever happens.
+        // eslint-disable-next-line unicorn/prefer-await -- turnEnded is synchronous, and the call has no rejection to await
+        this.attachMediaThenEnd(channel, info, text, endReasonOf(reason), error, summary).catch(() => {});
+    }
+
+    /** What an import needs to post: the same signing, endpoint and clock the turns use. */
+    public importIo(): ImportIo {
+        return {
+            deviceId: () => this.options.deviceId(),
+            now: () => this.now(),
+            random: () => this.random(),
+            request: async (payload) => await this.request(payload),
+        };
     }
 
     // ─── Start and stop ─────────────────────────────────────────────────────
 
-    /** Ends, as `interrupted`, every turn a previous run left behind. Call once after the core is up. */
-    public async recover(): Promise<void> {
+    /**
+     * The turns a previous run left running, read from disk. Read BEFORE anything that opens a channel (the replay of held
+     * messages does): the file is rewritten by the first one. Until `recover` has ended them they are kept in the file.
+     */
+    public async readLeftovers(): Promise<RunningTurn[]> {
         const read = this.readState();
 
         // A write queued from here on lands after the read, so it cannot drop the turns the read is about to find.
         this.writing = settledAfter(this.writing, read);
 
-        const leftovers = await read;
+        this.unrecovered = await read;
 
-        for (const left of leftovers) {
-            if (this.channels.has(left.turnId)) {
+        return this.unrecovered;
+    }
+
+    /**
+     * Ends, as `interrupted`, every turn a previous run left behind, except the ones that have a channel since (a held
+     * message the replay took up again). Call once after the core is up, with what `readLeftovers` returned.
+     */
+    public async recover(leftovers?: RunningTurn[]): Promise<void> {
+        const left = leftovers ?? await this.readLeftovers();
+
+        for (const turn of left) {
+            if (this.channels.has(turn.turnId)) {
                 continue;
             }
 
-            const channel = new TurnChannel(this.channelHost, left.sessionId, left.turnId, left.threadId, true);
+            const channel = new TurnChannel(this.channelHost, turn.sessionId, turn.turnId, turn.threadId, true);
 
-            this.channels.set(left.turnId, channel);
+            this.channels.set(turn.turnId, channel);
             channel.end("interrupted");
         }
+
+        this.unrecovered = [];
     }
 
     /** Stops every timer. Output not yet sent is lost, as the process is going away; the next start ends those turns as interrupted. */
@@ -226,6 +359,47 @@ export class HostPoster implements SessionObserver {
     }
 
     // ─── Posting ────────────────────────────────────────────────────────────
+
+    /**
+     * Reads and uploads the files the reply refers to, queues their events and only then the end of the turn: the
+     * channel takes nothing after it. The turn stays open meanwhile (its keepalive keeps the backend's reaper off).
+     * Whatever goes wrong, the turn still ends.
+     */
+    private async attachMediaThenEnd(
+        channel: TurnChannel,
+        info: HostSessionInfo,
+        text: string,
+        reason: "cancelled" | "failed" | "finished",
+        error?: string,
+        summary?: TurnSummary,
+    ): Promise<void> {
+        const { media } = this.options;
+
+        try {
+            if (media !== undefined) {
+                const events = await collectMedia(
+                    {
+                        ...media,
+                        deviceId: this.options.deviceId,
+                        ...this.options.fetch && { fetch: this.options.fetch },
+                        ...this.options.log && { log: this.options.log },
+                        now: () => this.now(),
+                    },
+                    info.agentKey,
+                    info.folderId,
+                    text,
+                );
+
+                for (const event of events) {
+                    channel.enqueue(event);
+                }
+            }
+        } catch (error_) {
+            this.options.log?.(`[acp-host] a reply's files could not be attached: ${(error_ as Error).name}`);
+        } finally {
+            channel.end(reason, error, summary);
+        }
+    }
 
     /** A session that will not be posted: the turns still waiting on its thread end instead of holding output for ever. */
     private releaseChannels(sessionId: string): void {
@@ -324,6 +498,7 @@ export class HostPoster implements SessionObserver {
                 ended: fields.ended === true,
                 kind: "ok",
                 next: fields.next,
+                ...typeof fields.existing === "boolean" && { existing: fields.existing },
                 ...typeof fields.threadId === "string" && { threadId: fields.threadId },
             };
         }
@@ -351,7 +526,9 @@ export class HostPoster implements SessionObserver {
 
         if (!streak.reported) {
             streak.reported = true;
-            this.options.log?.("[acp-host] the backend no longer accepts this computer (it was removed, or its clock is far off); agent output is no longer posted");
+            this.options.log?.(
+                "[acp-host] the backend no longer accepts this computer (it was removed, or its clock is far off); agent output is no longer posted",
+            );
         }
 
         return { kind: "refused" };
@@ -359,7 +536,7 @@ export class HostPoster implements SessionObserver {
 
     // ─── The turns that are running, on disk ────────────────────────────────
 
-    private async readState(): Promise<{ sessionId: string; threadId: string; turnId: string }[]> {
+    private async readState(): Promise<RunningTurn[]> {
         try {
             const parsed: unknown = JSON.parse(await readFile(this.options.stateFile, "utf8"));
             const turns = isRecord(parsed) && Array.isArray(parsed.turns) ? parsed.turns : [];
@@ -375,11 +552,18 @@ export class HostPoster implements SessionObserver {
     }
 
     private async writeState(): Promise<void> {
-        const turns: { sessionId: string; threadId: string; turnId: string }[] = [];
+        const turns: RunningTurn[] = [];
 
         for (const channel of this.channels.values()) {
             if (channel.threadId !== undefined) {
                 turns.push({ sessionId: channel.sessionId, threadId: channel.threadId, turnId: channel.turnId });
+            }
+        }
+
+        // A turn the last run left is still to be ended: a crash before then must not lose it.
+        for (const left of this.unrecovered) {
+            if (!this.channels.has(left.turnId)) {
+                turns.push(left);
             }
         }
 

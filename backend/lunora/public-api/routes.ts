@@ -703,7 +703,9 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 data: {
                     // Pages are fetched newest-first but `toUIMessages` returns each
                     // page oldest-first; sort so the whole list reads newest-first.
+                    // An agent-switch divider is a marker for the app's thread view, not a turn of the conversation.
                     data: page.page
+                        .filter((message) => message.parts.every((part) => part.type !== "data-agentSwitch"))
                         .toSorted((a, b) => b.order - a.order || b.stepOrder - a.stepOrder)
                         .map((message) => {
                             return {

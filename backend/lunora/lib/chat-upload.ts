@@ -165,15 +165,19 @@ export const assertStagedChatJson = async (ctx: Pick<ActionCtx, "storage">, key:
     }
 };
 
+/** A finalized chat file: its row, the content-addressed key it is stored under, the type it was stored with and a signed URL. */
+export interface FinalizedChatFile {
+    fileId: Id<"chatFiles">;
+    mediaType: string;
+    storageId: string;
+    url: string;
+}
+
 /**
  * Turn `userId`'s staged `uploadId` into a chat file: stored content-addressed
  * with a grant for `userId`, and queued for text extraction.
  */
-export const finalizeStagedUpload = async (
-    ctx: ActionCtx,
-    userId: string,
-    args: { filename: string; uploadId: string },
-): Promise<{ fileId: Id<"chatFiles">; url: string }> =>
+export const finalizeStagedUploadFile = async (ctx: ActionCtx, userId: string, args: { filename: string; uploadId: string }): Promise<FinalizedChatFile> =>
     await takeStagedUpload(ctx, userId, args.uploadId, uploadLimitFor, async ({ bytes, contentType }) => {
         const maxBytes = uploadLimitFor(contentType);
         const {
@@ -199,8 +203,19 @@ export const finalizeStagedUpload = async (
             });
         }
 
-        return { fileId: fileId as Id<"chatFiles">, url };
+        return { fileId: fileId as Id<"chatFiles">, mediaType: contentType, storageId, url };
     });
+
+/** What the browser's finalize procedures answer: the file and its URL only, from {@link finalizeStagedUploadFile}. */
+export const finalizeStagedUpload = async (
+    ctx: ActionCtx,
+    userId: string,
+    args: { filename: string; uploadId: string },
+): Promise<{ fileId: Id<"chatFiles">; url: string }> => {
+    const { fileId, url } = await finalizeStagedUploadFile(ctx, userId, args);
+
+    return { fileId, url };
+};
 
 /** The keys under `prefix` last written before `cutoff`, at most {@link PURGE_MAX_PAGES} pages of them. */
 const staleKeys = async (storage: Pick<ActionCtx["storage"], "list">, prefix: string, cutoff: number): Promise<string[]> => {

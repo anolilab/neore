@@ -18,6 +18,23 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
+const crossings = vi.hoisted(() => {
+    return { calls: [] as { args: unknown; reference: unknown; shardKey: string }[], run: undefined as undefined | ((args: unknown) => Promise<unknown>) };
+});
+
+// The route crosses to the owner's shard as the system (`systemRunners` -> `callOnShard`). The harness runs a
+// registered function, not the generated path reference the route passes, so the crossing is recorded and the
+// registered writer it names is run in its place.
+vi.mock("../../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: unknown, args: unknown, options: { shardKey: string }) => {
+            crossings.calls.push({ args, reference, shardKey: options.shardKey });
+
+            return await crossings.run?.(args);
+        },
+    };
+});
+
 /** The gateway's signing (`usage/tracker.ts#sendNotifications`), reproduced byte for byte. */
 const signedRequest = async (payload: unknown, secret = SECRET, timestamp = Date.now()): Promise<Request> => {
     const body = JSON.stringify(payload);
@@ -41,25 +58,11 @@ const payload = { notifications: [firing], userId: "user-a" };
 /** A firing as a gateway that predates `firedAt` sends it. */
 const withoutFiredAt = () => Object.fromEntries(Object.entries(firing).filter(([key]) => key !== "firedAt"));
 
-const runMutation = vi.fn();
+const crossed = () => crossings.calls;
 
-/**
- * A fake HTTP-action ctx whose shard-scoped mutation runs on the harness. The harness runs a
- * registered function, not the generated path reference the handler passes, so the reference is
- * recorded and the registered writer it names is run in its place.
- */
-const context = () =>
-    ({
-        forShard: () => {
-            return {
-                runMutation: async (reference: unknown, args: unknown) => {
-                    runMutation(reference, args);
-
-                    return await harness.run(async (ctx: any) => await ctx.runMutation(createNotifications, args));
-                },
-            };
-        },
-    }) as never;
+/** The route's context: it crosses through `systemRunners`, so the context itself is never used to reach a shard. */
+const forShard = vi.fn();
+const context = () => ({ forShard }) as never;
 
 const rows = async () =>
     (await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { userId: "user-a" } }))) as {
@@ -67,14 +70,16 @@ const rows = async () =>
     };
 
 beforeEach(() => {
+    crossings.calls.length = 0;
     vi.useFakeTimers({ now: Date.UTC(2026, 0, 1, 10, 30), toFake: ["Date"] });
     vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", SECRET);
     harness = lunoraTest(schema as never);
+    crossings.run = async (args) => await harness.run(async (ctx: any) => await ctx.runMutation(createNotifications, args));
 });
 
 afterEach(() => {
     harness.close();
-    runMutation.mockReset();
+    forShard.mockReset();
     vi.unstubAllEnvs();
     vi.useRealTimers();
 });
@@ -86,14 +91,14 @@ describe(gatewayNotificationsHttpAction, () => {
         const response = await gatewayNotificationsHttpAction(context(), request);
 
         expect(response.status).toBe(401);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
     });
 
     it("rejects a request signed with the wrong secret", async () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest(payload, "someone-else"));
 
         expect(response.status).toBe(401);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
     });
 
     it("rejects everything while no secret is configured", async () => {
@@ -102,7 +107,7 @@ describe(gatewayNotificationsHttpAction, () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
 
         expect(response.status).toBe(401);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
     });
 
     it("refuses a body past the byte cap before hashing it, whatever its Content-Length says", async () => {
@@ -123,23 +128,35 @@ describe(gatewayNotificationsHttpAction, () => {
         const response = await gatewayNotificationsHttpAction(context(), request);
 
         expect(response.status).toBe(401);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
     });
 
     it("rejects a signed body that is not a notification batch", async () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: [{ ruleId: "r" }], userId: "user-a" }));
 
         expect(response.status).toBe(400);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
+    });
+
+    it("crosses nowhere for a malformed user id, even when signed", async () => {
+        const response = await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: [firing], userId: { a: 1 } }));
+
+        expect(response.status).toBe(400);
+        expect(crossed()).toStrictEqual([]);
     });
 
     it("creates one inbox notification for a valid request", async () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
 
         expect(response.status).toBe(200);
-        expect(runMutation).toHaveBeenCalledExactlyOnceWith(internal.notifications.functions.createNotifications, {
-            notifications: [expect.objectContaining({ type: "usage_alert", userId: "user-a" })],
-        });
+        expect(crossed()).toStrictEqual([
+            {
+                args: { notifications: [expect.objectContaining({ type: "usage_alert", userId: "user-a" })] },
+                reference: internal.notifications.functions.createNotifications,
+                shardKey: "user-a",
+            },
+        ]);
+        expect(forShard).not.toHaveBeenCalled();
 
         const { page } = await rows();
 
@@ -159,7 +176,7 @@ describe(gatewayNotificationsHttpAction, () => {
         const again = await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
 
         expect(again.status).toBe(200);
-        expect(runMutation).toHaveBeenCalledTimes(2);
+        expect(crossed()).toHaveLength(2);
         const { page } = await rows();
 
         expect(page).toHaveLength(1);
@@ -205,7 +222,7 @@ describe(gatewayNotificationsHttpAction, () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: many, userId: "user-a" }));
 
         expect(response.status).toBe(200);
-        expect(runMutation).toHaveBeenCalledTimes(1);
+        expect(crossed()).toHaveLength(1);
 
         const { page } = await rows();
 
@@ -219,7 +236,7 @@ describe(gatewayNotificationsHttpAction, () => {
         );
 
         expect(response.status).toBe(200);
-        expect(runMutation).not.toHaveBeenCalled();
+        expect(crossed()).toStrictEqual([]);
     });
 });
 

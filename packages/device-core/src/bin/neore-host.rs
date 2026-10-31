@@ -75,6 +75,8 @@ fn main() -> ExitCode {
     if let Err(error) = launch::exit_on_term(launch.as_ref().map(|launch| launch.path().to_owned()))
     {
         eprintln!("neore-host: SIGTERM is not handled: {error}");
+
+        return ExitCode::FAILURE;
     }
 
     let served =

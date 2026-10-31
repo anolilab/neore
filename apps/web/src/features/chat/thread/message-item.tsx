@@ -8,6 +8,7 @@
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { AgentSwitchPart } from "@neore/backend/agent/agent-switch-validators";
 import type { Id } from "@neore/backend/dataModel";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
@@ -54,9 +55,11 @@ import { saveBlob } from "@/lib/download";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import AgentSwitchDivider from "./agent-switch-divider";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
+import HostChanges from "./host-changes";
 import MemoryUsageAction from "./memory-usage-action";
 import MessageBranchSwitcher from "./message-branch-switcher";
 import MessageContent from "./message-content";
@@ -204,7 +207,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
             </span>
             <MessageContentWrapper
                 className={cn(
-                    "message-text col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word",
+                    "message-text col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
                     hasRateLimitError ? "text-destructive dark:text-red-400" : "text-foreground dark:text-white",
                 )}
             >
@@ -523,6 +526,7 @@ const MessageItem: FC<MessageItemProps> = memo(
             <>
                 {message.role !== "system" && <MessageSelectCheckbox disabled={messageIsStreaming || message.status === "pending"} message={message} />}
                 <MessageContent isStreaming={messageIsStreaming} message={message} />
+                {message.role === "assistant" && message.hostChanges && <HostChanges changes={message.hostChanges} />}
             </>
         );
 
@@ -574,6 +578,16 @@ const MessageItem: FC<MessageItemProps> = memo(
         }
 
         if (message.role === "system") {
+            const agentSwitch = message.parts.find((part) => part.type === "data-agentSwitch");
+
+            if (agentSwitch && "data" in agentSwitch) {
+                return (
+                    <div {...containerProps}>
+                        <AgentSwitchDivider part={agentSwitch.data as AgentSwitchPart} />
+                    </div>
+                );
+            }
+
             return (
                 <div {...containerProps}>
                     <SystemMessage>{content}</SystemMessage>

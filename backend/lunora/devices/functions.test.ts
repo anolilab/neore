@@ -299,6 +299,21 @@ describe("a device's project scope in the GDPR export", () => {
 
         expect(exported.devices.map((device) => device.projectIds)).toEqual([[project]]);
     });
+
+    it("lists the coding-agent folders the user approved", async () => {
+        const { deviceId } = await register(ownerId);
+        const offer = { agentKey: "claude", agentLabel: "Claude Code", folderId: "folder-1", folderLabel: "neore" };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(deviceId, { acpOffers: [offer] });
+        });
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(gdpr.collectDevicesForExport, { userId: ownerId }))) as {
+            devices: { acpOffers?: unknown[] }[];
+        };
+
+        expect(exported.devices.map((device) => device.acpOffers)).toEqual([[offer]]);
+    });
 });
 
 describe("a device's project scope", () => {
@@ -541,6 +556,40 @@ describe("the relay", () => {
             as(ownerId).mutation(functions.completeDeviceCall as never, (await signedResult(deviceId, secret, callId, { output: "other" })) as never),
         ).resolves.toEqual({ accepted: false });
         expect(await readCall(callId)).toMatchObject({ output: "file body" });
+    });
+
+    it("tells a window whose claim was saved but whose answer was lost that it still holds it, and no other window", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const claim = async (claimId?: string) =>
+            await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId, ...(claimId !== undefined && { claimId }) } as never);
+
+        // The first request saved the claim and its answer never arrived; the window asks again with the same id.
+        await expect(claim("window-a")).resolves.toEqual({ claimed: true });
+        await expect(claim("window-a")).resolves.toEqual({ claimed: true });
+        await expect(claim("window-b")).resolves.toEqual({ claimed: false });
+        await expect(claim()).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ claimId: "window-a", status: "claimed" });
+    });
+
+    it("takes a result only from the window that holds the claim", async () => {
+        const { deviceId, secret } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const complete = async (claimId?: string) =>
+            await as(ownerId).mutation(
+                functions.completeDeviceCall as never,
+                { ...(await signedResult(deviceId, secret, callId)), ...(claimId !== undefined && { claimId }) } as never,
+            );
+
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, claimId: "window-a", deviceId } as never);
+
+        // A window whose lease lapsed reports late: its result is not the claimant's, so the call stays open.
+        await expect(complete("window-b")).resolves.toEqual({ accepted: false });
+        expect(await readCall(callId)).toMatchObject({ claimId: "window-a", status: "claimed" });
+        await expect(complete("window-a")).resolves.toEqual({ accepted: true });
+        expect(await readCall(callId)).toMatchObject({ status: "completed" });
     });
 
     it("caps what a device returns, whatever it claims", async () => {

@@ -26,16 +26,18 @@
  * The function is pure and total: every malformed or impossible input
  * resolves to the tier already in use for the thread.
  */
+import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";
+
 import { QueryTier, rankOf, TIER_ORDER } from "./tiers.js";
 
 export const POLICY_THRESHOLDS = {
     /**
      * Above this conversation size a downgrade is refused: the prompt-cache
      * re-send it forces costs more than the cheaper tier saves on the turn.
-     * Tune against observed `cache_creation` tokens if the provider mix
-     * changes — the break-even moves with the price gap between tiers.
+     * The number is shared with the thread's agent switch (`@neore/ai/models`),
+     * which warns about the same re-send.
      */
-    downgradeMaxContextTokens: 20_000,
+    downgradeMaxContextTokens: PROMPT_CACHE_COLD_START_TOKENS,
 
     /**
      * Below this confidence we refuse to downgrade and cap upgrades at

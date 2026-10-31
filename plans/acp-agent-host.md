@@ -337,7 +337,7 @@ the folder and refers to it in its reply. Rules:
   canonicalise it. A path that leaves the folder (`..`, an absolute path elsewhere,
   a symlink that exits the folder) is refused and shown as text. The check runs in
   the main process, never in the page.
-- **Size and type.** A size cap and an allowlist of image types, both set in S8. A
+- **Size and type.** A size cap and an allowlist of image types, both set in S8 (provisional until measured; see "S8 as built"). A
   file over the cap is shown as a download link with its size, not as an image.
 - **Transport.** The bytes never pass through the page. The main process reads
   them through the device file operation and uploads them itself. This needs a
@@ -553,16 +553,107 @@ deadline, whatever the error).
   and measures there; `plans/acp-s3-throttling.md` stays the record of the method
   and the safe default (throttling on).
 
+**S4 as built** (differences from the text above):
+- `/hosts/send` writes the user's message and the host stream in one mutation, like the local-turn path
+  (`createHostStream`); it writes no pending reply row, because `finishHostTurn` saves the reply when the turn ends.
+  It is called from the browser with the owner's bearer, not through the gateway; the stream token it returns is the
+  same `createStreamToken`, but the web reads a host turn from the persisted stream, as every other reader does.
+- `acp_*` calls spend no nonce. A lapsed claim redelivers the same envelope, which a persisted nonce would refuse, so the
+  replay defence is the main process's receipt log, keyed by the signed call id, written before the command is acted on
+  and kept until the envelope expires. The core checks (`acp_prepare`), the main process writes the receipt and acts,
+  the core signs (`acp_sign`). A command is not persisted beyond its receipt: that is S7.
+- Claim lease 30 s (`ACP_CLAIM_LEASE_MS`, a guess, to be set from the throttling measurement); the claim window gates only
+  the first claim. Clocks are scheduled checks on one call (`acp/calls.ts`), not a sweep.
+- Remote answers find the Rust-side request by the id the backend shows (`requestId` on the core's permission request).
+  "Approve all" is the local window's bar and was built with S2; its test (a request that arrives after the bar is drawn
+  is not answered) is `approve_all_answers_exactly_the_requests_named_each_with_its_own_option`.
+- Not built here: attachments on `acp_send` (S8), a session id sent before the session opens (S7, built: see below), and the throttling
+  measurement (harness in [acp-s4-throttling.md](acp-s4-throttling.md); not run).
+
 **S5 — Registry.** Search and install from the official ACP registry, queried by
 the desktop. Pinned versions, checksum verification, installs under the app data
 directory, local consent for each install.
 - Acceptance: a checksum mismatch is refused; publisher and version are shown
   before install; there is no automatic update.
 
+**S5 as built:**
+- Source: the registry the protocol publishes, `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`
+  (`{ version, agents[] }`; entry format `agent.schema.json` in `agentclientprotocol/registry`). Read by the
+  desktop main process (`acp/registry.ts`) when the local window searches, with a 15 s deadline and a 5 MiB cap;
+  nothing reads it at any other time.
+- **Installable = a `binary` download for this platform with a published `sha256`.** The schema makes `sha256`
+  optional (42 of 107 targets carry none on the day this was written), and `npx`/`uvx` entries carry none at
+  all. Those are listed with the reason and cannot be installed: without a checksum there is nothing to verify,
+  and an `npx` launch would run whatever the package manager resolves that day. `.tar.gz`, `.zip` and a bare
+  binary unpack; `.tar.bz2` (4 targets) is refused with a reason.
+- The window sends only an agent id and the version it listed. The main process takes the entry from its own
+  snapshot (at most 15 minutes old, same version or "search again"), words a native confirmation from it
+  (publisher, version, license, source, the checksum) and downloads only after a "yes", https only (also after
+  redirects), 10 min deadline, 500 MiB cap, into a staging folder the core made.
+- The core (`device-core/src/acp_install.rs`, reachable through the addon only, not `acp_update`) hashes the file
+  and refuses a mismatch, unpacks refusing absolute paths, `..`, links and anything over 2 GiB / 20,000 entries,
+  resolves the command inside the unpacked folder (a bare name never reaches PATH), sets the executable bit only
+  then, renames into `<data dir>/acp-agents/<key>/<version>` and records the agent with an `install` pin
+  (version, publisher, source, sha256). Registry `env` goes through the same checks as a typed variable and a
+  program-changing name refuses the install. Only the pinned version stays on disk.
+- An install approves no folder. Installing over an installed key is another explicit install and drops its
+  folder approvals unless it is the same program (same command, arguments and verified archive checksum): a new
+  version, or the same version republished with different bytes, loses them. A same-version reinstall moves the
+  old folder aside until the new one is recorded and puts it back on failure. The old version's folder is pruned
+  by a separate core call (`acp_install_prune`) the main process makes after it closed the sessions that lost
+  their approval. A key registered by hand is never replaced. Saving a different command clears the pin and
+  deletes the installed files; removing an installed agent deletes them too.
+- The registry client mirrors the core's checks (version rule, program-changing variable names, argument and
+  name limits, command inside the download) so such entries are listed as not installable with the reason; the
+  core stays the authority. A search within a minute of the last filters that answer instead of fetching again.
+  Installs are refused where coding agents cannot run (`acpSupported`).
+- No update path: the registry is not compared with installed agents, there is no timer, and a newer version is
+  a new install the user confirms. Tests: no fetch from registering the handlers, loading the view or waiting a
+  week; the spawn plan keeps the recorded command and version until an install changes it.
+- Not built: re-hashing the installed binary at spawn, `.tar.bz2`, uninstalling an old version separately, and
+  archives that contain links: on `darwin-aarch64`, 2 of the 11 installable agents (a tar.gz with 2 link entries,
+  another with 4) are refused by the unpacker until links are handled safely.
+
 **S6 — Native session import and capability-driven controls.** Import an agent's
 saved sessions as threads, with ids derived from (agent key, native session id).
 - Acceptance: importing twice yields one thread; a missing capability hides its
   control.
+
+**S6 as built:**
+- Started from the local device window only (no `acp_*` kind, no public procedure, so no authz-matrix row). Each approved
+  (agent, folder) row shows **Import sessions…** only when the agent's last handshake reported both `sessions.listNative`
+  and `sessions.load` (`device/window/import-control.ts`, through `isAvailable`/`capabilityOf` of `@neore/ai/capabilities`).
+  A report is kept per agent key in the main process (`AcpManager.allReports`), filled by every handshake (Check version, a
+  started session), dropped when the agent's command changes or it is reinstalled. **No report hides the control**: the user
+  runs **Check version** once per app start. The main process checks the report again and sends no `session/list` or
+  `session/load` for an agent that did not advertise it (`acp/import.ts`).
+- The mapping is `acp/capabilities.ts#reportFromHandshake` and covers the `sessions` group only: `loadSession === true` and a
+  non-null `sessionCapabilities.list`. What the agent left out is `not_offered`; every other member stays unknown. It is also sent
+  with every `session_open`, together with the agent's own session id (`nativeSessionId`).
+- `session/list` is asked with the approved folder as `cwd`, and any entry for another working directory is dropped (the agent may
+  ignore the filter). At most 10 pages and 200 sessions.
+  An import lists the folder's sessions again and refuses an id that is not in the list, since the id comes from the window.
+- `session/load` replays the history as `session/update`s (`acp/replay.ts`): each user message starts a turn, the agent's text and
+  reasoning that follow belong to it. Tool calls are not kept, as for a live turn (a reply row holds text and reasoning). Text is
+  masked with the user's variable values, cut to the backend's limits, and the first 1000 turns are kept. The window is told how many
+  were dropped or shortened.
+- **One thread per (user, agent key, native session id).** `import_open` (a session-level post) looks the triple up through
+  `acpSessions.by_userId_agentKey_nativeSessionId` in the same mutation that inserts, and a shard runs one mutation at a time, so two
+  imports, concurrent or a week apart, leave one thread. A session that ran here is found the same way, because a live session records
+  its native id. The answer says `existing`, and `ended` when nothing more is wanted; the host then posts nothing else.
+- The transcript follows as `import_turn` posts, 25 turns and about 150 KB at most, claimed by `importedTurns` (the position of the
+  first turn in the post, as `(turnId, seq)` claims a live event): turns the backend holds are dropped, a post that starts past it
+  answers 409 with `next`. `import_end` closes it. Rows go through `addMessagesHandler` and `buildHostReply`. An interrupted import
+  resumes from `next`; the transcript is collected before the open, so a session that cannot be loaded leaves no empty thread.
+- A session whose thread was deleted (soft or hard) or is gone is replaced by the next `import_open`, and the hard delete removes the
+  session with the thread (`acp/functions.ts#deleteSessionsOfThread`), so a deleted import can be imported again, also when it was
+  deleted mid-way. An unfinished import can be finished from another computer of the same user: the open hands the session over, and
+  the first computer's later posts are refused. The host also stops keeping text at 8 million characters in all (turns past it count
+  as dropped), so one hostile session cannot fill the main process.
+- The imported session is `ended` (no agent runs for it) and keeps `nativeSessionId` for the native reattach of harness S4.
+  `importState` (`importing` | `done`) is unset on a session that ran here, and such a session takes no import turns.
+- Not built: import started from the web (a signed `acp_*` call), a re-import that refreshes a changed session, tool parts in
+  imported replies, and discovery without **Check version** (the app never starts an agent on its own).
 
 **S7 — Native child agents and early commands.** Early commands (§4.6) and §4.7
 (child ownership, buffering, settling). Needs S4 and the subagents group of the
@@ -576,6 +667,60 @@ mobile M2 needs them.
   event past the byte budget is dropped and logged, not stored.
 - The byte budget for child buffering is measured on a real child-heavy session
   before it is fixed.
+
+**S7 as built:**
+- **Early commands.** The backend no longer refuses a send to a `starting` session (`session_starting` is gone from `sendToHost`,
+  `/hosts/send` and the web composer): the message, the `accepted` stream and the call are stored, and `touchSession` leaves a
+  `starting` session `starting` (only `session_open` or a failed start leaves it; `session_open` then opens it `busy` when a
+  stream is waiting). A start that is refused, expires, or whose agent never opens (`endUnopenedSession`) now also fails the
+  held stream with "The agent did not start" (`endStartingSession`), instead of leaving it to the reaper.
+- **The hold is the receipt log, not memory.** `acp/commands.ts` keeps a `start` or `send` receipt WITH its signed envelope
+  until the command has been acted on (the file format gains the envelope and signature as entries 4 and 5; a cancel or an
+  answer is not kept, since the turn or request it names does not survive a restart). `apply` answers `HELD` for a command it
+  kept (a send for a session that is starting or not known yet; a start, until its agent has opened or failed); the call is
+  acknowledged at once and `HostCommands.finished` removes the envelope later, so a sent prompt does not stay on disk.
+  `HostCommands.recover()` runs at app start, before the poster's own recovery: it re-runs `acpPrepare` on each held envelope
+  (consent revoked meanwhile, expiry), acts on starts first and sends after, and a delivery waits for it (a replay that fails is logged and does not
+  hold the commands behind it). A held send past its `expiresAt` ends its stream with an error (`endLapsedTurn`); one whose
+  session no replayed start will open ends `interrupted`, never runs (the session died with the process, and the message may have
+  run before it). The poster reads the running turns left on disk BEFORE the replay, which opens channels and rewrites that
+  file, and keeps them in the file until it has ended them. The window between acting on a command and writing "acted on"
+  is not atomic: a process killed inside it acts twice.
+- **`acp/early-sends.ts`** holds the message against its session (open sessions take it at once, ended ones refuse it). The
+  thread comes from the signed envelope (`threadId`), so the turn's channel opens at once (`HostPoster.turnHeld`): the
+  backend sees `received` and the reaper keeps hearing keepalives. The message goes in, in arrival order, when the session
+  opens; it ends the stream with an error when the start fails, the envelope expires first (a timer, and a check at drain
+  time for a computer that slept) or the turn is cancelled. A send for a session this computer has never heard of is held too,
+  because the relay can claim the send before the start.
+- **Child agents** (`acp/children.ts`, `child-updates.ts`, `masked-stream.ts`). The wire, checked in the Claude Code ACP
+  adapter's published package (0.98.0): a client that declares `_meta["subagent-transcript"]` (or the newer `subagents`
+  client capability, a draft with child sessions) gets the child's `session/update`s stamped with
+  `_meta.claudeCode.parentToolUseId`, the id of the spawn call; an adapter that is not told to hide them forwards them
+  flattened into the main feed all the same. **No agent advertises this in its handshake**, so the host cannot map
+  `subagents.ownChildren` from what an agent said, and does not map it from its name: `reportFromHandshake` leaves the group
+  `unknown`, which is unsupported. The path is built and tested behind that capability (`capabilityReport` on a session
+  stands in for an agent that reports it), and shows nothing for real agents until a source for the report exists. The host
+  also declares nothing new at `initialize`.
+  What does change for every agent: an update stamped with a parent is now kept out of the parent's reply text and tools
+  (it was appended to the reply before), whether or not children are shown.
+  The ledger: a card exists once the spawn call was seen (the first sight of a tool call, after its own event is on the wire);
+  an event that names a call that never appears makes no card; events before the card wait in one per-session buffer
+  (provisional budget `CHILD_BUFFER_BUDGET_BYTES`, 512 KiB per session, at most 8 sessions: **pending measurement**, see [acp-s7-children.md](acp-s7-children.md) for the one real session measured, which never used the buffer); past
+  it an event is dropped and logged, never stored; a spawn's terminal update ends its card once (a repeat and anything later
+  are ignored), and its text is kept only when the child streamed none; text is masked with the user's variable values and
+  held back like the agent's own.
+- **Wire and storage.** Three event kinds, `child_text`, `child_tool` and `child_end` (all keyed by `spawnId`), in `vHostEvent` (so
+  also the `persistentChunks.event` column; the schema-drift gate calls it additive). The reply keeps them as
+  `providerMetadata.neore.subagentTranscripts` (one entry per spawn id: text, reasoning, tools, how it ended; at most 16
+  children, 64,000 characters each), **not** as a `subagentTranscript` content part: host replies carry no tool parts (so there is
+  no parent card in the saved message to hang a part on), and message content is strictly typed, so a new part type would reach
+  the schema, `toUIMessages` and the UI. The backend applies the same once-only rules, so a redelivered post and a second end
+  leave one transcript.
+- **Not built:** rendering `subagentTranscripts` in the thread (nothing reads the metadata yet); the resume rule of §4.7
+  (rebuilding ownership from stored spawn parts on session load needs the reattach of harness S4, which nothing does yet);
+  a source for the `subagents.ownChildren` report; the byte budget measured on a real child-heavy session (S7's acceptance
+  item for it is **pending measurement**: one run of three short children was recorded, peak 0; the live log line of a
+  session's peak exists only for an agent that reports its children, so today the offline harness is the way to measure).
 
 **S8 — Images and files from host agents.** §4.8. Needs S3 (persistence), the
 device file operation, and the device-signed create on the upload route (new
@@ -591,11 +736,60 @@ backend work, listed in §4.8).
 - The size cap and the type allowlist are set from a measured sample of real agent
   output before S8 starts.
 
+**S8 as built** (differences from the text above):
+- **The cap and the types are provisional.** No sample of real agent output could be taken, so they are
+  chosen, not measured, and stand in one pair of constants (`backend/lunora/acp/lib/constants.ts`,
+  `packages/device-core/src/media.rs`, pinned equal by `media-limits.test.ts`): an image up to 8 MiB shows inline,
+  a file up to 20 MiB is attached as a download (an image over 8 MiB, a PDF, `.txt`/`.log`, `.md`, `.json`), and a
+  larger one is named with its size and not uploaded. PNG, JPEG, GIF and WebP only; SVG, HTML, scripts, stylesheets
+  and XML are not on the list. A type is the file's bytes AND its extension agreeing. Set them from a sample and
+  re-run the pin.
+- **Only a Markdown image (`![](path)`) is looked at**, not a plain link and not a file a tool call reports as
+  created (that is S9's evidence). An agent links existing files constantly, and a mention is not a request to
+  upload one.
+- **The route is `/hosts/uploads`, not `/uploads`.** The payload rides in a header (`neore-device-request`,
+  base64url JSON) with its signature (`neore-device-signature`); the route checks the signed method, upload id, size,
+  type, `Upload-Offset` and body hash against the request. `serveUserUpload` in `lib/upload-route.ts` is the shared
+  inner handler, so a session, an API key and a device upload take one code path after authentication.
+- **The ingest finalizes the upload.** The `media` event names an upload id; the ingest ACTION finalizes it for the
+  device's verified owner and stores `fileId` and `storageKey` itself, only for events the stream does not have yet. A
+  failed finalize leaves the file named and marked not attached; it never fails the post. The result is remembered
+  per (owner, upload id), so a resend of a post whose answer was lost does not find the upload gone, and the device's
+  ingest budget is spent before the finalize.
+- **Left out:** attachments on `acp_send` (not in this slice's acceptance and not in the base), files a tool call
+  reports as created (S9), Office documents as downloads, and a measured cap. The phone reads the same message
+  parts; it was not run here.
+
 **S9 — Turn changes.** §4.9. Needs S3.
 - Acceptance: a turn that writes two files shows both with correct line counts; a
   file edited in the folder by something else during the turn is not listed; a
   later edit leaves the stored patch unchanged; a write outside the folder is not
   read; a patch over the cap keeps its file list.
+
+**S9 as built** (differences from the text above):
+- A file is recorded from a completed tool call only: ACP `diff` content (both sides are in the message, nothing is read;
+  a call first seen already complete still counts), or an edit, delete or move call that names `locations` with no diff,
+  whose earlier text is read when the call or its permission request first names the path and whose later text is read at
+  completion (`apps/desktop/src/acp/changes.ts`). Declined, failed and cancelled calls, binary files, files over 1 MiB a
+  side (in UTF-8 bytes) and a `locations` call first seen already complete (no earlier text exists to read) are left out.
+  Every path is resolved against the approved folder, links followed, before anything is read or listed
+  (`folder-files.ts`; the open uses `O_NOFOLLOW` and examines the open handle; a verbatim `\\?\` prefix on the core's
+  folder is removed so Windows paths compare); the summary carries paths relative to the folder.
+- Bounds: at most 200 paths (a dropped file gives its slot back), 16 MiB of text held, one snapshot read at a time that
+  stops at the cap, and a diff budget for the turn (table cells, patch bytes): past it a file keeps its counts and loses
+  its text, which makes the patch `{ tooLarge: true }`.
+- The path rule is one predicate on both sides (`isSummaryPath` / `isFolderRelativePath`), applied on the text that is
+  sent, after masking. An entry that fails it is left out; if the backend still refuses a post that carries a summary, the
+  host sends the end of the turn again without it, so the reply is not lost.
+- **The host's patch cap is 96 KiB, not 256 KiB.** A post is capped at 256 KiB whole and the `turn_end` event, escaped twice,
+  must fit one post alone, so a 256 KiB patch could never be sent. The backend still accepts the plan's bounds (200 files,
+  256 KiB patch); the host falls back to `{ tooLarge: true }` for the patch and then trims the tail of the file list until the
+  event fits (`turnEndEvent`). `MAX_INGEST_BYTES` is unchanged.
+- The summary is stored on the reply row as `providerMetadata.neore.hostChanges`, not as a new content part (which would reach
+  model conversion on a fork), and reaches clients as `UIMessage.hostChanges`. The turn's `turn_end` chunk keeps no copy of it.
+  A turn that only changed files still saves a reply.
+- Not built: a rename shown as a rename (a move is a delete plus a create when both paths are named), and fetching the patch
+  lazily on Open diff (it rides on the message).
 
 Additions to earlier slices:
 - S1 adds user-set environment variables (§6): a variable set for one agent

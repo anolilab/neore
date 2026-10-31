@@ -17,6 +17,8 @@ const LANGUAGE_LABELS: Record<Language, string> = {
     zh: "Chinese",
 };
 
+const NOT_BUILT = "On-device dictation is not available on this computer yet.";
+
 export interface ModelView {
     id: string;
     isDefault: boolean;
@@ -29,7 +31,7 @@ export interface ModelView {
 
 /** Everything the settings page shows. It holds no path, no URL and no audio. */
 export interface SettingsView {
-    /** False where the speech helper was not built: the page says so and offers nothing. */
+    /** False where the platform is not supported or the speech helper was not built: the page says why and offers nothing. */
     available: boolean;
     enabled: boolean;
     language: Language;
@@ -40,6 +42,8 @@ export interface SettingsView {
     shortcut: string;
     /** True when the switch is on but the OS refused the shortcut (another app holds it). */
     shortcutUnavailable: boolean;
+    /** What the page says while `available` is false. */
+    unavailableReason: string;
 }
 
 export interface SettingsApiOptions {
@@ -59,6 +63,8 @@ export interface SettingsApiOptions {
     shortcut: string;
     /** Whether the shortcut was refused when it was last registered. */
     shortcutRefused: () => boolean;
+    /** Why this platform is not supported, when it is not (`catalog.ts#unsupportedReason`). */
+    unsupported: string | undefined;
 }
 
 export interface SettingsApi {
@@ -84,6 +90,8 @@ export const createSettingsApi = (options: SettingsApiOptions): SettingsApi => {
 
     const downloadingOrMissing = (spec: OfferedModel["spec"]): ModelView["state"] => options.models.isDownloading(spec) ? "downloading" : "missing";
 
+    const available = (): boolean => options.unsupported === undefined && options.hasHelper();
+
     const view = async (): Promise<SettingsView> => {
         const settings = options.settings.get();
         const models = await Promise.all(
@@ -102,7 +110,7 @@ export const createSettingsApi = (options: SettingsApiOptions): SettingsApi => {
         );
 
         return {
-            available: options.hasHelper(),
+            available: available(),
             enabled: settings.enabled,
             language: settings.language,
             languages: LANGUAGES.map((id) => { return { id, label: LANGUAGE_LABELS[id] }; }),
@@ -110,11 +118,12 @@ export const createSettingsApi = (options: SettingsApiOptions): SettingsApi => {
             models,
             shortcut: options.shortcut,
             shortcutUnavailable: settings.enabled && options.shortcutRefused(),
+            unavailableReason: options.unsupported ?? NOT_BUILT,
         };
     };
 
     const requireHelper = (): void => {
-        if (!options.hasHelper()) {
+        if (!available()) {
             throw new Error("dictation settings: on-device dictation is not available on this computer yet");
         }
     };

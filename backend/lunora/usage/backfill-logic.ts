@@ -13,6 +13,7 @@
  *   `agent/branch-tree.ts`; a run's later rows never carry one);
  * - where the group-chat speaker changes — each speaker is a run of its own.
  */
+import { agentSwitchOf } from "../agent/agent-switch-logic";
 import type { StepUsage } from "../agent/message-cost";
 import type { RollupIncrement } from "./activity-logic";
 import { DEFAULT_SKILL_KEY, summariseReply, usageDayOf } from "./activity-logic";
@@ -51,6 +52,12 @@ export const groupReplies = (rows: ReadonlyArray<BackfillRow>): ReplyGroup[] => 
         if (isUserRow(row)) {
             current = undefined;
             prompt = row;
+            continue;
+        }
+
+        // A switch divider is no reply: the live path never records one.
+        if (agentSwitchOf(row) !== undefined) {
+            current = undefined;
             continue;
         }
 

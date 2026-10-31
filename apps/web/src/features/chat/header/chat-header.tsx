@@ -132,6 +132,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                 </>
             }
             trigger={<SidebarTrigger className="ml-2" name="left" />}
+            workspaceSwitch
         >
             <div className="flex items-center gap-2">
                 <InlineEdit

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
+import { MAX_HOST_REPLY_CHARS } from "./constants";
 import { MAX_TAIL_PAGES, MAX_TRANSCRIPT_PAGES, OMITTED_MARKER, readHostTranscript } from "./finish";
 
-type Chunk = { reasoning?: string; seq: number; text: string };
+type Chunk = { event?: unknown; reasoning?: string; seq: number; text: string };
 
 /** A chunk table that pages like the real one: ordered by seq, `limit` rows a page, a cursor that is the next offset. */
 const chunkTable = (chunks: Chunk[]) => {
@@ -110,5 +111,19 @@ describe("readHostTranscript", () => {
         const { ctx } = chunkTable(chunks);
 
         expect(await textOf(ctx)).toBe("Done.");
+    });
+
+    it("keeps collecting a child's events after the parent's text has reached its cap", async () => {
+        const chunks: Chunk[] = [
+            { seq: 0, text: "x".repeat(MAX_HOST_REPLY_CHARS) },
+            ...events(250, 1),
+            { event: { field: "text", kind: "child_text", spawnId: "task1", text: "late child words" }, seq: 251, text: "" },
+            { event: { kind: "child_end", spawnId: "task1", status: "completed" }, seq: 252, text: "" },
+        ];
+        const { ctx } = chunkTable(chunks);
+        const transcript = await read(ctx);
+
+        expect(transcript.text).toHaveLength(MAX_HOST_REPLY_CHARS);
+        expect(transcript.children).toMatchObject([{ spawnId: "task1", status: "completed", text: "late child words" }]);
     });
 });

@@ -89,6 +89,47 @@ microphone prompt and helper packaging for each.
 - Acceptance: the S2 acceptance tests pass on each OS in CI, or the platform is
   marked unsupported in settings.
 
+S4 as built (`.github/workflows/dictation-desktop.yml`, `apps/desktop/scripts/build-dictation-helper.mjs`):
+
+- **Helper.** The same whisper.cpp pin on Windows x64, Linux x64 and Linux arm64, plus Windows arm64 built with
+  clang-cl (ggml refuses to build ARM with MSVC unless it may tune for the build machine, which the portable build
+  never does). `GGML_NATIVE=OFF` on ARM leaves bare armv8-a, which has no half-precision or dot-product instructions, so
+  arm64 builds set `armv8.2-a+fp16+dotprod` (Cortex-A75 and later; a Raspberry Pi 4 is below it). `GGML_OPENMP=OFF`
+  everywhere but macOS: its runtime (`vcomp140`, `libgomp`) is not inside a single file. **CPU floor:** on x64
+  `GGML_NATIVE=OFF` still enables AVX2, FMA, F16C and BMI2, so a CPU older than Haswell (2013; AMD older than Excavator)
+  dies with SIGILL at start, which dictation reports as a helper error; ARM builds need Cortex-A75 or later (v8.2-a with
+  half-precision and dot product). Nothing detects an older CPU at run time. The script checks the finished
+  binary: Linux links only the C library (and the glibc it needs is printed and, with `--max-glibc`, capped, which the
+  release and CI do on the 22.04 runners, 2.35; CI tests that binary on the 24.04 runners), Windows imports no Visual C++ runtime DLL.
+- **Text on every OS.** At the pin, `-f - -otxt` makes the helper open `/dev/stdout` (the console, `CON`, on Windows). A
+  Node pipe is a socket, which cannot be opened by path, so the helper exits 0 with no text: CI showed it on Linux, and
+  Windows has the same shape. The helper is given an output name that is not `-` and no format flag instead, which makes it
+  print each segment to stdout itself, one line per segment behind a timestamp (`parseTranscript` strips it); no file is
+  opened under that name. The same arguments on every OS. Only the real helper shows this, so CI runs it on a spoken clip.
+- **Microphone.** macOS asks once (unchanged). Windows has no prompt for a desktop app, only a switch in Settings →
+  Privacy & security → Microphone: an explicit refusal stops the dictation with that path in the message, anything else is left to the
+  capture, which reports `denied` if it is blocked. Linux has no OS gate; the page's `denied` / `no-device` is the answer.
+- **Models.** Small is the default on every machine without a GPU, as in Appendix A.
+- **Unsupported.** `unsupportedReason` (`catalog.ts`) lists the platforms that are built, packaged and tested;
+  everywhere else (Intel Macs, any other OS or arch) settings says so, offers nothing and the shortcut stays off.
+  `catalog.test.ts` asserts the table, and against the runner it runs on (`NEORE_DICTATION_EXPECT`).
+- **Budget.** A supported platform's default model must finish a spoken 11 s clip in at most 1.5 times its length on a
+  four-core runner (`real-helper.test.ts`; the MSVC Windows arm64 build S1 rejected took 4.3 times). Measured in CI with
+  the shipped builds (whisper.cpp's `jfk.wav`, 11.0 s, small unless noted; peak memory is not measured here):
+
+  | Platform | Build | Time | Factor |
+  | --- | --- | --- | --- |
+  | Linux x64 | gcc, built on ubuntu-22.04 | 7.7 s | 0.70 |
+  | Linux arm64 | gcc, `armv8.2-a+fp16+dotprod` | 3.9 s | 0.36 |
+  | Windows x64 | MSVC | 8.8 s | 0.80 |
+  | Windows arm64 | clang-cl, `armv8.2-a+fp16+dotprod` | 7.1 s | 0.64 |
+  | Windows arm64, base | clang-cl | 5.5 s | 0.50 |
+  | Windows arm64, tiny | clang-cl | 0.7 s | 0.06 |
+
+  The clang-cl build is four to six times faster than the MSVC one S1 measured (42.9 s for small on a 10 s clip), so
+  Windows on ARM is supported with small as its default. These rows belong in Appendix A, which is part of the S1 branch
+  (#376) and not of this one.
+
 ## 5. Invariants crossed
 
 - The site origin gets no audio and no new IPC method. Every native channel is

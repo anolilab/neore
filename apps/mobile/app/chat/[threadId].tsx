@@ -2,8 +2,10 @@ import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Pressable, Text, TextInput, View } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
@@ -107,6 +109,24 @@ const Chat = () => {
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const insets = useSafeAreaInsets();
+    const [keyboardShown, setKeyboardShown] = useState(false);
+    // The header sits above this view, so the keyboard offset is the view's distance from the window top.
+    const [topOffset, setTopOffset] = useState(0);
+    const rootRef = useRef<ComponentRef<typeof View>>(null);
+    const measureTopOffset = useCallback(() => {
+        rootRef.current?.measureInWindow((_x, y) => setTopOffset(y));
+    }, []);
+
+    useEffect(() => {
+        const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardShown(true));
+        const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardShown(false));
+
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, []);
     // The send in flight, if any: leaving the screen cuts its stream instead of letting it run on.
     const sendAbort = useRef<AbortController | null>(null);
 
@@ -122,60 +142,63 @@ const Chat = () => {
     }, []);
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
-    const loadMessages = useCallback(async (id: string) => {
-        const result = await readThreadMessages({
-            cache,
-            fetchRows: async (startedAt) => {
-                const pages: Row[][] = [];
-                let cursor: string | null = null;
-                let isDone = false;
+    const loadMessages = useCallback(
+        async (id: string) => {
+            const result = await readThreadMessages({
+                cache,
+                fetchRows: async (startedAt) => {
+                    const pages: Row[][] = [];
+                    let cursor: string | null = null;
+                    let isDone = false;
 
-                for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
-                    // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-                    const page = await fetchMessagePage(id, cursor);
+                    for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
+                        // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+                        const page = await fetchMessagePage(id, cursor);
 
-                    // The server returns each page newest first; the rows are shown oldest first.
-                    pages.unshift(page.page.map((message) => toRow(message, id, startedAt)).toReversed());
-                    isDone = page.isDone;
-                    cursor = page.continueCursor;
+                        // The server returns each page newest first; the rows are shown oldest first.
+                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)).toReversed());
+                        isDone = page.isDone;
+                        cursor = page.continueCursor;
+                    }
+
+                    return { olderCursor: isDone ? null : cursor, rows: pages.flat() };
+                },
+                gate: readGate.current,
+                threadId: id,
+            });
+
+            switch (result.kind) {
+                case "failed": {
+                    setError(result.message);
+                    break;
                 }
-
-                return { olderCursor: isDone ? null : cursor, rows: pages.flat() };
-            },
-            gate: readGate.current,
-            threadId: id,
-        });
-
-        switch (result.kind) {
-            case "failed": {
-                setError(result.message);
-                break;
+                case "refused": {
+                    showRefused();
+                    reportRead("succeeded");
+                    break;
+                }
+                case "rows": {
+                    isRefused.current = false;
+                    hasLiveRows.current = true;
+                    setRows(result.rows);
+                    setOlderCursor(result.olderCursor);
+                    setError(withoutRefusal);
+                    reportRead("succeeded");
+                    break;
+                }
+                case "unreachable": {
+                    // No answer is not an error to show: the saved messages stay, under the offline banner.
+                    reportRead("failed");
+                    break;
+                }
+                default: {
+                    // Superseded by a newer read, which reports for itself.
+                    break;
+                }
             }
-            case "refused": {
-                showRefused();
-                reportRead("succeeded");
-                break;
-            }
-            case "rows": {
-                isRefused.current = false;
-                hasLiveRows.current = true;
-                setRows(result.rows);
-                setOlderCursor(result.olderCursor);
-                setError(withoutRefusal);
-                reportRead("succeeded");
-                break;
-            }
-            case "unreachable": {
-                // No answer is not an error to show: the saved messages stay, under the offline banner.
-                reportRead("failed");
-                break;
-            }
-            default: {
-                // Superseded by a newer read, which reports for itself.
-                break;
-            }
-        }
-    }, [cache, reportRead, showRefused]);
+        },
+        [cache, reportRead, showRefused],
+    );
 
     const loadOlder = async () => {
         if (!threadId || olderCursor === null || isLoadingOlder) {
@@ -191,7 +214,10 @@ const Chat = () => {
                     const page = await fetchMessagePage(threadId, olderCursor);
                     const syncedAt = Date.now();
 
-                    return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed() };
+                    return {
+                        olderCursor: page.isDone ? null : page.continueCursor,
+                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed(),
+                    };
                 },
                 gate: readGate.current,
                 threadId,
@@ -284,7 +310,11 @@ const Chat = () => {
         const stamp = Date.now();
         const assistantId = `pending-${stamp}`;
 
-        setRows((current) => [...current, localRow(`user-${stamp}`, "user", threadId ?? NEW_THREAD, prompt), localRow(assistantId, "assistant", threadId ?? NEW_THREAD, "")]);
+        setRows((current) => [
+            ...current,
+            localRow(`user-${stamp}`, "user", threadId ?? NEW_THREAD, prompt),
+            localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
+        ]);
 
         try {
             const config = loadConfig();
@@ -331,62 +361,75 @@ const Chat = () => {
         }
     };
 
-    const olderHeader = olderCursor === null
-        ? undefined
-        : (
-        <Pressable accessibilityRole="button" accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }} disabled={isLoadingOlder} onPress={loadOlder} style={{ padding: 12 }}>
-            <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
-        </Pressable>
-        );
+    const olderHeader
+        = olderCursor === null
+            ? undefined
+            : (
+            <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
+                disabled={isLoadingOlder}
+                onPress={loadOlder}
+                style={{ padding: 12 }}
+            >
+                <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
+            </Pressable>
+            );
 
     const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
     return (
-        <View style={{ flex: 1 }}>
+        <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
-            <LegendList
-                data={rows}
-                estimatedItemSize={72}
-                keyExtractor={(row) => row.id}
-                ListHeaderComponent={olderHeader}
-                renderItem={({ item }) => (
-                    <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
-                        <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
-                    </View>
-                )}
-            />
-            {error
-                ? (
-                <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
-                    {error}
-                </Text>
-                )
-                : null}
-            <View style={{ flexDirection: "row", gap: 8, padding: 12 }}>
-                <TextInput
-                    accessibilityHint={composer.reason}
-                    accessibilityLabel="Message"
-                    accessibilityState={{ disabled: composer.disabled }}
-                    editable={!composer.disabled}
-                    multiline
-                    onChangeText={setDraft}
-                    placeholder="Message"
-                    style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
-                    value={draft}
+            <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
+                <LegendList
+                    data={rows}
+                    estimatedItemSize={72}
+                    keyExtractor={(row) => row.id}
+                    ListHeaderComponent={olderHeader}
+                    renderItem={({ item }) => (
+                        <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
+                            <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
+                        </View>
+                    )}
                 />
-                <Pressable
-                    accessibilityHint={sendControl.reason}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: sending || sendControl.disabled }}
-                    disabled={sending || sendControl.disabled}
-                    onPress={send}
-                    style={{ justifyContent: "center", opacity: sendControl.disabled ? 0.5 : 1, padding: 12 }}
-                >
-                    <Text style={{ fontWeight: "600" }}>Send</Text>
-                </Pressable>
-            </View>
-            {sendControl.reason ? <Text style={{ fontSize: 12, paddingBottom: 8, paddingHorizontal: 12 }}>{sendControl.reason}</Text> : null}
+                {error
+                    ? (
+                    <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
+                        {error}
+                    </Text>
+                    )
+                    : null}
+                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendControl.reason ? 12 : 12 + (keyboardShown ? 0 : insets.bottom) }}>
+                    <TextInput
+                        accessibilityHint={composer.reason}
+                        accessibilityLabel="Message"
+                        accessibilityState={{ disabled: composer.disabled }}
+                        editable={!composer.disabled}
+                        multiline
+                        onChangeText={setDraft}
+                        placeholder="Message"
+                        style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
+                        value={draft}
+                    />
+                    <Pressable
+                        accessibilityHint={sendControl.reason}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: sending || sendControl.disabled }}
+                        disabled={sending || sendControl.disabled}
+                        onPress={send}
+                        style={{ justifyContent: "center", opacity: sendControl.disabled ? 0.5 : 1, padding: 12 }}
+                    >
+                        <Text style={{ fontWeight: "600" }}>Send</Text>
+                    </Pressable>
+                </View>
+                {sendControl.reason
+                    ? (
+                    <Text style={{ fontSize: 12, paddingBottom: 8 + (keyboardShown ? 0 : insets.bottom), paddingHorizontal: 12 }}>{sendControl.reason}</Text>
+                    )
+                    : null}
+            </KeyboardAvoidingView>
         </View>
     );
 };

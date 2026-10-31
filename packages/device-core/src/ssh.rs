@@ -19,8 +19,8 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -29,7 +29,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::frame::{read_frame, write_frame};
+use crate::frame::{chunk_of, read_frame, write_frame};
 use crate::host::PROTOCOL_VERSION;
 use crate::launch::Reaped;
 
@@ -954,7 +954,30 @@ pub struct RemoteOutcome {
 }
 
 type Reply = Result<Value, String>;
-type Pending = Arc<Mutex<HashMap<u64, Sender<Reply>>>>;
+type Pending = Arc<Mutex<HashMap<u64, Waiter>>>;
+
+/// A request in flight: where its response goes, and where the chunks of a streaming one go.
+struct Waiter {
+    chunks: Option<Chunks>,
+    reply: Sender<Reply>,
+}
+
+/// The chunks of a download between the reader of the connection and whoever writes them out. The reader never
+/// waits for the writer, because it also carries every other request's answer: it hands a chunk over and goes on.
+/// A writer that falls more than [`MAX_BACKLOG`] bytes behind has the download ended instead.
+#[derive(Clone)]
+struct Chunks {
+    /// Bytes handed over and not yet written.
+    backlog: Arc<AtomicUsize>,
+    /// Set by the reader when it dropped a chunk for want of room.
+    overflowed: Arc<AtomicBool>,
+    sender: Sender<Vec<u8>>,
+}
+
+/// Bytes of a download that may wait for the disk at once.
+const MAX_BACKLOG: usize = 64 * 1024 * 1024;
+/// How long a download may go without a byte before it is given up.
+pub const DOWNLOAD_IDLE: Duration = Duration::from_secs(60);
 
 /// What the engine needs of a connection to a server: the seam that lets its tests stand in for ssh.
 pub trait HostLink: Send + Sync {
@@ -982,6 +1005,20 @@ pub trait HostLink: Send + Sync {
     fn target(&self) -> Option<&Target>;
     /// Runs one approved action (`host::RunParams` as JSON) and waits at most `wait` for its answer.
     fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String>;
+    /// One page of a folder (`host::FilesParams` as JSON), as the server lists it.
+    fn list_files(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
+        Err("this connection cannot list files".into())
+    }
+    /// Writes the tar of a folder (`host::FilesParams` as JSON) to `out` as it arrives, giving up after `idle`
+    /// without a byte. What the server held is the answer; `out` is not an archive if this fails.
+    fn download(
+        &self,
+        _params: &Value,
+        _out: &mut dyn Write,
+        _idle: Duration,
+    ) -> Result<Value, String> {
+        Err("this connection cannot download files".into())
+    }
 }
 
 /// A live `neore-host --stdio` behind an `ssh` child.
@@ -1202,8 +1239,13 @@ impl HostConnection {
         &self.target
     }
 
-    /// Sends one request and waits at most `wait` for its answer.
-    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+    /// Sends one request. Its response arrives on the receiver; with `chunks` the bytes it streams arrive there first.
+    fn send(
+        &self,
+        op: &str,
+        params: &Value,
+        chunks: Option<Chunks>,
+    ) -> Result<(u64, Receiver<Reply>), String> {
         if !self.is_alive() {
             return Err("the connection to the server was lost".into());
         }
@@ -1212,7 +1254,13 @@ impl HostConnection {
         let (sender, receiver) = channel();
         let frame = json!({ "kind": "request", "id": id, "op": op, "params": params });
 
-        self.pending.lock().unwrap().insert(id, sender);
+        self.pending.lock().unwrap().insert(
+            id,
+            Waiter {
+                chunks,
+                reply: sender,
+            },
+        );
 
         let sent = serde_json::to_vec(&frame)
             .map_err(|error| error.to_string())
@@ -1227,6 +1275,11 @@ impl HostConnection {
             return Err(format!("the request could not be sent: {error}"));
         }
 
+        Ok((id, receiver))
+    }
+
+    /// Waits at most `wait` for the response to request `id`.
+    fn await_reply(&self, id: u64, receiver: &Receiver<Reply>, wait: Duration) -> Reply {
         match receiver.recv_timeout(wait) {
             Ok(reply) => reply,
             Err(_) => {
@@ -1239,6 +1292,18 @@ impl HostConnection {
                 })
             }
         }
+    }
+
+    /// Sends one request and waits at most `wait` for its answer.
+    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+        let (id, receiver) = self.send(op, params, None)?;
+
+        self.await_reply(id, &receiver, wait)
+    }
+
+    /// Asks the server to stop request `target`. Its answer is not waited for: nobody is listening for it.
+    fn cancel(&self, target: u64) {
+        let _ = self.send("cancel", &json!({ "target": target }), None);
     }
 }
 
@@ -1256,6 +1321,67 @@ impl HostLink for HostConnection {
 
         serde_json::from_value::<RemoteOutcome>(result)
             .map_err(|error| format!("the host's answer was not understood: {error}"))
+    }
+
+    fn list_files(&self, params: &Value, wait: Duration) -> Result<Value, String> {
+        self.request("list", params, wait)
+    }
+
+    fn download(
+        &self,
+        params: &Value,
+        out: &mut dyn Write,
+        idle: Duration,
+    ) -> Result<Value, String> {
+        let (sender, incoming) = channel();
+        let chunks = Chunks {
+            backlog: Arc::default(),
+            overflowed: Arc::default(),
+            sender,
+        };
+        let (backlog, overflowed) = (Arc::clone(&chunks.backlog), Arc::clone(&chunks.overflowed));
+        let (id, reply) = self.send("tar", params, Some(chunks))?;
+        let mut failure = None;
+
+        loop {
+            if overflowed.load(Ordering::SeqCst) {
+                self.pending.lock().unwrap().remove(&id);
+                self.cancel(id);
+
+                return Err("the disk cannot keep up with the server".into());
+            }
+
+            match incoming.recv_timeout(idle) {
+                Ok(bytes) if failure.is_none() => {
+                    backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+
+                    if let Err(error) = out.write_all(&bytes) {
+                        failure = Some(format!("the file could not be written: {error}"));
+
+                        self.cancel(id);
+                    }
+                }
+                // The server is stopping; what is still on the way is dropped.
+                Ok(bytes) => {
+                    backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+                }
+                // The response arrived (or the connection ended): every chunk before it was queued.
+                Err(RecvTimeoutError::Disconnected) => break,
+                Err(RecvTimeoutError::Timeout) => {
+                    self.pending.lock().unwrap().remove(&id);
+                    self.cancel(id);
+
+                    return Err(failure.unwrap_or_else(|| "the server stopped sending".to_owned()));
+                }
+            }
+        }
+
+        let answer = self.await_reply(id, &reply, Duration::from_secs(30));
+
+        match failure {
+            Some(failure) => Err(failure),
+            None => answer,
+        }
     }
 
     fn launch_id(&self) -> Option<&str> {
@@ -1332,8 +1458,28 @@ impl Drop for HostConnection {
     }
 }
 
-/// Hands a response frame to the request waiting for it; events and strays are dropped.
+/// Hands a response frame to the request waiting for it, and a chunk to the download it belongs to; events and
+/// strays are dropped.
 fn route(pending: &Pending, frame: &[u8]) {
+    if let Some((id, bytes)) = chunk_of(frame) {
+        let chunks = pending
+            .lock()
+            .unwrap()
+            .get(&id)
+            .and_then(|waiter| waiter.chunks.clone());
+
+        if let Some(chunks) = chunks {
+            if chunks.backlog.fetch_add(bytes.len(), Ordering::SeqCst) + bytes.len() > MAX_BACKLOG {
+                chunks.backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+                chunks.overflowed.store(true, Ordering::SeqCst);
+            } else {
+                let _ = chunks.sender.send(bytes.to_vec());
+            }
+        }
+
+        return;
+    }
+
     let Ok(value) = serde_json::from_slice::<Value>(frame) else {
         return;
     };
@@ -1345,6 +1491,7 @@ fn route(pending: &Pending, frame: &[u8]) {
     let Some(sender) = value["id"]
         .as_u64()
         .and_then(|id| pending.lock().unwrap().remove(&id))
+        .map(|waiter| waiter.reply)
     else {
         return;
     };
@@ -1477,7 +1624,7 @@ pub fn exec(
 /// What a failed remote command means to the reader. Only ssh itself exits 255, and only then is a "Permission
 /// denied" a refused login; from the command it is a file the account may not write.
 fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
-    if code == Some(255) && said.contains("Permission denied") {
+    if code == Some(255) && refused_login(said) {
         explain(target, said, &Mutex::new(said.to_owned()))
     } else if said.is_empty() {
         match code {
@@ -1492,6 +1639,17 @@ fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
     }
 }
 
+/// Whether ssh's own message says the server turned the login down, however it words it.
+fn refused_login(said: &str) -> bool {
+    [
+        "Permission denied",
+        "Too many authentication failures",
+        "No supported authentication methods",
+    ]
+    .iter()
+    .any(|phrase| said.contains(phrase))
+}
+
 /// What the user needs to read when a connection failed, from what ssh said.
 fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
     // The reader sees the stream end a moment before the stderr thread has everything.
@@ -1504,14 +1662,7 @@ fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
         said
     };
 
-    if [
-        "Permission denied",
-        "Too many authentication failures",
-        "No supported authentication methods available",
-    ]
-    .iter()
-    .any(|phrase| said.contains(phrase))
-    {
+    if refused_login(&said) {
         return format!(
             "{} refused the login ({said}). Passwords and one-time codes are not supported yet: use a key or an SSH agent.",
             target.label()
@@ -1583,6 +1734,19 @@ mod tests {
         );
 
         assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn every_wording_of_a_refused_login_is_called_one() {
+        for said in [
+            "Too many authentication failures",
+            "No supported authentication methods available (server sent: publickey)",
+        ] {
+            let message = explain(&target(), said, &Mutex::new(said.to_owned()));
+
+            assert!(message.contains("refused the login"), "{message}");
+            assert!(!SshError::from_connect_failure(message).retryable());
+        }
     }
 
     #[test]
@@ -1923,7 +2087,13 @@ mod tests {
         let pending: Pending = Arc::default();
         let (sender, receiver) = channel();
 
-        pending.lock().unwrap().insert(7, sender);
+        pending.lock().unwrap().insert(
+            7,
+            Waiter {
+                chunks: None,
+                reply: sender,
+            },
+        );
         route(&pending, br#"{"kind":"event","name":"x","data":{}}"#);
         route(
             &pending,
@@ -1941,5 +2111,51 @@ mod tests {
             (Some("completed"), Some("hi"))
         );
         assert!(pending.lock().unwrap().is_empty());
+    }
+
+    fn chunk_frame(id: u64, bytes: usize) -> Vec<u8> {
+        let mut frame = vec![crate::frame::CHUNK_TAG];
+
+        frame.extend_from_slice(&id.to_be_bytes());
+        frame.resize(frame.len() + bytes, 0);
+
+        frame
+    }
+
+    /// The reader of the connection carries every other request's answer: a download nobody is draining must
+    /// neither stop it nor make it wait.
+    #[test]
+    fn chunks_nobody_drains_never_hold_up_the_reader_and_a_late_writer_is_told() {
+        let pending: Pending = Arc::default();
+        let (sender, incoming) = channel();
+        let (reply, _) = channel();
+        let chunks = Chunks {
+            backlog: Arc::default(),
+            overflowed: Arc::default(),
+            sender,
+        };
+
+        pending.lock().unwrap().insert(
+            3,
+            Waiter {
+                chunks: Some(chunks.clone()),
+                reply,
+            },
+        );
+
+        for _ in 0..40 {
+            route(&pending, &chunk_frame(3, 256 * 1024));
+        }
+
+        assert!(!chunks.overflowed.load(Ordering::SeqCst));
+        assert_eq!(incoming.try_iter().count(), 40);
+
+        // The ten MiB above are still counted as waiting (nothing wrote them), so the cap is reached.
+        for _ in 0..(MAX_BACKLOG / (1024 * 1024) + 1) {
+            route(&pending, &chunk_frame(3, 1024 * 1024));
+        }
+
+        assert!(chunks.overflowed.load(Ordering::SeqCst));
+        assert!(chunks.backlog.load(Ordering::SeqCst) <= MAX_BACKLOG);
     }
 }

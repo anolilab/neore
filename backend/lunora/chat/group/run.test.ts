@@ -674,6 +674,45 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect(row.config).not.toHaveProperty("dispatchOrigin");
     });
 
+    it("removes the pause when the user stops the resumed participant", async () => {
+        await setGroup("supervisor", ["writer", "checker"]);
+        routerScript.speakers = ["p1", "p2"];
+        speakerTools.set("all", {
+            dangerous: tool({ description: "needs approval", execute: async () => "done", inputSchema: z.object({}), needsApproval: true }),
+        });
+
+        let streams = 0;
+
+        // The second stream is the resumed participant's: the user stops it as it starts.
+        speakerModels.set(
+            "INSTR:writer",
+            scriptedModel([toolCallStep("dangerous", "call-1"), textStep("writer after the tool.")], async () => {
+                streams += 1;
+
+                if (streams === 2) {
+                    const { stopActiveForThread } = await import("../streaming/persistent/library");
+
+                    await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId }));
+                }
+            }),
+        );
+
+        await runTurn();
+
+        const awaiting = async () =>
+            await harness.run(async (ctx: any) => {
+                const thread = await ctx.db.get(threadId);
+
+                return thread?.awaitingInput;
+            });
+
+        expect(await awaiting()).toBe("approval");
+
+        await resume(true);
+
+        expect(await awaiting()).toBeUndefined();
+    });
+
     it("resumes the paused participant, then runs the rest of the queue without re-routing", async () => {
         await setUpPausingWriter();
         await runTurn();

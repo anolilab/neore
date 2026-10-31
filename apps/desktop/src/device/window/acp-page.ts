@@ -3,7 +3,11 @@
  * a session in a folder, talk to it, stop it. Everything an agent wrote is rendered with `textContent`.
  * Variable values are typed here and never read back: the core returns names only.
  */
-import type { AcpView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import type { CapabilityReport } from "@neore/ai/capabilities";
+
+import type { RegistryListing } from "../../acp/registry";
+import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import { canImportSessions } from "./import-control";
 import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
 const TOOL_LABELS: Record<ToolStatus, string> = {
@@ -35,12 +39,19 @@ const CLICK_THROUGH_GUARD_MS = 800;
 
 const state: {
     guard?: ReturnType<typeof setTimeout>;
+    /** The saved sessions being offered for import, and where they are from. */
+    importing?: { agentKey: string; folder: string; sessions: NativeSessionView[] };
+    listings: RegistryListing[];
+    /** What each agent reported at its last start, by key. */
+    reports: Record<string, CapabilityReport>;
     requests: PermissionView[];
+    /** Counts registry searches: only the answer to the latest one is shown. */
+    searchSerial: number;
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
     view: AcpView;
-} = { requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -146,7 +157,75 @@ const probe = (key: string) =>
     guarded(async () => {
         const result = await globalThis.neoreDevice.acpProbe(key);
 
-        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.`;
+        await refreshReports();
+        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
+    });
+
+// ─── Importing saved sessions ───────────────────────────────────────────────
+
+const refreshReports = async (): Promise<void> => {
+    state.reports = await globalThis.neoreDevice.acpReports();
+
+    // An agent that was changed reports nothing until it starts again: its open list goes with the control.
+    if (state.importing !== undefined && !canImportSessions(state.reports[state.importing.agentKey])) {
+        state.importing = undefined;
+        renderImport();
+    }
+
+    renderAgents();
+};
+
+const importedText = (summary: ImportSummary): string => {
+    if (summary.status === "already") {
+        return "That session is already in Neore; nothing was added.";
+    }
+
+    const notes = [
+        summary.droppedTurns > 0 ? `${String(summary.droppedTurns)} later turns were not kept` : "",
+        summary.shortenedTurns > 0 ? `${String(summary.shortenedTurns)} turns have a message cut to the size Neore stores` : "",
+    ].filter(Boolean);
+
+    return `Imported ${String(summary.turns)} turns as a thread in Neore.${notes.length === 0 ? "" : ` ${notes.join("; ")}.`}`;
+};
+
+const renderImport = (): void => {
+    const { importing } = state;
+
+    $("acp-import").hidden = importing === undefined;
+
+    if (importing === undefined) {
+        return;
+    }
+
+    const { agentKey, folder, sessions } = importing;
+
+    $("acp-import-heading").textContent = `Saved sessions of ${agentLabel(agentKey)} in ${folder}`;
+    $("acp-import-list").replaceChildren(
+        ...sessions.length === 0
+            ? [item("None.")]
+            : sessions.map((session) => {
+                const when = session.updatedAt === "" ? "" : ` · ${new Date(session.updatedAt).toLocaleString()}`;
+                const name = session.title === "" ? "Untitled session" : session.title;
+
+                return item(
+                    `${name}${when}`,
+                    button("Import", `Import the session ${name}`, () => {
+                        guarded(async () => {
+                            $("acp-notice").textContent = "Importing…";
+                            $("acp-notice").textContent = importedText(await globalThis.neoreDevice.acpImport(agentKey, folder, session.sessionId, session.title === "" ? undefined : session.title));
+                        });
+                    }),
+                );
+            }),
+    );
+};
+
+const openImport = (agentKey: string, folder: string) =>
+    guarded(async () => {
+        $("acp-notice").textContent = "Asking the agent for its saved sessions…";
+        state.importing = { agentKey, folder, sessions: await globalThis.neoreDevice.acpImportList(agentKey, folder) };
+        $("acp-notice").textContent = "";
+        renderImport();
     });
 
 const renderAgents = (): void => {
@@ -157,12 +236,14 @@ const renderAgents = (): void => {
             ? [item("No agents yet.")]
             : view.agents.flatMap((agent) => [
                 item(
-                    `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`,
+                    agent.install === null
+                        ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
+                        : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
-                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}” and its variables?`)) {
+                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}”, its variables${agent.install === null ? "" : " and its installed files"}?`)) {
                                 return;
                             }
 
@@ -177,6 +258,10 @@ const renderAgents = (): void => {
                         item(
                             `↳ ${consent.folderPath}`,
                             button("Start", `Start ${agent.label} in ${consent.folderPath}`, () => startIn(agent.key, consent.folderPath)),
+                            // Only for an agent that said it can; a missing, unknown or not-offered answer shows nothing.
+                            ...canImportSessions(state.reports[agent.key])
+                                ? [button("Import sessions…", `Import saved sessions of ${agent.label} in ${consent.folderPath}`, () => openImport(agent.key, consent.folderPath))]
+                                : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
                                     state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
@@ -217,6 +302,48 @@ const renderAgents = (): void => {
                         });
                     }),
                 );
+            }),
+    );
+};
+
+// ─── Registry ───────────────────────────────────────────────────────────────
+
+const installFromRegistry = (listing: RegistryListing) =>
+    guarded(async () => {
+        // The main process words and shows the confirmation (publisher, version, source); this only asks.
+        const view = await globalThis.neoreDevice.acpRegistryInstall(listing.id, listing.version);
+
+        if (view === null) {
+            return;
+        }
+
+        state.view = view;
+        renderAgents();
+        renderRegistry(state.listings);
+        $("acp-notice").textContent = `${listing.name} ${listing.version} is installed. Approve a folder for it to use it.`;
+    });
+
+const renderRegistry = (listings: RegistryListing[]): void => {
+    state.listings = listings;
+
+    $("acp-registry-results").replaceChildren(
+        ...listings.length === 0
+            ? [item("No agents found.")]
+            : listings.map((listing) => {
+                const installed = state.view.agents.find((agent) => agent.key === listing.id)?.install;
+                const li = item(
+                    `${listing.name} ${listing.version} · by ${listing.publisher} · ${listing.license}`,
+                    ...listing.installable
+                        ? [button(installed === null || installed === undefined ? "Install…" : "Reinstall…", `Install ${listing.name} ${listing.version}`, () => installFromRegistry(listing))]
+                        : [],
+                );
+                const note = document.createElement("small");
+
+                note.className = "muted";
+                note.textContent = listing.installable ? listing.description : `Not installable here: ${listing.reason ?? "unknown"}`;
+                li.append(note);
+
+                return li;
             }),
     );
 };
@@ -475,6 +602,25 @@ export const initAcp = async (): Promise<void> => {
         });
     });
 
+    $("acp-registry-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        guarded(async () => {
+            state.searchSerial += 1;
+
+            const mine = state.searchSerial;
+            const found = await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query"));
+
+            // A newer search was submitted meanwhile: its answer is the one to show.
+            if (mine !== state.searchSerial) {
+                return;
+            }
+
+            renderRegistry(found);
+            // The notice is the page's live region: a list that changes silently is invisible to a screen reader.
+            $("acp-notice").textContent = `${String(found.length)} ${found.length === 1 ? "agent" : "agents"} found.`;
+        });
+    });
+
     $("acp-env-form").addEventListener("submit", (event) => {
         event.preventDefault();
         guarded(async () => {
@@ -511,9 +657,14 @@ export const initAcp = async (): Promise<void> => {
         });
     });
 
+    $("acp-import-close").addEventListener("click", () => {
+        state.importing = undefined;
+        renderImport();
+    });
+
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {
-            await Promise.all([refreshRequests(), refreshSessions()]);
+            await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
         } catch (error) {
             showError(error);
         }
@@ -522,6 +673,6 @@ export const initAcp = async (): Promise<void> => {
     await guarded(async () => {
         state.view = await globalThis.neoreDevice.acpView();
         renderAgents();
-        await Promise.all([refreshRequests(), refreshSessions()]);
+        await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
     });
 };

@@ -7,14 +7,15 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { getThreadWithAccess, checkThreadAccessBatchHandler } from "../agent/threads";
+import { checkThreadAccessBatchHandler, getThreadWithAccess } from "../agent/threads";
 import { listMessagesByThreadId } from "../agent/messages";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
 import schema from "../schema";
 import { getAttachmentsForChat } from "../vault/functions";
 import { getThreadWithData } from "./composite";
 import { getThread, getThreadUIMessages } from "./functions";
-import { getThreadAccess } from "./sharing";
+import { checkThreadAccessWithData, getThreadAccess } from "./sharing";
+import { streamRunThreadHandler } from "./streaming";
 
 const ORG = "org-1";
 
@@ -200,6 +201,68 @@ describe("vault", () => {
             await expect(as(harness, STRANGER).query(getAttachmentsForChat as never, { chatId: threadId } as never)).rejects.toThrow();
             expect(await as(harness, OWNER).query(getAttachmentsForChat as never, { chatId: threadId } as never)).toHaveLength(1);
             expect(await as(harness, GRANTEE).query(getAttachmentsForChat as never, { chatId: threadId } as never)).toHaveLength(1);
+        });
+    });
+});
+
+describe("the owner's thread state on the reads a grantee reaches", () => {
+    const OWNER_STATE = { awaitingInput: "approval", lastReplyAt: 11, lastViewedAt: 22, snoozedUntil: 33 } as const;
+    const stateKeys = Object.keys(OWNER_STATE);
+
+    const withState = async (harness: ReturnType<typeof lunoraTest>, threadId: string) =>
+        await harness.run(async (context: any) => {
+            await context.db.patch(threadId, OWNER_STATE);
+
+            return await context.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 60_000,
+                messageId: "m-1",
+                status: "streaming",
+                streamingConfig: { contentType: "text", model: "gpt-4o" },
+                threadId,
+                userId: OWNER,
+            });
+        });
+
+    const reads = (harness: ReturnType<typeof lunoraTest>, threadId: string, streamId: string) => {
+        const run = async (userId: string) =>
+            await harness.run(async (context: any) => {
+                const batch = await checkThreadAccessBatchHandler(context, { threadId: threadId as never, userId });
+                const withData = await context.runQuery(checkThreadAccessWithData, { threadId, userId });
+
+                return {
+                    accessBatch: batch.thread,
+                    accessWithData: withData.thread,
+                    streamRun: await streamRunThreadHandler(context, { streamId: streamId as never, userId }),
+                    withAccess: await context.runQuery(getThreadWithAccess, { threadId, userId }),
+                };
+            });
+
+        return run;
+    };
+
+    it("gives a grantee none of the owner's pause, unread, viewed or snooze state, from any of those reads", async () => {
+        await withHarness(async (harness, threadId) => {
+            const read = reads(harness, threadId, await withState(harness, threadId));
+            const seen = (await read(GRANTEE)) as Record<string, Record<string, unknown> | null>;
+
+            for (const [path, thread] of Object.entries(seen)) {
+                expect(thread, path).not.toBeNull();
+                expect(
+                    Object.keys(thread ?? {}).filter((key) => stateKeys.includes(key)),
+                    path,
+                ).toEqual([]);
+            }
+        });
+    });
+
+    it("keeps all of it for the owner", async () => {
+        await withHarness(async (harness, threadId) => {
+            const read = reads(harness, threadId, await withState(harness, threadId));
+            const seen = (await read(OWNER)) as Record<string, Record<string, unknown> | null>;
+
+            for (const [path, thread] of Object.entries(seen)) {
+                expect(thread, path).toMatchObject(OWNER_STATE);
+            }
         });
     });
 });
