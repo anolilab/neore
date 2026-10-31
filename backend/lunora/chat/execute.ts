@@ -196,6 +196,10 @@ export const runStreamingAgent = internalAction
             const invokedSkill = skillRun.invocation;
             // Skill text (enabled skills' descriptions, an invoked skill's instructions) reaches the prompt whoever wrote it.
             const skillText = injectsSkillText(skillRun);
+            // The one answer the quick check reads: at the first call from the tools below, and from the snapshot a pause leaves.
+            const untrustedContext = runContextPromise.then((context) => context.untrustedContext || skillText);
+
+            untrustedContext.catch(() => undefined);
 
             // A live bot keeps its pinned model (`/chat/start`); a skill's preferred model does not replace it.
             const liveBot = thread?.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId }) : null;
@@ -265,7 +269,7 @@ export const runStreamingAgent = internalAction
                               : undefined,
                           threadId,
                           // The tools are built while the context loads; the quick check reads this at the first call.
-                          untrustedContext: runContextPromise.then((context) => context.untrustedContext || skillText).catch(() => true),
+                          untrustedContext: untrustedContext.catch(() => true),
                           userId,
                       })
                     : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
@@ -457,7 +461,7 @@ export const runStreamingAgent = internalAction
                         toolNames: Object.keys(tools),
                         toolPermissionKeys: toolResult.permissionKeys,
                         // A continuation does not reload the context, so the quick check reads this off the snapshot.
-                        untrustedContext: runContext.untrustedContext || skillText,
+                        untrustedContext: await untrustedContext,
                     },
                     streamId,
                     threadId,

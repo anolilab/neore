@@ -453,7 +453,8 @@ written here is what is not.
   is client-supplied at creation, agents write skills from chats that may have read third-party content, and
   marketplace forks, imports and organisation-shared skills are other people's text, so "this user wrote it"
   cannot be told cheaply or reliably. A user with any enabled skill therefore never gets the check; narrowing
-  that needs a server-minted authorship marker first. The tools are built while the
+  that needs a server-minted authorship marker first. A thread summary records attached text as `files` taint
+  when it folds the rows in (`thread-summaries.ts`); summaries written before that are not repaired. The tools are built while the
   context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
   reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
   thread's sharing are re-read at every call**, in the same mutation that spends the budget unit
