@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
 
 describe("signOutOnDevice", () => {
     it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
@@ -35,5 +35,29 @@ describe("signOutOnDevice", () => {
 
         expect(revokeGrant).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith("Could not empty the offline cache.", expect.any(Error));
+    });
+});
+
+describe("emptyCacheWhileSignedOut", () => {
+    it("empties the cache whenever nobody is signed in, so a wipe that failed at sign-out is retried", async () => {
+        const clearCache = vi.fn(async () => undefined);
+
+        await emptyCacheWhileSignedOut({ clearCache, warn: vi.fn() });
+
+        expect(clearCache).toHaveBeenCalledTimes(1);
+    });
+
+    it("only warns when the cache cannot be emptied", async () => {
+        const warn = vi.fn();
+
+        await expect(
+            emptyCacheWhileSignedOut({
+                clearCache: async () => {
+                    throw new Error("disk I/O error");
+                },
+                warn,
+            }),
+        ).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledTimes(1);
     });
 });

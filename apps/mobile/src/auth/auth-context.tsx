@@ -11,7 +11,7 @@ import type { GrantUser } from "./grant";
 import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signInWithBrowser } from "./sign-in";
-import { signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
 
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
@@ -74,6 +74,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (jwt === null) {
                 setUser(null);
                 setStatus("signed-out");
+                // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
+                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), warn: console.warn });
 
                 return;
             }

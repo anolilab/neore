@@ -24,3 +24,16 @@ export const signOutOnDevice = async ({ clearCache, revokeGrant, warn }: SignOut
         warn("Could not clear the stored sign-in.", error);
     }
 };
+
+/**
+ * Runs whenever the app finds nobody signed in (at launch, or when a refresh finds no grant): empties the offline cache
+ * again, so a wipe that failed at sign-out (a locked or full disk) cannot leave the last account's chats in the file
+ * until someone signs in. Never blocks: a failure only warns, and the next signed-out start tries again.
+ */
+export const emptyCacheWhileSignedOut = async ({ clearCache, warn }: Pick<SignOutSteps, "clearCache" | "warn">): Promise<void> => {
+    try {
+        await clearCache();
+    } catch (error) {
+        warn("Could not empty the offline cache.", error);
+    }
+};
