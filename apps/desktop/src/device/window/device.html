@@ -211,6 +211,16 @@
                             <button type="button" id="acp-end">End session</button>
                         </div>
                     </form>
+                    <div id="acp-hooks" hidden>
+                        <h3 id="acp-hooks-heading">File-event hooks</h3>
+                        <p class="muted">
+                            This folder's <code>.neore/hooks.json</code> is part of the repository, so it can say anything. A hook can only send its prompt to this open session; the agent's own
+                            permission prompts still apply. Nothing runs until you approve exactly the file shown here for this agent in this folder, and any change to it needs a new approval. Another agent in the same folder is not covered.
+                        </p>
+                        <p id="acp-hooks-state" class="muted" role="status" aria-live="polite"></p>
+                        <ul id="acp-hooks-list" aria-labelledby="acp-hooks-heading"></ul>
+                        <div class="row" id="acp-hooks-actions"></div>
+                    </div>
                 </div>
                 <p id="acp-notice" class="muted" role="status" aria-live="polite"></p>
                 <p id="acp-error" class="error" role="alert"></p>

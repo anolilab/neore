@@ -86,9 +86,13 @@ export interface SessionOptions {
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
+    /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
+    folderIsRemote?: boolean;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
+    /** Told, without coalescing, when a turn starts or ends and when the session ends (by any path), for what must not miss one. */
+    lifecycle?: { ended: () => void; turnEnded: () => void; turnStarted: () => void };
     /** Where the session says what it measured (child buffering). */
     log?: (message: string) => void;
     /** Told what the session and its turns do, so they can be saved on the backend (`ingest.ts`). */
@@ -361,7 +365,7 @@ export class AgentSession {
     private run(prompt: string, turnId?: string): void {
         const turn = new Turn(prompt, this.options.process.scrub, turnId);
 
-        if (this.options.observer !== undefined) {
+        if (this.options.observer !== undefined && this.options.folderIsRemote !== true) {
             this.changes.set(turn, new TurnChanges(this.options.folder, this.options.process.scrub));
         }
 
@@ -369,6 +373,7 @@ export class AgentSession {
         this.current = turn;
         this.status = "busy";
         this.cancelRequested = false;
+        this.options.lifecycle?.turnStarted();
         this.observe((observer) => observer.turnStarted(this.id, turn.id, this.options.process.scrub(prompt)));
         this.options.onChange();
         this.prompt(turn);
@@ -435,6 +440,7 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.cancelTimer = undefined;
         this.current = undefined;
+        this.options.lifecycle?.turnEnded();
         // A child whose spawn call never reported its end is over with the turn: it must not take output from a later one.
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
@@ -510,6 +516,8 @@ export class AgentSession {
         this.dropQueue("failed", said);
 
         this.current = undefined;
+        this.options.lifecycle?.turnEnded();
+        this.options.lifecycle?.ended();
         this.observe((observer) => observer.sessionEnded(this.id));
         this.options.onChange();
     }

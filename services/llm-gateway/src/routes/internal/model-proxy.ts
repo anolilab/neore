@@ -21,6 +21,7 @@ import { countPromptTextChars, estimateCancelledUsage } from "../../lib/cancelle
 import { deferWaitUntil } from "../../lib/deferred-wait-until.js";
 import { GatewayError } from "../../lib/errors.js";
 import { deserializeFromWire, serializeForWire } from "../../lib/model-serialization.js";
+import { readRateLimit } from "../../lib/retry-after.js";
 import { internalAuth } from "../../middleware/auth.js";
 import { MODEL_MAP } from "../../models.js";
 import { createProviderModelForEnv, resolveApiKey } from "../../providers/factory.js";
@@ -174,6 +175,15 @@ modelProxyRouter.openapi(
         const failureReason = (error: unknown) => {
             try {
                 return classifyProviderFailure(error, Math.ceil(countPromptTextChars(body.callOptions.prompt) / 4), MODEL_MAP.get(body.modelId)?.contextWindow);
+            } catch {
+                return undefined;
+            }
+        };
+
+        // The provider's rate limit, as data, for the backend to pause a run on. Like the reason above, it never throws.
+        const rateLimitOf = (error: unknown) => {
+            try {
+                return readRateLimit(error);
             } catch {
                 return undefined;
             }
@@ -410,12 +420,14 @@ modelProxyRouter.openapi(
 
                             // An in-band provider error before any content is classified like a thrown one.
                             const fallbackReason = !hasContent && value.type === "error" ? failureReason(value.error) : undefined;
+                            // A pause re-runs the step, so a rate limit is only reported while nothing of it has gone out.
+                            const rateLimit = !hasContent && value.type === "error" ? rateLimitOf(value.error) : undefined;
 
                             if (isVisiblePart(value)) {
                                 hasContent = true;
                             }
 
-                            send(`data: ${JSON.stringify(fallbackReason ? { ...serialized, fallbackReason } : serialized)}\n\n`);
+                            send(`data: ${JSON.stringify({ ...serialized, ...(fallbackReason && { fallbackReason }), ...(rateLimit && { rateLimit }) })}\n\n`);
                         }
 
                         isReadingProvider = false;
@@ -484,11 +496,13 @@ modelProxyRouter.openapi(
                         ]);
                     } catch (error) {
                         // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
-                        // Retryable only while the call has produced nothing the user saw (the rule of `isVisiblePart`).
-                        const fallbackReason = !hasContent && isReadingProvider ? failureReason(error) : undefined;
+                        const isRetryable = !hasContent && isReadingProvider;
+                        const fallbackReason = isRetryable ? failureReason(error) : undefined;
+                        const rateLimit = isRetryable ? rateLimitOf(error) : undefined;
                         const errorChunk = {
                             error: error instanceof Error ? error.message : "Unknown stream error",
                             ...(fallbackReason && { fallbackReason }),
+                            ...(rateLimit && { rateLimit }),
                             type: "error",
                         };
 
@@ -525,6 +539,7 @@ modelProxyRouter.openapi(
             // Tells the caller whether another model could serve this request:
             // only an `infra` failure is worth retrying elsewhere.
             const fallbackReason = failureReason(error);
+            const rateLimit = rateLimitOf(error);
 
             return c.json(
                 {
@@ -532,6 +547,7 @@ modelProxyRouter.openapi(
                         code: "PROVIDER_ERROR",
                         ...(fallbackReason && { fallbackReason }),
                         message: error instanceof Error ? error.message : "Unknown provider error",
+                        ...(rateLimit && { rateLimit }),
                     },
                 },
                 502,

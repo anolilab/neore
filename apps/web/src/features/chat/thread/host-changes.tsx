@@ -3,39 +3,48 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/dialog";
-import { FileDiffIcon } from "lucide-react";
+import { FileDiffIcon, MessageSquarePlusIcon } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import DiffCommentForm from "@/features/chat/host/diff-comment-form";
+import DiffCommentsDraft from "@/features/chat/host/diff-comments-draft";
+import { useDiffCommentStore, useDiffDraftFull } from "@/features/chat/host/diff-comments-store";
 import type { UIMessage } from "@/lib/agent";
 
-import type { PatchLineKind } from "./host-changes-lines";
-import { classifyPatch } from "./host-changes-lines";
+import HostDiffViewer from "./host-diff-viewer";
 
 type HostChangesData = NonNullable<UIMessage["hostChanges"]>;
 
 interface HostChangesProps {
     changes: HostChangesData;
+    /** The reply these changes belong to; with `threadId`, it makes the diff and the files commentable. */
+    messageId?: string;
+    threadId?: string;
 }
-
-const LINE_CLASS: Record<PatchLineKind, string | undefined> = {
-    add: "text-green-700 dark:text-green-400",
-    context: undefined,
-    header: "text-muted-foreground font-medium",
-    hunk: "text-muted-foreground",
-    remove: "text-red-700 dark:text-red-400",
-};
 
 /**
  * What a host-run turn wrote: the files with their line counts, and the patch as it was at the end of that turn.
- * The patch is the agent's text, so it is shown as plain text in a `<pre>`, never as Markdown.
+ * The patch is the agent's text, so it is shown as plain text, never as Markdown. Given a thread, a person can comment
+ * on lines of the diff, or on a whole file (the only choice when the diff was too large to keep), and send the
+ * comments to the agent (`features/chat/host/diff-comments-draft.tsx`).
  */
-const HostChanges: FC<HostChangesProps> = ({ changes }) => {
+const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => {
     const { t } = useLingui();
     const [open, setOpen] = useState(false);
+    const [commenting, setCommenting] = useState<string | undefined>();
     const { files, patch } = changes;
     const added = files.reduce((sum, file) => sum + file.added, 0);
     const removed = files.reduce((sum, file) => sum + file.removed, 0);
+    const commentable = threadId !== undefined && messageId !== undefined;
+    const full = useDiffDraftFull(threadId ?? "");
+    // The button that opened each file's comment box: closing the box hands keyboard focus back to it.
+    const openers = useRef(new Map<string, HTMLButtonElement>());
+
+    const closeComment = (path: string): void => {
+        setCommenting(undefined);
+        openers.current.get(path)?.focus();
+    };
 
     return (
         <section aria-label={t`Files changed by this turn`} className="border-border my-2 rounded-md border text-sm" data-testid="host-changes">
@@ -53,12 +62,51 @@ const HostChanges: FC<HostChangesProps> = ({ changes }) => {
             </div>
             <ul className="border-border divide-border divide-y border-t">
                 {files.map((file) => (
-                    <li className="flex items-center justify-between gap-2 px-3 py-1" key={file.path}>
-                        <span className="min-w-0 truncate font-mono text-xs">{file.path}</span>
-                        <span className="shrink-0 font-mono text-xs">
-                            <span className="text-green-700 dark:text-green-400">+{file.added}</span>{" "}
-                            <span className="text-red-700 dark:text-red-400">−{file.removed}</span>
-                        </span>
+                    <li key={file.path}>
+                        <div className="flex items-center justify-between gap-2 px-3 py-1">
+                            <span className="min-w-0 truncate font-mono text-xs">{file.path}</span>
+                            <span className="flex shrink-0 items-center gap-2 font-mono text-xs">
+                                <span>
+                                    <span className="text-green-700 dark:text-green-400">+{file.added}</span>{" "}
+                                    <span className="text-red-700 dark:text-red-400">−{file.removed}</span>
+                                </span>
+                                {commentable && (
+                                    <Button
+                                        aria-expanded={commenting === file.path}
+                                        aria-label={t`Comment on ${file.path}`}
+                                        onClick={() => setCommenting(commenting === file.path ? undefined : file.path)}
+                                        ref={(element) => {
+                                            if (element) {
+                                                openers.current.set(file.path, element);
+                                            } else {
+                                                openers.current.delete(file.path);
+                                            }
+                                        }}
+                                        size="icon-sm"
+                                        type="button"
+                                        variant="ghost"
+                                    >
+                                        <MessageSquarePlusIcon aria-hidden="true" className="size-4" />
+                                    </Button>
+                                )}
+                            </span>
+                        </div>
+                        {commentable && commenting === file.path && (
+                            <DiffCommentForm
+                                full={full}
+                                label={t`Comment on the whole file ${file.path}`}
+                                onCancel={() => closeComment(file.path)}
+                                onSubmit={(text) => {
+                                    const stored = useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
+
+                                    if (stored) {
+                                        closeComment(file.path);
+                                    }
+
+                                    return stored;
+                                }}
+                            />
+                        )}
                     </li>
                 ))}
             </ul>
@@ -79,14 +127,8 @@ const HostChanges: FC<HostChangesProps> = ({ changes }) => {
                             </DialogDescription>
                         </DialogHeader>
                         <DialogPanel>
-                            <pre className="overflow-x-auto font-mono text-xs leading-5" data-testid="host-changes-patch">
-                                {classifyPatch(patch).map((line) => (
-                                    <span className={LINE_CLASS[line.kind]} key={line.id}>
-                                        {line.text}
-                                        {"\n"}
-                                    </span>
-                                ))}
-                            </pre>
+                            <HostDiffViewer comment={commentable ? { messageId, threadId } : undefined} patch={patch} />
+                            {commentable && <DiffCommentsDraft threadId={threadId} />}
                         </DialogPanel>
                     </DialogContent>
                 </Dialog>

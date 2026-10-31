@@ -275,6 +275,15 @@ export type GenerationOutputMetadata = {
     savedMessages?: MessageDoc[];
 };
 
+/** What a streamed generation lets its caller ask about the reply row it has open. */
+export type PendingMessageAccess = {
+    /**
+     * The id of the pending row the generation is writing its current step into, or undefined when it has none (saving
+     * is off, or the last step left no placeholder). It moves on as steps finish, so ask when you need it.
+     */
+    getPendingMessageId: () => string | undefined;
+};
+
 export type UsageHandler = (
     // `RunnerCtx` too: this is reached from the embedding path, which an HTTP
     // handler can be on, and recording usage goes through `runMutation` — there is
@@ -565,7 +574,7 @@ export interface Thread<DefaultTools extends ToolSet> {
              */
             saveStreamDeltas?: boolean | StreamingOptions;
         },
-    ) => Promise<StreamTextResult<TOOLS extends undefined ? DefaultTools : TOOLS, AiContext, OUTPUT> & ThreadOutputMetadata>;
+    ) => Promise<PendingMessageAccess & StreamTextResult<TOOLS extends undefined ? DefaultTools : TOOLS, AiContext, OUTPUT> & ThreadOutputMetadata>;
 
     /**
      * The target threadId, from the startThread or continueThread initializers.

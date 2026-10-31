@@ -18,6 +18,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import type { AcpCommand, AppliedCall } from "../acp/commands";
 import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
 import { EarlySends, NEVER_OPENED } from "../acp/early-sends";
+import { HookApprovals } from "../acp/hooks/approvals";
 import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
@@ -25,13 +26,15 @@ import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
+import { RemoteAgents } from "../acp/remote-process";
+import { ServerAgents } from "../acp/servers";
 import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
-import type { CoreEvent, DeviceCore, Prompt } from "./types";
+import type { CoreEvent, DeviceCore, Prompt, SettingsView } from "./types";
 import {
     readAcpUpdate,
     readAfter,
@@ -39,6 +42,8 @@ import {
     readAgentVersion,
     readDeviceId,
     readFolder,
+    readHookId,
+    readHooksHash,
     readHostPairing,
     readHostSpec,
     readNativeSessionId,
@@ -91,6 +96,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         installer?: AgentInstaller;
         local?: BrowserWindowInstance;
         registry?: AgentRegistry;
+        remote?: RemoteAgents;
+        servers?: ServerAgents;
         transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
@@ -256,6 +263,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
                 break;
             }
+            case "hostAgent":
+            case "hostAgentEnded": {
+                // Output of a coding agent on a server, for the process that stands for it (`acp/remote-process.ts`).
+                state.remote?.dispatch(event);
+                break;
+            }
             case "progress": {
                 // The signed report; the page forwards it to the backend, which verifies it.
                 for (const site of sites) {
@@ -332,10 +345,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         const host = requireHost(core);
 
+        const hookApprovalsFile = path.join(app.getPath("userData"), "acp-hook-approvals.json");
+
         // The core decides what may start: it refuses an unregistered agent and a folder that is not allowed.
         state.acp ??= new AcpManager({
             appVersion: app.getVersion(),
             gate: coreGate(core),
+            hooks: { approvals: new HookApprovals(hookApprovalsFile) },
             hostInfo: (agentKey, folder) => approvedFolder(core, agentKey, folder),
             log: (message) => console.error(message),
             observer: host,
@@ -380,18 +396,52 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return state.early;
     };
 
+    /** The coding agents on the servers this computer speaks for: one runtime each (`acp/servers.ts`). */
+    const requireServers = (): ServerAgents => {
+        const core = requireCore();
+
+        state.remote ??= new RemoteAgents(core);
+        state.servers ??= new ServerAgents({
+            appVersion: app.getVersion(),
+            backendOrigin: () => new URL(backendOrigin()),
+            core,
+            finished: (callId) => {
+                state.commands?.finished(callId);
+            },
+            gate: coreGate(core),
+            log: (message) => console.error(message),
+            onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
+            remote: state.remote,
+            servers: () => (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => { return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name }; }),
+            userData: app.getPath("userData"),
+        });
+
+        return state.servers;
+    };
+
+    /** The poster that saves a turn on the backend: the server's own for a server's device, this computer's otherwise. */
+    const posterFor = (deviceId: string | undefined): HostPoster => {
+        const servers = requireServers();
+
+        return deviceId !== undefined && servers.isServer(deviceId) ? servers.get(deviceId).poster : requireHost(requireCore());
+    };
+
     /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
-    const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>, call: AppliedCall): Promise<void> => {
+    const startRequestedSession = async (
+        command: Extract<AcpCommand, { kind: "start" }>,
+        call: AppliedCall,
+        server?: { acp: AcpManager; early: EarlySends },
+    ): Promise<void> => {
         try {
-            const sessionId = await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
+            const sessionId = await (server?.acp ?? requireAcp()).startSession(command.agentKey, command.agentLabel, command.folderPath, {
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });
 
-            requireEarly().opened(sessionId);
+            (server?.early ?? requireEarly()).opened(sessionId);
         } catch (error) {
             console.error("[neore-desktop] a requested coding agent did not start:", (error as Error).message);
-            requireEarly().failed(command.sessionId, (error as Error).message);
+            (server?.early ?? requireEarly()).failed(command.sessionId, (error as Error).message);
         } finally {
             await state.commands?.finished(call.callId);
         }
@@ -401,11 +451,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const applyCommand = (command: AcpCommand, call: AppliedCall): "accepted" | typeof HELD => {
         const core = requireCore();
 
+        // A command made for one of this computer's servers runs against that server's own agents and holds.
+        const server = call.deviceId === undefined ? undefined : requireServers().get(call.deviceId);
+
         switch (command.kind) {
             case "cancel": {
                 // The turn may have ended already; that is not a refusal.
-                requireAcp().cancelTurn(command.sessionId, command.turnId);
-                requireEarly().cancel(command.sessionId, command.turnId);
+                (server?.acp ?? requireAcp()).cancelTurn(command.sessionId, command.turnId);
+                (server?.early ?? requireEarly()).cancel(command.sessionId, command.turnId);
 
                 return "accepted";
             }
@@ -416,12 +469,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             }
             case "send": {
                 // Sent now, or held until the session opens (`acp/early-sends.ts`).
-                return requireEarly().submit(command, call);
+                return (server?.early ?? requireEarly()).submit(command, call);
             }
             case "start": {
                 // The agent takes a while to start. The command is accepted now and stays in the receipt log until the
                 // agent has opened (or failed to); the backend learns the session is open from its own `session_open`.
-                startRequestedSession(command, call);
+                startRequestedSession(command, call, server);
 
                 return HELD;
             }
@@ -435,12 +488,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.commands ??= new HostCommands({
             apply: applyCommand,
             core: requireCore(),
-            interrupted: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
-            lapsed: (held) => requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
+            interrupted: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
+            lapsed: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
             refused: (held, reason) =>
-                requireHost(requireCore()).endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
+                posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
                     error: `the message was not sent: ${reason}`.slice(0, 1000),
                     reason: "failed",
                 }),
@@ -455,16 +508,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
      */
     const recoverFromRestart = async (core: DeviceCore): Promise<void> => {
         const host = requireHost(core);
-        // Read first: the replay opens channels, and the first of them rewrites the file of running turns.
+        // Read first: the replay opens channels, and the first of them rewrites the file of running turns. The same goes
+        // for each server's file: a held message that fails for a server opens a channel through that server's poster.
         const read = host.readLeftovers();
-        // The gate goes up now, not once the read is done: a start delivered meanwhile would be replayed as well.
+        const serversRead = requireServers().readLeftovers();
+        // The gate goes up now, not once the reads are done: a start delivered meanwhile would be replayed as well. It
+        // waits for the servers' files too: a replayed message that fails for a server opens a channel through that
+        // server's poster, and the first channel rewrites that server's file, dropping the turns a read had not found yet.
         const recovered = requireCommands().recover(
             (async () => {
-                try {
-                    await read;
-                } catch {
-                    // The restart recovery below reports it.
-                }
+                // Each read reports its own failure to the recovery below.
+                await Promise.allSettled([read, serversRead]);
             })(),
         );
         let leftovers: Awaited<typeof read>;
@@ -477,6 +531,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
 
         await host.recover(leftovers);
+        // The same for the turns a previous run left on a server, each ended through that server's own poster.
+        await requireServers().recover(await serversRead);
     };
 
     if (state.core !== undefined) {
@@ -492,7 +548,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         clearInterval(reap);
         // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
         state.acp?.killAll();
+        state.servers?.killAll();
         state.host?.stop();
+        state.servers?.stop();
         state.transport?.stop();
     });
 
@@ -586,6 +644,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.hostFilesList, async (deviceId, folder, after) =>
         requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)));
 
+    // The coding agents of a server and the folders each may work in: approved here, in the local window, and nowhere else.
+    local(LOCAL_CHANNEL.hostAcpUpdate, async (deviceId, update) => {
+        const id = readDeviceId(deviceId);
+        const result = JSON.parse(requireCore().hostAcpUpdate(id, readAcpUpdate(update))) as Pick<AcpView, "agents" | "consents">;
+
+        // A running agent was started under an approval this update may have taken away.
+        await state.servers?.closeUnapproved(id, result);
+
+        return result;
+    });
+
     local(LOCAL_CHANNEL.hostFileRead, async (deviceId, file) => requireTransport().hostFileRead(readDeviceId(deviceId), readServerPath(file)));
 
     // The destination is chosen here, in a native dialog, and never taken from the window: it is a file this
@@ -603,15 +672,33 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return result.canceled || result.filePath === "" ? null : requireTransport().hostDownload(id, serverPath, result.filePath);
     });
 
-    local(LOCAL_CHANNEL.hostRemove, (deviceId) => {
-        requireTransport().hostRemove(readDeviceId(deviceId));
+    local(LOCAL_CHANNEL.hostRemove, async (deviceId) => {
+        const id = readDeviceId(deviceId);
+
+        // The server's sessions end while the core still holds its secret: the end of each live turn is signed with it.
+        await state.servers?.remove(id);
+        requireTransport().hostRemove(id);
     });
 
     local(LOCAL_CHANNEL.settingsGet, () => requireTransport().settingsGet());
 
-    local(LOCAL_CHANNEL.settingsUpdate, (update) =>
+    local(LOCAL_CHANNEL.settingsUpdate, async (update) => {
+        const json = readSettingsUpdate(update);
+
+        // Unpairing forgets every server and its secret: their sessions end first, while the end of each turn can be signed.
+        if ((JSON.parse(json) as { unpair?: unknown }).unpair === true) {
+            await state.servers?.removeAll();
+        }
+
         // The core emits `changed` itself, so the site resends its manifest.
-        requireTransport().settingsUpdate(readSettingsUpdate(update)));
+        const view = requireTransport().settingsUpdate(json);
+
+        // A server's shared folders may have shrunk, and the core dropped the approvals outside them: the agents that
+        // were started under those approvals stop.
+        await state.servers?.reviewApprovals();
+
+        return view;
+    });
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
         const dialogOptions = { properties: ["openDirectory" as const] };
@@ -652,6 +739,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         // A running agent was started under an approval this update may have taken away.
         await state.acp?.closeUnapproved(view);
+        // The variables for every agent reach a server's agents as well, and the core drops their approvals the same way.
+        await state.servers?.reviewApprovals();
 
         return view;
     };
@@ -738,6 +827,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpClose, (id) => requireAcp().close(readSessionId(id)));
 
     local(LOCAL_CHANNEL.acpForget, (id) => requireAcp().remove(readSessionId(id)));
+
+    // Hooks are repository content: only this window reads them in full, approves one file (by its hash) or runs a manual one.
+    local(LOCAL_CHANNEL.acpHooks, (id) => requireAcp().hooks(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpHooksApprove, (id, hash) => requireAcp().approveHooks(readSessionId(id), readHooksHash(hash)));
+
+    local(LOCAL_CHANNEL.acpHooksRevoke, (id) => requireAcp().revokeHooks(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpHookRun, (id, hookId, hash) => requireAcp().runHook(readSessionId(id), readHookId(hookId), readHooksHash(hash)));
 
     // The terminal is the user's own shell, opened by a click in this window. The folder is checked by the terminal module.
     local(LOCAL_CHANNEL.terminalAvailability, () => options.terminal?.availability ?? { available: false, reason: "The terminal is not available." });

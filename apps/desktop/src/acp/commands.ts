@@ -52,8 +52,12 @@ export type AcpCommand
 interface Prepared {
     callId: string;
     command: AcpCommand | null;
+    /** The device the call was made for: this computer, or one of its servers. */
+    deviceId?: string;
     expiresAt: number;
     refusal: string | null;
+    /** The server's name when the command is for a server; null for this computer. */
+    server?: string | null;
 }
 
 /** The part of the core these steps use. */
@@ -65,7 +69,11 @@ export interface CommandCore {
 /** What a command's `apply` is told about its call. */
 export interface AppliedCall {
     callId: string;
+    /** The server's device id when the command is for one of this computer's servers; absent for this computer. */
+    deviceId?: string;
     expiresAt: number;
+    /** The server's name, with `deviceId`. */
+    server?: string;
     /** The thread the backend made the call for; absent only for an envelope that carried none. */
     threadId?: string;
 }
@@ -77,6 +85,8 @@ export interface Held {
 
 /** A `send` that was held past its envelope's expiry, found by {@link HostCommands.recover}: its stream must end with an error. */
 export interface LapsedSend {
+    /** The device the envelope was made for: this computer, or a server. */
+    deviceId?: string;
     sessionId: string;
     threadId: string;
     turnId: string;
@@ -165,6 +175,16 @@ const threadOf = (envelope: string): string | undefined => {
     return typeof threadId === "string" && threadId !== "" ? threadId : undefined;
 };
 
+/** What `apply` is told about a prepared call; a command for a server also names the server. */
+const appliedOf = (prepared: Prepared, envelope: string): AppliedCall => {
+    return {
+        callId: prepared.callId,
+        ...prepared.server != null && prepared.deviceId !== undefined && { deviceId: prepared.deviceId, server: prepared.server },
+        expiresAt: prepared.expiresAt,
+        threadId: threadOf(envelope),
+    };
+};
+
 /** The session a held `start` opens, from its stored envelope; "" for anything else. */
 const startedSessionOf = (envelope: string): string => {
     const { input, tool } = parsedEnvelope(envelope);
@@ -174,11 +194,11 @@ const startedSessionOf = (envelope: string): string => {
 
 /** A held `send`'s ids, from its stored envelope. */
 const sendOf = (envelope: string): LapsedSend | undefined => {
-    const { input, threadId, tool } = parsedEnvelope(envelope);
+    const { deviceId, input, threadId, tool } = parsedEnvelope(envelope);
     const fields = isRecord(input) ? input : {};
 
     return tool === "acp_send" && typeof threadId === "string" && typeof fields.sessionId === "string" && typeof fields.turnId === "string"
-        ? { sessionId: fields.sessionId, threadId, turnId: fields.turnId }
+        ? { ...typeof deviceId === "string" && { deviceId }, sessionId: fields.sessionId, threadId, turnId: fields.turnId }
         : undefined;
 };
 
@@ -276,7 +296,7 @@ export class HostCommands {
             return known.refusal ?? ACCEPTED;
         }
 
-        const first = this.receive(prepared.command, { callId, expiresAt: prepared.expiresAt, threadId: threadOf(envelope) }, { envelope, signature });
+        const first = this.receive(prepared.command, appliedOf(prepared, envelope), { envelope, signature });
 
         this.handling.set(callId, first);
 
@@ -449,7 +469,7 @@ export class HostCommands {
             return reason;
         }
 
-        const running = this.act(prepared.command, { callId, expiresAt: prepared.expiresAt, threadId: threadOf(envelope) });
+        const running = this.act(prepared.command, appliedOf(prepared, envelope));
 
         this.handling.set(callId, running);
 

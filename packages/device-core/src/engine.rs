@@ -28,9 +28,10 @@ use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox::{self, NetworkTier};
-use crate::ssh::{HostLink, SshPaths, Target};
+use crate::ssh::{HostLink, RunningAgents, SshPaths, Target};
 use crate::store::{self, Host, Pairing, Settings};
 
+mod host_agents;
 mod hosts;
 mod reconnect;
 
@@ -58,6 +59,20 @@ pub enum Event {
     AcpPermission { agent: String, tool: String },
     /// A remote answer took a coding-agent request out of the queue: the device window should read it again.
     AcpPermissionsChanged,
+    /// Output of a coding agent on a server: `data` is base64 (unpadded) of its stdout or stderr bytes, in order.
+    HostAgent {
+        data: String,
+        handle: u64,
+        stream: &'static str,
+    },
+    /// A coding agent on a server is gone, after all its output. `error` is the connection or the host failing
+    /// instead of the agent ending.
+    HostAgentEnded {
+        code: Option<i32>,
+        error: Option<String>,
+        handle: u64,
+        signal: Option<i32>,
+    },
 }
 
 /// Receives [`Event`]s. Called from engine threads; must not block.
@@ -105,6 +120,8 @@ struct SshState {
     bundle: Result<Bundle, String>,
     /// The servers (`host:port`) with a "key changed" prompt on screen, so a retry does not queue another.
     changed_prompts: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// Coding agents running on servers, by the handle the main process chose: the connection and the agent's request.
+    agents: RunningAgents,
     /// Live connections by the server's device id.
     connections: Mutex<HashMap<String, Arc<dyn HostLink>>>,
     /// The servers (by device id) with a connection attempt running: at most one each, the person's or the keeper's.
@@ -159,6 +176,7 @@ impl DeviceState {
             settings_path,
             sink: Arc::from(sink),
             ssh: SshState {
+                agents: Arc::default(),
                 binary: binary.to_owned(),
                 attempting: Arc::default(),
                 bundle: Err("this build ships no host software".to_owned()),
@@ -735,14 +753,28 @@ impl DeviceState {
     /// Signs one batch of coding-agent turn output for the backend's ingest route. Only a payload that names
     /// itself a turn post for THIS device is signed, so this is no general signing oracle.
     pub fn sign_turn(&self, payload: &str) -> Result<String, String> {
-        let pairing = usable_pairing(&self.settings())?;
         let parsed: Value =
             serde_json::from_str(payload).map_err(|_| "the turn post is not JSON")?;
 
-        if parsed.get("v") != Some(&json!(1))
-            || parsed.get("kind") != Some(&json!("turn"))
-            || parsed.get("deviceId").and_then(Value::as_str) != Some(pairing.device_id.as_str())
-        {
+        if parsed.get("v") != Some(&json!(1)) || parsed.get("kind") != Some(&json!("turn")) {
+            return Err("the post is not a turn post for this computer".into());
+        }
+
+        // A coding agent on a server posts as the server: its own device, its own secret, which only this computer
+        // holds. The device the post names decides the secret; a post naming any other device is not signed.
+        if let Some(host) = self.server_named_by(payload) {
+            if host.secret.is_empty() {
+                return Err(
+                    "the server's secret is unavailable: the keychain could not be read".into(),
+                );
+            }
+
+            return Ok(envelope::sign(&host.secret, Domain::Turn, payload));
+        }
+
+        let pairing = usable_pairing(&self.settings())?;
+
+        if parsed.get("deviceId").and_then(Value::as_str) != Some(pairing.device_id.as_str()) {
             return Err("the post is not a turn post for this computer".into());
         }
 

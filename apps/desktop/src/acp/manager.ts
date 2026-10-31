@@ -9,6 +9,11 @@ import { rm } from "node:fs/promises";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import { reportFromHandshake } from "./capabilities";
+import type { HookApprovals } from "./hooks/approvals";
+import type { HookFs } from "./hooks/fs";
+import { nodeHookFs } from "./hooks/fs";
+import { HookRunner } from "./hooks/runner";
+import type { HooksView } from "./hooks/types";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
@@ -43,7 +48,11 @@ const removeQuietly = async (folder: string): Promise<void> => {
 export interface ManagerOptions {
     appVersion: string;
     cancelGraceMs?: number;
+    /** The agents run on another machine (a server): their folder is not one of this computer's, so none of its files are read for them. */
+    folderIsRemote?: boolean;
     gate?: PermissionGate;
+    /** File-event hooks (`hooks/runner.ts`). Without it, a folder's `.neore/hooks.json` is not looked at. */
+    hooks?: { approvals: HookApprovals; fs?: HookFs };
     /** The label of the folder the user approved for this agent (never its path), for the backend's thread. Undefined: keep the session on this computer. */
     hostInfo?: (agentKey: string, folder: string) => Pick<HostSessionInfo, "folderId" | "folderLabel"> | undefined;
     /** Where sessions say what they measured (child buffering). */
@@ -62,6 +71,9 @@ export class AcpManager {
     private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
     private readonly processes = new Set<AgentProcess>();
+
+    /** The hook runner of each session that has one; it lives and dies with the session. */
+    private readonly runners = new Map<string, HookRunner>();
 
     /** What each agent reported at its last handshake, by key. Forgotten when the agent's command may have changed. */
     private readonly reports = new Map<string, CapabilityReport>();
@@ -97,7 +109,7 @@ export class AcpManager {
         let child: AgentProcess;
 
         try {
-            child = this.spawn(plan);
+            child = this.spawn(plan, agentKey);
         } catch (error) {
             // The folder exists before anything starts; a start that fails must not leave it behind.
             if (plan.scratch) {
@@ -168,15 +180,20 @@ export class AcpManager {
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
-        const child = this.spawn(plan);
+        const child = this.spawn(plan, agentKey);
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
+        const { hooks } = this.options;
+        // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
+        let runner: HookRunner | undefined;
         const session = new AgentSession({
             agentKey,
             agentLabel,
             appVersion: this.options.appVersion,
             cancelGraceMs: this.options.cancelGraceMs,
             folder: plan.cwd,
+            folderIsRemote: this.options.folderIsRemote,
             gate: this.options.gate ?? declineGate,
+            lifecycle: hooks === undefined ? undefined : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
             log: this.options.log,
             onChange: () => this.changed(),
             process: child,
@@ -187,8 +204,32 @@ export class AcpManager {
 
         this.sessions.set(session.id, session);
 
+        if (hooks !== undefined) {
+            runner = new HookRunner({
+                agentKey,
+                approvals: hooks.approvals,
+                folder: plan.cwd,
+                fs: hooks.fs ?? nodeHookFs,
+                isIdle: () => session.summary().status === "idle",
+                log: this.options.log,
+                onChange: () => this.changed(),
+                send: (prompt) => {
+                    session.send(prompt);
+                },
+            });
+            this.runners.set(session.id, runner);
+        }
+
+        // The window may ask for the hooks while the session starts: the runner is looking at the folder from here on,
+        // and fires nothing until the session is idle.
+        this.watchFolder(runner);
+
         try {
             await session.start();
+        } catch (error) {
+            runner?.stop();
+
+            throw error;
         } finally {
             // A start that failed after the handshake still told what the agent can do.
             if (session.handshake !== undefined) {
@@ -250,7 +291,27 @@ export class AcpManager {
         }
 
         this.sessions.delete(sessionId);
+        this.runners.delete(sessionId);
         this.changed();
+    }
+
+    /** What the folder's hooks file says, every hook in full, and whether the person approved exactly this file. */
+    public async hooks(sessionId: string): Promise<HooksView> {
+        return await this.requireRunner(sessionId).view();
+    }
+
+    /** Approves the hooks file whose hash the person was shown. Refused if the file is no longer that one. */
+    public async approveHooks(sessionId: string, hash: string): Promise<void> {
+        await this.requireRunner(sessionId).approve(hash);
+    }
+
+    public async revokeHooks(sessionId: string): Promise<void> {
+        await this.requireRunner(sessionId).revoke();
+    }
+
+    /** Sends a manual hook's prompt to the open session; never starts one. */
+    public async runHook(sessionId: string, hookId: string, hash: string): Promise<void> {
+        await this.requireRunner(sessionId).runManual(hookId, hash);
     }
 
     public snapshot(sessionId: string): SessionSnapshot {
@@ -289,6 +350,27 @@ export class AcpManager {
         return session;
     }
 
+    /** Starts the hooks watcher once the session is open. A folder that cannot be watched costs the hooks, not the session. */
+    private async watchFolder(runner: HookRunner | undefined): Promise<void> {
+        try {
+            await runner?.start();
+        } catch (error) {
+            this.options.log?.(`[acp-hooks] could not watch the folder: ${(error as Error).message}`);
+        }
+    }
+
+    private requireRunner(sessionId: string): HookRunner {
+        this.require(sessionId);
+
+        const runner = this.runners.get(sessionId);
+
+        if (runner === undefined) {
+            throw new Error("hooks are not available for this session");
+        }
+
+        return runner;
+    }
+
     private changed(): void {
         this.changeTimer ??= setTimeout(() => {
             this.changeTimer = undefined;
@@ -296,8 +378,8 @@ export class AcpManager {
         }, CHANGE_INTERVAL_MS);
     }
 
-    private spawn(plan: SpawnPlan): AgentProcess {
-        const child = this.options.spawn(plan);
+    private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {
+        const child = this.options.spawn(plan, agentKey);
 
         this.processes.add(child);
         this.forgetWhenExited(child);

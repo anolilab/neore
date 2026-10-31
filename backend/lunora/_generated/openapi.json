@@ -22442,6 +22442,80 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_rate_limit_retry:retryRateLimitedRun": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_rate_limit_retry:retryRateLimitedRun` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_rate_limit_retry:retryRateLimitedRun",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_rate_limit_retry:retryRateLimitedRun",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "resumed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "resumed"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_rate_limit_retry:retryRateLimitedRun",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_resume:latestResumableThread": {
       "post": {
         "description": "Invoke the `query` `chat_resume:latestResumableThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -24318,6 +24392,29 @@
                               "type": "string"
                             }
                           ]
+                        },
+                        "pause": {
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "const": "rate_limit",
+                              "type": "string"
+                            },
+                            "retryAt": {
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "retryAt",
+                            "status"
+                          ],
+                          "type": "object"
                         },
                         "streamId": {
                           "description": "Id<\"persistentStreams\">",

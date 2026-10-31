@@ -36,6 +36,7 @@ import getAgent from "./get-agent";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
+import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
     isStreamWriteRefused,
@@ -58,8 +59,6 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import { repliesByOrder, replyUsageArgs } from "../../usage/activity-logic";
-import { scheduleReplyUsage } from "../../usage/schedule";
 import type { DispatchOrigin } from "../../sub-agents/logic";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
@@ -624,12 +623,12 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
     // One record per reply: a steered run saved two (`repliesByOrder`).
-    for (const reply of repliesByOrder(savedMessages)) {
-        scheduleReplyUsage(
-            ctx.scheduler as never,
-            replyUsageArgs(reply, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
-        );
-    }
+    scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
+        at: Date.now(),
+        userId,
+        ...(args.skill && { skill: args.skill }),
+        ...(args.timeZone && { timeZone: args.timeZone }),
+    });
 
     if (!args.extractMemory || !prompt) {
         return await Promise.allSettled(scheduled);

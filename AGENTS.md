@@ -261,6 +261,22 @@ written here is what is not.
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
 
+- **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
+  a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
+  headers/body (`services/llm-gateway/src/lib/retry-after.ts`) and sends `rateLimit: { status, retryAt }` beside
+  `fallbackReason` — on the 502 body, an in-band error part and a mid-read throw — only while the step has produced nothing
+  visible; the backend decides on that field alone, never on message text, and a bare 429 with no field still fails. The
+  stream stays `pending|streaming` with `persistentStreams.pause` set (so stop, the live query and the expiry sweep need no
+  new status; `expiresAt` moves past `retryAt`), the rejected step's empty placeholder row is deleted, and the resume is the
+  SAME `runStreamingAgent` job re-enqueued with `resume: <pause id>` at `retryAt` (the pause stores the job's input).
+  `claimRunResume` claims by pause id, so a redelivery, "Retry now" (`chat/rate-limit-retry.ts`, which queues the same
+  resume for now) and a stale delayed job all no-op after the first; the resume streams from the last row the run saved
+  (`pause.from`), not from the user message — `failPendingSteps` plus a user-message prompt would make a mid-run resume a
+  sibling reply. Caps: a pause ≤ 10 min, one per step (keyed on `from`), 3 per run; past them, or with a delivered steer, or
+  stateless, or in a group turn / approval continuation, the run fails as before. Nothing waits in an action or a queue
+  invocation. The AI SDK never retries these (`GatewayLanguageModel` throws a plain `Error`, not an `APICallError`), so the
+  pause is the only retry. The countdown in the chat is `aria-hidden`; a polite status region speaks every 30 s.
+
 - **Video render queue** — `POST /v1/videos` enqueues and returns 202; the
   Worker's `queue()` handler consumes it. **Cross-config invariant:**
   `VIDEO_RENDER_MAX_ATTEMPTS = 3` in the consumer MUST equal `maxRetries: 2`
@@ -819,6 +835,24 @@ written here is what is not.
   ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
+  **Coding agents on a server** (`device-core/src/{agent_host,engine/host_agents}.rs`, `apps/desktop/src/acp/{remote-process,servers}.ts`,
+  plans/ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
+  shared with the computer's own agents. The `agent` request streams stdout/stderr as chunk frames (tag 1/2) and takes stdin as
+  chunk frames of the same id; `hello.agents` announces it (no protocol bump), and the host kills the agent's process group on
+  cancel, on its stdin ending and on SIGTERM. A server's agents and approvals live on its `Host` row, the core picks the secret by
+  the DEVICE a payload names (`acp_prepare`/`acp_sign`/`sign_turn`), and a server's poster is its own. `TurnChanges` and media read
+  the desktop's disk, so they are off for a server (`folderIsRemote`): a new reader of the agent's folder must stay off for it too.
+  The agent's environment is built on the server, not copied from the desktop.
+  **No write waits on a pipe** (`device-core/src/outbox.rs`): `neore-host` writes its stdout, and the desktop writes
+  ssh's stdin, through one writer thread with a byte-bounded queue. The host's request reader and the app's synchronous
+  napi calls (`host_agent_write`/`_stop`) only queue, a cancel with extra room (`URGENT_HEADROOM`); a connection too far
+  behind for even that is closed, which makes the host stop every agent. Producers (an agent's output, an archive) wait
+  for room instead, holding the agent back. An agent that does not read its stdin is stopped at `INPUT_BUDGET`
+  (8 MiB), not buffered further. Every thread a launch spawns is joined before its request ends (the pumps `poll`, so a
+  `setsid` descendant holding a pipe cannot keep one). Narrowing a server's shared folders drops the approvals outside
+  them in the core (`apply_update`) and the desktop stops those sessions (`reviewApprovals`); removing a server or
+  unpairing ends its sessions FIRST (`ServerAgents.remove`), because the end of each turn is signed with a secret the
+  core deletes right after. The person's variables can never replace `SSH_AUTH_SOCK`.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay
@@ -924,7 +958,12 @@ written here is what is not.
   The size caps and the type list are PROVISIONAL (not measured) — one pair of
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
-  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  Host turns write no usage row and charge no credit.
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+  and a hook can only send a prompt to the already-open session. The watcher drops events
+  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.

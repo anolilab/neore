@@ -72,6 +72,33 @@ afterEach(() => {
 });
 
 describe("a coding-agent command", () => {
+    it("tells the applier which server it is for, and nothing for this computer", async () => {
+        const calls: AppliedCall[] = [];
+        const apply = (_command: AcpCommand, call: AppliedCall): string => {
+            calls.push(call);
+
+            return "accepted";
+        };
+        const forServer = new HostCommands({
+            apply,
+            core: fakeCore({ deviceId: "srv-1", server: "build-box" }),
+            receiptFile,
+        });
+        const forComputer = new HostCommands({
+            apply,
+            core: fakeCore({ deviceId: "desk-1", server: null }),
+            receiptFile: path.join(directory, "other.json"),
+        });
+
+        await forServer.execute(envelopeFor("c-server"), "sig");
+        await forComputer.execute(envelopeFor("c-desk"), "sig");
+
+        expect(calls[0]).toMatchObject({ callId: "c-server", deviceId: "srv-1", server: "build-box" });
+        expect(calls[1]).toMatchObject({ callId: "c-desk" });
+        expect(calls[1]?.deviceId).toBeUndefined();
+        expect(calls[1]?.server).toBeUndefined();
+    });
+
     it("is written to the receipt log before it is acted on, then signed accepted", async () => {
         const seen: string[] = [];
         const commands = make([], {
