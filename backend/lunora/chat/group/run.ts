@@ -39,7 +39,7 @@ import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
 import { getUtilityModel } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
-import type { RunContext } from "../lib/agent-run";
+import type { AwaitingInput, RunContext } from "../lib/agent-run";
 import {
     afterRun,
     AgentRunError,
@@ -234,7 +234,7 @@ const runSpeaker = async (
     turn: TurnContext,
     speaker: GroupParticipantRun,
     position: QueuePosition,
-): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     let mcpClients: MCPClient[] = [];
 
     try {
@@ -432,9 +432,10 @@ const runSpeaker = async (
         };
 
         let paused: boolean;
+        let awaitingInput: AwaitingInput | undefined;
 
         try {
-            ({ paused } = await finishRun(ctx, {
+            ({ awaitingInput, paused } = await finishRun(ctx, {
                 keepOpenUnlessPaused: true,
                 mcpLabels: toolResult.mcpLabels,
                 pending,
@@ -451,7 +452,7 @@ const runSpeaker = async (
 
         await recordRun(firstTokenTime);
 
-        return { lastMessageId: savedIds.at(-1), paused, stopped: false };
+        return { awaitingInput, lastMessageId: savedIds.at(-1), paused, stopped: false };
     } finally {
         await closeMCPClients(mcpClients);
     }
@@ -550,7 +551,7 @@ const runQueue = async (
 
         spoken.push(speaker.skillId);
 
-        const { lastMessageId, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
+        const { awaitingInput, lastMessageId, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
             continueFromMessageId: continueFrom,
             remaining: queue,
             spokenSkillIds: spoken,
@@ -559,7 +560,9 @@ const runQueue = async (
 
         if (paused) {
             // `finishRun` closed the stream; the approval's continuation picks up
-            // this speaker and the rest of `queue` from the snapshot.
+            // this speaker and the rest of `queue` from the snapshot. The thread waits for its owner.
+            await setThreadStatus(ctx, turn.threadId, "active", { awaitingInput });
+
             return;
         }
 
@@ -577,7 +580,7 @@ const runQueue = async (
         text: "",
     });
 
-    await setThreadStatus(ctx, turn.threadId, "active");
+    await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
     await discardRunSecrets(ctx, { streamId: turn.streamId, threadId: turn.threadId });
 
@@ -809,6 +812,12 @@ export const continueGroupAfterToolApproval = async (
 
     // Paused again, or stopped by the user: either way this turn goes no further.
     if (resumed.paused || resumed.stopped) {
+        if (resumed.paused) {
+            await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput });
+        } else {
+            await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
+        }
+
         return;
     }
 

@@ -7,7 +7,7 @@ import { internalMutation, internalQuery } from "../../_generated/server";
 import { vHostState } from "../../acp/validators";
 import { patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
-import { publicThread } from "../../agent/threads";
+import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
 import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
@@ -184,6 +184,14 @@ export const createStreamWithMessage = internalMutation
  * on the chunks, not on this row: no per-token write may land here, or every
  * token re-runs this for every viewer.
  */
+/** What the chat shows of a paused run: who limited it and when it resumes. The job's own arguments stay on the row. */
+const vRunPause = v.object({
+    provider: v.optional(v.string()),
+    reason: v.literal("rate_limit"),
+    retryAt: v.number(),
+    status: v.number(),
+});
+
 export const getActiveStreamForThread = optionalAuthQuery
     .input({
         threadId: v.id("threads"),
@@ -199,6 +207,8 @@ export const getActiveStreamForThread = optionalAuthQuery
                 deliveredSteerIds: v.optional(v.array(v.string())),
                 /** A coding agent's turn only (`acp/`): where the host is with it. */
                 hostState: v.optional(vHostState),
+                /** The run is waiting out a provider's rate limit and resumes by itself at `retryAt` (`lib/rate-limit-pause.ts`). */
+                pause: v.optional(vRunPause),
                 streamId: v.id("persistentStreams"),
             }),
             v.null(),
@@ -233,6 +243,14 @@ export const getActiveStreamForThread = optionalAuthQuery
             streamId: stream._id,
             ...(delivered.length > 0 && { deliveredSteerIds: delivered }),
             ...(stream.hostState !== undefined && { hostState: stream.hostState }),
+            ...(stream.pause && {
+                pause: {
+                    ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
+                    reason: stream.pause.reason,
+                    retryAt: stream.pause.retryAt,
+                    status: stream.pause.status,
+                },
+            }),
         };
     });
 
@@ -257,11 +275,11 @@ export const streamRunThreadHandler = async (ctx: QueryCtx, args: { streamId: Id
     }
 
     if (access.kind === "full") {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     if (access.kind === "locked" && !lockedAfterCreation(access.thread, stream._creationTime)) {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     return null;

@@ -39,10 +39,12 @@ const shortcutIdentity = (value: string): string => {
 
 const keyboardShortcutSchema = z
     .strictObject({
+        askAside: shortcutValueSchema,
         commandPalette: shortcutValueSchema,
         copyLastCodeBlock: shortcutValueSchema,
         decreaseEffort: shortcutValueSchema,
         escape: shortcutValueSchema,
+        findInThread: shortcutValueSchema,
         focusSearch: shortcutValueSchema,
         help: shortcutValueSchema,
         increaseEffort: shortcutValueSchema,
@@ -101,10 +103,12 @@ const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
     const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
+        askAside: t`Ask a Side Question`,
         commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
         decreaseEffort: t`Decrease Reasoning Effort`,
         escape: t`Escape`,
+        findInThread: t`Find in Thread`,
         focusSearch: t`Focus Search`,
         help: t`Help`,
         increaseEffort: t`Increase Reasoning Effort`,
@@ -116,11 +120,13 @@ const KeyboardShortcutsSettings: FC = () => {
     };
 
     const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
+        askAside: t`Open the side-question panel without interrupting a running reply (${defaultShortcut("askAside")})`,
         commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
         copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
         decreaseEffort: t`Lower the composer's reasoning effort by one step. Not bound by default.`,
         escape: t`Close dialogs and menus`,
-        focusSearch: t`Open the thread search and focus it. Leave it unbound to keep the browser's find (${defaultShortcut("focusSearch")})`,
+        findInThread: t`Search the open thread's messages and highlight the matches. Leave it unbound to keep the browser's find (${defaultShortcut("findInThread")})`,
+        focusSearch: t`Open the thread list search and focus it (${defaultShortcut("focusSearch")})`,
         help: t`Show help dialog (${defaultShortcut("help")})`,
         increaseEffort: t`Raise the composer's reasoning effort by one step. Not bound by default.`,
         newChat: t`Start a new chat (${defaultShortcut("newChat")})`,

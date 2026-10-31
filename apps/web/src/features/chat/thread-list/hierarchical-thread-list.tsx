@@ -5,8 +5,6 @@ import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { KeyCombo, Keys, KeySymbol, ShortcutsProvider } from "@neore/ui/components/keyboard-shortcuts";
-import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -15,7 +13,6 @@ import type { FC, ReactNode } from "react";
 import { lazy, memo, startTransition, Suspense, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
-import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import {
     useDeleteProject,
     useMoveThreadToProject,
@@ -45,70 +42,6 @@ const ProjectFormDialog = lazy(() => import("@/features/projects/components/proj
 // ============================================================================
 // Inlined Components (previously separate files)
 // ============================================================================
-
-// KeyboardHelp - Shows keyboard shortcuts overlay
-const keyboardHelpMappings = {
-    "?": { label: "Question Mark", symbols: { default: "?" } },
-    n: { label: "N", symbols: { default: "N" } },
-};
-
-const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, show }) => {
-    const { t } = useLingui();
-    const { keyboardShortcuts } = useKeyboardShortcuts();
-
-    if (!show) {
-        return null;
-    }
-
-    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
-
-    return (
-        <div className="bg-background/95 inset-0 z-50 rounded-lg border p-4 backdrop-blur-sm">
-            <ShortcutsProvider keyMappings={keyboardHelpMappings}>
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">{t`Keyboard Shortcuts`}</h3>
-                        <Button aria-label={t`Close`} className="h-6 w-6 p-0" onClick={onClose} size="icon" variant="ghost">
-                            ×
-                        </Button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 text-xs">
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`New thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "n"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`New temporary thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, Keys.Shift, "n"]} />
-                        </div>
-                        {focusSearchShortcut && (
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">{t`Focus search`}</span>
-                                <kbd className="font-mono">{focusSearchShortcut}</kbd>
-                            </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Navigate threads`}</span>
-                            <KeyCombo keyNames={[Keys.ArrowUp, Keys.ArrowDown]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Open thread`}</span>
-                            <KeySymbol keyName={Keys.Enter} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Show/hide help`}</span>
-                            <KeySymbol keyName="?" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Cancel/escape`}</span>
-                            <KeySymbol keyName={Keys.Escape} />
-                        </div>
-                    </div>
-                </div>
-            </ShortcutsProvider>
-        </div>
-    );
-};
 
 // SelectionToolbar - Toolbar for bulk thread operations
 const SelectionToolbar: FC<{
@@ -456,7 +389,6 @@ const HierarchicalThreadList: FC<
     setLoadingStates,
     setSelectedThreadIds,
     setShowKeyboardHelp,
-    showKeyboardHelp,
     threadRelationships,
     threadSearchResults,
     toggleExpanded,
@@ -1170,12 +1102,53 @@ const HierarchicalThreadList: FC<
         if (!shouldUseVirtualScrolling) {
             // Non-virtualized rendering for small lists
             // Separate project groups from other groups for sorting
+            const topGroups = threadGroups.filter((g) => g.groupType === "needsYou" || g.groupType === "working");
             const projectGroups = threadGroups.filter((g) => g.projectId);
-            const otherGroups = threadGroups.filter((g) => !g.projectId);
+            const otherGroups = threadGroups.filter((g) => !g.projectId && !topGroups.includes(g));
             const projectGroupIds = projectGroups.map((g) => `project-group-${g.projectId}`);
+
+            const renderPlainGroup = (group: ThreadGroup) => {
+                const project = group.projectId ? projectsMap.get(group.projectId) : null;
+                const isProjectGroup = getGroupType(group) === "project" && Boolean(group.projectId);
+
+                return (
+                    <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
+                        <ThreadGroupRenderer
+                            currentThreadId={currentThreadId}
+                            expandedThreads={expandedThreads}
+                            flattenedThreads={flattenedThreads}
+                            getGroupThreadIds={getGroupThreadIds}
+                            group={group}
+                            handleCreateBranch={handleCreateBranch}
+                            handleDeleteProject={handleDeleteProject}
+                            handleDeleteThread={handleDeleteThread}
+                            handleDownloadThread={handleDownloadThread}
+                            handleEditProject={handleEditProject}
+                            handleGroupToggle={handleGroupToggle}
+                            handleMouseEnter={handleMouseEnter}
+                            handlePinProject={handlePinProject}
+                            handlePinThread={handlePinThread}
+                            handleThreadToggle={handleThreadToggle}
+                            handleUnpinThread={handleUnpinThread}
+                            isKeyboardNavigating={isKeyboardNavigating}
+                            isSelectionMode={isSelectionMode}
+                            loadingStates={loadingStates}
+                            projectPinnedAt={project?.pinnedAt}
+                            searchQuery={searchQuery}
+                            selectedThreadIds={selectedThreadIds}
+                            selectedThreadIndex={selectedThreadIndex}
+                            toggleExpanded={toggleExpanded}
+                            toggleGroupCollapsed={toggleGroupCollapsed}
+                            updateThread={updateThread}
+                        />
+                    </ProjectGroupContainer>
+                );
+            };
 
             return (
                 <>
+                    {/* Derived sections sit above everything, Snoozed sits with the others; none of them is a drop target. */}
+                    {topGroups.map((group) => renderPlainGroup(group))}
                     {projectGroups.length > 0 && (
                         <SortableContext items={projectGroupIds} strategy={verticalListSortingStrategy}>
                             {projectGroups.map((group) => {
@@ -1224,44 +1197,7 @@ const HierarchicalThreadList: FC<
                         </SortableContext>
                     )}
 
-                    {/* Other groups (non-project) - uses extracted ThreadGroupRenderer */}
-                    {otherGroups.map((group) => {
-                        const project = group.projectId ? projectsMap.get(group.projectId) : null;
-                        const isProjectGroup = getGroupType(group) === "project" && Boolean(group.projectId);
-
-                        return (
-                            <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
-                                <ThreadGroupRenderer
-                                    currentThreadId={currentThreadId}
-                                    expandedThreads={expandedThreads}
-                                    flattenedThreads={flattenedThreads}
-                                    getGroupThreadIds={getGroupThreadIds}
-                                    group={group}
-                                    handleCreateBranch={handleCreateBranch}
-                                    handleDeleteProject={handleDeleteProject}
-                                    handleDeleteThread={handleDeleteThread}
-                                    handleDownloadThread={handleDownloadThread}
-                                    handleEditProject={handleEditProject}
-                                    handleGroupToggle={handleGroupToggle}
-                                    handleMouseEnter={handleMouseEnter}
-                                    handlePinProject={handlePinProject}
-                                    handlePinThread={handlePinThread}
-                                    handleThreadToggle={handleThreadToggle}
-                                    handleUnpinThread={handleUnpinThread}
-                                    isKeyboardNavigating={isKeyboardNavigating}
-                                    isSelectionMode={isSelectionMode}
-                                    loadingStates={loadingStates}
-                                    projectPinnedAt={project?.pinnedAt}
-                                    searchQuery={searchQuery}
-                                    selectedThreadIds={selectedThreadIds}
-                                    selectedThreadIndex={selectedThreadIndex}
-                                    toggleExpanded={toggleExpanded}
-                                    toggleGroupCollapsed={toggleGroupCollapsed}
-                                    updateThread={updateThread}
-                                />
-                            </ProjectGroupContainer>
-                        );
-                    })}
+                    {otherGroups.map((group) => renderPlainGroup(group))}
                 </>
             );
         }
@@ -1314,7 +1250,6 @@ const HierarchicalThreadList: FC<
                     selectedCount={selectedThreadIds.size}
                 />
             )}
-            <KeyboardHelp onClose={() => setShowKeyboardHelp(false)} show={showKeyboardHelp} />
             <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
                 {renderThreadGroups()}
             </DndContext>

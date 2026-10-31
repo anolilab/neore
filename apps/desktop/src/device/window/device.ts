@@ -7,7 +7,7 @@
  * with textContent only — never as HTML.
  */
 import { describeLink, multiplexingNote } from "../link-status";
-import type { HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
+import type { FileEntry, HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 import { defaultServerTier, networkUnrestricted, serverNeedsAttention, serverSandboxText, tierAvailable } from "./server-network";
 
@@ -34,6 +34,7 @@ const $ = (id: string): HTMLElement => {
 
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
 const state: {
+    countdownTimer?: ReturnType<typeof setInterval>;
     current: Prompt | null;
     expiryTimer?: ReturnType<typeof setInterval>;
     saves: Promise<void>;
@@ -90,9 +91,10 @@ const renderPrompt = (prompt: Prompt | null): void => {
     switch (body.kind) {
         case "hostConnect": {
             setText("prompt-heading", `Connect to ${body.user}@${body.address}?`);
-            const installs = body.installVersion === null
-                ? ""
-                : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
+            const installs
+                = body.installVersion === null
+                    ? ""
+                    : ` Unless the server already has this exact build, Neore also copies its host program (neore-host ${body.installVersion}) into ~/.neore/host there, replacing a different build of that version.`;
 
             setText(
                 "prompt-context",
@@ -170,10 +172,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
         }
         default: {
             setText("prompt-heading", body.host === undefined ? `Allow “${body.tool}”?` : `Allow “${body.tool}” on ${body.host}?`);
-            setText(
-                "prompt-context",
-                body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.",
-            );
+            setText("prompt-context", body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.");
 
             const taints = body.taintedBy.map((source) => TAINT_LABELS[source] ?? source);
 
@@ -407,6 +406,36 @@ const announceLinkChanges = (hosts: HostView[]): void => {
     }
 };
 
+/** The lines of cards that are counting down to a reconnect; the timer runs only while one is on the page. */
+const countdowns = new Map<HTMLElement, HostView>();
+
+const stopCountdown = (): void => {
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = undefined;
+    countdowns.clear();
+};
+
+const whereOf = (host: HostView): string => `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+
+const watchCountdown = (where: HTMLElement, host: HostView): void => {
+    countdowns.set(where, host);
+    state.countdownTimer ??= setInterval(() => {
+        for (const [line, view] of countdowns) {
+            if (line.isConnected) {
+                line.textContent = whereOf(view);
+            } else {
+                countdowns.delete(line);
+            }
+        }
+
+        if (countdowns.size === 0) {
+            stopCountdown();
+        }
+    }, 1000);
+};
+
+window.addEventListener("pagehide", stopCountdown);
+
 const hostCard = (host: HostView): HTMLElement => {
     const card = document.createElement("section");
     const heading = document.createElement("h3");
@@ -425,7 +454,7 @@ const hostCard = (host: HostView): HTMLElement => {
     card.setAttribute("aria-label", host.name);
     heading.textContent = host.name;
     where.className = "muted";
-    where.textContent = `${host.user}@${host.address}:${String(host.port)} — ${describeLink(host, Date.now())}`;
+    where.textContent = whereOf(host);
 
     // A server that is being reconnected can be stopped, or tried at once; one that gave up has a Retry.
     const phase = host.reconnect?.phase;
@@ -434,6 +463,11 @@ const hostCard = (host: HostView): HTMLElement => {
     const stop = (text: string): HTMLElement =>
         button(text, () => hostAction(() => globalThis.neoreDevice.hostDisconnect(host.deviceId), "Disconnected."), host.name);
     const reconnecting = phase === "waiting" || phase === "connecting";
+
+    if (phase === "waiting" && !host.connected) {
+        watchCountdown(where, host);
+    }
+
     let link: HTMLElement[] = [connect("Connect")];
 
     if (host.connected) {
@@ -459,7 +493,9 @@ const hostCard = (host: HostView): HTMLElement => {
     actions.className = "row";
     actions.append(
         ...link,
-        ...state.terminalAvailable && state.terminalServerReason === null ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)] : [],
+        ...state.terminalAvailable && state.terminalServerReason === null
+            ? [button("Terminal", () => hostAction(() => globalThis.neoreDevice.openHostTerminal(host.deviceId), "Terminal opened."), host.name)]
+            : [],
         // Installing is refused while a session is open, so the button is for a disconnected server.
         ...reconnecting || host.connected
             ? []
@@ -467,10 +503,13 @@ const hostCard = (host: HostView): HTMLElement => {
                 button(
                     "Install host software",
                     async () => {
-                        if (await globalThis.neoreDevice.confirm(`Copy neore-host into ~/.neore/host on ${host.address} and remove its other versions there?`)) {
+                        if (
+                            await globalThis.neoreDevice.confirm(`Copy neore-host into ~/.neore/host on ${host.address} and remove its other versions there?`)
+                        ) {
                             await hostAction(
                                 () => globalThis.neoreDevice.hostUpgrade(host.deviceId),
-                                (done) => done.alreadyCurrent ? `neore-host ${done.version} is already installed.` : `neore-host ${done.version} installed.`,
+                                (done) =>
+                                    done.alreadyCurrent ? `neore-host ${done.version} is already installed.` : `neore-host ${done.version} installed.`,
                             );
                         }
                     },
@@ -480,7 +519,11 @@ const hostCard = (host: HostView): HTMLElement => {
         button(
             "Forget host key",
             async () => {
-                if (await globalThis.neoreDevice.confirm(`Forget the pinned key of ${host.address}? The next connection asks to trust whatever key it presents.`)) {
+                if (
+                    await globalThis.neoreDevice.confirm(
+                        `Forget the pinned key of ${host.address}? The next connection asks to trust whatever key it presents.`,
+                    )
+                ) {
                     await hostAction(() => globalThis.neoreDevice.hostForgetKey(host.deviceId), "Key forgotten.");
                 }
             },
@@ -500,9 +543,7 @@ const hostCard = (host: HostView): HTMLElement => {
     folders.replaceChildren(
         ...host.roots.length === 0
             ? [listItem("No shared folders: the agent cannot reach this server until you add one.")]
-            : host.roots.map((root) =>
-                listItem(root, "Remove", () => updateHost(host.deviceId, { roots: host.roots.filter((other) => other !== root) })),
-            ),
+            : host.roots.map((root) => listItem(root, "Remove", () => updateHost(host.deviceId, { roots: host.roots.filter((other) => other !== root) }))),
     );
 
     typed.type = "text";
@@ -525,7 +566,12 @@ const hostCard = (host: HostView): HTMLElement => {
     sandboxBox.type = "checkbox";
     sandboxBox.checked = host.requireShellSandbox;
     sandboxBox.addEventListener("change", async () => {
-        if (!sandboxBox.checked && !await globalThis.neoreDevice.confirm(`Allow shell commands on ${host.name} to run WITHOUT a sandbox where it has none? They would run with full access to that server.`)) {
+        if (
+            !sandboxBox.checked
+            && !await globalThis.neoreDevice.confirm(
+                `Allow shell commands on ${host.name} to run WITHOUT a sandbox where it has none? They would run with full access to that server.`,
+            )
+        ) {
             sandboxBox.checked = true;
 
             return;
@@ -750,6 +796,7 @@ const renderSettings = (): void => {
             : view.allowRules.map((rule) => listItem(rule, "Remove", () => removeRule(rule))),
     );
     setText("audit-path", `Full log: ${view.auditPath}`);
+    renderFilesHosts();
 };
 
 const loadAudit = async (): Promise<void> => {
@@ -780,6 +827,207 @@ const loadTerminalAvailability = async (): Promise<void> => {
 
     state.terminalServerReason = server.available ? null : server.reason;
 };
+
+// ─── Files on a server ──────────────────────────────────────────────────────
+
+/** Where the file tree is: a server and one of its folders, or `null` for the list of its shared folders. */
+const files: { folder: string | null; next: string | null; preview: number; request: number; roots: string } = {
+    folder: null,
+    next: null,
+    preview: 0,
+    request: 0,
+    roots: "",
+};
+
+const filesHost = (): HostView | undefined => state.settings?.hosts.find((host) => host.deviceId === ($("files-host") as HTMLSelectElement).value);
+
+/** The server the tree shows and the folders it shares: what a redraw compares to tell the tree is stale. */
+const filesKey = (): string => JSON.stringify([($("files-host") as HTMLSelectElement).value, filesHost()?.roots ?? []]);
+
+const TRAILING_SLASH = /\/$/u;
+
+const joinPath = (folder: string, name: string): string => `${folder.replace(TRAILING_SLASH, "")}/${name}`;
+
+const renderFilesHosts = (): void => {
+    const select = $("files-host") as HTMLSelectElement;
+    const hosts = (state.settings?.hosts ?? []).filter((host) => host.connected);
+    const kept = select.value;
+
+    select.replaceChildren(
+        ...hosts.map((host) => {
+            const option = document.createElement("option");
+
+            option.value = host.deviceId;
+            option.textContent = host.name;
+
+            return option;
+        }),
+    );
+
+    const current = hosts.find((host) => host.deviceId === kept);
+
+    if (current !== undefined) {
+        select.value = kept;
+    }
+
+    const key = filesKey();
+
+    // A folder opened under shared folders that have since changed may no longer be shared: back to the list.
+    if (current === undefined || key !== files.roots) {
+        showFolder(null);
+    }
+
+    files.roots = key;
+
+    select.disabled = hosts.length === 0;
+    setText("files-path", hosts.length === 0 ? "Connect a server to browse it." : files.folder ?? "Shared folders");
+};
+
+const fileRow = (label: string, onOpen?: () => void): HTMLLIElement => {
+    const item = document.createElement("li");
+
+    if (onOpen === undefined) {
+        item.textContent = label;
+    } else {
+        item.append(button(label, onOpen));
+    }
+
+    return item;
+};
+
+const entryRow = (host: HostView, folder: string, entry: FileEntry): HTMLLIElement => {
+    const path = joinPath(folder, entry.name);
+
+    if (entry.type === "dir") {
+        return fileRow(`${entry.name}/`, () => showFolder(path));
+    }
+
+    if (entry.type === "file") {
+        return fileRow(`${entry.name} (${String(entry.size)} bytes)`, async () => {
+            const preview = $("files-preview");
+
+            files.preview += 1;
+
+            const request = files.preview;
+
+            try {
+                const read = await globalThis.neoreDevice.hostFileRead(host.deviceId, path);
+
+                // A slow read must not land in a folder or server the person has since moved to.
+                if (request !== files.preview || files.folder !== folder || filesHost()?.deviceId !== host.deviceId) {
+                    return;
+                }
+
+                preview.textContent = read.text;
+                preview.hidden = false;
+            } catch (error) {
+                status(String(error));
+            }
+        });
+    }
+
+    // A link or a special file is named and not opened: what it points at is the server's word.
+    return fileRow(`${entry.name} (${entry.type})`);
+};
+
+/** Loads the next page of the current folder, or the first when `reset`. A slower, older answer is dropped. */
+const loadFiles = async (reset: boolean): Promise<void> => {
+    const host = filesHost();
+    const { folder } = files;
+
+    if (host === undefined || folder === null) {
+        return;
+    }
+
+    files.request += 1;
+
+    const { request } = files;
+
+    try {
+        const page = await globalThis.neoreDevice.hostFilesList(host.deviceId, folder, reset ? undefined : files.next ?? undefined);
+
+        if (request !== files.request) {
+            return;
+        }
+
+        const rows = page.entries.map((entry) => entryRow(host, folder, entry));
+
+        if (reset) {
+            setText("files-path", `${page.host}: ${page.path}`);
+            $("files-list").replaceChildren(...rows);
+        } else {
+            $("files-list").append(...rows);
+        }
+
+        files.next = page.next;
+        setHidden("files-more", page.next === null);
+        status(page.truncated ? "This folder is larger than the server reads; the list is cut." : "");
+    } catch (error) {
+        if (request === files.request) {
+            status(String(error));
+
+            // The folder itself is above the shared folders, or gone: back to the list of shared folders. A later
+            // page that failed keeps the list so far, and "Load more" tries it again.
+            if (reset) {
+                showFolder(null);
+            }
+        }
+    }
+};
+
+const showFolder = (folder: string | null): void => {
+    const host = filesHost();
+
+    files.folder = folder;
+    files.next = null;
+    files.request += 1;
+    setHidden("files-preview", true);
+    setHidden("files-more", true);
+    ($("files-up") as HTMLButtonElement).disabled = folder === null;
+    ($("files-download") as HTMLButtonElement).disabled = folder === null;
+
+    if (folder === null) {
+        setText("files-path", host === undefined ? "Connect a server to browse it." : "Shared folders");
+        $("files-list").replaceChildren(...(host?.roots ?? []).map((root) => fileRow(root, () => showFolder(root))));
+
+        return;
+    }
+
+    loadFiles(true);
+};
+
+$("files-host").addEventListener("change", () => {
+    files.roots = filesKey();
+    showFolder(null);
+});
+$("files-more").addEventListener("click", () => loadFiles(false));
+$("files-up").addEventListener("click", () => {
+    const { folder } = files;
+    const slash = folder?.lastIndexOf("/") ?? -1;
+
+    // A shared folder is the top: above it the server would only answer that it is outside them.
+    showFolder(folder === null || slash <= 0 || filesHost()?.roots.includes(folder) === true ? null : folder.slice(0, slash));
+});
+$("files-download").addEventListener("click", async () => {
+    const host = filesHost();
+
+    if (host === undefined || files.folder === null) {
+        return;
+    }
+
+    status("Downloading…");
+
+    try {
+        const done = await globalThis.neoreDevice.hostDownload(host.deviceId, files.folder);
+        const skipped = done !== null && done.skipped > 0 ? ` ${String(done.skipped)} links or special files were left out.` : "";
+        const missing = done !== null && done.unreadable > 0 ? ` ${String(done.unreadable)} files or folders could not be read and are missing.` : "";
+        const left = `${skipped}${missing}`;
+
+        status(done === null ? "" : `Saved ${String(done.files)} files (${String(done.bytes)} bytes) from ${done.host}.${left}`);
+    } catch (error) {
+        status(String(error));
+    }
+});
 
 const loadSettings = async (): Promise<void> => {
     await loadTerminalAvailability();
@@ -939,8 +1187,24 @@ globalThis.neoreDevice.onChanged(async () => {
         .map((input) => [input.id, input.value] as const);
     const active = document.activeElement instanceof HTMLInputElement && document.activeElement.id.startsWith("host-root-") ? document.activeElement : null;
     const focused = active === null ? null : { end: active.selectionEnd, id: active.id, start: active.selectionStart };
+    const pressed
+        = document.activeElement instanceof HTMLButtonElement && document.activeElement.closest("section[aria-label]") !== null ? document.activeElement : null;
+    const pressedKey
+        = pressed === null
+            ? null
+            : { card: pressed.closest("section[aria-label]")?.getAttribute("aria-label"), label: pressed.getAttribute("aria-label") ?? pressed.textContent };
 
     renderSettings();
+
+    if (pressedKey !== null) {
+        const again = [...document.querySelectorAll<HTMLButtonElement>("section[aria-label] button")].find(
+            (candidate) =>
+                candidate.closest("section[aria-label]")?.getAttribute("aria-label") === pressedKey.card
+                && (candidate.getAttribute("aria-label") ?? candidate.textContent) === pressedKey.label,
+        );
+
+        again?.focus();
+    }
 
     for (const [id, value] of values) {
         const input = document.querySelector(`[id="${CSS.escape(id)}"]`);

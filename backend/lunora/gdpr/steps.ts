@@ -124,7 +124,10 @@ const projectMessage = (
  * to names — the ids alone mean nothing to the data subject.
  */
 const projectThread = (
-    thread: Pick<Doc<"threads">, "_creationTime" | "activeLeafMessageId" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & {
+    thread: Pick<
+        Doc<"threads">,
+        "_creationTime" | "activeLeafMessageId" | "category" | "lastViewedAt" | "model" | "snoozedUntil" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"
+    > & {
         _id: string;
     },
     tagNames: ReadonlyMap<string, string>,
@@ -136,7 +139,9 @@ const projectThread = (
         activeLeafMessageId: thread.activeLeafMessageId,
         category: thread.category,
         createdAt: thread._creationTime,
+        lastViewedAt: thread.lastViewedAt,
         model: thread.model,
+        snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
         tags: thread.tags,
         title: thread.title,
@@ -496,6 +501,9 @@ export const generateExportFile = internalAction
         // row that produced it — otherwise a stray object in the bucket is
         // unattributable, which is a poor property for a GDPR artefact.
         requestId: v.id("gdprRequests"),
+        // Review drafts on pull requests (`source-control/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        reviewDrafts: v.optional(v.any()),
         settings: v.any(),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -534,6 +542,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             prompts: args.prompts,
+            reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },

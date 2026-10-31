@@ -5,6 +5,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
+import { regenerateParentOf, syncActiveAgent } from "./agent-switch";
+import { agentSwitchOf } from "./agent-switch-logic";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
 import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
@@ -33,6 +35,44 @@ const MAX_PINNED_PAGE_ROWS = 500;
 
 const parseBranchCursor = (cursor: string | null | undefined): string | undefined =>
     cursor?.startsWith(BRANCH_CURSOR_PREFIX) ? cursor.slice(BRANCH_CURSOR_PREFIX.length) || undefined : undefined;
+
+/**
+ * The replies the switcher offers under `parent` (`null` = the top level): its children, with each agent-switch
+ * divider replaced by what hangs under it. A regenerate after a switch hangs its reply under a divider
+ * (`regenerateParentOf`), and the divider is no alternative to show — the reply under it is. A divider
+ * with nothing under it yet stays in the list.
+ */
+const alternativesUnder = async (context: QueryContext, threadId: Id<"threads">, parent: Doc<"messages"> | null): Promise<Doc<"messages">[]> => {
+    const alternatives: Doc<"messages">[] = [];
+    const children = await childrenOf(context, threadId, parent);
+
+    for (const child of children) {
+        const below = agentSwitchOf(child) ? await alternativesUnder(context, threadId, child) : [];
+
+        alternatives.push(...(below.length > 0 ? below : [child]));
+    }
+
+    return alternatives;
+};
+
+const isPrompt = (row: Doc<"messages">): boolean => (row.message as { role?: string } | undefined)?.role === "user";
+
+/**
+ * The alternatives `row` is one of: those under its nearest ancestor that is not a divider, of the same kind
+ * as `row`. A prompt sent after a switch hangs under the divider too, and it is the next turn, not a version
+ * of a reply regenerated there.
+ */
+const siblingsOf = async (context: QueryContext, threadId: Id<"threads">, row: Doc<"messages">, parent: Doc<"messages"> | null): Promise<Doc<"messages">[]> => {
+    let anchor = parent;
+
+    while (anchor && agentSwitchOf(anchor)) {
+        anchor = await parentOf(context, threadId, anchor);
+    }
+
+    const alternatives = await alternativesUnder(context, threadId, anchor);
+
+    return alternatives.filter((alternative) => isPrompt(alternative) === isPrompt(row));
+};
 
 /**
  * One page of the thread's ACTIVE path, newest first, or `null` for a thread
@@ -89,12 +129,13 @@ export const listActivePathPage = async (
     if (withSiblings) {
         await Promise.all(
             rows.map(async (row, index) => {
-                const siblings = await childrenOf(context, threadId, rows[index + 1] ?? next);
+                const siblings = await siblingsOf(context, threadId, row, rows[index + 1] ?? next);
+                const position = siblings.findIndex((sibling) => sibling._id === row._id);
 
-                if (siblings.length > 1) {
+                if (siblings.length > 1 && position !== -1) {
                     branches.set(row._id, {
                         count: siblings.length,
-                        index: siblings.findIndex((sibling) => sibling._id === row._id),
+                        index: position,
                         siblingIds: siblings.map((sibling) => sibling._id as string),
                     });
                 }
@@ -226,16 +267,30 @@ export const getMaxOrder = internalQuery
 /**
  * Points the thread at `messageId` without descending: a reply generated for
  * it afterwards is its latest child and so lands on the displayed path. Used
- * by regenerate, where the new reply does not exist yet.
+ * by regenerate, where the new reply does not exist yet. A regenerate of the
+ * newest turn that runs on a switched agent (`runModel`) points at a divider
+ * under the prompt instead, so the branch keeps that agent (`regenerateParentOf`).
  */
 export const setActiveLeaf = internalMutation
-    .input({ messageId: v.id("messages"), threadId: v.id("threads") })
+    .input({ messageId: v.id("messages"), runModel: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.patch(args.threadId, { activeLeafMessageId: args.messageId });
+        await setActiveLeafHandler(ctx, args);
 
         return null;
     });
+
+/** `setActiveLeaf`'s body, so the harness can drive it. */
+export const setActiveLeafHandler = async (
+    ctx: MutationContext,
+    args: { messageId: Id<"messages">; runModel?: string; threadId: Id<"threads"> },
+): Promise<void> => {
+    const thread = await ctx.db.get(args.threadId);
+    const leafId = thread ? await regenerateParentOf(ctx, thread, args.messageId, args.runModel) : args.messageId;
+
+    await ctx.db.patch(args.threadId, { activeLeafMessageId: leafId });
+    await syncActiveAgent(ctx, args.threadId, leafId);
+};
 
 /**
  * Saves an edited prompt as a SIBLING of the original — same parent, the
@@ -284,6 +339,7 @@ export const saveEditedSiblingHandler = async (
     const savedId = saved._id as Id<"messages">;
 
     await ctx.db.patch(threadId, { activeLeafMessageId: savedId });
+    await syncActiveAgent(ctx, threadId, savedId);
 
     return savedId;
 };
@@ -424,6 +480,7 @@ export const switchBranch = authMutation
         const leaf = await descendFrom(ctx, args.threadId, target);
 
         await ctx.db.patch(args.threadId, { activeLeafMessageId: leaf._id });
+        await syncActiveAgent(ctx, args.threadId, leaf._id);
 
         ctx.log.event("agent.switch_branch", { leafFound: true, threadId: args.threadId });
 

@@ -261,6 +261,22 @@ written here is what is not.
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
 
+- **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
+  a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
+  headers/body (`services/llm-gateway/src/lib/retry-after.ts`) and sends `rateLimit: { status, retryAt }` beside
+  `fallbackReason` — on the 502 body, an in-band error part and a mid-read throw — only while the step has produced nothing
+  visible; the backend decides on that field alone, never on message text, and a bare 429 with no field still fails. The
+  stream stays `pending|streaming` with `persistentStreams.pause` set (so stop, the live query and the expiry sweep need no
+  new status; `expiresAt` moves past `retryAt`), the rejected step's empty placeholder row is deleted, and the resume is the
+  SAME `runStreamingAgent` job re-enqueued with `resume: <pause id>` at `retryAt` (the pause stores the job's input).
+  `claimRunResume` claims by pause id, so a redelivery, "Retry now" (`chat/rate-limit-retry.ts`, which queues the same
+  resume for now) and a stale delayed job all no-op after the first; the resume streams from the last row the run saved
+  (`pause.from`), not from the user message — `failPendingSteps` plus a user-message prompt would make a mid-run resume a
+  sibling reply. Caps: a pause ≤ 10 min, one per step (keyed on `from`), 3 per run; past them, or with a delivered steer, or
+  stateless, or in a group turn / approval continuation, the run fails as before. Nothing waits in an action or a queue
+  invocation. The AI SDK never retries these (`GatewayLanguageModel` throws a plain `Error`, not an `APICallError`), so the
+  pause is the only retry. The countdown in the chat is `aria-hidden`; a polite status region speaks every 30 s.
+
 - **Video render queue** — `POST /v1/videos` enqueues and returns 202; the
   Worker's `queue()` handler consumes it. **Cross-config invariant:**
   `VIDEO_RENDER_MAX_ATTEMPTS = 3` in the consumer MUST equal `maxRetries: 2`
@@ -399,10 +415,48 @@ written here is what is not.
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
   via `chargeRound` only when there is something to report.
 
+- **Develop review** (`backend/lunora/source-control/`, plans/develop-mode.md) — the draft is the
+  `reviewDrafts` row, server-side so a reload or second device sees it. `submitReview` claims it
+  first (`submittingAt`, a 60 s lease; edits are refused meanwhile), posts ONE host call, and
+  clears the draft only on a confirmed review (`submit-review.ts` fixes the order). The claim
+  returns its `submittingAt` as a lease token: finish and release act only while the row still
+  holds it, and a finish that fails after the host accepted is still `ok`. A 401 on a write gets
+  one token renewal and one retry (the host did nothing); no other write is repeated. A refusal
+  keeps it (`rejected`, the host's reason is untrusted text); an answer that never came is
+  `unconfirmed` — the host may hold the review, so the UI says to look there before resubmitting.
+  Comment lines mean something only on the commit the reviewer saw, so a draft with comments
+  refuses edits on a newer head (`head_moved`). A reply and a resolve are written at once (the
+  review call has no place for a reply). Viewed marks are the host's, read and written through
+  GraphQL; a write is never redirected or replayed by the requester.
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
-  `/triggers/webhook/{triggerId}`), event (not built). Execution uses headless
+  `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
   trigger metadata.
+  **Event triggers** (`triggers/events.ts`, sources in `triggers/event-sources/`) are a `triggers` row with
+  `eventSource` (the condition: page, time or thread) and `eventState` (the baseline); `nextTriggerAt` is the
+  NEXT CHECK, so the shard tick finds a watcher exactly as it finds a schedule. `dispatchDueEventTriggers`
+  (tick, and `shardSweeps()` as backstop) leases a due watcher (moves `nextTriggerAt` out by 5 min) and
+  schedules `runEventCheck`, an action because a page and a shared thread are outbound calls; no model is
+  involved. The lease stamps `eventState.leasedAt`, which `recordEventCheck` clears: a watcher found due with the
+  stamp still set had a check that never reported (it died, e.g. on the CPU limit), and that counts as a failed check
+  the owner can fix — the third in a row pauses it (`failCheck`, shared with reported failures). `recordEventCheck`
+  claims the occurrence (`claimOnce` on trigger + the source's fire key, TTL below the 5-min minimum interval) and
+  does NOT enqueue: it records `eventState.pendingRun` and schedules `startEventRun`, which sends `executeTrigger`
+  (`once`, job id from the firing) to the jobs queue and settles with `settleEventRun`. A refused send is retried
+  with a doubling wait and, after `EVENT_RUN_MAX_ATTEMPTS`, given up (owner told). One firing waits at a time: an
+  occurrence that fires while an earlier one is still pending is folded into it (`pendingRun.coalesced`) unless that
+  one is past `EVENT_PENDING_RUN_HORIZON_MS`, when it is presumed dead and replaced. A one-shot (`time`) moment is
+  switched OFF (`enabled: false`) once its own firing is consumed — `switchOffFiredMoment` when its run settles or is
+  skipped as filtered, `switchOffConsumedMoment` when the run could not start or its queued delivery lapsed
+  (the `onLapse` of `queueEventRun`), `settleEventRun` when the send is given up — each only for its own
+  firing, so a manual run or an earlier arming cannot disarm it; `nextTriggerAt` is cleared on firing
+  so it is not dispatched again meanwhile. Check failures
+  use their own counter (`eventState.checkFailures`, same `advanceStreak` rule), not the run `failureStreak`.
+  A page is fetched only through the SSRF-guarded `fetchWithTimeout` (redirects followed by hand, each hop
+  re-checked), compared as visible text (never raw HTML), and its selector is a small subset (`page-extract.ts`:
+  there is no DOM parser in the Worker; it is ONE forward pass, because a hostile page of unclosed tags made the
+  earlier regex scan quadratic). A thread on another user's shard is scanned with `callOnShard` and access
+  is re-read on every check. The excerpt reaches the run as `<event-data>` data, never as instructions.
 
 - **Evals** (`backend/lunora/evals/`, `/evals`) — datasets of cases run against
   a skill, a model + system prompt, or knowledge retrieval, one case at a time
@@ -426,6 +480,21 @@ written here is what is not.
   (`BUILTIN_TOOLS_NEEDING_A_PERSON`). Its constants live in
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
+
+- **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
+  READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
+  nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the
+  thread, falling back to the utility model for a non-text model or a plan that lapsed. A thread on a
+  custom endpoint the caller cannot reach (deleted, a collaborator's account, `local-browser`, a malformed
+  id) is refused, never rerouted to a hosted model; a host-run thread sends the QUESTION ALONE (its
+  messages never reach a cloud model, as with follow-up suggestions). Billed like translate
+  (`chargeDailyLimit` "Text" right before the model call, gateway meters it); an aside on the thread's own
+  model is also recorded with `scheduleReplyUsage` under `aside:<entryId>`, a utility-model or host-run one
+  is not, and the usage backfill skips the added "Side question" row. The answer arrives whole: an action returns
+  once and an HTTP action has no service binding, so token streaming needs a chunk table. "Add to
+  thread" (`addAsideToThread`) writes ONE assistant row (`agentName` "Side question") and is refused
+  while a reply runs, because a row landing after the run's pending row would split the reply across
+  branches. `parseCustomModelId` returns `null`, not `undefined`, for a non-custom id.
 
 - **Sub-agents** (`sub-agents/`) — `delegateToSubAgent` admits a
   `subAgentRuns` row (owner of the parent thread only; depth ≤ 2 counted via
@@ -576,6 +645,24 @@ written here is what is not.
   continuation takes an `order` past EVERY row (`continuationOrder`), not
   `prompt + 1`, which a sibling branch may already hold.
 
+- **Agent switch** (`agent/agent-switch*.ts`, `chat/agent-switch.ts`, plans/harness-switch.md) —
+  switching a text thread's model leaves one `system` row with no text whose payload
+  (`providerMetadata.neoreAgentSwitch`) models never see (`docsToModelMessages` drops it) and the
+  transcript renders as a divider (`data-agentSwitch` part). The agent of a turn is the `to` of the
+  LAST such row on the path it continues, else `threads.model` — which therefore stays the
+  CREATION model: the picker no longer patches it for a text thread (`canSwitchAgent`), or an
+  older branch would change agent retroactively. `threads.activeAgent` caches the active path's
+  agent AND is the "was ever switched" flag: unset, a send keeps its own model and no path is
+  walked. Every writer of `activeLeafMessageId` that can change the path calls `syncActiveAgent`
+  with the row the path now ENDS at (a regenerate's prompt, not its descended leaf — a switch
+  below the prompt is not on its path). A switched thread runs on the derived agent whatever model
+  the send names (`getRunAgentModel`, in `/chat/start` and `/chat/edit`); a send naming a custom
+  endpoint keeps it. A switch needs a write grant, is refused while a stream is pending or
+  streaming, and routing never touches it: a run names its model and `/internal/model/proxy` runs
+  exactly that one (`model: "auto"` and `/internal/route` are for other callers). The cost-notice
+  threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
+  downgrade policy.
+
 - **Spreadsheets / design canvas** — `"sheet"` artifacts store CSV in
   `documents.content` (Univer editor, code-split XLSX convert). `"design"`
   artifacts store Fabric.js JSON in `contentJson` and a PNG data URL preview in
@@ -705,6 +792,12 @@ written here is what is not.
   (`Root::dir`) because the sshd tests run as the developer: they must never touch the real `~/.neore`. Release binaries
   are built `--no-default-features`; a plain `cargo build` of `neore-host` links the keyring. `host_upgrade` is a
   LOCAL-window channel only and refuses while any session is open to the target.
+  **Registry installs** (`apps/desktop/src/acp/{registry,install}.ts`, `device-core/src/acp_install.rs`):
+  the desktop reads the ACP registry (`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`) only when
+  the local window searches. A `binary` download is installable only with a published `sha256`, which the schema
+  makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
+  version; the main process takes archive, checksum and command from its own snapshot and words the native
+  consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
   **Server lifecycle** (`lifecycle.rs`, `engine/reconnect.rs`, `launch.rs`): a server the person connected is KEPT
   connected until they disconnect it. A 1 s tick (`DeviceState::supervise`, a `Weak` thread started by the napi
   constructor) sees a dead link, closes that session FIRST and `-O exit`s its master only when ssh gave the connection
@@ -724,6 +817,18 @@ written here is what is not.
   `SSH_AUTH_SOCK` from `<run>/agent-<desktop tag>.sock` and its children inherit that path. `ssh::MULTIPLEXING` is a fixed
   `false` on Windows (one ssh process per server, said in the window), not a measurement; the CI step
   `Measure ssh ControlMaster (Windows)` records whether Win32 OpenSSH could multiplex and fails when it cannot say.
+  **Files on a server** (protocol 3): `list` (one folder, name-sorted, a page at a time with an `after` cursor), `tar` and
+  `cancel` are host ops of the stdio pipe, reached from the LOCAL window only (`host_files_list` / `host_file_read` /
+  `host_download`; no signed call, no prompt, the person is the one asking) and never by the agent, so none of it enters
+  `taintedBy`. `tar` is hand-written ustar (`archive.rs`) walked by `openat` + `O_NOFOLLOW` from the folder's descriptor, the
+  same confinement as `fs_list`: symlinks (inside or out), hard-linked files (`st_nlink > 1`: another name may be outside), FIFOs
+  and devices are LEFT OUT, not followed and not archived,
+  and the desktop never unpacks the file it saves — the host's word is not trusted to name paths or plant links. Chunks are
+  raw frames (`frame.rs` `CHUNK_TAG`), not JSON, followed by the ordinary response. The reader of the connection NEVER waits
+  for the disk (it carries every other request's answer): chunks queue by bytes, and a writer more than 64 MiB behind
+  ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
+  process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
+  in `tests/ssh_host.rs` with the numbers it was set from.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay
@@ -752,6 +857,31 @@ written here is what is not.
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
+- **Mobile offline cache** (`apps/mobile/src/offline/`, plans/mobile-acp-and-remote-control.md §3.5) — read-only
+  `expo-sqlite` copy of the thread list, the last 50 messages of the 20 newest threads, and host/worker status. Every
+  row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
+  copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
+  delete either). There is deliberately no outbox table: offline, `write-gate.ts` disables the composer, send,
+  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(`/`.action(` call
+  in the app must pass `onlineOnly: true`, or the client queues it and replays it on reconnect (`reconnect.test.ts`
+  scans for it). The cache is bound to one account (`bindOwner`; a different id empties it) and `clear()` runs on
+  sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
+  server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
+  and a chat the server refuses (`FORBIDDEN`/`NOT_FOUND`/`THREAD_LOCKED`, not a lapsed sign-in) is forgotten with its
+  statuses and cleared from the screen (`message-read.ts`). A cold start with no network signs the stored user in
+  without a JWT (`auth-context.tsx`) so the saved chats can open; that state counts as offline.
+  **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
+  screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
+  a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
+  prunes. **Writes:** `canWrite` stays false after the network reports back until a request has answered, so the
+  controls are off during the transition. Reachability is `isConnected` only (Android's `isInternetReachable` reads
+  false until its probe ends) and a successful request overrides a no-network hint. Only fetch's own errors and the
+  client's transport errors/timeouts are network failures (`isNetworkFailure`); other `TypeError`s are bugs. **The file
+  lives in the cache directory** (`database-path.ts`), not expo-sqlite's default folder, which iOS backs up to iCloud;
+  Android Auto Backup never copies the cache directory, so no backup rule is needed (the secure-store plugin owns the
+  app's backup rules). `PRAGMA user_version` (`SCHEMA_VERSION` in `cache.ts`) drops and recreates the tables on a
+  mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
+
 - **Host-run threads** (`backend/lunora/acp/`, `apps/desktop/src/acp/`,
   plans/acp-agent-host.md) — a coding agent runs on a paired computer and the
   thread is `threads.runner = "host"` (`acp/lib/host-thread.ts`; deliberately
@@ -774,10 +904,55 @@ written here is what is not.
   `applyHostEvents`, not by shard isolation. A host stream ends through
   `endHostStream` from every path (the host's `turn_end`, the reaper, a revoked
   device, Stop), which sets the status and `hostState: ended` in one write.
-  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  **Files a host reply shows** (plans/acp-agent-host.md §4.8): only a Markdown
+  IMAGE in the reply (`![](path)`, never a plain link) is looked at, at the end
+  of the turn, by the desktop main process. Rust (`DeviceCore.acpReadMedia`,
+  `fs::read_media`) resolves it against the approved folder alone and opens it
+  through the same confined walk as `fs_read`; a path out of the folder (`..`,
+  absolute, a link out) is refused by the canonicalisation BEFORE any open (the
+  test makes the outside files mode 000 to prove it). Type is the file's bytes
+  AND its extension agreeing, from a short list with no SVG/HTML/script. The
+  upload goes over TUS to `/hosts/uploads` (`acp/upload-http.ts`), each request
+  signed in Rust under the `upload` domain (`DeviceCore.signUpload`); the
+  ingest's `media` event carries only the upload id, which the INGEST ACTION
+  finalizes for the device's owner (`acp/upload.ts#finalizeHostUpload`) and
+  stores as `storageKey`/`fileId` itself — a device-sent key is dropped. A
+  finalize failure never fails the post (the desktop would stop posting the
+  turn); the file is noted as not attached. A finalize deletes the staged
+  upload, so its result is remembered per (owner, upload id) in `actionCache`
+  and a resend of a post whose answer was lost reuses it (one file row); the
+  device's `hosts/ingest` budget is spent BEFORE the finalize
+  (`spendHostBudget`, then `applyHostEvents({ budgetSpent })`) so a post that
+  would answer 429 never uses an upload up. Device creates have their own
+  limit, `hosts/uploads/create`. The core judges a reference's TEXT first
+  (`fs::lexically_inside`, no backslash or drive forms in
+  `media::is_plain_path`) so agent text cannot make the system resolve a
+  network or automounted path. Content-addressed storage makes a
+  later edit of the file leave an earlier message alone. The reply's text parts
+  carry `providerMetadata.neore.runner = "host"`, which makes the reader skip
+  Markdown images (`hostMarkdownComponents`): a remote one would be fetched.
+  The size caps and the type list are PROVISIONAL (not measured) — one pair of
+  constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
+  equal by `media-limits.test.ts`.
+  Host turns write no usage row and charge no credit.
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+  and a hook can only send a prompt to the already-open session. The watcher drops events
+  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.
+
+- **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, plans/acp-agent-host.md) —
+  the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
+  computer's Rust core refuses an `acp_start` for a pair the user did not approve in its local window, whatever the
+  signature. These calls spend NO nonce: a claim is a 30 s lease (`acp/calls.ts` returns a lapsed one to `pending`),
+  the same envelope comes back, and the main process's receipt log (`acp/commands.ts`, keyed by the signed call id,
+  written BEFORE the command is acted on) makes the second delivery an acknowledgement. The page's relay retries a
+  failed claim or completion until the call's deadline, whatever the error. A call's prompt is cleared from `input` and
+  `envelope` on every terminal path (`ACP_CLEARED`). Any new way a call can end must go through `onAcpCallEnded`, or its
+  turn stays "Sending". `acp_cancel` has its own open-call budget and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`plans/acp-s4-throttling.md`).
 
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
@@ -1265,6 +1440,12 @@ can outlast a `timeout`, and `timeout … tsc | grep -c "error TS"` then prints
 `0` for a run that was killed before reporting anything — several "clean"
 reports were exactly that. Run it to completion (`pnpm lint:types`) and read
 `$?`.
+
+**A call in `.input()` registers an EMPTY argument shape.** `v.object(partial(pick(...)))`
+or `v.object(someConst)` generated `patch: {  }`, and the runtime silently stripped every key
+(thread status stuck on `running`, dropped title and project patches). Harness tests validate
+with the SOURCE validators and stay green; `lib/argument-shapes.guard.test.ts` reads
+`_generated/{api,internal}.ts` and is the catch. Spell the patch as a literal (`vThreadPatchFields`).
 
 **Declare `.output()` on every procedure.** It is authoritative — a declared
 `.output()` shapes the generated type. A procedure without one falls back to

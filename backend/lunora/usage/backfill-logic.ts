@@ -13,8 +13,10 @@
  *   `agent/branch-tree.ts`; a run's later rows never carry one);
  * - where the group-chat speaker changes — each speaker is a run of its own.
  */
+import { agentSwitchOf } from "../agent/agent-switch-logic";
 import type { StepUsage } from "../agent/message-cost";
 import type { RollupIncrement } from "./activity-logic";
+import { ASIDE_AGENT_NAME } from "../chat/lib/aside";
 import { DEFAULT_SKILL_KEY, summariseReply, usageDayOf } from "./activity-logic";
 
 /** The fields of a stored `messages` row the backfill reads. */
@@ -51,6 +53,17 @@ export const groupReplies = (rows: ReadonlyArray<BackfillRow>): ReplyGroup[] => 
         if (isUserRow(row)) {
             current = undefined;
             prompt = row;
+            continue;
+        }
+
+        // "Add to thread" posts a side question's answer as a row of its own; the question was recorded live, and the row carries no usage.
+        if (row.agentName === ASIDE_AGENT_NAME) {
+            continue;
+        }
+
+        // A switch divider is no reply: the live path never records one.
+        if (agentSwitchOf(row) !== undefined) {
+            current = undefined;
             continue;
         }
 

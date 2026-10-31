@@ -32,6 +32,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import { CinemaPanel } from "@/features/chat/components/cinema-studio";
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -50,6 +51,7 @@ import type {
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
+import HostComposer from "@/features/chat/host/host-composer";
 import PromptImprovementPanel from "@/features/chat/prompt-improvement/components/prompt-improvement-panel";
 import ConnectionBanner from "@/features/connection/components/connection-banner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -576,16 +578,10 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
         }
     }, [isSSEStreaming, isSubmitting]);
 
-    // A coding agent's thread runs on the user's computer; the server refuses a send from here (409 HOST_RUN_THREAD),
-    // so say so instead of letting the first send fail. Remote send lands with the next slice of plans/acp-agent-host.md.
+    // A coding agent's thread runs on the user's computer: its messages go to that computer (`host/host-composer.tsx`),
+    // never to a cloud model.
     if (thread?.runner === "host") {
-        return (
-            <div className={cn("relative w-full", className)}>
-                <p className="text-muted-foreground bg-muted rounded-lg px-4 py-3 text-center text-sm" role="status">
-                    {t`This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet.`}
-                </p>
-            </div>
-        );
+        return <HostComposer className={className} threadId={thread._id} />;
     }
 
     const renderModeSettings = () => {
@@ -780,6 +776,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             <div className="grow" />
+                            {composerMode === "text" && validThreadId && !minimal && <ComposerAskAside />}
                             <ComposerContextCount />
                             <ComposerLanguageSelector />
                         </>

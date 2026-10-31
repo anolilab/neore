@@ -36,6 +36,7 @@ import getAgent from "./get-agent";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
+import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
     isStreamWriteRefused,
@@ -59,8 +60,6 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import { repliesByOrder, replyUsageArgs } from "../../usage/activity-logic";
-import { scheduleReplyUsage } from "../../usage/schedule";
 import type { DispatchOrigin } from "../../sub-agents/logic";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
@@ -637,12 +636,12 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
     // One record per reply: a steered run saved two (`repliesByOrder`).
-    for (const reply of repliesByOrder(savedMessages)) {
-        scheduleReplyUsage(
-            ctx.scheduler as never,
-            replyUsageArgs(reply, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
-        );
-    }
+    scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
+        at: Date.now(),
+        userId,
+        ...(args.skill && { skill: args.skill }),
+        ...(args.timeZone && { timeZone: args.timeZone }),
+    });
 
     if (!args.extractMemory || !prompt) {
         return await Promise.allSettled(scheduled);
@@ -821,7 +820,7 @@ export const finishRun = async (
         unsaved?: StreamText;
         userId: string;
     },
-): Promise<{ paused: boolean }> => {
+): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean }> => {
     const { keepOpenUnlessPaused, mcpLabels, pending, savedMessages, snapshot, streamId, threadId, unsaved = { reasoning: "", text: "" }, userId } = args;
     const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels) ? [m._id] : []));
 
@@ -830,9 +829,9 @@ export const finishRun = async (
     }
 
     const approvalIds = collectApprovalRequestIds(savedMessages);
+    const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
 
     if (approvalIds.length > 0) {
-        const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
         const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
 
         await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
@@ -865,7 +864,17 @@ export const finishRun = async (
         await discardRunSecrets(ctx, { streamId, threadId });
     }
 
-    return { paused };
+    // A question when every pending call waits on the person's own input (askUser, or a secret card); any other tool
+    // in the set is an approval.
+    let awaitingInput: AwaitingInput | undefined;
+
+    if (paused) {
+        const secretPending = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME).length;
+
+        awaitingInput = askUserApprovalIds.length + secretPending === approvalIds.length ? "question" : "approval";
+    }
+
+    return { awaitingInput, paused };
 };
 
 /**
@@ -978,7 +987,7 @@ export const resumeApprovedRun = async (
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
     } = {},
-): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
@@ -1168,9 +1177,10 @@ export const resumeApprovedRun = async (
         }
 
         let paused: boolean;
+        let awaitingInput: AwaitingInput | undefined;
 
         try {
-            ({ paused } = await finishRun(ctx, {
+            ({ awaitingInput, paused } = await finishRun(ctx, {
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
@@ -1187,15 +1197,40 @@ export const resumeApprovedRun = async (
 
         await recordRun(true);
 
-        return { lastMessageId: messageIds.at(-1), paused, stopped: false };
+        return { awaitingInput, lastMessageId: messageIds.at(-1), paused, stopped: false };
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }
 };
 
-export const setThreadStatus = async (ctx: Pick<ActionCtx, "runMutation">, threadId: string, status: "active" | "error"): Promise<void> => {
+/** What the owner is being asked for when a run pauses. */
+export type AwaitingInput = "approval" | "question";
+
+/**
+ * How a run left the thread, written in the SAME patch as its status (the thread list is a live query, so a second
+ * write would re-run it): `awaitingInput` when it paused for the owner, `replied` when it finished successfully.
+ * Going back to `running` removes `awaitingInput` (`agent/table-writes.ts#patchThread`, `updateThread`).
+ */
+export interface RunOutcome {
+    awaitingInput?: AwaitingInput;
+    replied?: boolean;
+}
+
+export const setThreadStatus = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    threadId: string,
+    status: "active" | "error",
+    outcome: RunOutcome = {},
+): Promise<void> => {
+    const now = Date.now();
+
     await ctx.runMutation(internal.agent.threads.updateThread, {
-        patch: { status, updatedAt: Date.now() },
+        patch: {
+            status,
+            updatedAt: now,
+            ...(outcome.awaitingInput !== undefined && { awaitingInput: outcome.awaitingInput }),
+            ...(outcome.replied === true && outcome.awaitingInput === undefined && { lastReplyAt: now }),
+        },
         threadId: threadId as Id<"threads">,
     });
 };
@@ -1238,6 +1273,13 @@ export const failRun = async (
                 });
             }
         }
+    }
+
+    // A stopped run that fails here never saves the text it owed, so its stop is over (`settleStoppedRun`).
+    if (endedElsewhere) {
+        await ctx
+            .runMutation(internal.chat.streaming.persistent.library.settleStoppedRun, { streamId: streamId as Id<"persistentStreams"> })
+            .catch(() => undefined);
     }
 
     // A goal that replaced this run's own owns the thread: its status is not this run's to set.

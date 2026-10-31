@@ -4,10 +4,12 @@
  * relay, who may call the local window's commands, where events go, and what
  * happens to a prompt when its window closes.
  */
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SshTerminal } from "../terminal/index";
 import { isTrustedUrl } from "../trust.js";
@@ -32,6 +34,8 @@ const fake = vi.hoisted(() => {
         coreThrows: false,
         handlers: new Map<string, (...args: unknown[]) => unknown>(),
         notifications: [] as { body?: string; title: string }[],
+        /** `app.getPath("userData")`: a real folder, since coding-agent commands write their receipts there. */
+        userData: "",
         windows: [] as { close: () => void; webContents: WebContents }[],
     };
 });
@@ -84,14 +88,20 @@ vi.mock("electron", () => {
 
     return {
         app: {
-            getPath: () => "/user-data",
+            getPath: () => fake.userData,
             getVersion: () => "1.2.3",
             on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
         },
         BrowserWindow,
         dialog: {
+            showMessageBox: vi.fn(async (..._args: unknown[]) => {
+                return { checkboxChecked: false, response: 1 };
+            }),
             showOpenDialog: vi.fn(async () => {
                 return { canceled: false, filePaths: ["/shared/picked"] };
+            }),
+            showSaveDialog: vi.fn(async (..._args: unknown[]) => {
+                return { canceled: false, filePath: "/home/me/Downloads/app.tar" };
             }),
         },
         ipcMain: {
@@ -125,11 +135,17 @@ vi.mock("../acp/process", () => {
     return { acpSupported: true, spawnAgent };
 });
 
+const registryFetch = vi.hoisted(() => vi.fn());
+
 const { registerDeviceIpc } = await import("./index");
+const { dialog } = await import("electron");
+const { REGISTRY_FIXTURE, SHA } = await import("../acp/fixtures/registry");
+const { REGISTRY_URL } = await import("../acp/registry");
 const { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } = await import("./channels");
 
 const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
+    fetch: registryFetch as unknown as typeof fetch,
     isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, event.senderFrame?.url),
 };
 
@@ -190,22 +206,44 @@ const invoke = (channel: string, event: IpcEvent, ...args: unknown[]): unknown =
 
 const makeCore = () => {
     return {
+        acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+        acpInstallPrune: vi.fn(),
+        acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),
         acpPermissionAnswerBatch: vi.fn(() => 2),
+        acpPermissionAnswerRemote: vi.fn(),
         acpPermissionAsk: vi.fn(async () => "{\"outcome\":\"cancelled\"}"),
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
+        acpPrepare: vi.fn((): string =>
+            JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" }),
+        ),
+        acpReadMedia: vi.fn(async () => {
+            return { kind: "", mime: "", name: "", size: 0, status: "refused" };
+        }),
+        acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
+            JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
+        ),
         acpSpawnPlan: vi.fn((): string => {
             throw new Error("that folder is not allowed");
         }),
         acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
-        acpView: vi.fn(() => JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], key: "alpha", label: "Alpha" }], envNames: [] })),
+        acpView: vi.fn(() =>
+            JSON.stringify({ agents: [{ args: [], command: "agent", envNames: [], install: null, key: "alpha", label: "Alpha" }], envNames: [] }),
+        ),
         auditTail: vi.fn(() => ["{}"]),
         denyPrompts: vi.fn(),
         execute: vi.fn(async () => JSON.stringify({ payload: "{}", signature: "s" })),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),
+        hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) =>
+            JSON.stringify({ bytes: 5, files: 1, folders: 1, host: "build-box", skipped: 0 }),
+        ),
+        hostFileRead: vi.fn(async (_deviceId: string, _path: string) => JSON.stringify({ host: "build-box", path: "a.txt", text: "hi", truncated: false })),
+        hostFilesList: vi.fn(async (_deviceId: string, _path: string, _after?: string) =>
+            JSON.stringify({ entries: [], host: "build-box", next: null, path: "/srv/app", truncated: false }),
+        ),
         hostForgetKey: vi.fn(),
         hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
@@ -221,6 +259,7 @@ const makeCore = () => {
         reapIdleServers: vi.fn(),
         settingsGet: vi.fn(() => JSON.stringify({ paired: false, roots: [] })),
         settingsUpdate: vi.fn(() => JSON.stringify({ paired: false, roots: ["/x"] })),
+        signTurn: vi.fn((payload: string) => `sig:${String(payload.length)}`),
         status: vi.fn(() => JSON.stringify({ accountLabel: null, deviceId: null, platform: "macos" })),
         stop: vi.fn(),
     };
@@ -229,6 +268,7 @@ const makeCore = () => {
 let core: ReturnType<typeof makeCore>;
 
 beforeEach(() => {
+    fake.userData = mkdtempSync(path.join(tmpdir(), "neore-device-index-"));
     fake.handlers.clear();
     fake.windows.length = 0;
     fake.notifications.length = 0;
@@ -240,6 +280,13 @@ beforeEach(() => {
     siteContents = siteWebContents("https://neore.example/chat");
     registerDeviceIpc(options);
 });
+
+afterEach(() => {
+    rmSync(fake.userData, { force: true, recursive: true });
+});
+
+const ACP_ENVELOPE = JSON.stringify({ callId: "c1", tool: "acp_permission_answer" });
+const ACP_SIGNATURE = "a".repeat(64);
 
 describe("relay channels (the site window)", () => {
     it("refuse every sender but the site", () => {
@@ -258,6 +305,46 @@ describe("relay channels (the site window)", () => {
 
         expect(core.execute).toHaveBeenCalledWith("{}", "a".repeat(64));
         expect(result).toEqual({ payload: "{}", signature: "s" });
+    });
+
+    it("route a coding-agent command to its own steps, never to the tool runner", async () => {
+        const result = await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.execute).not.toHaveBeenCalled();
+        expect(core.acpPrepare).toHaveBeenCalledWith(ACP_ENVELOPE, ACP_SIGNATURE);
+        // The core would not allow it: nothing is acted on, and the refusal is what gets signed.
+        expect(core.acpSign).toHaveBeenCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "not approved on this computer");
+        expect(result).toEqual({ payload: JSON.stringify({ outcome: "not approved on this computer" }), signature: "signed" });
+    });
+
+    it("answer a coding-agent request from the web through the core, and report a request that is gone", async () => {
+        const command = { kind: "permissionAnswer", optionId: "allow", requestId: "r1", sessionId: "s1" };
+
+        core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c2", command, expiresAt: Date.now() + 60_000, refusal: null }));
+
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.acpPermissionAnswerRemote).toHaveBeenCalledWith("s1", "r1", "allow");
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
+
+        // Another delivery of the same call is acknowledged, not answered twice.
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+        expect(core.acpPermissionAnswerRemote).toHaveBeenCalledTimes(1);
+
+        core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c3", command, expiresAt: Date.now() + 60_000, refusal: null }));
+        core.acpPermissionAnswerRemote.mockImplementation(() => {
+            throw new Error("already_answered");
+        });
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "already_answered");
+    });
+
+    it("close the device window's prompt list when a remote answer takes a request", () => {
+        fake.coreEmit?.(JSON.stringify({ agent: "Claude", tool: "Run tests", type: "acpPermission" }));
+        deviceWindow().webContents.send.mockClear();
+        fake.coreEmit?.(JSON.stringify({ type: "acpPermissionsChanged" }));
+
+        expect(deviceWindow().webContents.send).toHaveBeenCalledWith(LOCAL_EVENT.acp, undefined);
     });
 
     it("pass the pairing through and reject a malformed one before the core", async () => {
@@ -329,7 +416,13 @@ describe("servers over SSH", () => {
     });
 
     it("keep removing a server and forgetting its key out of the page's reach", () => {
-        for (const channel of [LOCAL_CHANNEL.hostRemove, LOCAL_CHANNEL.hostForgetKey, LOCAL_CHANNEL.hostConnect, LOCAL_CHANNEL.hostDisconnect, LOCAL_CHANNEL.hostUpgrade]) {
+        for (const channel of [
+            LOCAL_CHANNEL.hostRemove,
+            LOCAL_CHANNEL.hostForgetKey,
+            LOCAL_CHANNEL.hostConnect,
+            LOCAL_CHANNEL.hostDisconnect,
+            LOCAL_CHANNEL.hostUpgrade,
+        ]) {
             expect(() => invoke(channel, siteEvent(), "host-1")).toThrow("device: not the device window");
         }
 
@@ -346,6 +439,46 @@ describe("servers over SSH", () => {
 
         await expect(invoke(LOCAL_CHANNEL.hostUpgrade, localEvent(), 7)).rejects.toThrow("device: deviceId is invalid");
         expect(core.hostUpgrade).toHaveBeenCalledTimes(1);
+    });
+
+    it("keep a server's files out of the page's reach and validate what the device window asks for", async () => {
+        for (const channel of [LOCAL_CHANNEL.hostFilesList, LOCAL_CHANNEL.hostFileRead, LOCAL_CHANNEL.hostDownload]) {
+            expect(() => invoke(channel, siteEvent(), "host-1", "/srv/app")).toThrow("device: not the device window");
+        }
+
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", "", undefined)).resolves.toMatchObject({ host: "build-box", next: null });
+        await invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", "/srv/app", "m");
+        await invoke(LOCAL_CHANNEL.hostFileRead, localEvent(), "host-1", "/srv/app/a.txt");
+
+        expect(core.hostFilesList.mock.calls).toEqual([
+            ["host-1", "", undefined],
+            ["host-1", "/srv/app", "m"],
+        ]);
+        expect(core.hostFileRead).toHaveBeenCalledWith("host-1", "/srv/app/a.txt");
+
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), 7, "")).rejects.toThrow("device: deviceId is invalid");
+        await expect(invoke(LOCAL_CHANNEL.hostFilesList, localEvent(), "host-1", 3)).rejects.toThrow("device: path is invalid");
+        await expect(invoke(LOCAL_CHANNEL.hostFileRead, localEvent(), "host-1", 7)).rejects.toThrow("device: path is invalid");
+        expect(core.hostFilesList).toHaveBeenCalledTimes(2);
+    });
+
+    it("download a folder only into a file the person picks in a native dialog", async () => {
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+
+        // The window names the folder; it has no way to name where the archive goes.
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "/srv/app/my:src", "/etc/passwd")).resolves.toMatchObject({ files: 1 });
+        expect(core.hostDownload).toHaveBeenCalledWith("host-1", "/srv/app/my:src", "/home/me/Downloads/app.tar");
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls[0]?.at(-1)).toMatchObject({ defaultPath: path.join(fake.userData, "my_src.tar") });
+
+        vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: true, filePath: "" });
+
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "/srv/app")).resolves.toBeNull();
+        expect(core.hostDownload).toHaveBeenCalledTimes(1);
+
+        await expect(invoke(LOCAL_CHANNEL.hostDownload, localEvent(), "host-1", "")).resolves.toMatchObject({ files: 1 });
+        expect(vi.mocked(dialog.showSaveDialog).mock.calls.at(-1)?.at(-1)).toMatchObject({ defaultPath: path.join(fake.userData, "folder.tar") });
     });
 
     it("let the device window manage a server", async () => {
@@ -406,7 +539,10 @@ describe("passphrases", () => {
     it("never forwards a passphrase into an event or a notification", () => {
         invoke(LOCAL_CHANNEL.promptSecret, localEvent(), 4, "correct horse");
         fake.coreEmit?.(
-            JSON.stringify({ prompt: { body: { host: "deploy@build", kind: "passphrase", prompt: "Enter passphrase for key" }, expiresAt: 1, id: 5 }, type: "prompt" }),
+            JSON.stringify({
+                prompt: { body: { host: "deploy@build", kind: "passphrase", prompt: "Enter passphrase for key" }, expiresAt: 1, id: 5 },
+                type: "prompt",
+            }),
         );
 
         expect(JSON.stringify(fake.notifications)).not.toContain("correct horse");
@@ -443,11 +579,20 @@ describe("coding-agent channels", () => {
         LOCAL_CHANNEL.acpCancel,
         LOCAL_CHANNEL.acpClose,
         LOCAL_CHANNEL.acpForget,
+        LOCAL_CHANNEL.acpHookRun,
+        LOCAL_CHANNEL.acpHooks,
+        LOCAL_CHANNEL.acpHooksApprove,
+        LOCAL_CHANNEL.acpHooksRevoke,
+        LOCAL_CHANNEL.acpImport,
+        LOCAL_CHANNEL.acpImportList,
         LOCAL_CHANNEL.acpPermissionAnswer,
         LOCAL_CHANNEL.acpPermissionAnswerBatch,
         LOCAL_CHANNEL.acpPermissionDecline,
         LOCAL_CHANNEL.acpPermissions,
         LOCAL_CHANNEL.acpProbe,
+        LOCAL_CHANNEL.acpReports,
+        LOCAL_CHANNEL.acpRegistryInstall,
+        LOCAL_CHANNEL.acpRegistrySearch,
         LOCAL_CHANNEL.acpSend,
         LOCAL_CHANNEL.acpSession,
         LOCAL_CHANNEL.acpSessions,
@@ -472,6 +617,16 @@ describe("coding-agent channels", () => {
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("take a hooks approval only as the sha-256 of a file, before anything is read", async () => {
+        for (const hash of ["", "abc", "Z".repeat(64), 7, undefined]) {
+            expect(() => invoke(LOCAL_CHANNEL.acpHooksApprove, localEvent(), "session-1", hash)).toThrow("hooks file hash is invalid");
+            expect(() => invoke(LOCAL_CHANNEL.acpHookRun, localEvent(), "session-1", "summary", hash)).toThrow("hooks file hash is invalid");
+        }
+
+        // A valid hash for a session that does not exist reaches the manager and is refused there.
+        await expect(invoke(LOCAL_CHANNEL.acpHooksApprove, localEvent(), "session-1", "a".repeat(64))).rejects.toThrow("no longer exists");
     });
 
     it("pass a permission answer to the core as the request id and the agent's option id, and nothing else", () => {
@@ -500,7 +655,13 @@ describe("coding-agent channels", () => {
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswer, localEvent(), 7, "")).toThrow("device: option is invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [])).toThrow("device: request ids are invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), [1, "2"])).toThrow("device: request id is invalid");
-        expect(() => invoke(LOCAL_CHANNEL.acpPermissionAnswerBatch, localEvent(), Array.from({ length: 51 }, (_, i) => i + 1))).toThrow("device: request ids are invalid");
+        expect(() =>
+            invoke(
+                LOCAL_CHANNEL.acpPermissionAnswerBatch,
+                localEvent(),
+                Array.from({ length: 51 }, (_, i) => i + 1),
+            ),
+        ).toThrow("device: request ids are invalid");
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
     });
@@ -525,6 +686,24 @@ describe("coding-agent channels", () => {
 
         expect(core.acpSpawnPlan).toHaveBeenCalledWith("alpha", "/not/allowed");
         expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("start no agent to list or import a session in a folder the core refuses, or for an agent that is not registered", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
+        await expect(invoke(LOCAL_CHANNEL.acpImport, localEvent(), "nobody", "/work", "s1")).rejects.toThrow("that agent is not registered");
+
+        expect(core.acpSpawnPlan).toHaveBeenCalledTimes(1);
+        expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("check the shape of an import request before it reaches the agent", () => {
+        expect(() => invoke(LOCAL_CHANNEL.acpImport, localEvent(), "alpha", "/work", 7)).toThrow("device: saved session is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", 7)).toThrow("device: folder is invalid");
+        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+    });
+
+    it("report what no agent has said yet as nothing", () => {
+        expect(invoke(LOCAL_CHANNEL.acpReports, localEvent())).toEqual({});
     });
 
     it("refuse an unregistered agent before asking for a plan", async () => {
@@ -678,12 +857,26 @@ describe("events", () => {
             return fake.notifications.at(-1)?.body;
         };
 
-        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe("Connect to deploy@build?");
-        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe("Trust the key of build?");
+        expect(notify({ address: "build", identityFile: null, kind: "hostConnect", name: "build-box", port: 22, user: "deploy" })).toBe(
+            "Connect to deploy@build?",
+        );
+        expect(notify({ fingerprint: "SHA256:x", host: "build", identityFile: null, keyType: "ED25519", kind: "hostKey", port: 22 })).toBe(
+            "Trust the key of build?",
+        );
         expect(notify({ host: "build", kind: "hostKeyChanged", pinned: [], port: 22, presented: [] })).toBe("The key of build changed");
         expect(notify({ address: "build", identityFile: null, kind: "hostPairing", name: "build-box", port: 22, user: "u" })).toBe("Add the server build-box");
         expect(
-            notify({ allowAlways: false, detail: "ls", host: "build-box", input: "{}", kind: "call", taintedBy: [], threadTitle: "T", tool: "fs_list", toolKind: "fs" }),
+            notify({
+                allowAlways: false,
+                detail: "ls",
+                host: "build-box",
+                input: "{}",
+                kind: "call",
+                taintedBy: [],
+                threadTitle: "T",
+                tool: "fs_list",
+                toolKind: "fs",
+            }),
         ).toBe("fs_list on build-box — T");
     });
 
@@ -736,5 +929,115 @@ describe("shutdown", () => {
         fake.appListeners.get("will-quit")?.();
 
         expect(core.stop).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("a restart that finds a running turn and a held message", () => {
+    it("ends the running turn and the held message as interrupted, and runs neither", async () => {
+        const posts: { events: { kind: string; reason?: string }[]; threadId?: string; turnId?: string }[] = [];
+
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (_url: unknown, init?: { body?: string }) => {
+                const { payload } = JSON.parse(String(init?.body)) as { payload: string };
+
+                posts.push(JSON.parse(payload) as (typeof posts)[number]);
+
+                return Response.json({ ended: false, next: 0, threadId: "thread-1" });
+            }),
+        );
+        // The last run died with turn t1 running, and with a message for session s2 (turn t2) received but not acted on.
+        writeFileSync(path.join(fake.userData, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "s1", threadId: "thread-1", turnId: "t1" }] }));
+
+        const envelope = JSON.stringify({ callId: "c2", input: { sessionId: "s2", text: "go", turnId: "t2" }, threadId: "thread-2", tool: "acp_send" });
+
+        writeFileSync(path.join(fake.userData, "acp-host-receipts.json"), JSON.stringify({ receipts: [["c2", Date.now() + 60_000, null, envelope, "sig"]] }));
+        core.status.mockReturnValue(JSON.stringify({ accountLabel: null, deviceId: "dev1", platform: "macos" }));
+        core.acpPrepare.mockReturnValue(
+            JSON.stringify({
+                callId: "c2",
+                command: { kind: "send", sessionId: "s2", text: "go", turnId: "t2" },
+                expiresAt: Date.now() + 60_000,
+                refusal: null,
+            }),
+        );
+        fake.handlers.clear();
+        registerDeviceIpc(options);
+
+        // The replay opened channels before the leftovers were ended, and t1 still ends. No start replays for s2, so the
+        // held message cannot run: its turn ends as interrupted too, and nothing is sent to an agent.
+        await vi.waitFor(() => {
+            expect(posts.find((post) => post.turnId === "t1")?.events).toEqual([{ kind: "turn_end", reason: "interrupted" }]);
+            expect(posts.find((post) => post.turnId === "t2")?.events).toEqual([{ kind: "turn_end", reason: "interrupted" }]);
+        });
+        expect(spawnAgent).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+    });
+});
+
+const DOWNLOAD_LINE = /Download: https:\/\/example\.com\/amp-/u;
+
+describe("registry channels (the device window)", () => {
+    const registryBody = (): Response => Response.json(REGISTRY_FIXTURE);
+
+    beforeEach(() => {
+        registryFetch.mockReset();
+        vi.mocked(dialog.showMessageBox).mockClear();
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+        registryFetch.mockImplementation(async (url: string) => url === REGISTRY_URL ? registryBody() : new Response("archive bytes"));
+    });
+
+    it("read the registry only when the window searches: loading the view or waiting changes nothing", async () => {
+        vi.useFakeTimers();
+
+        try {
+            invoke(LOCAL_CHANNEL.acpView, localEvent());
+            await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60 * 1000);
+
+            expect(registryFetch).not.toHaveBeenCalled();
+            expect(core.acpInstall).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+
+        const listings = (await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "amp")) as { id: string }[];
+
+        expect(listings.map((listing) => listing.id)).toEqual(["amp-acp"]);
+        expect(registryFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("install what the search listed after a native confirmation worded from the entry", async () => {
+        await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "");
+        await invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0");
+
+        const [dialogOptions] = vi.mocked(dialog.showMessageBox).mock.calls.at(-1)?.slice(-1) as [{ detail: string; message: string }];
+
+        expect(dialogOptions.message).toContain("Amp");
+        expect(dialogOptions.detail).toContain("Publisher (as listed in the registry): Ada Lovelace, Grace Hopper");
+        expect(core.acpInstallPrune).toHaveBeenCalledWith("amp-acp");
+        expect(dialogOptions.detail).toContain("0.10.0");
+        expect(dialogOptions.detail).toMatch(DOWNLOAD_LINE);
+        expect(JSON.parse(String(core.acpInstall.mock.calls[0]?.[0]))).toMatchObject({ key: "amp-acp", sha256: SHA, version: "0.10.0" });
+    });
+
+    it("install nothing on a no, for a version the registry does not list, or before a search", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0")).rejects.toThrow("Search the registry again");
+
+        await invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "");
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "6.6.6")).rejects.toThrow("Search again");
+
+        vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ checkboxChecked: false, response: 0 });
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", "0.10.0")).resolves.toBeNull();
+
+        expect(core.acpInstallStage).not.toHaveBeenCalled();
+        expect(core.acpInstall).not.toHaveBeenCalled();
+        expect(core.acpInstallPrune).not.toHaveBeenCalled();
+        expect(registryFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("check the shape of what the window sends", async () => {
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "", "1.0.0")).rejects.toThrow("device: agent is invalid");
+        await expect(invoke(LOCAL_CHANNEL.acpRegistryInstall, localEvent(), "amp-acp", 1)).rejects.toThrow("device: version is invalid");
+        expect(() => invoke(LOCAL_CHANNEL.acpRegistrySearch, localEvent(), "x".repeat(101))).toThrow("device: search is invalid");
     });
 });

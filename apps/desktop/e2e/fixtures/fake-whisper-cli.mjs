@@ -42,7 +42,8 @@ if (mode === "die") {
 const samples = (wav.length - 44) / 2;
 
 if (mode === "blank") {
-    process.stdout.write(" [BLANK_AUDIO]\n");
+    process.stdout.write("\n[00:00:00.000 --> 00:00:30.000]   [BLANK_AUDIO]\n");
 } else {
-    process.stdout.write(` Hello from the fake recogniser, ${samples} samples.\n Second segment.\n`);
+    // What the real helper prints with `-of`: a leading blank line, and each segment behind its timestamps.
+    process.stdout.write(`\n[00:00:00.000 --> 00:00:01.000]   Hello from the fake recogniser, ${samples} samples.\n[00:00:01.000 --> 00:00:02.000]   Second segment.\n`);
 }

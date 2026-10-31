@@ -5,9 +5,24 @@ import { THREAD_LOCKED_CODE } from "../../../lib/thread-lock";
 import type { ChunkRead } from "./http-api";
 import { CHUNKS_MAX_READS, CHUNKS_MAX_WAIT_MS, CHUNKS_WAIT_TICK_MS, getChunksHttpAction, readChunksWhenReady, toChunkWaitMs } from "./http-api";
 
-// The signature is not what these tests are about.
+// The signature is not what these tests are about (the unsigned case sets `signed`).
+const signed = { valid: true };
+
 vi.mock("../../../lib/sign-request", () => {
-    return { verifySignedRequest: async () => true };
+    return { verifySignedRequest: async () => signed.valid };
+});
+
+const crossings: { args: unknown; shardKey: string }[] = [];
+
+// The system crossing: record where it went and answer like the shard would.
+vi.mock("../../../lib/cross-shard", () => {
+    return {
+        callOnShard: vi.fn(async (_reference: unknown, args: unknown, options: { shardKey: string }) => {
+            crossings.push({ args, shardKey: options.shardKey });
+
+            return (args as { streamId?: string }).streamId === undefined ? null : { chunks: [], locked: false, status: "streaming", totalChunks: 0 };
+        }),
+    };
 });
 
 const empty = (status: ChunkRead["status"] = "pending"): ChunkRead => {
@@ -135,5 +150,53 @@ describe(getChunksHttpAction, () => {
         expect(await response.json()).toMatchObject({ code: THREAD_LOCKED_CODE });
         expect(runQuery.mock.calls.at(-1)?.[1]).toMatchObject({ checkLock: true });
         expect(runQuery.mock.calls.slice(1, -1).every(([, args]) => args.checkLock === false)).toBe(true);
+    });
+
+    it("never reaches a shard for an unsigned request", async () => {
+        signed.valid = false;
+        crossings.length = 0;
+
+        try {
+            const request = new Request("https://backend.test/chat/chunks", {
+                body: JSON.stringify({ afterIndex: 0, streamId: "s", userId: "victim" }),
+                method: "POST",
+            });
+            const runQuery = vi.fn();
+            const response = await getChunksHttpAction({ forShard: vi.fn(), runQuery } as unknown as HttpActionCtx, request);
+
+            expect(response.status).toBe(401);
+            expect(crossings).toStrictEqual([]);
+            expect(runQuery).not.toHaveBeenCalled();
+        } finally {
+            signed.valid = true;
+        }
+    });
+
+    it("reads a verified user's stream on their shard as the system, naming the user and thread so another user's stream finds nothing", async () => {
+        crossings.length = 0;
+        const request = new Request("https://backend.test/chat/chunks", {
+            body: JSON.stringify({ afterIndex: 0, streamId: "stream-1", threadId: "default", userId: "user-1" }),
+            method: "POST",
+        });
+        const forShard = vi.fn();
+
+        const response = await getChunksHttpAction({ forShard, runQuery: vi.fn() } as unknown as HttpActionCtx, request);
+
+        expect(response.status).toBe(200);
+        expect(forShard).not.toHaveBeenCalled();
+        expect(crossings.length).toBeGreaterThan(0);
+        expect(crossings.every((crossing) => crossing.shardKey === "user-1")).toBe(true);
+        expect(crossings.at(-1)?.args).toMatchObject({ streamId: "stream-1", threadId: "default", userId: "user-1" });
+    });
+
+    it("refuses an id that is not a bounded string", async () => {
+        const request = new Request("https://backend.test/chat/chunks", {
+            body: JSON.stringify({ afterIndex: 0, streamId: "s", userId: { $ne: 1 } }),
+            method: "POST",
+        });
+
+        const response = await getChunksHttpAction({ forShard: vi.fn(), runQuery: vi.fn() } as unknown as HttpActionCtx, request);
+
+        expect(response.status).toBe(400);
     });
 });

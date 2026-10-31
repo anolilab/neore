@@ -19,6 +19,7 @@ import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
+import { eventInputMessage } from "./event-sources";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
@@ -34,6 +35,8 @@ export const executeTrigger = internalAction
         // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
         // `claimedAt` fences the release: the run may start after the claim expired and a redelivery took the key.
         claim: v.optional(v.object({ claimedAt: v.number(), key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
+        // The firing of an event trigger that started this run (`eventState.firedAt`): a moment in time is switched off by its own firing's run only.
+        firing: v.optional(v.number()),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
         // The webhook body was not valid UTF-8, so `payload` is its lossy decode and filters see an empty body.
@@ -45,7 +48,7 @@ export const executeTrigger = internalAction
         releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { claim, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, firing, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId }, ctx }) => {
         /**
          * Gives a permanent claim back (admission refusals do their own, inside their transaction). A release
          * that fails is NOT dropped: the claim lasts years, so a lost release would refuse every redelivery of
@@ -97,6 +100,16 @@ export const executeTrigger = internalAction
             try {
                 return await work();
             } catch (error) {
+                // A moment in time fires once and this delivery is never re-run: leaving it on would hold its slot for good.
+                // A manual test run says nothing about the firing, which may still be on its way: it carries none.
+                if (firing !== undefined) {
+                    await ctx
+                        .runMutation(internal.triggers.functions.switchOffConsumedMoment, { firing, triggerId })
+                        .catch((switchOffError: unknown) =>
+                            console.error(`[Triggers] Could not switch off trigger ${triggerId} after its run failed to start:`, switchOffError),
+                        );
+                }
+
                 try {
                     await releaseWindow();
                 } finally {
@@ -163,7 +176,7 @@ export const executeTrigger = internalAction
         });
 
         if (skipped) {
-            await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Nothing to report", triggerId });
+            await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { firing, reason: "Nothing to report", triggerId });
 
             return;
         }
@@ -188,7 +201,11 @@ export const executeTrigger = internalAction
             );
 
             if (!reserved) {
-                await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, { reason: "Another run is reporting this activity", triggerId });
+                await ctx.runMutation(internal.triggers.functions.recordFilteredExecution, {
+                    firing,
+                    reason: "Another run is reporting this activity",
+                    triggerId,
+                });
 
                 return;
             }
@@ -200,6 +217,7 @@ export const executeTrigger = internalAction
         const executionId = await beforeRun(
             async () =>
                 await ctx.runMutation(internal.triggers.functions.createExecution, {
+                    firing,
                     payload,
                     triggerId,
                 }),
@@ -259,6 +277,9 @@ export const executeTrigger = internalAction
             if (triggerType === "schedule") {
                 // A cron run passes its template as the payload, so the same text arrives either way; a manual test run may pass its own input.
                 inputMessage = sanitizedPayload || trigger.inputTemplate || "You have been triggered on schedule. Please perform your configured task.";
+            } else if (triggerType === "event") {
+                // The watcher's own text saying what fired (`buildEventPayload`), then the owner's instruction.
+                inputMessage = eventInputMessage(sanitizedPayload, trigger.inputTemplate);
             } else if (triggerType === "webhook" && sanitizedPayload) {
                 const { payloadTemplate } = trigger;
 

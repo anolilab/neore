@@ -2,13 +2,14 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants } from "@neore/ui/components/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/dialog";
 import { HeadingLevelProvider } from "@neore/ui/components/heading";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
+import MOBILE_BREAKPOINT_QUERY from "@neore/ui/utils/breakpoints";
 import cn from "@neore/ui/utils/cn";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { AlertTriangle, Lock, RefreshCw, Settings } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Lock, RefreshCw, Settings } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
@@ -176,13 +177,24 @@ export const SettingsModal: FC = () => {
     // Incrementing this resets the error boundary for the current tab (retry).
     // Changing currentTab also resets it via the ScrollArea key below.
     const [tabRetryKey, setTabRetryKey] = useState(0);
+    // Below md the sidebar and the tab content do not fit side by side, so the modal shows one at a time.
+    const [mobileView, setMobileView] = useState<"detail" | "list">("list");
+    const backButtonRef = useRef<HTMLButtonElement>(null);
+    const navRef = useRef<HTMLElement>(null);
 
     // Sync from URL on first mount so deep-linked ?settings=true still works.
     // `currentTab` already seeds itself from `search.settingsTab` above.
     const openIfDeepLinked = useEffectEvent(() => {
-        if (search.settings === true) {
-            open();
+        if (search.settings !== true) {
+            return;
         }
+
+        // A link to a section shows that section on a phone, not the list; the closed-modal reset below runs first.
+        if (search.settingsTab) {
+            setMobileView("detail");
+        }
+
+        open();
     });
 
     useEffect(() => {
@@ -223,7 +235,8 @@ export const SettingsModal: FC = () => {
 
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
-    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null)) {
+    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null || mobileView !== "list")) {
+        setMobileView("list");
         setSearchQuery("");
         setAnnouncement("");
         // A jump that was cancelled by closing must not replay when the dialog opens again.
@@ -286,12 +299,21 @@ export const SettingsModal: FC = () => {
         navigate({ search: stripModalSearchParams as unknown as SearchUpdater });
     };
 
+    // The control that switched the view is hidden by it, so on a phone focus moves to the view that appeared. Never on desktop, never on close.
+    const focusAfterViewChange = (target: () => HTMLElement | null | undefined) => {
+        if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            requestAnimationFrame(() => target()?.focus());
+        }
+    };
+
     const handleTabChange = (tab: SettingsTab) => {
         // Update local state only — no navigation. Navigating on every tab click
         // can trigger Base UI's dialog dismiss logic during rapid re-renders.
         // The current tab is not written to the URL during a session; the initial
         // tab is read from the URL on mount so deep-links (?settingsTab=privacy) still work.
         setCurrentTab(tab);
+        setMobileView("detail");
+        focusAfterViewChange(() => backButtonRef.current);
         // A jump still waiting on the old tab is over.
         setPendingJump(null);
     };
@@ -303,8 +325,11 @@ export const SettingsModal: FC = () => {
         setPendingJump(entry.kind === "setting" ? { label } : null);
         setAnnouncement(entry.kind === "setting" ? t`Opened ${tabLabel}: ${label}` : t`Opened ${tabLabel}`);
         setSearchQuery("");
-        // The chosen result unmounts with the list; keep focus in the dialog.
-        searchInputRef.current?.focus();
+
+        // The chosen result unmounts with the list; keep focus in the dialog. On a phone the content takes over instead, and the keyboard stays down.
+        if (!globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            searchInputRef.current?.focus();
+        }
     };
 
     // Pre-compute the set of auth-required tabs for O(1) lock checks.
@@ -452,11 +477,11 @@ export const SettingsModal: FC = () => {
         <Dialog onOpenChange={(nextOpen) => !nextOpen && handleClose()} open={isOpen}>
             <DialogContent
                 bottomStickOnMobile={false}
-                className="flex h-[min(580px,calc(100vh-82px))] max-h-[95%] w-[480px] max-w-[98%] flex-row gap-0 overflow-hidden p-0 md:h-[min(672px,calc(100vh-82px))] md:w-[95vw] md:max-w-6xl"
+                className="-m-4 flex h-dvh max-h-none w-[calc(100%+2rem)] max-w-none flex-row gap-0 overflow-hidden rounded-none border-0 p-0 md:m-0 md:h-[min(672px,calc(100dvh-82px))] md:max-h-[95%] md:w-[95vw] md:max-w-6xl md:rounded-md md:border"
                 showCloseButton
             >
                 {/* Sidebar */}
-                <div className="bg-sidebar-foreground flex h-full w-64 shrink-0 flex-col border-r">
+                <div className={cn("bg-sidebar h-full w-full shrink-0 flex-col border-r md:flex md:w-64", mobileView === "detail" ? "hidden" : "flex")}>
                     <DialogHeader className="px-4 pt-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-8">
                         {/* TODO: ADD LOGO */}
                         <DialogTitle className="flex h-6 items-center gap-2">
@@ -495,7 +520,7 @@ export const SettingsModal: FC = () => {
                             setActive={settingsSearch.setActive}
                         />
                         {!settingsSearch.isSearching && (
-                            <nav className="flex flex-col gap-1 p-2">
+                            <nav className="flex flex-col gap-1 p-2" ref={navRef}>
                                 {navigationGroups.map((group) => (
                                     <div className="mb-2" key={group.label}>
                                         <div className="text-muted-foreground mb-1 px-3 text-xs font-medium tracking-wider uppercase">{group.label}</div>
@@ -514,8 +539,9 @@ export const SettingsModal: FC = () => {
 
                                             return (
                                                 <button
+                                                    aria-current={isActive ? "true" : undefined}
                                                     className={cn(
-                                                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                                                        "flex w-full items-center gap-2 rounded-md px-3 py-3 text-sm transition-colors md:py-2",
                                                         stateClassName,
                                                     )}
                                                     key={item.tab}
@@ -544,12 +570,25 @@ export const SettingsModal: FC = () => {
                 </div>
 
                 {/* Content */}
-                <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="border-b px-4 py-2">
-                        <h2 className="font-heading h-7 text-xl">{getTabTitle()}</h2>
+                <div className={cn("min-w-0 flex-1 flex-col md:flex", mobileView === "detail" ? "flex" : "hidden")}>
+                    <div className="flex items-center gap-2 border-b px-4 py-2 max-md:pe-14">
+                        <Button
+                            aria-label={t`Back to settings sections`}
+                            className="-ms-2 shrink-0 md:hidden"
+                            onClick={() => {
+                                setMobileView("list");
+                                focusAfterViewChange(() => navRef.current?.querySelector<HTMLElement>('[aria-current="true"]'));
+                            }}
+                            ref={backButtonRef}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <ArrowLeft aria-hidden="true" />
+                        </Button>
+                        <h2 className="font-heading h-7 min-w-0 truncate text-xl">{getTabTitle()}</h2>
                     </div>
                     <ScrollArea className="flex-1" key={`${currentTab}-${tabRetryKey}`}>
-                        <DialogPanel className="px-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-6">
+                        <DialogPanel className="px-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-6 md:px-6">
                             <ErrorBoundary
                                 fallback={(error) => <SettingsTabError error={error} onRetry={() => setTabRetryKey((k) => k + 1)} />}
                                 showToast={false}

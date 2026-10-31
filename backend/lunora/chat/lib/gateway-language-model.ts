@@ -24,6 +24,7 @@ import type { CustomProviderFormat } from "@neore/ai/gateway";
 import { GATEWAY_COST_METADATA_KEY } from "../../agent/message-cost.js";
 import { SERVICE_ORIGIN, type ServiceFetch } from "../../lib/services.js";
 import { generateTraceparent } from "../../lib/traceparent.js";
+import { type ProviderRateLimit, toProviderRateLimit } from "./rate-limit-pause.js";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -239,8 +240,11 @@ const streamErrorMessage = (error: unknown): string => {
  * An error from the gateway's model proxy. `fallbackReason` is the gateway's own
  * classification of a provider failure (`infra`, `content_policy`,
  * `context_overflow`); absent on errors the gateway did not classify.
+ * `rateLimit` is the provider's rate limit as the gateway read it from the
+ * provider's headers and body, so a run can pause until `retryAt`
+ * (`rate-limit-pause.ts`); it is only ever taken from that field, never inferred.
  */
-export type GatewayError = Error & { fallbackReason?: string; statusCode?: number };
+export type GatewayError = Error & { fallbackReason?: string; rateLimit?: ProviderRateLimit; statusCode?: number };
 
 // ── GatewayLanguageModel ─────────────────────────────────────────────────────
 
@@ -347,6 +351,7 @@ export class GatewayLanguageModel implements LanguageModelV3 {
         // `providerMetadata` — which the agent persists on the step's message.
         let heldFinish: Extract<LanguageModelV3StreamPart, { type: "finish" }> | undefined;
         const isByok = Boolean(this.config.providerApiKey);
+        const { provider } = this.config;
 
         const stream = new ReadableStream<LanguageModelV3StreamPart>({
             cancel() {
@@ -397,6 +402,12 @@ export class GatewayLanguageModel implements LanguageModelV3 {
                                     streamError.fallbackReason = parsed.fallbackReason;
                                 }
 
+                                const rateLimit = toProviderRateLimit(parsed.rateLimit, provider);
+
+                                if (rateLimit) {
+                                    streamError.rateLimit = rateLimit;
+                                }
+
                                 // The gateway is done with this call: close its response so the connection and the work behind it end.
                                 await sseReader.cancel().catch(() => undefined);
                                 controller.error(streamError);
@@ -433,17 +444,20 @@ export class GatewayLanguageModel implements LanguageModelV3 {
     private async throwStructuredError(response: Response): Promise<never> {
         let message = `Gateway model proxy failed (${response.status})`;
         let fallbackReason: string | undefined;
+        let rateLimit: ProviderRateLimit | undefined;
 
         try {
             // `Response.json()` is `Promise<unknown>` — this whole block reads a
             // shape off an error body, so it declares the one it reads.
-            const body = (await response.json()) as { error?: { fallbackReason?: unknown; message?: string } };
+            const body = (await response.json()) as { error?: { fallbackReason?: unknown; message?: string; rateLimit?: unknown } };
 
             message = body?.error?.message ? `${message}: ${body.error.message}` : `${message}: ${JSON.stringify(body)}`;
 
             if (typeof body?.error?.fallbackReason === "string") {
                 fallbackReason = body.error.fallbackReason;
             }
+
+            rateLimit = toProviderRateLimit(body?.error?.rateLimit, this.config.provider);
         } catch {
             const text = await response.text().catch(() => "");
 
@@ -457,6 +471,10 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
         if (fallbackReason !== undefined) {
             (error as GatewayError).fallbackReason = fallbackReason;
+        }
+
+        if (rateLimit) {
+            (error as GatewayError).rateLimit = rateLimit;
         }
 
         throw error;

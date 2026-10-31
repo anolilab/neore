@@ -8,22 +8,39 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
+import { requirementOf } from "../checks-logic";
 import type { HostDriver } from "../driver";
+import { graphqlRequest } from "../graphql";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
+import { discard, parse, readJson } from "../response";
 import type {
     CheckRun,
     CheckState,
     CheckSummary,
     CommitPage,
+    CursorPage,
+    DiffSide,
     FilePage,
     FileStatus,
     InboxPage,
     InboxSection,
+    MergedPullRequest,
+    MergeMethod,
+    MergeRequest,
+    MergeState,
+    MergeStatus,
     PullRequestDetail,
     PullRequestFile,
     PullRequestRef,
     PullRequestSummary,
+    RequiredChecks,
+    ReviewSubmission,
+    ReviewThread,
+    SubmittedReview,
+    ThreadComment,
+    ViewedFile,
+    ViewedState,
 } from "../types";
 
 export const GITHUB_API_ORIGIN = "https://api.github.com";
@@ -48,12 +65,21 @@ const MAX_COMMIT_PAGE = Math.ceil(GITHUB_COMMIT_LIMIT / GITHUB_PAGE_SIZE);
 export const PATCH_MAX_CHARS = 60_000;
 export const PAGE_PATCH_BUDGET_CHARS = 600_000;
 const BODY_MAX_CHARS = 60_000;
-const RESPONSE_MAX_BYTES = 12_000_000;
 
 const NATIVE = { degradation: "none", supported: true } as const;
 
 export const GITHUB_CAPABILITIES: HostCapabilityReport = {
     groups: {
+        checks: {
+            // Rulesets are readable by anyone; legacy branch protection only with admin rights, else every failing check counts.
+            requiredState: {
+                degradation: "divergent",
+                note: "Required checks come from rulesets and, for admins, branch protection. Otherwise every failing check counts.",
+                supported: true,
+            },
+            // A check run is re-run through its Actions job where it has one, else by a re-request of the check run.
+            rerun: NATIVE,
+        },
         inbox: {
             // Search `author:` with `draft:true`.
             drafts: NATIVE,
@@ -62,7 +88,19 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             // Branch protection and required checks are not evaluated: this is "approved and not a draft".
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
+        merge: { auto: NATIVE, now: NATIVE },
         pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE },
+        review: {
+            batchedSubmit: NATIVE,
+            lineComments: NATIVE,
+            // The review call takes no reply, so a reply is posted the moment it is sent, not with the review.
+            replies: { degradation: "divergent", note: "A reply is posted at once, not with the rest of the review.", supported: true },
+            resolveThreads: NATIVE,
+            verdictApprove: NATIVE,
+            verdictComment: NATIVE,
+            verdictRequestChanges: NATIVE,
+            viewedMarks: NATIVE,
+        },
     },
     reportedAt: 0,
     version: 1,
@@ -88,78 +126,6 @@ const repoPath = (ref: PullRequestRef): string => {
     }
 
     return `/repos/${parts.owner}/${parts.name}`;
-};
-
-/** Cancels a response body nobody will read; a failure to cancel is not worth reporting. */
-const discard = async (response: Response): Promise<void> => {
-    await response.body?.cancel().catch(() => undefined);
-};
-
-/** The body as text, read up to `RESPONSE_MAX_BYTES`: the cap bounds memory, not just what is kept. */
-const readText = async (response: Response): Promise<string> => {
-    const tooLarge = new HostApiError("The host's response is larger than this reads", 0);
-    const declared = Number(response.headers.get("content-length"));
-
-    if (Number.isFinite(declared) && declared > RESPONSE_MAX_BYTES) {
-        await discard(response);
-
-        throw tooLarge;
-    }
-
-    const reader = response.body?.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-
-    while (reader) {
-        // The request's deadline also covers the body: a slow or cut-off read is a host failure.
-        const { done, value } = await reader.read().catch(() => {
-            throw new HostApiError("The host's response could not be read", 0);
-        });
-
-        if (done) {
-            break;
-        }
-
-        received += value.byteLength;
-
-        if (received > RESPONSE_MAX_BYTES) {
-            await reader.cancel();
-
-            throw tooLarge;
-        }
-
-        chunks.push(value);
-    }
-
-    const bytes = new Uint8Array(received);
-    let offset = 0;
-
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-
-    return new TextDecoder().decode(bytes);
-};
-
-const readJson = async (response: Response): Promise<unknown> => {
-    const text = await readText(response);
-
-    try {
-        return JSON.parse(text) as unknown;
-    } catch {
-        throw new HostApiError("The host's response was not JSON", 0);
-    }
-};
-
-const parse = <T>(schema: z.ZodType<T>, value: unknown): T => {
-    const result = schema.safeParse(value);
-
-    if (!result.success) {
-        throw new HostApiError("The host's response did not have the expected shape", 0);
-    }
-
-    return result.data;
 };
 
 const toMs = (iso: string | null | undefined): number => {
@@ -428,6 +394,326 @@ const listFiles = async (request: HostRequest, ref: PullRequestRef, page: number
     return { files: fitPatches(files), hasMore: items.length === perPage && current < MAX_FILE_PAGE, page: current };
 };
 
+// ─── Review ─────────────────────────────────────────────────────────────────
+
+/** Cursor pages the review reads ask for: 100 files, 50 threads with their first 30 comments (the rest of a long thread is read on, up to {@link MAX_THREAD_COMMENT_PAGES} more pages). */
+const VIEWED_PAGE_SIZE = 100;
+const THREAD_PAGE_SIZE = 50;
+const THREAD_COMMENTS = 30;
+const MAX_THREAD_COMMENT_PAGES = 4;
+const COMMENT_PAGE_SIZE = 100;
+const COMMENT_MAX_CHARS = 20_000;
+const COMMENT_ID = /^\d{1,20}$/u;
+const NODE_ID = /^[\w=-]{1,200}$/u;
+
+const EVENTS = { approve: "APPROVE", comment: "COMMENT", request_changes: "REQUEST_CHANGES" } as const;
+
+const HOST_SIDES = { new: "RIGHT", old: "LEFT" } as const satisfies Record<DiffSide, string>;
+
+const pageInfoSchema = z.object({ endCursor: z.string().nullable(), hasNextPage: z.boolean() });
+
+const sideOf = (side: string): DiffSide => (side === "LEFT" ? "old" : "new");
+
+const repoParts = (ref: PullRequestRef): { name: string; number: number; owner: string } => {
+    const parts = splitGithubRepo(ref.repository);
+
+    if (!parts || !Number.isSafeInteger(ref.number) || ref.number < 1) {
+        throw new HostApiError("Not a GitHub pull request address", 404);
+    }
+
+    return { ...parts, number: ref.number };
+};
+
+const pullRequestOf = <T>(repo: { pullRequest: T | null } | null): T => {
+    if (repo?.pullRequest == null) {
+        throw new HostApiError("The pull request was not found", 404);
+    }
+
+    return repo.pullRequest;
+};
+
+const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: ${THREAD_PAGE_SIZE}, after: $after) {
+        pageInfo { endCursor hasNextPage }
+        nodes {
+          id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
+          comments(first: ${THREAD_COMMENTS}) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+        }
+      }
+    }
+  }
+}`;
+
+/** The comments of one thread after a cursor: the rest of a thread the first page did not hold. */
+const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequestReviewThread {
+      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+    }
+  }
+}`;
+
+const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional() });
+
+const commentsDataSchema = z.object({ node: z.object({ comments: commentsSchema }).nullable() });
+
+const threadCommentSchema = z.object({
+    author: z.object({ login: z.string() }).nullable(),
+    body: z.string(),
+    createdAt: z.string(),
+    fullDatabaseId: z.union([z.string(), z.number()]),
+});
+
+const threadSchema = z.object({
+    comments: commentsSchema,
+    diffSide: z.string(),
+    id: z.string(),
+    isOutdated: z.boolean(),
+    isResolved: z.boolean(),
+    line: z.number().nullable(),
+    path: z.string(),
+    startLine: z.number().nullable(),
+    viewerCanResolve: z.boolean(),
+    viewerCanUnresolve: z.boolean(),
+});
+
+const threadsDataSchema = z.object({
+    repository: z
+        .object({ pullRequest: z.object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema }) }).nullable() })
+        .nullable(),
+});
+
+const commentsOf = (nodes: unknown[]): ThreadComment[] =>
+    nodes.flatMap((node) => {
+        const comment = threadCommentSchema.safeParse(node);
+        const id = comment.success ? String(comment.data.fullDatabaseId) : "";
+
+        return comment.success && COMMENT_ID.test(id)
+            ? [
+                  {
+                      authorLogin: comment.data.author?.login ?? "ghost",
+                      body: comment.data.body.slice(0, COMMENT_MAX_CHARS),
+                      createdAt: toMs(comment.data.createdAt),
+                      id,
+                  },
+              ]
+            : [];
+    });
+
+/** A thread's comments past the first page, a page at a time up to {@link MAX_THREAD_COMMENT_PAGES}; a longer thread ends there. */
+const laterComments = async (request: HostRequest, threadId: string, first: z.infer<typeof commentsSchema>): Promise<unknown[]> => {
+    const nodes: unknown[] = [];
+    let { pageInfo } = first;
+
+    for (let page = 0; pageInfo?.hasNextPage && pageInfo.endCursor !== null && page < MAX_THREAD_COMMENT_PAGES; page += 1) {
+        const data = await graphqlRequest(request, COMMENTS_QUERY, { after: pageInfo.endCursor, id: threadId }, commentsDataSchema);
+
+        if (data.node === null) {
+            break;
+        }
+
+        nodes.push(...data.node.comments.nodes);
+        pageInfo = data.node.comments.pageInfo;
+    }
+
+    return nodes;
+};
+
+const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThread | undefined> => {
+    const thread = threadSchema.safeParse(value);
+
+    if (!thread.success) {
+        return undefined;
+    }
+
+    const comments = commentsOf([...thread.data.comments.nodes, ...(await laterComments(request, thread.data.id, thread.data.comments))]);
+
+    return {
+        canResolve: thread.data.viewerCanResolve,
+        canUnresolve: thread.data.viewerCanUnresolve,
+        comments,
+        id: thread.data.id,
+        isOutdated: thread.data.isOutdated,
+        isResolved: thread.data.isResolved,
+        line: thread.data.line,
+        path: thread.data.path,
+        side: sideOf(thread.data.diffSide),
+        startLine: thread.data.startLine,
+    };
+};
+
+const listThreads = async (request: HostRequest, ref: PullRequestRef, after: string | null): Promise<CursorPage<ReviewThread>> => {
+    const data = await graphqlRequest(request, THREADS_QUERY, { ...repoParts(ref), after }, threadsDataSchema);
+    const { reviewThreads } = pullRequestOf(data.repository);
+    const threads = await Promise.all(reviewThreads.nodes.map(async (node) => await toThread(request, node)));
+
+    return {
+        endCursor: reviewThreads.pageInfo.endCursor,
+        hasMore: reviewThreads.pageInfo.hasNextPage,
+        items: threads.filter((thread): thread is ReviewThread => thread !== undefined),
+    };
+};
+
+const replySchema = z.object({ id: z.number() });
+
+const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentId: string, body: string): Promise<{ id: string }> => {
+    if (!COMMENT_ID.test(commentId)) {
+        throw new HostApiError("Not a comment id", 404);
+    }
+
+    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/comments/${commentId}/replies`, { json: { body }, method: "POST" });
+    let reply: z.infer<typeof replySchema>;
+
+    try {
+        reply = parse(replySchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it took the reply; a retry would post it a second time.
+        throw new HostApiError("The host's answer to the reply could not be read", 0, false, { unconfirmed: true });
+    }
+
+    return { id: String(reply.id) };
+};
+
+const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
+const UNRESOLVE_MUTATION = `mutation ($threadId: ID!) { unresolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
+
+const resolvedSchema = z.object({ thread: z.object({ isResolved: z.boolean() }) });
+
+const setThreadResolved = async (request: HostRequest, threadId: string, resolved: boolean): Promise<void> => {
+    if (!NODE_ID.test(threadId)) {
+        throw new HostApiError("Not a thread id", 404);
+    }
+
+    const data = await graphqlRequest(
+        request,
+        resolved ? RESOLVE_MUTATION : UNRESOLVE_MUTATION,
+        { threadId },
+        z.object({ resolveReviewThread: resolvedSchema.optional(), unresolveReviewThread: resolvedSchema.optional() }),
+    );
+    const confirmed = (resolved ? data.resolveReviewThread : data.unresolveReviewThread)?.thread.isResolved;
+
+    // A mutation that answers without the state asked for did not do it.
+    if (confirmed !== resolved) {
+        throw new HostApiError("The host did not confirm the thread change", 0);
+    }
+};
+
+const VIEWED_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      files(first: ${VIEWED_PAGE_SIZE}, after: $after) {
+        pageInfo { endCursor hasNextPage }
+        nodes { path viewerViewedState }
+      }
+    }
+  }
+}`;
+
+const VIEWED_STATES: Record<string, ViewedState> = { DISMISSED: "changed", VIEWED: "viewed" };
+
+const viewedDataSchema = z.object({
+    repository: z
+        .object({
+            pullRequest: z
+                .object({
+                    files: z.object({
+                        nodes: z.array(z.object({ path: z.string(), viewerViewedState: z.string() })),
+                        pageInfo: pageInfoSchema,
+                    }),
+                })
+                .nullable(),
+        })
+        .nullable(),
+});
+
+const listViewed = async (request: HostRequest, ref: PullRequestRef, after: string | null): Promise<CursorPage<ViewedFile>> => {
+    const data = await graphqlRequest(request, VIEWED_QUERY, { ...repoParts(ref), after }, viewedDataSchema);
+    const { files } = pullRequestOf(data.repository);
+
+    return {
+        endCursor: files.pageInfo.endCursor,
+        hasMore: files.pageInfo.hasNextPage,
+        items: files.nodes.map((node) => {
+            return { path: node.path, state: VIEWED_STATES[node.viewerViewedState] ?? "unviewed" };
+        }),
+    };
+};
+
+const PULL_ID_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { id } }
+}`;
+const MARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
+const UNMARK_VIEWED_MUTATION = `mutation ($pullRequestId: ID!, $path: String!) { unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId } }`;
+
+/** The GraphQL node id of a pull request, which the host's mutations address it by. */
+const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<string> => {
+    const data = await graphqlRequest(
+        request,
+        PULL_ID_QUERY,
+        repoParts(ref),
+        z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
+    );
+
+    return pullRequestOf(data.repository).id;
+};
+
+const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string, viewed: boolean): Promise<void> => {
+    const pullRequestId = await pullNodeId(request, ref);
+
+    // The mutation's own field must come back: a null or empty `data` is a call the host did not act on.
+    await graphqlRequest(
+        request,
+        viewed ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION,
+        { path, pullRequestId },
+        z.object({ [viewed ? "markFileAsViewed" : "unmarkFileAsViewed"]: z.object({}).passthrough() }),
+    );
+};
+
+const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
+
+/** One `POST .../reviews`: every comment, the verdict and the commit in the same call. */
+const submitReview = async (request: HostRequest, ref: PullRequestRef, submission: ReviewSubmission): Promise<SubmittedReview> => {
+    if (!SHA.test(submission.commitId)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
+    const response = await request(`${repoPath(ref)}/pulls/${ref.number}/reviews`, {
+        json: {
+            body: submission.body,
+            comments: submission.comments.map((comment) => {
+                return {
+                    body: comment.body,
+                    line: comment.line,
+                    path: comment.path,
+                    side: HOST_SIDES[comment.side],
+                    ...(comment.startLine !== null && { start_line: comment.startLine, start_side: HOST_SIDES[comment.side] }),
+                };
+            }),
+            commit_id: submission.commitId,
+            event: EVENTS[submission.verdict],
+        },
+        method: "POST",
+    });
+    let review: z.infer<typeof reviewSchema>;
+
+    try {
+        review = parse(reviewSchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it took the review; we just cannot say which one it is.
+        throw new HostApiError("The host's answer to the review could not be read", 0, false, { unconfirmed: true });
+    }
+
+    // With an event the review is submitted; a pending one is not a review anybody can see yet, and
+    // while it exists GitHub refuses the reviewer another, so a retry would fail: the wording says so.
+    if (review.state === "PENDING") {
+        throw new HostApiError("The host kept the review as a pending draft, which blocks another review", 0, false, { unconfirmed: true });
+    }
+
+    return { id: String(review.id), url: webUrl(review.html_url) };
+};
+
 // ─── Checks ─────────────────────────────────────────────────────────────────
 
 const checkRunsSchema = z.object({
@@ -438,6 +724,7 @@ const checkRunsSchema = z.object({
 const checkRunSchema = z.object({
     conclusion: z.string().nullable(),
     html_url: z.string().nullable().optional(),
+    id: z.number().optional(),
     name: z.string(),
     status: z.string(),
 });
@@ -467,6 +754,130 @@ const runState = (status: string, conclusion: string | null): CheckState =>
 const STATUS_STATES: Record<string, CheckState> = { error: "failure", failure: "failure", success: "success" };
 
 const statusState = (state: string): CheckState => STATUS_STATES[state] ?? "pending";
+
+/** Longest branch name that is read; a longer one is treated as unreadable rather than sent. */
+const BRANCH_MAX_CHARS = 250;
+
+/**
+ * A branch name as a URL path, one encoded segment at a time, or `undefined` when it cannot be one safely. Git allows
+ * almost any character in a name, so the characters are not limited, only the segments that would walk the path
+ * (`.`, `..`) or vanish (empty).
+ */
+const branchPath = (branch: string): string | undefined => {
+    const segments = branch.split("/");
+
+    if (branch.length > BRANCH_MAX_CHARS || segments.some((segment) => ["", ".", ".."].includes(segment))) {
+        return undefined;
+    }
+
+    try {
+        return segments.map((segment) => encodeURIComponent(segment)).join("/");
+    } catch {
+        // A lone surrogate cannot be encoded.
+        return undefined;
+    }
+};
+
+/** Reads a source of required-check rules, which may be withheld: only a sign-in or rate-limit problem is the caller's. */
+const readable = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
+    try {
+        return await read();
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.status === 401 || error.rateLimited) {
+            throw error;
+        }
+
+        return undefined;
+    }
+};
+
+const rulesSchema = z.array(
+    z.object({
+        // Other rules (`pull_request`, `merge_queue`...) carry parameters of their own, without this key.
+        parameters: z.object({ required_status_checks: z.array(z.object({ context: z.string() })).optional() }).optional(),
+        type: z.string(),
+    }),
+);
+
+const protectionSchema = z.object({ checks: z.array(z.object({ context: z.string() })).optional(), contexts: z.array(z.string()) });
+
+/**
+ * The required-check patterns of the rulesets that apply to `branch`; anyone who can read the repository can read these.
+ * `complete` is false when the rules fill a whole page: the host may hold more.
+ */
+const rulesetPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<{ complete: boolean; patterns: string[] }> => {
+    const rules = parse(rulesSchema, await readJson(await request(`${repoPath(ref)}/rules/branches/${branch}`, { query: { per_page: GITHUB_PAGE_SIZE } })));
+
+    return {
+        complete: rules.length < GITHUB_PAGE_SIZE,
+        patterns: rules.flatMap((rule) =>
+            rule.type === "required_status_checks" ? (rule.parameters?.required_status_checks ?? []).map((check) => check.context) : [],
+        ),
+    };
+};
+
+const branchSchema = z.object({
+    protected: z.boolean(),
+    protection: z.object({ required_status_checks: protectionSchema.partial().nullable().optional() }).optional(),
+});
+
+const contextsOf = (protection: { checks?: { context: string }[]; contexts?: string[] }): string[] => [
+    ...(protection.contexts ?? []),
+    ...(protection.checks ?? []).map((check) => check.context),
+];
+
+/**
+ * The patterns of legacy branch protection, or `undefined` when they cannot be told. The host answers 404 both for a branch
+ * with no protection and for a reader it will not show the settings to, so a 404 means "none" only when the branch itself
+ * says it is not protected; otherwise the branch's own summary is used, and failing that the answer stays unknown.
+ */
+const protectionPatterns = async (request: HostRequest, ref: PullRequestRef, branch: string): Promise<string[] | undefined> => {
+    const repo = repoPath(ref);
+    const info = parse(branchSchema, await readJson(await request(`${repo}/branches/${branch}`)));
+
+    if (!info.protected) {
+        return [];
+    }
+
+    try {
+        return contextsOf(parse(protectionSchema, await readJson(await request(`${repo}/branches/${branch}/protection/required_status_checks`))));
+    } catch (error) {
+        if (!(error instanceof HostApiError) || error.rateLimited || ![403, 404].includes(error.status)) {
+            throw error;
+        }
+    }
+
+    const summary = info.protection?.required_status_checks;
+
+    return summary ? contextsOf(summary) : undefined;
+};
+
+const baseSchema = z.object({ base: z.object({ ref: z.string() }) });
+
+/** What the base branch's rules require; a source that cannot be read leaves `complete` false. */
+const requiredChecksOf = async (request: HostRequest, ref: PullRequestRef): Promise<RequiredChecks> => {
+    const pull = await readable(async () => parse(baseSchema, await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}`))));
+
+    if (pull === undefined) {
+        return { complete: false, patterns: [] };
+    }
+
+    const branch = branchPath(pull.base.ref);
+
+    if (branch === undefined) {
+        return { complete: false, patterns: [] };
+    }
+
+    const [rulesets, protection] = await Promise.all([
+        readable(async () => await rulesetPatterns(request, ref, branch)),
+        readable(async () => await protectionPatterns(request, ref, branch)),
+    ]);
+
+    return {
+        complete: rulesets?.complete === true && protection !== undefined,
+        patterns: [...(rulesets?.patterns ?? []), ...(protection ?? [])],
+    };
+};
 
 const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<CheckSummary> => {
     if (!SHA.test(headSha)) {
@@ -504,25 +915,215 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
     }
 
     const statuses = parse(commitStatusSchema, await readJson(statusResponse));
+    const required = await requiredChecksOf(request, ref);
     const checks: CheckRun[] = [
         ...runs.check_runs.flatMap((value) => {
             const run = checkRunSchema.safeParse(value);
 
-            return run.success ? [{ name: run.data.name, state: runState(run.data.status, run.data.conclusion), url: webUrl(run.data.html_url) }] : [];
+            return run.success
+                ? [
+                      {
+                          id: run.data.id !== undefined && Number.isSafeInteger(run.data.id) ? String(run.data.id) : null,
+                          name: run.data.name,
+                          required: requirementOf(run.data.name, required),
+                          state: runState(run.data.status, run.data.conclusion),
+                          url: webUrl(run.data.html_url),
+                      },
+                  ]
+                : [];
         }),
         ...statuses.statuses.flatMap((value) => {
             const status = statusSchema.safeParse(value);
 
-            // A status's link is the CI system's own, not a GitHub address: it is not kept.
-            return status.success ? [{ name: status.data.context, state: statusState(status.data.state), url: null }] : [];
+            // A status's link is the CI system's own, not a GitHub address: it is not kept. A status cannot be re-run.
+            return status.success
+                ? [
+                      {
+                          id: null,
+                          name: status.data.context,
+                          required: requirementOf(status.data.context, required),
+                          state: statusState(status.data.state),
+                          url: null,
+                      },
+                  ]
+                : [];
         }),
     ];
 
-    return { checks, total: runs.total_count + (statuses.total_count ?? statuses.statuses.length) };
+    return { checks, required, total: runs.total_count + (statuses.total_count ?? statuses.statuses.length) };
+};
+
+const runAppSchema = z.object({ app: z.object({ slug: z.string() }).nullable().optional() });
+
+/** Actions runs a check run as a job, which can be re-run alone; any other app's check is asked to run again. */
+const ACTIONS_APP = "github-actions";
+
+const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<void> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    const repo = repoPath(ref);
+    const run = parse(runAppSchema, await readJson(await request(`${repo}/check-runs/${checkId}`)));
+    const path = run.app?.slug === ACTIONS_APP ? `${repo}/actions/jobs/${checkId}/rerun` : `${repo}/check-runs/${checkId}/rerequest`;
+
+    try {
+        await discard(await request(path, { json: {}, method: "POST" }));
+    } catch (error) {
+        // A 403 that is not a rate limit and says why ("cannot re-run a job while other jobs in the run are in progress") is a
+        // refusal of this call, not a lack of access: the reason is what the person needs.
+        if (error instanceof HostApiError && error.status === 403 && !error.rateLimited && error.detail !== undefined) {
+            throw new HostApiError(error.message, 422, false, { detail: error.detail });
+        }
+
+        throw error;
+    }
+};
+
+// ─── Merge ──────────────────────────────────────────────────────────────────
+
+const mergeSettingsSchema = z.object({
+    allow_auto_merge: z.boolean().optional(),
+    allow_merge_commit: z.boolean().optional(),
+    allow_rebase_merge: z.boolean().optional(),
+    allow_squash_merge: z.boolean().optional(),
+});
+
+const mergeabilitySchema = z.object({
+    auto_merge: z.unknown().nullable().optional(),
+    mergeable_state: z.string().optional(),
+});
+
+const MERGE_STATES: Record<string, MergeState> = {
+    behind: "behind",
+    blocked: "blocked",
+    clean: "clean",
+    dirty: "conflicting",
+    draft: "draft",
+    has_hooks: "clean",
+    unstable: "unstable",
+};
+
+const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promise<MergeStatus> => {
+    const repo = repoPath(ref);
+    const settings = parse(mergeSettingsSchema, await readJson(await request(repo)));
+    const pull = parse(mergeabilitySchema, await readJson(await request(`${repo}/pulls/${ref.number}`)));
+    const allowed: [MergeMethod, boolean | undefined][] = [
+        ["merge", settings.allow_merge_commit],
+        ["squash", settings.allow_squash_merge],
+        ["rebase", settings.allow_rebase_merge],
+    ];
+
+    return {
+        autoMergeAllowed: settings.allow_auto_merge === true,
+        autoMergeEnabled: pull.auto_merge != null,
+        methods: allowed.flatMap(([method, on]) => (on === true ? [method] : [])),
+        state: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
+    };
+};
+
+const mergedSchema = z.object({ merged: z.boolean(), message: z.string().optional(), sha: z.string().nullish() });
+
+const mergedPullSchema = z.object({ head: z.object({ sha: z.string() }), merge_commit_sha: z.string().nullable().optional(), merged: z.boolean().optional() });
+
+/**
+ * Whether the pull request is already merged at `headSha`: a second tab's merge, or a retry, is then the same merge done,
+ * not a refusal. `undefined` when the host answered that it is not; a read that could not be answered (rate limited, down, unreadable) is
+ * unconfirmed, because the merge may have happened.
+ */
+const alreadyMerged = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<MergedPullRequest | undefined> => {
+    try {
+        const pull = parse(mergedPullSchema, await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}`)));
+
+        return pull.merged === true && pull.head.sha === headSha ? { sha: pull.merge_commit_sha ?? null } : undefined;
+    } catch (error) {
+        // A read the host answered with a refusal says nothing about the merge; one it could not answer (throttled, down, unreadable) may hide it.
+        if (error instanceof HostApiError && (error.rateLimited || error.status === 0 || error.status >= 500)) {
+            throw new HostApiError("The host could not say whether the pull request was merged", 0, false, { unconfirmed: true });
+        }
+
+        if (error instanceof HostApiError) {
+            return undefined;
+        }
+
+        throw error;
+    }
+};
+
+/** One `PUT .../merge` naming the head the person saw: the host merges that commit or refuses, with its reason. */
+const mergePullRequest = async (request: HostRequest, ref: PullRequestRef, merge: MergeRequest): Promise<MergedPullRequest> => {
+    if (!SHA.test(merge.headSha)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
+    let response: Response;
+
+    try {
+        response = await request(`${repoPath(ref)}/pulls/${ref.number}/merge`, { json: { merge_method: merge.method, sha: merge.headSha }, method: "PUT" });
+    } catch (error) {
+        // 405 ("not mergeable") and 409 ("head modified") are also what a merge that already happened answers.
+        if (error instanceof HostApiError && !error.rateLimited && [405, 409].includes(error.status)) {
+            const done = await alreadyMerged(request, ref, merge.headSha);
+
+            if (done) {
+                return done;
+            }
+        }
+
+        throw error;
+    }
+
+    let result: z.infer<typeof mergedSchema>;
+
+    try {
+        result = parse(mergedSchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it merged; we just cannot say which commit.
+        throw new HostApiError("The host's answer to the merge could not be read", 0, false, { unconfirmed: true });
+    }
+
+    if (!result.merged) {
+        throw new HostApiError("The host did not merge", 405, false, { detail: result.message });
+    }
+
+    return { sha: result.sha ?? null };
+};
+
+const AUTO_MERGE_METHODS = { merge: "MERGE", rebase: "REBASE", squash: "SQUASH" } as const satisfies Record<MergeMethod, string>;
+
+const ENABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!, $method: PullRequestMergeMethod!, $expectedHeadOid: GitObjectID!) {
+  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $method, expectedHeadOid: $expectedHeadOid }) { pullRequest { autoMergeRequest { enabledAt } } }
+}`;
+const DISABLE_AUTO_MERGE = `mutation ($pullRequestId: ID!) {
+  disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) { pullRequest { autoMergeRequest { enabledAt } } }
+}`;
+
+const autoMergeResultSchema = z.object({ pullRequest: z.object({ autoMergeRequest: z.unknown().nullable() }) });
+
+const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string): Promise<void> => {
+    // Turning it on names the head the person looked at, so a branch that moved since is not merged unseen.
+    if (enabled && !SHA.test(headSha)) {
+        throw new HostApiError("Not a commit id", 404);
+    }
+
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await graphqlRequest(
+        request,
+        enabled ? ENABLE_AUTO_MERGE : DISABLE_AUTO_MERGE,
+        enabled ? { expectedHeadOid: headSha, method: AUTO_MERGE_METHODS[method], pullRequestId } : { pullRequestId },
+        z.object({ disablePullRequestAutoMerge: autoMergeResultSchema.optional(), enablePullRequestAutoMerge: autoMergeResultSchema.optional() }),
+    );
+    const result = enabled ? data.enablePullRequestAutoMerge : data.disablePullRequestAutoMerge;
+
+    // A mutation that answers without the state asked for did not do it.
+    if (result === undefined || (result.pullRequest.autoMergeRequest != null) !== enabled) {
+        throw new HostApiError("The host did not confirm the auto-merge change", 0);
+    }
 };
 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },
     kind: "github",
@@ -530,6 +1131,15 @@ export const githubDriver: HostDriver = {
     listCommits,
     listFiles,
     listInbox,
+    listThreads,
+    listViewed,
+    mergePullRequest,
+    replyToThread,
+    rerunCheck,
+    setAutoMerge,
+    setThreadResolved,
+    setViewed,
+    submitReview,
     view: {
         capabilities: GITHUB_CAPABILITIES,
         connectorSlug: "github",

@@ -210,7 +210,7 @@ describe(finishRun, () => {
     it("a normal finish writes its final chunk and reports no pause", async () => {
         const ctx = { runMutation: vi.fn(async () => null) };
 
-        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ paused: false });
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ awaitingInput: undefined, paused: false });
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
     });
 
@@ -225,7 +225,7 @@ describe(finishRun, () => {
             }),
         };
 
-        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ paused: false });
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ awaitingInput: undefined, paused: false });
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, { streamId: "stream-1", threadId: "thread-1" });
     });
 
@@ -237,8 +237,9 @@ describe(finishRun, () => {
             savedMessages: [{ _id: "m1", message: { content: [{ approvalId: "a1", toolCallId: "c1", type: "tool-approval-request" }], role: "assistant" } }],
         };
 
-        await expect(finishRun(ctx as never, paused)).resolves.toStrictEqual({ paused: true });
+        await expect(finishRun(ctx as never, paused)).resolves.toStrictEqual({ awaitingInput: "approval", paused: true });
         await expect(finishRun(ctx as never, { ...runArgs, keepOpenUnlessPaused: true, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
             paused: false,
         });
         expect(ctx.runMutation).not.toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, expect.anything());
@@ -252,6 +253,28 @@ describe(finishRun, () => {
         expect(mutations.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({
             streamId: "stream-1",
             threadId: "thread-1",
+        });
+    });
+
+    describe("what a pause waits for", () => {
+        const request = (approvalId: string, toolCallId: string, toolName: string) => [
+            { input: {}, toolCallId, toolName, type: "tool-call" },
+            { approvalId, toolCallId, type: "tool-approval-request" },
+        ];
+        const saved = (...parts: unknown[][]) => [{ _id: "m1", message: { content: parts.flat(), role: "assistant" } }];
+        const finish = async (messages: ReturnType<typeof saved>) =>
+            await finishRun({ runMutation: vi.fn(async () => null) } as never, { ...runArgs, pending: { reasoning: "", text: "" }, savedMessages: messages });
+
+        it("is a question when every pending call is askUser", async () => {
+            await expect(finish(saved(request("a1", "c1", "askUser")))).resolves.toStrictEqual({ awaitingInput: "question", paused: true });
+        });
+
+        it("is an approval for any other tool, or a mix", async () => {
+            await expect(finish(saved(request("a1", "c1", "browser")))).resolves.toStrictEqual({ awaitingInput: "approval", paused: true });
+            await expect(finish(saved(request("a1", "c1", "askUser"), request("a2", "c2", "browser")))).resolves.toStrictEqual({
+                awaitingInput: "approval",
+                paused: true,
+            });
         });
     });
 });

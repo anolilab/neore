@@ -11,7 +11,33 @@ import { z } from "zod";
 const require = createRequire(import.meta.url);
 const schema = require("@agentclientprotocol/sdk/schema/v1/schema.json");
 const check = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: schema.$defs });
-const REQUEST_SCHEMAS = { initialize: check("InitializeRequest"), "session/new": check("NewSessionRequest"), "session/prompt": check("PromptRequest") };
+const REQUEST_SCHEMAS = {
+    initialize: check("InitializeRequest"),
+    "session/new": check("NewSessionRequest"),
+    "session/prompt": check("PromptRequest"),
+    "session/list": check("ListSessionsRequest"),
+    "session/load": check("LoadSessionRequest"),
+};
+
+// FAKE_AGENT_SESSIONS = "list", "load" or "list,load": which saved-session methods the agent advertises (and answers).
+const advertised = new Set((process.env.FAKE_AGENT_SESSIONS ?? "").split(",").filter(Boolean));
+// The sessions the agent keeps. One is for a folder nobody approved, which a host must not offer.
+const SAVED = [
+    { sessionId: "s-old", title: "Old chat", updatedAt: "2026-01-01T00:00:00Z" },
+    { sessionId: "s-new", title: "New chat", updatedAt: "2026-02-01T00:00:00Z" },
+];
+const HISTORY = {
+    "s-new": [
+        ["user_message_chunk", "fix the "],
+        ["user_message_chunk", "bug"],
+        ["agent_thought_chunk", "hm"],
+        ["agent_message_chunk", "Done"],
+        ["agent_message_chunk", "."],
+        ["user_message_chunk", "and the tests"],
+        ["agent_message_chunk", "Tests too."],
+    ],
+    "s-old": [["user_message_chunk", "older question"]],
+};
 const CANCEL_SCHEMA = check("CancelNotification");
 const PERMISSION_RESPONSE_SCHEMA = check("RequestPermissionResponse");
 
@@ -211,7 +237,11 @@ const handle = async (message) => {
             id: message.id,
             result: {
                 protocolVersion: Number(process.env.FAKE_AGENT_VERSION ?? 1),
-                agentCapabilities: { loadSession: false, promptCapabilities: { image: false, audio: false, embeddedContext: false } },
+                agentCapabilities: {
+                    loadSession: advertised.has("load"),
+                    promptCapabilities: { image: false, audio: false, embeddedContext: false },
+                    ...advertised.has("list") && { sessionCapabilities: { list: {} } },
+                },
                 agentInfo: { name: "fake-agent", title: "Fake Agent", version: "1.2.3" },
                 authMethods: [],
             },
@@ -229,6 +259,44 @@ const handle = async (message) => {
         }
         state.sessionId = "fake-session-1";
         return send({ id: message.id, result: { sessionId: state.sessionId } });
+    }
+
+    if (message.method === "session/list" || message.method === "session/load") {
+        const name = message.method === "session/list" ? "list" : "load";
+
+        if (!advertised.has(name)) {
+            return violation(`${message.method} without advertising it`, message);
+        }
+        if (!REQUEST_SCHEMAS[message.method].safeParse(message.params).success) {
+            violation(`${message.method} does not match the schema`, message);
+        }
+        record({ [name]: message.params });
+
+        if (name === "list") {
+            const second = message.params.cursor === "p2";
+            const mine = process.env.FAKE_AGENT_PAGES === "1" ? [SAVED[second ? 1 : 0]] : SAVED;
+            const sessions = mine.map((entry) => ({ ...entry, cwd: message.params.cwd }));
+
+            if (process.env.FAKE_AGENT_ELSEWHERE === "1") {
+                sessions.push({ sessionId: "s-elsewhere", title: "Other folder", cwd: "/elsewhere" });
+            }
+
+            return send({ id: message.id, result: { sessions, ...process.env.FAKE_AGENT_PAGES === "1" && !second && { nextCursor: "p2" } } });
+        }
+
+        const history = HISTORY[message.params.sessionId];
+
+        if (history === undefined) {
+            return send({ id: message.id, error: { code: -32002, message: "Resource not found" } });
+        }
+
+        state.sessionId = message.params.sessionId;
+        for (const [kind, text] of history) {
+            update(state.sessionId, { sessionUpdate: kind, content: { type: "text", text } });
+        }
+        update(state.sessionId, { sessionUpdate: "tool_call", toolCallId: "h1", title: "Read", kind: "read", status: "completed" });
+
+        return send({ id: message.id, result: {} });
     }
 
     // session/prompt

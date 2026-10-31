@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CLOUD_HEADLESS_CAPABILITIES, CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES } from "./declarations";
 import type { CapabilityKey } from "./rules";
-import { capabilityIn, capabilityOf, followUpControl, isAvailable, selectableModels, UNKNOWN_CAPABILITY, visibleModes } from "./rules";
+import { capabilityIn, capabilityOf, followUpControl, isAvailable, selectableModels, UNKNOWN_CAPABILITY, unknownCapabilityReport, visibleModes } from "./rules";
 import type { Capability, CapabilityGroups, CapabilityReport } from "./types";
 
 /** `Record<CapabilityKey, …>` makes this list exhaustive: a member added to the type fails the type check here. */
@@ -60,6 +60,13 @@ describe("capabilityOf", () => {
 
         expect(capability).toEqual(UNKNOWN_CAPABILITY);
         expect(isAvailable(capability)).toBe(false);
+    });
+
+    it.each(ALL_KEYS)("reads %s as unsupported on an unknown report", (key) => {
+        const capability = capabilityOf(unknownCapabilityReport(5), key);
+
+        expect(isAvailable(capability)).toBe(false);
+        expect(unknownCapabilityReport(5)).toEqual({ groups: {}, reportedAt: 5, version: 1 });
     });
 
     it.each(ALL_KEYS)("reads %s as unsupported with no report, or no groups", (key) => {

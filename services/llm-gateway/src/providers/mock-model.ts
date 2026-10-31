@@ -14,8 +14,9 @@
  * Prompt markers (anywhere in the latest user message):
  *   - `[[reasoning]]`                  — emit a reasoning part before the text
  *   - `[[tool:&lt;name> &lt;json>]]`         — call tool `&lt;name>` with `&lt;json>` as input,
- *                                        once; the follow-up turn (after the tool
- *                                        result) answers with plain text. Not when
+ *                                        once; several markers are called in order,
+ *                                        one per step, and the step after the last
+ *                                        tool result answers with plain text. Not when
  *                                        the request sets `tool_choice: "none"`
  *   - `[[delay:&lt;ms>]]`                 — wait that long (at most 60s) before
  *                                        answering — a stand-in for a slow model,
@@ -72,7 +73,7 @@ export const assertMockLlmAllowed = (env: MockLlmEnv): void => {
 
 // ── Prompt inspection ────────────────────────────────────────────────────────
 
-const TOOL_MARKER = /\[\[tool:([\w.:-]+)(?:\s+(\{[\s\S]*?\}))?\]\]/;
+const TOOL_MARKER = /\[\[tool:([\w.:-]+)(?:\s+(\{[\s\S]*?\}))?\]\]/g;
 const REASONING_MARKER = "[[reasoning]]";
 const DELAY_MARKER = /\[\[delay:(\d{1,6})\]\]/;
 const MAX_DELAY_MS = 60_000;
@@ -423,9 +424,9 @@ export const planMockResponse = (options: LanguageModelV3CallOptions): MockPlan 
 
     const userText = lastUserText(options.prompt);
     const results = toolResultsSinceLastUser(options.prompt);
-    const toolMatch = TOOL_MARKER.exec(userText);
+    const toolMatch = userText.matchAll(TOOL_MARKER).toArray()[results.length];
 
-    if (toolMatch?.[1] && results.length === 0 && options.toolChoice?.type !== "none") {
+    if (toolMatch?.[1] && options.toolChoice?.type !== "none") {
         const toolName = toolMatch[1];
         const available = (options.tools ?? []).some((tool) => tool.name === toolName);
 
@@ -436,7 +437,7 @@ export const planMockResponse = (options: LanguageModelV3CallOptions): MockPlan 
         return { kind: "text", text: `Mock: tool "${toolName}" is not available in this request.` };
     }
 
-    const echo = userText.replace(TOOL_MARKER, "").replace(REASONING_MARKER, "").replace(DELAY_MARKER, "").replaceAll(WHITESPACE, " ").trim();
+    const echo = userText.replaceAll(TOOL_MARKER, "").replace(REASONING_MARKER, "").replace(DELAY_MARKER, "").replaceAll(WHITESPACE, " ").trim();
     const echoed = echo.length > 0 ? echo.slice(0, 200) : "(empty prompt)";
     const text =
         results.length > 0

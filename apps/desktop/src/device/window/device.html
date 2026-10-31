@@ -88,6 +88,24 @@
                 </p>
                 <div id="hosts" aria-labelledby="hosts-heading"></div>
 
+                <h2 id="files-heading">Files on a server</h2>
+                <p class="muted">
+                    Browse the shared folders of a connected server, or download one as a tar archive (links are left out). What a server
+                    lists or holds is shown as plain text, and none of this goes to the agent.
+                </p>
+                <div id="files" role="group" aria-labelledby="files-heading">
+                    <label for="files-host">Server</label>
+                    <select id="files-host"></select>
+                    <p id="files-path" class="muted"></p>
+                    <div class="row">
+                        <button type="button" id="files-up">Up</button>
+                        <button type="button" id="files-download">Download this folder…</button>
+                    </div>
+                    <ul id="files-list" aria-label="Contents"></ul>
+                    <button type="button" id="files-more" hidden>Load more</button>
+                    <pre id="files-preview" tabindex="0" aria-label="File contents" hidden></pre>
+                </div>
+
                 <h2 id="servers-heading">Local MCP servers</h2>
                 <p class="muted">
                     Started on this computer when the agent first uses them, inside the sandbox above. Each keeps its package caches in a private folder. Only add commands you trust.
@@ -140,6 +158,17 @@
                     <textarea id="acp-args" rows="3" spellcheck="false"></textarea>
                     <button type="submit">Add agent</button>
                 </form>
+                <h2 id="acp-registry-heading">Agent registry</h2>
+                <p class="muted">
+                    Search the official Agent Client Protocol registry. Only agents that publish a checksum for a download can be installed. Before anything is downloaded you see the
+                    publisher, version and source; the file is checked against the published checksum and kept under Neore's app data. Neore never updates an installed agent.
+                </p>
+                <form id="acp-registry-form" novalidate>
+                    <label for="acp-registry-query">Search</label>
+                    <input id="acp-registry-query" type="search" maxlength="100" autocomplete="off" />
+                    <button type="submit">Search</button>
+                </form>
+                <ul id="acp-registry-results" aria-labelledby="acp-registry-heading"></ul>
                 <p class="muted">An app opened from the Dock or Finder has a short PATH. If the command is not found, give its full path or set PATH for the agent below.</p>
 
                 <h2 id="acp-env-heading">Environment variables</h2>
@@ -160,6 +189,14 @@
 
                 <h2 id="acp-sessions-heading">Sessions</h2>
                 <ul id="acp-sessions" aria-labelledby="acp-sessions-heading"></ul>
+                <div id="acp-import" hidden>
+                    <h2 id="acp-import-heading"></h2>
+                    <p class="muted">
+                        The agent's saved sessions for this folder. Importing one reads its history from the agent and saves it in your Neore account as a thread; importing it again opens the same thread.
+                    </p>
+                    <ul id="acp-import-list" aria-labelledby="acp-import-heading"></ul>
+                    <button type="button" id="acp-import-close">Close</button>
+                </div>
                 <div id="acp-session" hidden>
                     <h2 id="acp-session-title"></h2>
                     <p id="acp-session-status" class="muted" role="status" aria-live="polite"></p>
@@ -174,6 +211,16 @@
                             <button type="button" id="acp-end">End session</button>
                         </div>
                     </form>
+                    <div id="acp-hooks" hidden>
+                        <h3 id="acp-hooks-heading">File-event hooks</h3>
+                        <p class="muted">
+                            This folder's <code>.neore/hooks.json</code> is part of the repository, so it can say anything. A hook can only send its prompt to this open session; the agent's own
+                            permission prompts still apply. Nothing runs until you approve exactly the file shown here for this agent in this folder, and any change to it needs a new approval. Another agent in the same folder is not covered.
+                        </p>
+                        <p id="acp-hooks-state" class="muted" role="status" aria-live="polite"></p>
+                        <ul id="acp-hooks-list" aria-labelledby="acp-hooks-heading"></ul>
+                        <div class="row" id="acp-hooks-actions"></div>
+                    </div>
                 </div>
                 <p id="acp-notice" class="muted" role="status" aria-live="polite"></p>
                 <p id="acp-error" class="error" role="alert"></p>

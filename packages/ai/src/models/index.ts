@@ -77,6 +77,7 @@ export {
     isModelAllowed,
     type ModelFilterRules,
 } from "./model-filters";
+export { CHARACTERS_PER_TOKEN, estimateInputCostMicrodollars, estimateTokensFromCharacters, PROMPT_CACHE_COLD_START_TOKENS } from "./prompt-cache";
 
 /**
  * Model exports

@@ -62,6 +62,12 @@ describe("shard tick trigger candidate", () => {
         await expect(shardTickCandidate()).resolves.toBeNull();
     });
 
+    it("returns an armed event watcher: its next check is its nextTriggerAt", async () => {
+        const watcherId = await insertTrigger({ enabled: true, nextTriggerAt: NOW + 500, type: "event" });
+
+        await expect(shardTickCandidate()).resolves.toMatchObject({ _id: watcherId, type: "event" });
+    });
+
     it("returns the armed schedule trigger even when a webhook trigger is also enabled", async () => {
         await insertTrigger({ enabled: true, type: "webhook" });
         const scheduleId = await insertTrigger({ cronExpression: "0 9 * * *", enabled: true, nextTriggerAt: NOW + 1000, type: "schedule" });

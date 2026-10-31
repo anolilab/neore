@@ -8,6 +8,8 @@ import { v } from "lunorash/server";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { ACP_CLEARED } from "../acp/lib/constants";
+import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
@@ -261,7 +263,11 @@ export const sweepDeviceCalls = internalMutation
         for (const status of OPEN_CALL_STATUSES) {
             const { page } = await ctx.db.deviceCalls.findMany({ limit: SWEEP_BATCH, where: { deadline: { lt: now }, status } });
 
-            await Promise.all(page.map(async (call) => await ctx.db.patch(call._id, { completedAt: now, error: "Timed out", status: "expired" })));
+            // One at a time: an expiring coding-agent call also ends its turn, which writes the thread.
+            for (const call of page) {
+                await ctx.db.patch(call._id, { completedAt: now, error: "Timed out", status: "expired", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
+                await onAcpCallEnded(ctx, call, { error: HOST_DID_NOT_ANSWER, status: "expired" }, now);
+            }
         }
 
         const { page: old } = await ctx.db.deviceCalls.findMany({

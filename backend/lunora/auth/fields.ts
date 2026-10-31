@@ -67,6 +67,7 @@ export const userSettingsFieldsWithoutUserId = {
     keyboardShortcuts: v.optional(
         v.object({
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),
+            askAside: v.optional(v.string().max(MAX_LENGTH.short)),
             audioRecord: v.optional(v.string().max(MAX_LENGTH.short)),
             commandPalette: v.optional(v.string().max(MAX_LENGTH.short)),
             copyLastCodeBlock: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -74,6 +75,7 @@ export const userSettingsFieldsWithoutUserId = {
             decreaseEffort: v.optional(v.string().max(MAX_LENGTH.short)),
             deleteThread: v.optional(v.string().max(MAX_LENGTH.short)),
             escape: v.optional(v.string().max(MAX_LENGTH.short)),
+            findInThread: v.optional(v.string().max(MAX_LENGTH.short)),
             firstItem: v.optional(v.string().max(MAX_LENGTH.short)),
             focusSearch: v.optional(v.string().max(MAX_LENGTH.short)),
             help: v.optional(v.string().max(MAX_LENGTH.short)),

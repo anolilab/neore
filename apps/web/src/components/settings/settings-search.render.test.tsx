@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogTitle } from "@neore/ui/components/responsive-dialog";
+import { Dialog, DialogContent, DialogTitle } from "@neore/ui/components/dialog";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { FC } from "react";
 import { useMemo } from "react";

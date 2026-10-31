@@ -19,9 +19,11 @@ import cn from "@neore/ui/utils/cn";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRouter } from "@tanstack/react-router";
 import {
+    AlarmClock,
     ArchiveIcon,
     ChevronDown,
     ChevronRight,
+    CircleStop,
     DownloadIcon,
     ExternalLink,
     Folder,
@@ -33,9 +35,7 @@ import {
     Lock,
     Pin,
     PinOff,
-    Radio,
     Send,
-    Square,
     Tag,
     TrashIcon,
     Users,
@@ -56,9 +56,13 @@ import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc"
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError } from "@/lib/toast";
 
+import { useThreadStateActions } from "./hooks/use-thread-state-actions";
+import { releaseBlinkWindow } from "./lib/needs-you-blink";
+import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
 import { selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
 // Lazy: its project icons pull `lucide-react/dynamic`'s import map of every icon (~190KB).
@@ -275,7 +279,21 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isArchiving = loadingStates.archiving.has(node.threadId);
     // Check thread status directly from Lunora - "running" means actively streaming, "error" means failed
     const isStreaming = node.status === "running";
-    const isFailed = node.status === "error";
+    // Owner-only fields: absent on a thread shared with the caller, so none of the states below can show there.
+    const needsYou = isStreaming ? undefined : node.awaitingInput;
+    const isFailed = node.status === "error" && needsYou === undefined;
+    const isUnread = hasUnreadReply(node, { isOpen: isActive, isStreaming });
+    const { snoozedUntil } = node;
+
+    // A thread that no longer waits forgets its blink window, so a later pause may blink again.
+    useEffect(() => {
+        if (needsYou === undefined) {
+            releaseBlinkWindow(node.threadId);
+        }
+    }, [needsYou, node.threadId]);
+    // Read when the snooze menu opens, so render never touches the clock.
+    const [snoozeMenuNow, setSnoozeMenuNow] = useState(0);
+    const { snooze, unsnooze } = useThreadStateActions();
 
     const formatRemainingTime = useCallback(
         (expiresAt?: number): string | null => {
@@ -495,15 +513,21 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     render={
                         <span
                             className={cn(
-                                "text-brand-black dark:text-brand-white -mr-4 flex flex-1 cursor-pointer items-center gap-1.5 truncate text-sm",
+                                "text-brand-black dark:text-brand-white flex flex-1 cursor-pointer items-center gap-1.5 truncate text-sm",
+                                // The pull under the trailing slot would clip the needs-you label at the row's edge.
+                                needsYou === undefined && "-mr-4",
                                 node.status === "archived" && "-mr-9",
                             )}
                         >
-                            {isStreaming && <Radio aria-label={t`Streaming`} className="text-primary h-3 w-3 shrink-0 animate-pulse" />}
-                            {isFailed && <Radio aria-label={t`Failed`} className="text-destructive h-3 w-3 shrink-0" />}
+                            {isStreaming && <ThreadStatusIcon status="running" threadId={node.threadId} />}
+                            {needsYou !== undefined && <ThreadStatusIcon status={needsYou} threadId={node.threadId} />}
+                            {isFailed && <ThreadStatusIcon status="error" threadId={node.threadId} />}
                             {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
                             {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
-                            <span className="truncate">{displayTitle}</span>
+                            <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
+                            {needsYou !== undefined && (
+                                <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
+                            )}
                         </span>
                     }
                 />
@@ -511,8 +535,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <p className="break-words">{displayTitle}</p>
                     {isStreaming && <p className="text-muted-foreground mt-1 text-xs">{t`Streaming...`}</p>}
                     {isFailed && <p className="text-destructive mt-1 text-xs">{t`Response failed - try again`}</p>}
+                    {needsYou === "approval" && <p className="mt-1 text-xs">{t`Waiting for your approval`}</p>}
+                    {needsYou === "question" && <p className="mt-1 text-xs">{t`Waiting for your answer`}</p>}
                 </TooltipContent>
             </Tooltip>
+
+            {/* Always mounted, so a thread that starts waiting is announced to a user whose focus is elsewhere. */}
+            <span className="sr-only" role="status">
+                {needsYou === "approval" && t`Waiting for your approval`}
+                {needsYou === "question" && t`Waiting for your answer`}
+            </span>
 
             {isStreaming && !isSelectionMode && (
                 <Tooltip>
@@ -520,7 +552,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         render={
                             <Button
                                 aria-label={named(t`Stop generating`)}
-                                className="hover:text-primary h-6 w-6 shrink-0 p-0"
+                                className="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 p-0 opacity-0 transition-none group-focus-within/action-item:opacity-100 group-hover/action-item:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                                 disabled={isStopping}
                                 onClick={(e) => {
                                     e.preventDefault();
@@ -537,7 +569,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 type="button"
                                 variant="ghost"
                             >
-                                <Square aria-hidden="true" className="h-3 w-3 fill-current" />
+                                <CircleStop aria-hidden="true" className="h-4 w-4" />
                             </Button>
                         }
                     />
@@ -765,6 +797,55 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+                {/* Only roots are sorted into the Snoozed section, so a child has no snooze to set. */}
+                {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
+                    <DropdownMenu
+                        onOpenChange={(open) => {
+                            if (open) {
+                                setSnoozeMenuNow(Date.now());
+                            }
+                        }}
+                    >
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <DropdownMenuTrigger
+                                        render={
+                                            <Button
+                                                aria-label={named(t`Snooze thread`)}
+                                                className="hover:text-primary h-6 w-6 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                }}
+                                                size="icon-sm"
+                                                variant="ghost"
+                                            >
+                                                <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                                            </Button>
+                                        }
+                                    />
+                                }
+                            />
+                            <TooltipContent>{t`Snooze thread`}</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                        >
+                            <DropdownMenuItem onClick={() => snooze(node.threadId, "hour", node.snoozedUntil)}>{t`Snooze 1 hour`}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => snooze(node.threadId, "tomorrow", node.snoozedUntil)}>
+                                {t`Snooze until tomorrow 09:00`}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => snooze(node.threadId, "nextWeek", node.snoozedUntil)}
+                            >{t`Snooze until next week`}</DropdownMenuItem>
+                            {isSnoozed(snoozedUntil, snoozeMenuNow) && (
+                                <DropdownMenuItem onClick={() => unsnooze(node.threadId, node.snoozedUntil)}>{t`Unsnooze`}</DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger
@@ -947,6 +1028,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </Tooltip>
             )}
             {node.status === "archived" && <ArchiveIcon className="text-muted-foreground h-3 w-3 shrink-0" />}
+            {isUnread && (
+                <>
+                    <span aria-hidden="true" className="bg-foreground h-1.5 w-1.5 shrink-0 rounded-full" />
+                    <span className="sr-only">{t`Unread`}</span>
+                </>
+            )}
             {searchQuery.trim() && node.relevantMessages && node.relevantMessages.length > 0 && (
                 <div className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-xs">
                     <Plural one="# match" other="# matches" value={node.relevantMessages.length} />

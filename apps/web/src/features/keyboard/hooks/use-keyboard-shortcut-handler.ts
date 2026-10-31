@@ -1,8 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { FIND_IN_THREAD_EVENT, hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { focusThreadSearch } from "../lib/thread-search-target";
 
 // No-op handler for SSR - keyboard shortcuts only work on client
@@ -24,6 +26,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
             }
 
             switch (action) {
+                case "askAside": {
+                    // The thread's listener opens the panel (`ask-aside-shortcut-listener.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("askAside"));
+                    break;
+                }
                 case "audioRecord": {
                     // Dispatch custom event for audio recording
                     // The audio recording hook listens for this event
@@ -59,6 +66,17 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
 
                     break;
                 }
+                case "findInThread": {
+                    if (hasFindInThreadTarget()) {
+                        // The open thread's find bar owns the query and the highlights (`thread-find-bar.tsx`).
+                        globalThis.dispatchEvent(new CustomEvent(FIND_IN_THREAD_EVENT));
+                    } else {
+                        // Not on a thread: the chord's older meaning.
+                        focusThreadSearch();
+                    }
+
+                    break;
+                }
                 case "firstItem": {
                     // Navigate to first item
                     const items = focusableItems();
@@ -73,15 +91,8 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     break;
                 }
                 case "help": {
-                    // Open help modal or navigate to help page
-                    const helpButton = document.querySelector<HTMLButtonElement>('[data-testid="help-button"]');
-
-                    if (helpButton) {
-                        helpButton.click();
-                    } else {
-                        // Fallback to help page if no help button found
-                        navigate({ from: "/chat/$threadId" as "/chat/$threadId" | "/dashboard", to: "/help" });
-                    }
+                    // The shortcuts sheet (`keyboard-shortcuts-sheet.tsx`) shares its open state with the thread list.
+                    useThreadListUIStore.getState().toggleShowKeyboardHelp();
 
                     break;
                 }

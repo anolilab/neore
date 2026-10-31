@@ -54,6 +54,7 @@ import {
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
 } from "./message-windowing";
+import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -64,6 +65,8 @@ const ESTIMATED_ROW_HEIGHT = 160;
 const JUMP_PAGE_SIZE = 50;
 
 interface ScrollToMessageDetail {
+    /** Move focus to the message after scrolling. Defaults to true; the find bar keeps focus in its field. */
+    focus?: boolean;
     messageId: string;
     /** Where the message sits, for a stored step that renders merged into an earlier message. */
     position?: MessagePosition;
@@ -73,6 +76,7 @@ interface ScrollToMessageDetail {
 const scrollToMessageChannel = createRequestChannel<ScrollToMessageDetail>();
 
 interface PendingJump {
+    focus?: boolean;
     messageId: string;
     pagesLoaded: number;
     position?: MessagePosition;
@@ -86,7 +90,7 @@ interface PendingJump {
  * `threadId` when the request races a navigation to that thread: the jump then
  * waits until that thread's messages are showing.
  */
-export const scrollToMessage = (messageId: string, options: { position?: MessagePosition; threadId?: string } = {}): void => {
+export const scrollToMessage = (messageId: string, options: { focus?: boolean; position?: MessagePosition; threadId?: string } = {}): void => {
     scrollToMessageChannel.request({ messageId, ...options });
 };
 
@@ -237,7 +241,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const messages = withoutGoalInstructions(threadMessages);
     const reviewNotes = goalReviewNotes(threadMessages);
     const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(messages, goal.verdicts, reviewNotes)) : null;
-    const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
+    const { activeStreamId, gatewayUrl, isStreaming, pause, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
@@ -260,7 +264,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         virtualizerRef.current = virtualizer;
     }, []);
 
-    const jumpTo = useCallback((requestedId: string, position?: MessagePosition): boolean => {
+    const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
         const { messages: currentMessages, plan: currentPlan } = jumpStateRef.current;
         const messageId = resolveJumpMessageId(currentMessages, requestedId, position);
 
@@ -286,8 +290,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             }
 
             element.scrollIntoView({ block: "center" });
+
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
-            element.focus({ preventScroll: true });
+            if (focus) {
+                element.focus({ preventScroll: true });
+            }
         };
 
         if (target.kind === "head" && virtualizerRef.current) {
@@ -314,8 +321,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     });
 
     useEffect(() => {
-        const request = ({ messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
-            pendingJumpRef.current = { messageId, pagesLoaded: 0, position, threadId: targetThreadId };
+        const request = ({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
+            pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
             setJumpRequest((value) => value + 1);
         };
         const readHash = (): PendingJump | undefined => {
@@ -357,7 +364,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 return;
             }
 
-            if (jumpTo(pending.messageId, pending.position)) {
+            if (jumpTo(pending.messageId, pending.position, pending.focus)) {
                 pendingJumpRef.current = undefined;
 
                 return;
@@ -493,6 +500,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                                 maxWidth={maxWidth}
                                 streamId={streamIdToShow}
                             />
+                        )}
+                        {/* The run is waiting out a provider's rate limit: when it resumes, and what a person can do meanwhile. */}
+                        {streamIdToShow && pause && threadId && (
+                            <RateLimitPauseNotice className="mx-auto w-full max-w-(--thread-max-width) pb-3" pause={pause} threadId={threadId} />
                         )}
                         {/* Simple "Thinking..." placeholder when regenerating but no stream yet */}
                         {!streamIdToShow && <ThinkingPlaceholder maxWidth={maxWidth} />}

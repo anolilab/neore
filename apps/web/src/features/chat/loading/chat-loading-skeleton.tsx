@@ -31,7 +31,7 @@ const ChatLoadingSkeleton: FC = () => {
         <SidebarProvider defaultOpen={chatDefaultOpen} sidebarNames={chatSidebarNames} style={chatSidebarStyle}>
             <div className="animate-in fade-in flex h-dvh w-full duration-150 [--tw-animation-delay:200ms] [--tw-animation-fill-mode:both] motion-reduce:animate-none">
                 {/* Mirrors SidebarShortcut's geometry; the real one reads session and settings data, so it is not mounted here. */}
-                <div className="z-20 hidden h-screen w-16 shrink-0 py-1 pl-1 md:block">
+                <div className="z-20 hidden h-dvh w-16 shrink-0 py-1 pl-1 md:block">
                     <div className="bg-sidebar ring-sidebar-border flex h-full flex-col items-center rounded-lg ring-1">
                         <Skeleton className="mt-3 mb-4 size-7 rounded-md" />
                         <div className="mt-4 flex flex-col gap-1">

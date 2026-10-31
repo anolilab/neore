@@ -55,6 +55,8 @@ interface Sweep {
  * `crons.ts`. A function, so the references resolve at use, not at import.
  */
 const shardSweeps = (): ReadonlyArray<Sweep> => [
+    // Backstop for the minute tick: an event watcher whose shard lost its due row is still visited.
+    { name: "dispatchDueEventTriggers", ref: internal.triggers.events.dispatchDueEventTriggers },
     { name: "cleanupExpiredPersistentStreams", ref: internal.chat.streaming.persistent.crons.cleanupExpiredStreams },
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },
@@ -220,6 +222,11 @@ export const runShardTick = internalMutation
     .mutation(async ({ ctx }) => {
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
+        // Event watchers whose next check is due; their checks run as actions. A failure here must not stop the reaping
+        // and the re-arming below, or the shard's other schedules stall with it.
+        await bestEffort("dispatchDueEventTriggers", async () => {
+            await ctx.runMutation(internal.triggers.events.dispatchDueEventTriggers, {});
+        });
         // Coding-agent turns that went silent; re-arms this shard for the next one to expire.
         const reaped = await bestEffort("reapHostStreams", async () => {
             await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
@@ -227,8 +234,8 @@ export const runShardTick = internalMutation
 
         const { now } = ctx;
         const [trigger, task] = await Promise.all([
-            // Only triggers with a first run armed. A webhook or event trigger has
-            // no `nextTriggerAt`, and `.first()` on the enabled prefix could return
+            // Only triggers with a next run armed: a schedule's first run or an event watcher's next check.
+            // A webhook trigger has no `nextTriggerAt`, and `.first()` on the enabled prefix could return
             // one, which then armed the shard to tick every minute for nothing.
             ctx.db
                 .query("triggers")

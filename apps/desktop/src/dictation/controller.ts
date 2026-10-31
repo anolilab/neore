@@ -51,6 +51,8 @@ export interface ControllerDependencies {
      * the person: the key may be up by now and nothing could see it, so this press ends and the next one records.
      */
     microphoneAllowed: () => Promise<boolean | "prompted">;
+    /** Where this OS keeps the microphone switch, for the "denied" message; a generic phrase when not given. */
+    microphoneSettings?: string;
     /** The model the user chose (or this machine's default), read at every press. */
     model: () => ModelSpec;
     models: Pick<ModelStore, "download" | "ensureVerified" | "isDownloading" | "status">;
@@ -76,10 +78,12 @@ export interface DictationController {
     windowClosed: () => void;
 }
 
-const CAPTURE_MESSAGES: Record<CaptureFailure, string> = {
-    denied: "Neore can't use the microphone. Allow it in your system's privacy settings and try again.",
-    error: "The microphone could not be opened.",
-    "no-device": "No microphone was found.",
+const captureMessages = (settings: string): Record<CaptureFailure, string> => {
+    return {
+        denied: `Neore can't use the microphone. Allow it in ${settings} and try again.`,
+        error: "The microphone could not be opened.",
+        "no-device": "No microphone was found.",
+    };
 };
 
 const TITLE = "Dictation";
@@ -96,6 +100,7 @@ const killWhenStarted = async (pending: Promise<Recognizer>): Promise<void> => {
 };
 
 export const createDictationController = (dependencies: ControllerDependencies): DictationController => {
+    const captureText = captureMessages(dependencies.microphoneSettings ?? "your system's privacy settings");
     let state: DictationState = "idle";
     let outcome: DictationOutcome | undefined;
     /** Bumped when a dictation ends, so a step that was awaiting for an older one drops its result. */
@@ -240,7 +245,7 @@ export const createDictationController = (dependencies: ControllerDependencies):
 
         if (!allowed) {
             settle("no-microphone");
-            dependencies.notify(TITLE, CAPTURE_MESSAGES.denied);
+            dependencies.notify(TITLE, captureText.denied);
 
             return false;
         }
@@ -394,7 +399,7 @@ export const createDictationController = (dependencies: ControllerDependencies):
         },
         captureFailed: (failure) => {
             if (state === "recording") {
-                fail(CAPTURE_MESSAGES[failure]);
+                fail(captureText[failure]);
             }
         },
         lastOutcome: () => outcome,

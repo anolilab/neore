@@ -134,6 +134,20 @@ describe(saveLocalTurnHandler, () => {
         expect(orders).toStrictEqual([0, 0, 1, 1]);
     });
 
+    it("leaves a switched thread's stored model alone, so paths before the switch keep their cloud model", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, {});
+        const agent = { kind: "model", model: "openai/gpt-4.1-mini" };
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
+        await save(OWNER, { prompt: "again", threadId: first.threadId });
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+
+        expect(thread).toMatchObject({ activeAgent: agent, model: "google/gemini-2.0-flash-001" });
+    });
+
     it("refuses a server-side endpoint, so the client cannot write replies under it", async () => {
         await seedEndpoint(OWNER, "openai");
 

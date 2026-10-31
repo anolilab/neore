@@ -431,8 +431,8 @@ describe("github driver: inbox", () => {
 });
 
 describe("github capability report", () => {
-    it("declares only reads, and says what Ready to merge approximates", () => {
-        expect(Object.keys(GITHUB_CAPABILITIES.groups)).toEqual(["inbox", "pullRequest"]);
+    it("declares checks, the inbox, merge, the pull request and the review, and says what Ready to merge approximates", () => {
+        expect(Object.keys(GITHUB_CAPABILITIES.groups)).toEqual(["checks", "inbox", "merge", "pullRequest", "review"]);
         expect(GITHUB_CAPABILITIES.groups.inbox?.readyToMerge).toMatchObject({ degradation: "synthetic", supported: true });
     });
 });
