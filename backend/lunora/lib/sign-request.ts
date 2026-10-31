@@ -129,4 +129,4 @@ const verifySignedRequest = async (request: Request, secret: string, maxBodyByte
 };
 
 export default signRequest;
-export { canonicalPathAndQuery, verifySignedRequest };
+export { canonicalPathAndQuery, readBodyWithin, verifySignedRequest };

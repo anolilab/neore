@@ -20,6 +20,8 @@ import { throwUnauthorized } from "../lib/error-helpers";
 import type { RateLimitName } from "../lib/rate-limiter";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { aiUserPreferencesFields, userSettingsFieldsWithoutUserId } from "./fields";
+import type { McpSecretHeader } from "./lib/mcp-secret-headers";
+import { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } from "./lib/mcp-secret-headers";
 import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreferences, type StoredKeyEntry } from "./lib/byok-keys";
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getCurrentUserInternal } from "./lib/helper";
@@ -180,6 +182,16 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         } else {
             toStore[fieldName] = value;
         }
+    }
+
+    // Header secrets (`requestSecret`) belong to a saved server: follow the list when the Settings page sends one.
+    if (tableName === "aiUserPreferences" && Array.isArray(toStore.mcpServers)) {
+        const secrets = ((settings as { mcpSecretHeaders?: McpSecretHeader[] } | null)?.mcpSecretHeaders ?? []) as McpSecretHeader[];
+
+        toStore.mcpSecretHeaders = pruneMcpSecretHeaders(
+            secrets,
+            toStore.mcpServers as { headers?: { key: string; value: string }[]; name: string; url: string }[],
+        );
     }
 
     const savedKeyPurposes = Object.keys(inputArguments).filter((k) => KEY_INPUT_FIELDS.has(k));
@@ -1092,6 +1104,30 @@ export const getUserPreferencesQuery = internalQuery
         }
     });
 
+/**
+ * The header secrets saved for ONE server (`aiUserPreferences.mcpSecretHeaders`), decrypted, for a connection test
+ * of that server. Bound to its name AND url, like a run's view in {@link getMCPServersQuery}.
+ */
+export const getMcpSecretHeadersQuery = internalQuery
+    .input({ name: v.string().max(MAX_LENGTH.short), url: v.string().max(MAX_LENGTH.url), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.array(v.object({ key: v.string(), value: v.string() })))
+    .query(async ({ args: { name, url, userId }, ctx: context }) => {
+        try {
+            const aiPreferences = await context.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+            const [server] = await mcpServersWithSecretHeaders<{ headers?: { key: string; value: string }[]; name: string; url: string }>(
+                [{ name, url }],
+                aiPreferences?.mcpSecretHeaders,
+            );
+
+            return server?.headers ?? [];
+        } catch {
+            return [];
+        }
+    });
+
 export const getMCPServersQuery = internalQuery
     .input({ userId: v.string() })
     .output(
@@ -1113,7 +1149,8 @@ export const getMCPServersQuery = internalQuery
                 .withIndex("by_userId", (q) => q.eq("userId", userId))
                 .unique();
 
-            return aiPreferences?.mcpServers ?? [];
+            // Header secrets the user handed the agent (`requestSecret`) join their server here, decrypted, and nowhere else.
+            return await mcpServersWithSecretHeaders(aiPreferences?.mcpServers ?? [], aiPreferences?.mcpSecretHeaders);
         } catch {
             return [];
         }

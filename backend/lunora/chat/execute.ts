@@ -42,6 +42,7 @@ import {
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunStartedBy,
     setThreadStatus,
     stampSavedToolCalls,
 } from "./lib/agent-run";
@@ -323,6 +324,8 @@ export const runStreamingAgent = internalAction
 
                 setResearchDepth(ctx, effectiveResearchDepth);
                 setDispatchOrigin(ctx, origin ?? "lead");
+                // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
+                setRunStartedBy(ctx, userId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -470,6 +473,7 @@ export const runStreamingAgent = internalAction
                         stamp: { autoApprovals: toolResult.autoApprovals, mcpLabels: toolResult.mcpLabels, userId },
                         stop: stopping,
                         streamId,
+                        threadId,
                     });
 
                     // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -556,9 +560,12 @@ export const runStreamingAgent = internalAction
                             model,
                             promptMessageId: messageId,
                             reasoningEffort: threadReasoningEffort,
+                            // The reply is named by its first stream; every continuation inherits it.
+                            replyKey: streamId,
                             researchDepth: effectiveResearchDepth,
                             searchMode: effectiveSearchMode,
                             shouldAutoContinue: isAutoContinue,
+                            startedBy: userId,
                             toolNames: Object.keys(tools),
                             toolPermissionKeys: toolResult.permissionKeys,
                             // A continuation does not reload the context, so the quick check reads this off the snapshot.

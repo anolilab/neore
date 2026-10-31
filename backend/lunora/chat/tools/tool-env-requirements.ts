@@ -64,6 +64,9 @@ export const TOOL_ENV_REQUIREMENTS_OR: Partial<Record<string, string[][]>> = {
 /** Tools that have no external dependency and are always available */
 export const ALWAYS_AVAILABLE_TOOLS = [
     "askUser",
+    "requestSecret",
+    "saveSecretAsProviderKey",
+    "setMcpServerSecret",
     "delegateToSubAgent",
     "messageWorker",
     "dateTime",

@@ -34,6 +34,7 @@ import type {
     PullRequestFile,
     PullRequestRef,
     PullRequestSummary,
+    RepoPoll,
     RequiredChecks,
     ReviewSubmission,
     ReviewThread,
@@ -51,6 +52,8 @@ export const GITHUB_FILE_LIMIT = 3000;
 /** Commits GitHub lists for one pull request. */
 export const GITHUB_COMMIT_LIMIT = 250;
 export const GITHUB_PAGE_SIZE = 100;
+/** A poll reads page one of a repository's open pull requests, newest activity first. */
+export const GITHUB_POLL_PAGE_SIZE = 100;
 const INBOX_PAGE_SIZE = 30;
 
 const SEARCH_RESULT_LIMIT = 1000;
@@ -80,6 +83,9 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             // A check run is re-run through its Actions job where it has one, else by a re-request of the check run.
             rerun: NATIVE,
         },
+        // ETag on the list endpoints (a 304 is not counted against the rate limit); a repository webhook signs with the
+        // repository secret (`X-Hub-Signature-256`).
+        freshness: { conditionalPolling: NATIVE, webhooks: NATIVE },
         inbox: {
             // Search `author:` with `draft:true`.
             drafts: NATIVE,
@@ -89,7 +95,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE },
+        pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,
@@ -239,6 +245,79 @@ const listInbox = async (request: HostRequest, section: InboxSection, page: numb
         page: current,
         total: search.total_count,
     };
+};
+
+// ─── Polling one repository ─────────────────────────────────────────────────
+
+const polledPullSchema = z.object({
+    created_at: z.string(),
+    draft: z.boolean().optional(),
+    html_url: z.string(),
+    labels: z.array(z.object({ name: z.string() })).optional(),
+    number: z.int(),
+    requested_reviewers: z.array(z.object({ login: z.string() })).optional(),
+    title: z.string(),
+    updated_at: z.string(),
+    user: z.object({ login: z.string() }).nullable(),
+});
+
+const normalizeRepo = (input: string): string | null => {
+    const parts = splitGithubRepo(input.trim());
+
+    return parts ? `${parts.owner}/${parts.name}` : null;
+};
+
+const pollReviewRequests = async (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }): Promise<RepoPoll> => {
+    const parts = splitGithubRepo(repo);
+
+    if (!parts) {
+        throw new HostApiError("Not a GitHub repository address", 404);
+    }
+
+    // The login first, only when it is not stored: a poll that finds nothing new is then one request.
+    const login = known.login ?? (await signedInLogin(request));
+    const response = await request(`/repos/${parts.owner}/${parts.name}/pulls`, {
+        // Without a stored validator the list is read in full; with one, an unchanged list answers 304.
+        ...(known.etag !== null && known.login !== null && { ifNoneMatch: known.etag }),
+        query: { direction: "desc", per_page: GITHUB_POLL_PAGE_SIZE, sort: "updated", state: "open" },
+    });
+
+    if (response.status === 304) {
+        return { status: "not_modified" };
+    }
+
+    const list = parse(z.array(z.unknown()), await readJson(response));
+    const wanted = login.toLowerCase();
+    const requested: PullRequestSummary[] = [];
+
+    for (const entry of list) {
+        const item = polledPullSchema.safeParse(entry);
+        const url = item.success ? webUrl(item.data.html_url) : null;
+
+        if (
+            !item.success ||
+            url === null ||
+            item.data.draft === true ||
+            (item.data.requested_reviewers ?? []).every((reviewer) => reviewer.login.toLowerCase() !== wanted)
+        ) {
+            continue;
+        }
+
+        requested.push({
+            authorLogin: item.data.user?.login ?? "ghost",
+            commentCount: 0,
+            createdAt: toMs(item.data.created_at),
+            draft: false,
+            labels: (item.data.labels ?? []).map((label) => label.name),
+            number: item.data.number,
+            repository: repo,
+            title: item.data.title,
+            updatedAt: toMs(item.data.updated_at),
+            url,
+        });
+    }
+
+    return { etag: response.headers.get("etag"), login, requested, status: "changed" };
 };
 
 // ─── One pull request ───────────────────────────────────────────────────────
@@ -1134,6 +1213,8 @@ export const githubDriver: HostDriver = {
     listThreads,
     listViewed,
     mergePullRequest,
+    normalizeRepository: normalizeRepo,
+    pollReviewRequests,
     replyToThread,
     rerunCheck,
     setAutoMerge,
@@ -1147,5 +1228,6 @@ export const githubDriver: HostDriver = {
         limits: { commits: GITHUB_COMMIT_LIMIT, files: GITHUB_FILE_LIMIT },
         requestNoun: "pull request",
     },
+    webhookScheme: "native",
     webOrigin: GITHUB_WEB_ORIGIN,
 };

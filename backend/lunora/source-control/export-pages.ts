@@ -25,3 +25,27 @@ export const collectAllReviewDrafts = async (readPage: (cursor: string | null, p
         cursor = result.cursor;
     }
 };
+
+/** One page of `collectGuidesForExport`: same contract as the drafts' page. */
+interface GuidesPage {
+    cursor?: string | null;
+    guides?: unknown[];
+}
+
+/** Walks every page of a user's guides for the export workflow, one workflow step per page (a guide can be large). */
+export const collectAllGuides = async (readPage: (cursor: string | null, page: number) => Promise<unknown>): Promise<{ guides: unknown[] }> => {
+    const guides: unknown[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; ; page += 1) {
+        const result = (await readPage(cursor, page)) as GuidesPage;
+
+        guides.push(...(result.guides ?? []));
+
+        if (!result.cursor) {
+            return { guides };
+        }
+
+        cursor = result.cursor;
+    }
+};

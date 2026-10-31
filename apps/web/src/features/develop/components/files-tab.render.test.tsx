@@ -135,6 +135,38 @@ describe("FilesTab: a page that failed", () => {
     });
 });
 
+const SOURCE_ROW = /src\/a\.ts/;
+
+describe("FilesTab: a file asked for by the guide", () => {
+    it("opens the file, scrolls to it and moves keyboard focus to its row", () => {
+        const scrollIntoView = vi.fn();
+
+        Element.prototype.scrollIntoView = scrollIntoView;
+        files.current = { ...idle, data: { pages: [{ files: [file], hasMore: false, page: 1, status: "ok" }] }, isFetching: false, retry };
+
+        render(
+            <FilesTab
+                address={{ number: 7, repository: "octo/hello" }}
+                capabilities={{}}
+                fileCount={3}
+                fileLimit={3000}
+                focus={{ path: "src/a.ts", token: 1 }}
+                headSha={"a".repeat(40)}
+                hostLabel="GitHub"
+                leftOut={0}
+                showDiff={false}
+            />,
+        );
+
+        const toggle = screen.getByRole("button", { name: SOURCE_ROW });
+
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+        expect(scrollIntoView).toHaveBeenCalled();
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(toggle);
+    });
+});
+
 const RENAMED_ROW = /src\/old\.ts → src\/new\.ts/;
 
 describe("FilesTab: pending comments with no row of their own", () => {

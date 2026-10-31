@@ -54,6 +54,7 @@ import { onCallerShard, onRoutedShard, onThreadShard } from "./lib/http-shard";
 import optimizePromptHttpAction from "./prompts/http";
 import { PUBLIC_API_PREFIX } from "./public-api/identity";
 import { createPublicApiRouter, publicApiUploadGate } from "./public-api/router";
+import { routeWatchWebhook } from "./source-control/webhook";
 import handleTriggerWebhook from "./triggers/http";
 import streamWorkflowHttpAction from "./workflow/http";
 
@@ -253,6 +254,11 @@ app.post(
             async (ctx) => await handleTriggerWebhook(ctx, c.req.raw, c.req.param("triggerId")),
         ),
 );
+
+// A watched repository's webhook (no CORS/auth — signature-verified; it only marks the repository dirty). The
+// route is limited per client address on the root shard, then finds the owner's shard from the watch id
+// (`source-control/webhook.ts`).
+app.post("/source-control/webhook/:watchId", async (c) => await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId")));
 
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).

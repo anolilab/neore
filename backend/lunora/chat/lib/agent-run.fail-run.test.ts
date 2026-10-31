@@ -74,6 +74,19 @@ describe(failRun, () => {
         expect(calls.find((call) => call.ref === internal.agent.threads.updateThread)?.args).toMatchObject({ patch: { status: "error" } });
     });
 
+    it("drops the thread's saved secret references, whichever way the stream ended", async () => {
+        for (const statuses of [["done"], ["streaming"]]) {
+            const { calls, ctx } = fakeCtx(statuses);
+
+            await failRun(ctx as never, ARGS);
+
+            expect(calls.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({
+                streamId: "stream-1",
+                threadId: "thread-1",
+            });
+        }
+    });
+
     it("writes no error line and leaves the thread active when the stream was already ended", async () => {
         const { calls, ctx } = fakeCtx(["done"]);
 

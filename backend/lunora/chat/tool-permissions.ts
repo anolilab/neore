@@ -53,6 +53,7 @@ import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
+import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -83,7 +84,7 @@ export const getToolPermissionsQuery = internalQuery
 
 /** The user's time-boxed allows, lapsed ones included — the resolver judges them against the clock. */
 export const getToolPermissionGrantsQuery = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(vToolPermissionGrants)
     .query(async ({ args: { userId }, ctx }) => {
         const prefs = await ctx.db
@@ -429,11 +430,13 @@ export const recordPendingToolApprovals = internalMutation
         // tool calls — they notify as "a question is waiting", not "approve".
         askUserApprovalIds: v.optional(v.array(v.string())),
         config: vToolRunConfig,
+        // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
+        secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         threadId: v.string(),
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, secretApprovalIds, threadId, userId }, ctx }) => {
         const createdAt = ctx.now;
         const thread = await ctx.db.get(threadId as Id<"threads">);
         // The row belongs to the thread OWNER, whoever's turn paused: only the
@@ -452,19 +455,30 @@ export const recordPendingToolApprovals = internalMutation
         }
 
         // One notification per pause, to the thread OWNER — only they can answer
-        // (`respondToToolApproval`). A question takes precedence over approvals.
+        // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
+        // answered with something, and nothing offers to "approve" them.
         const askUserIds = new Set(askUserApprovalIds);
+        const secretIds = new Set(secretApprovalIds);
         const [first] = uniqueIds;
+        const secret = [...uniqueIds].find((id) => secretIds.has(id));
         const question = [...uniqueIds].find((id) => askUserIds.has(id));
 
         if (first !== undefined) {
-            const key = question ?? first;
+            let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
+
+            if (secret !== undefined) {
+                type = "secret_request";
+            } else if (question !== undefined) {
+                type = "ask_user";
+            }
+
+            const key = secret ?? question ?? first;
 
             await notifyQuietly(ctx, {
-                dedupeKey: `${question === undefined ? "tool_approval" : "ask_user"}:${key}`,
+                dedupeKey: `${type}:${key}`,
                 link: `/chat/${threadId}`,
                 title: thread?.title ?? "Chat",
-                type: question === undefined ? "tool_approval" : "ask_user",
+                type,
                 userId: ownerId,
             });
         }
@@ -543,6 +557,11 @@ export const respondToToolApproval = authMutation
         // the claim back.
         if (toolName === ASK_USER_TOOL_NAME) {
             throw new LunoraError("BAD_REQUEST", "Answer this question instead of approving it");
+        }
+
+        // Likewise a secret request is answered with the value (`chat/request-secret.ts`), or declined there.
+        if (toolName === REQUEST_SECRET_TOOL_NAME) {
+            throw new LunoraError("BAD_REQUEST", "Answer this secret request instead of approving it");
         }
 
         // The key recorded when the tool was built. A snapshot without one

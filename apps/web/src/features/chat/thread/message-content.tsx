@@ -32,6 +32,7 @@ const LazyDocumentArtifact = lazy(() => import("@/features/canvas/document-artif
 const LazyMcpAppView = lazy(() => import("@/features/chat/thread/mcp-app-view"));
 const LazyToolApproval = lazy(() => import("@/features/chat/thread/tool-approval"));
 const LazyAskUserPrompt = lazy(() => import("@/features/chat/thread/ask-user-prompt"));
+const LazyRequestSecretPrompt = lazy(() => import("@/features/chat/thread/request-secret-prompt"));
 const LazySubAgentToolView = lazy(() => import("@/features/sub-agents/components/sub-agent-tool-view"));
 const LazySandboxFiles = lazy(() => import("@/features/chat/thread/sandbox-files"));
 const LazyCodingAgentToolView = lazy(() => import("@/features/coding-agents/components/coding-agent-tool-view"));
@@ -61,15 +62,28 @@ const AskUserPrompt: FC<{ part: ToolPart }> = (props) => (
     </Suspense>
 );
 
-// An `askUser` call pauses as an approval request too, but is answered, not approved.
-const ToolApproval: FC<{ part: ToolPart }> = ({ part }) =>
-    part.type === "tool-askUser" ? (
-        <AskUserPrompt part={part} />
-    ) : (
+const RequestSecretPrompt: FC<{ part: ToolPart }> = (props) => (
+    <Suspense fallback={null}>
+        <LazyRequestSecretPrompt {...props} />
+    </Suspense>
+);
+
+// An `askUser` or `requestSecret` call pauses as an approval request too, but is answered, not approved.
+const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
+    if (part.type === "tool-askUser") {
+        return <AskUserPrompt part={part} />;
+    }
+
+    if (part.type === "tool-requestSecret") {
+        return <RequestSecretPrompt part={part} />;
+    }
+
+    return (
         <Suspense fallback={null}>
             <LazyToolApproval part={part} />
         </Suspense>
     );
+};
 
 const PresentationArtifact: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }> = (props) => (
     <Suspense fallback={null}>
@@ -108,6 +122,7 @@ const TOOL_VIEWS: Record<string, FC<{ part: ToolPart }>> = {
     delegateToCodingAgent: CodingAgentToolView,
     delegateToSubAgent: SubAgentToolView,
     messageWorker: SubAgentToolView,
+    requestSecret: RequestSecretPrompt,
 };
 
 interface MessageContentProps {
