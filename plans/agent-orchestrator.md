@@ -332,8 +332,10 @@ capability-gated steer.
   `delegateToSubAgent` (with `persistent`). Admission refuses a pair the computer did not offer, an offline computer
   and a source other than `lead`/`user`, and writes the child thread (`runner: "host"`), its `acpSessions` row and the
   signed `acp_start` in one transaction (a refused start throws, taking all of it back). A run is started in the
-  transaction that claims it: the same `acp_send` as `/hosts/send`, no charge, and a host that cannot be reached
-  (offline, busy, no session) fails the run at once through `finishRun`, so the lead gets the per-run failure post. The
+  transaction that claims it: the same `acp_send` as `/hosts/send`, no charge, and a host that cannot take it
+  (offline, ineligible, no session or an ended one, input too large) fails the run at once through `finishRun`, so the lead gets the per-run failure
+  post. A busy one (its open-call budget spent, or another turn holding the session) puts the run back at the head of its
+  line and retries it, waits doubling from 5 s to 2 min, up to `HOST_START_MAX_ATTEMPTS` (8) tries. The
   turn's end (`turn_end`, the reaper, a revoke, Stop, a deleted thread) finishes the run that sent it (`hostTurnId`).
   A stop or a stale-run failure on this side cancels the turn on the computer and releases the line at once.
   Releasing the line before the computer confirms is safe: the desktop session keeps one turn at a time and queues an
