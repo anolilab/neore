@@ -1,6 +1,7 @@
 /** The hooks file against the real file system: a link is never followed, and the hash is of the bytes that were parsed. */
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, constants, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -95,5 +96,23 @@ describe("nodeHookFs.readInside", () => {
         mkdirSync(path.join(root, HOOKS_PATH));
 
         expect(await nodeHookFs.readInside(root, HOOKS_PATH, 1000)).toMatchObject({ state: "refused" });
+    });
+
+    it.runIf(process.platform !== "win32")("refuses a named pipe without waiting for a writer", async () => {
+        const pipe = path.join(root, HOOKS_PATH);
+
+        execFileSync("/usr/bin/mkfifo", [pipe]);
+
+        try {
+            expect(await nodeHookFs.readInside(root, HOOKS_PATH, 1000)).toMatchObject({ state: "refused" });
+        } finally {
+            // Frees a reader that was left waiting, if the read did block.
+            try {
+                // eslint-disable-next-line no-bitwise -- open flags are a bit set
+                closeSync(openSync(pipe, constants.O_WRONLY | constants.O_NONBLOCK));
+            } catch {
+                // Nobody is reading: nothing to free.
+            }
+        }
     });
 });

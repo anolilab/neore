@@ -1,5 +1,6 @@
 /** The file system as the hook runner uses it, so tests can stand in for it and a watcher's timing is theirs to set. */
 import { constants, watch } from "node:fs";
+import type { FileHandle } from "node:fs/promises";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
@@ -86,14 +87,11 @@ const refusedRead = (reason: string): InsideRead => {
     return { reason, state: "refused" };
 };
 
-/** The open handle's own view of the file, compared with what its path says now. */
-const readInside = async (root: string, relative: string, maxBytes: number): Promise<InsideRead> => {
-    const segments = relative.split("/");
-    const target = path.join(root, ...segments);
+/** What lstat says of every folder on the way and of the file itself: all real entries of the right kind, no links. `undefined`: nothing to object to. */
+const pathRefusal = async (root: string, segments: string[]): Promise<InsideRead | undefined> => {
     let walked = root;
 
-    // Every folder on the way and the file itself must be real entries, not links.
-    for (const segment of segments) {
+    for (const [index, segment] of segments.entries()) {
         walked = path.join(walked, segment);
 
         // eslint-disable-next-line no-await-in-loop -- each step is below the one before
@@ -106,26 +104,50 @@ const readInside = async (root: string, relative: string, maxBytes: number): Pro
         if (info.isSymbolicLink()) {
             return refusedRead("a link on the way to the file");
         }
+
+        // A named pipe or device would make the open wait (or read something that is not the file), so only a real file is opened.
+        if (index < segments.length - 1 ? !info.isDirectory() : !info.isFile()) {
+            return refusedRead("not a regular file inside real folders");
+        }
     }
 
-    let handle;
+    return undefined;
+};
 
+/** The handle, or why there is none. */
+const openFile = async (target: string): Promise<FileHandle | InsideRead> => {
     try {
-        // O_NOFOLLOW refuses a link as the last part of the path; the checks below cover the rest of it.
+        // O_NOFOLLOW refuses a link as the last part of the path; the checks on the handle cover the rest of it.
+        // Non-blocking as well: a pipe swapped in after the checks above must not park the open.
         // eslint-disable-next-line no-bitwise -- open flags are a bit set
-        handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        return await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
     } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code ?? "";
-
         if (missing(error)) {
             return { state: "none" };
         }
 
-        if (code === "ELOOP") {
+        if ((error as NodeJS.ErrnoException).code === "ELOOP") {
             return refusedRead("a link on the way to the file");
         }
 
         throw error;
+    }
+};
+
+/** The open handle's own view of the file, compared with what its path says now; the bytes come from that handle. */
+const readInside = async (root: string, relative: string, maxBytes: number): Promise<InsideRead> => {
+    const segments = relative.split("/");
+    const target = path.join(root, ...segments);
+    const refusal = await pathRefusal(root, segments);
+
+    if (refusal !== undefined) {
+        return refusal;
+    }
+
+    const handle = await openFile(target);
+
+    if (!("close" in handle)) {
+        return handle;
     }
 
     try {
