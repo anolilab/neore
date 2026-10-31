@@ -1151,6 +1151,7 @@ export interface Doc_persistentChunks {
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
     text: string;
+    toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number };
 }
 
 export interface Doc_persistentStreams {
@@ -3931,6 +3932,7 @@ export interface Insert_persistentChunks {
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
     text: string;
+    toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number };
 }
 
 export interface Insert_persistentStreams {

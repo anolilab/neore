@@ -5,7 +5,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { createElement } from "react";
+import { createElement, memo } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UIMessage } from "@/lib/agent";
@@ -13,6 +13,8 @@ import type { UIMessage } from "@/lib/agent";
 const harness = vi.hoisted(() => {
     return {
         contentPaints: 0,
+        /** What the persisted body read (`getStreamBody`) answers; null reads as "no body yet". */
+        body: null as unknown,
         /** Ends the stream the test is feeding. */
         finish: undefined as (() => void) | undefined,
         lastText: "",
@@ -34,7 +36,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
     const { skipToken } = await import("@tanstack/react-query");
     const leaf = {
         queryOptions: (args: unknown) => {
-            return { queryFn: args === skipToken ? skipToken : async () => null, queryKey: ["stream-body", args] };
+            return { queryFn: args === skipToken ? skipToken : async () => harness.body, queryKey: ["stream-body", args] };
         },
     };
     // Any depth of namespace (`crpc.a.b.fn`) ends at `leaf`.
@@ -49,12 +51,13 @@ vi.mock("@/features/chat/group/speaker-label", () => {
 
 vi.mock("./message-content", () => {
     return {
-        default: ({ message }: { message: UIMessage }) => {
+        // Memoized like the real one (`message-content.tsx`), which a parent re-render for something else must not repaint.
+        default: memo(({ message }: { message: UIMessage }) => {
             harness.contentPaints += 1;
             harness.lastText = message.text;
 
             return createElement("div", { "data-testid": "content" }, message.text);
-        },
+        }),
     };
 });
 
@@ -102,6 +105,7 @@ describe("streaming placeholder render cost", () => {
         vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false);
         harness.contentPaints = 0;
         harness.lastText = "";
+        harness.body = null;
     });
 
     afterEach(() => {
@@ -188,6 +192,50 @@ describe("streaming placeholder render cost", () => {
         expect(document.querySelectorAll(".text-xs").length).toBeGreaterThan(0);
         // eslint-disable-next-line testing-library/no-node-access -- the assertion is about DOM ancestry
         expect(document.querySelectorAll(".message-text .text-xs")).toHaveLength(0);
+    });
+
+    it("shows a running tool call's progress without touching the reply, and drops it when the call ends", async () => {
+        mount();
+
+        harness.push?.(JSON.stringify({ text: "Looking." }));
+        await vi.waitFor(() => expect(harness.lastText).toBe("Looking."));
+
+        const baseline = harness.contentPaints;
+        const tool = { serverName: "Docs", toolCallId: "call_1", toolName: "index" };
+
+        harness.push?.(JSON.stringify({ text: "", toolProgress: { ...tool, message: "Page 1", progress: 1, total: 4 } }));
+        await vi.waitFor(() => expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("25"));
+
+        harness.push?.(JSON.stringify({ text: "", toolProgress: { ...tool, message: "Page 2", progress: 2, total: 4 } }));
+        await vi.waitFor(() => expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50"));
+
+        expect(screen.getByText("Page 2", { selector: "p" })).toBeDefined();
+        expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+        expect(harness.contentPaints - baseline).toBe(0);
+
+        harness.push?.(JSON.stringify({ text: "", toolProgress: { ...tool, ended: true } }));
+        await vi.waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
+
+        expect(harness.lastText).toBe("Looking.");
+    });
+
+    it("keeps showing a running call's progress from the persisted body when there is no live stream", async () => {
+        harness.body = {
+            reasoning: "",
+            status: "streaming",
+            text: "Looking.",
+            toolProgress: [{ message: "Page 3", progress: 3, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 4 }],
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <StreamingPlaceholder streamId="stream-1" />
+            </QueryClientProvider>,
+        );
+
+        await vi.waitFor(() => expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("75"));
+
+        expect(screen.getByText("Page 3", { selector: "p" })).toBeDefined();
     });
 
     it("shows the final text when the stream ends", async () => {

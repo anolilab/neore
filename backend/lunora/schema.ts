@@ -1723,6 +1723,19 @@ export const schema = defineSchema({
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
         text: v.string(),
+        // A long MCP tool call's latest progress report (`chat/lib/mcp-progress.ts`), or `ended` once the
+        // call is over. The chunk carries no text: the placeholder keeps the newest per `toolCallId`.
+        toolProgress: v.optional(
+            v.object({
+                ended: v.optional(v.boolean()),
+                message: v.optional(v.string().max(500)),
+                progress: v.optional(v.number()),
+                serverName: v.string().max(500),
+                toolCallId: v.string().max(128),
+                toolName: v.string().max(500),
+                total: v.optional(v.number()),
+            }),
+        ),
     })
         .index("by_streamId_seq", ["streamId", "seq"])
         .relations((r) => {

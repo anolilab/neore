@@ -47,7 +47,7 @@ import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { closeMCPClients } from "./lib/mcp-tools";
-import { pipeToPersistentChunks, type PipedStream, stopWhenStopped } from "./lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
@@ -249,6 +249,7 @@ export const runStreamingAgent = internalAction
                           autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                           // Interactive: the user's devices, if this thread may reach them.
                           deviceThreadId: threadId,
+                          mcpProgress: toolProgressSink(ctx, streamId),
                           mcpServerNames: streamingConfig.mcpServerNames,
                           model,
                           ...(origin === "outside_agent" && { origin }),
