@@ -219,8 +219,11 @@ export const runShardTick = internalMutation
     .mutation(async ({ ctx }) => {
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
-        // Event watchers whose next check is due; their checks run as actions.
-        await ctx.runMutation(internal.triggers.events.dispatchDueEventTriggers, {});
+        // Event watchers whose next check is due; their checks run as actions. A failure here must not stop the reaping
+        // and the re-arming below, or the shard's other schedules stall with it.
+        await bestEffort("dispatchDueEventTriggers", async () => {
+            await ctx.runMutation(internal.triggers.events.dispatchDueEventTriggers, {});
+        });
         // Coding-agent turns that went silent; re-arms this shard for the next one to expire.
         const reaped = await bestEffort("reapHostStreams", async () => {
             await ctx.runMutation(internal.acp.ingest.reapHostStreams, {});
