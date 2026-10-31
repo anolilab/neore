@@ -45,6 +45,24 @@ describe("createBoundRequester", () => {
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
     });
 
+    it("marks a write the host answered with a redirect unconfirmed, and a read not", async () => {
+        const write = transport(() => redirect("/repos/o/new", 307));
+
+        await expect(
+            createBoundRequester({ origin: ORIGIN, token: "tkn", via: write.via })("/repos/o/r/pulls/1/merge", { json: {}, method: "PUT" }),
+        ).rejects.toMatchObject({
+            name: "HostApiError",
+            unconfirmed: true,
+        });
+        expect(write.seen).toHaveLength(1);
+
+        const loop = transport(() => redirect("/again"));
+
+        await expect(createBoundRequester({ maxRedirects: 0, origin: ORIGIN, token: "tkn", via: loop.via })("/start")).rejects.toMatchObject({
+            unconfirmed: false,
+        });
+    });
+
     it("never sends the token to a plain-http origin", async () => {
         const { seen, via } = transport(() => Response.json({}));
 
@@ -103,19 +121,52 @@ describe("createBoundRequester", () => {
         [403, { "x-ratelimit-remaining": "0" }, { rateLimited: true, status: 403 }],
         [403, {}, { rateLimited: false, status: 403 }],
         [429, {}, { rateLimited: true, status: 429 }],
-    ])("cancels the body of a %i response, and flags a rate limit", async (status, headers, expected) => {
-        let cancelled = false;
+    ])("releases the body of a %i response, and flags a rate limit", async (status, headers, expected) => {
+        let released = false;
+        // A body that was read to its end closes the stream (`pull` finds nothing more); one that was not is cancelled.
         const response = new Response(
             new ReadableStream({
                 cancel() {
-                    cancelled = true;
+                    released = true;
+                },
+                pull(controller) {
+                    controller.close();
+                    released = true;
                 },
             }),
             { headers, status },
         );
 
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via: async () => response })("/x")).rejects.toMatchObject(expected);
-        expect(cancelled).toBe(true);
+        expect(released).toBe(true);
+    });
+
+    it.each([
+        ["GET", "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."],
+        ["GET", "API rate limit exceeded for user ID 1."],
+        ["POST", "You have exceeded a SECONDARY RATE LIMIT."],
+    ] as const)("flags a bare 403 whose message names a rate limit (%s)", async (method, message) => {
+        const via = async () => Response.json({ message }, { status: 403 });
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/x", { method })).rejects.toMatchObject({ rateLimited: true, status: 403 });
+    });
+
+    it("keeps a 403 that is a plain refusal a refusal, and a huge hostile message linear", async () => {
+        const refusal = async () => Response.json({ message: "Resource not accessible by integration" }, { status: 403 });
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via: refusal })("/x")).rejects.toMatchObject({ rateLimited: false, status: 403 });
+
+        const hostile = async () => Response.json({ message: "rate limi".repeat(100_000) }, { status: 403 });
+        const started = performance.now();
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via: hostile })("/x")).rejects.toMatchObject({ rateLimited: false });
+        expect(performance.now() - started).toBeLessThan(3000);
+    });
+
+    it("does not read a rate limit out of the message of a status that is not 403", async () => {
+        const via = async () => Response.json({ message: "rate limit" }, { status: 422 });
+
+        await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/x", { method: "POST" })).rejects.toMatchObject({ rateLimited: false });
     });
 
     it("turns a transport failure into a refused request, not a throw of its own", async () => {
@@ -124,5 +175,60 @@ describe("createBoundRequester", () => {
         };
 
         await expect(createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/x")).rejects.toMatchObject({ name: "HostApiError", status: 0 });
+    });
+
+    describe("writes", () => {
+        it("sends a JSON body with the method, to the bound origin only", async () => {
+            const bodies: { body: unknown; contentType: string | null; method: string | undefined }[] = [];
+            const via = async (_input: Request | string | URL, init?: RequestInit): Promise<Response> => {
+                bodies.push({ body: init?.body, contentType: new Headers(init?.headers).get("content-type"), method: init?.method });
+
+                return Response.json({ id: 1 });
+            };
+
+            await createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/r/pulls/1/reviews", { json: { event: "COMMENT" }, method: "POST" });
+
+            expect(bodies).toEqual([{ body: '{"event":"COMMENT"}', contentType: "application/json", method: "POST" }]);
+        });
+
+        it("never replays a write after a redirect, even one that stays on the origin", async () => {
+            const { seen, via } = transport(() => redirect("/repos/o/new", 307));
+
+            await expect(
+                createBoundRequester({ origin: ORIGIN, token: "tkn", via })("/repos/o/old/pulls/1/reviews", { json: { body: "x" }, method: "POST" }),
+            ).rejects.toMatchObject({ name: "HostApiError", status: 0 });
+            expect(seen).toHaveLength(1);
+        });
+
+        it("keeps the host's reason for a refused write, and not for a refused read", async () => {
+            const refuse = () => Response.json({ message: "Unprocessable Entity: Can not approve your own pull request" }, { status: 422 });
+            const requester = createBoundRequester({ origin: ORIGIN, token: "tkn", via: async () => refuse() });
+
+            await expect(requester("/x", { json: {}, method: "POST" })).rejects.toMatchObject({
+                detail: "Unprocessable Entity: Can not approve your own pull request",
+                status: 422,
+                unconfirmed: false,
+            });
+            await expect(requester("/x")).rejects.toMatchObject({ detail: undefined, status: 422 });
+        });
+
+        it("reads the host's reason from GraphQL-style errors, and from a truncated body gives none", async () => {
+            const via = (body: string) => async () => new Response(body, { status: 422 });
+            const ask = (body: string) => createBoundRequester({ origin: ORIGIN, token: "tkn", via: via(body) })("/x", { json: {}, method: "POST" });
+
+            await expect(ask(JSON.stringify({ errors: [{ message: "Could not resolve" }] }))).rejects.toMatchObject({ detail: "Could not resolve" });
+            await expect(ask(JSON.stringify({ errors: ["plain"] }))).rejects.toMatchObject({ detail: "plain" });
+            await expect(ask('{"errors":[{"message":"cut')).rejects.toMatchObject({ detail: undefined, status: 422 });
+        });
+
+        it("marks a write whose answer never came as unconfirmed, and a read as not", async () => {
+            const via = async (): Promise<Response> => {
+                throw new DOMException("timed out", "TimeoutError");
+            };
+            const requester = createBoundRequester({ origin: ORIGIN, token: "tkn", via });
+
+            await expect(requester("/x", { json: {}, method: "POST" })).rejects.toMatchObject({ status: 0, unconfirmed: true });
+            await expect(requester("/x")).rejects.toMatchObject({ status: 0, unconfirmed: false });
+        });
     });
 });

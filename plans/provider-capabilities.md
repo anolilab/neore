@@ -165,11 +165,19 @@ Needs ACP S3.
   changed report replaces it; an invalid report is stored as all unknown; a
   stranger's call to `getThreadCapabilities` returns nothing.
 
-**S3 — Gated controls.** The steer control, the mode menu, the compaction button
-and the rollback actions read the rules. The "no provider names" test lands.
-- Acceptance: per control, a component test asserts it is absent when the
-  capability is absent or `unknown`, and labelled "interrupt and restart" for a
-  `restart` steer; the grep test fails on an injected provider name.
+**S3 — Gated controls.** The steer control reads `followUpControl`, and the "no
+provider names" test lands. Only the steer control exists in the UI today; the
+mode menu, the compaction button and the rollback actions are gated by the
+slices that build them (`visibleModes`, `capabilityOf("context.compactOnRequest")`
+and `capabilityOf("checkpoints.fileRollback")` are ready), each with the same
+absent-when-`unknown` component test. A host's native `steer` reads as no
+follow-up until the backend takes one (`chat/steering.ts` refuses a host turn)
+and the web composer is mounted for host threads (`composer.tsx` shows a notice
+instead).
+- Acceptance: the steer control has a component test asserting it is absent when
+  the capability is absent or `unknown`, and labelled "interrupt and restart"
+  for a `restart` steer, which stops the reply and sends the text next; the grep
+  test fails on an injected provider name.
 
 ## 8. Invariants
 

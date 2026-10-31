@@ -22,9 +22,10 @@ use sha2::{Digest, Sha256};
 
 use crate::acp_permission::{Answered, Outcome, PendingView, PermissionRequest};
 use crate::engine::{now_ms, validate_roots, DeviceState, Event};
+use crate::fs::{self as confined_fs, MediaRead};
 use crate::hmac::to_hex;
 
-const MAX_AGENTS: usize = 20;
+pub(crate) const MAX_AGENTS: usize = 20;
 const MAX_CONSENTS: usize = 100;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
@@ -102,9 +103,25 @@ pub struct AcpAgent {
     /// Variables for this agent only; they win over the global ones.
     #[serde(default)]
     pub env: EnvVars,
+    /// Set when the agent was installed from the registry (`acp_install.rs`): what was pinned. Only that install
+    /// writes it; a saved command that differs from the installed one clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub install: Option<AcpInstall>,
     /// Stable id, `a-z0-9-`: what a session, a consent and (later) an offer name.
     pub key: String,
     pub label: String,
+}
+
+/// What a registry install pinned. Nothing changes it but another explicit install: there is no update path.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpInstall {
+    pub publisher: String,
+    /// SHA-256 of the archive that was verified, lowercase hex.
+    pub sha256: String,
+    /// The archive's URL, as the registry gave it.
+    pub source: String,
+    pub version: String,
 }
 
 /// The user's approval of one agent in one folder, given in the local window and nowhere else.
@@ -141,6 +158,7 @@ pub struct AcpAgentView {
     pub command: String,
     /// Names only: values are masked in the window and never leave this crate.
     pub env_names: Vec<String>,
+    pub install: Option<AcpInstall>,
     pub key: String,
     pub label: String,
 }
@@ -354,13 +372,14 @@ const CODE_LOADING_NAMES: [&str; 14] = [
     "_JAVA_OPTIONS",
     "ZDOTDIR",
 ];
-const CODE_LOADING_PREFIXES: [&str; 11] = [
-    "BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PYTHON", "RUBY",
+const CODE_LOADING_PREFIXES: [&str; 12] = [
+    "BUNDLE_", "DYLD_", "GEM_", "GIT_", "JAVA", "LD_", "NODE_", "NPM_", "PERL", "PHP", "PYTHON",
+    "RUBY",
 ];
 
 /// Whether `name` changes which program (or which code in it) runs. Case-insensitive: Windows names are. A name
 /// this misses keeps the approvals, so the list errs wide.
-fn changes_program(name: &str) -> bool {
+pub(crate) fn changes_program(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
 
     CODE_LOADING_NAMES.contains(&upper.as_str())
@@ -425,6 +444,7 @@ impl DeviceState {
                     args: agent.args.clone(),
                     command: agent.command.clone(),
                     env_names: agent.env.names(),
+                    install: agent.install.clone(),
                     key: agent.key.clone(),
                     label: agent.label.clone(),
                 })
@@ -435,6 +455,9 @@ impl DeviceState {
     }
 
     pub fn acp_update(&self, update: AcpUpdate) -> Result<AcpView, String> {
+        let mut uninstall = None;
+        let install_root = self.install_root();
+
         self.change_settings(|settings| {
             match update {
                 AcpUpdate::SaveAgent {
@@ -448,6 +471,13 @@ impl DeviceState {
                         .iter()
                         .position(|agent| agent.key == key);
                     let agent = AcpAgent {
+                        // The pin describes the installed command: a different one is no longer that.
+                        install: existing
+                            .filter(|&i| {
+                                settings.acp_agents[i].command == command
+                                    && settings.acp_agents[i].args == args
+                            })
+                            .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,
                         command,
                         env: existing
@@ -467,6 +497,16 @@ impl DeviceState {
                                 settings.acp_consents.retain(|c| c.agent_key != agent.key);
                             }
 
+                            // A command that is no longer the installed one leaves its files with no owner, unless it
+                            // still points inside them (other arguments, or another program of the same download).
+                            if settings.acp_agents[i].install.is_some()
+                                && agent.install.is_none()
+                                && !Path::new(&agent.command)
+                                    .starts_with(install_root.join(&agent.key))
+                            {
+                                uninstall = Some(agent.key.clone());
+                            }
+
                             settings.acp_agents[i] = agent;
                         }
                         None if settings.acp_agents.len() >= MAX_AGENTS => {
@@ -476,6 +516,14 @@ impl DeviceState {
                     }
                 }
                 AcpUpdate::RemoveAgent { key } => {
+                    if settings
+                        .acp_agents
+                        .iter()
+                        .any(|agent| agent.key == key && agent.install.is_some())
+                    {
+                        uninstall = Some(key.clone());
+                    }
+
                     settings.acp_agents.retain(|agent| agent.key != key);
                     settings.acp_consents.retain(|c| c.agent_key != key);
                 }
@@ -552,6 +600,13 @@ impl DeviceState {
             Ok(())
         })?;
 
+        if let Some(key) = uninstall {
+            self.remove_installed_files(&key);
+        }
+
+        // The approved pairs are in the manifest: the page sends a fresh one.
+        self.emit(Event::Changed);
+
         Ok(self.acp_view())
     }
 
@@ -620,6 +675,37 @@ impl DeviceState {
 }
 
 impl DeviceState {
+    /// Reads a file an agent's reply refers to, for attaching to it (`fs::read_media`). `folder` is the session's
+    /// folder; the pair must be one the user approved, so nothing is read for a folder no agent was allowed in.
+    /// Only that one folder is searched, not every folder shared with other tools.
+    pub fn acp_read_media(&self, agent_key: &str, folder: &str, reference: &str) -> MediaRead {
+        let Some(folder) = validate_roots(&[folder.to_owned()])
+            .ok()
+            .and_then(|mut canonical| canonical.pop())
+        else {
+            return MediaRead::Refused;
+        };
+        let approved = self
+            .settings()
+            .acp_consents
+            .iter()
+            .any(|c| c.agent_key == agent_key && c.folder_path == folder);
+
+        if !approved {
+            return MediaRead::Refused;
+        }
+
+        let roots = confined_fs::canonical_roots(std::slice::from_ref(&folder));
+
+        // Resolved again here, so a folder swapped for a link since the consent check would resolve somewhere else:
+        // only the very folder the user approved is a root.
+        if roots.len() != 1 || roots[0].to_string_lossy() != folder.as_str() {
+            return MediaRead::Refused;
+        }
+
+        confined_fs::read_media(&roots, reference)
+    }
+
     /// Registers a request from a coding agent and blocks until it is answered, cancelled or times out.
     /// Run it on a worker thread. The outcome is exactly what the agent receives.
     pub fn acp_permission_ask(&self, request: PermissionRequest) -> Outcome {
@@ -1087,6 +1173,70 @@ mod tests {
     }
 
     #[test]
+    fn a_file_is_read_for_an_approved_pair_only() {
+        let (state, dir) = state("media");
+        let (one, two) = (dir.join("one"), dir.join("two"));
+        let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+        fs::create_dir_all(&one).unwrap();
+        fs::create_dir_all(&two).unwrap();
+        fs::write(one.join("chart.png"), png).unwrap();
+        fs::write(two.join("chart.png"), png).unwrap();
+        save(&state, "alpha");
+        save(&state, "beta");
+        grant(&state, "alpha", &one);
+
+        let read = |agent: &str, folder: &Path| {
+            state.acp_read_media(agent, folder.to_str().unwrap(), "chart.png")
+        };
+
+        assert!(matches!(read("alpha", &one), MediaRead::Read(_)));
+        // Another folder, and another agent in the approved folder, are different pairs.
+        assert!(matches!(read("alpha", &two), MediaRead::Refused));
+        assert!(matches!(read("beta", &one), MediaRead::Refused));
+        assert!(matches!(
+            read("alpha", &dir.join("missing")),
+            MediaRead::Refused
+        ));
+        // The folder's sibling is not reachable through the approved one.
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "../two/chart.png"),
+            MediaRead::Refused
+        ));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_replaced_by_a_link_after_approval_reads_nothing() {
+        let (state, dir) = state("media-swap");
+        let (one, two) = (dir.join("one"), dir.join("two"));
+        let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+        fs::create_dir_all(&one).unwrap();
+        fs::create_dir_all(&two).unwrap();
+        fs::write(one.join("chart.png"), png).unwrap();
+        fs::write(two.join("chart.png"), png).unwrap();
+        save(&state, "alpha");
+        grant(&state, "alpha", &one);
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
+            MediaRead::Read(_)
+        ));
+
+        fs::remove_dir_all(&one).unwrap();
+        std::os::unix::fs::symlink(&two, &one).unwrap();
+
+        assert!(matches!(
+            state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
+            MediaRead::Refused
+        ));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn an_approval_is_stored_and_shows_no_path_in_its_id() {
         let (state, dir) = state("persist");
         let work = dir.join("project");
@@ -1194,6 +1344,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            request_id: "r1".into(),
             options: vec![
                 OfferedOption {
                     kind: "allow_once".into(),

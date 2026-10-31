@@ -136,6 +136,46 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         [deleteBranch, handleUndoDeleteThread, t],
     );
 
+    const handleUndoUnpinThread = useCallback(
+        (threadId: string) => {
+            setOptimisticPin(threadId, true);
+
+            pinThreadMutation({ threadId: threadId as Id<"threads"> })
+                .then(() => {
+                    clearOptimisticPin(threadId);
+
+                    return undefined;
+                })
+                .catch((error) => {
+                    console.error("Failed to re-pin thread:", error);
+                    showError(t`Failed to pin thread`);
+                    setOptimisticPin(threadId, false);
+                    clearOptimisticPin(threadId);
+                });
+        },
+        [pinThreadMutation, setOptimisticPin, clearOptimisticPin, t],
+    );
+
+    const handleUndoArchiveThread = useCallback(
+        (threadId: string, model: string) => {
+            setOptimisticStatus(threadId, "active");
+
+            updateThreadAction({ model, status: "active", threadId: threadId as Id<"threads"> })
+                .then(() => {
+                    clearOptimisticStatus(threadId);
+
+                    return undefined;
+                })
+                .catch((error) => {
+                    console.error("Failed to unarchive thread:", error);
+                    showError(t`Failed to unarchive thread`);
+                    setOptimisticStatus(threadId, "archived");
+                    clearOptimisticStatus(threadId);
+                });
+        },
+        [updateThreadAction, setOptimisticStatus, clearOptimisticStatus, t],
+    );
+
     const handlePinThread = useCallback(
         async (threadId: string) => {
             // Optimistic update - show pinned immediately
@@ -167,7 +207,11 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
 
             unpinThreadMutation({ threadId: threadId as Id<"threads"> })
                 .then(() => {
-                    showSuccess(t`Thread unpinned`);
+                    showSuccess(
+                        <>
+                            {t`Thread unpinned`} <button onClick={() => handleUndoUnpinThread(threadId)} type="button">{t`Undo`}</button>
+                        </>,
+                    );
                     // Clear optimistic state - server data is now authoritative
                     clearOptimisticPin(threadId);
 
@@ -181,7 +225,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                     clearOptimisticPin(threadId);
                 });
         },
-        [unpinThreadMutation, setOptimisticPin, clearOptimisticPin, t],
+        [unpinThreadMutation, handleUndoUnpinThread, setOptimisticPin, clearOptimisticPin, t],
     );
 
     const updateThread = useCallback(
@@ -194,7 +238,15 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
             // `threadId` originates from thread list nodes/route params, which only name real threads.
             updateThreadAction({ model, status, threadId: threadId as Id<"threads"> })
                 .then(() => {
-                    showSuccess(status === "archived" ? t`Thread archived` : t`Thread restored`);
+                    showSuccess(
+                        status === "archived" ? (
+                            <>
+                                {t`Thread archived`} <button onClick={() => handleUndoArchiveThread(threadId, model)} type="button">{t`Undo`}</button>
+                            </>
+                        ) : (
+                            t`Thread restored`
+                        ),
+                    );
                     // Clear optimistic state - server data is now authoritative
                     clearOptimisticStatus(threadId);
 
@@ -210,7 +262,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                     clearOptimisticStatus(threadId);
                 });
         },
-        [updateThreadAction, setOptimisticStatus, clearOptimisticStatus, t],
+        [updateThreadAction, handleUndoArchiveThread, setOptimisticStatus, clearOptimisticStatus, t],
     );
 
     const handleBulkDeleteThreads = useCallback(

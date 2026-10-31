@@ -1,6 +1,6 @@
 /** One turn's output on its way to the backend, in order, one batch at a time (`ingest.ts` has the rules). */
-import type { HostEvent, PostResult } from "./host-events";
-import { jitteredBackoff, wireBytes } from "./host-events";
+import type { HostEvent, PostResult, TurnSummary } from "./host-events";
+import { jitteredBackoff, turnEndEvent, wireBytes } from "./host-events";
 
 /** At most one post per turn in this interval. */
 export const POST_INTERVAL_MS = 250;
@@ -17,6 +17,15 @@ const MAX_BATCH_EVENTS = 200;
 /** Unsent output a turn holds while the backend is out of reach; past this, new text is dropped, not the turn. */
 const MAX_PENDING_JSON = 4_000_000;
 
+/** The same events with the end of the turn stripped of its summary; undefined when no event carries one. */
+const withoutSummary = (events: HostEvent[]): HostEvent[] | undefined => {
+    if (events.every((event) => event.kind !== "turn_end" || event.summary === undefined)) {
+        return undefined;
+    }
+
+    return events.map((event) => event.kind === "turn_end" ? { kind: "turn_end", reason: event.reason, ...event.error !== undefined && { error: event.error } } : event);
+};
+
 const jsonLength = (event: HostEvent): number => JSON.stringify(event).length;
 
 interface Inflight {
@@ -26,6 +35,11 @@ interface Inflight {
 
 /** What a channel needs from the poster it belongs to. */
 export interface ChannelHost {
+    /**
+     * The backend closed a turn this host has not ended (Stop, the reaper, a revoke), so the agent may still be
+     * running it. A cancel that never arrived (the page was throttled or closed, the call expired) is made good here.
+     */
+    readonly endedByBackend: (channel: TurnChannel) => void;
     readonly finished: (channel: TurnChannel) => void;
     readonly log: (message: string) => void;
     readonly now: () => number;
@@ -119,12 +133,12 @@ export class TurnChannel {
     }
 
     /** Queues the end of the turn. The channel takes nothing after it. */
-    public end(reason: "cancelled" | "failed" | "finished" | "interrupted", error?: string): void {
+    public end(reason: "cancelled" | "failed" | "finished" | "interrupted", error?: string, summary?: TurnSummary): void {
         if (this.sealed) {
             return;
         }
 
-        this.enqueue({ kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } });
+        this.enqueue(turnEndEvent(reason, error, summary));
         this.sealed = true;
     }
 
@@ -214,6 +228,11 @@ export class TurnChannel {
             size += length;
             batch.push(next);
             this.pending.shift();
+
+            // A post with a file in it ends there: the backend stores one file per request (it holds the whole file in memory).
+            if (next.kind === "media") {
+                break;
+            }
         }
 
         return batch;
@@ -250,6 +269,10 @@ export class TurnChannel {
                 this.inflight = undefined;
                 this.nextSeq = result.next;
 
+                if (result.ended && !this.sealed) {
+                    this.host.endedByBackend(this);
+                }
+
                 if (result.ended || inflight.events.some((event) => event.kind === "turn_end")) {
                     this.finish();
                 } else {
@@ -259,6 +282,17 @@ export class TurnChannel {
                 break;
             }
             case "refused": {
+                const plain = withoutSummary(inflight.events);
+
+                // The summary is a courtesy and the end of the turn is not: one the backend will not take is sent
+                // again without it, once, so the reply is still saved.
+                if (plain !== undefined) {
+                    this.host.log("[acp-host] the backend refused this turn's summary of changed files; the turn ends without it");
+                    this.inflight = { events: plain, firstSeq: inflight.firstSeq };
+                    this.schedule(Math.max(0, POST_INTERVAL_MS - (this.host.now() - this.lastPostAt)));
+                    break;
+                }
+
                 this.host.log("[acp-host] the backend refused this turn's output; it is no longer posted");
                 this.finish();
                 break;

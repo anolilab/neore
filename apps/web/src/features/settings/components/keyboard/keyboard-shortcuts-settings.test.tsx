@@ -92,6 +92,7 @@ describe("KeyboardShortcutsSettings", () => {
             "copyLastCodeBlock",
             "decreaseEffort",
             "escape",
+            "findInThread",
             "focusSearch",
             "help",
             "increaseEffort",

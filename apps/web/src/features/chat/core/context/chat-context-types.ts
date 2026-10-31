@@ -5,6 +5,7 @@ import type { UIMessage } from "@/lib/agent";
 import type { AppError } from "@/lib/errors";
 import type { useLunora } from "@/lib/lunora/crpc";
 
+import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 
 /**
@@ -26,8 +27,10 @@ export interface ThreadCapabilities {
 /** The exact row shape `chat_functions.getThread` returns (superset of {@link ThreadData}). */
 export type ThreadRow = NonNullable<ReturnOf<typeof api.chat.functions.getThread>>;
 
-export interface ThreadData {
+export interface ThreadData extends ThreadOwnerState {
     _id: string;
+    /** The agent the thread's active path runs on, once it has been switched (`agent/agent-switch.ts`). */
+    activeAgent?: { kind: "model"; model: string };
     /** Set on a bot thread: the bot's model is the one that runs. */
     botId?: string | null;
     branchName?: string;
@@ -70,6 +73,10 @@ export interface ChatStreamingContextValue {
     activeStreamId: string | null;
     /** Gateway URL for edge streaming */
     gatewayUrl: string | null;
+    /** The model runs on a `local-browser` endpoint: the browser streams it and the backend saves text only. */
+    isLocalModel: boolean;
+    /** The running turn is the browser's own `local-browser` stream (not the picked model's). */
+    isLocalStreaming: boolean;
     isStreaming: boolean;
 
     /**

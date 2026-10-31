@@ -205,8 +205,33 @@ describe(finishRun, () => {
     it("a normal finish writes its final chunk and reports no pause", async () => {
         const ctx = { runMutation: vi.fn(async () => null) };
 
-        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ paused: false });
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
+            paused: false,
+        });
         expect(ctx.runMutation).toHaveBeenLastCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
+    });
+
+    describe("what a pause waits for", () => {
+        const request = (approvalId: string, toolCallId: string, toolName: string) => [
+            { input: {}, toolCallId, toolName, type: "tool-call" },
+            { approvalId, toolCallId, type: "tool-approval-request" },
+        ];
+        const saved = (...parts: unknown[][]) => [{ _id: "m1", message: { content: parts.flat(), role: "assistant" } }];
+        const finish = async (messages: ReturnType<typeof saved>) =>
+            await finishRun({ runMutation: vi.fn(async () => null) } as never, { ...runArgs, pending: { reasoning: "", text: "" }, savedMessages: messages });
+
+        it("is a question when every pending call is askUser", async () => {
+            await expect(finish(saved(request("a1", "c1", "askUser")))).resolves.toStrictEqual({ awaitingInput: "question", paused: true });
+        });
+
+        it("is an approval for any other tool, or a mix", async () => {
+            await expect(finish(saved(request("a1", "c1", "browser")))).resolves.toStrictEqual({ awaitingInput: "approval", paused: true });
+            await expect(finish(saved(request("a1", "c1", "askUser"), request("a2", "c2", "browser")))).resolves.toStrictEqual({
+                awaitingInput: "approval",
+                paused: true,
+            });
+        });
     });
 });
 

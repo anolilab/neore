@@ -6,6 +6,7 @@
  * The harness is one database for every shard, so "another user's thread is refused" is proven here by the
  * explicit owner comparison in `applyHostEvents`, not by shard isolation.
  */
+import { CLOUD_INTERACTIVE_CAPABILITIES, LOCAL_BROWSER_CAPABILITIES } from "@neore/ai/capabilities";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +28,31 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 /** The harness runs a procedure object; production resolves a reference by path (`test/registered-api.ts`). */
 const registry = vi.hoisted(() => new Map<string, unknown>());
+
+/** The storage-backed finalize: the real one needs a bucket, so a test says what it answers. */
+const stagedFinalize = vi.hoisted(() => vi.fn());
+
+vi.mock("../lib/chat-upload", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../lib/chat-upload")>()), finalizeStagedUploadFile: stagedFinalize };
+});
+
+/**
+ * Signed host routes cross to the owner's shard as the system (`systemRunners` → `callOnShard`), past the
+ * request's own runners: route those calls through the same runners the test's `httpContext` has, so the
+ * finalize stub and the failing mutation still apply.
+ */
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: { __lunoraRef?: string; kind?: string }, args: never) => {
+            const registered = reference.kind === undefined ? await import("../_generated/functions") : undefined;
+            const kind = reference.kind ?? registered?.LUNORA_FUNCTIONS[reference.__lunoraRef ?? ""]?.kind;
+            const runners = httpContext() as unknown as Record<"runAction" | "runMutation" | "runQuery", (r: unknown, a: never) => Promise<unknown>>;
+            const methods: Record<string, "runAction" | "runMutation"> = { action: "runAction", mutation: "runMutation" };
+
+            return await runners[methods[kind ?? ""] ?? "runQuery"](reference, args);
+        },
+    };
+});
 
 vi.mock("../_generated/internal", async (importOriginal) => {
     const { registeredApi } = await import("../../test/registered-api");
@@ -50,17 +76,20 @@ const { signDevicePayload } = await import("../devices/lib/signing");
 const { floodAllowed, hostIngestHttpAction, readCappedBody, resetFloodGuard, resetOwnerCache } = await import("./http");
 const { applyHostEvents, reapHostStreams } = await import("./ingest");
 const { createHostStream } = await import("../chat/streaming/persistent/host");
-const { getHostSession, listHostSessions } = await import("./functions");
+const { deleteSessionsOfThread, getHostSession, getThreadCapabilities, listHostSessions } = await import("./functions");
+const { collectAcpSessionsForExport } = await import("./gdpr");
 const agentThreads = await import("../agent/threads");
 const composite = await import("../chat/composite");
 const { measureDb } = await import("../../test/db-cost");
-const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE } = await import("./lib/constants");
+const { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS, INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_IMPORT_TURNS } = await import("./lib/constants");
 const { streamLogger } = await import("../lib/logger");
-const { MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("../devices/lib/constants");
+const { MAX_OPEN_ACP_CALLS_PER_DEVICE, MAX_OPEN_ACP_CANCELS_PER_DEVICE } = await import("../devices/lib/constants");
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "lib_shard_housekeeping", await import("../lib/shard-housekeeping"));
 registerModule(registry, "acp_ingest", await import("./ingest"));
+registerModule(registry, "acp_upload", await import("./upload"));
+registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
@@ -68,6 +97,7 @@ registerModule(registry, "chat_streaming_persistent_library", await import("../c
 // Documentation addresses (RFC 5737): the guard only keys on the string.
 const FLOODER = "192.0.2.1";
 const NEIGHBOUR = "192.0.2.2";
+const HOST_TEXT = { neore: { runner: "host" } };
 const RESTARTED = /restarted/u;
 const STOPPED_SENDING = /stopped sending output/u;
 const REMOVED = /was removed/u;
@@ -87,13 +117,31 @@ const insertUser = async () =>
             await ctx.db.insert("user", { createdAt: 0, email: `u${String(Math.random())}@example.com`, emailVerified: true, name: "U", updatedAt: 0 }),
     )) as string;
 
+/** Makes the next `applyHostEvents` throw, as a failing mutation or a lost response would. */
+let failApply = false;
+
+/** What the next `finalizeHostUpload` answers; `undefined` means no action may run. */
+let finalizeStub: ((args: { filename: string; uploadId: string; userId: string }) => Promise<unknown>) | undefined;
+
 /** An `HttpActionCtx` over the harness: every shard is the one database. */
 const httpContext = () => {
     const runners = {
-        runAction: async () => {
-            throw new Error("no actions here");
+        runAction: async (_ref: never, args: never) => {
+            if (!finalizeStub) {
+                throw new Error("no actions here");
+            }
+
+            return await finalizeStub(args);
         },
-        runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
+        runMutation: async (ref: never, args: never) => {
+            if (failApply && ref === (applyHostEvents as never)) {
+                failApply = false;
+
+                throw new Error("the mutation failed");
+            }
+
+            return await harness.run(async (ctx: any) => await ctx.runMutation(ref, args));
+        },
         runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
     };
 
@@ -229,6 +277,9 @@ const row = async (id: string) => (await harness.run(async (ctx: any) => await c
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
+    finalizeStub = undefined;
+    failApply = false;
+    stagedFinalize.mockReset();
     resetFloodGuard();
     resetOwnerCache();
     ownerId = await insertUser();
@@ -261,6 +312,583 @@ describe("session_open", () => {
 
         await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ threadId });
         await expect(as(stranger).query(getHostSession as never, { threadId } as never)).resolves.toBeNull();
+    });
+});
+
+describe("capability reports", () => {
+    const REPORT = {
+        groups: {
+            permissions: { modes: ["ask"] },
+            streaming: { text: { degradation: "none", supported: true } },
+            turns: { cancel: { degradation: "none", supported: true }, followUp: { kind: "queue" } },
+        },
+        reportedAt: 1_700_000_000_000,
+        version: 1,
+    };
+    const CHANGED = { groups: { turns: { followUp: { degradation: "restart", kind: "steer" } } }, reportedAt: 1_700_000_100_000, version: 1 };
+    const UNKNOWN = { groups: {}, reportedAt: 0, version: 1 };
+
+    const openWith = async (device: Paired, capabilities: unknown) => {
+        const result = await ingest(device, { events: [{ ...SESSION_OPEN, capabilities }] });
+
+        expect(result.status).toBe(200);
+
+        return result.json.threadId as string;
+    };
+
+    const reportOf = async (threadId: string, userId = ownerId) => await as(userId).query(getThreadCapabilities as never, { threadId } as never);
+
+    it("stores the report the host sent, and gives it back to the owner", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+        const session = await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+        expect(session).toMatchObject({ capabilities: REPORT });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+    });
+
+    it("replaces the stored report wholesale when the host reconnects with a changed one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await expect(openWith(device, CHANGED)).resolves.toBe(threadId);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+    });
+
+    it("keeps the stored report when a reconnect carries none", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await ingest(device, { events: [SESSION_OPEN] });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+    });
+
+    it.each([
+        ["a string", "supports everything"],
+        ["a wrong version", { ...REPORT, version: 2 }],
+        ["an unknown reason", { groups: { turns: { cancel: { reason: "because", supported: false } } }, reportedAt: 1, version: 1 }],
+        ["null", null],
+    ])("stores %s as all unknown and still opens the session", async (_name, bad) => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, bad);
+
+        await expect(reportOf(threadId)).resolves.toEqual(UNKNOWN);
+    });
+
+    it("answers a host thread that never reported with all unknown", async () => {
+        const device = await pair(ownerId);
+
+        await expect(reportOf(await openSession(device))).resolves.toEqual(UNKNOWN);
+    });
+
+    it("does not roll the stored report back for an older or replayed open", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, CHANGED);
+
+        await openWith(device, REPORT);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+
+        await openWith(device, CHANGED);
+        await expect(reportOf(threadId)).resolves.toEqual(CHANGED);
+    });
+
+    it("keeps the stored report when another one carries the same time, and cannot be shut out by a future-dated one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        // Same time, different content: the stored one stays.
+        await openWith(device, { ...CHANGED, reportedAt: REPORT.reportedAt });
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+
+        // A report dated far ahead of this clock is stored as of now, so the next real one still replaces it.
+        await openWith(device, { ...CHANGED, reportedAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+        await openWith(device, { ...REPORT, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+    });
+
+    it("clamps a future-dated report on the first open too, so the next real one still replaces it", async () => {
+        const device = await pair(ownerId);
+        const before = Date.now();
+        const threadId = await openWith(device, { ...REPORT, reportedAt: before + 10 * 365 * 24 * 60 * 60 * 1000 });
+        const first = (await reportOf(threadId)) as { reportedAt: number };
+
+        expect(first.reportedAt).toBeLessThanOrEqual(Date.now());
+        await openWith(device, { ...CHANGED, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+    });
+
+    it("stores a new session's future-dated report as of now, so the next real one replaces it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, { ...CHANGED, reportedAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 });
+
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
+        await openWith(device, { ...REPORT, reportedAt: Date.now() + 1000 });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+    });
+
+    it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openWith(device, REPORT);
+
+        await openWith(device, "garbage");
+        await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+
+        const other = await pair(ownerId);
+        const fallback = await ingest(other, { events: [{ ...SESSION_OPEN, capabilities: "garbage" }], sessionId: "host-s2" });
+        const fallbackThread = fallback.json.threadId as string;
+
+        await expect(reportOf(fallbackThread)).resolves.toEqual(UNKNOWN);
+        await ingest(other, { events: [{ ...SESSION_OPEN, capabilities: REPORT }], sessionId: "host-s2" });
+        await expect(reportOf(fallbackThread)).resolves.toEqual(REPORT);
+    });
+
+    describe("on a cloud or local thread", () => {
+        const insertThread = async (fields: Record<string, unknown> = {}) =>
+            (await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("threads", {
+                        createdBy: ownerId,
+                        mode: "text",
+                        status: "active",
+                        tags: [],
+                        title: "t",
+                        updatedAt: Date.now(),
+                        userId: ownerId,
+                        ...fields,
+                    }),
+            )) as string;
+
+        const grant = async (threadId: string, userId: string, fields: Record<string, unknown> = {}) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.threadAccess.insert({ grantedAt: Date.now(), grantedBy: ownerId, ownerId, permission: "read", threadId, userId, ...fields }),
+            );
+
+        it("answers the owner with the cloud declaration", async () => {
+            await expect(reportOf(await insertThread())).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } }, version: 1 });
+        });
+
+        it("answers a stranger with nothing", async () => {
+            await expect(reportOf(await insertThread(), await insertUser())).resolves.toBeNull();
+        });
+
+        it("answers a live grantee with the cloud declaration, and an expired one with nothing", async () => {
+            const threadId = await insertThread();
+            const live = await insertUser();
+            const expired = await insertUser();
+
+            await grant(threadId, live);
+            await grant(threadId, expired, { expiresAt: Date.now() - 1000 });
+
+            await expect(reportOf(threadId, live)).resolves.toMatchObject({ groups: { turns: { followUp: { kind: "steer" } } } });
+            await expect(reportOf(threadId, expired)).resolves.toBeNull();
+        });
+
+        it("answers a revoked grantee with nothing", async () => {
+            const threadId = await insertThread();
+            const grantee = await insertUser();
+            const grantId = await grant(threadId, grantee);
+
+            await expect(reportOf(threadId, grantee)).resolves.not.toBeNull();
+            await harness.run(async (ctx: any) => await ctx.db.threadAccess.delete(grantId));
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+        });
+
+        it("answers a viewer of a public-only thread with nothing", async () => {
+            const threadId = await insertThread({ isPublic: true });
+
+            await expect(reportOf(threadId, await insertUser())).resolves.toBeNull();
+        });
+
+        it("answers a live grantee of a host thread with nothing, and the owner with its report", async () => {
+            const device = await pair(ownerId);
+            const threadId = await openWith(device, REPORT);
+            const grantee = await insertUser();
+
+            await grant(threadId, grantee);
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+            await expect(reportOf(threadId)).resolves.toEqual(REPORT);
+        });
+
+        it("answers nobody, the owner included, for a locked thread", async () => {
+            const threadId = await insertThread({ lockedAt: Date.now() });
+            const grantee = await insertUser();
+
+            await grant(threadId, grantee);
+            await expect(reportOf(threadId)).resolves.toBeNull();
+            await expect(reportOf(threadId, grantee)).resolves.toBeNull();
+        });
+
+        it("answers the owner of a thread on a local-browser endpoint with the local declaration, by endpoint type", async () => {
+            const providers = {
+                hosted: { enabled: true, models: [{ id: "shared-name" }], type: "openai-compatible" },
+                laptop: { enabled: true, models: [{ id: "shared-name" }], type: "local-browser" },
+            };
+
+            await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { customAIProviders: providers, userId: ownerId }));
+
+            const local = await insertThread({ model: "custom:laptop/shared-name" });
+            const hosted = await insertThread({ model: "custom:hosted/shared-name" });
+            const plain = await insertThread({ model: "shared-name" });
+
+            await expect(reportOf(local)).resolves.toEqual(LOCAL_BROWSER_CAPABILITIES);
+            await expect(reportOf(hosted)).resolves.toEqual(CLOUD_INTERACTIVE_CAPABILITIES);
+            await expect(reportOf(plain)).resolves.toEqual(CLOUD_INTERACTIVE_CAPABILITIES);
+        });
+    });
+
+    it("returns nothing to a stranger, for a host thread and an id that does not exist", async () => {
+        const device = await pair(ownerId);
+        const hostThread = await openWith(device, REPORT);
+        const stranger = await insertUser();
+
+        await expect(reportOf(hostThread, stranger)).resolves.toBeNull();
+        await expect(reportOf("not-an-id", stranger)).resolves.toBeNull();
+    });
+});
+
+const IMPORT_OPEN = {
+    agentKey: "claude",
+    agentLabel: "Claude Code",
+    folderId: "f1",
+    folderLabel: "neore",
+    kind: "import_open",
+    nativeSessionId: "native-1",
+};
+const IMPORT_TURN = (user: string, text: string, reasoning?: string) => {
+    return { kind: "import_turn", text, user, ...(reasoning !== undefined && { reasoning }) };
+};
+const IMPORT_END = { kind: "import_end" };
+
+/** What a host does for one saved session: open, post its turns in batches, end. Returns the thread and what the open said. */
+const importSession = async (device: Paired, turns: ReturnType<typeof IMPORT_TURN>[], open: Record<string, unknown> = {}) => {
+    const sessionId = "import-1";
+    const opened = await ingest(device, { events: [{ ...IMPORT_OPEN, ...open }], sessionId });
+
+    if (opened.status !== 200 || opened.json.ended === true) {
+        return { opened, threadId: opened.json.threadId as string };
+    }
+
+    const threadId = opened.json.threadId as string;
+    const sent = await ingest(device, { events: [...turns.slice(opened.json.next), IMPORT_END], firstSeq: opened.json.next, sessionId, threadId });
+
+    return { opened, sent, threadId };
+};
+
+const transcriptOf = async (threadId: string) => {
+    const rows = await messagesOf(threadId);
+
+    return rows
+        .toSorted((a, b) => a.order - b.order || a.stepOrder - b.stepOrder)
+        .map((message) => {
+            const content = message.message.content as string | { text: string }[];
+
+            return [message.message.role, typeof content === "string" ? content : content.map((part) => part.text).join("")];
+        });
+};
+
+const sessionRows = async () => await pageOf(async (ctx) => await ctx.db.acpSessions.findMany({}));
+
+const threadRows = async () => await pageOf(async (ctx) => await ctx.db.threads.findMany({}));
+
+describe("importing an agent's saved session", () => {
+    const TURNS = [IMPORT_TURN("fix the bug", "Done.", "thinking"), IMPORT_TURN("and the tests", "Tests too.")];
+
+    it("writes the transcript as a host thread, in order, with the native id on the session", async () => {
+        const device = await pair(ownerId);
+        const { opened, sent, threadId } = await importSession(device, TURNS, { title: "Fix the bug" });
+
+        expect(opened.json).toMatchObject({ ended: false, existing: false, next: 0 });
+        expect(sent?.json).toMatchObject({ ended: true, next: 2 });
+        await expect(row(threadId)).resolves.toMatchObject({ runner: "host", title: "Fix the bug", userId: ownerId });
+        await expect(transcriptOf(threadId)).resolves.toEqual([
+            ["user", "fix the bug"],
+            ["assistant", "Done."],
+            ["user", "and the tests"],
+            ["assistant", "Tests too."],
+        ]);
+        expect(await sessionRows()).toMatchObject([
+            { agentKey: "claude", importedTurns: 2, importState: "done", nativeSessionId: "native-1", status: "ended", threadId },
+        ]);
+        expect(await assistantRepliesOf(threadId)).toHaveLength(2);
+    });
+
+    it("yields one thread when the same session is imported twice", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+        const again = await importSession(device, TURNS);
+
+        expect(again.opened.json).toMatchObject({ ended: true, existing: true, next: 2, threadId: first.threadId });
+        expect(await threadRows()).toHaveLength(1);
+        expect(await sessionRows()).toHaveLength(1);
+        expect(await messagesOf(first.threadId)).toHaveLength(4);
+    });
+
+    it("yields one thread and one copy of the transcript when two imports run at once", async () => {
+        const device = await pair(ownerId);
+        const [a, b] = await Promise.all([importSession(device, TURNS), importSession(device, TURNS)]);
+
+        expect(a.threadId).toBe(b.threadId);
+        expect(await threadRows()).toHaveLength(1);
+        expect(await sessionRows()).toHaveLength(1);
+        await expect(transcriptOf(a.threadId)).resolves.toHaveLength(4);
+    });
+
+    it("finds a session that ran here, and writes nothing into it", async () => {
+        const device = await pair(ownerId);
+        const live = await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: "native-1" }], sessionId: "live-1" });
+        const imported = await importSession(device, TURNS);
+
+        expect(imported.opened.json).toMatchObject({ ended: true, existing: true, threadId: live.json.threadId });
+        expect(await threadRows()).toHaveLength(1);
+        expect(await messagesOf(live.json.threadId)).toHaveLength(0);
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("x", "y")], firstSeq: 0, sessionId: "live-1", threadId: live.json.threadId }),
+        ).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("learns the native id of a session the web started, when the host opens it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: "native-1" }] });
+
+        expect(await sessionRows()).toMatchObject([{ nativeSessionId: "native-1", threadId }]);
+        await expect(importSession(device, TURNS)).resolves.toMatchObject({ opened: { json: { existing: true, threadId } } });
+    });
+
+    it("gives each user their own thread for the same agent session id", async () => {
+        const other = await insertUser();
+        const mine = await importSession(await pair(ownerId), TURNS);
+        const theirs = await importSession(await pair(other), TURNS);
+
+        expect(mine.threadId).not.toBe(theirs.threadId);
+        expect(await threadRows()).toHaveLength(2);
+    });
+
+    it("keeps an agent's two sessions apart", async () => {
+        const device = await pair(ownerId);
+        const one = await importSession(device, TURNS);
+        const two = await importSession(device, TURNS, { nativeSessionId: "native-2" });
+
+        expect(one.threadId).not.toBe(two.threadId);
+    });
+
+    it("drops turns it holds and answers a gap with where to send from", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+        const { threadId } = json;
+
+        await expect(ingest(device, { events: [IMPORT_TURN("c", "d")], firstSeq: 1, sessionId, threadId })).resolves.toMatchObject({
+            json: { next: 0 },
+            status: 409,
+        });
+        await ingest(device, { events: [IMPORT_TURN("a", "b")], firstSeq: 0, sessionId, threadId });
+        // A resend that overlaps what is held writes only the new turn.
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("a", "b"), IMPORT_TURN("c", "d"), IMPORT_END], firstSeq: 0, sessionId, threadId }),
+        ).resolves.toMatchObject({
+            json: { ended: true, next: 2 },
+            status: 200,
+        });
+        await expect(transcriptOf(threadId)).resolves.toHaveLength(4);
+    });
+
+    it("refuses a post that mixes a turn's events with an import's, and one into another user's thread", async () => {
+        const device = await pair(ownerId);
+        const { threadId } = await importSession(device, TURNS);
+        const stranger = await pair(await insertUser());
+
+        await expect(ingest(device, { events: [IMPORT_TURN("a", "b"), TEXT("x")], firstSeq: 0, sessionId: "import-1", threadId })).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(ingest(stranger, { events: [IMPORT_TURN("a", "b")], firstSeq: 2, sessionId: "import-1", threadId })).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(ingest(device, { events: [IMPORT_TURN("a", "b")], firstSeq: 0, sessionId: "import-1", threadId, turnId: "t1" })).resolves.toMatchObject({
+            status: 200,
+        });
+        await expect(messagesOf(threadId)).resolves.toHaveLength(4);
+    });
+
+    it("keeps a turn post from writing into an imported thread", async () => {
+        const device = await pair(ownerId);
+        const { threadId } = await importSession(device, TURNS);
+
+        await expect(turn(device, threadId, "t9", 0, [START()])).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("keeps the session of a soft-deleted thread, and imports again only once the thread is gone for good", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { deleted: true }));
+
+        // Undo must still find the session: nothing is deleted and no second thread is made.
+        const second = await importSession(device, TURNS);
+
+        expect(second.threadId).toBe(first.threadId);
+        expect(second.opened.json).toMatchObject({ ended: true, existing: true });
+        expect(await sessionRows()).toHaveLength(1);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(deleteSessionsOfThread, { threadId: first.threadId });
+            await ctx.db.delete(first.threadId);
+        });
+        expect(await sessionRows()).toHaveLength(0);
+
+        const third = await importSession(device, TURNS);
+
+        expect(third.threadId).not.toBe(first.threadId);
+        await expect(transcriptOf(third.threadId)).resolves.toHaveLength(4);
+
+        // A session left behind by anything else than a delete is replaced all the same.
+        await harness.run(async (ctx: any) => await ctx.db.delete(third.threadId));
+
+        const fourth = await importSession(device, TURNS);
+
+        expect(fourth.threadId).not.toBe(third.threadId);
+    });
+
+    it("replaces the session of a thread that vanished without it", async () => {
+        const device = await pair(ownerId);
+        const first = await importSession(device, TURNS);
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(first.threadId));
+
+        const second = await importSession(device, TURNS);
+
+        expect(second.threadId).not.toBe(first.threadId);
+        expect(await sessionRows()).toHaveLength(1);
+    });
+
+    it("does not restart an import whose thread was soft-deleted mid-way", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+
+        await ingest(device, { events: [IMPORT_TURN("fix the bug", "Done.")], firstSeq: 0, sessionId, threadId: json.threadId });
+        await harness.run(async (ctx: any) => await ctx.db.patch(json.threadId, { deleted: true }));
+        await expect(
+            ingest(device, { events: [IMPORT_TURN("and the tests", "Tests too."), IMPORT_END], firstSeq: 1, sessionId, threadId: json.threadId }),
+        ).resolves.toMatchObject({
+            status: 403,
+        });
+
+        const again = await importSession(device, TURNS);
+
+        expect(again.threadId).toBe(json.threadId);
+        expect(again.opened.json).toMatchObject({ ended: true, existing: true });
+        expect(await sessionRows()).toHaveLength(1);
+    });
+
+    it("lets another computer of the same user finish an unfinished import", async () => {
+        const first = await pair(ownerId);
+        const second = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(first, { events: [IMPORT_OPEN], sessionId });
+
+        await ingest(first, { events: [TURNS[0]], firstSeq: 0, sessionId, threadId: json.threadId });
+
+        const finished = await importSession(second, TURNS);
+
+        expect(finished.opened.json).toMatchObject({ ended: false, existing: true, next: 1, threadId: json.threadId });
+        expect(finished.sent?.json).toMatchObject({ ended: true, next: 2 });
+        await expect(transcriptOf(json.threadId)).resolves.toHaveLength(4);
+        expect(await sessionRows()).toMatchObject([{ deviceId: second.deviceId, importState: "done" }]);
+        // The first computer no longer writes into it.
+        await expect(ingest(first, { events: [TURNS[1]], firstSeq: 1, sessionId, threadId: json.threadId })).resolves.toMatchObject({ status: 403 });
+    });
+
+    it("closes the import when the end arrives after the backend already holds every turn of the post", async () => {
+        const device = await pair(ownerId);
+        const sessionId = "import-1";
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
+        const three = [IMPORT_TURN("a", "1"), IMPORT_TURN("b", "2"), IMPORT_TURN("c", "3")];
+
+        await ingest(device, { events: three, firstSeq: 0, sessionId, threadId: json.threadId });
+
+        await expect(ingest(device, { events: [three[0], three[1], IMPORT_END], firstSeq: 0, sessionId, threadId: json.threadId })).resolves.toMatchObject({
+            json: { ended: true, next: 3 },
+            status: 200,
+        });
+        expect(await sessionRows()).toMatchObject([{ importedTurns: 3, importState: "done" }]);
+        await expect(transcriptOf(json.threadId)).resolves.toHaveLength(6);
+    });
+
+    it("refuses an end that is not the last event", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+
+        await expect(
+            ingest(device, { events: [IMPORT_END, IMPORT_TURN("a", "b")], firstSeq: 0, sessionId: "import-1", threadId: json.threadId }),
+        ).resolves.toMatchObject({
+            status: 403,
+        });
+    });
+
+    it("exports the native id and the import state with the session", async () => {
+        const device = await pair(ownerId);
+
+        await importSession(device, TURNS);
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectAcpSessionsForExport, { userId: ownerId }))) as {
+            sessions: Record<string, unknown>[];
+        };
+
+        expect(exported.sessions).toMatchObject([{ importedTurns: 2, importState: "done", nativeSessionId: "native-1" }]);
+    });
+
+    it("takes the capability report the host builds from a handshake, on a live session and on an import", async () => {
+        const device = await pair(ownerId);
+        // The literal `reportFromHandshake` (apps/desktop/src/acp/capabilities.ts) produces.
+        const capabilities = {
+            groups: { sessions: { listNative: { degradation: "none", supported: true }, load: { reason: "not_offered", supported: false } } },
+            reportedAt: 1_793_179_919_354,
+            version: 1,
+        };
+        const live = await ingest(device, { events: [{ ...SESSION_OPEN, capabilities, nativeSessionId: "native-9" }], sessionId: "live-9" });
+        const imported = await importSession(device, TURNS, { capabilities, nativeSessionId: "native-10" });
+
+        expect(live.status).toBe(200);
+        expect(imported.opened.status).toBe(200);
+
+        const stored = await sessionRows();
+
+        expect(stored.map((session) => session.capabilities)).toEqual([capabilities, capabilities]);
+    });
+
+    it("writes none of a post that would pass the cap", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+
+        // A session that already holds all but one of the turns it may take.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.acpSessions.findMany({});
+
+            await ctx.db.patch(page[0]._id, { importedTurns: MAX_IMPORT_TURNS - 1 });
+        });
+
+        await expect(
+            ingest(device, {
+                events: [IMPORT_TURN("a", "b"), IMPORT_TURN("c", "d")],
+                firstSeq: MAX_IMPORT_TURNS - 1,
+                sessionId: "import-1",
+                threadId: json.threadId,
+            }),
+        ).resolves.toMatchObject({ status: 403 });
+        expect(await messagesOf(json.threadId)).toHaveLength(0);
+        expect(await sessionRows()).toMatchObject([{ importedTurns: MAX_IMPORT_TURNS - 1 }]);
+    });
+
+    it("takes no more turns than the cap", async () => {
+        const device = await pair(ownerId);
+        const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId: "import-1" });
+        const batch = Array.from({ length: 26 }, () => IMPORT_TURN("a", "b"));
+
+        await expect(ingest(device, { events: batch, firstSeq: 0, sessionId: "import-1", threadId: json.threadId })).resolves.toMatchObject({ status: 403 });
     });
 });
 
@@ -412,7 +1040,7 @@ describe("a host turn", () => {
         expect(stream).toMatchObject({ hostEndReason: "finished", hostState: "ended", status: "done" });
         expect(rows.find((message) => message.message.role === "user")?.text).toBe("hello");
         expect(reply).toMatchObject({ provider: "acp-host", reasoning: "thought", status: "success" });
-        expect(reply?.message.content).toEqual([{ text: "Done.", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "Done.", type: "text" }]);
         expect(await row(threadId)).toMatchObject({ status: "active" });
         await expect(as(ownerId).query(streaming.getActiveStreamForThread as never, { threadId } as never)).resolves.toBeNull();
 
@@ -478,7 +1106,7 @@ describe("a host turn", () => {
         expect(older?.order).toBe(newer?.order);
         expect(newer?.parentMessageId).toBe(promptId);
         expect(await rowField(threadId, "activeLeafMessageId")).toBe(newer?._id);
-        expect(newer?.message.content).toEqual([{ text: "second answer", type: "text" }]);
+        expect(newer?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "second answer", type: "text" }]);
     });
 
     it("tracks the permission requests the agent is waiting on", async () => {
@@ -656,7 +1284,7 @@ describe("the reaper", () => {
 
         expect(others).toHaveLength(0);
         expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
-        expect(reply?.message.content).toEqual([{ text: "working", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "working", type: "text" }]);
         expect(reply?.error).toMatch(STOPPED_SENDING);
         expect(call).toMatchObject({ deviceId: device.deviceId, status: "pending", toolName: "acp_cancel" });
         expect(JSON.parse(call?.envelope)).toMatchObject({ input: { sessionId: "host-s1", turnId: "t1" }, kind: "call", tool: "acp_cancel" });
@@ -717,6 +1345,33 @@ describe("the reaper", () => {
         expect(await messagesOf(threadId)).toHaveLength(before.length);
     });
 
+    it("keeps an agent's children with the reply, once each, however often the host posts them", async () => {
+        const owner = await insertUser();
+        const device = await pair(owner);
+        const threadId = await openSession(device);
+        const child = (text: string) => {
+            return { field: "text", kind: "child_text", spawnId: "task1", text };
+        };
+        const events = [START(), TEXT("delegating"), child("child "), child("says hi"), { kind: "child_end", spawnId: "task1", status: "completed" }];
+
+        const first = await turn(device, threadId, "t1", 0, events);
+
+        expect(first.status).toBe(200);
+        // The same post again, and the end again: dropped by their `seq`, not kept twice.
+        await turn(device, threadId, "t1", 0, events);
+        await turn(device, threadId, "t1", 5, [
+            { kind: "child_end", spawnId: "task1", status: "failed" },
+            { kind: "turn_end", reason: "finished" },
+        ]);
+
+        const [reply] = await assistantRepliesOf(threadId);
+
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "delegating", type: "text" }]);
+        expect(reply?.providerMetadata.neore.subagentTranscripts).toEqual([
+            { reasoning: "", spawnId: "task1", status: "completed", text: "child says hi", tools: [] },
+        ]);
+    });
+
     it("keeps every chunk of a turn longer than one page when it saves the reply", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
@@ -726,7 +1381,7 @@ describe("the reaper", () => {
 
         const [reply] = await assistantRepliesOf(threadId);
 
-        expect(reply?.message.content).toEqual([{ text: texts.map((event) => event.text).join(""), type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: texts.map((event) => event.text).join(""), type: "text" }]);
     });
 
     it("keeps a stopped turn's end reason when the host's end arrives afterwards", async () => {
@@ -803,7 +1458,7 @@ describe("stopping and revoking", () => {
         const calls = await cancelCalls();
 
         expect(stream).toMatchObject({ hostEndReason: "stopped", hostState: "ended", status: "done" });
-        expect(reply?.message.content).toEqual([{ text: "partial", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "partial", type: "text" }]);
         expect(calls).toHaveLength(1);
         // The host's own end arrives afterwards and changes nothing.
         await expect(turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "cancelled" }])).resolves.toMatchObject({ json: { ended: true } });
@@ -822,7 +1477,7 @@ describe("stopping and revoking", () => {
         const [reply] = await assistantRepliesOf(threadId);
 
         expect(reply).toMatchObject({ finishReason: "error", status: "failed" });
-        expect(reply?.message.content).toEqual([{ text: "busy", type: "text" }]);
+        expect(reply?.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "busy", type: "text" }]);
         expect(reply?.error).toMatch(REMOVED);
         await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ status: "ended" });
         expect(await row(threadId)).toMatchObject({ status: "active" });
@@ -1142,14 +1797,9 @@ describe("deleting a host thread", () => {
 });
 
 describe("the cancel a stop or a delete sends", () => {
-    it("is logged, not lost silently, when the device's call budget is spent", async () => {
-        const device = await pair(ownerId);
-        const threadId = await openSession(device);
-        const warn = vi.spyOn(streamLogger, "warn").mockImplementation(() => {});
-
-        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+    const fillOpenCalls = async (device: { deviceId: string }, threadId: string, toolName: string, count: number) => {
         await harness.run(async (ctx: any) => {
-            for (let index = 0; index < MAX_OPEN_ACP_CALLS_PER_DEVICE; index += 1) {
+            for (let index = 0; index < count; index += 1) {
                 await ctx.db.insert("deviceCalls", {
                     createdAt: Date.now(),
                     deadline: Date.now() + 600_000,
@@ -1161,15 +1811,36 @@ describe("the cancel a stop or a delete sends", () => {
                     status: "claimed",
                     taintedBy: [],
                     threadId,
-                    toolName: "acp_send",
+                    toolName,
                     userId: ownerId,
                 });
             }
         });
+    };
+
+    it("still reaches the agent when the device's send budget is spent", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await fillOpenCalls(device, threadId, "acp_send", MAX_OPEN_ACP_CALLS_PER_DEVICE);
         await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
 
         expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", status: "done" });
-        expect(await cancelCalls()).toHaveLength(0);
+        expect(await cancelCalls()).toHaveLength(1);
+    });
+
+    it("is logged, not lost silently, when the device's cancel budget is spent", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const warn = vi.spyOn(streamLogger, "warn").mockImplementation(() => {});
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("x")]);
+        await fillOpenCalls(device, threadId, "acp_cancel", MAX_OPEN_ACP_CANCELS_PER_DEVICE);
+        await harness.run(async (ctx: any) => await ctx.runMutation(library.stopActiveForThread, { threadId }));
+
+        expect(await streamFor("t1")).toMatchObject({ hostEndReason: "stopped", status: "done" });
+        expect(await cancelCalls()).toHaveLength(MAX_OPEN_ACP_CANCELS_PER_DEVICE);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("busy"));
         warn.mockRestore();
     });
@@ -1186,5 +1857,455 @@ describe("the apply mutation", () => {
         );
 
         expect(result).toEqual({ outcome: "limited" });
+    });
+});
+
+describe("what a turn changed", () => {
+    const SUMMARY = {
+        files: [
+            { added: 2, path: "src/a.ts", removed: 1 },
+            { added: 4, path: "b.md", removed: 0 },
+        ],
+        patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n+more\n",
+    };
+
+    /** The UI message a client reads for the thread's reply. */
+    const replyFor = async (threadId: string) => {
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const ui = toUIMessages((await messagesOf(threadId)) as never);
+
+        return ui.find((message) => message.role === "assistant");
+    };
+
+    it("shows the two files a turn wrote with their counts, and the patch, on the reply a client reads", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), TEXT("Done."), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+
+        const reply = await replyFor(threadId);
+
+        expect(reply?.hostChanges).toEqual(SUMMARY);
+        expect(reply?.text).toBe("Done.");
+    });
+
+    it("saves a reply for a turn that only changed files, and for a cancelled one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [
+            START("edit"),
+            { kind: "turn_end", reason: "cancelled", summary: { files: SUMMARY.files, patch: SUMMARY.patch } },
+        ]);
+
+        const replies = await assistantRepliesOf(threadId);
+
+        expect(replies).toHaveLength(1);
+        expect(replies[0]?.providerMetadata.neore.hostChanges.files).toEqual(SUMMARY.files);
+    });
+
+    it("keeps the file list and counts of a patch the host could not keep", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [
+            START("edit"),
+            TEXT("ok"),
+            { kind: "turn_end", reason: "finished", summary: { files: SUMMARY.files, patch: { tooLarge: true } } },
+        ]);
+
+        const reply = await replyFor(threadId);
+
+        expect(reply?.hostChanges).toEqual({ files: SUMMARY.files, patch: { tooLarge: true } });
+    });
+
+    it("leaves an earlier reply's patch as it was when a later turn changes the same file", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const later = { files: [{ added: 9, path: "src/a.ts", removed: 9 }], patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,9 +1,9 @@\n" };
+
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+        await turn(device, threadId, "t2", 0, [START("two"), TEXT("second"), { kind: "turn_end", reason: "finished", summary: later }]);
+
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const replies = toUIMessages((await messagesOf(threadId)) as never).filter((message) => message.role === "assistant");
+
+        expect(replies.map((reply) => reply.hostChanges)).toEqual([SUMMARY, later]);
+
+        // A redelivery of the first turn's end, even with a different summary, is dropped.
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: later }]);
+        expect(toUIMessages((await messagesOf(threadId)) as never).find((message) => message.role === "assistant")?.hostChanges).toEqual(SUMMARY);
+    });
+
+    it("ignores a summary that lists no file, so a turn that said nothing still saves no reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "finished", summary: { files: [] } }]);
+
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+    });
+
+    it("keeps each turn's summary on its own reply, not on the next turn's", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("one"), TEXT("first"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+        await turn(device, threadId, "t2", 0, [START("two"), TEXT("second"), { kind: "turn_end", reason: "finished" }]);
+
+        const { toUIMessages } = await import("../agent/ui-messages");
+        const ui = toUIMessages((await messagesOf(threadId)) as never);
+
+        expect(ui.map((message) => `${message.role}:${message.text}`)).toEqual(["user:one", "assistant:first", "user:two", "assistant:second"]);
+        expect(ui[1]?.hostChanges).toEqual(SUMMARY);
+        expect(ui[3]?.hostChanges).toBeUndefined();
+    });
+
+    it("keeps the patch out of the stream's chunks, which every reader of the stream pays for", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await turn(device, threadId, "t1", 0, [START("edit"), { kind: "turn_end", reason: "finished", summary: SUMMARY }]);
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream?._id);
+
+        expect(JSON.stringify(chunks)).not.toContain("+more");
+        expect(chunks.at(-1)?.event).toEqual({ kind: "turn_end", reason: "finished" });
+    });
+
+    it("refuses a whole post whose summary is outside the bounds", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const bad = [
+            { files: [{ added: 1, path: "/etc/passwd", removed: 0 }] },
+            { files: [{ added: 1, path: "../outside.txt", removed: 0 }] },
+            { files: [{ added: 1, path: String.raw`C:\Windows\x`, removed: 0 }] },
+            { files: [{ added: 1, path: "a\n+++ b/forged", removed: 0 }] },
+            { files: [{ added: -1, path: "a.ts", removed: 0 }] },
+            { files: [{ added: 1.5, path: "a.ts", removed: 0 }] },
+            { files: [{ added: 1, path: "x".repeat(1025), removed: 0 }] },
+            {
+                files: Array.from({ length: 201 }, (_, index) => {
+                    return { added: 1, path: `f${String(index)}.ts`, removed: 0 };
+                }),
+            },
+            { files: SUMMARY.files, patch: "x".repeat(256 * 1024 + 1) },
+            { files: SUMMARY.files, patch: { tooLarge: false } },
+        ];
+
+        await turn(device, threadId, "t1", 0, [START("edit")]);
+
+        for (const summary of bad) {
+            const result = await turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary }]);
+
+            // A patch past the post's body cap is refused by the route itself (413) before the validator sees it.
+            expect([400, 413]).toContain(result.status);
+        }
+
+        expect(await assistantRepliesOf(threadId)).toHaveLength(0);
+        // The accepted bounds themselves are not refused.
+        const edge = {
+            files: Array.from({ length: 200 }, (_, index) => {
+                return { added: 0, path: `${"d/".repeat(5)}f${String(index)}.ts`, removed: 0 };
+            }),
+            patch: "x".repeat(100 * 1024),
+        };
+
+        await expect(turn(device, threadId, "t1", 1, [{ kind: "turn_end", reason: "finished", summary: edge }])).resolves.toMatchObject({ status: 200 });
+    });
+});
+
+describe("files a reply refers to", () => {
+    const KEY = `agent-files/${"b".repeat(64)}`;
+
+    const insertFile = async (): Promise<string> =>
+        (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("chatFiles", {
+                    filename: "chart.png",
+                    hash: "b".repeat(64),
+                    lastTouchedAt: 0,
+                    mediaType: "image/png",
+                    refcount: 0,
+                    storageId: KEY,
+                }),
+        )) as string;
+
+    const MEDIA = { contentType: "image/png", kind: "media", name: "chart.png", reference: "out/chart.png", size: 1234, uploadId: "u".repeat(21) };
+
+    /** The thread's `index`th assistant reply; a test that expects it fails here, not on a later `undefined`. */
+    const replyAt = async (threadId: string, index: number): Promise<Record<string, any>> => {
+        const replies = await assistantRepliesOf(threadId);
+        const reply = replies[index];
+
+        if (reply === undefined) {
+            throw new Error(`expected a reply at ${String(index)}`);
+        }
+
+        return reply;
+    };
+
+    const setUp = async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const fileId = await insertFile();
+        const finalize = vi.fn(async () => {
+            return { fileId, mediaType: "image/png", storageKey: KEY };
+        });
+
+        finalizeStub = finalize;
+
+        return { device, fileId, finalize, threadId };
+    };
+
+    it("finalizes the upload for the device's owner and saves the file on the reply, counted once", async () => {
+        const { device, fileId, finalize, threadId } = await setUp();
+        const sent = await turn(device, threadId, "t1", 0, [
+            START(),
+            TEXT("Here is the chart: ![c](out/chart.png)"),
+            MEDIA,
+            { kind: "turn_end", reason: "finished" },
+        ]);
+
+        expect(sent.status).toBe(200);
+        expect(finalize).toHaveBeenCalledExactlyOnceWith({ filename: "chart.png", uploadId: MEDIA.uploadId, userId: ownerId });
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream!._id);
+        const mediaChunk = chunks.find((chunk) => chunk.event?.kind === "media");
+
+        // What is kept is the stored file, never the upload id.
+        expect(mediaChunk!.event).toEqual({
+            contentType: "image/png",
+            fileId,
+            kind: "media",
+            name: "chart.png",
+            reference: "out/chart.png",
+            size: 1234,
+            storageKey: KEY,
+        });
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([
+            { providerMetadata: HOST_TEXT, text: "Here is the chart: c", type: "text" },
+            { data: `storage:${KEY}`, filename: "chart.png", mediaType: "image/png", type: "file" },
+        ]);
+        expect(reply.fileIds).toEqual([fileId]);
+        expect(await rowField(fileId, "refcount")).toBe(1);
+    });
+
+    it("drops a file id and a storage key a device sends: it cannot name stored bytes", async () => {
+        const { device, finalize, threadId } = await setUp();
+        const forged = { ...MEDIA, fileId: "someone-elses", storageKey: `agent-files/${"c".repeat(64)}`, uploadId: undefined };
+
+        await turn(device, threadId, "t1", 0, [START(), { ...forged }, { kind: "turn_end", reason: "finished" }]);
+
+        const stream = await streamFor("t1");
+        const chunks = await chunksOf(stream!._id);
+        const mediaChunk = chunks.find((chunk) => chunk.event?.kind === "media");
+
+        expect(finalize).not.toHaveBeenCalled();
+        expect(mediaChunk!.event).not.toHaveProperty("storageKey");
+        expect(mediaChunk!.event).not.toHaveProperty("fileId");
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KiB) could not be attached.", type: "text" }]);
+        expect(reply.fileIds).toBeUndefined();
+    });
+
+    it("does not fail the post when a finalize fails: the file is shown as not attached", async () => {
+        const { device, threadId } = await setUp();
+
+        finalizeStub = async () => null;
+
+        const sent = await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        expect(sent.status).toBe(200);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content).toEqual([{ providerMetadata: HOST_TEXT, text: "`chart.png` (1 KiB) could not be attached.", type: "text" }]);
+    });
+
+    it("names a file over the cap with its size, without an upload", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await turn(device, threadId, "t1", 0, [
+            START(),
+            { kind: "media", name: "dump.json", reference: "dump.json", size: 30 * 1024 * 1024 },
+            { kind: "turn_end", reason: "finished" },
+        ]);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(finalize).not.toHaveBeenCalled();
+        expect(reply.message.content).toEqual([
+            { providerMetadata: HOST_TEXT, text: "`dump.json` (30.0 MiB) is over the 20.0 MiB limit and was not attached.", type: "text" },
+        ]);
+    });
+
+    it("finalizes a redelivered post's file once, and not at all for a post the backend answers gap to", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await turn(device, threadId, "t1", 0, [START(), TEXT("a")]);
+
+        const first = await turn(device, threadId, "t1", 2, [MEDIA]);
+        const again = await turn(device, threadId, "t1", 2, [MEDIA]);
+        const gap = await turn(device, threadId, "t1", 9, [{ ...MEDIA, uploadId: "v".repeat(21) }]);
+
+        expect(first.json.next).toBe(3);
+        expect(again.json.next).toBe(3);
+        expect(gap.status).toBe(409);
+        expect(finalize).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves an earlier message as it was when the file changes and is attached again", async () => {
+        const { device, fileId, threadId } = await setUp();
+        const NEW_KEY = `agent-files/${"d".repeat(64)}`;
+
+        await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        // The file was edited; the next turn uploads the new bytes, which are stored under their own key.
+        finalizeStub = async () => {
+            return { fileId, mediaType: "image/png", storageKey: NEW_KEY };
+        };
+
+        await turn(device, threadId, "t2", 0, [START("again"), { ...MEDIA, uploadId: "w".repeat(21) }, { kind: "turn_end", reason: "finished" }]);
+
+        const first = await replyAt(threadId, 0);
+        const second = await replyAt(threadId, 1);
+        const keysOf = (reply: Record<string, any>) => reply.message.content.filter((part: any) => part.type === "file").map((part: any) => part.data);
+
+        expect(keysOf(first)).toEqual([`storage:${KEY}`]);
+        expect(keysOf(second)).toEqual([`storage:${NEW_KEY}`]);
+    });
+
+    it("answers 200 and shows the file as not attached when a finalize throws, or the upload id is malformed", async () => {
+        const { device, threadId } = await setUp();
+
+        finalizeStub = async () => {
+            throw new Error("storage is down");
+        };
+
+        const thrown = await turn(device, threadId, "t1", 0, [START(), { ...MEDIA, name: "n".repeat(255) }]);
+        const malformed = await turn(device, threadId, "t1", 2, [
+            { ...MEDIA, uploadId: "../x" },
+            { kind: "turn_end", reason: "finished" },
+        ]);
+
+        expect(thrown.status).toBe(200);
+        expect(malformed.status).toBe(200);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content[0].text).toContain("could not be attached");
+        expect(reply.fileIds).toBeUndefined();
+    });
+
+    it("finalizes the files of one post one at a time", async () => {
+        const { device, fileId, threadId } = await setUp();
+        let running = 0;
+        let overlapped = false;
+
+        finalizeStub = async () => {
+            running += 1;
+            overlapped ||= running > 1;
+            await new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+            running -= 1;
+
+            return { fileId, mediaType: "image/png", storageKey: KEY };
+        };
+
+        await turn(device, threadId, "t1", 0, [START(), MEDIA, { ...MEDIA, uploadId: "x".repeat(21) }, { ...MEDIA, uploadId: "y".repeat(21) }]);
+
+        expect(overlapped).toBe(false);
+    });
+
+    it("keeps a finalized file for the resend of a post whose mutation failed: one finalize, one file row, the file attached", async () => {
+        const { device, fileId, threadId } = await setUp();
+        const { finalizeHostUpload } = await import("./upload");
+        const actionContext = {
+            runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
+            runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
+            storage: {},
+        };
+
+        // The staging object is deleted by the first finalize: a second one throws, as the real one does.
+        stagedFinalize.mockResolvedValueOnce({ fileId, mediaType: "image/png", storageId: KEY, url: "https://signed" });
+        stagedFinalize.mockRejectedValue(new Error("the upload expired"));
+        finalizeStub = async (args) =>
+            await (finalizeHostUpload as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler(actionContext, args);
+        failApply = true;
+
+        await expect(turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }])).rejects.toThrow("the mutation failed");
+
+        const resent = await turn(device, threadId, "t1", 0, [START(), MEDIA, { kind: "turn_end", reason: "finished" }]);
+
+        expect(resent.status).toBe(200);
+        expect(stagedFinalize).toHaveBeenCalledTimes(1);
+
+        const reply = await replyAt(threadId, 0);
+
+        expect(reply.message.content[0]).toMatchObject({ data: `storage:${KEY}`, type: "file" });
+        expect(reply.fileIds).toEqual([fileId]);
+
+        const rows = await pageOf(async (ctx) => await ctx.db.chatFiles.findMany({}));
+
+        expect(rows).toHaveLength(1);
+    });
+
+    it("spends the device's budget before finalizing a file, and answers 429 without using the upload up", async () => {
+        const { device, finalize, threadId } = await setUp();
+
+        await spendBudget(device.deviceId);
+
+        const sent = await turn(device, threadId, "t1", 0, [START(), MEDIA]);
+
+        expect(sent.status).toBe(429);
+        expect(finalize).not.toHaveBeenCalled();
+    });
+
+    it("charges the device's budget once for a post that names a file: the apply skips what the route already spent", async () => {
+        const device = await pair(ownerId);
+        const apply = async (budgetSpent?: boolean) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(applyHostEvents, {
+                        ...(budgetSpent && { budgetSpent }),
+                        deviceId: device.deviceId,
+                        events: [SESSION_OPEN],
+                        sessionId: "s",
+                    }),
+            );
+
+        const rowsOf = async () => {
+            const all = await rateLimitRows();
+
+            return all.filter((limit) => JSON.stringify(limit).includes(device.deviceId)).length;
+        };
+
+        await apply(true);
+        expect(await rowsOf()).toBe(0);
+
+        await apply();
+        expect(await rowsOf()).toBe(1);
+    });
+
+    it("refuses a post carrying more files than one turn may attach", async () => {
+        const { device, finalize, threadId } = await setUp();
+        const sent = await turn(device, threadId, "t1", 0, [
+            START(),
+            ...Array.from({ length: 9 }, () => {
+                return { ...MEDIA };
+            }),
+        ]);
+
+        expect(sent.status).toBe(400);
+        expect(finalize).not.toHaveBeenCalled();
     });
 });

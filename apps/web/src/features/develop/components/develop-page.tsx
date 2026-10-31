@@ -40,7 +40,7 @@ const DevelopPage = ({ onSearchChange, search }: { onSearchChange: (next: Develo
         <div className="mx-auto max-w-7xl space-y-6">
             <header className="space-y-1">
                 <h1 className="text-xl font-semibold">{t`Develop`}</h1>
-                <p className="text-muted-foreground text-sm">{t`Read what needs you: the description, commits, files, diff and checks of each change.`}</p>
+                <p className="text-muted-foreground text-sm">{t`Review what needs you: the description, commits, files, diff and checks of each change, and your own review of it.`}</p>
             </header>
             {connected ? (
                 <div className="flex flex-col gap-6 lg:flex-row">

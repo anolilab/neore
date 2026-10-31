@@ -43,6 +43,8 @@ const STREAMING_VALUE: ChatStreamingContextValue = {
     activeStreamId: null,
     // The landing page never streams, so there is no gateway session to point at.
     gatewayUrl: null,
+    isLocalModel: false,
+    isLocalStreaming: false,
     isStreaming: false,
     streamingMessageId: null,
     streamToken: null,

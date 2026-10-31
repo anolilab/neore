@@ -5,13 +5,23 @@
 import type { HttpActionCtx } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { callOnShard } from "./cross-shard";
+import { currentShard } from "./shard-context";
+import { inSystemShard, onRoutedShard, systemShardContext } from "./http-shard";
 import { onThreadShard } from "./http-shard";
+
+vi.mock("./cross-shard", () => {
+    return { callOnShard: vi.fn(async () => "result") };
+});
 
 vi.mock("../_generated/internal", () => {
     return {
         internal: {
             agent: { sharing: { getGrantOwner: { __lunoraRef: "agent_sharing:getGrantOwner" } } },
-            lib: { shard_housekeeping: { recordShardActivity: { __lunoraRef: "lib_shard_housekeeping:recordShardActivity" } } },
+            lib: {
+                shard_housekeeping: { recordShardActivity: { __lunoraRef: "lib_shard_housekeeping:recordShardActivity" } },
+                shard_routes: { getRouteOwner: { __lunoraRef: "lib_shard_routes:getRouteOwner" } },
+            },
         },
     };
 });
@@ -86,5 +96,53 @@ describe("onThreadShard", () => {
 
         expect(shards).toStrictEqual([]);
         expect(handler).toHaveBeenCalledWith(context, expect.any(Request));
+    });
+});
+
+describe("system shard context", () => {
+    const ref = { __lunoraRef: "x:y" };
+
+    it("aims every runner at the shard key as the system, never through forShard", async () => {
+        const { context } = contextFor(null);
+        const forShard = vi.fn();
+        const system = systemShardContext({ ...context, forShard } as unknown as HttpActionCtx, "user-9");
+
+        await system.runQuery(ref as never, { a: 1 } as never);
+        await system.runMutation(ref as never, {} as never);
+        await system.runAction(ref as never, {} as never);
+
+        expect(callOnShard).toHaveBeenCalledWith(ref, { a: 1 }, { shardKey: "user-9" });
+        expect(vi.mocked(callOnShard)).toHaveBeenCalledTimes(3);
+        expect(forShard).not.toHaveBeenCalled();
+        expect(system.forShard).toBe(forShard);
+    });
+
+    it("runs the handler inside that shard's ALS context", async () => {
+        const { context } = contextFor(null);
+        let seen: string | undefined;
+
+        await inSystemShard(context, "user-9", async () => {
+            seen = currentShard();
+
+            return null;
+        });
+
+        expect(seen).toBe("user-9");
+    });
+
+    it("routes a webhook to the owner in shardRoutes as the system, and to root for an unknown key", async () => {
+        const { context } = contextFor(null);
+        const rootQuery = vi.fn(async () => "owner-1");
+        const handler = vi.fn(async (shardCtx: HttpActionCtx) => {
+            await shardCtx.runQuery({ __lunoraRef: "h:h" } as never, {} as never);
+
+            return currentShard();
+        });
+
+        await expect(onRoutedShard({ ...context, runQuery: rootQuery } as unknown as HttpActionCtx, "messenger", "c1", handler)).resolves.toBe("owner-1");
+        expect(callOnShard).toHaveBeenLastCalledWith({ __lunoraRef: "h:h" }, {}, { shardKey: "owner-1" });
+
+        rootQuery.mockResolvedValueOnce(null as never);
+        await expect(onRoutedShard({ ...context, runQuery: rootQuery } as unknown as HttpActionCtx, "messenger", "c2", handler)).resolves.toBeUndefined();
     });
 });

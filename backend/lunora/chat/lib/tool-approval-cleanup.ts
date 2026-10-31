@@ -21,12 +21,33 @@
  * that changes, and `claimToolApproval` refuses an expired row either way. The
  * unit harness is one database, so it cannot tell shards apart.
  */
+import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
+import { clearAwaitingInput } from "../../agent/table-writes";
 
 export const RESOLVED_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 export const PENDING_APPROVAL_TTL_MS = 7 * RESOLVED_APPROVAL_TTL_MS;
 
 const PURGE_BATCH = 100;
+
+/**
+ * An expired PENDING request can never be answered, so a thread still waiting on it
+ * (`awaitingInput`) stops waiting — unless a newer request on it is still open.
+ */
+const releaseExpiredPauses = async (ctx: Pick<MutationCtx, "db">, expired: ReadonlyArray<{ status: string; threadId: string }>): Promise<void> => {
+    const threadIds = new Set(expired.filter((row) => row.status === "pending").map((row) => row.threadId));
+
+    for (const threadId of threadIds) {
+        const open = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+            .collect();
+
+        if (open.every((row) => row.status !== "pending")) {
+            await clearAwaitingInput(ctx.db, threadId as Id<"threads">);
+        }
+    }
+};
 
 export const deleteToolApprovalRunsForThread = async (ctx: Pick<MutationCtx, "db">, threadId: string): Promise<number> => {
     const rows = await ctx.db
@@ -58,6 +79,7 @@ export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">,
     const expired = [...pending, ...approved, ...denied];
 
     await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
+    await releaseExpiredPauses(ctx, expired);
 
     return expired.length;
 };
@@ -82,6 +104,7 @@ export const purgeExpiredToolApprovalRunsForUser = async (ctx: Pick<MutationCtx,
     const expired = rows.filter((row) => isToolApprovalRunExpired(row, now));
 
     await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
+    await releaseExpiredPauses(ctx, expired);
 
     return expired.length;
 };

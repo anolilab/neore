@@ -20,6 +20,8 @@
 
 :root {
     --thread-max-width: 65ch;
+    /* Assistant reply body (15px). The line height follows the density (display-presets.css). */
+    --assistant-body-size: 0.9375rem;
 }
 
 /* Chat text size (Settings > Appearance). `data-chat-text-size` on <html> is set before first paint by
@@ -38,6 +40,10 @@
 
 :root[data-chat-text-size="large"] {
     --chat-text-scale: 1.125;
+}
+
+:root[data-chat-text-size] .message-text {
+    --assistant-body-size: calc(0.9375rem * var(--chat-text-scale));
 }
 
 :root[data-chat-text-size] .message-text,
@@ -62,6 +68,10 @@
 
 :root[data-chat-text-size] .message-text .message-text-fixed .leading-7 {
     line-height: 1.75rem;
+}
+
+:root .message-text .message-text-fixed {
+    font-size: 0.875rem;
 }
 
 .thread-viewport > [data-radix-scroll-area-content] {

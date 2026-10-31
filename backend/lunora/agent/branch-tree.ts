@@ -142,6 +142,11 @@ export interface BranchParentInput {
     activeLeafId?: string;
     /** Whether earlier saves already wrote into `overrideOrder`. */
     continuationHasRows: boolean;
+    /**
+     * The agent-switch divider a regenerate wrote under its prompt (`regenerateParentOf`) and pointed the
+     * thread at: the reply hangs under it, not under the prompt, so the branch keeps the switch.
+     */
+    dividerUnderPromptId?: string;
     /** A parent the caller named — `saveEditedSibling`, a continuation's first save. */
     explicitParentId?: string;
     failPendingSteps?: boolean;
@@ -179,7 +184,7 @@ export const resolveBranchParent = async (input: BranchParentInput, loadLeafId: 
         // and what makes two replies siblings when it has one (regenerate) —
         // or a tool result answering an approval request, appended at the end
         // of an `order` that may already hold a sibling reply's rows.
-        return prompt._id;
+        return input.dividerUnderPromptId ?? prompt._id;
     }
 
     if (!input.promptMessageId && input.overrideOrder === undefined && input.firstRole === "user" && input.activeLeafId) {

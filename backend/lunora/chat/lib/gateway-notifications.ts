@@ -2,6 +2,7 @@ import type { HttpActionCtx, Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
+import { systemRunners } from "../../lib/http-shard";
 import { MAX_LENGTH } from "../../lib/validators";
 import { verifySignedRequest } from "../../lib/sign-request";
 import type { NotificationInput } from "../../notifications/notify";
@@ -89,7 +90,7 @@ export const toUsageAlert = (userId: string, notification: GatewayNotification, 
  * Called by the LLM Gateway when a user's usage rule fires; each firing becomes
  * one inbox notification (`notify()`, idempotent on its dedupe key).
  */
-export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {
+export const gatewayNotificationsHttpAction = async (_context: HttpActionCtx, request: Request): Promise<Response> => {
     const secret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
     if (!secret || !(await verifySignedRequest(request, secret, MAX_BODY_BYTES))) {
@@ -121,7 +122,7 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
     try {
         if (alerts.length > 0) {
             // One mutation on the user's shard for the whole batch: it fits the gateway's request deadline however many rules fired.
-            await context.forShard(userId).runMutation(internal.notifications.functions.createNotifications, { notifications: alerts });
+            await systemRunners(userId).runMutation(internal.notifications.functions.createNotifications, { notifications: alerts });
         }
     } catch (error) {
         console.error("[GatewayNotifications] Failed to write notifications:", error);

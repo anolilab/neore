@@ -3,9 +3,9 @@
 import { Field } from "@base-ui/react/field";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import cn from "@neore/ui/utils/cn";
 import type { ComponentProps } from "react";
 import { useState } from "react";

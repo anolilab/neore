@@ -12,6 +12,7 @@ import { useMediaMatch } from "rooks";
 
 import AnonymousConvertCard from "@/features/auth/components/anonymous/anonymous-convert-card";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import MobileSectionNav from "@/features/layout/components/mobile-section-nav";
 import NavUser from "@/features/layout/components/nav-user";
 import SidebarShortcut from "@/features/layout/components/sidebar-shortcut";
 
@@ -35,7 +36,10 @@ const AppSidebar: FC<
             <Sidebar className={cn("left-16 [&>div]:flex-row", className)} collapsible="offcanvas" name="left" variant="inset">
                 <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
                     {header && <SidebarHeader>{header}</SidebarHeader>}
-                    <SidebarContent>{content}</SidebarContent>
+                    <SidebarContent>
+                        {isMobile && <MobileSectionNav />}
+                        {content}
+                    </SidebarContent>
                     <SidebarFooter>
                         {footer}
                         {isAnonymous ? (

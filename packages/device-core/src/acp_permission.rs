@@ -50,6 +50,10 @@ pub struct PermissionRequest {
     pub details_complete: bool,
     pub folder: String,
     pub options: Vec<OfferedOption>,
+    /// The id the backend and the phone know this request by (`permission_request` in the turn post). A remote
+    /// answer names it; the numeric id below is this window's own.
+    #[serde(default)]
+    pub request_id: String,
     /// The host's session id, not the agent's.
     pub session_id: String,
     pub target: Option<String>,
@@ -158,6 +162,40 @@ fn answered(pending: &Pending, decision: &'static str) -> Answered {
     }
 }
 
+/// What a remote answer gets for a request that is gone. The backend shows it as "already answered".
+pub const ALREADY_ANSWERED: &str = "already_answered";
+
+/// What a remote "allow" gets for a request whose details were cut or never sent whole. The person decides on what
+/// the web shows, so an allow needs all of it; a decline needs none.
+pub const DETAILS_INCOMPLETE: &str = "details_incomplete";
+
+/// Takes the request at `index` out of the queue and gives the agent the option, if it may be chosen.
+fn answer_at(queue: &mut Vec<Pending>, index: usize, option_id: &str) -> Result<Answered, String> {
+    let option = queue[index]
+        .request
+        .options
+        .iter()
+        .find(|option| option.option_id == option_id)
+        .ok_or("the agent did not offer that option")?;
+
+    let decision = match option.kind.as_str() {
+        ALLOW_ONCE => "once",
+        REJECT_ONCE => "deny",
+        kind if kind.ends_with("_always") => {
+            return Err("\"Always allow\" is not available for coding agents".into());
+        }
+        _ => return Err("that option is not available".into()),
+    };
+    let pending = queue.remove(index);
+    let summary = answered(&pending, decision);
+
+    let _ = pending.sender.send(Outcome::Selected {
+        option_id: option_id.to_owned(),
+    });
+
+    Ok(summary)
+}
+
 fn limited(text: String, max: usize) -> String {
     cap_utf8(&text, max).0
 }
@@ -166,10 +204,21 @@ impl AcpPermissions {
     /// Queues a request and blocks until it is answered, cancelled, or `WAIT` passes (which cancels it).
     /// `on_queued` runs once the request is visible, with its id.
     pub fn ask(&self, request: PermissionRequest, on_queued: impl FnOnce(u64)) -> Outcome {
+        // What the person sees is cut at these lengths; a cut command or target is not a complete request.
+        let cut = request
+            .command
+            .as_ref()
+            .is_some_and(|text| text.len() > MAX_TEXT * 4)
+            || request
+                .target
+                .as_ref()
+                .is_some_and(|text| text.len() > MAX_TEXT);
         let request = PermissionRequest {
             agent_label: limited(request.agent_label, MAX_TEXT),
             command: request.command.map(|text| limited(text, MAX_TEXT * 4)),
-            details_complete: request.details_complete && request.details.len() <= MAX_DETAILS,
+            details_complete: request.details_complete
+                && !cut
+                && request.details.len() <= MAX_DETAILS,
             details: limited(request.details, MAX_DETAILS),
             folder: limited(request.folder, MAX_TEXT),
             // Checked on everything the agent sent, then cut: an id repeated past the cap would otherwise hide.
@@ -177,6 +226,7 @@ impl AcpPermissions {
                 .into_iter()
                 .take(MAX_OPTIONS)
                 .collect(),
+            request_id: limited(request.request_id, MAX_TEXT),
             session_id: request.session_id,
             target: request.target.map(|text| limited(text, MAX_TEXT)),
             tool: limited(request.tool, MAX_TEXT),
@@ -255,29 +305,40 @@ impl AcpPermissions {
             .iter()
             .position(|pending| pending.id == id)
             .ok_or("that request is no longer waiting")?;
-        let option = queue[index]
+
+        answer_at(&mut queue, index, option_id)
+    }
+
+    /// Answers the request the backend names (`session_id` and `request_id` of its `permission_request` event),
+    /// under the same rules as the window: the agent's own option, allow-once or reject-once, never "always".
+    /// A request that is no longer waiting (answered in the window, cancelled, timed out) is
+    /// [`ALREADY_ANSWERED`]; so is one that belongs to another session.
+    pub fn answer_remote(
+        &self,
+        session_id: &str,
+        request_id: &str,
+        option_id: &str,
+    ) -> Result<Answered, String> {
+        let mut queue = self.queue.lock().unwrap();
+        let index = queue
+            .iter()
+            .position(|pending| {
+                !request_id.is_empty()
+                    && pending.request.request_id == request_id
+                    && pending.request.session_id == session_id
+            })
+            .ok_or(ALREADY_ANSWERED)?;
+        let allows = queue[index]
             .request
             .options
             .iter()
-            .find(|option| option.option_id == option_id)
-            .ok_or("the agent did not offer that option")?;
+            .any(|option| option.option_id == option_id && option.kind == ALLOW_ONCE);
 
-        let decision = match option.kind.as_str() {
-            ALLOW_ONCE => "once",
-            REJECT_ONCE => "deny",
-            kind if kind.ends_with("_always") => {
-                return Err("\"Always allow\" is not available for coding agents".into());
-            }
-            _ => return Err("that option is not available".into()),
-        };
-        let pending = queue.remove(index);
-        let summary = answered(&pending, decision);
+        if allows && !queue[index].request.details_complete {
+            return Err(DETAILS_INCOMPLETE.into());
+        }
 
-        let _ = pending.sender.send(Outcome::Selected {
-            option_id: option_id.to_owned(),
-        });
-
-        Ok(summary)
+        answer_at(&mut queue, index, option_id)
     }
 
     /// Says no to one request.
@@ -410,6 +471,7 @@ mod tests {
                 option("always", "allow_always"),
                 option("reject", REJECT_ONCE),
             ],
+            request_id: format!("req-{tool}"),
             session_id: session.into(),
             target: Some("/work/a.txt".into()),
             tool: tool.into(),
@@ -521,6 +583,120 @@ mod tests {
             .contains("no longer waiting"));
         assert!(permissions.decline(id).is_err());
         assert_eq!(waiting.join().unwrap(), selected("allow"));
+    }
+
+    #[test]
+    fn a_remote_answer_after_a_local_one_is_already_answered() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let (id, waiting) = queue(&permissions, request("s1", "Run tests"));
+
+        permissions.answer(id, "allow").unwrap();
+
+        assert_eq!(
+            permissions
+                .answer_remote("s1", "req-Run tests", "allow")
+                .unwrap_err(),
+            ALREADY_ANSWERED
+        );
+        assert_eq!(waiting.join().unwrap(), selected("allow"));
+    }
+
+    #[test]
+    fn a_remote_answer_finds_its_request_by_session_and_request_id_and_only_once() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let (_, waiting) = queue(&permissions, request("s1", "Run tests"));
+        let (_, other) = queue(&permissions, request("s2", "Run tests"));
+
+        // Another session's request, or an id nobody asked under, is not this one.
+        assert_eq!(
+            permissions
+                .answer_remote("s3", "req-Run tests", "allow")
+                .unwrap_err(),
+            ALREADY_ANSWERED
+        );
+        assert_eq!(
+            permissions.answer_remote("s1", "", "allow").unwrap_err(),
+            ALREADY_ANSWERED
+        );
+        assert_eq!(permissions.view().len(), 2);
+
+        let answered = permissions
+            .answer_remote("s1", "req-Run tests", "reject")
+            .unwrap();
+
+        assert_eq!(answered.decision, "deny");
+        assert_eq!(waiting.join().unwrap(), selected("reject"));
+        assert_eq!(
+            permissions
+                .answer_remote("s1", "req-Run tests", "reject")
+                .unwrap_err(),
+            ALREADY_ANSWERED
+        );
+        permissions.cancel_session("s2");
+        other.join().unwrap();
+    }
+
+    #[test]
+    fn a_remote_allow_of_a_request_that_was_cut_is_refused_but_a_decline_is_not() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut partial = request("s1", "Run tests");
+
+        partial.details_complete = false;
+
+        let (_, waiting) = queue(&permissions, partial);
+
+        assert_eq!(
+            permissions
+                .answer_remote("s1", "req-Run tests", "allow")
+                .unwrap_err(),
+            DETAILS_INCOMPLETE
+        );
+        assert_eq!(permissions.view().len(), 1);
+        permissions
+            .answer_remote("s1", "req-Run tests", "reject")
+            .unwrap();
+        assert_eq!(waiting.join().unwrap(), selected("reject"));
+    }
+
+    #[test]
+    fn a_command_or_target_cut_by_the_core_makes_the_request_incomplete() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut long_command = request("s1", "a");
+
+        long_command.command = Some("x".repeat(MAX_TEXT * 4 + 1));
+
+        let mut long_target = request("s1", "b");
+
+        long_target.target = Some("y".repeat(MAX_TEXT + 1));
+
+        let (_, first) = queue(&permissions, long_command);
+        let (_, second) = queue(&permissions, long_target);
+
+        assert!(permissions
+            .view()
+            .iter()
+            .all(|pending| !pending.details_complete && !pending.batchable));
+        permissions.cancel_session("s1");
+        first.join().unwrap();
+        second.join().unwrap();
+    }
+
+    #[test]
+    fn a_remote_answer_never_picks_an_always_option_or_one_the_agent_did_not_offer() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let (_, waiting) = queue(&permissions, request("s1", "Run tests"));
+
+        assert!(permissions
+            .answer_remote("s1", "req-Run tests", "always")
+            .unwrap_err()
+            .contains("Always allow"));
+        assert!(permissions
+            .answer_remote("s1", "req-Run tests", "invented")
+            .is_err());
+        // Refused answers leave the request waiting.
+        assert_eq!(permissions.view().len(), 1);
+        permissions.cancel_session("s1");
+        waiting.join().unwrap();
     }
 
     #[test]

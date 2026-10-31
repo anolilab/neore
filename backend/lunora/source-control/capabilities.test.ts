@@ -6,15 +6,27 @@ import { GITHUB_CAPABILITIES } from "./drivers/github";
 
 /** `Record<HostCapabilityKey, …>` makes this exhaustive: a member added to the type fails the type check here. */
 const KEYS: Record<HostCapabilityKey, true> = {
+    "checks.requiredState": true,
+    "checks.rerun": true,
     "inbox.drafts": true,
     "inbox.mine": true,
     "inbox.needsMyReview": true,
     "inbox.readyToMerge": true,
+    "merge.auto": true,
+    "merge.now": true,
     "pullRequest.checks": true,
     "pullRequest.commits": true,
     "pullRequest.description": true,
     "pullRequest.diff": true,
     "pullRequest.files": true,
+    "review.batchedSubmit": true,
+    "review.lineComments": true,
+    "review.replies": true,
+    "review.resolveThreads": true,
+    "review.verdictApprove": true,
+    "review.verdictComment": true,
+    "review.verdictRequestChanges": true,
+    "review.viewedMarks": true,
 };
 
 describe("host capability rules", () => {
@@ -39,7 +51,11 @@ describe("host capability rules", () => {
         expect(isHostCapabilityAvailable(report, "inbox.drafts")).toBe(false);
     });
 
-    it("declares every member GitHub's read driver supports, and no more", () => {
+    it("words a reply as posted at once, not with the review", () => {
+        expect(hostCapabilityOf(GITHUB_CAPABILITIES as never, "review.replies")).toMatchObject({ degradation: "divergent", supported: true });
+    });
+
+    it("declares every member the GitHub driver supports, and no more", () => {
         expect(Object.keys(KEYS).filter((key) => isHostCapabilityAvailable(GITHUB_CAPABILITIES as never, key as HostCapabilityKey))).toHaveLength(
             Object.keys(KEYS).length,
         );

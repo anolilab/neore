@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { isTrustedUrl } from "../trust.js";
-import { createPermissionPolicy, isDictationAsset } from "./permissions.js";
+import { createPermissionPolicy, isDictationAsset, microphoneAllowed, microphoneSettingsPath } from "./permissions.js";
 
 const SITE = "https://app.example";
 const DICTATION_PAGE = "file:///app/dist/dictation-window/dictation.html";
@@ -107,5 +107,62 @@ describe("isDictationAsset", () => {
         "not a url",
     ])("refuses %s", (url) => {
         expect(isDictationAsset(folder, url)).toBe(false);
+    });
+});
+
+describe("microphoneAllowed", () => {
+    const access = (platform: NodeJS.Platform, status: string, answer = true) => {
+        const ask = vi.fn(async () => answer);
+
+        return { access: { ask, platform, status: () => status }, ask };
+    };
+
+    it.each([
+        ["granted", true],
+        ["denied", false],
+        ["restricted", false],
+    ] as const)("on macOS answers from the status without asking: %s", async (status, expected) => {
+        const { access: given, ask } = access("darwin", status);
+
+        expect(await microphoneAllowed(given)).toBe(expected);
+        expect(ask).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [true, "prompted"],
+        [false, false],
+    ] as const)("on macOS asks once when it has not been decided, and believes the answer (%s)", async (answer, expected) => {
+        const { access: given, ask } = access("darwin", "not-determined", answer);
+
+        expect(await microphoneAllowed(given)).toBe(expected);
+        expect(ask).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+        ["granted", true],
+        ["not-determined", true],
+        ["unknown", true],
+        ["denied", false],
+        ["restricted", false],
+    ] as const)("on Windows refuses only an explicit refusal, and never shows a prompt of its own: %s", async (status, expected) => {
+        const { access: given, ask } = access("win32", status);
+
+        expect(await microphoneAllowed(given)).toBe(expected);
+        expect(ask).not.toHaveBeenCalled();
+    });
+
+    it("on Linux has no OS gate, and does not read a status the platform does not have", async () => {
+        const ask = vi.fn(async () => false);
+        const status = vi.fn(() => "denied");
+
+        expect(await microphoneAllowed({ ask, platform: "linux", status })).toBe(true);
+        expect(ask).not.toHaveBeenCalled();
+        expect(status).not.toHaveBeenCalled();
+    });
+
+    it("names the settings page of each OS", () => {
+        expect(microphoneSettingsPath("darwin")).toContain("System Settings");
+        expect(microphoneSettingsPath("win32")).toContain("Privacy & security");
+        expect(microphoneSettingsPath("linux")).toContain("sound");
     });
 });

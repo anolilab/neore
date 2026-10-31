@@ -3,6 +3,7 @@ import { type EmbeddingModel, embedMany as embedMany_, type ModelMessage } from 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { assert } from "../../lib/error-helpers";
+import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff, withHandoff } from "../handoff-context";
 import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
@@ -660,6 +661,32 @@ export const fetchContextWithPrompt = async (
         }
     }
 
+    // A switch's handoff stands in for the turns before it. A window cut below the divider that holds it asks for
+    // the newest ones above (`agent/agent-switch.ts`); a thread that starts inside the window needs no lookup. A
+    // switch back whose model left above the window asks for what that model had seen.
+    const oldest = prePromptDocs[0];
+    const earlierHandoffs =
+        threadId && oldest && oldest.order > 0 && needsEarlierHandoff(prePromptDocs)
+            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
+            : [];
+    const deltaBases = new Map(
+        await Promise.all(
+            (threadId ? deltaOrphans(prePromptDocs) : []).map(
+                async ({ id, model }) =>
+                    [
+                        model,
+                        await context.runQuery(internal.agent.agent_switch.getHandoffBeforeDelta, {
+                            dividerMessageId: id as Id<"messages">,
+                            threadId: threadId as Id<"threads">,
+                        }),
+                    ] as const,
+            ),
+        ),
+    );
+    const handoff = assembleHandoffContext(prePromptDocs, earlierHandoffs, deltaBases);
+
+    prePromptDocs = handoff.docs;
+
     // Attachments and generated media are persisted as storage references (or,
     // in older rows, URLs that have since expired). Sign them NOW, for this call
     // only, so every turn — follow-ups included — hands the model live links.
@@ -688,7 +715,7 @@ export const fetchContextWithPrompt = async (
     }
 
     const search = docsToModelMessages(signedSearch);
-    const recent = docsToModelMessages(signedPrePrompt);
+    const recent = withHandoff(signedPrePrompt, handoff.blocks);
     const inputMessages = messages.map((item) => toModelMessage(item));
     const inputPrompt = promptArray.map((item) => toModelMessage(item));
     const existingResponses = docsToModelMessages(signedExisting);

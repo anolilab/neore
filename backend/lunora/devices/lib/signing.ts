@@ -6,7 +6,7 @@
  * Signing the exact string (rather than a re-serialised object) means neither
  * side needs canonical JSON: the verifier checks the bytes it received and only
  * then parses them. The domain prefix keeps a signed result from being replayed
- * as a call, a manifest, a progress report or a turn post (`acp/http.ts`). The Rust half is `packages/device-core/src/envelope.rs`;
+ * as a call, a manifest, a progress report, a turn post (`acp/http.ts`) or a request to the device upload route (`acp/upload-http.ts`). The Rust half is `packages/device-core/src/envelope.rs`;
  * `signing.test.ts` pins a vector both sides share.
  *
  * The secret is 32 random bytes as 64 hex characters, used as the HMAC key in
@@ -14,7 +14,7 @@
  */
 import { bytesToHex, hmacSha256Hex, timingSafeEqual } from "../../lib/crypto";
 
-export type DeviceSigningDomain = "call" | "manifest" | "progress" | "result" | "turn";
+export type DeviceSigningDomain = "call" | "manifest" | "progress" | "result" | "turn" | "upload";
 
 const HEX_64 = /^[0-9a-f]{64}$/u;
 

@@ -7,8 +7,9 @@ import type { FC } from "react";
 
 import { ModelPickerButton } from "@/components/model-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
-import { useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
+import AgentSwitchConfirmDialog from "@/features/chat/model-settings/agent-switch-confirm-dialog";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -19,8 +20,10 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { changeModel } = useModelCombobox({ threadId });
+    const { cancelSwitch, changeModel, confirmSwitch, pendingSwitch } = useModelCombobox({ threadId });
     const { isAnonymous } = useIsAnonymous();
+    // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
+    const isRunning = useChatIsRunning();
 
     // A bot's thread always runs on the bot's model (the server enforces it), so the picker is locked.
     const botId = thread?.botId ?? null;
@@ -72,7 +75,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         <>
             <ModelPickerButton
                 className={baseClassName}
-                disabled={isBotThread}
+                disabled={isBotThread || (Boolean(threadId) && isRunning)}
                 includeCustomModels
                 listenForShortcut
                 modelId={effectiveModelId}
@@ -83,6 +86,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 }
                 size="sm"
             />
+            <AgentSwitchConfirmDialog onCancel={cancelSwitch} onConfirm={confirmSwitch} pending={pendingSwitch} />
             {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
         </>
     );
