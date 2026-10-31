@@ -3196,6 +3196,11 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
+      "from": "function:coding_agents_execute:createPullRequest",
+      "kind": "call",
+      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
+    },
+    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -3229,6 +3234,11 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
+    },
+    {
+      "from": "function:coding_agents_execute:finishRun",
+      "kind": "call",
+      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3291,6 +3301,11 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
+      "from": "function:coding_agents_execute:pollPullRequest",
+      "kind": "call",
+      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
+    },
+    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3304,6 +3319,11 @@
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:postRunResult"
+    },
+    {
+      "from": "function:coding_agents_execute:reapPullRequest",
+      "kind": "call",
+      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:reapRun",
@@ -6351,6 +6371,16 @@
       "to": "table:reviewDrafts"
     },
     {
+      "from": "function:source_control_gdpr:deleteUserPullRequestThreads",
+      "kind": "read",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_gdpr:deleteUserPullRequestThreads",
+      "kind": "write",
+      "to": "table:pullRequestThreads"
+    },
+    {
       "from": "function:source_control_gdpr:deleteUserReviewDrafts",
       "kind": "read",
       "to": "table:reviewDrafts"
@@ -6359,6 +6389,36 @@
       "from": "function:source_control_gdpr:deleteUserReviewDrafts",
       "kind": "write",
       "to": "table:reviewDrafts"
+    },
+    {
+      "from": "function:source_control_pr_threads:getForThread",
+      "kind": "read",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_pr_threads:listForPullRequest",
+      "kind": "read",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_pr_threads:recordOpenedPullRequest",
+      "kind": "read",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_pr_threads:recordOpenedPullRequest",
+      "kind": "write",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_pr_threads:startWorkOnPullRequest",
+      "kind": "read",
+      "to": "table:pullRequestThreads"
+    },
+    {
+      "from": "function:source_control_pr_threads:startWorkOnPullRequest",
+      "kind": "write",
+      "to": "table:pullRequestThreads"
     },
     {
       "from": "function:source_control_review_drafts:deleteDraftComment",
@@ -14999,6 +15059,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:source_control_gdpr:deleteUserPullRequestThreads",
+      "kind": "function",
+      "name": "source_control.gdpr.deleteUserPullRequestThreads",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
       "id": "function:source_control_gdpr:deleteUserReviewDrafts",
       "kind": "function",
       "name": "source_control.gdpr.deleteUserReviewDrafts",
@@ -15030,6 +15097,34 @@
       "id": "function:source_control_merge_functions:setAutoMerge",
       "kind": "function",
       "name": "source_control.merge_functions.setAutoMerge",
+      "module": "source-control"
+    },
+    {
+      "detail": "query",
+      "id": "function:source_control_pr_threads:getForThread",
+      "kind": "function",
+      "name": "source_control.pr_threads.getForThread",
+      "module": "source-control"
+    },
+    {
+      "detail": "query",
+      "id": "function:source_control_pr_threads:listForPullRequest",
+      "kind": "function",
+      "name": "source_control.pr_threads.listForPullRequest",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_pr_threads:recordOpenedPullRequest",
+      "kind": "function",
+      "name": "source_control.pr_threads.recordOpenedPullRequest",
+      "module": "source-control"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:source_control_pr_threads:startWorkOnPullRequest",
+      "kind": "function",
+      "name": "source_control.pr_threads.startWorkOnPullRequest",
       "module": "source-control"
     },
     {
@@ -16647,6 +16742,12 @@
       "module": "prompts"
     },
     {
+      "id": "table:pullRequestThreads",
+      "kind": "table",
+      "name": "pullRequestThreads",
+      "module": "source-control"
+    },
+    {
       "id": "table:rateLimit",
       "kind": "table",
       "name": "rateLimit",
@@ -17262,9 +17363,10 @@
       ]
     },
     {
-      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts; the client caches what it reads.",
+      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts and the threads a pull request is worked on in; the client caches what it reads.",
       "name": "source-control",
       "tables": [
+        "pullRequestThreads",
         "reviewDrafts"
       ]
     },
@@ -20376,157 +20478,163 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 250,
+      "line": 249,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 253,
+      "line": 254,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 262,
+      "line": 257,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 267,
+      "line": 266,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 276,
+      "line": 271,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 281,
+      "line": 280,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 287,
+      "line": 285,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 289,
+      "line": 291,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 295,
+      "line": 293,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 297,
+      "line": 299,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 309,
+      "line": 301,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 314,
+      "line": 313,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 323,
+      "line": 318,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 328,
+      "line": 327,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 339,
+      "line": 332,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 346,
+      "line": 343,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 355,
+      "line": 350,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 375,
+      "line": 359,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 387,
+      "line": 379,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 401,
+      "line": 391,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 435,
+      "line": 405,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 459,
+      "line": 439,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 478,
+      "line": 463,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 493,
+      "line": 482,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 515,
+      "line": 497,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 526,
+      "line": 519,
+      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/deletion-workflow",
+      "kind": "call",
+      "line": 530,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {

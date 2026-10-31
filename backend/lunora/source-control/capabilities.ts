@@ -28,6 +28,8 @@ export type HostCapabilityGroups = {
     pullRequest?: {
         checks?: Capability;
         commits?: Capability;
+        /** Opens a pull request from a pushed branch: the one write a coding agent asks a host for. */
+        create?: Capability;
         description?: Capability;
         diff?: Capability;
         files?: Capability;

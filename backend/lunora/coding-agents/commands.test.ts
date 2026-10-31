@@ -19,6 +19,9 @@ import {
     buildCommitCommand,
     buildDiffCommand,
     buildPushCommand,
+    GITHUB_CREDENTIAL_ORIGIN,
+    credentialFor,
+    extraheaderKey,
     githubBasicCredential,
     gitAuthEnv,
     isValidBranchName,
@@ -183,13 +186,18 @@ describe("parseRepoUrl", () => {
             cloneUrl: "https://github.com/anolilab/neore.git",
             github: { owner: "anolilab", repo: "neore" },
             host: "github.com",
+            origin: GITHUB_CREDENTIAL_ORIGIN,
         });
         expect(parseRepoUrl("https://github.com/anolilab/neore.git").cloneUrl).toBe("https://github.com/anolilab/neore.git");
         expect(parseRepoUrl("https://github.com/anolilab/neore/").github).toEqual({ owner: "anolilab", repo: "neore" });
     });
 
     it("accepts other https hosts without a GitHub identity", () => {
-        expect(parseRepoUrl("https://gitlab.com/group/project.git")).toEqual({ cloneUrl: "https://gitlab.com/group/project.git", host: "gitlab.com" });
+        expect(parseRepoUrl("https://gitlab.com/group/project.git")).toEqual({
+            cloneUrl: "https://gitlab.com/group/project.git",
+            host: "gitlab.com",
+            origin: "https://gitlab.com",
+        });
     });
 
     it.each([
@@ -246,6 +254,54 @@ describe("git credentials", () => {
 
     it("quotes the commit message", () => {
         expect(buildCommitCommand("neore/agent-x", "fix'; rm -rf /; '")).toContain(String.raw`'fix'\''; rm -rf /; '\'''`);
+    });
+});
+
+describe("origin-scoped credentials", () => {
+    it("records the origin a repository is on", () => {
+        expect(parseRepoUrl("anolilab/neore").origin).toBe(GITHUB_CREDENTIAL_ORIGIN);
+        expect(parseRepoUrl("https://github.com/octo/hello.git").origin).toBe(GITHUB_CREDENTIAL_ORIGIN);
+        expect(parseRepoUrl("https://git.example:8443/octo/hello.git").origin).toBe("https://git.example:8443");
+    });
+
+    it("keys the git extraheader on the origin", () => {
+        expect(extraheaderKey(GITHUB_CREDENTIAL_ORIGIN)).toBe("http.https://github.com/.extraheader");
+        expect(gitAuthEnv(FAKE_GITHUB_TOKEN, "https://git.example:8443")).toMatchObject({
+            GIT_CONFIG_KEY_0: "http.https://git.example:8443/.extraheader",
+            GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${githubBasicCredential(FAKE_GITHUB_TOKEN)}`,
+        });
+    });
+
+    it("gives the credential to the origin the token was saved for alone", () => {
+        const github = parseRepoUrl("anolilab/neore");
+
+        expect(credentialFor(FAKE_GITHUB_TOKEN, github)).toBe(githubBasicCredential(FAKE_GITHUB_TOKEN));
+        expect(credentialFor(FAKE_GITHUB_TOKEN, parseRepoUrl("https://git.example.com/octo/hello.git"))).toBeUndefined();
+        expect(credentialFor(FAKE_GITHUB_TOKEN, github, "https://git.example:8443")).toBeUndefined();
+    });
+
+    it("sends no auth config without a token, and never over plaintext http", () => {
+        // eslint-disable-next-line unicorn/prefer-https -- the case IS a cleartext origin: it must never receive the credential.
+        expect(gitAuthEnv(FAKE_GITHUB_TOKEN, "http://git.example")).toEqual({ GIT_TERMINAL_PROMPT: "0" });
+    });
+
+    it("binds the scripts' credential to the repository's own origin", () => {
+        const onGithub = buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), timeoutSeconds: 600 });
+        const offGithub = buildRunScript({ agent: "claude_code", repo: parseRepoUrl("https://git.example.com/octo/hello.git"), timeoutSeconds: 600 });
+        const prOnGithub = buildPullRequestScript({ baseBranch: "main", branch: "neore/agent-run1", message: "m", repo: parseRepoUrl("a/b") });
+        const prOffGithub = buildPullRequestScript({
+            baseBranch: "main",
+            branch: "neore/agent-run1",
+            message: "m",
+            repo: parseRepoUrl("https://git.example.com/octo/hello.git"),
+        });
+
+        expect(onGithub).toContain(extraheaderKey(GITHUB_CREDENTIAL_ORIGIN));
+        expect(offGithub).toContain(extraheaderKey("https://git.example.com"));
+        expect(prOnGithub).toContain(extraheaderKey(GITHUB_CREDENTIAL_ORIGIN));
+        expect(prOffGithub).toContain(extraheaderKey("https://git.example.com"));
+        expect(offGithub).not.toContain(GITHUB_CREDENTIAL_ORIGIN);
+        expect(prOffGithub).not.toContain(GITHUB_CREDENTIAL_ORIGIN);
     });
 });
 

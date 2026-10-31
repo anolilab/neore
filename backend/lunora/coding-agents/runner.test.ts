@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { HostDriver } from "../source-control/driver";
+import type { HostRequest } from "../source-control/origin-fetch";
 import {
     BASE_INFO_PATH,
     CODEX_LAST_MESSAGE_PATH,
@@ -13,12 +16,22 @@ import {
 } from "./commands";
 import { expandSecrets } from "./redact";
 import type { CommandOutcome, RunCommandOptions, RunSpec, SandboxHandle, SandboxProvider } from "./runner";
-import { checkPullRequest, finalizeRun, openPullRequestForBranch, pollRun, pullRequestProblem, startPullRequest, startRun } from "./runner";
+import {
+    checkPullRequest,
+    finalizeRun,
+    openPullRequestForBranch,
+    pollRun,
+    pullRequestApiFromDriver,
+    pullRequestProblem,
+    startPullRequest,
+    startRun,
+} from "./runner";
 import { fakeKey } from "./test-fixtures";
 
 const PROVIDER_KEY = fakeKey("anthropic");
 const GITHUB_TOKEN = fakeKey("github");
 const BASE_SHA = "0123456789abcdef0123456789abcdef01234567";
+const ADAPTER_ERROR = /adapter/u;
 
 interface FakeSandbox extends SandboxHandle {
     calls: { command: string; options: RunCommandOptions }[];
@@ -114,6 +127,11 @@ const spec = (overrides: Partial<RunSpec> = {}): RunSpec => {
 const notCancelled = async () => {
     return { cancelled: false };
 };
+
+/** A stubbed `fetch` is removed after every test, so one test's host cannot answer the next one's. */
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
 
 /** A poll answer: status line, then the log bytes. */
 const pollOutput = (status: string, log: string): CommandOutcome => ok(`${status}\n${log}`);
@@ -289,25 +307,30 @@ describe("finalizeRun", () => {
     });
 });
 
-describe("pull requests (async: start, poll, then the API)", () => {
-    const prSpec = {
+const prSpec = (overrides: Record<string, unknown> = {}) => {
+    return {
         baseBranch: "main",
         diff: "diff --git a/x b/x\n",
         githubToken: GITHUB_TOKEN,
         repo: parseRepoUrl("anolilab/neore"),
         runId: "run123",
         title: "Coding agent: fix",
+        ...overrides,
     };
+};
+
+describe("pull requests (async: start, poll, then the API)", () => {
     const secrets = expandSecrets([GITHUB_TOKEN]);
 
     it("starts the PR script detached in a FRESH sandbox and returns without running git", async () => {
         const sandbox = fakeSandbox();
         const provider = providerFor(sandbox);
-        const result = await startPullRequest(prSpec, { sandboxes: provider });
+        const pullRequest = prSpec();
+        const result = await startPullRequest(pullRequest as never, { sandboxes: provider });
 
         expect(result).toEqual({ sandboxId: "sbx-1" });
         expect(provider.created).toBe(1);
-        expect(sandbox.files.get(PATCH_PATH)).toBe(prSpec.diff);
+        expect(sandbox.files.get(PATCH_PATH)).toBe(pullRequest.diff);
         expect(sandbox.files.get(PR_SCRIPT_PATH)).toContain("git' 'apply'");
         expect(sandbox.detached).toHaveLength(1);
         expect(sandbox.calls).toHaveLength(0);
@@ -317,7 +340,7 @@ describe("pull requests (async: start, poll, then the API)", () => {
     it("keeps the token out of every environment and the script — it is a file the script reads", async () => {
         const sandbox = fakeSandbox();
 
-        await startPullRequest(prSpec, { sandboxes: providerFor(sandbox) });
+        await startPullRequest(prSpec() as never, { sandboxes: providerFor(sandbox) });
 
         expect(sandbox.detached[0]?.envs).toBeUndefined();
         expect(sandbox.files.get(GIT_AUTH_PATH)).toBe(githubBasicCredential(GITHUB_TOKEN));
@@ -332,7 +355,7 @@ describe("pull requests (async: start, poll, then the API)", () => {
             throw new Error(`boom ${GITHUB_TOKEN}`);
         };
 
-        const result = await startPullRequest(prSpec, { sandboxes: providerFor(sandbox) });
+        const result = await startPullRequest(prSpec() as never, { sandboxes: providerFor(sandbox) });
 
         expect(result.error).toContain("boom");
         expect(result.error).not.toContain(GITHUB_TOKEN);
@@ -364,9 +387,11 @@ describe("pull requests (async: start, poll, then the API)", () => {
         expect(sandbox.killed).toBe(1);
     });
 
-    it("opens the PR through the API for the pushed branch", async () => {
-        const createPullRequest = vi.fn(async () => "https://github.com/anolilab/neore/pull/1");
-        const url = await openPullRequestForBranch(
+    it("opens the PR through the adapter for the pushed branch", async () => {
+        const createPullRequest = vi.fn(async () => {
+            return { url: "https://github.com/anolilab/neore/pull/1" };
+        });
+        const { url } = await openPullRequestForBranch(
             { baseBranch: "main", body: "summary", branch: "neore/agent-run123", repo: parseRepoUrl("anolilab/neore"), title: "t" },
             { createPullRequest },
         );
@@ -376,8 +401,7 @@ describe("pull requests (async: start, poll, then the API)", () => {
             base: "main",
             body: "summary",
             head: "neore/agent-run123",
-            owner: "anolilab",
-            repo: "neore",
+            repository: "anolilab/neore",
             title: "t",
         });
     });
@@ -392,5 +416,87 @@ describe("pullRequestProblem", () => {
         expect(pullRequestProblem({ baseBranch: "main", repo })).toContain("Connectors");
         expect(pullRequestProblem({ baseBranch: "HEAD", githubToken: "t", repo })).toContain("base branch");
         expect(pullRequestProblem({ baseBranch: "main", diffTruncated: true, githubToken: "t", repo })).toContain("too large");
+    });
+});
+
+describe("pushing the branch carries no credential off the saved origin", () => {
+    it("writes no credential file when the repository is not on the origin the token is for", async () => {
+        const sandbox = fakeSandbox();
+        const onAnotherOrigin = prSpec({ repo: parseRepoUrl("https://git.example.com/octo/hello.git") });
+
+        await startPullRequest(onAnotherOrigin, { sandboxes: providerFor(sandbox) });
+
+        expect(sandbox.files.has(GIT_AUTH_PATH)).toBe(false);
+        expect(sandbox.files.get(PR_SCRIPT_PATH)).not.toContain(GITHUB_TOKEN);
+        expect(sandbox.files.get(PR_SCRIPT_PATH)).not.toContain(githubBasicCredential(GITHUB_TOKEN));
+    });
+
+    it("gives a run's clone no credential file either", async () => {
+        const sandbox = fakeSandbox();
+
+        await startRun(spec({ repo: parseRepoUrl("https://git.example.com/octo/hello.git") }), {
+            onSandbox: notCancelled,
+            sandboxes: providerFor(sandbox),
+        });
+
+        expect(sandbox.files.has(GIT_AUTH_PATH)).toBe(false);
+    });
+});
+
+describe("the pull request goes through the host adapter", () => {
+    it("sends the token only to the driver's API origin, with the driver's headers", async () => {
+        let seen: { method?: string; requestHeaders?: Record<string, string>; url?: string } | undefined;
+        const driver = {
+            apiOrigin: "https://api.example.com",
+            createPullRequest: async (request: HostRequest, input: unknown) => {
+                const response = await request("/new-pull-request", { json: input, method: "POST" });
+                const data = (await response.json()) as { url?: string };
+
+                return { url: data.url ?? "" };
+            },
+            headers: { "X-Driver": "1" },
+        };
+
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (input: Request | string | URL, init?: RequestInit) => {
+                const headers = new Headers(init?.headers);
+
+                seen = {
+                    method: init?.method,
+                    requestHeaders: { Authorization: headers.get("authorization") ?? "", "X-Driver": headers.get("x-driver") ?? "" },
+                    url: String(input),
+                };
+
+                return Response.json({ url: "https://api.example.com/pull/5" });
+            }),
+        );
+
+        const api = pullRequestApiFromDriver(driver as unknown as Pick<HostDriver, "apiOrigin" | "createPullRequest" | "headers">, GITHUB_TOKEN);
+        const { url } = await api.createPullRequest({ base: "main", body: "b", head: "h", repository: "octo/hello", title: "t" });
+
+        expect(url).toBe("https://api.example.com/pull/5");
+        expect(seen?.url).toBe("https://api.example.com/new-pull-request");
+        expect(seen?.method).toBe("POST");
+        expect(seen?.requestHeaders?.Authorization).toBe(`Bearer ${GITHUB_TOKEN}`);
+        expect(seen?.requestHeaders?.["X-Driver"]).toBe("1");
+    });
+
+    it("refuses to build an adapter API for a driver that cannot open one", async () => {
+        expect(() =>
+            pullRequestApiFromDriver(
+                { apiOrigin: "https://api.example.com", headers: {} } as unknown as Pick<HostDriver, "apiOrigin" | "createPullRequest" | "headers">,
+                GITHUB_TOKEN,
+            ),
+        ).toThrow(ADAPTER_ERROR);
+    });
+
+    it("the actions file talks to the adapter, never to GitHub's API on its own", async () => {
+        const source = await readFile(decodeURIComponent(new URL("execute.ts", import.meta.url).pathname), "utf8");
+
+        expect(source).not.toContain("api.github.com");
+        expect(source).not.toContain("githubPullRequestCreator");
+        expect(source).toContain("pullRequestApiFromDriver");
+        expect(source).toContain("pullRequest.create");
     });
 });

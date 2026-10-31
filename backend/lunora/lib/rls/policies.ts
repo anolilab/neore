@@ -208,6 +208,7 @@ const OWNER_TABLES = [
     "outcomeEmails",
     "passkey",
     "presentations",
+    "pullRequestThreads",
     "reviewDrafts",
     "sandboxSessions",
     "session",

@@ -1013,7 +1013,11 @@ export interface InternalApiTypes {
     source_control: {
         gdpr: {
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
+            deleteUserPullRequestThreads: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+        };
+        pr_threads: {
+            recordOpenedPullRequest: FunctionReference<"mutation", { prUrl: string; threadId: string; userId: string }, { created: boolean; threadId: string }>;
         };
         review_internal: {
             claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
@@ -2138,7 +2142,11 @@ export const internal: InternalApiTypes = {
     source_control: {
         gdpr: {
             collectReviewDraftsForExport: { __lunoraRef: "source_control_gdpr:collectReviewDraftsForExport" },
+            deleteUserPullRequestThreads: { __lunoraRef: "source_control_gdpr:deleteUserPullRequestThreads" },
             deleteUserReviewDrafts: { __lunoraRef: "source_control_gdpr:deleteUserReviewDrafts" },
+        },
+        pr_threads: {
+            recordOpenedPullRequest: { __lunoraRef: "source_control_pr_threads:recordOpenedPullRequest" },
         },
         review_internal: {
             claimDraftForSubmit: { __lunoraRef: "source_control_review_internal:claimDraftForSubmit" },

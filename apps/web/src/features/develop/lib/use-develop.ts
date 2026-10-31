@@ -1,10 +1,10 @@
 import { api } from "@neore/backend/api";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { LIVE_META_KEY } from "@neore/client-runtime";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
-import { createLunoraActionQueryOptions, useAction, useLunora } from "@/lib/lunora/crpc";
+import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import { retryFailedPage } from "./failed-pages";
 
@@ -125,4 +125,28 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
         queryKey: [DEVELOP_QUERY_ROOT, userId, "checks", address, headSha],
         staleTime: MINUTE_MS,
     });
+};
+
+/**
+ * The threads working on one pull request: the one started from here and the ones a coding agent opened it from. Our
+ * own rows, not the host's, so this one is live — a run that opens a pull request shows up while the page is open.
+ */
+export const usePullRequestThreads = (address: PullRequestAddress | undefined) => {
+    const crpc = useCRPC();
+
+    return useQuery(crpc.source_control.pr_threads.listForPullRequest.queryOptions(address ?? skipToken));
+};
+
+/** Work on this PR: opens a thread with the pull request attached, or names the thread already working on it. */
+export const useStartWorkOnPullRequest = () => {
+    const crpc = useCRPC();
+
+    return useMutation(crpc.source_control.pr_threads.startWorkOnPullRequest.mutationOptions());
+};
+
+/** The pull request a thread was attached to or opened, for the thread's own header. */
+export const useThreadPullRequest = (threadId: string | undefined) => {
+    const crpc = useCRPC();
+
+    return useQuery(crpc.source_control.pr_threads.getForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
 };

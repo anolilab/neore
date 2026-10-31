@@ -1,12 +1,13 @@
 /**
- * Review drafts in the GDPR export and account deletion.
+ * Review drafts and pull-request/thread links in the GDPR export and account deletion.
  *
  * Wired into `gdpr/workflows/export-workflow.ts` ("collect-review-drafts") and
- * `gdpr/workflows/deletion-workflow.ts` ("delete-user-review-drafts"). Deletion
- * follows the residual steps' contract (`gdpr/steps/residual-deletion-steps.ts`):
- * at most `BATCH` rows per call, `{ hasMore }` back, idempotent on retry. Draft
- * text is the user's own writing about someone else's code, so it travels with the
- * export; nothing the host sent us is stored.
+ * `gdpr/workflows/deletion-workflow.ts` ("delete-user-review-drafts",
+ * "delete-user-pull-request-threads"). Deletion follows the residual steps' contract
+ * (`gdpr/steps/residual-deletion-steps.ts`): at most `BATCH` rows per call, `{ hasMore }` back,
+ * idempotent on retry. Draft text is the user's own writing about someone else's code, so it
+ * travels with the export; nothing the host sent us is stored. The links hold no content of
+ * theirs, so they are erased and not exported.
  */
 import { v } from "lunorash/server";
 
@@ -75,4 +76,22 @@ export const deleteUserReviewDrafts = internalMutation
         await Promise.all(drafts.map((draft) => ctx.db.delete(draft._id)));
 
         return { hasMore: drafts.length >= BATCH };
+    });
+
+/**
+ * The links between a user's threads and the pull requests they work on. Nothing here is content of theirs — a
+ * repository address, a number, a title the server built — so it is erased, not exported.
+ */
+export const deleteUserPullRequestThreads = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ hasMore: v.boolean() }))
+    .mutation(async ({ args: { userId }, ctx }) => {
+        const links = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId))
+            .take(BATCH);
+
+        await Promise.all(links.map((link) => ctx.db.delete(link._id)));
+
+        return { hasMore: links.length >= BATCH };
     });

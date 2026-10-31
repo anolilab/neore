@@ -32,9 +32,9 @@ import {
     buildPullRequestScript,
     buildRunScript,
     CODEX_LAST_MESSAGE_PATH,
+    credentialFor,
     DIFF_MAX_BYTES,
     GIT_AUTH_PATH,
-    githubBasicCredential,
     parsePullRequestStatus,
     parseRunStatus,
     PATCH_PATH,
@@ -50,6 +50,8 @@ import {
     TIMEOUT_EXIT_CODE,
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
+import type { HostDriver } from "../source-control/driver";
+import { createBoundRequester } from "../source-control/origin-fetch";
 
 export interface CommandOutcome {
     exitCode: number;
@@ -156,8 +158,11 @@ export const startRun = async (
         await sandbox.writeFile(RUN_SCRIPT_PATH, script);
         await sandbox.writeFile(PROMPT_PATH, buildAgentPrompt(spec.prompt));
 
-        if (spec.githubToken) {
-            await sandbox.writeFile(GIT_AUTH_PATH, githubBasicCredential(spec.githubToken));
+        // The credential is written only for the origin the token was saved for; a clone of another host gets none.
+        const credential = credentialFor(spec.githubToken, spec.repo);
+
+        if (credential !== undefined) {
+            await sandbox.writeFile(GIT_AUTH_PATH, credential);
         }
 
         // The provider key is the one secret the script's environment carries:
@@ -377,7 +382,14 @@ export const startPullRequest = async (
         sandbox = await dependencies.sandboxes.create({ metadata: { purpose: "coding-agent-pr", runId: spec.runId }, timeoutMs: PR_SANDBOX_TIMEOUT_MS });
 
         await sandbox.writeFile(PATCH_PATH, spec.diff);
-        await sandbox.writeFile(GIT_AUTH_PATH, githubBasicCredential(spec.githubToken));
+
+        // The push carries the credential, so it is written only for the origin the token was saved for.
+        const credential = credentialFor(spec.githubToken, spec.repo);
+
+        if (credential !== undefined) {
+            await sandbox.writeFile(GIT_AUTH_PATH, credential);
+        }
+
         await sandbox.writeFile(
             PR_SCRIPT_PATH,
             buildPullRequestScript({ baseBranch: spec.baseBranch, branch: prBranchName(spec.runId), message: spec.title, repo: spec.repo }),
@@ -425,15 +437,31 @@ export const checkPullRequest = async (sandbox: SandboxHandle, input: { runId: s
 };
 
 export interface PullRequestApi {
-    /** The GitHub API call, made from the backend — never from the sandbox. */
-    createPullRequest: (input: { base: string; body: string; head: string; owner: string; repo: string; title: string }) => Promise<string>;
+    /** The host's call that opens the PR, made from the backend — never from the sandbox. */
+    createPullRequest: (input: { base: string; body: string; head: string; repository: string; title: string }) => Promise<{ url: string }>;
 }
+
+/**
+ * The host adapter's pull-request call, bound to the driver's own origin: the token is sent there and nowhere else. A
+ * driver that does not declare `createPullRequest` cannot open one, and says so rather than reaching GitHub itself.
+ */
+export const pullRequestApiFromDriver = (driver: Pick<HostDriver, "apiOrigin" | "createPullRequest" | "headers">, token: string): PullRequestApi => {
+    const create = driver.createPullRequest;
+
+    if (!create) {
+        throw new Error("This host's adapter cannot open a pull request");
+    }
+
+    const request = createBoundRequester({ headers: driver.headers, origin: driver.apiOrigin, token });
+
+    return { createPullRequest: async (input) => await create(request, input) };
+};
 
 /** The final, short step: open the PR for a pushed branch. */
 export const openPullRequestForBranch = async (
     input: { baseBranch: string; body: string; branch: string; repo: ParsedRepo; title: string },
     dependencies: PullRequestApi,
-): Promise<string> => {
+): Promise<{ url: string }> => {
     if (!input.repo.github) {
         throw new Error("Pull requests are only supported for github.com repositories");
     }
@@ -442,8 +470,7 @@ export const openPullRequestForBranch = async (
         base: input.baseBranch,
         body: input.body,
         head: input.branch,
-        owner: input.repo.github.owner,
-        repo: input.repo.github.repo,
+        repository: `${input.repo.github.owner}/${input.repo.github.repo}`,
         title: input.title,
     });
 };

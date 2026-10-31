@@ -16,6 +16,7 @@ const KEYS: Record<HostCapabilityKey, true> = {
     "merge.now": true,
     "pullRequest.checks": true,
     "pullRequest.commits": true,
+    "pullRequest.create": true,
     "pullRequest.description": true,
     "pullRequest.diff": true,
     "pullRequest.files": true,
