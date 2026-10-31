@@ -10,7 +10,7 @@ import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimOnce } from "../lib/claim-once";
@@ -85,6 +85,87 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
     return [...found.values()].toReversed();
 };
 
+export interface StartHostSessionInput {
+    agentKey: string;
+    clientId: string;
+    deviceId: Id<"devices">;
+    folderId: string;
+}
+
+/** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
+export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
+    const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+    const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
+
+    if (!device?.encryptedSecret || !offer) {
+        throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
+    }
+
+    if (!isDeviceOnline(device, ctx.now)) {
+        throw new LunoraError("BAD_REQUEST", "That computer is not online.");
+    }
+
+    // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
+    const hostSessionId = `web-${await sha256Hex(`${userId}:${args.clientId}`)}`;
+
+    if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
+        // The first try's answer may have been lost: hand back the session it made.
+        const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
+
+        return { started: false, ...(first && { threadId: first.threadId as string }) };
+    }
+
+    const threadId = await insertThread(ctx.db, {
+        createdBy: userId,
+        mode: "text",
+        model: offer.agentKey,
+        runner: "host",
+        status: "active",
+        tags: ["chat", "host"],
+        title: `${offer.agentLabel} · ${offer.folderLabel}`.slice(0, MAX_LENGTH.short),
+        updatedAt: ctx.now,
+        userId,
+    });
+
+    await ctx.db.insert("acpSessions", {
+        agentKey: offer.agentKey,
+        agentLabel: offer.agentLabel,
+        createdAt: ctx.now,
+        deviceId: device._id,
+        folderId: offer.folderId,
+        folderLabel: offer.folderLabel,
+        hostSessionId,
+        status: "starting",
+        threadId,
+        updatedAt: ctx.now,
+        userId,
+    });
+
+    const call = await createAcpCall(
+        ctx,
+        {
+            deviceId: device._id,
+            input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
+            kind: "acp_start",
+            threadId,
+            userId,
+        },
+        ctx.now,
+    );
+
+    if ("error" in call) {
+        // Throwing rolls the thread and the session back with the claim.
+        throw new LunoraError(
+            "BAD_REQUEST",
+            call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
+        );
+    }
+
+    ctx.log.event("acp.start_host_session", { started: true });
+
+    return { started: true, threadId: threadId as string };
+};
+
 /**
  * Starts a coding agent on one of the caller's computers, for a pair the user approved there. Makes the thread and
  * its session now (`starting`) and queues `acp_start`; the session is `idle` once the computer's agent has opened it.
@@ -99,79 +180,7 @@ export const startHostSession = authMutation
         folderId: v.string().max(128),
     })
     .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
-    .mutation(async ({ args, ctx }) => {
-        const { userId } = ctx.user;
-        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
-        const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
-
-        if (!device?.encryptedSecret || !offer) {
-            throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
-        }
-
-        if (!isDeviceOnline(device, ctx.now)) {
-            throw new LunoraError("BAD_REQUEST", "That computer is not online.");
-        }
-
-        // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
-        const hostSessionId = `web-${await sha256Hex(`${userId}:${args.clientId}`)}`;
-
-        if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
-            // The first try's answer may have been lost: hand back the session it made.
-            const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
-
-            return { started: false, ...(first && { threadId: first.threadId as string }) };
-        }
-
-        const threadId = await insertThread(ctx.db, {
-            createdBy: userId,
-            mode: "text",
-            model: offer.agentKey,
-            runner: "host",
-            status: "active",
-            tags: ["chat", "host"],
-            title: `${offer.agentLabel} · ${offer.folderLabel}`.slice(0, MAX_LENGTH.short),
-            updatedAt: ctx.now,
-            userId,
-        });
-
-        await ctx.db.insert("acpSessions", {
-            agentKey: offer.agentKey,
-            agentLabel: offer.agentLabel,
-            createdAt: ctx.now,
-            deviceId: device._id,
-            folderId: offer.folderId,
-            folderLabel: offer.folderLabel,
-            hostSessionId,
-            status: "starting",
-            threadId,
-            updatedAt: ctx.now,
-            userId,
-        });
-
-        const call = await createAcpCall(
-            ctx,
-            {
-                deviceId: device._id,
-                input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
-                kind: "acp_start",
-                threadId,
-                userId,
-            },
-            ctx.now,
-        );
-
-        if ("error" in call) {
-            // Throwing rolls the thread and the session back with the claim.
-            throw new LunoraError(
-                "BAD_REQUEST",
-                call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
-            );
-        }
-
-        ctx.log.event("acp.start_host_session", { started: true });
-
-        return { started: true, threadId: threadId as string };
-    });
+    .mutation(async ({ args, ctx }) => await startHostSessionFor(ctx, ctx.user.userId, args));
 
 /**
  * Stops the turn a host thread is running: what the host wrote is kept, the stream ends, and the computer is told
