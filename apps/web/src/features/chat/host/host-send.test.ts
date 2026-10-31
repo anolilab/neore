@@ -27,7 +27,8 @@ describe("sendHostMessage", () => {
         await sendHostMessage(INPUT, { fetch: fetcher as never });
         await sendHostMessage({ ...INPUT, threadId: "t2" }, { fetch: fetcher as never });
 
-        const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse((init as unknown as RequestInit).body as string) as Record<string, unknown>);
+        const calls = fetcher.mock.calls as unknown as [URL, RequestInit][];
+        const bodies = calls.map(([, init]) => JSON.parse(init.body as string) as Record<string, unknown>);
 
         expect(bodies[0]).toEqual({ ...INPUT, unlockProof: "proof-1" });
         expect(bodies[1]).not.toHaveProperty("unlockProof");

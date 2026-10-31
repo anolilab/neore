@@ -58,7 +58,10 @@ const DiffCommentForm: FC<DiffCommentFormProps> = ({ full, label, onCancel, onSu
                 aria-label={label}
                 className="bg-background min-h-16 w-full resize-y rounded-md border px-2 py-1 text-sm"
                 maxLength={MAX_COMMENT_CHARS}
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) => {
+                    setText(event.target.value);
+                    setRefused(false);
+                }}
                 onKeyDown={onKeyDown}
                 placeholder={t`What should the agent change?`}
                 ref={field}
