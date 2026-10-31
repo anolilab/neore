@@ -194,7 +194,7 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...(this.report !== undefined && { capabilities: this.report }),
+                ...this.report !== undefined && { capabilities: this.report },
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -573,7 +573,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
+        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
     }
 
     private observeTool(tool: ToolState): void {
@@ -655,9 +655,9 @@ export class AgentSession {
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
-                ...(described.command !== undefined && { command: described.command }),
-                ...(described.target !== undefined && { target: described.target }),
+                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
+                ...described.command !== undefined && { command: described.command },
+                ...described.target !== undefined && { target: described.target },
             }),
         );
     }
