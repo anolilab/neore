@@ -601,9 +601,10 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
     }
 
-    // Only the task text reaches a coding agent on a computer: a stored tool list or skill would read as a limit that
-    // nothing applies there.
-    if (runnerKind === "host" && ((origin?.toolAllowlist ?? common.allowlist)?.length || (origin?.skillSlug ?? skillSlug) !== undefined)) {
+    // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
+    // limit that nothing applies there. (The lead's own tool names, which a cloud worker inherits, are not one: a host
+    // worker never stores them, below.)
+    if (runnerKind === "host" && (common.allowlist?.length || skillSlug !== undefined)) {
         return await refuse(other(HOST_NO_TOOLS_OR_SKILL));
     }
 
@@ -659,7 +660,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             return await refuse(other(tools.error));
         }
 
-        allowlist = tools.tools;
+        // A host worker keeps no tool list: its agent uses its own tools, each asked for on the computer.
+        allowlist = runnerKind === "host" ? undefined : tools.tools;
     }
 
     const depth = origin?.depth ?? (await threadDepth(ctx, parent._id)) + 1;

@@ -567,6 +567,29 @@ describe("who may reach a host worker", () => {
     });
 });
 
+describe("a worker the lead created on a computer", () => {
+    it("takes the lead's next message: the lead's own tool names are not a tool list it was given", async () => {
+        const device = await pairedDevice();
+        const first = (await run(
+            async (context) =>
+                await functions.dispatchWorkerRun(context, {
+                    leadTools: ["webSearch"],
+                    parentThreadId: leadId,
+                    runner: { agentKey: "claude", deviceId: device.deviceId, folderId: "f1", kind: "host" },
+                    task: "First",
+                    toolCallId: "call-new",
+                    userId: OWNER,
+                }),
+        )) as { runId: string };
+        const workerId = (await runRow(first.runId)).childThreadId as string;
+
+        await sessionOpen(device, workerId);
+        await finishTurn(device, workerId);
+
+        expect(await dispatchFromLead(workerId, "call-next")).not.toHaveProperty("error");
+    });
+});
+
 describe("activity and waiting on a person", () => {
     it("reads a host run's activity from its host events, and pauses the clock while it waits on a permission", async () => {
         const device = await pairedDevice();
