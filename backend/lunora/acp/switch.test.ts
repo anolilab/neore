@@ -65,6 +65,7 @@ const MODEL = "openai/gpt-4.1-mini";
 const OTHER_MODEL = "google/gemini-2.0-flash-001";
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
+const NOT_IN_PROJECT = /not allowed in this conversation's project/u;
 const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
 const DIFFERENT_AGENT = /different agent/u;
@@ -758,6 +759,20 @@ describe("what a switch may target", () => {
 
         expect(offersBefore).toEqual([CLAUDE, CODEX]);
         expect((await row(device.deviceId))?.acpOffers).toEqual(offersBefore);
+    });
+
+    it("refuses a computer limited to other projects, creating nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await harness.run(async (context: any) => {
+            const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: ownerId });
+
+            await context.db.patch(device.deviceId, { projectIds: [project] });
+        });
+
+        await expect(switchTo(source, hostTarget(device, CLAUDE))).rejects.toThrow(NOT_IN_PROJECT);
+        expect(await rows("threads")).toHaveLength(1);
     });
 
     it("needs the computer to be online", async () => {

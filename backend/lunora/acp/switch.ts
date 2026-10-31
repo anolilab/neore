@@ -52,6 +52,7 @@ import {
 } from "../chat/agent-switch";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
 import { loadEligibleThread } from "../devices/internal";
+import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
@@ -90,7 +91,7 @@ const hostTitle = (offer: Offer): string => `${offer.agentLabel} · ${offer.fold
  * The target, resolved. A host pair must be in the offer list of one of the caller's own paired, online computers;
  * a model must be one a send may use now. Throws a coded refusal otherwise, before anything is written.
  */
-const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, now: number): Promise<ResolvedTarget> => {
+const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, thread: Doc<"threads">, now: number): Promise<ResolvedTarget> => {
     const { target } = args;
 
     if (target.kind === "model") {
@@ -110,6 +111,15 @@ const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, now: number): P
 
     if (!isDeviceOnline(device, now)) {
         return refuse(AGENT_SWITCH_HOST_OFFLINE, "That computer is not online.");
+    }
+
+    // A computer limited to some projects takes only those projects' chats, the rule the device tools follow: the
+    // handoff carries this chat to it.
+    if (!isDeviceInScope(device, await resolveThreadProject(ctx, thread, args.userId, [device]))) {
+        return refuse(
+            AGENT_SWITCH_NOT_OFFERED,
+            "That computer is not allowed in this conversation's project. Change which projects it may be used in, in its settings.",
+        );
     }
 
     return { device, kind: "host", offer };
@@ -322,7 +332,7 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         });
     }
 
-    const target = await resolveTarget(ctx, args, now);
+    const target = await resolveTarget(ctx, args, thread, now);
     const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
 
     if (fromHost) {
