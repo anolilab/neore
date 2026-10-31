@@ -1,6 +1,8 @@
 import { createInMemoryPersistence, createInMemoryQueryCache, LunoraClient } from "@lunora/client";
+import { createWsTicketMinter } from "@neore/client-runtime";
 
 import { loadConfig } from "./config";
+import { wireLiveSocket } from "./live-socket";
 
 /**
  * The one Lunora client for the app. Hermes has no IndexedDB, so the browser's
@@ -8,12 +10,18 @@ import { loadConfig } from "./config";
  * restart, and the offline outbox is not durable. An expo-sqlite adapter is the
  * upgrade path (it is real work, so it is not in this slice).
  */
-export const createAppClient = (url: string): LunoraClient =>
-    new LunoraClient({
+export const createAppClient = (url: string): LunoraClient => {
+    const lunora = new LunoraClient({
         persistence: createInMemoryPersistence(),
         queryCache: createInMemoryQueryCache(),
         url,
     });
+
+    // Live queries (`client.subscribe`) open a socket, and the socket needs this to be signed in.
+    wireLiveSocket(lunora, createWsTicketMinter(url));
+
+    return lunora;
+};
 
 let client: LunoraClient | undefined;
 

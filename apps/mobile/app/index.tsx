@@ -102,11 +102,18 @@ const ThreadListScreen = () => {
             data={threads}
             keyExtractor={(thread) => thread.id}
             ListHeaderComponent={(
-                <Link asChild href="/chat/new">
-                    <Pressable accessibilityRole="link" style={{ padding: 16 }}>
-                        <Text style={{ fontWeight: "600" }}>New chat</Text>
-                    </Pressable>
-                </Link>
+                <>
+                    <Link asChild href="/chat/new">
+                        <Pressable accessibilityRole="link" style={{ padding: 16 }}>
+                            <Text style={{ fontWeight: "600" }}>New chat</Text>
+                        </Pressable>
+                    </Link>
+                    <Link asChild href="/projects">
+                        <Pressable accessibilityLabel="Projects" accessibilityRole="link" style={{ padding: 16 }}>
+                            <Text style={{ fontWeight: "600" }}>Projects</Text>
+                        </Pressable>
+                    </Link>
+                </>
               )}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
