@@ -8,7 +8,7 @@ import { getModelName, getProviderName } from "../shared";
 import type { Agent } from "./index";
 import startGeneration from "./start";
 import { compressUIMessageChunks, DeltaStreamer, mergeTransforms, type StreamingOptions } from "./streaming";
-import type { ActionCtx as ActionContext, AgentComponent, AgentPrompt, GenerationOutputMetadata, Options, Output } from "./types";
+import type { ActionCtx as ActionContext, AgentComponent, AgentPrompt, GenerationOutputMetadata, Options, Output, PendingMessageAccess } from "./types";
 import { willContinue } from "./utilities";
 
 /**
@@ -57,7 +57,8 @@ const streamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, any,
         threadId?: string;
         userId?: string | null;
     },
-): Promise<GenerationOutputMetadata & StreamTextResult<TOOLS, AiContext, OUTPUT>> => _doStreamText(context, component, streamTextArgs, options, false);
+): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<TOOLS, AiContext, OUTPUT>> =>
+    _doStreamText(context, component, streamTextArgs, options, false);
 
 const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, any, any> = never>(
     context: ActionContext,
@@ -74,7 +75,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         userId?: string | null;
     },
     isRetry: boolean,
-): Promise<GenerationOutputMetadata & StreamTextResult<TOOLS, AiContext, OUTPUT>> => {
+): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<TOOLS, AiContext, OUTPUT>> => {
     const { threadId } = options ?? {};
     const { args, order, promptMessageId, stepOrder, userId, ...call } = await startGeneration(context, component, streamTextArgs, options);
 
@@ -213,7 +214,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         savedMessages: call.getSavedMessages(),
     };
 
-    return Object.assign(result, metadata);
+    return Object.assign(result, metadata, { getPendingMessageId: call.getPendingMessageId });
 };
 
 export default streamText;

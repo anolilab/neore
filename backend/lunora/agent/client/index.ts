@@ -58,6 +58,7 @@ import type {
     ContextOptions,
     GenerateObjectArgs,
     GenerationOutputMetadata,
+    PendingMessageAccess,
     MaybeCustomCtx as MaybeCustomContext,
     MutationCtx as MutationContext,
     ObjectMode,
@@ -532,7 +533,7 @@ export class Agent<
              */
             saveStreamDeltas?: boolean | StreamingOptions;
         },
-    ): Promise<GenerationOutputMetadata & StreamTextResult<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT>> {
+    ): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT>> {
         type Tools = TOOLS extends undefined ? AgentTools : TOOLS;
 
         return streamText<Tools, OUTPUT>(

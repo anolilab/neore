@@ -5,6 +5,7 @@ import type { UIMessage } from "@/lib/agent";
 import type { AppError } from "@/lib/errors";
 import type { useLunora } from "@/lib/lunora/crpc";
 
+import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 
@@ -78,6 +79,8 @@ export interface ChatStreamingContextValue {
     /** The running turn is the browser's own `local-browser` stream (not the picked model's). */
     isLocalStreaming: boolean;
     isStreaming: boolean;
+    /** The run is waiting out a provider's rate limit and resumes by itself (`getActiveStreamForThread`). */
+    pause?: RateLimitPause | null;
 
     /**
      * The stream this client just started, from the `/v1/chat` response. The

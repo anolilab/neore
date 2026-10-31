@@ -17,6 +17,7 @@ import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp
 import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
+import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
@@ -1771,6 +1772,9 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
+        // such a step may pause once more. It still counts toward the cap on pauses.
+        earlySteps: v.optional(v.array(v.string())),
         expiresAt: v.number(),
         // Host-run turns (`acp/`; unset = a cloud turn). `hostTurnId` is the UUID the starter minted;
         // `hostState` drives "Sending" versus "Working"; the permission ids are the requests the agent is
@@ -1783,6 +1787,37 @@ export const schema = defineSchema({
         hostState: v.optional(vHostState),
         hostTurnId: v.optional(v.string()),
         messageId: v.string(),
+        // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
+        // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
+        // names this pause, and exactly one resume claims it (`claimRunResume`). `run` is the job's own
+        // input, kept so "Retry now" can enqueue the resume from a mutation.
+        pause: v.optional(
+            v.object({
+                // The row the rejected step continues from: the last row this run saved, else the prompt.
+                // The resume streams from it as its prompt, so it lands under it and not beside it.
+                from: v.string(),
+                id: v.string(),
+                provider: v.optional(v.string()),
+                reason: v.literal("rate_limit"),
+                retryAt: v.number(),
+                run: v.object({ ...runStreamingAgentFields }),
+                status: v.number(),
+            }),
+        ),
+        // What the run has done before its pauses, cumulative across them: the reply rows it saved, how many steps
+        // it ran (the resume gets only the rest of the step cap), and what its usage record needs (`skill`,
+        // `timeZone`). The run records ONE reply when it ends, covering these rows; a pause that never resumes
+        // (a stop, a superseded run) records them itself (`pause-usage.ts`), once, and clears this.
+        pausedRun: v.optional(
+            v.object({
+                replyRowIds: v.array(v.string()),
+                skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })),
+                stepsUsed: v.number(),
+                timeZone: v.optional(v.string()),
+            }),
+        ),
+        // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
+        pausedSteps: v.optional(v.array(v.string())),
         producer: v.optional(v.literal("host")),
         // Set once, by the ONE run that may write this stream (`claimStreamRun`).
         // The run arrives on the jobs queue, which delivers at least once; a

@@ -1658,6 +1658,11 @@
     {
       "from": "function:chat_execute:runStreamingAgent",
       "kind": "call",
+      "to": "function:chat_streaming_persistent_library:claimRunResume"
+    },
+    {
+      "from": "function:chat_execute:runStreamingAgent",
+      "kind": "call",
       "to": "function:chat_streaming_persistent_library:claimStreamRun"
     },
     {
@@ -2756,6 +2761,11 @@
       "to": "table:threadPins"
     },
     {
+      "from": "function:chat_rate_limit_retry:retryRateLimitedRun",
+      "kind": "call",
+      "to": "function:chat_streaming_persistent_library:retryPausedRunsNow"
+    },
+    {
       "from": "function:chat_sharing:acceptThreadInvite",
       "kind": "call",
       "to": "function:agent_sharing:createThreadAccess"
@@ -2966,11 +2976,6 @@
       "to": "table:streamingMessages"
     },
     {
-      "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
-      "kind": "write",
-      "to": "table:persistentStreams"
-    },
-    {
       "from": "function:chat_streaming_persistent_library:addChunk",
       "kind": "write",
       "to": "table:persistentChunks"
@@ -2979,6 +2984,11 @@
       "from": "function:chat_streaming_persistent_library:addChunk",
       "kind": "write",
       "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:claimRunResume",
+      "kind": "read",
+      "to": "table:streamingMessages"
     },
     {
       "from": "function:chat_streaming_persistent_library:claimStreamRun",
@@ -2991,6 +3001,16 @@
       "to": "table:toolApprovalRuns"
     },
     {
+      "from": "function:chat_streaming_persistent_library:pauseRunForRateLimit",
+      "kind": "write",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:retryPausedRunsNow",
+      "kind": "write",
+      "to": "table:persistentStreams"
+    },
+    {
       "from": "function:chat_streaming_persistent_library:setStreamStatus",
       "kind": "write",
       "to": "table:persistentStreams"
@@ -2999,11 +3019,6 @@
       "from": "function:chat_streaming_persistent_library:stopActiveForThread",
       "kind": "schedule",
       "to": "function:agent_streams:resetThreadStatusToActive"
-    },
-    {
-      "from": "function:chat_streaming_persistent_library:stopActiveForThread",
-      "kind": "write",
-      "to": "table:persistentStreams"
     },
     {
       "from": "function:chat_streaming_persistent_purge:purgeFinishedStreams",
@@ -10786,6 +10801,13 @@
       "module": "chat"
     },
     {
+      "detail": "mutation",
+      "id": "function:chat_rate_limit_retry:retryRateLimitedRun",
+      "kind": "function",
+      "name": "chat.rate_limit_retry.retryRateLimitedRun",
+      "module": "chat"
+    },
+    {
       "detail": "query",
       "id": "function:chat_resume:latestResumableThread",
       "kind": "function",
@@ -11032,6 +11054,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:claimRunResume",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.claimRunResume",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
       "id": "function:chat_streaming_persistent_library:claimStreamRun",
       "kind": "function",
       "name": "chat.streaming.persistent.library.claimStreamRun",
@@ -11070,6 +11099,20 @@
       "id": "function:chat_streaming_persistent_library:getStreamText",
       "kind": "function",
       "name": "chat.streaming.persistent.library.getStreamText",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:pauseRunForRateLimit",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.pauseRunForRateLimit",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:retryPausedRunsNow",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.retryPausedRunsNow",
       "module": "chat"
     },
     {
@@ -17514,49 +17557,49 @@
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 339,
+      "line": 340,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 801,
+      "line": 802,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 908,
+      "line": 909,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 956,
+      "line": 957,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 968,
+      "line": 969,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1020,
+      "line": 1021,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1037,
+      "line": 1038,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1051,
+      "line": 1052,
       "reason": "at module scope"
     },
     {
@@ -17670,25 +17713,25 @@
     {
       "file": "agent/client/start",
       "kind": "call",
-      "line": 135,
+      "line": 136,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "agent/client/start",
       "kind": "call",
-      "line": 179,
+      "line": 180,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "agent/client/start",
       "kind": "call",
-      "line": 202,
+      "line": 203,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "agent/client/start",
       "kind": "call",
-      "line": 293,
+      "line": 294,
       "reason": "the default export is not a registered function"
     },
     {
@@ -19062,37 +19105,43 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
+      "line": 118,
+      "reason": "\"readRunPlan\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
       "line": 119,
       "reason": "\"readRunPlan\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 120,
-      "reason": "\"readRunPlan\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 157,
+      "line": 156,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 200,
+      "line": 199,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 256,
+      "line": 255,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 347,
+      "line": 346,
+      "reason": "\"loadRunContext\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 382,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
@@ -19104,145 +19153,139 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 384,
+      "line": 391,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 392,
+      "line": 410,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 411,
-      "reason": "\"loadRunContext\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 544,
+      "line": 543,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 579,
+      "line": 578,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 590,
+      "line": 589,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 605,
+      "line": 604,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 617,
+      "line": 616,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 638,
+      "line": 637,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 759,
+      "line": 758,
       "reason": "\"createRunSteering\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 811,
+      "line": 810,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 818,
+      "line": 817,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 830,
+      "line": 829,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 882,
+      "line": 881,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 976,
+      "line": 975,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 983,
+      "line": 982,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1075,
+      "line": 1074,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1182,
+      "line": 1181,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1207,
+      "line": 1206,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1214,
+      "line": 1213,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1225,
+      "line": 1224,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1235,
+      "line": 1234,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1241,
+      "line": 1240,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1255,
+      "line": 1254,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -19346,6 +19389,12 @@
       "kind": "call",
       "line": 303,
       "reason": "\"callMCPToolFromAppHttpAction\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/pause-run",
+      "kind": "call",
+      "line": 53,
+      "reason": "\"pauseOnRateLimit\" is not a registered function"
     },
     {
       "file": "chat/lib/persist-stream",
@@ -19578,7 +19627,7 @@
     {
       "file": "chat/streaming/persistent/library",
       "kind": "write",
-      "line": 46,
+      "line": 50,
       "reason": "\"insertPersistentStream\" is not a registered function"
     },
     {
