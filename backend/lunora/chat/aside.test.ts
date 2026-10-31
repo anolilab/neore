@@ -10,12 +10,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-const { generateText, getAgent, getUtilityModel, registry, sessionFrom, users } = vi.hoisted(() => {
+const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
     return {
         generateText: vi.fn(),
         getAgent: vi.fn(),
         getUtilityModel: vi.fn(),
         registry: new Map<string, unknown>(),
+        scheduleReplyUsage: vi.fn(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
@@ -29,6 +30,10 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
+});
+
+vi.mock("../usage/schedule", () => {
+    return { scheduleReplyUsage };
 });
 
 vi.mock("../lib/utility-model", () => {
@@ -219,6 +224,7 @@ afterEach(() => {
     generateText.mockReset();
     getAgent.mockReset();
     getUtilityModel.mockReset();
+    scheduleReplyUsage.mockReset();
     delete process.env.STORAGE_SIGNING_SECRET;
 });
 
@@ -366,6 +372,29 @@ describe("askAside", () => {
 
         generateText.mockRejectedValueOnce(new Error("boom"));
         expect(await errorCode(ask())).toBe("INTERNAL");
+    });
+
+    it("records an aside on the thread's own model in the usage rollup, once, under its own key", async () => {
+        await ask();
+
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", userId: OWNER });
+    });
+
+    it("records nothing for an aside on the utility model", async () => {
+        await patchThread({ mode: "image", model: "not-a-text-model" });
+        await ask();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+
+    it("records nothing for a coding agent's thread", async () => {
+        await patchThread({ runner: "host" });
+        await ask();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
     });
 
     it("sends only the question to the utility model on a coding agent's thread", async () => {
