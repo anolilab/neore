@@ -774,6 +774,11 @@ describe("a Stop in the worker's own thread", () => {
         expect(await runRow(queued.runId)).toMatchObject({ status: "running" });
         // The next message is live on the computer, so the thread must keep its Stop control.
         expect((await get(receipt.workerId)).status).toBe("running");
+        // The cancel keeps what waits behind the turn: the next message's send is signed in the same transaction, and
+        // the computer may apply it first, so a cancel that dropped the queue would drop that message.
+        const cancels = await table("deviceCalls", { toolName: "acp_cancel" });
+
+        expect(JSON.parse(cancels[0]!.envelope as string).input).toMatchObject({ keepQueue: true });
     });
 });
 

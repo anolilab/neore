@@ -13,6 +13,7 @@ import { streamLogger } from "../../lib/logger";
 import { settleHostGuide } from "../../source-control/guide-host-end";
 import { findRunningHostRun } from "../../sub-agents/host-runs";
 import type { SubAgentOutcome } from "../../sub-agents/functions";
+import { isWorkerThread } from "../../sub-agents/worker-thread";
 import type { HostChanges } from "./changes";
 import {
     addMediaToTranscript,
@@ -302,12 +303,16 @@ export const endLiveHostTurns = async (
 
 /**
  * Asks the stream's host to stop the turn. Best effort: a refusal (budget, device gone) leaves the stream ended all the same.
- * The computer drops the prompts queued behind the turn unless `keepQueue`, which only a worker run's stop passes.
+ * The computer drops the prompts queued behind the turn unless `keepQueue`. A worker's thread always keeps them: only the
+ * worker's own messages queue there (`/hosts/send` refuses its thread), and ending the stopped turn signs the next one's
+ * `acp_send` in the same transaction, which the computer may apply before this cancel.
  */
 export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<void> => {
     if (!stream.hostTurnId) {
         return;
     }
+
+    const keep = keepQueue || (await isWorkerThread(ctx, stream.threadId));
 
     const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
 
@@ -321,7 +326,7 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
             {
                 deviceId: session.deviceId,
                 hostSessionId: session.hostSessionId,
-                keepQueue,
+                keepQueue: keep,
                 threadId: stream.threadId as Id<"threads">,
                 turnId: stream.hostTurnId,
                 userId: stream.userId,
