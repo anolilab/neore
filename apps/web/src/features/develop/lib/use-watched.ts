@@ -1,18 +1,36 @@
 import { api } from "@neore/backend/api";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { useDevelopUser } from "./use-develop";
 
-/** The caller's watched repositories with their cached lists. Live: a poll on the shard shows without a refetch. */
+/**
+ * The caller's watched repositories with their cached lists. Live: a poll on the shard shows without a refetch.
+ *
+ * The query key names no account, so after an account switch in this browser the cache still holds the previous
+ * account's list until the new read lands: that list is never returned, and it is dropped.
+ */
 export const useWatchedRepositories = (enabled: boolean) => {
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const userId = useDevelopUser();
     const options = crpc.source_control.freshness.listWatchedRepositories.queryOptions({});
+    const query = useQuery({ ...options, enabled: enabled && userId !== undefined });
+    const owner = useRef(userId);
+    const switched = owner.current !== userId;
 
-    return useQuery({ ...options, enabled: enabled && userId !== undefined });
+    useEffect(() => {
+        if (owner.current === userId) {
+            return;
+        }
+
+        owner.current = userId;
+        queryClient.removeQueries({ queryKey: options.queryKey });
+    }, [options.queryKey, queryClient, userId]);
+
+    return switched ? { ...query, data: undefined } : query;
 };
 
 export const useWatchMutations = () => {
