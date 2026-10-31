@@ -194,10 +194,8 @@ export const runStreamingAgent = internalAction
             }
 
             const invokedSkill = skillRun.invocation;
-            // Skill text (enabled skills' descriptions, an invoked skill's instructions) reaches the prompt whoever wrote it.
-            const skillText = injectsSkillText(skillRun);
             // The one answer the quick check reads: at the first call from the tools below, and from the snapshot a pause leaves.
-            const untrustedContext = runContextPromise.then((context) => context.untrustedContext || skillText);
+            const untrustedContext = runContextPromise.then((context) => context.untrustedContext || injectsSkillText(skillRun));
 
             untrustedContext.catch(() => undefined);
 
