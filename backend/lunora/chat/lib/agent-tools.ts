@@ -150,7 +150,14 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
         headless || origin === "outside_agent" || threadId === undefined
             ? false
-            : ctx.runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, { threadId: threadId as Id<"threads">, userId }),
+            : // A failed read turns the quick check off; it must not take the run down.
+              ctx
+                  .runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, { threadId: threadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Quick-check eligibility unavailable:", error);
+
+                      return false;
+                  }),
         // A broken connector must never take the run down with it.
         getConnectorMcpServers(ctx, userId).catch((error: unknown) => {
             toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);

@@ -124,6 +124,11 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
         return false;
     }
 
+    // An imported conversation's rows come from an outside export file, which no taint signal can see.
+    if (thread?.createdBy?.startsWith("import:")) {
+        return false;
+    }
+
     const summaryTaint = await threadSummaryTaint(ctx, threadId);
 
     return summaryTaint.length === 0;

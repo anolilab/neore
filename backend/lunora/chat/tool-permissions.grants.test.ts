@@ -263,6 +263,12 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ userId: "someone-else" }))).toBe(false);
     });
 
+    it("stays false in an imported conversation, whose rows came from an export file", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        expect(await ask(await THREAD_ARGS({ createdBy: "import:chatgpt" }))).toBe(false);
+    });
+
     it("is false for a tool the user set a mode for themselves, even mid-run", async () => {
         await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
 
