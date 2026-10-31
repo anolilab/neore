@@ -28,6 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [status, setStatus] = useState<AuthStatus>("loading");
     const [user, setUser] = useState<GrantUser | null>(null);
     const [refreshTick, setRefreshTick] = useState(0);
+    const [hasToken, setHasToken] = useState(false);
     const signOutCount = useRef(0);
     const [config] = useState(loadConfig);
     const [client] = useState(getClient);
@@ -65,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             client.setAuthToken(jwt);
+            setHasToken(jwt !== null);
 
             if (jwt === null) {
                 setUser(null);
@@ -115,14 +117,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             signOutCount.current += 1;
             client.setAuthToken(null);
+            setHasToken(false);
             setUser(null);
             setStatus("signed-out");
         }
     }, [client, config.lunoraUrl]);
 
+    const retryToken = useCallback(() => setRefreshTick(nextTick), []);
+
     const value = useMemo(() => {
-        return { signIn, signOut, status, user };
-    }, [signIn, signOut, status, user]);
+        return { hasToken, retryToken, signIn, signOut, status, user };
+    }, [hasToken, retryToken, signIn, signOut, status, user]);
 
     return <AuthContext value={value}>{children}</AuthContext>;
 };

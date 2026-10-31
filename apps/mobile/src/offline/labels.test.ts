@@ -6,7 +6,7 @@ const LAST_SEEN = /^Last seen/;
 
 describe("displayStatus", () => {
     it("never shows a cached running session as running", () => {
-        for (const status of ["running", "busy", "streaming", "queued", "pending"]) {
+        for (const status of ["running", "busy", "starting", "streaming", "queued", "pending"]) {
             expect(displayStatus(status, { isOffline: true, lastSeenAt: undefined }), status).toMatch(LAST_SEEN);
             expect(displayStatus(status, { isOffline: true, lastSeenAt: undefined }).toLowerCase(), status).not.toContain("running");
         }
@@ -21,8 +21,19 @@ describe("displayStatus", () => {
         expect(displayStatus("finish", { isOffline: true, lastSeenAt: undefined })).toBe("Finished");
     });
 
+    it("shows a host that stopped answering as last seen, online or not", () => {
+        expect(displayStatus("offline", { isOffline: false, lastSeenAt: undefined })).toBe("Last seen");
+        expect(displayStatus("ended", { isOffline: true, lastSeenAt: undefined })).toBe("Ended");
+    });
+
     it("names the time a cached running session was last seen", () => {
-        const label = displayStatus("running", { isOffline: true, lastSeenAt: Date.UTC(2026, 9, 31, 12, 0), locale: "en-US", now: Date.UTC(2026, 10, 5), timeZone: "UTC" });
+        const label = displayStatus("running", {
+            isOffline: true,
+            lastSeenAt: Date.UTC(2026, 9, 31, 12, 0),
+            locale: "en-US",
+            now: Date.UTC(2026, 10, 5),
+            timeZone: "UTC",
+        });
 
         expect(label).toBe("Last seen Oct 31, 12:00 PM");
     });

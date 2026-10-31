@@ -5,6 +5,7 @@ export const MAX_MESSAGES_PER_THREAD = 50;
 export const MAX_THREADS_WITH_MESSAGES = 20;
 /** The list screen pages in 100 at a time; older rows past this are evicted, not deleted from the server. */
 export const MAX_CACHED_THREADS = 200;
+export const MAX_CACHED_STATUSES = 100;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS cache_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
@@ -84,6 +85,11 @@ interface StatusSql {
 
 /** One signed-in account's view of the cache. Once the account signs out or another binds, every call does nothing. */
 export interface ScopedCache {
+    /**
+     * Removes threads and their messages. For a thread the server reports as locked after it was saved: that is a
+     * positive signal, unlike a thread merely missing from a page.
+     */
+    forgetThreads: (threadIds: ReadonlyArray<string>) => Promise<void>;
     loadMessages: (threadId: string) => Promise<MessageRow[]>;
     loadStatuses: () => Promise<StatusRow[]>;
     loadThreads: () => Promise<ThreadRow[]>;
@@ -157,12 +163,34 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
             });
 
         return {
+            forgetThreads: (threadIds) =>
+                scoped<undefined>(undefined, async () => {
+                    await database.withTransactionAsync(async () => {
+                        for (const threadId of threadIds) {
+                            // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
+                            await database.runAsync("DELETE FROM cached_messages WHERE thread_id = ?", [threadId]);
+                            // eslint-disable-next-line no-await-in-loop -- as above
+                            await database.runAsync("DELETE FROM cached_threads WHERE id = ?", [threadId]);
+                        }
+                    });
+                }),
             loadMessages: (threadId) =>
                 scoped<MessageRow[]>([], async () => {
-                    const rows = await database.getAllAsync<MessageSql>("SELECT * FROM cached_messages WHERE thread_id = ? ORDER BY created_at ASC, id ASC", [threadId]);
+                    const rows = await database.getAllAsync<MessageSql>("SELECT * FROM cached_messages WHERE thread_id = ? ORDER BY created_at ASC, id ASC", [
+                        threadId,
+                    ]);
 
                     return rows.map((row) => {
-                        return { createdAt: row.created_at, id: row.id, role: row.role, status: row.status, syncedAt: row.synced_at, text: row.text, threadId: row.thread_id, updatedAt: row.updated_at };
+                        return {
+                            createdAt: row.created_at,
+                            id: row.id,
+                            role: row.role,
+                            status: row.status,
+                            syncedAt: row.synced_at,
+                            text: row.text,
+                            threadId: row.thread_id,
+                            updatedAt: row.updated_at,
+                        };
                     });
                 }),
             loadStatuses: () =>
@@ -187,7 +215,14 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                     const rows = await database.getAllAsync<ThreadSql>("SELECT * FROM cached_threads ORDER BY updated_at DESC, id DESC");
 
                     return rows.map((row) => {
-                        return { id: row.id, status: row.status, syncedAt: row.synced_at, title: row.title, updatedAt: row.updated_at, ...row.runner === "host" && { runner: "host" as const } };
+                        return {
+                            id: row.id,
+                            status: row.status,
+                            syncedAt: row.synced_at,
+                            title: row.title,
+                            updatedAt: row.updated_at,
+                            ...row.runner === "host" && { runner: "host" as const },
+                        };
                     });
                 }),
             saveMessages: (threadId, messages) =>
@@ -203,7 +238,16 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
 
                     await database.withTransactionAsync(async () => {
                         for (const message of messages) {
-                            const params: SqlParametereter[] = [message.id, threadId, message.role, message.text, message.status, message.createdAt, message.updatedAt ?? message.createdAt, syncedAt];
+                            const params: SqlParametereter[] = [
+                                message.id,
+                                threadId,
+                                message.role,
+                                message.text,
+                                message.status,
+                                message.createdAt,
+                                message.updatedAt ?? message.createdAt,
+                                syncedAt,
+                            ];
 
                             // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
                             await database.runAsync(
@@ -237,6 +281,11 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                                 [row.id, row.kind, row.label, row.status, orNull(row.threadId), orNull(row.lastSeenAt), row.updatedAt, syncedAt],
                             );
                         }
+
+                        // A finished worker run drops out of the live list and would otherwise stay here for good.
+                        await database.runAsync(
+                            `DELETE FROM cached_statuses WHERE id NOT IN (SELECT id FROM cached_statuses ORDER BY updated_at DESC, id DESC LIMIT ${MAX_CACHED_STATUSES})`,
+                        );
                     });
                 }),
             saveThreads: (threads) =>
@@ -276,7 +325,9 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                     await wipe();
                 }
 
-                await database.runAsync("INSERT INTO cache_meta (key, value) VALUES ('owner', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [userId]);
+                await database.runAsync("INSERT INTO cache_meta (key, value) VALUES ('owner', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [
+                    userId,
+                ]);
                 owner = userId;
             }),
         clear: () => {

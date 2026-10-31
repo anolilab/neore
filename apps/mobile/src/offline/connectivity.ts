@@ -12,10 +12,7 @@ export interface Connectivity {
 export const INITIAL_CONNECTIVITY: Connectivity = { network: undefined, requestFailed: false, socket: undefined };
 
 export type ConnectivityEvent
-    = | { network: boolean; type: "network" }
-        | { socket: ConnectionStatus; type: "socket" }
-        | { type: "request-failed" }
-        | { type: "request-succeeded" };
+    = { network: boolean; type: "network" } | { socket: ConnectionStatus; type: "socket" } | { type: "request-failed" } | { type: "request-succeeded" };
 
 export const reduceConnectivity = (state: Connectivity, event: ConnectivityEvent): Connectivity => {
     switch (event.type) {

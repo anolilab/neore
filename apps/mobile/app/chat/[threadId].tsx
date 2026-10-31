@@ -82,7 +82,7 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
 const ChatScreen = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
-    const { status } = useAuth();
+    const { hasToken, status } = useAuth();
     const { cache, isOffline, refreshTick, reportRead } = useOffline();
     const composer = useWriteControl("composer");
     const sendControl = useWriteControl("send");
@@ -184,10 +184,11 @@ const ChatScreen = () => {
     }, [cache, status, threadId]);
 
     useEffect(() => {
-        if (status === "signed-in" && threadId && !sending) {
+        // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
+        if (status === "signed-in" && hasToken && threadId && !sending) {
             loadMessages(threadId);
         }
-    }, [loadMessages, refreshTick, sending, status, threadId]);
+    }, [hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
     const send = async () => {
         const prompt = draft.trim();

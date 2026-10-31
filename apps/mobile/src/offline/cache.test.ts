@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { OfflineCache } from "./cache";
-import { createOfflineCache, MAX_MESSAGES_PER_THREAD, MAX_THREADS_WITH_MESSAGES } from "./cache";
+import { createOfflineCache, MAX_CACHED_STATUSES, MAX_MESSAGES_PER_THREAD, MAX_THREADS_WITH_MESSAGES } from "./cache";
 import { createTestDatabase } from "./test-database";
 import type { CachedMessage, CachedStatus, CachedThread } from "./types";
 
@@ -103,7 +103,10 @@ describe("messages", () => {
         const scoped = await owned(cache);
 
         await scoped.saveThreads([thread("t", 1)]);
-        await scoped.saveMessages("t", Array.from({ length: 80 }, (_, index) => message(`m${index}`, "t", index)));
+        await scoped.saveMessages(
+            "t",
+            Array.from({ length: 80 }, (_, index) => message(`m${index}`, "t", index)),
+        );
 
         const rows = await scoped.loadMessages("t");
 
@@ -180,6 +183,24 @@ describe("messages", () => {
     });
 });
 
+describe("locked threads", () => {
+    it("forgets a thread and its messages once the server says it is locked", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("a", 10), thread("b", 20)]);
+        await scoped.saveMessages("a", [message("m1", "a", 1)]);
+        await scoped.saveMessages("b", [message("m2", "b", 1)]);
+        await scoped.forgetThreads(["a"]);
+
+        const threads = await scoped.loadThreads();
+
+        expect(threads.map((row) => row.id)).toEqual(["b"]);
+        expect(await scoped.loadMessages("a")).toEqual([]);
+        expect(await scoped.loadMessages("b")).toHaveLength(1);
+    });
+});
+
 describe("statuses", () => {
     it("stores host and worker status with the time it was synced", async () => {
         const { cache, clock } = makeCache();
@@ -192,6 +213,19 @@ describe("statuses", () => {
 
         expect(rows.map((row) => row.id).toSorted((a, b) => a.localeCompare(b))).toEqual(["h1", "w1"]);
         expect(rows.find((row) => row.id === "h1")).toMatchObject({ kind: "host", lastSeenAt: 9, status: "busy", syncedAt: 4000 });
+    });
+
+    it("keeps the newest 100 statuses", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveStatuses(Array.from({ length: 120 }, (_, index) => status(`w${index}`, index, { kind: "worker" })));
+
+        const rows = await scoped.loadStatuses();
+
+        expect(rows).toHaveLength(MAX_CACHED_STATUSES);
+        expect(rows.some((row) => row.id === "w119")).toBe(true);
+        expect(rows.some((row) => row.id === "w0")).toBe(false);
     });
 
     it("never lets an older status replace a newer one, and keeps one a later save omits", async () => {

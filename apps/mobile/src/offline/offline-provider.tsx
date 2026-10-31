@@ -25,14 +25,20 @@ const isReachable = (state: NetworkState): boolean => state.isConnected !== fals
  * coming back online moves `refreshTick` and nothing else.
  */
 export const OfflineProvider = ({ children }: { children: ReactNode }) => {
-    const { status, user } = useAuth();
+    const { retryToken, status, user } = useAuth();
     const [connectivity, dispatch] = useReducer(reduceConnectivity, INITIAL_CONNECTIVITY);
     const [refreshTick, setRefreshTick] = useState(0);
     const [bound, setBound] = useState<{ cache: ScopedCache; userId: string } | undefined>();
     const userId = user?.id;
     const isOffline = isOfflineState(connectivity);
     const wasOffline = useRef(false);
-    const refresher = useRef(createReconnectRefresher(() => setRefreshTick(nextTick)));
+    // Coming back online reads again, and mints a token first if the one held may have lapsed or was never fetched.
+    const refresher = useRef(
+        createReconnectRefresher(() => {
+            retryToken();
+            setRefreshTick(nextTick);
+        }),
+    );
 
     useEffect(() => {
         const subscription = addNetworkStateListener((state) => dispatch({ network: isReachable(state), type: "network" }));

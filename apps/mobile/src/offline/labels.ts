@@ -1,10 +1,11 @@
 /** Statuses that mean work is in flight. A cached one is a last-known state, so it is never shown as live. */
-const IN_FLIGHT = new Set(["busy", "pending", "queued", "running", "streaming"]);
+const IN_FLIGHT = new Set(["busy", "pending", "queued", "running", "starting", "streaming"]);
 
 const SETTLED: Record<string, string> = {
     abort: "Stopped",
     active: "Active",
     archived: "Archived",
+    ended: "Ended",
     error: "Failed",
     failed: "Failed",
     finish: "Finished",
@@ -42,7 +43,15 @@ export const lastSyncedLabel = (syncedAt: number | undefined, options: FormatOpt
  * The status to show for a row. Online it is the live status. Offline an in-flight status becomes "Last seen":
  * the cache knows the session was running when it was read, not that it is running now.
  */
-export const displayStatus = (status: string, { isOffline, lastSeenAt, ...format }: FormatOptions & { isOffline: boolean; lastSeenAt: number | undefined }): string => {
+export const displayStatus = (
+    status: string,
+    { isOffline, lastSeenAt, ...format }: FormatOptions & { isOffline: boolean; lastSeenAt: number | undefined },
+): string => {
+    // A host that stopped answering is "last seen" whether or not this phone is online: the phone never hears from a host itself.
+    if (status === "offline") {
+        return lastSeenAt === undefined ? "Last seen" : `Last seen ${formatMoment(lastSeenAt, format)}`;
+    }
+
     if (!IN_FLIGHT.has(status)) {
         return SETTLED[status] ?? status;
     }
