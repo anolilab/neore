@@ -11137,6 +11137,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:devices_functions:setDeviceProjectScope",
+      "kind": "function",
+      "name": "devices.functions.setDeviceProjectScope",
+      "module": "devices"
+    },
+    {
+      "detail": "mutation",
       "id": "function:devices_functions:updateDeviceManifest",
       "kind": "function",
       "name": "devices.functions.updateDeviceManifest",
