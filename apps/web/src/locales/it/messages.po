@@ -2024,7 +2024,7 @@ msgstr "Aggiungi ai preferiti"
 msgid "Add to starred"
 msgstr "Aggiungi ai contrassegnati"
 
-#: src/features/chat/aside/aside-panel.tsx:137
+#: src/features/chat/aside/aside-panel.tsx:143
 msgid "Add to thread"
 msgstr ""
 
@@ -2063,7 +2063,8 @@ msgstr "Aggiunti {added} documento/i."
 msgid "Added to favorites"
 msgstr "Aggiunto ai preferiti"
 
-#: src/features/chat/aside/aside-panel.tsx:124
+#: src/features/chat/aside/aside-panel.tsx:130
+#: src/features/chat/aside/aside-panel.tsx:235
 msgid "Added to the thread"
 msgstr ""
 
@@ -2976,7 +2977,7 @@ msgstr "Rispondi ai messaggi WhatsApp tramite il tuo numero WhatsApp Business (M
 msgid "Answered"
 msgstr "Risposta data"
 
-#: src/features/chat/aside/aside-panel.tsx:119
+#: src/features/chat/aside/aside-panel.tsx:125
 msgid "Answered without the conversation: this chat runs on your computer."
 msgstr ""
 
@@ -3388,13 +3389,13 @@ msgstr "Cresc."
 msgid "ask"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/aside/aside-panel.tsx:263
 #: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "Chiedi"
 
-#: src/features/chat/aside/aside-panel.tsx:248
+#: src/features/chat/aside/aside-panel.tsx:259
 msgid "Ask a quick question…"
 msgstr ""
 
@@ -3426,7 +3427,7 @@ msgstr "Fai la stessa domanda a GPT-4, Claude e Gemini. Esegui lo stesso prompt 
 msgid "Ask me anything..."
 msgstr "Chiedimi qualsiasi cosa..."
 
-#: src/features/chat/aside/aside-panel.tsx:240
+#: src/features/chat/aside/aside-panel.tsx:251
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr ""
 
@@ -3704,7 +3705,7 @@ msgstr "Disponibile su Neore: inizia gratis, senza carta di credito."
 msgid "Available once the reply is saved"
 msgstr "Disponibile dopo il salvataggio della risposta"
 
-#: src/features/chat/aside/aside-panel.tsx:139
+#: src/features/chat/aside/aside-panel.tsx:145
 msgid "Available when the reply finishes"
 msgstr ""
 
@@ -7075,11 +7076,11 @@ msgstr "Costa Rica"
 msgid "Could not add the server."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:80
+#: src/features/chat/aside/aside-panel.tsx:86
 msgid "Could not add this to the thread. Try again."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:73
+#: src/features/chat/aside/aside-panel.tsx:78
 msgid "Could not answer the question. Try again."
 msgstr ""
 
@@ -9106,7 +9107,7 @@ msgstr "Ignora errori"
 msgid "Dismiss setup suggestions"
 msgstr "Ignora suggerimenti di configurazione"
 
-#: src/features/chat/aside/aside-panel.tsx:92
+#: src/features/chat/aside/aside-panel.tsx:98
 msgid "Dismiss this side question"
 msgstr ""
 
@@ -20242,6 +20243,10 @@ msgstr "Sono state analizzate solo le esecuzioni più recenti, quindi potrebbe m
 msgid "Only the owner can change who sees this skill."
 msgstr "Solo il proprietario può cambiare chi vede questa skill."
 
+#: src/features/chat/aside/aside-panel.tsx:84
+msgid "Only the owner of a chat can add to it from here."
+msgstr ""
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "Usa solo provider che garantiscono zero conservazione dei dati: i tuoi prompt non vengono mai memorizzati."
@@ -26039,12 +26044,12 @@ msgstr "Righe da {firstShown} a {lastShown} di {totalRows}"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "Mostrata all'assistente per sapere quando la skill è pertinente."
 
-#: src/features/chat/aside/aside-panel.tsx:175
-#: src/features/chat/aside/aside-panel.tsx:239
+#: src/features/chat/aside/aside-panel.tsx:183
+#: src/features/chat/aside/aside-panel.tsx:250
 msgid "Side question"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:75
+#: src/features/chat/aside/aside-panel.tsx:80
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr ""
 
@@ -26929,7 +26934,7 @@ msgstr "Inizia una conversazione"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "Inizia una conversazione tutta tua con i modelli di IA più recenti."
 
-#: src/features/chat/aside/aside-panel.tsx:176
+#: src/features/chat/aside/aside-panel.tsx:184
 msgid "Start a conversation to ask a side question."
 msgstr ""
 
@@ -28849,11 +28854,11 @@ msgstr "Il perfezionamento non ha modificato alcun campo."
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "La regione in cui hai abilitato l'accesso ai modelli nella console di Bedrock."
 
-#: src/features/chat/aside/aside-panel.tsx:78
+#: src/features/chat/aside/aside-panel.tsx:83
 msgid "The reply is still running. Add it when the reply finishes."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:71
+#: src/features/chat/aside/aside-panel.tsx:75
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
@@ -29063,7 +29068,8 @@ msgstr "Modello visione-linguaggio con pensiero"
 msgid "Thinking..."
 msgstr "Sto pensando..."
 
-#: src/features/chat/aside/aside-panel.tsx:105
+#: src/features/chat/aside/aside-panel.tsx:111
+#: src/features/chat/aside/aside-panel.tsx:200
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -29082,7 +29088,7 @@ msgstr "Questa azione non può essere annullata. L'organizzazione e tutti i dati
 msgid "This browser cannot receive push notifications here."
 msgstr "Questo browser non può ricevere notifiche push qui."
 
-#: src/features/chat/aside/aside-panel.tsx:82
+#: src/features/chat/aside/aside-panel.tsx:88
 msgid "This cannot be added to this chat."
 msgstr ""
 
@@ -30519,11 +30525,11 @@ msgstr "Sblocca nodo"
 msgid "Unlock this chat"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:85
 msgid "Unlock this chat to add this to the thread."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:72
+#: src/features/chat/aside/aside-panel.tsx:77
 msgid "Unlock this chat to ask a side question."
 msgstr ""
 
@@ -32633,6 +32639,10 @@ msgstr "Ora puoi riprovare!"
 msgid "You can view this page but not edit it."
 msgstr "Puoi visualizzare questa pagina ma non modificarla."
 
+#: src/features/chat/aside/aside-panel.tsx:76
+msgid "You cannot ask a side question in this chat."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-setup.tsx:92
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "Hai scelto queste integrazioni nel builder dell'agente. Ognuna si apre per una tua revisione prima che venga collegato qualcosa."
@@ -32657,8 +32667,8 @@ msgstr "Non hai ancora tag."
 msgid "You have returned to your admin account"
 msgstr "Sei tornato al tuo account admin"
 
-#: src/features/chat/aside/aside-panel.tsx:74
-#: src/features/chat/aside/aside-panel.tsx:81
+#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:87
 msgid "You have used today's messages. Try again later."
 msgstr ""
 
@@ -32926,7 +32936,7 @@ msgstr "La tua sessione è scaduta. Ricarica la pagina e accedi di nuovo."
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "La tua sessione non è recente. Esci e accedi di nuovo per eliminare il tuo account."
 
-#: src/features/chat/aside/aside-panel.tsx:242
+#: src/features/chat/aside/aside-panel.tsx:253
 msgid "Your side question"
 msgstr ""
 

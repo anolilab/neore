@@ -2024,7 +2024,7 @@ msgstr "お気に入りに追加"
 msgid "Add to starred"
 msgstr "スターを付ける"
 
-#: src/features/chat/aside/aside-panel.tsx:137
+#: src/features/chat/aside/aside-panel.tsx:143
 msgid "Add to thread"
 msgstr ""
 
@@ -2063,7 +2063,8 @@ msgstr "{added} 件のドキュメントを追加しました。"
 msgid "Added to favorites"
 msgstr "お気に入りに追加しました"
 
-#: src/features/chat/aside/aside-panel.tsx:124
+#: src/features/chat/aside/aside-panel.tsx:130
+#: src/features/chat/aside/aside-panel.tsx:235
 msgid "Added to the thread"
 msgstr ""
 
@@ -2976,7 +2977,7 @@ msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセ
 msgid "Answered"
 msgstr "回答済み"
 
-#: src/features/chat/aside/aside-panel.tsx:119
+#: src/features/chat/aside/aside-panel.tsx:125
 msgid "Answered without the conversation: this chat runs on your computer."
 msgstr ""
 
@@ -3388,13 +3389,13 @@ msgstr "昇順"
 msgid "ask"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/aside/aside-panel.tsx:263
 #: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "確認"
 
-#: src/features/chat/aside/aside-panel.tsx:248
+#: src/features/chat/aside/aside-panel.tsx:259
 msgid "Ask a quick question…"
 msgstr ""
 
@@ -3426,7 +3427,7 @@ msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロ
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
-#: src/features/chat/aside/aside-panel.tsx:240
+#: src/features/chat/aside/aside-panel.tsx:251
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr ""
 
@@ -3704,7 +3705,7 @@ msgstr "Neore で利用可能 — 無料で始められ、クレジットカー�
 msgid "Available once the reply is saved"
 msgstr "返信の保存後に利用できます"
 
-#: src/features/chat/aside/aside-panel.tsx:139
+#: src/features/chat/aside/aside-panel.tsx:145
 msgid "Available when the reply finishes"
 msgstr ""
 
@@ -7075,11 +7076,11 @@ msgstr "コスタリカ"
 msgid "Could not add the server."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:80
+#: src/features/chat/aside/aside-panel.tsx:86
 msgid "Could not add this to the thread. Try again."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:73
+#: src/features/chat/aside/aside-panel.tsx:78
 msgid "Could not answer the question. Try again."
 msgstr ""
 
@@ -9106,7 +9107,7 @@ msgstr "エラーを閉じる"
 msgid "Dismiss setup suggestions"
 msgstr "セットアップの提案を閉じる"
 
-#: src/features/chat/aside/aside-panel.tsx:92
+#: src/features/chat/aside/aside-panel.tsx:98
 msgid "Dismiss this side question"
 msgstr ""
 
@@ -20242,6 +20243,10 @@ msgstr "最新の実行だけを確認したため、古いモデルが含まれ
 msgid "Only the owner can change who sees this skill."
 msgstr "このスキルの公開範囲を変更できるのはオーナーのみです。"
 
+#: src/features/chat/aside/aside-panel.tsx:84
+msgid "Only the owner of a chat can add to it from here."
+msgstr ""
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "データを一切保持しないことを保証するプロバイダーのみを使用します。プロンプトが保存されることはありません。"
@@ -26039,12 +26044,12 @@ msgstr "{totalRows} 行中 {firstShown}〜{lastShown} 行を表示"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "スキルをいつ適用するかを判断できるよう、アシスタントに表示されます。"
 
-#: src/features/chat/aside/aside-panel.tsx:175
-#: src/features/chat/aside/aside-panel.tsx:239
+#: src/features/chat/aside/aside-panel.tsx:183
+#: src/features/chat/aside/aside-panel.tsx:250
 msgid "Side question"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:75
+#: src/features/chat/aside/aside-panel.tsx:80
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr ""
 
@@ -26929,7 +26934,7 @@ msgstr "会話を始める"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "最新の AI モデルで、自分の会話を始めましょう。"
 
-#: src/features/chat/aside/aside-panel.tsx:176
+#: src/features/chat/aside/aside-panel.tsx:184
 msgid "Start a conversation to ask a side question."
 msgstr ""
 
@@ -28849,11 +28854,11 @@ msgstr "改善によって変更されたフィールドはありませんでし
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "Bedrock コンソールでモデルアクセスを有効にしたリージョン。"
 
-#: src/features/chat/aside/aside-panel.tsx:78
+#: src/features/chat/aside/aside-panel.tsx:83
 msgid "The reply is still running. Add it when the reply finishes."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:71
+#: src/features/chat/aside/aside-panel.tsx:75
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
@@ -29063,7 +29068,8 @@ msgstr "思考機能を備えた視覚言語モデル"
 msgid "Thinking..."
 msgstr "考えています..."
 
-#: src/features/chat/aside/aside-panel.tsx:105
+#: src/features/chat/aside/aside-panel.tsx:111
+#: src/features/chat/aside/aside-panel.tsx:200
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -29082,7 +29088,7 @@ msgstr "この操作は元に戻せません。組織と関連するすべての
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/chat/aside/aside-panel.tsx:82
+#: src/features/chat/aside/aside-panel.tsx:88
 msgid "This cannot be added to this chat."
 msgstr ""
 
@@ -30519,11 +30525,11 @@ msgstr "ノードのロックを解除"
 msgid "Unlock this chat"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:85
 msgid "Unlock this chat to add this to the thread."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:72
+#: src/features/chat/aside/aside-panel.tsx:77
 msgid "Unlock this chat to ask a side question."
 msgstr ""
 
@@ -32633,6 +32639,10 @@ msgstr "もう一度お試しいただけます！"
 msgid "You can view this page but not edit it."
 msgstr "このページは閲覧できますが、編集はできません。"
 
+#: src/features/chat/aside/aside-panel.tsx:76
+msgid "You cannot ask a side question in this chat."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-setup.tsx:92
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "これらはエージェントビルダーで選択した連携です。接続される前に、それぞれ確認画面が開きます。"
@@ -32657,8 +32667,8 @@ msgstr "タグはまだありません。"
 msgid "You have returned to your admin account"
 msgstr "管理者アカウントに戻りました"
 
-#: src/features/chat/aside/aside-panel.tsx:74
-#: src/features/chat/aside/aside-panel.tsx:81
+#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:87
 msgid "You have used today's messages. Try again later."
 msgstr ""
 
@@ -32926,7 +32936,7 @@ msgstr "セッションの有効期限が切れました。ページを再読み
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "セッションが最新ではありません。アカウントを削除するには、サインアウトしてから再度サインインしてください。"
 
-#: src/features/chat/aside/aside-panel.tsx:242
+#: src/features/chat/aside/aside-panel.tsx:253
 msgid "Your side question"
 msgstr ""
 

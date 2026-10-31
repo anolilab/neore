@@ -295,6 +295,12 @@ export const addAsideToThread = authMutation
             throw new LunoraError("NOT_FOUND", "Thread not found");
         }
 
+        // The row reads as the assistant's own, and a later run reads it as such, so only the owner posts it
+        // (as `saveLocalTurn` does with the text a browser supplies): a collaborator with write access does not.
+        if (thread.userId !== userId) {
+            throw new LunoraError("FORBIDDEN", "Only the owner of a chat can add to it from here");
+        }
+
         // A worker's thread takes a turn only through `dispatchToWorker`.
         if (await isWorkerThread(ctx, threadId)) {
             throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");

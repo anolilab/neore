@@ -778,7 +778,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             <div className="grow" />
-                            {composerMode === "text" && validThreadId && <ComposerAskAside />}
+                            {composerMode === "text" && validThreadId && !minimal && <ComposerAskAside />}
                             <ComposerContextCount />
                             <ComposerLanguageSelector />
                         </>

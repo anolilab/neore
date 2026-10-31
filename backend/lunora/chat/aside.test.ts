@@ -280,7 +280,19 @@ describe("addAsideToThread", () => {
 
         expect(added).toMatchObject({ agentName: "Side question", message: { role: "assistant" }, status: "success" });
         expect(added.order).toBeGreaterThan(Math.max(...before.map((row) => row.order)));
-        expect(added.message.content).toBe("> What does idempotent mean?\n\nIt means safe to repeat.");
+        expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
+    });
+
+    it("refuses a collaborator with write access: the row reads as the assistant's own", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "write", threadId, userId: OTHER }),
+        );
+
+        await expect(addToThread(OTHER)).rejects.toThrow("Only the owner");
+
+        expect(await rows("messages")).toHaveLength(2);
     });
 
     it("refuses someone with no write access to the thread", async () => {

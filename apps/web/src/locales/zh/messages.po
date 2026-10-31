@@ -2024,7 +2024,7 @@ msgstr "添加到收藏"
 msgid "Add to starred"
 msgstr "添加到星标"
 
-#: src/features/chat/aside/aside-panel.tsx:137
+#: src/features/chat/aside/aside-panel.tsx:143
 msgid "Add to thread"
 msgstr ""
 
@@ -2063,7 +2063,8 @@ msgstr "已添加 {added} 个文档。"
 msgid "Added to favorites"
 msgstr "已添加到收藏"
 
-#: src/features/chat/aside/aside-panel.tsx:124
+#: src/features/chat/aside/aside-panel.tsx:130
+#: src/features/chat/aside/aside-panel.tsx:235
 msgid "Added to the thread"
 msgstr ""
 
@@ -2976,7 +2977,7 @@ msgstr "通过你的 WhatsApp Business 号码回复 WhatsApp 消息（Meta Cloud
 msgid "Answered"
 msgstr "已回答"
 
-#: src/features/chat/aside/aside-panel.tsx:119
+#: src/features/chat/aside/aside-panel.tsx:125
 msgid "Answered without the conversation: this chat runs on your computer."
 msgstr ""
 
@@ -3388,13 +3389,13 @@ msgstr "升序"
 msgid "ask"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:252
+#: src/features/chat/aside/aside-panel.tsx:263
 #: src/features/chat/sidebar/thread-sidebar.tsx:322
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:56
 msgid "Ask"
 msgstr "询问"
 
-#: src/features/chat/aside/aside-panel.tsx:248
+#: src/features/chat/aside/aside-panel.tsx:259
 msgid "Ask a quick question…"
 msgstr ""
 
@@ -3426,7 +3427,7 @@ msgstr "向 GPT-4、Claude 和 Gemini 提出同一个问题。在 FLUX、Imagen 
 msgid "Ask me anything..."
 msgstr "问我任何问题..."
 
-#: src/features/chat/aside/aside-panel.tsx:240
+#: src/features/chat/aside/aside-panel.tsx:251
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr ""
 
@@ -3704,7 +3705,7 @@ msgstr "已在 Neore 上提供——免费开始，无需信用卡。"
 msgid "Available once the reply is saved"
 msgstr "回复保存后可用"
 
-#: src/features/chat/aside/aside-panel.tsx:139
+#: src/features/chat/aside/aside-panel.tsx:145
 msgid "Available when the reply finishes"
 msgstr ""
 
@@ -7075,11 +7076,11 @@ msgstr "哥斯达黎加"
 msgid "Could not add the server."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:80
+#: src/features/chat/aside/aside-panel.tsx:86
 msgid "Could not add this to the thread. Try again."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:73
+#: src/features/chat/aside/aside-panel.tsx:78
 msgid "Could not answer the question. Try again."
 msgstr ""
 
@@ -9106,7 +9107,7 @@ msgstr "关闭错误提示"
 msgid "Dismiss setup suggestions"
 msgstr "关闭设置建议"
 
-#: src/features/chat/aside/aside-panel.tsx:92
+#: src/features/chat/aside/aside-panel.tsx:98
 msgid "Dismiss this side question"
 msgstr ""
 
@@ -20242,6 +20243,10 @@ msgstr "仅扫描了最新的运行记录，因此可能缺少较早的模型。
 msgid "Only the owner can change who sees this skill."
 msgstr "只有所有者可以更改谁能看到此技能。"
 
+#: src/features/chat/aside/aside-panel.tsx:84
+msgid "Only the owner of a chat can add to it from here."
+msgstr ""
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "仅使用保证零数据保留的提供商——你的提示词绝不会被存储。"
@@ -26039,12 +26044,12 @@ msgstr "显示第 {firstShown} 至 {lastShown} 行，共 {totalRows} 行"
 msgid "Shown to the assistant so it knows when the skill applies."
 msgstr "会展示给助手，让它知道何时适用此技能。"
 
-#: src/features/chat/aside/aside-panel.tsx:175
-#: src/features/chat/aside/aside-panel.tsx:239
+#: src/features/chat/aside/aside-panel.tsx:183
+#: src/features/chat/aside/aside-panel.tsx:250
 msgid "Side question"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:75
+#: src/features/chat/aside/aside-panel.tsx:80
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr ""
 
@@ -26929,7 +26934,7 @@ msgstr "开始对话"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "用最新的 AI 模型开始你自己的对话。"
 
-#: src/features/chat/aside/aside-panel.tsx:176
+#: src/features/chat/aside/aside-panel.tsx:184
 msgid "Start a conversation to ask a side question."
 msgstr ""
 
@@ -28849,11 +28854,11 @@ msgstr "此次优化没有改变任何字段。"
 msgid "The region where you enabled model access in the Bedrock console."
 msgstr "你在 Bedrock 控制台中启用模型访问的区域。"
 
-#: src/features/chat/aside/aside-panel.tsx:78
+#: src/features/chat/aside/aside-panel.tsx:83
 msgid "The reply is still running. Add it when the reply finishes."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:71
+#: src/features/chat/aside/aside-panel.tsx:75
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
@@ -29063,7 +29068,8 @@ msgstr "支持思考的视觉语言模型"
 msgid "Thinking..."
 msgstr "正在思考..."
 
-#: src/features/chat/aside/aside-panel.tsx:105
+#: src/features/chat/aside/aside-panel.tsx:111
+#: src/features/chat/aside/aside-panel.tsx:200
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -29082,7 +29088,7 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
-#: src/features/chat/aside/aside-panel.tsx:82
+#: src/features/chat/aside/aside-panel.tsx:88
 msgid "This cannot be added to this chat."
 msgstr ""
 
@@ -30519,11 +30525,11 @@ msgstr "解锁节点"
 msgid "Unlock this chat"
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:85
 msgid "Unlock this chat to add this to the thread."
 msgstr ""
 
-#: src/features/chat/aside/aside-panel.tsx:72
+#: src/features/chat/aside/aside-panel.tsx:77
 msgid "Unlock this chat to ask a side question."
 msgstr ""
 
@@ -32633,6 +32639,10 @@ msgstr "现在可以重试了！"
 msgid "You can view this page but not edit it."
 msgstr "你可以查看此页面，但不能编辑。"
 
+#: src/features/chat/aside/aside-panel.tsx:76
+msgid "You cannot ask a side question in this chat."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-setup.tsx:92
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "这些是你在智能体构建器中选择的集成。每一个都会先打开供你审阅，然后才会建立连接。"
@@ -32657,8 +32667,8 @@ msgstr "你还没有标签。"
 msgid "You have returned to your admin account"
 msgstr "你已返回管理员账号"
 
-#: src/features/chat/aside/aside-panel.tsx:74
-#: src/features/chat/aside/aside-panel.tsx:81
+#: src/features/chat/aside/aside-panel.tsx:79
+#: src/features/chat/aside/aside-panel.tsx:87
 msgid "You have used today's messages. Try again later."
 msgstr ""
 
@@ -32926,7 +32936,7 @@ msgstr "你的会话已过期。请重新加载页面并重新登录。"
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "你的会话不是最新的。请退出后重新登录，再删除你的账号。"
 
-#: src/features/chat/aside/aside-panel.tsx:242
+#: src/features/chat/aside/aside-panel.tsx:253
 msgid "Your side question"
 msgstr ""
 

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAsideStore } from "./aside-store";
 import AsidePanel from "./aside-panel";
+import { useAsideStore } from "./aside-store";
 
 const chat = vi.hoisted(() => {
     return { isRunning: false };
@@ -45,7 +45,17 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useAction: () => askAside,
         useCRPC: () => {
-            return { chat: { aside: { addAsideToThread: { mutationOptions: () => ({}) } } } };
+            return {
+                chat: {
+                    aside: {
+                        addAsideToThread: {
+                            mutationOptions: () => {
+                                return {};
+                            },
+                        },
+                    },
+                },
+            };
         },
     };
 });
@@ -66,8 +76,6 @@ describe("AsidePanel", () => {
         addAside.mockReset();
     });
 
-    afterEach(cleanup);
-
     it("is a labelled region and announces the answer in a polite live region", async () => {
         askAside.mockResolvedValue({ answer: "It is safe to repeat.", withThread: true });
         render(<AsidePanel threadId="thread-1" />);
@@ -78,7 +86,8 @@ describe("AsidePanel", () => {
         const live = screen.getByRole("status");
 
         expect(live.getAttribute("aria-live")).toBe("polite");
-        await waitFor(() => expect(live.textContent).toContain("It is safe to repeat."));
+        expect(live.textContent).toBe("Thinking…");
+        await waitFor(() => expect(live.textContent).toBe("It is safe to repeat."));
         expect(askAside).toHaveBeenCalledWith({ question: "What is idempotent?", threadId: "thread-1", unlockProof: undefined });
     });
 
@@ -88,9 +97,7 @@ describe("AsidePanel", () => {
         const { rerender } = render(<AsidePanel threadId="thread-1" />);
 
         ask("Why?");
-        await screen.findByText("Because.");
-
-        const addButton = screen.getByRole("button", { name: "Add to thread" }) as HTMLButtonElement;
+        const addButton = (await screen.findByRole("button", { name: "Add to thread" })) as HTMLButtonElement;
 
         expect(addButton.disabled).toBe(true);
         expect(addAside).not.toHaveBeenCalled();
@@ -100,7 +107,7 @@ describe("AsidePanel", () => {
         addAside.mockResolvedValue({ messageId: "m1" });
         fireEvent.click(screen.getByRole("button", { name: "Add to thread" }));
 
-        await screen.findByText("Added to the thread");
+        await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Added to the thread"));
         expect(addAside).toHaveBeenCalledOnce();
         expect(addAside).toHaveBeenCalledWith({ answer: "Because.", question: "Why?", threadId: "thread-1", unlockProof: undefined });
     });
@@ -111,7 +118,9 @@ describe("AsidePanel", () => {
 
         ask("Again?");
 
-        expect((await screen.findByRole("alert")).textContent).toContain("used today's messages");
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("used today's messages");
     });
 
     it("asks for a conversation first when there is no thread", () => {

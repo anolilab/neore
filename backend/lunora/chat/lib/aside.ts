@@ -34,6 +34,9 @@ export interface AsideRow {
 
 const clip = (text: string, limit: number): string => (text.length > limit ? `${text.slice(0, limit)}…` : text);
 
+/** The end of a text: for a reply still being written, the part the question is most likely about. */
+const clipTail = (text: string, limit: number): string => (text.length > limit ? `…${text.slice(-limit)}` : text);
+
 /**
  * The rows that fit `ASIDE_CONTEXT_CHARS`, newest kept, oldest dropped, in
  * reading order. `rows` arrive oldest first.
@@ -74,7 +77,7 @@ export const buildAsidePrompt = (question: string, rows: ReadonlyArray<AsideRow>
     if (rows.length > 0 || liveReply) {
         const snapshot = [
             ...rows,
-            ...(liveReply ? [{ role: "assistant" as const, text: `${clip(liveReply, ASIDE_LIVE_REPLY_CHARS)} [reply still being written]` }] : []),
+            ...(liveReply ? [{ role: "assistant" as const, text: `${clipTail(liveReply, ASIDE_LIVE_REPLY_CHARS)} [reply still being written]` }] : []),
         ];
 
         parts.push(`Conversation so far (JSON):\n${JSON.stringify(snapshot)}`);
@@ -93,5 +96,5 @@ export const formatAsideMessage = (question: string, answer: string): string => 
         .map((line) => `> ${line}`)
         .join("\n");
 
-    return `${quoted}\n\n${answer.trim()}`;
+    return `**${ASIDE_AGENT_NAME}**\n\n${quoted}\n\n${answer.trim()}`;
 };

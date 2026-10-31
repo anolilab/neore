@@ -29,7 +29,7 @@ const errorCodeOf = (error: unknown): string | undefined => {
 };
 
 /** What a failed question or add says, from the server's code (`chat/aside.ts`). */
-export const asideErrorKind = (error: unknown): "busy" | "locked" | "other" | "quota" | "unavailable" => {
+export const asideErrorKind = (error: unknown): "busy" | "forbidden" | "locked" | "other" | "quota" | "unavailable" => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
     const codes = new Set([code, data?.code]);
 
@@ -43,6 +43,10 @@ export const asideErrorKind = (error: unknown): "busy" | "locked" | "other" | "q
 
     if (codes.has("CONFLICT")) {
         return "busy";
+    }
+
+    if (codes.has("FORBIDDEN")) {
+        return "forbidden";
     }
 
     return codes.has("BAD_REQUEST") ? "unavailable" : "other";
@@ -69,6 +73,7 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
     const { t } = useLingui();
     const errors = {
         busy: t`The reply is still running. Try again when it finishes.`,
+        forbidden: t`You cannot ask a side question in this chat.`,
         locked: t`Unlock this chat to ask a side question.`,
         other: t`Could not answer the question. Try again.`,
         quota: t`You have used today's messages. Try again later.`,
@@ -76,6 +81,7 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
     };
     const addErrors = {
         busy: t`The reply is still running. Add it when the reply finishes.`,
+        forbidden: t`Only the owner of a chat can add to it from here.`,
         locked: t`Unlock this chat to add this to the thread.`,
         other: t`Could not add this to the thread. Try again.`,
         quota: t`You have used today's messages. Try again later.`,
@@ -168,6 +174,8 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
     const update = useAsideStore((state) => state.update);
     const remove = useAsideStore((state) => state.remove);
     const [question, setQuestion] = useState("");
+    // What a screen reader hears: the newest state only, in its own small region, rather than the whole list again.
+    const [announcement, setAnnouncement] = useState("");
 
     if (!threadId || threadId === "default") {
         return (
@@ -189,9 +197,11 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
 
         add(threadId, { id, question: text, status: "pending" });
         setQuestion("");
+        setAnnouncement(t`Thinking…`);
         askAside({ question: text, threadId: threadId as Id<"threads">, unlockProof })
             .then(({ answer, withThread }) => {
                 update(threadId, id, { answer, status: "answered", withThread });
+                setAnnouncement(answer);
 
                 return undefined;
             })
@@ -222,6 +232,7 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
         addAside({ answer: entry.answer, question: entry.question, threadId: threadId as Id<"threads">, unlockProof })
             .then(() => {
                 update(threadId, entry.id, { addErrorCode: undefined, status: "added" });
+                setAnnouncement(t`Added to the thread`);
 
                 return undefined;
             })
@@ -252,14 +263,15 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
                     {t`Ask`}
                 </Button>
             </form>
-            {/* The answers land here; a polite region so a screen reader announces each one without cutting in. */}
-            <div aria-live="polite" aria-relevant="additions text" role="status">
-                <ul className="space-y-3">
-                    {entries.map((entry) => (
-                        <AsideItem entry={entry} isRunning={isRunning} key={entry.id} onAdd={handleAdd} onDismiss={handleDismiss} />
-                    ))}
-                </ul>
-            </div>
+            {/* Polite, so the answer is announced without cutting in. It holds only the newest state: a live role on the list would read the buttons and every earlier answer again on each change. */}
+            <p aria-live="polite" className="sr-only" role="status">
+                {announcement}
+            </p>
+            <ul className="space-y-3">
+                {entries.map((entry) => (
+                    <AsideItem entry={entry} isRunning={isRunning} key={entry.id} onAdd={handleAdd} onDismiss={handleDismiss} />
+                ))}
+            </ul>
         </section>
     );
 };

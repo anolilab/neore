@@ -31,6 +31,13 @@ describe("buildAsidePrompt", () => {
         expect(buildAsidePrompt("What is X?", [])).toBe("Side question:\nWhat is X?");
     });
 
+    it("keeps the end of a long reply that is still being written", () => {
+        const prompt = buildAsidePrompt("What is X?", [], `${"a".repeat(20_000)}THE END`);
+
+        expect(prompt).toContain("THE END [reply still being written]");
+        expect(prompt.length).toBeLessThan(9000);
+    });
+
     it("wraps the conversation as JSON, marks a running reply, and puts the question last", () => {
         const prompt = buildAsidePrompt("What is X?", [{ role: "user", text: 'say "hi"' }], "Partly writ");
 
@@ -42,6 +49,6 @@ describe("buildAsidePrompt", () => {
 
 describe("formatAsideMessage", () => {
     it("quotes every line of the question, then the answer", () => {
-        expect(formatAsideMessage("a\nb", " The answer. ")).toBe("> a\n> b\n\nThe answer.");
+        expect(formatAsideMessage("a\nb", " The answer. ")).toBe("**Side question**\n\n> a\n> b\n\nThe answer.");
     });
 });
