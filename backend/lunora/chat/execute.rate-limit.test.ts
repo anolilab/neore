@@ -176,6 +176,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_streams", await import("../agent/streams"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 
