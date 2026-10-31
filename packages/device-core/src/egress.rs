@@ -9,19 +9,26 @@
 //!
 //! What it checks, in order: the request is a `CONNECT` with a header under [`MAX_HEAD`] bytes read within
 //! [`HEAD_TIMEOUT`]; the port is 443; the host, lower-cased and without a trailing dot, is EXACTLY a listed
-//! name (no wildcards, no IP literals); the name resolves to at least one public address (loopback, private,
-//! link-local, CGNAT and other special-use ranges are dropped, which keeps a listed name whose DNS was
-//! tampered with from reaching a service on this computer or its LAN). The proxy connects to the address it
-//! checked and does not resolve again.
+//! name (no wildcards, no IP literals); the name resolves, within [`DIAL_DEADLINE`], to at least one public
+//! address (loopback, private, link-local, CGNAT, IPv4 embedded in IPv6 and other special-use ranges are
+//! dropped, which keeps a listed name whose DNS was tampered with from reaching a service on this computer or
+//! its LAN). The proxy connects to the address it checked and does not resolve again. Then, after the `200`, the
+//! first TLS record the client sends must be a ClientHello whose server name (SNI) is that same host, compared
+//! case-insensitively: a CONNECT line is only a claim, and without this a client could ask a listed host's
+//! address for any other site it serves. A hello with no server name, one that hides it (Encrypted ClientHello),
+//! or bytes that are not a TLS handshake, end the tunnel before anything reaches the host.
 //!
-//! What it does not do: it does not see inside the TLS stream, so a listed host that shares an address with
-//! other tenants of a CDN could be reached under another name (domain fronting), and a listed host receives
-//! whatever the program sends it. Both are said in the approval prompt ([`crate::sandbox`]).
+//! What it does not do: it does not see inside the TLS stream after the hello, so a listed host receives
+//! whatever the program sends it, and a listed host that also serves other sites could be asked for them
+//! with an HTTP `Host` header inside the encrypted stream. Both are said in the approval prompt
+//! ([`crate::sandbox`]). A ClientHello split over several TLS records is refused (real clients send one).
 
 use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{
+    IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs,
+};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -89,8 +96,15 @@ pub const MAX_HEAD: usize = 8 * 1024;
 /// How long a client has to finish its request header.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// How long the proxy waits to reach a listed host.
-const DIAL_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long a client has to send the first TLS record after the 200.
+const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The most a TLS record may carry (2^14), which also caps what the proxy buffers before the tunnel starts.
+const MAX_RECORD: usize = 16 * 1024;
+
+/// How long one direction of a tunnel may keep going once the other has ended. Without it a peer that half-closes
+/// and stops reading leaves the other direction (and its slot) blocked for good.
+const CLOSE_GRACE: Duration = Duration::from_secs(30);
 
 /// Tunnels open at once. A package install opens a handful; more is a program fanning out, and is refused with 503.
 const MAX_CONNECTIONS: usize = 128;
@@ -159,44 +173,119 @@ fn is_public_v4(ip: Ipv4Addr) -> bool {
 
 fn is_public_v6(ip: Ipv6Addr) -> bool {
     let segments = ip.segments();
+    let embedded = |high: u16, low: u16| {
+        let [a, b] = high.to_be_bytes();
+        let [c, d] = low.to_be_bytes();
 
-    // An IPv4 address in an IPv6 coat (mapped `::ffff:a.b.c.d`, NAT64 `64:ff9b::/96`) is judged as the IPv4 one.
+        Ipv4Addr::new(a, b, c, d)
+    };
+
+    // An IPv4 address in an IPv6 coat (mapped `::ffff:a.b.c.d`, NAT64 `64:ff9b::/96`, 6to4 `2002:a.b.c.d::/48`) is
+    // judged as the IPv4 one.
     if let Some(v4) = ip.to_ipv4_mapped() {
         return is_public_v4(v4);
     }
 
     if segments[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
-        let [high, low] = [segments[6].to_be_bytes(), segments[7].to_be_bytes()];
+        return is_public_v4(embedded(segments[6], segments[7]));
+    }
 
-        return is_public_v4(Ipv4Addr::new(high[0], high[1], low[0], low[1]));
+    if segments[0] == 0x2002 {
+        return is_public_v4(embedded(segments[1], segments[2]));
     }
 
     !(ip.is_unspecified()
         || ip.is_loopback()
         || ip.is_multicast()
+        // ::/96 IPv4-compatible (deprecated: `::7f00:1` is 127.0.0.1 to a stack that still honours it).
+        || segments[..6] == [0; 6]
         // fc00::/7 unique local, fe80::/10 link local, fec0::/10 site local.
         || (segments[0] & 0xfe00) == 0xfc00
         || (segments[0] & 0xffc0) == 0xfe80
         || (segments[0] & 0xffc0) == 0xfec0
-        // 2001:db8::/32 documentation.
-        || (segments[0] == 0x2001 && segments[1] == 0x0db8))
+        // 2001:db8::/32 documentation; 2001::/32 Teredo, whose address carries (obfuscated) IPv4 endpoints, and
+        // 64:ff9b:1::/48 local-use NAT64: a listed name has no business resolving to either.
+        || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+        || (segments[0] == 0x2001 && segments[1] == 0)
+        || (segments[0] == 0x64 && segments[1] == 0xff9b && segments[2] == 1))
 }
 
 /// How the proxy reaches a listed host. The real one resolves and connects to a public address; a test hands in
 /// one that dials a listener of its own.
 pub type Dial = Arc<dyn Fn(&str, u16) -> io::Result<TcpStream> + Send + Sync>;
 
+/// Lookup and connect together get this long; a name with many dead addresses cannot hold a worker for
+/// `addresses × timeout`.
+const DIAL_DEADLINE: Duration = Duration::from_secs(10);
+
+/// How many of a name's public addresses are tried.
+const MAX_ADDRESSES: usize = 4;
+
+/// Lookups that may be stuck at once. `getaddrinfo` cannot be interrupted, so a stalled resolver leaves its thread
+/// behind; past this count a new lookup fails at once instead of adding to the pile.
+const MAX_LOOKUPS: usize = 16;
+
+static LOOKUPS: AtomicUsize = AtomicUsize::new(0);
+
+struct Lookup;
+
+impl Drop for Lookup {
+    fn drop(&mut self) {
+        LOOKUPS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+fn system_lookup(host: &str, port: u16) -> io::Result<Vec<SocketAddr>> {
+    (host, port).to_socket_addrs().map(Iterator::collect)
+}
+
 fn dial_public(host: &str, port: u16) -> io::Result<TcpStream> {
+    dial_within(DIAL_DEADLINE, host, port, system_lookup)
+}
+
+/// Resolves `host` on a thread of its own (so the wait has a deadline), then connects to the first of its public
+/// addresses that answers, all inside `deadline`.
+fn dial_within(
+    deadline: Duration,
+    host: &str,
+    port: u16,
+    lookup: impl FnOnce(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + 'static,
+) -> io::Result<TcpStream> {
+    let started = Instant::now();
+    let timed_out = || io::Error::new(io::ErrorKind::TimedOut, "the lookup took too long");
+
+    if LOOKUPS.fetch_add(1, Ordering::SeqCst) >= MAX_LOOKUPS {
+        LOOKUPS.fetch_sub(1, Ordering::SeqCst);
+
+        return Err(io::Error::other("too many lookups are still waiting"));
+    }
+
+    let guard = Lookup;
+    let (send, receive) = mpsc::channel();
+    let host = host.to_owned();
+
+    thread::spawn(move || {
+        let _guard = guard;
+        let _ = send.send(lookup(&host, port));
+    });
+
+    let addresses = receive.recv_timeout(deadline).map_err(|_| timed_out())??;
     let mut last = io::Error::new(
         io::ErrorKind::PermissionDenied,
         "the name resolves only to non-public addresses",
     );
 
-    for address in (host, port)
-        .to_socket_addrs()?
+    for address in addresses
+        .into_iter()
         .filter(|address| is_public(address.ip()))
+        .take(MAX_ADDRESSES)
     {
-        match TcpStream::connect_timeout(&address, DIAL_TIMEOUT) {
+        let left = deadline
+            .checked_sub(started.elapsed())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(timed_out)?;
+
+        match TcpStream::connect_timeout(&address, left) {
             Ok(stream) => return Ok(stream),
             Err(error) => last = error,
         }
@@ -367,6 +456,8 @@ impl Drop for Slot {
 }
 
 struct Shared {
+    /// How long one direction of a tunnel may outlive the other ([`CLOSE_GRACE`]).
+    close_grace: Duration,
     dial: Dial,
     refused: Mutex<Vec<String>>,
     stop: AtomicBool,
@@ -382,31 +473,249 @@ impl Shared {
     }
 }
 
-/// Copies `from` to `to` until the end, a failure or the stop flag. Half-closes `to` at a clean end so the other
-/// side sees EOF; a failure closes both directions.
-fn pump(mut from: TcpStream, mut to: TcpStream, stop: &AtomicBool) {
+/// A TLS extension that hides the server name (Encrypted ClientHello, and the draft it replaced).
+const ENCRYPTED_NAME_EXTENSIONS: [usize; 2] = [0xfe0d, 0xffce];
+
+const NOT_TLS: &str = "the tunnel did not open with a TLS handshake";
+const BAD_HELLO: &str = "the TLS ClientHello was malformed or spread over several records";
+
+/// A read position over a TLS structure; every read fails (`None`) rather than going past the end.
+struct Cursor<'a>(&'a [u8]);
+
+impl<'a> Cursor<'a> {
+    fn take(&mut self, count: usize) -> Option<&'a [u8]> {
+        if self.0.len() < count {
+            return None;
+        }
+
+        let (head, tail) = self.0.split_at(count);
+
+        self.0 = tail;
+
+        Some(head)
+    }
+
+    fn number(&mut self, bytes: usize) -> Option<usize> {
+        self.take(bytes).map(|taken| {
+            taken
+                .iter()
+                .fold(0, |value, byte| value << 8 | usize::from(*byte))
+        })
+    }
+
+    /// A field with a length prefix of `prefix` bytes.
+    fn prefixed(&mut self, prefix: usize) -> Option<&'a [u8]> {
+        let count = self.number(prefix)?;
+
+        self.take(count)
+    }
+}
+
+/// How many bytes the first TLS record takes (header included), `None` while fewer than five have arrived. Looks
+/// at each byte as it comes, so a client that is not speaking TLS is refused at once.
+fn first_record_len(buffer: &[u8]) -> Result<Option<usize>, &'static str> {
+    if buffer.first().is_some_and(|kind| *kind != 0x16)
+        || buffer.get(1).is_some_and(|major| *major != 3)
+    {
+        return Err(NOT_TLS);
+    }
+
+    let Some(header) = buffer.get(..5) else {
+        return Ok(None);
+    };
+    let length = usize::from(u16::from_be_bytes([header[3], header[4]]));
+
+    if length == 0 || length > MAX_RECORD {
+        return Err(BAD_HELLO);
+    }
+
+    Ok(Some(5 + length))
+}
+
+/// The server name a ClientHello `record` asks for. Refuses a hello that hides it (Encrypted ClientHello), names
+/// none, names several, or does not fit in the one record.
+fn server_name(record: &[u8]) -> Result<String, &'static str> {
+    let bad = || BAD_HELLO;
+    let mut record = Cursor(record);
+
+    // Record header: handshake, a 3.x version, the length first_record_len read.
+    record.take(5).ok_or_else(bad)?;
+
+    let mut handshake = Cursor(record.0);
+
+    if handshake.number(1) != Some(1) {
+        return Err(NOT_TLS);
+    }
+
+    let mut hello = Cursor(handshake.prefixed(3).ok_or_else(bad)?);
+
+    // client_version, random, session id, cipher suites, compression methods.
+    hello.take(2 + 32).ok_or_else(bad)?;
+    hello.prefixed(1).ok_or_else(bad)?;
+    hello.prefixed(2).ok_or_else(bad)?;
+    hello.prefixed(1).ok_or_else(bad)?;
+
+    let mut extensions = Cursor(
+        hello
+            .prefixed(2)
+            .ok_or("the TLS ClientHello names no server")?,
+    );
+    let mut name: Option<String> = None;
+
+    while !extensions.0.is_empty() {
+        let kind = extensions.number(2).ok_or_else(bad)?;
+        let mut body = Cursor(extensions.prefixed(2).ok_or_else(bad)?);
+
+        if ENCRYPTED_NAME_EXTENSIONS.contains(&kind) {
+            return Err("the TLS ClientHello hides its server name (Encrypted ClientHello)");
+        }
+
+        if kind != 0 {
+            continue;
+        }
+
+        if name.is_some() {
+            return Err(BAD_HELLO);
+        }
+
+        let mut list = Cursor(body.prefixed(2).ok_or_else(bad)?);
+
+        while !list.0.is_empty() {
+            let kind = list.number(1).ok_or_else(bad)?;
+            let entry = list.prefixed(2).ok_or_else(bad)?;
+
+            // Only `host_name` (0) is defined; one entry, ASCII.
+            if kind != 0 || name.is_some() || !entry.is_ascii() {
+                return Err(BAD_HELLO);
+            }
+
+            name = Some(String::from_utf8_lossy(entry).into_owned());
+        }
+    }
+
+    name.filter(|name| !name.is_empty())
+        .ok_or("the TLS ClientHello names no server")
+}
+
+/// Whether the first TLS record in `record` is a ClientHello for exactly `host` (case aside).
+fn check_hello(record: &[u8], host: &str) -> Result<(), &'static str> {
+    if server_name(record)?.eq_ignore_ascii_case(host) {
+        Ok(())
+    } else {
+        Err("the TLS server name is not the host the tunnel was asked for")
+    }
+}
+
+/// Reads the client's first TLS record (what `early` does not already hold) and checks that it is a ClientHello
+/// naming `host`. Returns everything buffered, which is to be sent upstream first.
+fn read_hello(
+    client: &mut TcpStream,
+    mut buffer: Vec<u8>,
+    host: &str,
+    stop: &AtomicBool,
+) -> Result<Vec<u8>, &'static str> {
+    let started = Instant::now();
+    let mut chunk = [0u8; 2048];
+
+    loop {
+        if let Some(length) = first_record_len(&buffer)? {
+            if buffer.len() >= length {
+                check_hello(&buffer[..length], host)?;
+
+                return Ok(buffer);
+            }
+        }
+
+        let left = HELLO_TIMEOUT
+            .checked_sub(started.elapsed())
+            .filter(|left| !left.is_zero() && !stop.load(Ordering::Relaxed))
+            .ok_or("the client sent no TLS handshake in time")?;
+
+        client
+            .set_read_timeout(Some(left.min(POLL)))
+            .map_err(|_| NOT_TLS)?;
+
+        match client.read(&mut chunk) {
+            Ok(0) => return Err(NOT_TLS),
+            Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock
+                        | io::ErrorKind::TimedOut
+                        | io::ErrorKind::Interrupted
+                ) => {}
+            Err(_) => return Err(NOT_TLS),
+        }
+    }
+}
+
+/// When the first direction of a tunnel ended: the other has [`Shared::close_grace`] from then.
+type Ended = Mutex<Option<Instant>>;
+
+fn close_both(from: &TcpStream, to: &TcpStream) {
+    let _ = from.shutdown(Shutdown::Both);
+    let _ = to.shutdown(Shutdown::Both);
+}
+
+/// Whether this tunnel must end now: the proxy is stopping, or one direction ended long enough ago.
+fn must_end(shared: &Shared, ended: &Ended) -> bool {
+    shared.stop.load(Ordering::Relaxed)
+        || ended
+            .lock()
+            .unwrap()
+            .is_some_and(|at| at.elapsed() >= shared.close_grace)
+}
+
+/// `write_all` that gives up when the tunnel must end, instead of blocking on a peer that stopped reading. The
+/// socket has a short write timeout, so each stalled write comes back to check.
+fn write_until_end(to: &mut TcpStream, mut bytes: &[u8], shared: &Shared, ended: &Ended) -> bool {
+    while !bytes.is_empty() {
+        if must_end(shared, ended) {
+            return false;
+        }
+
+        match to.write(bytes) {
+            Ok(0) => return false,
+            Ok(written) => bytes = &bytes[written..],
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock
+                        | io::ErrorKind::TimedOut
+                        | io::ErrorKind::Interrupted
+                ) => {}
+            Err(_) => return false,
+        }
+    }
+
+    true
+}
+
+/// Copies `from` to `to` until the end, a failure, the stop flag, or the grace after the other direction ended.
+/// Half-closes `to` at a clean end so the other side sees EOF; anything else closes both directions.
+fn pump(mut from: TcpStream, mut to: TcpStream, shared: &Shared, ended: &Ended) {
     let mut chunk = [0u8; 16 * 1024];
 
     let _ = from.set_read_timeout(Some(POLL));
 
     loop {
-        if stop.load(Ordering::Relaxed) {
-            let _ = from.shutdown(Shutdown::Both);
-            let _ = to.shutdown(Shutdown::Both);
+        if must_end(shared, ended) {
+            close_both(&from, &to);
 
             return;
         }
 
         match from.read(&mut chunk) {
             Ok(0) => {
+                ended.lock().unwrap().get_or_insert_with(Instant::now);
                 let _ = to.shutdown(Shutdown::Write);
 
                 return;
             }
             Ok(read) => {
-                if to.write_all(&chunk[..read]).is_err() {
-                    let _ = from.shutdown(Shutdown::Both);
-                    let _ = to.shutdown(Shutdown::Both);
+                if !write_until_end(&mut to, &chunk[..read], shared, ended) {
+                    close_both(&from, &to);
 
                     return;
                 }
@@ -419,8 +728,7 @@ fn pump(mut from: TcpStream, mut to: TcpStream, stop: &AtomicBool) {
                         | io::ErrorKind::Interrupted
                 ) => {}
             Err(_) => {
-                let _ = from.shutdown(Shutdown::Both);
-                let _ = to.shutdown(Shutdown::Both);
+                close_both(&from, &to);
 
                 return;
             }
@@ -433,18 +741,26 @@ fn tunnel(client: TcpStream, upstream: TcpStream, shared: &Arc<Shared>) {
     else {
         return;
     };
-    let forward = {
-        let shared = shared.clone();
+    let ended: Arc<Ended> = Arc::default();
 
-        thread::spawn(move || pump(client_reader, upstream_writer, &shared.stop))
+    // A stalled write comes back every POLL to look at the stop flag and the grace.
+    let _ = client.set_write_timeout(Some(POLL));
+    let _ = upstream.set_write_timeout(Some(POLL));
+
+    let forward = {
+        let (shared, ended) = (shared.clone(), ended.clone());
+
+        thread::spawn(move || pump(client_reader, upstream_writer, &shared, &ended))
     };
 
-    pump(upstream, client, &shared.stop);
+    pump(upstream, client, shared, &ended);
     let _ = forward.join();
 }
 
 fn serve(mut client: TcpStream, shared: &Arc<Shared>) {
     let _ = client.set_nonblocking(false);
+    // A client that does not read its reply must not hold the worker.
+    let _ = client.set_write_timeout(Some(HEAD_TIMEOUT));
 
     let (head, early) = match read_head(&mut client) {
         Ok(read) => read,
@@ -478,8 +794,22 @@ fn serve(mut client: TcpStream, shared: &Arc<Shared>) {
 
     respond(&mut client, 200, "");
 
-    // A client that started its handshake before the 200 has those bytes in `early`.
-    if !early.is_empty() && upstream.write_all(&early).is_err() {
+    // The tunnel was granted for `host`. The CONNECT line is the only place the policy can read a name, so the
+    // TLS handshake inside must name the same one: a client otherwise gets a pipe to a listed host's address and
+    // can ask it for any virtual host it serves. The hello may already be in `early` (sent before the 200).
+    let hello = match read_hello(&mut client, early, &host, &shared.stop) {
+        Ok(hello) => hello,
+        Err(reason) => {
+            shared.note_refused(format!("{host} ({reason})"));
+            close_both(&client, &upstream);
+
+            return;
+        }
+    };
+
+    let _ = upstream.set_write_timeout(Some(HEAD_TIMEOUT));
+
+    if upstream.write_all(&hello).is_err() {
         return;
     }
 
@@ -501,9 +831,14 @@ impl Proxy {
 
     /// [`Proxy::start`] with another way to reach a listed host.
     pub fn start_with(dial: Dial) -> io::Result<Proxy> {
+        Proxy::start_graced(dial, CLOSE_GRACE)
+    }
+
+    fn start_graced(dial: Dial, close_grace: Duration) -> io::Result<Proxy> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let port = listener.local_addr()?.port();
         let shared = Arc::new(Shared {
+            close_grace,
             dial,
             refused: Mutex::new(Vec::new()),
             stop: AtomicBool::new(false),
@@ -555,6 +890,8 @@ fn accept_loop(listener: &TcpListener, shared: &Arc<Shared>) {
         match listener.accept() {
             Ok((mut client, _)) => {
                 let Some(slot) = Slot::take(&open) else {
+                    // The accept thread writes this one itself: a client that never reads must not stall it.
+                    let _ = client.set_write_timeout(Some(Duration::from_secs(1)));
                     respond(&mut client, 503, "too many connections");
 
                     continue;
@@ -712,6 +1049,15 @@ mod tests {
             "64:ff9b::7f00:1",
             "ff02::1",
             "2001:db8::1",
+            // IPv4-compatible (::/96), 6to4 (2002::/16) and Teredo (2001::/32) carry an IPv4 address.
+            "::7f00:1",
+            "::a00:1",
+            "::a9fe:a9fe",
+            "2002:7f00:1::1",
+            "2002:a00:1::",
+            "2002:a9fe:a9fe::1",
+            "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+            "64:ff9b:1::1",
         ] {
             assert!(!is_public(private.parse().unwrap()), "{private}");
         }
@@ -780,13 +1126,13 @@ mod tests {
         (Proxy::start_with(dial).unwrap(), dialed, hosts)
     }
 
-    fn ask(proxy: &Proxy, request: &str) -> (String, TcpStream) {
+    fn ask(proxy: &Proxy, request: impl AsRef<[u8]>) -> (String, TcpStream) {
         let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, proxy.port())).unwrap();
 
         client
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
-        client.write_all(request.as_bytes()).unwrap();
+        client.write_all(request.as_ref()).unwrap();
 
         let mut reply = Vec::new();
         let mut byte = [0u8; 1];
@@ -802,6 +1148,77 @@ mod tests {
         (String::from_utf8_lossy(&reply).into_owned(), client)
     }
 
+    /// A TLS ClientHello record as a client would send it: `sni` names the server (none = no extension), `extra`
+    /// are more extensions as (type, body).
+    fn client_hello(sni: Option<&str>, extra: &[(u16, &[u8])]) -> Vec<u8> {
+        let mut extensions: Vec<u8> = Vec::new();
+        let mut add = |kind: u16, body: &[u8]| {
+            extensions.extend_from_slice(&kind.to_be_bytes());
+            extensions.extend_from_slice(&(body.len() as u16).to_be_bytes());
+            extensions.extend_from_slice(body);
+        };
+
+        if let Some(name) = sni {
+            let mut list = vec![0u8];
+
+            list.extend_from_slice(&(name.len() as u16).to_be_bytes());
+            list.extend_from_slice(name.as_bytes());
+
+            let mut body = (list.len() as u16).to_be_bytes().to_vec();
+
+            body.extend_from_slice(&list);
+            add(0, &body);
+        }
+
+        // supported_versions, so the hello looks like a real one.
+        add(43, &[2, 3, 4]);
+
+        for (kind, body) in extra {
+            add(*kind, body);
+        }
+
+        let mut body = vec![3, 3];
+
+        body.extend_from_slice(&[7u8; 32]);
+        body.push(0);
+        body.extend_from_slice(&[0, 2, 0x13, 0x01]);
+        body.extend_from_slice(&[1, 0]);
+        body.extend_from_slice(&(extensions.len() as u16).to_be_bytes());
+        body.extend_from_slice(&extensions);
+
+        let mut handshake = vec![1u8];
+
+        handshake.extend_from_slice(&(body.len() as u32).to_be_bytes()[1..]);
+        handshake.extend_from_slice(&body);
+
+        let mut record = vec![0x16, 3, 1];
+
+        record.extend_from_slice(&(handshake.len() as u16).to_be_bytes());
+        record.extend_from_slice(&handshake);
+
+        record
+    }
+
+    /// Whether the proxy ended the tunnel instead of passing `hello` upstream (the echo server would have sent
+    /// it back).
+    fn hello_is_refused(proxy: &Proxy, host: &str, hello: &[u8]) -> bool {
+        let (reply, mut client) = ask(proxy, format!("CONNECT {host}:443 HTTP/1.1\r\n\r\n"));
+
+        assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+        let _ = client.write_all(hello);
+
+        let mut byte = [0u8; 1];
+
+        match client.read(&mut byte) {
+            Ok(0) => true,
+            Ok(_) => false,
+            Err(error) => !matches!(
+                error.kind(),
+                io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+            ),
+        }
+    }
+
     #[test]
     fn a_listed_host_is_tunnelled_and_bytes_cross_both_ways() {
         let (proxy, dialed, hosts) = echo_proxy();
@@ -811,6 +1228,15 @@ mod tests {
         );
 
         assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+
+        let hello = client_hello(Some("registry.npmjs.org"), &[]);
+
+        client.write_all(&hello).unwrap();
+
+        let mut echoed = vec![0u8; hello.len()];
+
+        client.read_exact(&mut echoed).unwrap();
+        assert_eq!(echoed, hello);
 
         client.write_all(b"hello through the filter").unwrap();
 
@@ -825,17 +1251,106 @@ mod tests {
     }
 
     #[test]
-    fn bytes_sent_before_the_200_reach_the_host() {
+    fn a_hello_sent_before_the_200_reaches_the_host() {
         let (proxy, _, _) = echo_proxy();
-        let (reply, mut client) = ask(&proxy, "CONNECT pypi.org:443 HTTP/1.1\r\n\r\nclient-hello");
+        let hello = client_hello(Some("PyPI.org"), &[]);
+        let mut request = b"CONNECT pypi.org:443 HTTP/1.1\r\n\r\n".to_vec();
+
+        request.extend_from_slice(&hello);
+
+        let (reply, mut client) = ask(&proxy, &request);
 
         assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
 
-        let mut echoed = [0u8; 12];
+        let mut echoed = vec![0u8; hello.len()];
 
         client.read_exact(&mut echoed).unwrap();
 
-        assert_eq!(&echoed, b"client-hello");
+        assert_eq!(echoed, hello);
+    }
+
+    #[test]
+    fn a_hello_split_over_several_writes_is_assembled() {
+        let (proxy, _, _) = echo_proxy();
+        let (_, mut client) = ask(&proxy, "CONNECT pypi.org:443 HTTP/1.1\r\n\r\n");
+        let hello = client_hello(Some("pypi.org"), &[]);
+
+        for part in hello.chunks(7) {
+            client.write_all(part).unwrap();
+            thread::sleep(Duration::from_millis(2));
+        }
+
+        let mut echoed = vec![0u8; hello.len()];
+
+        client.read_exact(&mut echoed).unwrap();
+
+        assert_eq!(echoed, hello);
+    }
+
+    #[test]
+    fn a_tunnel_whose_hello_names_another_host_is_ended() {
+        let (proxy, _, hosts) = echo_proxy();
+
+        // The CONNECT names a listed host; the hello inside the tunnel names one that is not.
+        assert!(hello_is_refused(
+            &proxy,
+            "registry.npmjs.org",
+            &client_hello(Some("evil.example"), &[])
+        ));
+        // Another listed host is no better: the tunnel was granted for one name.
+        assert!(hello_is_refused(
+            &proxy,
+            "registry.npmjs.org",
+            &client_hello(Some("github.com"), &[])
+        ));
+        // A suffix or prefix of the name is not the name.
+        assert!(hello_is_refused(
+            &proxy,
+            "pypi.org",
+            &client_hello(Some("pypi.org.evil.example"), &[])
+        ));
+        assert!(hello_is_refused(
+            &proxy,
+            "pypi.org",
+            &client_hello(Some("evil.pypi.org"), &[])
+        ));
+        // The dial went to the listed host's address, but nothing the program sent was passed on.
+        assert_eq!(hosts.lock().unwrap().len(), 4);
+        assert!(proxy.refused_note().contains("pypi.org"));
+    }
+
+    #[test]
+    fn a_tunnel_without_a_server_name_or_with_an_encrypted_one_is_ended() {
+        let (proxy, _, _) = echo_proxy();
+
+        assert!(hello_is_refused(
+            &proxy,
+            "pypi.org",
+            &client_hello(None, &[])
+        ));
+        // Encrypted ClientHello hides the real name behind a public one that may match.
+        assert!(hello_is_refused(
+            &proxy,
+            "pypi.org",
+            &client_hello(Some("pypi.org"), &[(0xfe0d, &[0, 0, 0])])
+        ));
+    }
+
+    #[test]
+    fn a_tunnel_that_does_not_open_with_a_tls_handshake_is_ended() {
+        let (proxy, _, _) = echo_proxy();
+
+        for bytes in [
+            &b"GET / HTTP/1.1\r\nHost: pypi.org\r\n\r\n"[..],
+            // A handshake record, but not a ClientHello.
+            &[0x16, 3, 3, 0, 4, 2, 0, 0, 0][..],
+            // An application-data record.
+            &[0x17, 3, 3, 0, 2, 1, 2][..],
+            // A record longer than TLS allows.
+            &[0x16, 3, 3, 0xff, 0xff][..],
+        ] {
+            assert!(hello_is_refused(&proxy, "pypi.org", bytes), "{bytes:?}");
+        }
     }
 
     #[test]
@@ -890,11 +1405,148 @@ mod tests {
     }
 
     #[test]
+    fn the_hello_is_read_for_the_one_name_in_it() {
+        let ok = |sni: &str, host: &str| check_hello(&client_hello(Some(sni), &[]), host);
+
+        assert_eq!(ok("pypi.org", "pypi.org"), Ok(()));
+        assert_eq!(ok("PyPI.ORG", "pypi.org"), Ok(()));
+        assert!(ok("pypi.org", "github.com").is_err());
+        assert!(ok("pypi.org.", "pypi.org").is_err());
+        assert!(ok("", "pypi.org").is_err());
+        // Other extensions around the name do not matter.
+        assert_eq!(
+            check_hello(
+                &client_hello(
+                    Some("pypi.org"),
+                    &[(16, &[0, 3, 2, b'h', b'2']), (0xfe0e, &[1])]
+                ),
+                "pypi.org"
+            ),
+            Ok(())
+        );
+
+        // A second server_name extension, an unknown name type inside one, and a hello with no extensions.
+        let mut second = vec![0, 11, 0, 0, 8];
+
+        second.extend_from_slice(b"pypi.org");
+        assert!(check_hello(&client_hello(Some("pypi.org"), &[(0, &second)]), "pypi.org").is_err());
+        assert!(check_hello(
+            &client_hello(None, &[(0, &[0, 4, 9, 0, 1, b'x'])]),
+            "pypi.org"
+        )
+        .is_err());
+        assert!(check_hello(&client_hello(Some("pypi.org"), &[(0, &[0, 0])]), "pypi.org").is_err());
+        assert!(check_hello(&[0x16, 3, 1, 0, 4, 1, 0, 0, 0], "pypi.org").is_err());
+        assert!(check_hello(&[], "pypi.org").is_err());
+    }
+
+    #[test]
+    fn only_the_first_bytes_of_a_tls_handshake_are_waited_for() {
+        assert_eq!(first_record_len(b""), Ok(None));
+        assert_eq!(first_record_len(&[0x16, 3, 1]), Ok(None));
+        assert_eq!(first_record_len(&[0x16, 3, 1, 0, 9]), Ok(Some(14)));
+        assert_eq!(first_record_len(b"G"), Err(NOT_TLS));
+        assert_eq!(first_record_len(&[0x16, 2]), Err(NOT_TLS));
+        assert_eq!(first_record_len(&[0x16, 3, 3, 0, 0]), Err(BAD_HELLO));
+        assert_eq!(
+            first_record_len(&[0x16, 3, 3, 0x40, 1]),
+            Err(BAD_HELLO),
+            "one byte over the record limit"
+        );
+    }
+
+    #[test]
+    fn a_lookup_that_never_answers_ends_at_the_deadline() {
+        let started = Instant::now();
+        let error = dial_within(Duration::from_millis(200), "pypi.org", 443, |_, _| {
+            thread::sleep(Duration::from_secs(30));
+
+            Ok(Vec::new())
+        })
+        .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_name_with_only_private_addresses_is_not_dialed() {
+        let error = dial_within(Duration::from_secs(5), "pypi.org", 443, |_, port| {
+            Ok(vec![
+                SocketAddr::from((Ipv4Addr::LOCALHOST, port)),
+                SocketAddr::from((Ipv4Addr::new(10, 0, 0, 1), port)),
+            ])
+        })
+        .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    /// A listed host that took the hello, said goodbye and then stopped reading: what the client sends next piles up.
+    #[test]
+    fn a_tunnel_whose_peer_stopped_reading_is_ended_and_frees_its_slot() {
+        let silent = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = silent.local_addr().unwrap();
+        let held = Arc::new(Mutex::new(Vec::new()));
+
+        {
+            let held = held.clone();
+
+            thread::spawn(move || {
+                for stream in silent.incoming().map_while(Result::ok) {
+                    let _ = stream.shutdown(Shutdown::Write);
+
+                    held.lock().unwrap().push(stream);
+                }
+            });
+        }
+
+        let dial: Dial = Arc::new(move |_, _| TcpStream::connect(address));
+        let proxy = Proxy::start_graced(dial, Duration::from_millis(300)).unwrap();
+        let (_, mut client) = ask(&proxy, "CONNECT pypi.org:443 HTTP/1.1\r\n\r\n");
+
+        client
+            .write_all(&client_hello(Some("pypi.org"), &[]))
+            .unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+
+        // Fill every buffer on the way, then keep offering bytes: the proxy has to give up on this tunnel.
+        let chunk = vec![0u8; 64 * 1024];
+        let started = Instant::now();
+        let mut ended = false;
+
+        while started.elapsed() < Duration::from_secs(10) {
+            match client.write(&chunk) {
+                Ok(_) => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                    ) => {}
+                Err(_) => {
+                    ended = true;
+
+                    break;
+                }
+            }
+        }
+
+        assert!(ended, "the tunnel stayed open on a peer that never reads");
+    }
+
+    #[test]
     fn dropping_the_proxy_closes_its_port_and_ends_open_tunnels() {
         let (proxy, _, _) = echo_proxy();
         let port = proxy.port();
         let (_, mut client) = ask(&proxy, "CONNECT pypi.org:443 HTTP/1.1\r\n\r\n");
 
+        let hello = client_hello(Some("pypi.org"), &[]);
+        let mut echoed = vec![0u8; hello.len()];
+
+        client.write_all(&hello).unwrap();
+        client.read_exact(&mut echoed).unwrap();
         drop(proxy);
 
         // The tunnel ends: the read returns EOF (or a reset) instead of waiting.
@@ -1027,7 +1679,20 @@ mod tests {
             assert!(metadata.contains("403"), "{metadata}");
             assert_eq!(hosts.lock().unwrap().as_slice(), ["registry.npmjs.org:443"]);
             assert_eq!(dialed.load(Ordering::SeqCst), 1);
-            assert_eq!(proxy.refused(), ["evil.example", "169.254.169.254"]);
+
+            // The script that was let through never sent a handshake, which the proxy notes too (a pipe is not
+            // a tunnel until it opens with one).
+            let mut refused = proxy.refused();
+
+            refused.sort();
+
+            assert_eq!(refused.len(), 3, "{refused:?}");
+            assert_eq!(refused[0], "169.254.169.254");
+            assert_eq!(refused[1], "evil.example");
+            assert!(
+                refused[2].starts_with("registry.npmjs.org ("),
+                "{refused:?}"
+            );
         }
 
         /// The whole path as `shell_run` takes it: the run starts its own proxy, points the environment at it, and

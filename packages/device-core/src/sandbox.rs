@@ -923,8 +923,11 @@ fn network_sentence(_policy: &Policy, _subject: Subject) -> String {
     allow(dead_code)
 )]
 const DEPENDENCIES_SENTENCE: &str = " Network access is limited to common package registries and source hosts \
-    (npm, PyPI, crates.io, Go modules, RubyGems, GitHub) through a local filter. Those hosts can still receive \
-    data the program sends them, for example a push to a repository or a package publish.";
+    (npm, PyPI, crates.io, Go modules, RubyGems, GitHub), over HTTPS only, through a local filter that checks \
+    that each connection's TLS server name is the listed host it was opened for. The filter cannot read the \
+    encrypted traffic: those hosts can still receive any data the program sends them, for example a push to a \
+    repository or a package publish, and a host that also serves other sites could be asked for them. A program \
+    that does not use HTTPS through the filter, or that hides the server name, has no network.";
 
 /// The line the approval prompt shows about a sandboxed shell command.
 pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
@@ -1345,6 +1348,21 @@ mod tests {
         .contains("limited to common package registries and source hosts"));
         assert!(describe_for(Subject::Mcp, &available, Some(&policy())).contains("private folder"));
         assert!(describe(&missing, None).starts_with("NOT sandboxed (no Landlock)"));
+    }
+
+    #[test]
+    fn the_dependencies_sentence_says_what_the_filter_checks_and_what_it_cannot() {
+        for said in [
+            "TLS server name",
+            "HTTPS only",
+            "can still receive any data",
+            "hides the server name",
+        ] {
+            assert!(DEPENDENCIES_SENTENCE.contains(said), "{said}");
+        }
+
+        // It must not promise more than the filter does.
+        assert!(!DEPENDENCIES_SENTENCE.contains("nothing else"));
     }
 
     /// What a forked child sees from `socket(2)` after `filter` (if any) is

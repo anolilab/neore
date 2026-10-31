@@ -123,9 +123,11 @@ sandboxed; there is no per-server opt-out, only the global setting above.
 ## Network tiers
 
 Shell commands and each MCP server have one of three tiers (`sandbox::NetworkTier`, stored as
-`off` / `dependencies` / `on`). Shell commands default to Off; a server saved before the tiers existed,
-and a newly added one, defaults to Common dependencies only, since a package launcher cannot start from an
-empty cache with the network off.
+`off` / `dependencies` / `on`). Shell commands default to Off; a server saved before the tiers existed
+defaults to Common dependencies only where this computer can enforce it (macOS) and to Off elsewhere
+(`mcp::default_network`), so it still starts. A newly added one is offered the same default in the device
+window (a package launcher cannot start from an empty cache with the network off, but "Common dependencies
+only" is not selectable where it is refused).
 
 | Tier | macOS | Linux | Windows |
 | --- | --- | --- | --- |
@@ -138,8 +140,20 @@ at it with `HTTP(S)_PROXY` (and `NODE_USE_ENV_PROXY=1`). On macOS the profile de
 outbound connections to exactly `localhost:<proxy port>`, so a tool that ignores the proxy variables has no
 network at all. The proxy accepts only `CONNECT <host>:443` for a host in the list below (exact names, no
 wildcards, no IP literals), resolves it itself, refuses addresses that are loopback, private, link-local or
-otherwise special-use, and connects to the address it checked. Plain-HTTP proxying is refused. When a failed
-run asked for a host the list does not contain, the error ends with the names that were blocked.
+otherwise special-use (including an IPv4 address carried in IPv6: mapped, `::/96`, NAT64, 6to4; Teredo is
+dropped outright), and connects to the address it checked, with one deadline for lookup and connect. Plain-HTTP
+proxying is refused. When a failed run asked for a host the list does not contain, the error ends with the names
+that were blocked.
+
+After the `200` the proxy reads the client's first TLS record and requires a ClientHello whose server name
+(SNI) is exactly the CONNECT host (case aside). No server name, a hidden one (Encrypted ClientHello), a second
+`server_name`, a hello spread over several records, or bytes that are not a TLS handshake end the tunnel before
+anything is sent upstream; the refusal is added to the blocked names with the reason. Without this check
+the CONNECT line would only be a claim, and a client could open a pipe to a listed host's address and ask it for
+any other site it serves. Clients that send an Encrypted ClientHello extension (browsers do, as GREASE) are not
+served; `npm`, `pip`, `cargo`, `git`, `go` and `gem` do not send one. The proxy also bounds what a tunnel can
+hold: a read or write that stalls ends it once the other direction has been closed for 30 s or the proxy
+stops, so a peer that stops reading cannot keep a worker.
 
 It is **refused on Linux**, not downgraded: Landlock (ABI 4) filters TCP connects by port only, so allowing
 the proxy's port would allow that port on every host (a program knows its own `HTTPS_PROXY`), and seccomp
@@ -147,9 +161,15 @@ cannot read a socket address. A per-server network namespace with a socket bridg
 built. A Linux server or shell command set to this tier fails to start with a message naming the setting; Off
 and On work there. Windows has no sandbox, so no tier is enforced.
 
-Limits worth knowing: the proxy does not open the TLS stream, so a listed host that shares an address with other
-tenants of a CDN could be reached under another name (domain fronting), and a listed host receives whatever the
-program sends it (a push to a repository, a package publish). The approval prompt says so.
+Limits worth knowing: the proxy checks the name in the handshake and does not open the TLS stream after it, so a
+listed host that also serves other sites could be asked for them with an HTTP `Host` header inside the
+encrypted stream, and a listed host receives whatever the program sends it (a push to a repository, a
+package publish). The approval prompt says so.
+
+A sandboxed server (and a sandboxed shell command) can still **write the shared folders**, so files it leaves
+there (git hooks, package scripts, `node_modules/.bin`, build outputs) can run later outside the sandbox, when you
+or another tool use that folder. Share only folders you trust a server with, and treat what it wrote there as you
+would code it sent you.
 
 The list (`egress::DEPENDENCY_HOSTS`; `cargo test egress` fails if this table and the code disagree):
 

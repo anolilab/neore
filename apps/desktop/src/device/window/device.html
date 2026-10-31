@@ -75,8 +75,9 @@
                     </select>
                 </div>
                 <p id="network-help" class="muted">
-                    “Common dependencies only” reaches package registries and source hosts (npm, PyPI, crates.io, Go modules, RubyGems, GitHub) and nothing else.
-                    Those hosts can still receive what a program sends them. Windows does not restrict the network.
+                    “Common dependencies only” (macOS) lets a program open HTTPS connections to package registries and source hosts (npm, PyPI, crates.io, Go modules, RubyGems, GitHub),
+                    each checked by its TLS server name against the host it was opened for, and nothing else. Those hosts can still receive anything a program sends them.
+                    It is not available on Linux, and Windows has no sandbox, so no network setting is enforced there.
                 </p>
                 <p id="sandbox-status" class="muted"></p>
 

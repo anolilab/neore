@@ -206,7 +206,7 @@ by RFC 4231 test vectors) — **no new crate**.
   (`shell_network`: off / dependencies / on, default off; `allow_shell_network` is
   its legacy form): Off blocks it on macOS and Linux, "common dependencies only"
   reaches a fixed list of package registries and source hosts through a loopback
-  filter (macOS; refused on Linux), On leaves it open; Windows does not restrict it. On Linux that is a seccomp-bpf
+  filter that also checks each tunnel's TLS server name against the host it was opened for (macOS; refused on Linux), On leaves it open; Windows does not restrict it. On Linux that is a seccomp-bpf
   filter that makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
   `AF_NETLINK` (and refuses `io_uring_setup`); local Unix and netlink sockets stay open. The filter exists for little-endian x86_64 and aarch64 only: on other CPUs the call is refused unless unsandboxed shells are allowed, and then it keeps Landlock and the prompt says its network is NOT blocked. Linux uses Landlock (best effort across ABIs; no Landlock → no
   sandbox) with `PR_SET_NO_NEW_PRIVS`, macOS `sandbox-exec` with a generated

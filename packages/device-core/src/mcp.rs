@@ -36,7 +36,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -61,13 +61,24 @@ pub struct McpServerConfig {
     pub env: BTreeMap<String, String>,
     pub name: String,
     /// How far the server may reach into the network. A server saved before the tiers existed has
-    /// the middle one: it can fetch its packages and nothing else.
+    /// the middle one where this computer can enforce it (it can fetch its packages and nothing else),
+    /// else Off, so it still starts.
     #[serde(default = "default_network")]
     pub network: NetworkTier,
 }
 
 fn default_network() -> NetworkTier {
-    NetworkTier::Dependencies
+    default_network_for(sandbox::dependencies_support().is_ok())
+}
+
+/// The tier of a server saved with none. "Common dependencies only" is refused where it cannot be enforced
+/// (Linux, and anywhere without a sandbox), so defaulting to it there would leave the server unable to start.
+fn default_network_for(dependencies_enforceable: bool) -> NetworkTier {
+    if dependencies_enforceable {
+        NetworkTier::Dependencies
+    } else {
+        NetworkTier::Off
+    }
 }
 
 /// `[a-z0-9_]` only, lower case — what a device tool name may contain.
@@ -635,11 +646,32 @@ impl McpManager {
     }
 
     /// Stops these servers and deletes their private folders (caches included).
+    ///
+    /// The process table stays locked throughout, so no server starts into a folder this is about to delete. Each
+    /// server is killed through its own lock, which a call in flight holds: the folder goes only after the
+    /// server has stopped. A folder belongs to a name's sanitized form (`old-name` and `old_name` share one), so
+    /// every running server under that folder is stopped, not just the one named.
     pub fn forget(&self, names: &[String]) {
-        for name in names {
-            self.processes.lock().unwrap().remove(name);
+        let mut processes = self.processes.lock().unwrap();
 
-            let _ = std::fs::remove_dir_all(self.state_root.join(sanitize(name)));
+        for name in names {
+            let folder = sanitize(name);
+            let sharing: Vec<String> = processes
+                .keys()
+                .filter(|running| sanitize(running) == folder)
+                .cloned()
+                .collect();
+
+            for running in sharing {
+                if let Some(process) = processes.remove(&running) {
+                    process
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .kill();
+                }
+            }
+
+            let _ = std::fs::remove_dir_all(self.state_root.join(folder));
         }
     }
 }
@@ -1017,6 +1049,81 @@ sleep 1"#
         ));
     }
 
+    /// A fake server that completes the handshake and stays up.
+    #[cfg(unix)]
+    fn idle_server(name: &str) -> McpServerConfig {
+        let script = r#"read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"fake","version":"1"}}}'; sleep 30"#;
+
+        McpServerConfig {
+            args: vec!["-c".into(), script.into()],
+            command: "sh".into(),
+            env: BTreeMap::new(),
+            name: name.into(),
+            network: NetworkTier::Off,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn forgetting_waits_for_a_call_in_flight_before_deleting_its_folder() {
+        let root = temp_root("forget-busy");
+        let manager = Arc::new(McpManager::new(root.clone()));
+        let config = idle_server("busy");
+        let folder = root.join(sanitize("busy"));
+
+        std::fs::create_dir_all(&folder).unwrap();
+        let (started, running) = std::sync::mpsc::channel();
+        let existed_throughout = Arc::new(AtomicBool::new(false));
+        let call = {
+            let (manager, config, folder) = (manager.clone(), config.clone(), folder.clone());
+            let existed = existed_throughout.clone();
+
+            thread::spawn(move || {
+                manager
+                    .with(&config, None, |_| {
+                        let _ = started.send(());
+                        thread::sleep(Duration::from_millis(400));
+                        existed.store(folder.is_dir(), Ordering::SeqCst);
+
+                        Ok(())
+                    })
+                    .unwrap();
+            })
+        };
+
+        running.recv_timeout(Duration::from_secs(10)).unwrap();
+        manager.forget(&["busy".to_owned()]);
+
+        assert!(!folder.exists());
+        call.join().unwrap();
+        assert!(
+            existed_throughout.load(Ordering::SeqCst),
+            "the folder was deleted under a running call"
+        );
+        assert!(manager.processes.lock().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn forgetting_a_name_stops_a_server_whose_name_shares_its_folder() {
+        let root = temp_root("forget-alias");
+        let manager = McpManager::new(root.clone());
+
+        std::fs::create_dir_all(root.join("old_name")).unwrap();
+        manager.process(&idle_server("old_name"), None).unwrap();
+
+        // `old-name` and `old_name` are the same folder, so renaming one to the other must stop the live server
+        // before the folder goes.
+        manager.forget(&["old-name".to_owned()]);
+
+        assert!(manager.processes.lock().unwrap().is_empty());
+        assert!(!root.join(sanitize("old_name")).exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn forgetting_a_server_removes_its_private_folder() {
         let root = temp_root("forget");
@@ -1035,11 +1142,21 @@ sleep 1"#
     }
 
     #[test]
-    fn a_server_saved_before_the_tiers_gets_the_dependencies_tier() {
+    fn a_server_saved_before_the_tiers_gets_the_tier_this_computer_can_enforce() {
+        assert_eq!(default_network_for(true), NetworkTier::Dependencies);
+        assert_eq!(default_network_for(false), NetworkTier::Off);
+
         let config: McpServerConfig =
             serde_json::from_str(r#"{"name":"git","command":"git-mcp"}"#).unwrap();
 
-        assert_eq!(config.network, NetworkTier::Dependencies);
+        assert_eq!(
+            config.network,
+            default_network_for(sandbox::dependencies_support().is_ok())
+        );
+        // Whatever it got must be a tier the sandbox accepts here, or the server could never start.
+        assert!(
+            config.network != NetworkTier::Dependencies || sandbox::dependencies_support().is_ok()
+        );
         assert_eq!(
             serde_json::from_str::<McpServerConfig>(
                 r#"{"name":"g","command":"c","network":"off"}"#

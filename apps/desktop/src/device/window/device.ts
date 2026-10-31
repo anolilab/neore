@@ -9,6 +9,7 @@
 import { describeLink, multiplexingNote } from "../link-status";
 import type { HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
+import { defaultServerTier, networkUnrestricted, tierAvailable } from "./server-network";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
 const CLICK_THROUGH_GUARD_MS = 800;
@@ -652,7 +653,7 @@ const serverSandboxText = (serverStatus: McpServerStatus | undefined): string =>
         return `Cannot start: ${serverStatus.problem} `;
     }
 
-    return serverStatus.sandboxed ? "Sandboxed. " : "NOT sandboxed: runs with your full access (sandbox not required in the settings above). ";
+    return serverStatus.sandboxed ? "Sandboxed. " : "NOT sandboxed: runs with your full access (sandbox not required in the settings above); its network is not restricted. ";
 };
 
 /** A server in the list: its command, whether it runs sandboxed here and under which network tier, and its controls. */
@@ -695,7 +696,12 @@ const serverItem = (server: McpServer, serverStatus: McpServerStatus | undefined
     line.setAttribute("role", "status");
     line.textContent = serverSandboxText(serverStatus);
 
-    item.append(document.createElement("br"), line, label, select);
+    item.append(document.createElement("br"), line);
+
+    // Without a sandbox nothing enforces a tier: say so instead of showing one as if it were.
+    if (!networkUnrestricted(serverStatus)) {
+        item.append(label, select);
+    }
 
     return item;
 };
@@ -747,8 +753,8 @@ const renderSettings = (): void => {
     tierSelectState(newServerNetwork, view);
 
     // A disabled option stays selected: where the middle tier cannot be enforced, a new server must not default to it.
-    if (view.dependenciesUnavailable !== null && newServerNetwork.value === "dependencies") {
-        newServerNetwork.value = "off";
+    if (isNetworkTier(newServerNetwork.value) && !tierAvailable(newServerNetwork.value, view)) {
+        newServerNetwork.value = defaultServerTier(view);
     }
 
     $("rules").replaceChildren(
@@ -891,6 +897,12 @@ $("server-form").addEventListener("submit", async (event) => {
         return;
     }
 
+    if (!tierAvailable(tier, state.settings)) {
+        status(`“${NETWORK_LABELS[tier]}” is not available on this computer.`);
+
+        return;
+    }
+
     // The exact command line, and the network it gets, confirmed once more: it will run as you, in the sandbox
     // if this computer has one.
     if (!await globalThis.neoreDevice.confirm(
@@ -911,6 +923,11 @@ $("server-form").addEventListener("submit", async (event) => {
         return { mcpServers: [...latest.mcpServers, { args, command, env, name, network: tier }] };
     });
     (event.target as HTMLFormElement).reset();
+
+    // `reset()` restores the markup's choice, the middle tier, which this computer may not be able to enforce.
+    if (state.settings !== null) {
+        ($("server-network") as HTMLSelectElement).value = defaultServerTier(state.settings);
+    }
 });
 
 // A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.
