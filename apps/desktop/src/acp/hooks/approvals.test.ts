@@ -84,7 +84,7 @@ describe("HookApprovals", () => {
         approvals.approve("a", "b/c", "hash-1");
 
         expect(approvals.get("a/b", "c")).toBeUndefined();
-        expect(approvals.get("a\u0000b", "c")).toBeUndefined();
+        expect(approvals.get("a\u{0}b", "c")).toBeUndefined();
     });
 
     it("reads an approval made for a folder alone, before agents were part of it, as nothing approved", () => {

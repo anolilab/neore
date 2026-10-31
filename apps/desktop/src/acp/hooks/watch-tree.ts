@@ -5,10 +5,10 @@
  * skip list names, and anything below it, never gets one, a symlinked directory is not followed (the listing leaves
  * it out), and the number of watches is capped.
  *
- * Pure over {@link TreeDeps}, so the rules are tested where the system's watch is not the one that matters.
+ * Pure over {@link TreeDependencies}, so the rules are tested where the system's watch is not the one that matters.
  */
 
-export interface TreeDeps {
+export interface TreeDependencies {
     /** At most this many directories are watched at once; the rest of a very large tree is simply not covered. */
     limit: number;
     /** The directories and files directly inside a directory, as paths relative to the root, symlinks left out. */
@@ -27,7 +27,7 @@ const join = (directory: string, name: string): string => directory === "" ? nam
 const parentOf = (relative: string): string => relative.slice(0, Math.max(0, relative.lastIndexOf("/")));
 
 export const watchTree = (
-    deps: TreeDeps,
+    dependencies: TreeDependencies,
     listener: (eventType: string, filename: string | null) => void,
     onError: (error: Error) => void,
 ): { close: () => void } => {
@@ -37,22 +37,25 @@ export const watchTree = (
 
     const drop = (relative: string): void => {
         for (const [key, handle] of watchers) {
-            if (key === relative || key.startsWith(`${relative}/`)) {
-                handle.close();
-                watchers.delete(key);
+            if (!(key === relative || key.startsWith(`${relative}/`))) {
+                continue;
             }
+
+            handle.close();
+            watchers.delete(key);
         }
     };
 
-    const add = async (relative: string, announce?: { left: number }): Promise<void> => {
-        if (closed || watchers.has(relative) || (relative !== "" && deps.skip(relative)) || watchers.size >= deps.limit) {
+    /** `announce`: reports a file of a directory that is new (it may have been written before its watch), until the budget is spent. */
+    const add = async (relative: string, announce?: () => boolean): Promise<void> => {
+        if (closed || watchers.has(relative) || (relative !== "" && dependencies.skip(relative)) || watchers.size >= dependencies.limit) {
             return;
         }
 
         try {
             watchers.set(
                 relative,
-                deps.watchDirectory(
+                dependencies.watchDirectory(
                     relative,
                     (eventType, name) => {
                         if (name === null) {
@@ -85,12 +88,11 @@ export const watchTree = (
             return;
         }
 
-        const { directories, files } = await deps.list(relative);
+        const { directories, files } = await dependencies.list(relative);
 
         if (announce !== undefined) {
             for (const file of files) {
-                if (announce.left > 0) {
-                    announce.left -= 1;
+                if (announce()) {
                     listener("rename", file);
                 }
             }
@@ -104,7 +106,7 @@ export const watchTree = (
 
     /** A name appeared or went in `directory`: watch the new directories, and let go of the ones that are gone. */
     const recheck = (directory: string): void => {
-        if (rechecking.has(directory) || closed) {
+        if (closed || rechecking.has(directory)) {
             return;
         }
 
@@ -116,16 +118,21 @@ export const watchTree = (
                 return;
             }
 
-            const { directories } = await deps.list(directory);
+            const { directories } = await dependencies.list(directory);
             const present = new Set(directories);
 
-            for (const key of [...watchers.keys()]) {
+            for (const key of watchers.keys()) {
                 if (key !== "" && parentOf(key) === directory && !present.has(key)) {
                     drop(key);
                 }
             }
 
-            const announce = { left: MAX_ANNOUNCED };
+            let left = MAX_ANNOUNCED;
+            const announce = (): boolean => {
+                left -= 1;
+
+                return left >= 0;
+            };
 
             for (const child of directories) {
                 // eslint-disable-next-line no-await-in-loop -- see above
@@ -134,7 +141,13 @@ export const watchTree = (
         }, 0);
     };
 
-    add("").catch((error: unknown) => onError(error as Error));
+    (async () => {
+        try {
+            await add("");
+        } catch (error) {
+            onError(error as Error);
+        }
+    })();
 
     return {
         close: () => {

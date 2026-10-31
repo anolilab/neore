@@ -4,18 +4,18 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { nodeTreeDeps } from "./fs";
-import type { TreeDeps } from "./watch-tree";
+import { nodeTreeDependencies } from "./fs";
+import type { TreeDependencies } from "./watch-tree";
 import { watchTree } from "./watch-tree";
 
 const ignored = (relative: string): boolean => relative.split("/").some((segment) => segment === "node_modules" || segment === ".git");
 
 /** A tree of directories (relative paths → their subdirectories) and the watchers placed on it, driven by hand. */
 const fakeTree = (tree: Record<string, string[]>) => {
-    const watched = new Map<string, { close: ReturnType<typeof vi.fn>; fire: (eventType: string, name: string | null) => void; fail: (error: Error) => void }>();
+    const watched = new Map<string, { close: ReturnType<typeof vi.fn>; fail: (error: Error) => void; fire: (eventType: string, name: string | null) => void }>();
     const files = new Map<string, string[]>();
 
-    const deps = (limit = 100): TreeDeps => {
+    const dependencies = (limit = 100): TreeDependencies => {
         return {
             limit,
             list: async (relative) => {
@@ -32,7 +32,7 @@ const fakeTree = (tree: Record<string, string[]>) => {
         };
     };
 
-    return { deps, files, tree, watched };
+    return { deps: dependencies, files, tree, watched };
 };
 
 const settle = async (): Promise<void> => {
@@ -48,14 +48,20 @@ describe("watchTree", () => {
         watchTree(deps(), () => {}, () => {});
         await settle();
 
-        expect([...watched.keys()].sort()).toEqual(["", "src", "src/deep"]);
+        expect(new Set(watched.keys())).toEqual(new Set(["", "src", "src/deep"]));
     });
 
     it("reports a name relative to the root, not to the directory it came from", async () => {
         const { deps, watched } = fakeTree({ "": ["src"], src: ["src/deep"] });
         const seen: [string, string | null][] = [];
 
-        watchTree(deps(), (eventType, filename) => seen.push([eventType, filename]), () => {});
+        watchTree(
+            deps(),
+            (eventType, filename) => {
+                seen.push([eventType, filename]);
+            },
+            () => {},
+        );
         await settle();
         watched.get("")?.fire("change", "README.md");
         watched.get("src")?.fire("change", "a.ts");
@@ -82,7 +88,13 @@ describe("watchTree", () => {
         const { deps, files, tree, watched } = fakeTree({ "": [] });
         const seen: [string, string | null][] = [];
 
-        watchTree(deps(), (eventType, filename) => seen.push([eventType, filename]), () => {});
+        watchTree(
+            deps(),
+            (eventType, filename) => {
+                seen.push([eventType, filename]);
+            },
+            () => {},
+        );
         await settle();
 
         tree[""] = ["fresh"];
@@ -152,7 +164,7 @@ describe("watchTree", () => {
         watcher.close();
         watcher.close();
 
-        expect([...watched.values()].every((entry) => entry.close.mock.calls.length === 1)).toBe(true);
+        expect(Array.from(watched.values(), (entry) => entry.close.mock.calls.length)).toEqual([1, 1, 1]);
     });
 });
 
@@ -164,14 +176,16 @@ describe("watchTree on a real folder", () => {
     });
 
     it("hears a nested file, and never puts a watch on node_modules or .git", async () => {
-        directory = realpathSync(mkdtempSync(path.join(tmpdir(), "neore-watch-tree-")));
+        const prefix = path.join(tmpdir(), "neore-watch-tree-");
+
+        directory = realpathSync(mkdtempSync(prefix));
         mkdirSync(path.join(directory, "src", "deep"), { recursive: true });
         mkdirSync(path.join(directory, "node_modules", "pkg"), { recursive: true });
         mkdirSync(path.join(directory, ".git", "objects"), { recursive: true });
 
         const seen: string[] = [];
         const placed: string[] = [];
-        const real = nodeTreeDeps(directory, ignored, 100);
+        const real = nodeTreeDependencies(directory, ignored, 100);
         const watcher = watchTree(
             {
                 ...real,
@@ -181,7 +195,9 @@ describe("watchTree on a real folder", () => {
                     return real.watchDirectory(relative, onEvent, onError);
                 },
             },
-            (_eventType, filename) => seen.push(String(filename)),
+            (_eventType, filename) => {
+                seen.push(String(filename));
+            },
             (error) => {
                 throw error;
             },
@@ -191,7 +207,8 @@ describe("watchTree on a real folder", () => {
             await settle();
             writeFileSync(path.join(directory, "src", "deep", "a.ts"), "a");
             await expect.poll(() => seen.includes("src/deep/a.ts"), { timeout: 4000 }).toBe(true);
-            expect(placed.sort()).toEqual(["", "src", "src/deep"]);
+            expect(new Set(placed)).toEqual(new Set(["", "src", "src/deep"]));
+            expect(placed).toHaveLength(3);
         } finally {
             watcher.close();
         }

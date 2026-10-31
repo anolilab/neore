@@ -18,7 +18,9 @@ let outside: string;
 
 beforeEach(() => {
     // The runner hands over the folder's real path (/var is a link on macOS).
-    directory = realpathSync(mkdtempSync(path.join(tmpdir(), "neore-hooks-file-")));
+    const prefix = path.join(tmpdir(), "neore-hooks-file-");
+
+    directory = realpathSync(mkdtempSync(prefix));
     root = path.join(directory, "project");
     outside = path.join(directory, "outside");
     mkdirSync(path.join(root, ".neore"), { recursive: true });

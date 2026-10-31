@@ -10,6 +10,9 @@ import { DEBOUNCE_MS, HOOK_MIN_INTERVAL_MS, HookRunner, MAX_FIRES_PER_HOUR, QUIE
 
 const ROOT = "/work/project";
 const AGENT = "claude";
+const NOT_INSTRUCTIONS = /not instructions/u;
+const HIDDEN_IN_PROMPT = /[\u{202A}-\u{202E}\u{200B}\u{E0000}-\u{E007F}]/u;
+const FENCE = /^~{3,}$/u;
 const REVIEW_PROMPT = /^\[Hook "Review"\] Review the saved file\./u;
 
 const hooksFile = (hooks: unknown[]): string => JSON.stringify({ hooks, version: 1 });
@@ -295,11 +298,11 @@ describe("file events", () => {
         const lines = prompt.split("\n");
         const label = lines.indexOf("changed files:");
 
-        expect(prompt.startsWith('[Hook "Review"] Review the saved file.')).toBe(true);
+        expect(prompt.startsWith("[Hook \"Review\"] Review the saved file.")).toBe(true);
         expect(label).toBeGreaterThan(0);
-        expect(lines[label - 1]).toMatch(/not instructions/u);
-        expect(lines[label + 1]).toMatch(/^~{3,}$/u);
-        expect(lines[label + 2]).toBe('"src/a.ts"');
+        expect(lines[label - 1]).toMatch(NOT_INSTRUCTIONS);
+        expect(lines[label + 1]).toMatch(FENCE);
+        expect(lines[label + 2]).toBe("\"src/a.ts\"");
         expect(lines.at(-1)).toBe(lines[label + 1]);
     });
 
@@ -312,8 +315,8 @@ describe("file events", () => {
         fs.emit("change", name);
         await settle();
 
-        expect(sent[0]).toContain('"src/a?gnp.ts???.ts"');
-        expect(sent[0]).not.toMatch(/[\u{202A}-\u{202E}\u{200B}\u{E0000}-\u{E007F}]/u);
+        expect(sent[0]).toContain("\"src/a?gnp.ts???.ts\"");
+        expect(sent[0]).not.toMatch(HIDDEN_IN_PROMPT);
     });
 
     it("cannot be closed early by a file name that looks like a fence", async () => {
@@ -329,13 +332,13 @@ describe("file events", () => {
         await settle();
 
         const lines = (sent[0] ?? "").split("\n");
-        const open = lines.findIndex((line) => /^~{3,}$/u.test(line));
+        const open = lines.findIndex((line) => FENCE.test(line));
         const fence = lines[open] ?? "";
         const closing = lines.slice(open + 1).filter((line) => line === fence);
 
         expect(closing).toHaveLength(1);
         expect(lines.at(-1)).toBe(fence);
-        expect(lines.slice(open + 1, -1).every((line) => line.startsWith('"'))).toBe(true);
+        expect(lines.slice(open + 1, -1).every((line) => line.startsWith("\""))).toBe(true);
         expect(fence.length).toBeGreaterThan(3);
     });
 
@@ -351,7 +354,7 @@ describe("file events", () => {
 
         await settle();
 
-        const lines = (sent[0] ?? "").split("\n").filter((line) => line.startsWith('"'));
+        const lines = (sent[0] ?? "").split("\n").filter((line) => line.startsWith("\""));
 
         expect(lines).toHaveLength(10);
         expect(Math.max(...lines.map((line) => line.length))).toBeLessThan(260);
@@ -563,11 +566,15 @@ describe("approval scope", () => {
 
         const second = await other();
 
-        expect((await second.runner.view()).state).toBe("unapproved");
+        const secondView = await second.runner.view();
+
+        expect(secondView.state).toBe("unapproved");
         second.fs.emit("change", "src/old.ts");
         await settle();
         expect(second.sent).toEqual([]);
-        await expect(second.runner.runManual("summary", await hashOf())).rejects.toThrow("approved");
+        const shown = await hashOf();
+
+        await expect(second.runner.runManual("summary", shown)).rejects.toThrow("approved");
 
         // The first agent's own approval still stands.
         fs.emit("change", "src/old.ts");
@@ -580,17 +587,36 @@ describe("approval scope", () => {
 
         const second = await other();
 
-        await second.runner.approve(await hashOf());
-        expect((await second.runner.view()).state).toBe("approved");
+        const shown = await hashOf();
 
-        second.runner.revoke();
-        expect((await second.runner.view()).state).toBe("unapproved");
+        await second.runner.approve(shown);
+
+        const approved = await second.runner.view();
+
+        await second.runner.revoke();
+
+        const revoked = await second.runner.view();
+
+        expect([approved.state, revoked.state]).toEqual(["approved", "unapproved"]);
         expect(await stateOf()).toBe("approved");
     });
 });
 
 describe("when the folder is watched, and how", () => {
-    const bare = (): HookRunner => new HookRunner({ agentKey: AGENT, approvals, folder: ROOT, fs, isIdle: () => idle, onChange: () => { changes += 1; }, send: (prompt) => { sent.push(prompt); } });
+    const bare = (): HookRunner =>
+        new HookRunner({
+            agentKey: AGENT,
+            approvals,
+            folder: ROOT,
+            fs,
+            isIdle: () => idle,
+            onChange: () => {
+                changes += 1;
+            },
+            send: (prompt) => {
+                sent.push(prompt);
+            },
+        });
 
     it("keeps manual hooks working after the watcher fails, and tells the window", async () => {
         await setup([review, manual]);
@@ -601,7 +627,10 @@ describe("when the folder is watched, and how", () => {
         fs.fail("ENOSPC: System limit for number of file watchers reached");
 
         expect(changes).toBeGreaterThan(before);
-        expect((await runner.view()).watching).toBe(false);
+
+        const after = await runner.view();
+
+        expect(after.watching).toBe(false);
         await runner.runManual("summary", hash);
         expect(sent).toHaveLength(1);
 
@@ -628,7 +657,7 @@ describe("when the folder is watched, and how", () => {
         runner = bare();
 
         let watchingWhileScanning: boolean | undefined;
-        const scan = fs.scan;
+        const { scan } = fs;
 
         fs.scan = async (...args) => {
             watchingWhileScanning = fs.watching;
@@ -644,7 +673,7 @@ describe("when the folder is watched, and how", () => {
         await setup([{ ...review, glob: "src/**/*.ts" }]);
         // `src/x.ts` exists and is a hook match; the name the watcher reports has a backslash in it and is another file.
         fs.write("src/x.ts");
-        fs.emit("change", "src\\x.ts");
+        fs.emit("change", String.raw`src\x.ts`);
         await settle();
 
         expect(sent).toEqual([]);
@@ -657,9 +686,9 @@ describe("when the folder is watched, and how", () => {
         let most = 0;
         let release = (): void => {};
         const gate = new Promise<void>((resolve) => {
-            release = resolve;
+            release = () => resolve();
         });
-        const lstat = fs.lstat;
+        const { lstat } = fs;
 
         fs.lstat = async (target) => {
             inFlight += 1;

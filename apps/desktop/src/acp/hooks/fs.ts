@@ -1,10 +1,9 @@
 /** The file system as the hook runner uses it, so tests can stand in for it and a watcher's timing is theirs to set. */
-import { watch } from "node:fs";
-import { constants } from "node:fs";
+import { constants, watch } from "node:fs";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-import type { TreeDeps } from "./watch-tree";
+import type { TreeDependencies } from "./watch-tree";
 import { watchTree } from "./watch-tree";
 
 export interface FileInfo {
@@ -18,6 +17,7 @@ export type InsideRead = { bytes: Buffer; state: "ok" } | { reason: string; stat
 
 export interface HookFs {
     lstat: (target: string) => Promise<FileInfo | undefined>;
+
     /**
      * At most `maxBytes` of the regular file `relative` (`/`-separated) under `root`, which is a real path. A link
      * anywhere on the way, a file that is not where its real path says, or anything but a regular file is `refused`.
@@ -27,6 +27,7 @@ export interface HookFs {
     realpath: (target: string) => Promise<string | undefined>;
     /** Regular files under `root` (relative, `/`-separated), skipping what `skip` says and every symlink, at most `limit`. */
     scan: (root: string, limit: number, skip: (relative: string) => boolean) => Promise<string[]>;
+
     /**
      * Calls `listener` for every change under `root`. `filename` is relative to it. `skip` names directories that are not
      * worth a watch (they may still report events), and `limit` caps the directories a platform without a native
@@ -111,6 +112,7 @@ const readInside = async (root: string, relative: string, maxBytes: number): Pro
 
     try {
         // O_NOFOLLOW refuses a link as the last part of the path; the checks below cover the rest of it.
+        // eslint-disable-next-line no-bitwise -- open flags are a bit set
         handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     } catch (error) {
         const code = (error as NodeJS.ErrnoException).code ?? "";
@@ -148,8 +150,8 @@ const readInside = async (root: string, relative: string, maxBytes: number): Pro
     }
 };
 
-/** {@link watchTree} over the real file system: Node's own `fs.watch` on one directory at a time. */
-export const nodeTreeDeps = (root: string, skip: (relative: string) => boolean, limit: number): TreeDeps => {
+/** The tree watcher over the real file system: Node's own `fs.watch` on one directory at a time. */
+export const nodeTreeDependencies = (root: string, skip: (relative: string) => boolean, limit: number): TreeDependencies => {
     return {
         limit,
         list: (relative) => listFolder(root, relative, skip),
@@ -189,7 +191,7 @@ export const nodeHookFs: HookFs = {
     watch: (root, listener, onError, options) => {
         // Linux has no native recursive watch: Node would put one inotify watch on every directory, node_modules included.
         if (process.platform === "linux") {
-            return watchTree(nodeTreeDeps(root, options.skip, options.limit), listener, onError);
+            return watchTree(nodeTreeDependencies(root, options.skip, options.limit), listener, onError);
         }
 
         const watcher = watch(root, { persistent: false, recursive: true }, (eventType, filename) => listener(eventType, filename === null ? null : String(filename)));

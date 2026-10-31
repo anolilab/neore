@@ -68,28 +68,28 @@ describe("parseHooks", () => {
     describe("hidden characters", () => {
         // Each is written as a JSON escape: the character exists only after the file is parsed, as in a real hooks file.
         const hidden: Record<string, string> = {
-            "a C0 control": String.raw`\u0007`,
-            "a carriage return": String.raw`\r`,
-            "a DEL": String.raw`\u007f`,
-            "a C1 control": String.raw`\u0085`,
             "a bidi embedding": String.raw`\u202a`,
-            "a bidi override": String.raw`\u202e`,
             "a bidi isolate": String.raw`\u2066`,
             "a bidi isolate end": String.raw`\u2069`,
+            "a bidi override": String.raw`\u202e`,
+            "a byte order mark": String.raw`\ufeff`,
+            "a C0 control": String.raw`\u0007`,
+            "a C1 control": String.raw`\u0085`,
+            "a carriage return": String.raw`\r`,
+            "a DEL": String.raw`\u007f`,
             "a line separator": String.raw`\u2028`,
             "a paragraph separator": String.raw`\u2029`,
-            "a zero width space": String.raw`\u200b`,
-            "a word joiner": String.raw`\u2060`,
             "a soft hyphen": String.raw`\u00ad`,
-            "a byte order mark": String.raw`\ufeff`,
             "a tag character": String.raw`\udb40\udc41`,
+            "a word joiner": String.raw`\u2060`,
+            "a zero width space": String.raw`\u200b`,
             "the tag block's first code point": String.raw`\udb40\udc00`,
             "the tag block's last code point": String.raw`\udb40\udc7f`,
         };
         const textOf = (field: "glob" | "name" | "prompt", character: string): string => {
             const base = { glob: "src/a", id: "h", name: "Name", on: "saved", prompt: "Look." };
 
-            return JSON.stringify({ hooks: [{ ...base, [field]: `${base[field]}@@x` }], version: 1 }).replace("@@", character);
+            return JSON.stringify({ hooks: [{ ...base, [field]: `${base[field]}@@x` }], version: 1 }).replace("@@", () => character);
         };
 
         for (const [label, character] of Object.entries(hidden)) {
