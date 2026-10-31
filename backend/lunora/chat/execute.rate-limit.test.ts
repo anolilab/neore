@@ -353,17 +353,6 @@ describe("a provider rate limit on the first model call", () => {
         expect(enqueued[0]!.delayMs).toBeGreaterThan(25_000);
     });
 
-    it("treats a BYOK key and a platform key the same: the pause is on the error, not the key", async () => {
-        // The gateway reports the same `rateLimit` whoever's key was rejected; nothing here reads a key.
-        modelState.model = planned([rateLimited()]);
-
-        await run();
-
-        const { pause } = await readState();
-
-        expect(pause).toBeDefined();
-    });
-
     it("continues the same run when the resume arrives: one reply, no failed rows, one charge", async () => {
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
 

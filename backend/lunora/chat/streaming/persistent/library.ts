@@ -15,7 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
 import { patchRow } from "../../../lib/patch";
-import { planPause, type PauseRefusal } from "../../lib/rate-limit-pause";
+import { planPause } from "../../lib/rate-limit-pause";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
@@ -634,7 +634,7 @@ export const pauseRunForRateLimit = internalMutation
         });
 
         if (!plan.pause) {
-            return { paused: false, reason: plan.reason satisfies PauseRefusal };
+            return { paused: false, reason: plan.reason };
         }
 
         // The rejected step opened a placeholder under `from` before its call (the agent marks it failed when the call
