@@ -183,6 +183,46 @@ describe("messages", () => {
     });
 });
 
+describe("pruning threads missing from a complete list", () => {
+    it("drops a thread, its messages and its statuses once a complete list no longer has it", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("a", 10), thread("b", 20)], { syncedAt: 100 });
+        await scoped.saveMessages("a", [message("m1", "a", 1)], { syncedAt: 100 });
+        await scoped.saveStatuses([status("h1", 5, { threadId: "a" })], { syncedAt: 100 });
+        await scoped.pruneThreads(["b"], { readStartedAt: 200 });
+
+        const remaining = await scoped.loadThreads();
+
+        expect(remaining.map((row) => row.id)).toEqual(["b"]);
+        expect(await scoped.loadMessages("a")).toEqual([]);
+        expect(await scoped.loadStatuses()).toEqual([]);
+    });
+
+    it("keeps a thread that a newer read saved after this read began", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("fresh", 30)], { syncedAt: 300 });
+        await scoped.pruneThreads([], { readStartedAt: 200 });
+
+        const remaining = await scoped.loadThreads();
+
+        expect(remaining.map((row) => row.id)).toEqual(["fresh"]);
+    });
+
+    it("empties the older rows when the complete list is empty", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("a", 10)], { syncedAt: 100 });
+        await scoped.pruneThreads([], { readStartedAt: 200 });
+
+        expect(await scoped.loadThreads()).toEqual([]);
+    });
+});
+
 describe("messages of a chat the list has not stored yet", () => {
     it("keeps the messages of a new chat, up to the same 20 threads", async () => {
         const { cache } = makeCache();

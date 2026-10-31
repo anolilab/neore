@@ -87,7 +87,7 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         threadId: threadId as Id<"threads">,
     });
 
-const ChatScreen = () => {
+const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
     const { hasToken, status } = useAuth();
@@ -360,4 +360,10 @@ const ChatScreen = () => {
     );
 };
 
-export default ChatScreen;
+/** Keyed by the signed-in account, so one account's messages never stay in screen state for the next. */
+// eslint-disable-next-line react/function-component-definition -- the default export is declared inline (unicorn/default-export-style), which makes it a function declaration
+export default function ChatScreen() {
+    const { user } = useAuth();
+
+    return <Chat key={user?.id ?? "none"} />;
+}

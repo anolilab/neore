@@ -11,6 +11,7 @@ import type { GrantUser } from "./grant";
 import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signInWithBrowser } from "./sign-in";
+import { signOutOnDevice } from "./sign-out";
 
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
@@ -101,20 +102,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signOut = useCallback(async () => {
         try {
-            await signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
-        } catch (error) {
-            // The stored grant could not be cleared. The user is still signed out in memory below.
-            // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
-            console.warn("Could not clear the stored sign-in.", error);
+            // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
+            // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
+            await signOutOnDevice({
+                clearCache: () => getOfflineCache().clear(),
+                revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
+                // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
+                warn: console.warn,
+            });
         } finally {
-            // The cache holds this person's chats: it is emptied with the sign-in, whether or not the server heard about it.
-            try {
-                await getOfflineCache().clear();
-            } catch (error) {
-                // eslint-disable-next-line no-console -- no logger in the app; a cache that could not be emptied must not be silent
-                console.warn("Could not empty the offline cache.", error);
-            }
-
             signOutCount.current += 1;
             client.setAuthToken(null);
             setHasToken(false);

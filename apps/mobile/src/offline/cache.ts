@@ -104,6 +104,13 @@ export interface ScopedCache {
     loadMessages: (threadId: string) => Promise<MessageRow[]>;
     loadStatuses: () => Promise<StatusRow[]>;
     loadThreads: () => Promise<ThreadRow[]>;
+
+    /**
+     * Removes the threads a COMPLETE, successful list read (one that reached the end) no longer contains: deleted,
+     * or no longer shared. `readStartedAt` is when that read began; a thread saved by a read that began later is
+     * newer than this answer and stays. Never call it for a partial page.
+     */
+    pruneThreads: (liveThreadIds: ReadonlyArray<string>, options: { readStartedAt: number }) => Promise<void>;
     saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage>, options?: SaveOptions) => Promise<void>;
     saveStatuses: (statuses: ReadonlyArray<CachedStatus>, options?: SaveOptions) => Promise<void>;
     saveThreads: (threads: ReadonlyArray<CachedThread>, options?: SaveOptions) => Promise<void>;
@@ -210,6 +217,13 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
         return unlisted.some((row) => row.thread_id === threadId) || unlisted.length < MAX_THREADS_WITH_MESSAGES;
     };
 
+    /** Inside a transaction. */
+    const removeThread = async (threadId: string) => {
+        await database.runAsync("DELETE FROM cached_messages WHERE thread_id = ?", [threadId]);
+        await database.runAsync("DELETE FROM cached_statuses WHERE thread_id = ?", [threadId]);
+        await database.runAsync("DELETE FROM cached_threads WHERE id = ?", [threadId]);
+    };
+
     const forOwner = (userId: string): ScopedCache => {
         const scoped = async <T>(fallback: T, task: () => Promise<T>): Promise<T> =>
             enqueue(async () => {
@@ -228,11 +242,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                     await database.withTransactionAsync(async () => {
                         for (const threadId of threadIds) {
                             // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
-                            await database.runAsync("DELETE FROM cached_messages WHERE thread_id = ?", [threadId]);
-                            // eslint-disable-next-line no-await-in-loop -- as above
-                            await database.runAsync("DELETE FROM cached_statuses WHERE thread_id = ?", [threadId]);
-                            // eslint-disable-next-line no-await-in-loop -- as above
-                            await database.runAsync("DELETE FROM cached_threads WHERE id = ?", [threadId]);
+                            await removeThread(threadId);
                         }
                     });
                 }),
@@ -285,6 +295,21 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                             updatedAt: row.updated_at,
                             ...row.runner === "host" && { runner: "host" as const },
                         };
+                    });
+                }),
+            pruneThreads: (liveThreadIds, { readStartedAt }) =>
+                scoped<undefined>(undefined, async () => {
+                    const marks = liveThreadIds.map(() => "?").join(", ");
+                    const missing = await database.getAllAsync<{ id: string }>(
+                        `SELECT id FROM cached_threads WHERE synced_at <= ? AND id NOT IN (${marks})`,
+                        [readStartedAt, ...liveThreadIds],
+                    );
+
+                    await database.withTransactionAsync(async () => {
+                        for (const { id } of missing) {
+                            // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
+                            await removeThread(id);
+                        }
                     });
                 }),
             saveMessages: (threadId, messages, options) =>
