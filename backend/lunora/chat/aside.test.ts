@@ -579,6 +579,14 @@ describe("addAsideToThread", () => {
         expect(await rows("messages")).toStrictEqual(before);
     });
 
+    it("is refused on a coding agent's thread while its turn runs past the stream's expiry", async () => {
+        // A host turn waiting on a permission prompt outlives `expiresAt`; the reaper extends it rather than ending it.
+        await patchThread({ runner: "host" });
+        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
+
+        await expect(addToThread()).rejects.toThrow("Wait for the reply");
+    });
+
     it("is not blocked by a dead stream the reaper has not reached", async () => {
         await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
 

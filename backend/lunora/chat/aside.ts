@@ -81,6 +81,7 @@ import {
 import { chargeDailyLimit } from "./lib/daily-limit";
 import getAgent from "./lib/get-agent";
 import { throwUnlessGranted, threadGateOutcome } from "./lib/thread-gate";
+import { isHostRunThread } from "../acp/lib/host-thread";
 
 /** A short answer; a hung gateway must not hold the action forever. */
 const ASIDE_TIMEOUT_MS = 60_000;
@@ -111,12 +112,14 @@ const LIVE_STREAM_CANDIDATES = 5;
  * The reply being written in `threadId`: the newest pending or streaming stream that is not past its expiry (one
  * the reaper has not reached yet is dead, and must neither feed a question nor block "Add to thread").
  */
-const findLiveStream = async (ctx: Reader, threadId: string, now: number) => {
+const findLiveStream = async (ctx: Reader, threadId: string, now: number, options: { hostRun?: boolean } = {}) => {
     // Expiry is part of the query: dead streams the reaper has not reached must not crowd a live one out of the page.
+    // Except on a coding agent's thread: a host turn waiting on a permission prompt outlives `expiresAt`, and the
+    // reaper extends it rather than ending it, so there any pending or streaming row is the reply still being written.
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: LIVE_STREAM_CANDIDATES,
         orderBy: [{ _creationTime: "desc" }],
-        where: { expiresAt: { gt: now }, status: { in: ["pending", "streaming"] }, threadId },
+        where: { ...(!options.hostRun && { expiresAt: { gt: now } }), status: { in: ["pending", "streaming"] }, threadId },
     });
 
     return page[0];
@@ -477,7 +480,7 @@ export const addAsideToThread = authMutation
         }
 
         // A row that lands after a running reply's pending row would split that reply across two branches.
-        if ((await findLiveStream(ctx, threadId, ctx.now)) || (await hasStreamingEdit(ctx, threadId))) {
+        if ((await findLiveStream(ctx, threadId, ctx.now, { hostRun: isHostRunThread(thread) })) || (await hasStreamingEdit(ctx, threadId))) {
             throw new LunoraError("CONFLICT", "Wait for the reply to finish before adding this to the thread");
         }
 
