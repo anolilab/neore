@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStreamLine } from "./stream-line";
+import { parseStreamLine, readToolProgress } from "./stream-line";
 
 describe(parseStreamLine, () => {
     it("reads text and reasoning from a relayed chunk", () => {
@@ -74,5 +74,55 @@ describe(parseStreamLine, () => {
     it("does not read a malformed resume marker as a resume", () => {
         expect(parseStreamLine(JSON.stringify({ lastChunkIndex: -1, type: "resume" })).kind).toBe("chunk");
         expect(parseStreamLine(JSON.stringify({ lastChunkIndex: "4", type: "resume" })).kind).toBe("chunk");
+    });
+});
+
+describe("toolProgress", () => {
+    const tool = { serverName: "Docs", toolCallId: "call_1", toolName: "index" };
+
+    it("reads a progress report relayed on a chunk", () => {
+        expect(parseStreamLine(JSON.stringify({ text: "", toolProgress: { ...tool, message: "Reading", progress: 2, total: 8 } }))).toStrictEqual({
+            kind: "chunk",
+            reasoning: "",
+            text: "",
+            toolProgress: { ...tool, message: "Reading", progress: 2, total: 8 },
+        });
+    });
+
+    it("reads the end of a call", () => {
+        expect(parseStreamLine(JSON.stringify({ text: "", toolProgress: { ...tool, ended: true } }))).toMatchObject({ toolProgress: { ...tool, ended: true } });
+    });
+
+    it("treats a total that is missing, zero or not finite as unknown", () => {
+        for (const total of [undefined, 0, -1, "8", null]) {
+            expect(readToolProgress({ ...tool, progress: 1, total })).toStrictEqual({ ...tool, progress: 1 });
+        }
+    });
+
+    it("drops a report whose progress is unusable, and cuts a long message", () => {
+        expect(readToolProgress({ ...tool, progress: -1 })).toBeUndefined();
+        expect(readToolProgress({ ...tool, progress: "1" })).toBeUndefined();
+        expect(readToolProgress({ progress: 1 })).toBeUndefined();
+        expect(readToolProgress({ ...tool, message: "x".repeat(900), progress: 1 })?.message).toHaveLength(200);
+    });
+
+    it("strips control characters and bidi overrides and isolates from the message", () => {
+        expect(readToolProgress({ ...tool, message: "a\u{7}b\u{202E}c\u{2066}d\u{2069}e", progress: 1 })?.message).toBe("abcde");
+        expect(readToolProgress({ ...tool, message: "page 1\r\npage 2", progress: 1 })?.message).toBe("page 1 page 2");
+        expect(readToolProgress({ ...tool, message: "\u{202E}\u{2066}", progress: 1 })).toStrictEqual({ ...tool, progress: 1 });
+        expect(readToolProgress({ ...tool, progress: 1, serverName: "Do\u{202E}cs", toolName: "in\u{2066}dex" })).toMatchObject({
+            serverName: "Docs",
+            toolName: "index",
+        });
+    });
+
+    it("cuts the message by code point, so a surrogate pair is never split", () => {
+        const message = readToolProgress({ ...tool, message: "😀".repeat(300), progress: 1 })?.message;
+
+        expect(message).toBe("😀".repeat(200));
+    });
+
+    it("leaves a chunk without it exactly as before", () => {
+        expect(parseStreamLine(JSON.stringify({ text: "Hi." }))).toStrictEqual({ kind: "chunk", reasoning: "", text: "Hi." });
     });
 });

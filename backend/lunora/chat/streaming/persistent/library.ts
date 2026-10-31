@@ -15,6 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
+import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -96,6 +97,18 @@ export const addChunk = internalMutation
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
         text: v.string(),
+        /** A long MCP tool call's progress, or its end (`chat/lib/mcp-progress.ts`). A chunk with it carries no text. */
+        toolProgress: v.optional(
+            v.object({
+                ended: v.optional(v.boolean()),
+                message: v.optional(v.string().max(MAX_LENGTH.short)),
+                progress: v.optional(v.number()),
+                serverName: v.string().max(MAX_LENGTH.short),
+                toolCallId: v.string().max(MAX_LENGTH.id),
+                toolName: v.string().max(MAX_LENGTH.short),
+                total: v.optional(v.number()),
+            }),
+        ),
     })
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
@@ -126,6 +139,7 @@ export const addChunk = internalMutation
             ...(args.speaker && { speaker: args.speaker }),
             streamId: args.streamId,
             text: args.text,
+            ...(args.toolProgress && { toolProgress: args.toolProgress }),
         });
 
         // The stream row changes only when its status does: on the first chunk
@@ -381,6 +395,19 @@ export const getStreamText = internalQuery
             ),
             text: v.string(),
             threadId: v.optional(v.string()),
+            /** The MCP tool calls running now, each with its latest report (`chat/lib/mcp-progress.ts`); absent when none. */
+            toolProgress: v.optional(
+                v.array(
+                    v.object({
+                        message: v.optional(v.string().max(MAX_LENGTH.short)),
+                        progress: v.number(),
+                        serverName: v.string().max(MAX_LENGTH.short),
+                        toolCallId: v.string().max(MAX_LENGTH.id),
+                        toolName: v.string().max(MAX_LENGTH.short),
+                        total: v.optional(v.number()),
+                    }),
+                ),
+            ),
             userId: v.optional(v.string()),
         }),
     )
@@ -394,6 +421,7 @@ export const getStreamText = internalQuery
         let text = "";
         let reasoning = "";
         let speaker: { name: string; skillId: string } | undefined;
+        let toolProgress: OpenToolProgress[] = [];
 
         if (stream.status !== "pending") {
             const { page: allChunks } = await ctx.db.persistentChunks.findMany({
@@ -407,6 +435,11 @@ export const getStreamText = internalQuery
             const chunks = lastMarker === -1 ? allChunks : allChunks.slice(lastMarker);
 
             speaker = lastMarker === -1 ? undefined : (allChunks[lastMarker]?.speaker ?? undefined);
+
+            // Only the newest report per call goes out, from the chunks of the current reply; a settled stream runs no call.
+            if (stream.status === "streaming") {
+                toolProgress = openToolProgress(chunks);
+            }
 
             // A steer delivered whose marker is not written yet (the next step never started: a stop or a failure came
             // first): everything written so far is above the steered message, so nothing is the current reply's.
@@ -427,6 +460,7 @@ export const getStreamText = internalQuery
             streamingConfig: stream.streamingConfig,
             text,
             threadId: stream.threadId,
+            ...(toolProgress.length > 0 && { toolProgress }),
             userId: stream.userId,
         };
     });
@@ -490,6 +524,17 @@ export const getChunksAfter = internalQuery
                     restart: v.optional(v.boolean()),
                     speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
                     text: v.string(),
+                    toolProgress: v.optional(
+                        v.object({
+                            ended: v.optional(v.boolean()),
+                            message: v.optional(v.string().max(MAX_LENGTH.short)),
+                            progress: v.optional(v.number()),
+                            serverName: v.string().max(MAX_LENGTH.short),
+                            toolCallId: v.string().max(MAX_LENGTH.id),
+                            toolName: v.string().max(MAX_LENGTH.short),
+                            total: v.optional(v.number()),
+                        }),
+                    ),
                 }),
             ),
             /**
@@ -533,8 +578,14 @@ export const getChunksAfter = internalQuery
             return lockedAnswer;
         }
 
-        const toChunk = (c: { reasoning?: string | null; restart?: boolean | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
-            return { reasoning: c.reasoning ?? undefined, ...(c.restart && { restart: true }), ...(c.speaker && { speaker: c.speaker }), text: c.text };
+        const toChunk = (c: Pick<Doc<"persistentChunks">, "reasoning" | "restart" | "speaker" | "text" | "toolProgress">) => {
+            return {
+                reasoning: c.reasoning ?? undefined,
+                ...(c.restart && { restart: true }),
+                ...(c.speaker && { speaker: c.speaker }),
+                text: c.text,
+                ...(c.toolProgress && { toolProgress: c.toolProgress }),
+            };
         };
 
         // Only the chunks past the cursor, in order. With nothing new this is

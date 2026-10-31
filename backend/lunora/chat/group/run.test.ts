@@ -89,6 +89,11 @@ const replyCharges = vi.hoisted(() => {
 /** Per-participant scripts, keyed by the skill instructions `getAgent` receives. */
 const speakerModels = vi.hoisted(() => new Map<string, unknown>());
 const speakerTools = vi.hoisted(() => new Map<string, unknown>());
+
+/** When set, the faked `buildAgentTools` reports one MCP call's progress through the sink the turn gave it. */
+const progressProbe = vi.hoisted(() => {
+    return { on: false };
+});
 const routerScript = vi.hoisted(() => {
     return { calls: 0, speakers: [] as string[] };
 });
@@ -118,7 +123,14 @@ vi.mock("../lib/get-agent", () => {
 
 vi.mock("../lib/agent-tools", () => {
     return {
-        buildAgentTools: async () => {
+        buildAgentTools: async (_ctx: unknown, options: { mcpProgress?: (tool: { serverName: string; toolCallId: string; toolName: string }) => any }) => {
+            if (progressProbe.on) {
+                const call = options.mcpProgress?.({ serverName: "Docs", toolCallId: "call_1", toolName: "index" });
+
+                call?.push({ progress: 1, total: 2 });
+                await call?.finish();
+            }
+
             // Both the fresh run and the snapshot rebuild get the approval-gated tool.
             const tools = (speakerTools.get("all") ?? {}) as ToolSet;
 
@@ -318,6 +330,7 @@ beforeEach(async () => {
     skillRows.clear();
     speakerModels.clear();
     speakerTools.clear();
+    progressProbe.on = false;
     routerScript.calls = 0;
     routerScript.speakers = [];
     replyCharges.allow = Infinity;
@@ -429,6 +442,24 @@ describe("runGroupTurn — cap and mentions", () => {
 
         expect(routerScript.calls).toBe(0);
         expect(await speakersSaid()).toStrictEqual(["DESIGNER"]);
+    });
+});
+
+describe("runGroupTurn — MCP tool progress", () => {
+    it("relays a running tool call's progress on the turn's stream, like a single-thread run", async () => {
+        await setGroup("supervisor", ["writer"]);
+        routerScript.speakers = ["p1"];
+        progressProbe.on = true;
+
+        await runTurn();
+
+        const written = await chunks();
+        const progress = written.flatMap((chunk) => (chunk.toolProgress ? [chunk.toolProgress] : []));
+
+        expect(progress).toStrictEqual([
+            { progress: 1, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 2 },
+            { ended: true, serverName: "Docs", toolCallId: "call_1", toolName: "index" },
+        ]);
     });
 });
 
