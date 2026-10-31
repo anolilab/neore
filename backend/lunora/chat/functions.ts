@@ -1,6 +1,7 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
 import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
+import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -888,12 +889,15 @@ export const getThreadMessages = authQuery
         const agent = await getAgentForUser(context, userId, model, threadLanguage);
 
         // Fetch messages directly from the thread (branch messages are copied on branch creation)
-        return await agent.listMessages(context, {
+        const messages = await agent.listMessages(context, {
             paginationOpts,
             threadId,
             // The gate above admitted this proof.
             unlockProof,
         });
+
+        // A divider's computer ids and handoff are the owner's alone (`agentSwitchForWire`).
+        return thread?.userId === userId ? messages : { ...messages, page: messages.page.map((message) => withoutSwitchIds(message)) };
     });
 
 /**
