@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -34,6 +34,25 @@ describe("HookApprovals", () => {
         approvals.approve("claude", "/work/a", "hash-1");
         approvals.approve("claude", "/work/a", "hash-2");
         expect(approvals.get("claude", "/work/a")).toBe("hash-2");
+        approvals.revoke("claude", "/work/a");
+        expect(new HookApprovals(file).get("claude", "/work/a")).toBeUndefined();
+    });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("keeps an approval it could not forget on disk, so a retry saves the revoke", () => {
+        const approvals = new HookApprovals(file);
+
+        approvals.approve("claude", "/work/a", "hash-1");
+        chmodSync(directory, 0o500);
+
+        try {
+            expect(() => {
+                approvals.revoke("claude", "/work/a");
+            }).toThrow();
+            expect(approvals.get("claude", "/work/a")).toBe("hash-1");
+        } finally {
+            chmodSync(directory, 0o700);
+        }
+
         approvals.revoke("claude", "/work/a");
         expect(new HookApprovals(file).get("claude", "/work/a")).toBeUndefined();
     });

@@ -58,8 +58,22 @@ export class HookApprovals {
     }
 
     public revoke(agentKey: string, folder: string): void {
-        if (this.approvals.delete(keyOf(agentKey, folder))) {
+        const key = keyOf(agentKey, folder);
+        const hash = this.approvals.get(key);
+
+        if (hash === undefined) {
+            return;
+        }
+
+        this.approvals.delete(key);
+
+        try {
             this.save();
+        } catch (error) {
+            // Still approved on disk, so still approved here: a retry must find it and save the revoke.
+            this.approvals.set(key, hash);
+
+            throw error;
         }
     }
 

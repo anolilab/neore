@@ -70,6 +70,11 @@ describe("loadHooksFile", () => {
 });
 
 describe("nodeHookFs.readInside", () => {
+    it("refuses a path that climbs out of the folder", async () => {
+        expect(await nodeHookFs.readInside(root, "../outside/secret.json", 1000)).toMatchObject({ state: "refused" });
+        expect(await nodeHookFs.readInside(root, ".neore/../../outside/secret.json", 1000)).toMatchObject({ state: "refused" });
+    });
+
     it("refuses a link itself, even when no earlier check ran", async () => {
         symlinkSync(path.join(outside, "secret.json"), path.join(root, HOOKS_PATH));
 

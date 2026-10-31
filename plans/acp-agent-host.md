@@ -403,9 +403,10 @@ The file is repository content, so it is untrusted:
   any turn of a host session it writes no usage and charges nothing.
 - The watcher belongs to the session (`AgentSession`'s `lifecycle`) and stops when it ends, by any path. Agents run on
   this computer only, so the watcher runs in the main process beside `AcpManager`.
-- **Known limit.** The watcher is `fs.watch` with `recursive: true`. On Linux Node implements that by walking the tree, so a
-  repository with a very large `node_modules` can exhaust the system's watches; the watcher then stops, and the window
-  says file hooks cannot fire (manual hooks still work). Skipping ignored folders there is a follow-up.
+- **Linux.** `fs.watch` with `recursive: true` is native on macOS and Windows. On Linux Node would put an inotify watch on
+  every directory, `node_modules` included, so there the watcher walks the tree itself (`hooks/watch-tree.ts`): folders
+  the skip list names get no watch, symlinked folders are not followed, and the number of watches is capped. If the system
+  still runs out of watches, the watcher stops and the window says file hooks cannot fire (manual hooks still work).
 
 ## 5. Data changes
 

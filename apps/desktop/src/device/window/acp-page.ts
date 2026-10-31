@@ -740,7 +740,13 @@ const refreshSessions = async (): Promise<void> => {
             }),
     );
 
-    const snapshot = state.selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(state.selected);
+    const { selected } = state;
+    const snapshot = selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(selected);
+
+    // Another session was opened while this one loaded: its own refresh draws it.
+    if (state.selected !== selected) {
+        return;
+    }
 
     renderSession(snapshot);
 

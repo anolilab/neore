@@ -141,6 +141,12 @@ const openFile = async (target: string): Promise<FileHandle | InsideRead> => {
 /** The open handle's own view of the file, compared with what its path says now; the bytes come from that handle. */
 const readInside = async (root: string, relative: string, maxBytes: number): Promise<InsideRead> => {
     const segments = relative.split("/");
+
+    // `path.join` would resolve a `..` out of the folder before any check saw it.
+    if (segments.some((segment) => ["", ".", ".."].includes(segment))) {
+        return refusedRead("a path that leaves the folder");
+    }
+
     const target = path.join(root, ...segments);
     const refusal = await pathRefusal(root, segments);
 
