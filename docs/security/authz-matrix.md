@@ -546,6 +546,10 @@ for a schema table that is neither policed nor listed:
 | `skills_builder.attachSkillTestDrive` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `skills_builder.refineBuilderDraft` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `skills_builder.runBuilderTurn` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
+| `skills_bundle.exportBundle` | action | authAction + RL | skills, threads, triggers | owner only: `loadBundleSources` NOT_FOUNDs any id that is not the caller's; participants of an exported group chat are read through `getSkill`; output built from a field whitelist, no secret, owner or organization | ok |
+| `skills_bundle.importBundle` | action | authAction + RL | skills, threads, triggers | caller-scoped (ctx.user); parsed and re-planned server-side, created only through `createSkill` / `createGroupChat` / `createTrigger` (triggers disabled); rolled back on failure | ok |
+| `skills_bundle.listBundleCandidates` | query | authQuery | skills, threads, triggers | caller-scoped (ctx.user); rows with `userId == caller` only | ok |
+| `skills_bundle.previewBundle` | action | authAction + RL | skills | caller-scoped (ctx.user); reads, creates nothing | ok |
 | `skills_functions.createSkill` | mutation | authMutation + RL | skillHistory, skillStats, skills, userSkills | caller-scoped (ctx.user) | ok |
 | `skills_functions.deleteSkill` | mutation | authMutation + RL | skillStats, skills | skill access | ok |
 | `skills_functions.getAvailableSkillTools` | query | authQuery | — | static registry | ok |

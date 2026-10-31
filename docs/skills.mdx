@@ -95,6 +95,67 @@ Disabled skills remain saved but have no effect on conversations.
 - A skills.sh link is turned into a GitHub path by trying the usual repository layouts (`skills/<name>/`, `<name>/`, `.claude/skills/<name>/`) on the default branch. If the skill lives elsewhere, paste its GitHub link instead.
 - Only public GitHub repositories are read, only over `https`, redirects are not followed, and a `SKILL.md` over 64 KB is refused. The text is untrusted: it is parsed and checked again on import, and tools the app does not have are dropped with a warning.
 
+### Share a Bundle
+
+A **bundle** is a chosen set of your skills, schedules or webhooks, and group chats as **one Markdown file**. Use it to hand a team the same setup, or to move your own to another account. **Export bundle** and **Import bundle** sit beside **Import** on the Skills page.
+
+**Export.** Tick the items to share and download the file. Only items you own can be exported. A group chat brings its participants along as skills, so they count toward the skill limit below. Everything is built from a fixed list of fields, so none of these ever reach the file: API keys and encrypted values, webhook secrets and URLs, connector tokens and MCP headers, custom-endpoint (bring-your-own-key) references, variable defaults, a skill's source link, voice, and your user and organization ids. A webhook is exported without its secret, a schedule without being switched on, and neither names a bot. Tools that are not built into the app (connector and MCP tools) are left out of a skill. A skill's additional files (`scripts/`, `references/`, `assets/`) are not part of a bundle; export that skill on its own as a `.zip`. Schedules and group chats that use one of your custom endpoints cannot be exported, because another account does not have it. Event triggers are not included. The group-chat list covers your 300 most recently active chats.
+
+**Import.** Upload the file. The server reads it and checks every item against your account as a full dry run: which free skill name it would get, whether the model is available, whether the cron expression and time zone are valid, which tools a skill adds, and whether a group chat's participants are in the file and selected. You then see a **review screen** listing each item and what it will do, and pick what to import.
+
+- The review screen is the safety boundary. The bundle came from someone else; nothing in it runs until you turn it on. Schedules and webhooks are created **switched off**, group chats are created **without starting anything**, and skills only run when you use them. Tool permission modes are per user, not per skill, so a skill adds the tools listed for it and your own permission settings still apply.
+- Skills are imported exactly like a single `SKILL.md`: unknown tools are dropped with a warning, and a name you already use gets a free slug (`name-2`). Schedules and webhooks go through the normal create path (the same checks and limits as the Triggers page), and so do group chats.
+- A new webhook's signing secret is shown **once**, on the result screen. Copy it then; only an encrypted form is stored.
+- A group chat can only be imported together with the skills it names. Selecting it selects them.
+- If an item is refused while importing, everything created before it is removed again and you get the reason. Each item is its own create, so removal is best effort: if the service crashes mid-import, or removal itself is refused, some switched-off items can be left behind, and the error names them.
+
+**Limits.** A file is at most 512 KB, and a single item at most 64 KB. A bundle holds at most 9 skills, 4 schedules and webhooks, and 9 group chats. The limits are per type, set just under the rate limit of the matching create (10, 5 and 20 a minute on the free plan), so a valid bundle does not hit a rate limit halfway through. A free account is also held to its 5-skill limit. A file with an unknown `bundle:` version is refused.
+
+**Format.** The frontmatter says `bundle: 1` and carries a `name` and `description`. After it comes one section per item: a `## skill: slug`, `## trigger: name` or `## group: title` heading and one fenced block. A skill's block is its `SKILL.md`; a trigger's and a group chat's are JSON. Each block is fenced with more backticks than the longest run inside it, and the reader follows fences line by line, so a heading inside an embedded `SKILL.md` is never read as a new item. Fields the format does not name are ignored on import, so a hand-edited file cannot switch an item on or add a secret.
+
+````markdown
+---
+bundle: 1
+name: Team starter
+description: Our weekly review setup
+---
+
+## skill: paper-summary
+
+```markdown
+---
+name: paper-summary
+description: Summarise a paper.
+---
+
+Read the paper and list its claims.
+```
+
+## trigger: Weekly digest
+
+```json
+{
+  "cronExpression": "0 9 * * 1",
+  "inputTemplate": "Summarise last week",
+  "model": "gpt-5",
+  "name": "Weekly digest",
+  "timezone": "Europe/Berlin",
+  "type": "schedule"
+}
+```
+
+## group: Review panel
+
+```json
+{
+  "mode": "round-robin",
+  "model": "gpt-5",
+  "participants": ["paper-summary", "critic"],
+  "title": "Review panel"
+}
+```
+````
+
 ## Skill Limits
 
 | Plan | Skills |

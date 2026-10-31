@@ -465,6 +465,11 @@ msgstr "{0} is one of {totalModels}+ AI models available on Neore — all in one
 msgid "{0} is required"
 msgstr "{0} is required"
 
+#. placeholder {0}: done.items.length
+#: src/features/skills/components/bundle-import-dialog.tsx:168
+msgid "{0} items were created. Schedules and webhooks are switched off; turn each one on when you are ready."
+msgstr "{0} items were created. Schedules and webhooks are switched off; turn each one on when you are ready."
+
 #. placeholder {0}: stats.lines
 #: src/features/chat/thread/composer-text-counter.tsx:54
 msgid "{0} lines"
@@ -617,6 +622,12 @@ msgstr "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2
 #: src/features/develop/components/pull-request-view.tsx:87
 #~ msgid "{0} wants to merge {1} commits into {2} from {3}"
 #~ msgstr "{0} wants to merge {1} commits into {2} from {3}"
+
+#. placeholder {0}: group.mode
+#. placeholder {1}: group.participantSkillIds.length
+#: src/features/skills/components/bundle-export-dialog.tsx:198
+msgid "{0}, {1} participants. Its participants are included as skills."
+msgstr "{0}, {1} participants. Its participants are included as skills."
 
 #. placeholder {0}: String(percent)
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:106
@@ -1975,7 +1986,7 @@ msgstr "Add row"
 msgid "Add Server"
 msgstr "Add Server"
 
-#: src/features/skills/components/skill-list.tsx:385
+#: src/features/skills/components/skill-list.tsx:429
 msgid "Add Skill"
 msgstr "Add Skill"
 
@@ -2083,6 +2094,14 @@ msgstr "Adding your earlier replies…"
 #: src/features/devices/components/devices-settings.tsx:293
 msgid "Address"
 msgstr "Address"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:75
+msgid "Adds no tools."
+msgstr "Adds no tools."
+
+#: src/features/skills/components/bundle-import-dialog.tsx:73
+msgid "Adds these tools:"
+msgstr "Adds these tools:"
 
 #: src/features/canvas/canvas-panel.tsx:121
 msgid "Adjust"
@@ -2792,7 +2811,7 @@ msgstr "Allowed Regions"
 msgid "Alloy (Neutral)"
 msgstr "Alloy (Neutral)"
 
-#: src/features/skills/components/skill-list.tsx:378
+#: src/features/skills/components/skill-list.tsx:421
 msgid "Alphabetical"
 msgstr "Alphabetical"
 
@@ -4468,7 +4487,7 @@ msgstr "Build and automate AI workflows visually"
 msgid "Build draft"
 msgstr "Build draft"
 
-#: src/features/skills/components/skill-list.tsx:315
+#: src/features/skills/components/skill-list.tsx:333
 msgid "Build with AI"
 msgstr "Build with AI"
 
@@ -4514,6 +4533,14 @@ msgstr "Bulgarian (Bulgaria)"
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
 msgstr "Bulk actions"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:167
+msgid "Bundle imported"
+msgstr "Bundle imported"
+
+#: src/features/skills/components/bundle-export-dialog.tsx:155
+msgid "Bundle name"
+msgstr "Bundle name"
 
 #: src/features/chat/tags/thread-categories.ts:11
 #: src/features/chat/tags/thread-category-filter.tsx:24
@@ -4753,6 +4780,8 @@ msgstr "Canada"
 #: src/features/settings/components/personalization/memory-settings.tsx:246
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
+#: src/features/skills/components/bundle-export-dialog.tsx:218
+#: src/features/skills/components/bundle-import-dialog.tsx:352
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
 #: src/features/skills/components/skill-import-dialog.tsx:243
@@ -4813,6 +4842,11 @@ msgstr "Cancelling..."
 #: src/features/evals/components/run-comparison.tsx:149
 msgid "Candidate"
 msgstr "Candidate"
+
+#. placeholder {0}: item.disabledReason
+#: src/features/skills/components/bundle-export-dialog.tsx:71
+msgid "Cannot be exported: {0}"
+msgstr "Cannot be exported: {0}"
 
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:168
 #: src/features/prompts/hooks/use-prompt-loader.tsx:52
@@ -5262,6 +5296,10 @@ msgstr "Choose a unique username"
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:57
 msgid "Choose at least one permission"
 msgstr "Choose at least one permission"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:285
+msgid "Choose bundle file"
+msgstr "Choose bundle file"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:283
 msgid "Choose default image models"
@@ -6884,6 +6922,7 @@ msgstr "Copied!"
 #: src/features/chat/thread/message-item.tsx:351
 #: src/features/chat/thread/text-selection-menu.tsx:385
 #: src/features/settings/components/chat/trigger-settings.tsx:739
+#: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Copy"
 msgstr "Copy"
 
@@ -6973,6 +7012,7 @@ msgid "Copy the Phone number ID, a permanent (System User) access token, and the
 msgstr "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:722
+#: src/features/skills/components/bundle-import-dialog.tsx:139
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "Copy this secret now and store it with your webhook sender. It will not be shown again."
 
@@ -7110,6 +7150,7 @@ msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Could not copy automatically. Public link: {publicLink}"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:616
+#: src/features/skills/components/bundle-import-dialog.tsx:132
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "Could not copy the secret. Select it and copy it manually."
 
@@ -7607,6 +7648,10 @@ msgstr "Create your first workflow to automate AI tasks visually."
 #: src/features/skills/components/skill-item.tsx:80
 msgid "Created"
 msgstr "Created"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:103
+msgid "Created switched off."
+msgstr "Created switched off."
 
 #: src/features/admin/components/user-sessions-dialog.tsx:101
 msgid "Created: {createdAt}"
@@ -8343,7 +8388,7 @@ msgstr "Delegate tasks to Devin, the AI software engineer"
 #: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
-#: src/features/skills/components/skill-list.tsx:290
+#: src/features/skills/components/skill-list.tsx:308
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
@@ -8355,7 +8400,7 @@ msgstr "Delete"
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
 #: src/features/settings/components/chat/trigger-settings.tsx:1016
-#: src/features/skills/components/skill-list.tsx:296
+#: src/features/skills/components/skill-list.tsx:314
 msgid "Delete \"{0}\"?"
 msgstr "Delete \"{0}\"?"
 
@@ -8538,7 +8583,7 @@ msgstr "Delete selected ({selectedCount})"
 msgid "Delete selected rows"
 msgstr "Delete selected rows"
 
-#: src/features/skills/components/skill-list.tsx:296
+#: src/features/skills/components/skill-list.tsx:314
 msgid "Delete skill?"
 msgstr "Delete skill?"
 
@@ -8809,6 +8854,7 @@ msgstr "Description"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
 #: src/features/settings/components/chat/trigger-settings.tsx:266
+#: src/features/skills/components/bundle-export-dialog.tsx:159
 msgid "Description (optional)"
 msgstr "Description (optional)"
 
@@ -9215,6 +9261,7 @@ msgstr "Don't have an account?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:171
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:193
+#: src/features/skills/components/bundle-import-dialog.tsx:192
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -9254,6 +9301,7 @@ msgstr "download"
 #: src/features/canvas/canvas-panel.tsx:794
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/download/components/download-page.tsx:120
+#: src/features/skills/components/bundle-export-dialog.tsx:226
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:303
 msgid "Download"
@@ -11096,9 +11144,17 @@ msgstr "Exploring next-gen capabilities before stable release"
 msgid "Export {0}"
 msgstr "Export {0}"
 
+#: src/features/skills/components/bundle-export-dialog.tsx:147
+msgid "Export a bundle"
+msgstr "Export a bundle"
+
 #: src/features/skills/components/skill-item.tsx:177
 msgid "Export as SKILL.md"
 msgstr "Export as SKILL.md"
+
+#: src/features/skills/components/skill-list.tsx:371
+msgid "Export bundle"
+msgstr "Export bundle"
 
 #: src/features/settings/components/privacy/data-export.tsx:75
 msgid "Export cancelled"
@@ -11137,6 +11193,11 @@ msgstr "Export workflow"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:348
 msgid "Export workflow (ZIP)"
 msgstr "Export workflow (ZIP)"
+
+#. placeholder {0}: result.itemCount
+#: src/features/skills/components/bundle-export-dialog.tsx:137
+msgid "Exported {0} items"
+msgstr "Exported {0} items"
 
 #: src/features/marketing/data/models-data.ts:229
 msgid "Expressive dynamic motion"
@@ -11447,7 +11508,7 @@ msgstr "Failed to delete project"
 msgid "Failed to delete prompt"
 msgstr "Failed to delete prompt"
 
-#: src/features/skills/components/skill-list.tsx:217
+#: src/features/skills/components/skill-list.tsx:221
 msgid "Failed to delete skill"
 msgstr "Failed to delete skill"
 
@@ -11530,7 +11591,7 @@ msgstr "Failed to export"
 msgid "Failed to export as XLSX."
 msgstr "Failed to export as XLSX."
 
-#: src/features/skills/components/skill-list.tsx:266
+#: src/features/skills/components/skill-list.tsx:270
 msgid "Failed to export skill"
 msgstr "Failed to export skill"
 
@@ -11597,7 +11658,7 @@ msgstr "Failed to load audio"
 msgid "Failed to load image"
 msgstr "Failed to load image"
 
-#: src/features/skills/components/skill-list.tsx:93
+#: src/features/skills/components/skill-list.tsx:97
 msgid "Failed to load skills"
 msgstr "Failed to load skills"
 
@@ -12879,7 +12940,7 @@ msgid "Forked — the copy is in My skills, ready to edit."
 msgstr "Forked — the copy is in My skills, ready to edit."
 
 #. placeholder {0}: skill.name
-#: src/features/skills/components/skill-list.tsx:233
+#: src/features/skills/components/skill-list.tsx:237
 msgid "Forked \"{0}\" — opening your copy."
 msgstr "Forked \"{0}\" — opening your copy."
 
@@ -12939,8 +13000,8 @@ msgstr "Free"
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 
-#: src/features/skills/components/skill-list.tsx:133
-#: src/features/skills/components/skill-list.tsx:150
+#: src/features/skills/components/skill-list.tsx:137
+#: src/features/skills/components/skill-list.tsx:154
 msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skills."
 msgstr "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skills."
 
@@ -14044,12 +14105,17 @@ msgid "Group ({groupableCount})"
 msgstr "Group ({groupableCount})"
 
 #: src/features/chat/group/create-group-chat-button.tsx:168
+#: src/features/skills/components/bundle-import-dialog.tsx:49
 msgid "Group chat"
 msgstr "Group chat"
 
 #: src/features/chat/group/group-participant-bar.tsx:200
 msgid "Group chat participants"
 msgstr "Group chat participants"
+
+#: src/features/skills/components/bundle-export-dialog.tsx:204
+msgid "Group chats"
+msgstr "Group chats"
 
 #: src/features/knowledge/components/collection-dialog.tsx:53
 msgid "Group knowledge files into a library you can attach to a chat or a project as a whole."
@@ -14655,9 +14721,18 @@ msgstr "Idle"
 msgid "If this problem persists, please contact support."
 msgstr "If this problem persists, please contact support."
 
+#. placeholder {0}: new Date(trigger.nextRunAt).toLocaleString()
+#: src/features/skills/components/bundle-import-dialog.tsx:89
+msgid "If you turn it on, the next run is {0}."
+msgstr "If you turn it on, the next run is {0}."
+
 #: src/features/settings/components/chat/default-models-settings.tsx:163
 msgid "If your chosen model is unavailable, the reply is retried once on this model"
 msgstr "If your chosen model is unavailable, the reply is retried once on this model"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:78
+msgid "Ignored, not available here:"
+msgstr "Ignored, not available here:"
 
 #: src/features/marketing/data/models-data.ts:34
 msgid "illustration"
@@ -14869,13 +14944,26 @@ msgstr "Impersonation Stopped"
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
 #: src/features/skills/components/skill-import-dialog.tsx:247
-#: src/features/skills/components/skill-list.tsx:331
+#: src/features/skills/components/skill-list.tsx:349
 msgid "Import"
 msgstr "Import"
+
+#. placeholder {0}: selectedCount(selected, entries)
+#: src/features/skills/components/bundle-import-dialog.tsx:356
+msgid "Import {0} items"
+msgstr "Import {0} items"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:274
+msgid "Import a bundle"
+msgstr "Import a bundle"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Import All"
 msgstr "Import All"
+
+#: src/features/skills/components/skill-list.tsx:366
+msgid "Import bundle"
+msgstr "Import bundle"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:295
 msgid "Import cancelled"
@@ -14951,6 +15039,11 @@ msgstr "Imported {added} Notion page(s); skipped {skipped} attachment(s)."
 #: src/features/knowledge/hooks/use-knowledge-import.ts:242
 msgid "Imported {added} Notion page(s)."
 msgstr "Imported {added} Notion page(s)."
+
+#. placeholder {0}: skill.slug
+#: src/features/skills/components/bundle-import-dialog.tsx:80
+msgid "Imported as /{0}."
+msgstr "Imported as /{0}."
 
 #. placeholder {0}: result.slug
 #: src/features/skills/components/skill-import-dialog.tsx:147
@@ -15080,6 +15173,15 @@ msgstr "In Settings > API Keys add the App ID, App Secret, Verification Token an
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:90
 msgid "In Settings > API Keys add the AppID, AppSecret, Token and EncodingAESKey under \"Messenger Bot Keys\"."
 msgstr "In Settings > API Keys add the AppID, AppSecret, Token and EncodingAESKey under \"Messenger Bot Keys\"."
+
+#. placeholder {0}: limits.skills
+#. placeholder {1}: triggers.size
+#. placeholder {2}: limits.triggers
+#. placeholder {3}: groups.size
+#. placeholder {4}: limits.groupChats
+#: src/features/skills/components/bundle-export-dialog.tsx:212
+msgid "In the file: {skillCount} of {0} skills, {1} of {2} schedules and webhooks, {3} of {4} group chats."
+msgstr "In the file: {skillCount} of {0} skills, {1} of {2} schedules and webhooks, {3} of {4} group chats."
 
 #: src/features/local-models/components/local-setup-guide.tsx:134
 msgid "In the server settings, turn on \"Enable CORS\"."
@@ -15311,6 +15413,11 @@ msgstr "Instructions for the AI..."
 #: src/features/tasks/components/task-form-dialog.tsx:75
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "Instructions must be {INSTRUCTIONS_MAX} characters or less"
+
+#. placeholder {0}: trigger.systemPrompt
+#: src/features/skills/components/bundle-import-dialog.tsx:101
+msgid "Instructions: {0}"
+msgstr "Instructions: {0}"
 
 #: src/features/settings/lib/settings-keywords.ts:84
 msgid "integrations"
@@ -16773,6 +16880,10 @@ msgstr "Loading triggers..."
 msgid "Loading workflow..."
 msgstr "Loading workflow..."
 
+#: src/features/skills/components/bundle-export-dialog.tsx:166
+msgid "Loading your items…"
+msgstr "Loading your items…"
+
 #: src/features/home/components/home-page.tsx:128
 msgid "Loading your overview…"
 msgstr "Loading your overview…"
@@ -17936,6 +18047,12 @@ msgstr "Mobile app icon"
 msgid "Mode"
 msgstr "Mode"
 
+#. placeholder {0}: group.mode
+#. placeholder {1}: group.model
+#: src/features/skills/components/bundle-import-dialog.tsx:106
+msgid "Mode {0}, on {1}. Nothing starts when it is created."
+msgstr "Mode {0}, on {1}. Nothing starts when it is created."
+
 #: src/features/settings/components/chat/models-settings.tsx:433
 msgid "Mode:"
 msgstr "Mode:"
@@ -18243,7 +18360,7 @@ msgid "Most the case may cost, in US dollars"
 msgstr "Most the case may cost, in US dollars"
 
 #: src/features/prompts/components/prompt-list.tsx:538
-#: src/features/skills/components/skill-list.tsx:377
+#: src/features/skills/components/skill-list.tsx:420
 msgid "Most Used"
 msgstr "Most Used"
 
@@ -19562,7 +19679,7 @@ msgstr "No shortcuts found"
 msgid "No skill"
 msgstr "No skill"
 
-#: src/features/skills/components/skill-list.tsx:395
+#: src/features/skills/components/skill-list.tsx:439
 msgid "No skills found matching your search"
 msgstr "No skills found matching your search"
 
@@ -20263,6 +20380,10 @@ msgstr "Only these projects"
 #: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "Only use providers that guarantee zero data retention — your prompts are never stored."
+
+#: src/features/skills/components/bundle-import-dialog.tsx:96
+msgid "Only when:"
+msgstr "Only when:"
 
 #: src/features/skills/components/skill-form-dialog.tsx:470
 msgid "Only you can see and use it."
@@ -21269,6 +21390,10 @@ msgstr "Participants"
 msgid "Participants take turns, one reply per message."
 msgstr "Participants take turns, one reply per message."
 
+#: src/features/skills/components/bundle-import-dialog.tsx:107
+msgid "Participants:"
+msgstr "Participants:"
+
 #: src/features/chat/core/utils/language-utilities.ts:215
 #: src/features/chat/core/utils/language-utilities.ts:297
 msgid "Pashto"
@@ -21659,6 +21784,10 @@ msgstr "Pick color"
 msgid "Pick one from the inbox to read it."
 msgstr "Pick one from the inbox to read it."
 
+#: src/features/skills/components/bundle-export-dialog.tsx:149
+msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
+msgstr "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
@@ -21848,9 +21977,10 @@ msgstr "Please sign in to continue."
 msgid "Please sign in to create prompts"
 msgstr "Please sign in to create prompts"
 
-#: src/features/skills/components/skill-list.tsx:127
-#: src/features/skills/components/skill-list.tsx:144
-#: src/features/skills/components/skill-list.tsx:325
+#: src/features/skills/components/skill-list.tsx:131
+#: src/features/skills/components/skill-list.tsx:148
+#: src/features/skills/components/skill-list.tsx:343
+#: src/features/skills/components/skill-list.tsx:360
 msgid "Please sign in to create skills"
 msgstr "Please sign in to create skills"
 
@@ -22023,6 +22153,11 @@ msgstr "Preferred model"
 #: src/features/skills/components/skill-builder-review.tsx:193
 msgid "Preferred model: {0}"
 msgstr "Preferred model: {0}"
+
+#. placeholder {0}: skill.model
+#: src/features/skills/components/bundle-import-dialog.tsx:79
+msgid "Prefers the model {0}."
+msgstr "Prefers the model {0}."
 
 #: src/features/marketing/data/models-data.ts:534
 #: src/features/marketing/data/models-data.ts:665
@@ -23096,6 +23231,10 @@ msgstr "Read & Write"
 msgid "Read aloud"
 msgstr "Read aloud"
 
+#: src/features/skills/components/bundle-import-dialog.tsx:307
+msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills only run when you use them. A skill adds the tools listed for it, and your own tool permissions still apply."
+msgstr "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills only run when you use them. A skill adds the tools listed for it, and your own tool permissions still apply."
+
 #: src/features/settings/components/account/account-settings.tsx:360
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "Read every assistant reply aloud when it finishes, using your browser's voice."
@@ -23335,7 +23474,7 @@ msgstr "Recent messages"
 msgid "Recent Registrations"
 msgstr "Recent Registrations"
 
-#: src/features/skills/components/skill-list.tsx:376
+#: src/features/skills/components/skill-list.tsx:419
 msgid "Recently Created"
 msgstr "Recently Created"
 
@@ -24688,6 +24827,18 @@ msgstr "Runs of {0}"
 msgid "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 msgstr "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 
+#. placeholder {0}: trigger.schedule ?? ""
+#. placeholder {1}: trigger.timezone ? ` (${trigger.timezone})` : " (UTC)"
+#. placeholder {2}: trigger.model
+#: src/features/skills/components/bundle-import-dialog.tsx:86
+msgid "Runs on the schedule {0}{1}, on {2}."
+msgstr "Runs on the schedule {0}{1}, on {2}."
+
+#. placeholder {0}: trigger.model
+#: src/features/skills/components/bundle-import-dialog.tsx:95
+msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
+msgstr "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
+
 #: src/features/settings/components/chat/trigger-settings.tsx:800
 msgid "Runs: {runCount}"
 msgstr "Runs: {runCount}"
@@ -24940,6 +25091,15 @@ msgstr "Scene Description"
 msgid "Schedule"
 msgstr "Schedule"
 
+#. placeholder {0}: trigger.schedule ?? ""
+#: src/features/skills/components/bundle-export-dialog.tsx:184
+msgid "Schedule {0}"
+msgstr "Schedule {0}"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:52
+msgid "Schedule or webhook"
+msgstr "Schedule or webhook"
+
 #: src/features/chat/thread/widgets/flight-widget.tsx:60
 msgid "Scheduled"
 msgstr "Scheduled"
@@ -24959,6 +25119,10 @@ msgstr "Scheduled runs can run shell commands and edit files on the bot's comput
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:143
 msgid "Scheduler"
 msgstr "Scheduler"
+
+#: src/features/skills/components/bundle-export-dialog.tsx:190
+msgid "Schedules and webhooks"
+msgstr "Schedules and webhooks"
 
 #: src/features/evals/components/dataset-panel.tsx:237
 #: src/features/evals/components/run-detail.tsx:224
@@ -25178,7 +25342,7 @@ msgstr "Search settings..."
 msgid "Search shortcuts..."
 msgstr "Search shortcuts..."
 
-#: src/features/skills/components/skill-list.tsx:364
+#: src/features/skills/components/skill-list.tsx:407
 msgid "Search skills..."
 msgstr "Search skills..."
 
@@ -25235,7 +25399,7 @@ msgstr "Search X posts"
 msgid "Search your knowledge files and score retrieval (hit rate, MRR, precision, recall) and faithfulness."
 msgstr "Search your knowledge files and score retrieval (hit rate, MRR, precision, recall) and faithfulness."
 
-#: src/features/skills/components/skill-list.tsx:361
+#: src/features/skills/components/skill-list.tsx:404
 msgid "Search your skills"
 msgstr "Search your skills"
 
@@ -26277,15 +26441,16 @@ msgstr "Size of the text in chat messages. The sidebar and the rest of the app k
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
+#: src/features/skills/components/bundle-import-dialog.tsx:52
 msgid "Skill"
 msgstr "Skill"
 
-#: src/features/skills/components/skill-list.tsx:160
-#: src/features/skills/components/skill-list.tsx:196
+#: src/features/skills/components/skill-list.tsx:164
+#: src/features/skills/components/skill-list.tsx:200
 msgid "Skill created"
 msgstr "Skill created"
 
-#: src/features/skills/components/skill-list.tsx:213
+#: src/features/skills/components/skill-list.tsx:217
 msgid "Skill deleted"
 msgstr "Skill deleted"
 
@@ -26318,7 +26483,7 @@ msgstr "Skill or agent"
 msgid "Skill removed"
 msgstr "Skill removed"
 
-#: src/features/skills/components/skill-list.tsx:190
+#: src/features/skills/components/skill-list.tsx:194
 msgid "Skill updated"
 msgstr "Skill updated"
 
@@ -26331,6 +26496,7 @@ msgid "SKILL.md"
 msgstr "SKILL.md"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:33
+#: src/features/skills/components/bundle-export-dialog.tsx:176
 #: src/features/skills/components/skill-header.tsx:10
 msgid "Skills"
 msgstr "Skills"
@@ -26568,7 +26734,7 @@ msgstr "Something went wrong on our side. Please try again in a moment."
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr "Something went wrong. Nothing was changed. Try again."
 
-#: src/features/skills/components/skill-list.tsx:248
+#: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
@@ -26596,7 +26762,7 @@ msgstr "Sort desc"
 msgid "Sort models"
 msgstr "Sort models"
 
-#: src/features/skills/components/skill-list.tsx:372
+#: src/features/skills/components/skill-list.tsx:415
 msgid "Sort skills"
 msgstr "Sort skills"
 
@@ -28098,6 +28264,11 @@ msgstr "Task rejected"
 msgid "Task views"
 msgstr "Task views"
 
+#. placeholder {0}: trigger.task
+#: src/features/skills/components/bundle-import-dialog.tsx:99
+msgid "Task: {0}"
+msgstr "Task: {0}"
+
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/tasks/components/tasks-page.tsx:192
 msgid "Tasks"
@@ -28129,6 +28300,11 @@ msgstr "Team"
 #: src/features/marketing/components/landing-page.tsx:312
 msgid "Team Alignment"
 msgstr "Team Alignment"
+
+#: src/features/skills/components/bundle-export-dialog.tsx:131
+#: src/features/skills/components/bundle-export-dialog.tsx:156
+msgid "Team bundle"
+msgstr "Team bundle"
 
 #: src/features/auth/components/team/create-team-dialog.tsx:54
 msgid "Team created successfully"
@@ -28583,6 +28759,14 @@ msgstr "The browser cannot read this video to capture a frame"
 msgid "The builder could not answer. Try again."
 msgstr "The builder could not answer. Try again."
 
+#: src/features/skills/components/bundle-export-dialog.tsx:140
+msgid "The bundle could not be exported."
+msgstr "The bundle could not be exported."
+
+#: src/features/skills/components/bundle-import-dialog.tsx:263
+msgid "The bundle could not be imported."
+msgstr "The bundle could not be imported."
+
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:215
 msgid "The change is too large to show in full."
 msgstr "The change is too large to show in full."
@@ -28660,6 +28844,11 @@ msgstr "The extension could not be connected."
 #: src/routes/auth/extension.tsx:136
 msgid "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 msgstr "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
+
+#. placeholder {0}: MAX_BUNDLE_BYTES / 1024
+#: src/features/skills/components/bundle-import-dialog.tsx:238
+msgid "The file is larger than {0} KB, which is more than a bundle can be."
+msgstr "The file is larger than {0} KB, which is more than a bundle can be."
 
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
@@ -29102,6 +29291,14 @@ msgstr "This action cannot be undone. This will permanently delete the organizat
 msgid "This browser cannot receive push notifications here."
 msgstr "This browser cannot receive push notifications here."
 
+#: src/features/skills/components/bundle-import-dialog.tsx:305
+msgid "This bundle came from someone else"
+msgstr "This bundle came from someone else"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:316
+msgid "This bundle has no items."
+msgstr "This bundle has no items."
+
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr "This chat is locked"
@@ -29179,6 +29376,10 @@ msgstr "This diff is cut short."
 #: src/features/local-models/components/ollama-model-manager.tsx:177
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
+
+#: src/features/skills/components/bundle-import-dialog.tsx:252
+msgid "This file could not be read as a bundle."
+msgstr "This file could not be read as a bundle."
 
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "This file could not be read."
@@ -29279,7 +29480,7 @@ msgstr "This page doesn't exist or may have been moved."
 msgid "This page is not available"
 msgstr "This page is not available"
 
-#: src/features/skills/components/skill-list.tsx:291
+#: src/features/skills/components/skill-list.tsx:309
 msgid "This permanently deletes the skill and its history. Anyone who installed it loses access."
 msgstr "This permanently deletes the skill and its history. Anyone who installed it loses access."
 
@@ -30198,6 +30399,10 @@ msgstr "Turn any GitHub repository into a remote MCP endpoint"
 msgid "Turn on Daily Brief"
 msgstr "Turn on Daily Brief"
 
+#: src/features/skills/components/bundle-import-dialog.tsx:77
+msgid "Turns these tools off:"
+msgstr "Turns these tools off:"
+
 #: src/features/settings/lib/settings-keywords.ts:97
 msgid "tutorial"
 msgstr "tutorial"
@@ -30483,7 +30688,7 @@ msgid "Uninstall {0}"
 msgstr "Uninstall {0}"
 
 #. placeholder {0}: skill.name
-#: src/features/skills/components/skill-list.tsx:244
+#: src/features/skills/components/skill-list.tsx:248
 msgid "Uninstalled \"{0}\""
 msgstr "Uninstalled \"{0}\""
 
@@ -30791,6 +30996,10 @@ msgstr "upload"
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
 msgstr "Upload"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:275
+msgid "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
+msgstr "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
 
 #: src/features/evals/components/import-cases-dialog.tsx:68
 msgid "Upload a CSV or JSONL file. Nothing is imported if any row is invalid."
@@ -32044,6 +32253,7 @@ msgstr "Web search via Parallel's search API"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:443
 #: src/features/settings/components/chat/trigger-type-picker.tsx:16
+#: src/features/skills/components/bundle-export-dialog.tsx:184
 msgid "Webhook"
 msgstr "Webhook"
 
@@ -32056,8 +32266,13 @@ msgid "Webhook secret"
 msgstr "Webhook secret"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:614
+#: src/features/skills/components/bundle-import-dialog.tsx:130
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook secret copied to clipboard"
+
+#: src/features/skills/components/bundle-import-dialog.tsx:138
+msgid "Webhook secret for \"{title}\""
+msgstr "Webhook secret for \"{title}\""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:106
 msgid "Webhook secret for verifying incoming Telegram updates"
@@ -32625,6 +32840,11 @@ msgstr "You are offline."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
 
+#. placeholder {0}: review.skillSlotsLeft ?? 0
+#: src/features/skills/components/bundle-import-dialog.tsx:344
+msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
+msgstr "You can add {0} more skills on this plan. Untick some skills or upgrade."
+
 #: src/features/pages/components/page-view.tsx:482
 msgid "You can comment on this page but not edit it."
 msgstr "You can comment on this page but not edit it."
@@ -32661,6 +32881,10 @@ msgstr "You have left the team"
 msgid "You have no eval datasets yet."
 msgstr "You have no eval datasets yet."
 
+#: src/features/skills/components/bundle-export-dialog.tsx:195
+msgid "You have no group chats."
+msgstr "You have no group chats."
+
 #: src/features/evals/components/run-dialog.tsx:137
 msgid "You have no indexed knowledge files yet."
 msgstr "You have no indexed knowledge files yet."
@@ -32668,6 +32892,14 @@ msgstr "You have no indexed knowledge files yet."
 #: src/features/devices/components/device-scope.tsx:120
 msgid "You have no projects yet."
 msgstr "You have no projects yet."
+
+#: src/features/skills/components/bundle-export-dialog.tsx:181
+msgid "You have no schedules or webhooks."
+msgstr "You have no schedules or webhooks."
+
+#: src/features/skills/components/bundle-export-dialog.tsx:172
+msgid "You have no skills of your own yet."
+msgstr "You have no skills of your own yet."
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:232
 msgid "You have no tags yet."

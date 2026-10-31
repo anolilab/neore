@@ -82,7 +82,7 @@ export type ParseSkillResult = { errors: string[]; ok: false } | { ok: true; ski
 
 type YamlValue = Record<string, string> | string | string[];
 
-const FRONTMATTER_RE = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
+export const FRONTMATTER_RE = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
 const KEY_LINE_RE = /^([A-Z_][\w.-]*)[ \t]*:(?:[ \t](.*))?$/i;
 const LIST_ITEM_RE = /^-(?:[ \t](.*))?$/;
 const BLOCK_SCALAR_RE = /^([|>])([+-]?)\d*[ \t]*$/;
@@ -302,7 +302,7 @@ const needsQuotes = (value: string): boolean =>
     RESERVED_SCALAR_RE.test(value) ||
     NUMERIC_START_RE.test(value);
 
-const yamlString = (value: string): string => (needsQuotes(value) ? JSON.stringify(value) : value);
+export const yamlString = (value: string): string => (needsQuotes(value) ? JSON.stringify(value) : value);
 
 // ─── Export ──────────────────────────────────────────────────────────────────
 

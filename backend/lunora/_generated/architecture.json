@@ -5986,6 +5986,66 @@
       "to": "function:skills_builder:searchMarketplaceForBuilder"
     },
     {
+      "from": "function:skills_bundle:exportBundle",
+      "kind": "call",
+      "to": "function:skills_bundle:loadBundleSources"
+    },
+    {
+      "from": "function:skills_bundle:exportBundle",
+      "kind": "call",
+      "to": "function:skills_functions:getSkill"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:chat_functions:deleteThread"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:chat_group_functions:createGroupChat"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:skills_bundle:loadImportContext"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:skills_functions:createSkill"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:skills_functions:deleteSkill"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:triggers_functions:createTrigger"
+    },
+    {
+      "from": "function:skills_bundle:importBundle",
+      "kind": "call",
+      "to": "function:triggers_functions:deleteTrigger"
+    },
+    {
+      "from": "function:skills_bundle:listBundleCandidates",
+      "kind": "read",
+      "to": "table:threads"
+    },
+    {
+      "from": "function:skills_bundle:listBundleCandidates",
+      "kind": "read",
+      "to": "table:triggers"
+    },
+    {
+      "from": "function:skills_bundle:previewBundle",
+      "kind": "call",
+      "to": "function:skills_bundle:loadImportContext"
+    },
+    {
       "from": "function:skills_executor:resolveSkillsForRun",
       "kind": "read",
       "to": "table:temporaryThreads"
@@ -14104,6 +14164,48 @@
       "module": "skills"
     },
     {
+      "detail": "action",
+      "id": "function:skills_bundle:exportBundle",
+      "kind": "function",
+      "name": "skills.bundle.exportBundle",
+      "module": "skills"
+    },
+    {
+      "detail": "action",
+      "id": "function:skills_bundle:importBundle",
+      "kind": "function",
+      "name": "skills.bundle.importBundle",
+      "module": "skills"
+    },
+    {
+      "detail": "query",
+      "id": "function:skills_bundle:listBundleCandidates",
+      "kind": "function",
+      "name": "skills.bundle.listBundleCandidates",
+      "module": "skills"
+    },
+    {
+      "detail": "query",
+      "id": "function:skills_bundle:loadBundleSources",
+      "kind": "function",
+      "name": "skills.bundle.loadBundleSources",
+      "module": "skills"
+    },
+    {
+      "detail": "query",
+      "id": "function:skills_bundle:loadImportContext",
+      "kind": "function",
+      "name": "skills.bundle.loadImportContext",
+      "module": "skills"
+    },
+    {
+      "detail": "action",
+      "id": "function:skills_bundle:previewBundle",
+      "kind": "function",
+      "name": "skills.bundle.previewBundle",
+      "module": "skills"
+    },
+    {
       "detail": "query",
       "id": "function:skills_executor:getEnabledSkillsForSystemPromptQuery",
       "kind": "function",
@@ -19890,19 +19992,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 799,
+      "line": 804,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 895,
+      "line": 900,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 937,
+      "line": 942,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
