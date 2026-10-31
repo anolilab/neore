@@ -91,6 +91,7 @@ export interface Doc_aiUserPreferences {
     searchProvider?: string;
     selectedModel?: string;
     showTimestamps?: boolean;
+    toolPermissionGrants?: Record<string, number>;
     toolPermissions?: Record<string, "auto" | "ask" | "off">;
     userId: string;
 }
@@ -2871,6 +2872,7 @@ export interface Insert_aiUserPreferences {
     searchProvider?: string;
     selectedModel?: string;
     showTimestamps?: boolean;
+    toolPermissionGrants?: Record<string, number>;
     toolPermissions?: Record<string, "auto" | "ask" | "off">;
     userId: string;
 }

@@ -27,6 +27,10 @@
  */
 import type { ToolSet } from "ai";
 
+import type { ToolPermissionGrants } from "./tool-permission-grants";
+import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
+import { grantExpiryFor } from "./tool-permission-grants";
+
 export type ToolPermissionMode = "auto" | "ask" | "off";
 
 export type ToolSource = "builtin" | "connector" | "device" | "mcp";
@@ -80,13 +84,7 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set(["askUs
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
 
-/**
- * Built-ins that exist to wait for a person — `askUser` pauses the run until
- * the user answers, whatever its mode (the tool itself always needs approval).
- * A headless run has nobody to answer, so they are removed there even when the
- * user set them to `auto`.
- */
-export const BUILTIN_TOOLS_NEEDING_A_PERSON: ReadonlySet<string> = new Set(["askUser"]);
+export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
 /**
  * Default mode when the user has not chosen one.
@@ -128,6 +126,19 @@ export interface ToolPermissionOptions {
      * check. `off` stays off, and a tool that needs a person is still removed.
      */
     headlessApproved?: ReadonlySet<string>;
+    /** The instant the grants are judged at. Defaults to the clock. */
+    now?: number;
+    /**
+     * The user's time-boxed allows (`tool-permission-grants.ts`). They turn an `ask` into an `auto` for an interactive run only: a
+     * headless run inherits nothing, and `off` stays off.
+     */
+    timedGrants?: ToolPermissionGrants;
+}
+
+export interface ResolvedToolPermission {
+    mode: ToolPermissionMode;
+    /** Set when `mode` is `auto` only because a time-boxed allow covers the tool until then. */
+    timedUntil?: number;
 }
 
 /**
@@ -137,40 +148,57 @@ export const resolveToolPermission = (
     descriptor: ToolDescriptor,
     overrides: ToolPermissionOverrides | null | undefined,
     options: ToolPermissionOptions = {},
-): ToolPermissionMode => {
+): ToolPermissionMode => resolveToolPermissionWithGrant(descriptor, overrides, options).mode;
+
+/** The effective mode as {@link resolveToolPermission} answers it, plus the time-boxed allow that lifted the tool, if one did. */
+export const resolveToolPermissionWithGrant = (
+    descriptor: ToolDescriptor,
+    overrides: ToolPermissionOverrides | null | undefined,
+    options: ToolPermissionOptions = {},
+): ResolvedToolPermission => {
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
-    const chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    let chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    let timedUntil: number | undefined;
+
+    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`.
+    if (chosen === "ask" && !options.headless && descriptor.source !== "device") {
+        timedUntil = grantExpiryFor(options.timedGrants, descriptor.key, options.now ?? Date.now());
+
+        if (timedUntil !== undefined) {
+            chosen = "auto";
+        }
+    }
 
     if (options.apiKeyOrigin && descriptor.source === "device") {
-        return "off";
+        return { mode: "off" };
     }
 
     // A sub-agent runs headless and does not carry the run's origin, so its auto tools would run
     // unattended: an outside agent cannot start one.
     if (options.apiKeyOrigin && builtinName !== undefined && SUB_AGENT_BUILTINS.has(builtinName)) {
-        return "off";
+        return { mode: "off" };
     }
 
     const mode = options.apiKeyOrigin && chosen === "auto" ? "ask" : chosen;
 
     if (!options.headless) {
-        return mode;
+        return mode === "auto" && timedUntil !== undefined ? { mode, timedUntil } : { mode };
     }
 
     if (descriptor.source === "device") {
-        return "off";
+        return { mode: "off" };
     }
 
     if (builtinName !== undefined && BUILTIN_TOOLS_NEEDING_A_PERSON.has(builtinName)) {
-        return "off";
+        return { mode: "off" };
     }
 
     if (mode === "ask") {
-        return builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off";
+        return { mode: builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off" };
     }
 
-    return mode;
+    return { mode };
 };
 
 /** Reads MCP annotations off an `@ai-sdk/mcp` tool (`metadata.annotations`). */
@@ -200,7 +228,7 @@ export const applyToolPermissions = (
 
     for (const [name, tool] of Object.entries(tools)) {
         const descriptor = describe(name) ?? { key: toolPermissionKey("builtin", name), source: "builtin" as const };
-        const mode = resolveToolPermission(descriptor, overrides, options);
+        const { mode, timedUntil } = resolveToolPermissionWithGrant(descriptor, overrides, options);
 
         if (mode === "off") {
             removed.push(name);
@@ -213,7 +241,8 @@ export const applyToolPermissions = (
             continue;
         }
 
-        result[name] = tool;
+        // Tools are built once per run and a run can outlast the grant, so the lapse is checked at every call.
+        result[name] = timedUntil === undefined ? tool : ({ ...tool, needsApproval: () => Date.now() >= timedUntil } as ToolSet[string]);
     }
 
     return { removed, requiresApproval, tools: result };
