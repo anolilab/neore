@@ -29,6 +29,10 @@
 //!   pointed at files in the state folder so a hidden `~/.npmrc` is never consulted, and
 //!   git is told to use no global config for the same reason.
 //! - It is removed when the server is removed or its command changes.
+//!
+//! A server keeps the app's working directory, sandboxed or not, so a relative command or argument resolves
+//! as it did before the sandbox. That grants nothing: the policy alone decides what the server may read, so a
+//! working directory outside the shared folders is a name it can stat, not a folder it can open.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -127,6 +131,9 @@ pub struct McpProcess {
     last_used: Instant,
     next_id: u64,
     pending: Pending,
+    /// Set once `kill` has waited the child: from then on its pid, and the group id it gave, may belong to
+    /// somebody else, so nothing is signalled.
+    reaped: bool,
     stderr: Arc<Mutex<Vec<u8>>>,
     stdin: Arc<Mutex<ChildStdin>>,
 }
@@ -178,6 +185,10 @@ fn prepare_state(state_root: &Path, name: &str) -> Result<PathBuf, String> {
     let folder = state_root.join(sanitize(name));
 
     create_private(&folder).map_err(fail)?;
+    // The package caches in here are programs the server will run, so a folder somebody else could have put there
+    // first, or can write to, is refused rather than used.
+    ensure_private(state_root)?;
+    ensure_private(&folder)?;
 
     let folder = std::fs::canonicalize(&folder).map_err(fail)?;
     let tmp = folder.join("tmp");
@@ -186,6 +197,41 @@ fn prepare_state(state_root: &Path, name: &str) -> Result<PathBuf, String> {
     create_private(&tmp).map_err(fail)?;
 
     Ok(folder)
+}
+
+/// Fails unless `path` is a real folder (not a link) that only this user can enter and write.
+fn ensure_private(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let refused = |why: &str| {
+            format!(
+                "{} is not a private folder ({why}); remove it so the server can start from a new one",
+                path.display()
+            )
+        };
+        let meta = std::fs::symlink_metadata(path)
+            .map_err(|error| format!("could not prepare the server's folder: {error}"))?;
+
+        if !meta.is_dir() {
+            return Err(refused("a link or a file"));
+        }
+
+        // SAFETY: geteuid takes no arguments and cannot fail.
+        if meta.uid() != unsafe { libc::geteuid() } {
+            return Err(refused("owned by another user"));
+        }
+
+        if meta.permissions().mode() & 0o077 != 0 {
+            return Err(refused("others can reach it"));
+        }
+    }
+
+    #[cfg(not(unix))]
+    let _ = path;
+
+    Ok(())
 }
 
 fn create_private(path: &Path) -> std::io::Result<()> {
@@ -300,8 +346,6 @@ impl McpProcess {
                 if let Some(proxy) = &proxy {
                     command.envs(egress::proxy_env(proxy.port()));
                 }
-
-                command.current_dir(&state);
             }
         }
 
@@ -374,6 +418,7 @@ impl McpProcess {
             last_used: Instant::now(),
             next_id: 1,
             pending,
+            reaped: false,
             stderr,
             stdin,
         };
@@ -447,8 +492,22 @@ impl McpProcess {
         Ok(response.get("result").cloned().unwrap_or(Value::Null))
     }
 
+    /// Whether the server's process is still running. A process that exited is NOT reaped here: until `kill` waits
+    /// for it, its pid, which is also its group's id, stays reserved, so stopping it later cannot signal a stranger.
     pub fn is_alive(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
+        if self.reaped {
+            return false;
+        }
+
+        #[cfg(unix)]
+        {
+            !exited_unreaped(self.child.id() as libc::pid_t)
+        }
+
+        #[cfg(not(unix))]
+        {
+            matches!(self.child.try_wait(), Ok(None))
+        }
     }
 
     pub fn list_tools(&mut self) -> Result<Vec<McpTool>, String> {
@@ -539,17 +598,54 @@ impl McpProcess {
         Ok((text, is_error))
     }
 
+    /// Stops the server and what it started. Safe to call again: the first call waits for the child, after which
+    /// its pid may belong to anyone, so a later call signals nothing.
     pub fn kill(&mut self) {
+        if self.reaped {
+            return;
+        }
+
         #[cfg(unix)]
         // SAFETY: plain syscall with no memory arguments; the group is the one `process_group(0)` made for this
-        // server. Not checked: ESRCH means it already ended.
+        // server, and its leader has not been waited for yet (see `reaped`), so the id is still ours even when the
+        // leader exited. Not checked: ESRCH means the group is empty.
         unsafe {
             libc::kill(-(self.child.id() as libc::pid_t), libc::SIGKILL);
         }
 
         let _ = self.child.kill();
         let _ = self.child.wait();
+        self.reaped = true;
     }
+}
+
+/// Whether `pid`, a child of ours, has exited, without reaping it (`WNOWAIT`): the zombie keeps the pid reserved.
+/// A child somebody already waited for counts as exited.
+#[cfg(unix)]
+fn exited_unreaped(pid: libc::pid_t) -> bool {
+    // SAFETY: an all-zero siginfo_t is a valid value (plain integers and a union of them).
+    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    // SAFETY: waitid takes an id type, a pid, a siginfo to fill and flags; `info` outlives the call.
+    let result = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            pid as libc::id_t,
+            &mut info,
+            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+        )
+    };
+
+    if result != 0 {
+        return std::io::Error::last_os_error().raw_os_error() != Some(libc::EINTR);
+    }
+
+    // SAFETY (linux): reading si_pid of a siginfo_t waitid filled. With WNOHANG and nothing to report it stays 0.
+    #[cfg(target_os = "linux")]
+    let reported = unsafe { info.si_pid() };
+    #[cfg(not(target_os = "linux"))]
+    let reported = info.si_pid;
+
+    reported != 0
 }
 
 impl Drop for McpProcess {
@@ -561,14 +657,9 @@ impl Drop for McpProcess {
 /// Running servers by name.
 pub struct McpManager {
     processes: Mutex<HashMap<String, Arc<Mutex<McpProcess>>>>,
-    /// Where each server's private folder lives (`prepare_state`).
+    /// Where each server's private folder lives (`prepare_state`): always under the app's own data folder, never a
+    /// shared temp folder, which is why there is no `Default`.
     state_root: PathBuf,
-}
-
-impl Default for McpManager {
-    fn default() -> Self {
-        McpManager::new(std::env::temp_dir().join("neore-mcp"))
-    }
 }
 
 impl McpManager {
@@ -595,6 +686,13 @@ impl McpManager {
             {
                 return Ok(process.clone());
             }
+        }
+
+        // Stop the old one BEFORE starting its replacement: if the new start fails, the access the old policy
+        // granted (a shared folder since removed, a wider network tier) must not stay in a running process. The
+        // process's own lock is taken first, so a call in flight finishes before it dies.
+        if let Some(stale) = processes.remove(&config.name) {
+            stale.lock().unwrap_or_else(PoisonError::into_inner).kill();
         }
 
         let process = Arc::new(Mutex::new(McpProcess::spawn(
@@ -738,7 +836,7 @@ sleep 1
             name: "fake".into(),
             network: NetworkTier::Off,
         };
-        let manager = McpManager::default();
+        let manager = McpManager::new(temp_root("restart-config"));
 
         let first = manager.process(&config("1"), None).unwrap();
         assert!(Arc::ptr_eq(
@@ -883,9 +981,19 @@ sleep 1"#
             (echo x > "$TMPDIR/t") 2>/dev/null && printf 'tmp:wrote '
             (mkdir -p "$npm_config_cache/x" && echo x > "$npm_config_cache/x/c") 2>/dev/null && printf 'cache:wrote '
             (mkdir -p "$UV_CACHE_DIR" && echo x > "$UV_CACHE_DIR/c") 2>/dev/null && printf 'uv:wrote '
-            [ "$PWD" = "$(dirname "$TMPDIR")" ] && printf 'cwd:state '
+            [ "$(pwd -P)" = "$APPCWD" ] && printf 'cwd:inherited '
         "#;
-        let config = probing_server("write", &folders, probe, NetworkTier::Off);
+        let mut config = probing_server("write", &folders, probe, NetworkTier::Off);
+
+        // The server keeps the app's working directory, so a relative command or argument resolves as it always did;
+        // its private folder is reached through $TMPDIR and the cache variables, not through the cwd.
+        config.env.insert(
+            "APPCWD".into(),
+            std::fs::canonicalize(std::env::current_dir().unwrap())
+                .unwrap()
+                .display()
+                .to_string(),
+        );
         let policy = folders.policy(NetworkTier::Off);
         // The app's data folder lives under the user's home, which the sandbox hides: the server's own folder
         // is still readable and writable there, and nothing else under it is.
@@ -897,7 +1005,7 @@ sleep 1"#
             "tmp:wrote",
             "cache:wrote",
             "uv:wrote",
-            "cwd:state",
+            "cwd:inherited",
             "outside:denied",
             "home:denied",
         ] {
@@ -1061,6 +1169,156 @@ sleep 1"#
             name: name.into(),
             network: NetworkTier::Off,
         }
+    }
+
+    #[cfg(unix)]
+    fn pid_gone(pid: libc::pid_t) -> bool {
+        // A zombie nobody reaped yet is as dead as a reaped one.
+        let state = Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+            .unwrap_or_default();
+
+        state.is_empty() || state.starts_with('Z')
+    }
+
+    #[cfg(unix)]
+    fn wait_until(mut done: impl FnMut() -> bool) -> bool {
+        for _ in 0..100 {
+            if done() {
+                return true;
+            }
+
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        false
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_replacement_that_cannot_start_leaves_the_old_server_stopped() {
+        let manager = McpManager::new(temp_root("replace-fails"));
+        let old = manager.process(&idle_server("svc"), None).unwrap();
+        let pid = old.lock().unwrap().child.id() as libc::pid_t;
+
+        assert!(!pid_gone(pid));
+
+        // Same name, changed config that cannot start: whatever the old server had must not outlive the edit.
+        let broken = McpServerConfig {
+            command: "/nonexistent/neore-mcp-server".into(),
+            ..idle_server("svc")
+        };
+
+        assert!(manager.process(&broken, None).is_err());
+        assert!(manager.processes.lock().unwrap().is_empty());
+        assert!(pid_gone(pid), "the old server is still running");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_dead_server_is_not_reaped_until_it_is_stopped_so_its_group_stays_ours() {
+        let root = temp_root("dead-group");
+        let pidfile = root.join("orphan.pid");
+        let script = format!(
+            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; sleep 30 & echo $! > '{}'; exit 0"#,
+            pidfile.display()
+        );
+
+        std::fs::create_dir_all(&root).unwrap();
+
+        let config = McpServerConfig {
+            args: vec!["-c".into(), script],
+            ..idle_server("leaves-a-child")
+        };
+        let mut process = McpProcess::spawn(&config, None, &root).unwrap();
+        let leader = process.child.id() as libc::pid_t;
+
+        assert!(wait_until(|| !process.is_alive()));
+        // Asking whether it is alive must not reap it: while the leader is a zombie its pid, which is the group's
+        // id, cannot go to an unrelated process.
+        // SAFETY: signal 0 only checks that the pid exists.
+        assert_eq!(unsafe { libc::kill(leader, 0) }, 0, "the leader was reaped");
+
+        assert!(wait_until(|| pidfile.exists()
+            && !std::fs::read_to_string(&pidfile)
+                .unwrap()
+                .trim()
+                .is_empty()));
+        let orphan: libc::pid_t = std::fs::read_to_string(&pidfile)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+
+        assert!(!pid_gone(orphan));
+
+        drop(process);
+
+        assert!(
+            wait_until(|| pid_gone(orphan)),
+            "the group outlived the server"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stopping_a_server_twice_signals_its_group_once() {
+        let mut process =
+            McpProcess::spawn(&idle_server("twice"), None, &temp_root("twice")).unwrap();
+
+        process.kill();
+        assert!(process.reaped);
+
+        // The pid may belong to somebody else by now: a second stop (the drop) must not signal it.
+        process.kill();
+        assert!(!process.is_alive());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_state_folder_that_others_can_write_or_a_link_is_refused() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let root = temp_root("state-trust");
+        let _ = std::fs::remove_dir_all(&root);
+
+        let state = prepare_state(&root, "ok").unwrap();
+
+        assert_eq!(
+            std::fs::metadata(&state).unwrap().permissions().mode() & 0o077,
+            0
+        );
+        assert!(prepare_state(&root, "ok").is_ok());
+
+        // Somebody else pre-created it open to the world, or as a link to a place of their choosing.
+        std::fs::create_dir_all(root.join("open")).unwrap();
+        std::fs::set_permissions(root.join("open"), std::fs::Permissions::from_mode(0o777))
+            .unwrap();
+        assert!(prepare_state(&root, "open")
+            .unwrap_err()
+            .contains("private"));
+
+        let elsewhere = temp_root("state-trust-elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        symlink(&elsewhere, root.join("linked")).unwrap();
+        assert!(prepare_state(&root, "linked")
+            .unwrap_err()
+            .contains("private"));
+        assert!(!elsewhere.join("tmp").exists());
+
+        // The root itself must not be a place others can write.
+        let loose = temp_root("state-trust-loose");
+        std::fs::create_dir_all(&loose).unwrap();
+        std::fs::set_permissions(&loose, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(prepare_state(&loose, "x").unwrap_err().contains("private"));
+
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&elsewhere);
+        let _ = std::fs::remove_dir_all(&loose);
     }
 
     #[cfg(unix)]

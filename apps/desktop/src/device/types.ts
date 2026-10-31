@@ -125,6 +125,8 @@ export interface McpServer {
 /** Whether a configured server will run sandboxed here (`McpServerStatus` in `engine.rs`). */
 export interface McpServerStatus {
     name: string;
+    /** Why its network tier is not fully enforced although it is sandboxed (Off, on a computer that cannot block sockets); `null` when it is. */
+    networkGap: string | null;
     /** What its approval prompt says about the sandbox and the network tier; empty when it cannot start. */
     note: string;
     /** Why it cannot start; `null` when it can. */

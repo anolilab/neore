@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { McpServerStatus } from "../types";
-import { defaultServerTier, networkUnrestricted, tierAvailable } from "./server-network";
+import { defaultServerTier, networkUnrestricted, serverNeedsAttention, serverSandboxText, tierAvailable } from "./server-network";
 
 const status = (overrides: Partial<McpServerStatus>): McpServerStatus => {
-    return { name: "docs", note: "", problem: null, sandboxed: true, ...overrides };
+    return { name: "docs", networkGap: null, note: "", problem: null, sandboxed: true, ...overrides };
 };
 
 describe("server network tiers", () => {
@@ -29,5 +29,27 @@ describe("server network tiers", () => {
         // Cannot start: nothing runs, and the tier will apply once it can.
         expect(networkUnrestricted(status({ problem: "no sandbox", sandboxed: false }))).toBe(false);
         expect(networkUnrestricted(undefined)).toBe(false);
+    });
+
+    it("words a sandboxed server's row, and says so when its network is not blocked after all", () => {
+        expect(serverSandboxText(undefined)).toBe("");
+        expect(serverSandboxText(status({}))).toBe("Sandboxed. ");
+        expect(serverSandboxText(status({ problem: "no sandbox", sandboxed: false }))).toBe("Cannot start: no sandbox ");
+        expect(serverSandboxText(status({ sandboxed: false }))).toContain("NOT sandboxed");
+
+        const gap = status({ networkGap: "this CPU's seccomp filter is not available" });
+
+        // Sandboxed, yet Off is not enforced: the row must not read as an unqualified "Sandboxed".
+        expect(serverSandboxText(gap)).toContain("network is NOT restricted");
+        expect(serverSandboxText(gap)).toContain("this CPU's seccomp filter is not available");
+        expect(serverSandboxText(gap)).not.toBe("Sandboxed. ");
+    });
+
+    it("flags a server that is not fully confined as a warning", () => {
+        expect(serverNeedsAttention(status({}))).toBe(false);
+        expect(serverNeedsAttention(status({ networkGap: "no filter" }))).toBe(true);
+        expect(serverNeedsAttention(status({ sandboxed: false }))).toBe(true);
+        expect(serverNeedsAttention(status({ problem: "no sandbox", sandboxed: false }))).toBe(true);
+        expect(serverNeedsAttention(undefined)).toBe(true);
     });
 });

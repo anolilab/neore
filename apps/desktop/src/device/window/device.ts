@@ -9,7 +9,7 @@
 import { describeLink, multiplexingNote } from "../link-status";
 import type { HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
-import { defaultServerTier, networkUnrestricted, tierAvailable } from "./server-network";
+import { defaultServerTier, networkUnrestricted, serverNeedsAttention, serverSandboxText, tierAvailable } from "./server-network";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
 const CLICK_THROUGH_GUARD_MS = 800;
@@ -643,19 +643,6 @@ const tierSelectState = (select: HTMLSelectElement, view: SettingsView): void =>
     }
 };
 
-/** What a server's row says about its sandbox. */
-const serverSandboxText = (serverStatus: McpServerStatus | undefined): string => {
-    if (serverStatus === undefined) {
-        return "";
-    }
-
-    if (serverStatus.problem !== null) {
-        return `Cannot start: ${serverStatus.problem} `;
-    }
-
-    return serverStatus.sandboxed ? "Sandboxed. " : "NOT sandboxed: runs with your full access (sandbox not required in the settings above); its network is not restricted. ";
-};
-
 /** A server in the list: its command, whether it runs sandboxed here and under which network tier, and its controls. */
 const serverItem = (server: McpServer, serverStatus: McpServerStatus | undefined, view: SettingsView): HTMLLIElement => {
     const item = listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () => removeServer(server.name));
@@ -691,8 +678,8 @@ const serverItem = (server: McpServer, serverStatus: McpServerStatus | undefined
     label.htmlFor = selectId;
     label.textContent = "Network: ";
 
-    // Not sandboxed is a warning, not a footnote: it runs with the user's full access.
-    line.className = serverStatus?.sandboxed === true ? "muted" : "warning";
+    // Not sandboxed, or sandboxed with its network open anyway, is a warning, not a footnote.
+    line.className = serverNeedsAttention(serverStatus) ? "warning" : "muted";
     line.setAttribute("role", "status");
     line.textContent = serverSandboxText(serverStatus);
 

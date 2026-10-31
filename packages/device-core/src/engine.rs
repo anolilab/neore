@@ -21,7 +21,7 @@ use serde_json::{json, Value};
 use crate::acp_permission::AcpPermissions;
 use crate::actions::{
     self, canonical_home, plan_builtin, plan_mcp_launch, platform, refused_root, shareable_roots,
-    Action, ShellSettings, MAX_ROOTS,
+    Action, McpLaunch, ShellSettings, MAX_ROOTS,
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, CallEnvelope, Domain, NonceSet, Signed};
@@ -918,23 +918,35 @@ fn mcp_status(settings: &Settings) -> Vec<McpServerStatus> {
     settings
         .mcp_servers
         .iter()
-        .map(
-            |server| match plan_mcp_launch(server, &roots, settings.allow_unsandboxed_shell) {
-                Ok(launch) => McpServerStatus {
-                    name: server.name.clone(),
-                    note: launch.note,
-                    problem: None,
-                    sandboxed: launch.policy.is_some(),
-                },
-                Err(problem) => McpServerStatus {
-                    name: server.name.clone(),
-                    note: String::new(),
-                    problem: Some(problem),
-                    sandboxed: false,
-                },
-            },
-        )
+        .map(|server| {
+            server_status(
+                &server.name,
+                plan_mcp_launch(server, &roots, settings.allow_unsandboxed_shell),
+            )
+        })
         .collect()
+}
+
+fn server_status(name: &str, launch: Result<McpLaunch, String>) -> McpServerStatus {
+    match launch {
+        Ok(launch) => McpServerStatus {
+            name: name.to_owned(),
+            network_gap: launch
+                .policy
+                .as_ref()
+                .and_then(|policy| policy.network_gap.clone()),
+            note: launch.note,
+            problem: None,
+            sandboxed: launch.policy.is_some(),
+        },
+        Err(problem) => McpServerStatus {
+            name: name.to_owned(),
+            network_gap: None,
+            note: String::new(),
+            problem: Some(problem),
+            sandboxed: false,
+        },
+    }
 }
 
 /// Names of the servers that were removed, changed or added.
@@ -1234,6 +1246,9 @@ pub struct SettingsView {
 #[serde(rename_all = "camelCase")]
 pub struct McpServerStatus {
     pub name: String,
+    /// Why a sandboxed server's network tier is not fully enforced here (Linux on a CPU the filter does not
+    /// cover, with the user having allowed that): the server runs sandboxed but its network is NOT blocked.
+    pub network_gap: Option<String>,
     /// What the approval prompt says about its sandbox and network tier. Empty when it cannot run.
     pub note: String,
     /// Why it cannot start (no sandbox here and one is required, or its tier is unavailable).
@@ -1911,6 +1926,35 @@ mod tests {
         let status = mcp_status(&settings);
 
         assert!(!status[0].sandboxed && status[0].problem.is_some());
+    }
+
+    #[test]
+    fn a_status_carries_the_network_gap_of_a_sandboxed_server() {
+        let launch = |gap: Option<&str>| McpLaunch {
+            note: "Sandboxed".into(),
+            policy: Some(sandbox::Policy {
+                network_gap: gap.map(str::to_owned),
+                ..sandbox::Policy::for_roots(&[], None)
+            }),
+        };
+
+        let gapped = server_status("a", Ok(launch(Some("no seccomp here"))));
+
+        assert!(gapped.sandboxed);
+        assert_eq!(gapped.network_gap.as_deref(), Some("no seccomp here"));
+        assert_eq!(server_status("a", Ok(launch(None))).network_gap, None);
+        assert_eq!(
+            server_status(
+                "a",
+                Ok(McpLaunch {
+                    note: String::new(),
+                    policy: None
+                })
+            )
+            .network_gap,
+            None
+        );
+        assert_eq!(server_status("a", Err("no".into())).network_gap, None);
     }
 
     #[test]
