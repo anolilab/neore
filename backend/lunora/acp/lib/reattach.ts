@@ -37,8 +37,8 @@ export const savedSessionFor = (
 /**
  * Whether the agent a session was started for with a saved session id (`session.nativeSessionId`, recorded when the start
  * was queued) did NOT end up in that session, and why. A computer from before reattach ignores the id, opens a new
- * session and reports nothing about it, which reads the same as a failed load: only a reported `loaded: true` under
- * the id asked for is a reattach.
+ * session and reports nothing about it, which reads the same as a failed load: only a reported `loaded: true` with the
+ * id asked for is a reattach, so a load report without an id counts as a failed one.
  */
 export const reattachFailureOf = (
     requestedNativeSessionId: string,
@@ -52,7 +52,12 @@ export const reattachFailureOf = (
         return open.reattach.reason === "load_unsupported" ? "load_unsupported" : "load_failed";
     }
 
-    return open.nativeSessionId !== undefined && open.nativeSessionId !== requestedNativeSessionId ? "other_session" : undefined;
+    // A load nobody can match to the session asked for is not confirmed: without an id to compare, the agent may be in any session.
+    if (open.nativeSessionId === undefined) {
+        return "not_reattached";
+    }
+
+    return open.nativeSessionId === requestedNativeSessionId ? undefined : "other_session";
 };
 
 /**

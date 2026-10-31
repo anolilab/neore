@@ -41,6 +41,7 @@ const { hashPasscode, mintUnlockProof, newPasscodeEpoch } = await import("../lib
 const { readPasscodeRow } = await import("../agent/thread-passcode");
 const { listMessagesByThreadId } = await import("../agent/messages");
 const { agentKeyOf, sameAgent } = await import("../agent/agent-switch-logic");
+const { reattachFailureOf } = await import("./lib/reattach");
 const calls = await import("./calls");
 const send = await import("./send");
 const switchModule = await import("./switch");
@@ -275,7 +276,7 @@ const sendTaints = async (): Promise<string[][]> => {
 };
 
 /** The computer's agent opens the session a switch queued, as its `session_open` does; `reattach` is what it says of the saved session. */
-const openStartedSession = async (device: Device, threadId: string, reattach?: Row, nativeSessionId?: string) => {
+const openStartedSession = async (device: Device, threadId: string, reattach?: Row, nativeSessionId?: string, capabilities?: Row) => {
     const sessions = (await rows("acpSessions", { threadId })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
     const session = sessions[0] as Row;
 
@@ -290,6 +291,7 @@ const openStartedSession = async (device: Device, threadId: string, reattach?: R
                         folderId: session.folderId,
                         folderLabel: session.folderLabel,
                         kind: "session_open",
+                        ...(capabilities && { capabilities }),
                         ...(nativeSessionId !== undefined && { nativeSessionId }),
                         ...(reattach && { reattach }),
                     },
@@ -848,7 +850,7 @@ describe("native reattach (S4)", () => {
         expect(back?.fallbackReason).toBeUndefined();
 
         // The agent has its own session back: the first prompt carries nothing of the handoff.
-        await openStartedSession(device, threadId, { loaded: true });
+        await openStartedSession(device, threadId, { loaded: true }, "native-1");
         expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
         expect((await acpSends()).at(-1)).toBe("carry on");
     });
@@ -1073,6 +1075,8 @@ describe("native reattach (S4)", () => {
         await switchTo(threadId, hostTarget(device, CLAUDE));
 
         expect(await lastStart()).toMatchObject({ nativeSessionId: "native-1" });
+    });
+});
 
 describe("what a chat must be to be handed to a computer", () => {
     it("refuses a chat with a collaborator and a public one, and writes nothing", async () => {
@@ -1218,5 +1222,68 @@ describe("the identity of a coding agent", () => {
         expect(agentKeyOf(one)).not.toBe(agentKeyOf(other));
         expect(sameAgent(one, other)).toBe(false);
         expect(sameAgent(one, { ...one })).toBe(true);
+    });
+});
+
+describe("a saved session is reattached only if it received the conversation", () => {
+    /** The computer answered everything it was sent: the device's open-call budget is free again. */
+    const answerOpenCalls = async () =>
+        await run(async (ctx) => {
+            for (const status of ["pending", "claimed"]) {
+                const { page } = await ctx.db.deviceCalls.findMany({ where: { status } });
+
+                for (const call of page) {
+                    await ctx.db.patch(call._id, { status: "completed" });
+                }
+            }
+        });
+
+    const codexOpensAndLeaves = async (device: Device, threadId: string, prompted: boolean) => {
+        await switchTo(threadId, hostTarget(device, CODEX));
+        await openStartedSession(device, threadId, undefined, "native-codex", CAN_LOAD);
+
+        if (prompted) {
+            expect((await sendText(threadId, "look at the build")).outcome).toBe("sent");
+            await finishSentTurn(device, threadId);
+        }
+
+        await answerOpenCalls();
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+        await openStartedSession(device, threadId, { loaded: true }, "native-1");
+        await answerOpenCalls();
+    };
+
+    it("hands the whole conversation over when the agent opened for a handoff and never got a prompt", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await codexOpensAndLeaves(device, threadId, false);
+        await switchTo(threadId, hostTarget(device, CODEX));
+
+        expect((await lastStart()).nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
+
+        await openStartedSession(device, threadId);
+        expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
+        expect((await acpSends()).at(-1)).toContain("question 0");
+    });
+
+    it("reattaches once the agent has been prompted with it", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await codexOpensAndLeaves(device, threadId, true);
+        await switchTo(threadId, hostTarget(device, CODEX));
+
+        expect((await lastStart()).nativeSessionId).toBe("native-codex");
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("native");
+    });
+});
+
+describe("a load report that cannot be checked", () => {
+    it("is a failed load: a reattach with no session id to compare is not confirmed", () => {
+        expect(reattachFailureOf("native-1", { reattach: { loaded: true } })).toBeDefined();
+        expect(reattachFailureOf("native-1", { nativeSessionId: "native-1", reattach: { loaded: true } })).toBeUndefined();
+        expect(reattachFailureOf("native-1", { nativeSessionId: "other", reattach: { loaded: true } })).toBe("other_session");
     });
 });

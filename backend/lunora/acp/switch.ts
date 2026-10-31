@@ -29,7 +29,7 @@ import { leafRowOf, resolvePathAgent } from "../agent/agent-switch";
 import { agentKeyOf, sameAgent } from "../agent/agent-switch-logic";
 import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving } from "../agent/handoff-source";
+import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { inheritPasscodeHandler } from "../agent/thread-lock";
@@ -176,6 +176,30 @@ interface NativePlan {
 }
 
 /**
+ * Whether the agent's last stay in the thread, ending at `lastSeen`, began with nothing it had still to be sent. A handoff
+ * (or a catch-up) rides in the agent's first prompt, so a stay that opened with one and had no turn since never delivered
+ * it: the agent's saved session holds none of that conversation, and reattaching it would leave it blind.
+ */
+const receivedItsHandoff = async (ctx: MutationCtx, threadId: Id<"threads">, lastSeen: Doc<"messages">, agent: SwitchAgentRef) => {
+    const arrival = await findDividerEntering(ctx, threadId, lastSeen, agentKeyOf(agent));
+
+    if (!arrival) {
+        // It opened the thread itself: nothing was due.
+        return true;
+    }
+
+    const due = arrival.part.mode === "native" ? arrival.part.catchUp : arrival.part.handoff;
+
+    if (!due) {
+        return true;
+    }
+
+    const stay = await collectHandoffSource(ctx, threadId, lastSeen, { stopAtId: arrival.row._id });
+
+    return stay.turns.length > 0;
+};
+
+/**
  * The reattach of a host-to-host switch (harness switch S4): the same agent, folder and computer as an earlier session of this
  * thread that can load itself again. That session has seen the thread up to where the agent left and nothing after, so
  * whatever another agent did since goes with the first prompt as a delta. Nothing to reattach to, or what it missed
@@ -201,12 +225,19 @@ const nativePlanFor = async (
 
     // The agent's session just ended, with nobody else having run since: it has seen everything.
     if (sameAgent(current.agent, to)) {
-        return { catchUp: "", nativeSessionId: saved.nativeSessionId };
+        return (await receivedItsHandoff(ctx, thread._id, leaf, to)) ? { catchUp: "", nativeSessionId: saved.nativeSessionId } : undefined;
     }
 
     const departure = await findDividerLeaving(ctx, thread._id, leaf, agentKeyOf(to));
 
     if (!departure) {
+        return undefined;
+    }
+
+    const lastSeenId = ctx.db.normalizeId("messages", departure.part.startMessageId);
+    const lastSeen = lastSeenId ? await ctx.db.get(lastSeenId) : null;
+
+    if (!lastSeen || !(await receivedItsHandoff(ctx, thread._id, lastSeen, to))) {
         return undefined;
     }
 
