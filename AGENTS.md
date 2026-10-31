@@ -811,6 +811,16 @@ written here is what is not.
   the DEVICE a payload names (`acp_prepare`/`acp_sign`/`sign_turn`), and a server's poster is its own. `TurnChanges` and media read
   the desktop's disk, so they are off for a server (`folderIsRemote`): a new reader of the agent's folder must stay off for it too.
   The agent's environment is built on the server, not copied from the desktop.
+  **No write waits on a pipe** (`device-core/src/outbox.rs`): `neore-host` writes its stdout, and the desktop writes
+  ssh's stdin, through one writer thread with a byte-bounded queue. The host's request reader and the app's synchronous
+  napi calls (`host_agent_write`/`_stop`) only queue, a cancel with extra room (`URGENT_HEADROOM`); a connection too far
+  behind for even that is closed, which makes the host stop every agent. Producers (an agent's output, an archive) wait
+  for room instead, holding the agent back. An agent that does not read its stdin is stopped at `INPUT_BUDGET`
+  (8 MiB), not buffered further. Every thread a launch spawns is joined before its request ends (the pumps `poll`, so a
+  `setsid` descendant holding a pipe cannot keep one). Narrowing a server's shared folders drops the approvals outside
+  them in the core (`apply_update`) and the desktop stops those sessions (`reviewApprovals`); removing a server or
+  unpairing ends its sessions FIRST (`ServerAgents.remove`), because the end of each turn is signed with a secret the
+  core deletes right after. The person's variables can never replace `SSH_AUTH_SOCK`.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay
