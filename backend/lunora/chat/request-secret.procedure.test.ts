@@ -297,6 +297,24 @@ describe("the Settings save and a stored header secret", () => {
         expect(await secrets()).toHaveLength(0);
     });
 
+    it("drops the secret, and the server, when the last server is removed (Settings sends an empty list)", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpSecretHeaders: [{ encryptedValue: "v1:x", header: "Authorization", server: "Files", url: FILES_URL }],
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+
+        await save({ mcpServers: [] });
+        expect(await secrets()).toHaveLength(0);
+
+        const preferences = (await rows("aiUserPreferences")) as { mcpServers?: unknown[] }[];
+
+        expect(preferences[0]?.mcpServers ?? []).toHaveLength(0);
+    });
+
     it("drops the secret when the user types that header by hand", async () => {
         await harness.run(
             async (ctx: any) =>
