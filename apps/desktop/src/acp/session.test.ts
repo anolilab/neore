@@ -182,7 +182,10 @@ describe("the end of a turn", () => {
         await sleep(60);
         expect(agent.written.filter((frame) => frame.method === "session/prompt")).toHaveLength(1);
 
-        agent.say({ id: agent.written.find((frame) => frame.method === "session/prompt")!.id as number, result: { stopReason: "cancelled" } });
+        const prompt = agent.written.find((frame) => frame.method === "session/prompt");
+
+        expect(prompt).toBeDefined();
+        agent.say({ id: prompt?.id as number, result: { stopReason: "cancelled" } });
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
     });
 
