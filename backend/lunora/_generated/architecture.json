@@ -17718,85 +17718,79 @@
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 16,
+      "line": 17,
       "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 20,
+      "line": 21,
       "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 24,
+      "line": 25,
+      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 32,
+      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 33,
+      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 34,
       "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 28,
-      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
-    },
-    {
-      "file": "chat/gdpr",
-      "kind": "write",
-      "line": 35,
-      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
-    },
-    {
-      "file": "chat/gdpr",
-      "kind": "write",
-      "line": 36,
-      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
-    },
-    {
-      "file": "chat/gdpr",
-      "kind": "write",
-      "line": 37,
-      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
-    },
-    {
-      "file": "chat/gdpr",
-      "kind": "write",
-      "line": 38,
-      "reason": "\"eraseThreadPinsAndTagsForUser\" is not a registered function"
-    },
-    {
-      "file": "chat/gdpr",
-      "kind": "read",
-      "line": 49,
+      "line": 46,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 53,
+      "line": 50,
+      "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "read",
+      "line": 54,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "write",
-      "line": 59,
+      "line": 60,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 65,
+      "line": 66,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 76,
+      "line": 77,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 85,
+      "line": 86,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {

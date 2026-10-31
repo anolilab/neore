@@ -104,6 +104,39 @@ describe("batched account-deletion steps", () => {
         expect(await count("persistentChunks", { streamId: otherStream })).toBe(1);
     });
 
+    it("deletes more than one batch of goals with the run state, and leaves another user's", async () => {
+        const goal = (userId: string) => {
+            return {
+                config: { model: "test-model" },
+                costMicrodollars: 0,
+                createdAt: 1,
+                maxCostMicrodollars: 2_000_000,
+                maxRounds: 5,
+                promptMessageId: "m",
+                round: 0,
+                startMessageId: "m",
+                status: "stopped",
+                text: "A goal",
+                threadId: "t",
+                updatedAt: 1,
+                userId,
+                verdicts: [],
+            };
+        };
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < BATCH + 3; index += 1) {
+                await ctx.db.insert("threadGoals", goal(A));
+            }
+
+            await ctx.db.insert("threadGoals", goal(B));
+        });
+
+        expect(await drain(deleteUserPersistentStreams, A)).toBeGreaterThan(1);
+        expect(await count("threadGoals", { userId: A })).toBe(0);
+        expect(await count("threadGoals", { userId: B })).toBe(1);
+    });
+
     it("deletes more than one batch of vault files, then the folders", async () => {
         await harness.run(async (ctx: any) => {
             const folderId = await ctx.db.insert("folders", { createdAt: 0, name: "Docs", updatedAt: 0, userId: A });

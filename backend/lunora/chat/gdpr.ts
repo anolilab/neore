@@ -8,11 +8,12 @@ import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
- * The user's pins, tags, goals and thread passcodes (relationships and grants are `agent/gdpr.ts`).
+ * The user's pins, tags and thread passcodes (relationships and grants are `agent/gdpr.ts`; goals go in batches
+ * with the run state, {@link erasePersistentStreamsForUser}).
  * A passcode row is the hash of a lock on one of their threads: it goes with them.
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const [pins, threadTags, passcodes, goals] = await Promise.all([
+    const [pins, threadTags, passcodes] = await Promise.all([
         ctx.db
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
@@ -25,27 +26,23 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
             .query("threadPasscodes")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .collect(),
-        ctx.db
-            .query("threadGoals")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect(),
     ]);
 
     await Promise.all([
         ...pins.map((p) => ctx.db.delete(p._id)),
         ...threadTags.map((tag) => ctx.db.delete(tag._id)),
         ...passcodes.map((row) => ctx.db.delete(row._id)),
-        ...goals.map((goal) => ctx.db.delete(goal._id)),
     ]);
 };
 
 /**
- * Tool-approval snapshots, then a stream per reply and every chunk of it. The
+ * Tool-approval snapshots and goals, then a stream per reply and every chunk of it. The
  * approval snapshots carry the run's final system prompt, which can hold memory
- * and personalisation text.
+ * and personalisation text; a goal carries the goal text and every verdict. One
+ * batch of each per call.
  */
 export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [streams, approvalRuns] = await Promise.all([
+    const [streams, approvalRuns, goals] = await Promise.all([
         ctx.db
             .query("persistentStreams")
             .withIndex("by_userId_status", (q) => q.eq("userId", userId))
@@ -54,9 +51,13 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .query("toolApprovalRuns")
             .withIndex("by_userId_status_createdAt", (q) => q.eq("userId", userId))
             .take(BATCH),
+        ctx.db
+            .query("threadGoals")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .take(BATCH),
     ]);
 
-    await Promise.all(approvalRuns.map(async (run) => await ctx.db.delete(run._id)));
+    await Promise.all([...approvalRuns, ...goals].map(async (row) => await ctx.db.delete(row._id)));
 
     const streamsLeft = await deleteParentsWithChildren(
         ctx,
@@ -68,7 +69,7 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
                 .take(BATCH),
     );
 
-    return { hasMore: streamsLeft || approvalRuns.length >= BATCH };
+    return { hasMore: streamsLeft || approvalRuns.length >= BATCH || goals.length >= BATCH };
 };
 
 /** The user's presentations, each after its slides. */
