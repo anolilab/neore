@@ -240,10 +240,13 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     const sizedForBackup = fallback?.canServe({ hasTools, messages: context.messages }) ? fallback.backupModelId : undefined;
     const messages = applyLateCompression(context.messages, modelId, sizedForBackup);
 
+    // The notes on the thread's older turns ride in the system prompt: they are reference material, not a turn.
+    const system = [(args as { system?: string }).system, context.threadNotes].filter(Boolean).join("\n\n");
     const aiArgs = {
         ...options.callSettings,
         providerOptions: options.providerOptions,
         ...omit(args, ["promptMessageId", "messages", "prompt"]),
+        ...(system !== "" && { system }),
         messages,
         model,
         stopWhen: args.stopWhen ?? (options.maxSteps ? stepCountIs(options.maxSteps) : undefined),

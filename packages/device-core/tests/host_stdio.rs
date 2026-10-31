@@ -189,7 +189,14 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
     let host = Host::start();
     let hello = host.next();
     let support = device_core::sandbox::support();
-    let confines = device_core::sandbox::policy_for_call(&support, false, false, &[], None).is_ok();
+    let confines = device_core::sandbox::policy_for_call(
+        &support,
+        false,
+        device_core::sandbox::NetworkTier::Off,
+        &[],
+        None,
+    )
+    .is_ok();
 
     assert_eq!(hello["kind"], "hello");
     assert_eq!(hello["protocol"], 3);

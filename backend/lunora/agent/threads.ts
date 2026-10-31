@@ -27,6 +27,7 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { patchesWithoutAwaitingInput } from "./table-writes";
+import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     const result = omit(thread, ["parentThreadIds"]);
@@ -442,6 +443,8 @@ export const deleteAllForThreadIdAsync = internalMutation
             if (passcode) {
                 await ctx.db.delete(passcode._id);
             }
+
+            await deleteThreadSummaries(ctx, args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,

@@ -21,6 +21,7 @@ pub mod actions;
 #[cfg(feature = "keychain")]
 pub mod approval;
 pub mod archive;
+pub mod egress;
 #[cfg(feature = "keychain")]
 pub mod engine;
 #[cfg(feature = "keychain")]

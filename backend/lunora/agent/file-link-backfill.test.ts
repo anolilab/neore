@@ -311,6 +311,26 @@ describe("the unindexed-chat sweep and the triggers", () => {
         expect(await stampOf(threadId)).toBeUndefined();
     });
 
+    it("locking a chat erases the context summaries made before the lock", async () => {
+        const threadId = await newThread();
+        const coveredUpToMessageId = await legacyMessage(threadId, 0);
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId,
+                    createdAt: 1,
+                    summary: "Salary talks.",
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        await as(OWNER).mutation(enableThreadLock as never, { passcode: PASSCODE, threadId } as never);
+
+        expect(await run(async (ctx) => await ctx.db.query("threadContextSummaries").collect())).toHaveLength(0);
+    });
+
     it("locking an unindexed chat again queues its walk, and an indexed one does not", async () => {
         const unindexed = await newThread(2);
         const indexed = await newThread(2);

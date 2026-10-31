@@ -12254,6 +12254,9 @@
                       "temporaryChatRetentionHours": {
                         "type": "number"
                       },
+                      "threadSummariesEnabled": {
+                        "type": "boolean"
+                      },
                       "threadTitleInstructions": {
                         "type": "string"
                       },
@@ -17622,6 +17625,12 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      "summaryEpoch": {
+                        "type": "number"
+                      },
+                      "summaryPathTooLongAt": {
+                        "type": "number"
                       },
                       "tagIds": {
                         "items": {

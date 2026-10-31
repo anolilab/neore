@@ -69,6 +69,8 @@ const AccountSettings: FC = () => {
     const currentLocation = userSettings?.location;
     const currentTimezone = userSettings?.timezone;
     const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
+    // OPT-IN: absent means off, matching the backend gate (`agent/thread-summaries.ts`).
+    const isThreadSummariesEnabled = userSettings?.threadSummariesEnabled === true;
     // Opt-in: absent means off.
     const isAutoReadReplies = userSettings?.autoReadReplies === true;
     const currentSpeechVoice = userSettings?.voiceModeVoice ?? DEFAULT_SPEECH_VOICE ?? null;
@@ -324,6 +326,28 @@ const AccountSettings: FC = () => {
                                     "enableFollowupSuggestions",
                                     checked,
                                     checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="thread-summaries">
+                                {t`Summarise long chats`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="thread-summaries-description">
+                                {t`Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="thread-summaries-description"
+                            checked={isThreadSummariesEnabled}
+                            id="thread-summaries"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "threadSummariesEnabled",
+                                    checked,
+                                    checked ? t`Long chats will be summarised` : t`Long chats will no longer be summarised`,
                                 );
                             }}
                         />

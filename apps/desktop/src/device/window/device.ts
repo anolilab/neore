@@ -7,8 +7,9 @@
  * with textContent only — never as HTML.
  */
 import { describeLink, multiplexingNote } from "../link-status";
-import type { FileEntry, HostView, Prompt, SettingsView } from "../types";
+import type { FileEntry, HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
+import { defaultServerTier, networkUnrestricted, serverNeedsAttention, serverSandboxText, tierAvailable } from "./server-network";
 
 /** Buttons stay disabled this long after a prompt appears, so a click meant for another window cannot land on "Allow". */
 const CLICK_THROUGH_GUARD_MS = 800;
@@ -666,6 +667,78 @@ const rootItem = (root: string): HTMLLIElement => {
     return item;
 };
 
+const NETWORK_LABELS: Record<NetworkTier, string> = {
+    dependencies: "Common dependencies only",
+    off: "Off",
+    on: "On",
+};
+
+const isNetworkTier = (value: string): value is NetworkTier => Object.hasOwn(NETWORK_LABELS, value);
+
+/** Asks before a tier that lets a program send data anywhere; the middle tier and Off need no confirmation. */
+const confirmTier = async (tier: NetworkTier, subject: string): Promise<boolean> =>
+    tier !== "on" || await globalThis.neoreDevice.confirm(`Allow ${subject} to use the network? An approved program could then send files or data to any server.`);
+
+/** One option list for every tier select; "Common dependencies only" is disabled where this computer cannot enforce it. */
+const tierSelectState = (select: HTMLSelectElement, view: SettingsView): void => {
+    const option = [...select.options].find((candidate) => candidate.value === "dependencies");
+
+    if (option !== undefined) {
+        option.disabled = view.dependenciesUnavailable !== null;
+        option.title = view.dependenciesUnavailable ?? "";
+    }
+};
+
+/** A server in the list: its command, whether it runs sandboxed here and under which network tier, and its controls. */
+const serverItem = (server: McpServer, serverStatus: McpServerStatus | undefined, view: SettingsView): HTMLLIElement => {
+    const item = listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () => removeServer(server.name));
+    const line = document.createElement("span");
+    const select = document.createElement("select");
+    const selectId = `server-tier-${server.name.replaceAll(/[^\w-]/g, "_")}`;
+    const label = document.createElement("label");
+
+    for (const tier of ["dependencies", "off", "on"] as const) {
+        const option = document.createElement("option");
+
+        option.value = tier;
+        option.textContent = NETWORK_LABELS[tier];
+        select.append(option);
+    }
+
+    select.id = selectId;
+    select.value = server.network;
+    tierSelectState(select, view);
+    select.addEventListener("change", async () => {
+        const tier = select.value;
+
+        if (!isNetworkTier(tier) || !await confirmTier(tier, `“${server.name}”`)) {
+            select.value = server.network;
+
+            return;
+        }
+
+        await update((latest) => {
+            return { mcpServers: latest.mcpServers.map((other) => other.name === server.name ? { ...other, network: tier } : other) };
+        });
+    });
+    label.htmlFor = selectId;
+    label.textContent = "Network: ";
+
+    // Not sandboxed, or sandboxed with its network open anyway, is a warning, not a footnote.
+    line.className = serverNeedsAttention(serverStatus) ? "warning" : "muted";
+    line.setAttribute("role", "status");
+    line.textContent = serverSandboxText(serverStatus);
+
+    item.append(document.createElement("br"), line);
+
+    // Without a sandbox nothing enforces a tier: say so instead of showing one as if it were.
+    if (!networkUnrestricted(serverStatus)) {
+        item.append(label, select);
+    }
+
+    return item;
+};
+
 const renderSettings = (): void => {
     if (state.settings === null) {
         return;
@@ -677,14 +750,23 @@ const renderSettings = (): void => {
     setHidden("unpair", !view.paired);
 
     ($("require-sandbox") as HTMLInputElement).checked = view.requireShellSandbox;
-    ($("allow-network") as HTMLInputElement).checked = view.allowShellNetwork;
-    const network = view.allowShellNetwork ? "allowed" : "blocked where the sandbox can enforce it (macOS and Linux). Windows does not restrict it";
-    const unsandboxed = view.requireShellSandbox ? "Shell commands are refused." : "Shell commands run with your full access.";
+    const shellNetwork = $("shell-network") as HTMLSelectElement;
+
+    tierSelectState(shellNetwork, view);
+    shellNetwork.value = view.shellNetwork;
+
+    const network = {
+        dependencies: "limited to common package registries and source hosts",
+        off: "blocked where the sandbox can enforce it (macOS and Linux). Windows does not restrict it",
+        on: "allowed",
+    }[view.shellNetwork];
+    const unsandboxed = view.requireShellSandbox ? "Shell commands and local MCP servers are refused." : "Shell commands and local MCP servers run with your full access.";
+    const dependencies = view.dependenciesUnavailable === null ? "" : ` “Common dependencies only” is not available on this computer: ${view.dependenciesUnavailable}.`;
 
     setText(
         "sandbox-status",
         view.sandboxUnavailable === null
-            ? `Shell commands can change files only in the shared folders. See the sandbox note in each approval for what else they can reach. Network access is ${network}.`
+            ? `Shell commands can change files only in the shared folders. See the sandbox note in each approval for what else they can reach. Network access for shell commands is ${network}.${dependencies}`
             : `Not available on this computer: ${view.sandboxUnavailable}. ${unsandboxed}`,
     );
 
@@ -696,10 +778,18 @@ const renderSettings = (): void => {
     announceLinkChanges(view.hosts);
     $("roots").replaceChildren(...view.roots.map((root) => rootItem(root)));
     $("servers").replaceChildren(
-        ...view.mcpServers.map((server) =>
-            listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () => removeServer(server.name)),
-        ),
+        ...view.mcpServers.map((server, index) => serverItem(server, view.mcpStatus[index], view)),
     );
+
+    const newServerNetwork = $("server-network") as HTMLSelectElement;
+
+    tierSelectState(newServerNetwork, view);
+
+    // A disabled option stays selected: where the middle tier cannot be enforced, a new server must not default to it.
+    if (isNetworkTier(newServerNetwork.value) && !tierAvailable(newServerNetwork.value, view)) {
+        newServerNetwork.value = defaultServerTier(view);
+    }
+
     $("rules").replaceChildren(
         ...view.allowRules.length === 0
             ? [listItem("None — every action asks.")]
@@ -993,21 +1083,18 @@ $("require-sandbox").addEventListener("change", async (event) => {
     });
 });
 
-$("allow-network").addEventListener("change", async (event) => {
-    const checkbox = event.target as HTMLInputElement;
-    const allowed = checkbox.checked;
+$("shell-network").addEventListener("change", async (event) => {
+    const select = event.target as HTMLSelectElement;
+    const tier = select.value;
 
-    if (
-        allowed
-        && !await globalThis.neoreDevice.confirm("Allow shell commands to use the network? An approved command could then send files or data to any server.")
-    ) {
-        checkbox.checked = false;
+    if (!isNetworkTier(tier) || !await confirmTier(tier, "shell commands")) {
+        select.value = state.settings?.shellNetwork ?? "off";
 
         return;
     }
 
     await update(() => {
-        return { allowShellNetwork: allowed };
+        return { shellNetwork: tier };
     });
 });
 
@@ -1037,8 +1124,25 @@ $("server-form").addEventListener("submit", async (event) => {
         .map((line) => line.trim())
         .filter(Boolean);
 
-    // The exact command line, confirmed once more: it will run as you.
-    if (!await globalThis.neoreDevice.confirm(`Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}`)) {
+    const tier = field("server-network");
+
+    if (!isNetworkTier(tier)) {
+        status("Choose a network setting.");
+
+        return;
+    }
+
+    if (!tierAvailable(tier, state.settings)) {
+        status(`“${NETWORK_LABELS[tier]}” is not available on this computer.`);
+
+        return;
+    }
+
+    // The exact command line, and the network it gets, confirmed once more: it will run as you, in the sandbox
+    // if this computer has one.
+    if (!await globalThis.neoreDevice.confirm(
+        `Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}\n\nNetwork: ${NETWORK_LABELS[tier]}.${tier === "on" ? " It can send files or data to any server." : ""}`,
+    )) {
         return;
     }
 
@@ -1051,9 +1155,14 @@ $("server-form").addEventListener("submit", async (event) => {
     );
 
     await update((latest) => {
-        return { mcpServers: [...latest.mcpServers, { args, command, env, name }] };
+        return { mcpServers: [...latest.mcpServers, { args, command, env, name, network: tier }] };
     });
     (event.target as HTMLFormElement).reset();
+
+    // `reset()` restores the markup's choice, the middle tier, which this computer may not be able to enforce.
+    if (state.settings !== null) {
+        ($("server-network") as HTMLSelectElement).value = defaultServerTier(state.settings);
+    }
 });
 
 // A link that drops or comes back while this window stays open: show the Retry / Stop reconnecting it now needs.

@@ -22,6 +22,7 @@
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
+ * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |

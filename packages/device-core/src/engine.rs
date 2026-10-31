@@ -20,14 +20,14 @@ use serde_json::{json, Value};
 
 use crate::acp_permission::AcpPermissions;
 use crate::actions::{
-    self, canonical_home, plan_builtin, platform, refused_root, shareable_roots, Action,
-    ShellSettings, MAX_ROOTS,
+    self, canonical_home, plan_builtin, plan_mcp_launch, platform, refused_root, shareable_roots,
+    Action, McpLaunch, ShellSettings, MAX_ROOTS,
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
 use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
-use crate::sandbox;
+use crate::sandbox::{self, NetworkTier};
 use crate::ssh::{HostLink, SshPaths, Target};
 use crate::store::{self, Host, Pairing, Settings};
 
@@ -146,7 +146,7 @@ impl DeviceState {
             acp_permissions: AcpPermissions::default(),
             audit_path: data_dir.join("device-audit.jsonl"),
             last_manifest_at: Mutex::new(0),
-            mcp: McpManager::default(),
+            mcp: McpManager::new(data_dir.join("mcp")),
             mcp_tools: Mutex::default(),
             save_lock: Mutex::default(),
             generation: AtomicU64::new(0),
@@ -377,14 +377,17 @@ impl DeviceState {
                 .pairing
                 .as_ref()
                 .map(|pairing| pairing.account_label.clone()),
-            allow_rules: settings.allow_rules,
-            allow_shell_network: settings.allow_shell_network,
+            allow_rules: settings.allow_rules.clone(),
+            allow_shell_network: settings.shell_network_tier() == NetworkTier::On,
             audit_path: self.audit_path.to_string_lossy().into_owned(),
+            dependencies_unavailable: sandbox::dependencies_support().err(),
             hosts,
-            mcp_servers: settings.mcp_servers,
+            mcp_status: mcp_status(&settings),
+            mcp_servers: settings.mcp_servers.clone(),
             paired: settings.pairing.is_some(),
             require_shell_sandbox: !settings.allow_unsandboxed_shell,
-            roots: settings.roots,
+            roots: settings.roots.clone(),
+            shell_network: settings.shell_network_tier(),
             sandbox_unavailable: match sandbox::support() {
                 sandbox::Support::Available(_) => None,
                 sandbox::Support::Unavailable(reason) => Some(reason),
@@ -433,6 +436,9 @@ impl DeviceState {
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
+        // Filled by the change below and acted on once it is saved: a save that fails deletes nothing.
+        let mut wipe: Vec<String> = Vec::new();
+
         self.change_settings_counted(true, |settings| {
             if let Some(roots) = update.roots {
                 settings.roots = validate_roots(&roots)?;
@@ -441,6 +447,9 @@ impl DeviceState {
             if let Some(servers) = update.mcp_servers {
                 validate_servers(&servers)?;
                 let changed = changed_server_names(&settings.mcp_servers, &servers);
+
+                // A removed server, or one with another command, does not inherit the caches of the old one.
+                wipe = servers_to_wipe(&settings.mcp_servers, &servers);
                 drop_rules_of_changed_servers(
                     &settings.mcp_servers,
                     &servers,
@@ -460,8 +469,14 @@ impl DeviceState {
                 settings.allow_unsandboxed_shell = !required;
             }
 
-            if let Some(allowed) = update.allow_shell_network {
-                settings.allow_shell_network = allowed;
+            if let Some(tier) = update.shell_network {
+                settings.set_shell_network(tier);
+            } else if let Some(allowed) = update.allow_shell_network {
+                settings.set_shell_network(if allowed {
+                    NetworkTier::On
+                } else {
+                    NetworkTier::Off
+                });
             }
 
             // Rules are only ever REMOVED here; one is added by answering "Always allow".
@@ -482,6 +497,7 @@ impl DeviceState {
 
             Ok(())
         })?;
+        self.mcp.forget(&wipe);
         self.drop_stale_connections();
 
         // A probe belongs to the pairing that is gone: the next account must not inherit an open connection.
@@ -795,8 +811,27 @@ impl DeviceState {
         let mut tools = builtin_tools(&shareable_roots(&settings.roots), "the user's computer");
         let mut mcp_tools = HashMap::new();
 
+        let roots = shareable_roots(&settings.roots);
+
         for server in &settings.mcp_servers {
-            match self.mcp.with(server, |process| process.list_tools()) {
+            // Listing the tools starts the server, so it is planned (and refused) exactly like a call: a server
+            // that may not run sandboxed offers no tools.
+            let launch = match plan_mcp_launch(server, &roots, settings.allow_unsandboxed_shell) {
+                Ok(launch) => launch,
+                Err(error) => {
+                    eprintln!(
+                        "[device-core] MCP server {} not started: {error}",
+                        server.name
+                    );
+                    // One started under the old settings keeps no access the new ones refuse.
+                    self.mcp.stop(&server.name);
+                    continue;
+                }
+            };
+
+            match self.mcp.with(server, launch.policy.as_ref(), |process| {
+                process.list_tools()
+            }) {
                 Ok(listed) => {
                     for tool in listed {
                         let name = mcp::tool_name(&server.name, &tool.name);
@@ -843,6 +878,57 @@ impl DeviceState {
                 "acpOffers": self.acp_offers(),
             }),
         ))
+    }
+}
+
+/// The servers whose private folder (caches) is deleted by a settings change: removed ones, and ones whose
+/// command line changed. A new network tier or env alone keeps its caches.
+fn servers_to_wipe(old: &[McpServerConfig], new: &[McpServerConfig]) -> Vec<String> {
+    old.iter()
+        .filter(|before| {
+            new.iter()
+                .find(|after| after.name == before.name)
+                .is_none_or(|after| after.command != before.command || after.args != before.args)
+        })
+        .map(|server| server.name.clone())
+        .collect()
+}
+
+/// What the settings view says about each configured server: whether it will run sandboxed, how, and why not.
+fn mcp_status(settings: &Settings) -> Vec<McpServerStatus> {
+    let roots = shareable_roots(&settings.roots);
+
+    settings
+        .mcp_servers
+        .iter()
+        .map(|server| {
+            server_status(
+                &server.name,
+                plan_mcp_launch(server, &roots, settings.allow_unsandboxed_shell),
+            )
+        })
+        .collect()
+}
+
+fn server_status(name: &str, launch: Result<McpLaunch, String>) -> McpServerStatus {
+    match launch {
+        Ok(launch) => McpServerStatus {
+            name: name.to_owned(),
+            network_gap: launch
+                .policy
+                .as_ref()
+                .and_then(|policy| policy.network_gap.clone()),
+            note: launch.note,
+            problem: None,
+            sandboxed: launch.policy.is_some(),
+        },
+        Err(problem) => McpServerStatus {
+            name: name.to_owned(),
+            network_gap: None,
+            note: String::new(),
+            problem: Some(problem),
+            sandboxed: false,
+        },
     }
 }
 
@@ -925,6 +1011,11 @@ fn sandbox_state(action: &Action) -> Option<SandboxState> {
             sandbox,
             sandbox_note,
             ..
+        }
+        | Action::Mcp {
+            sandbox,
+            sandbox_note,
+            ..
         } => Some(SandboxState {
             confined: sandbox.is_some(),
             note: sandbox_note.clone(),
@@ -942,7 +1033,7 @@ fn plan(
     let roots = shareable_roots(&settings.roots);
     let shell = ShellSettings {
         allow_unsandboxed: settings.allow_unsandboxed_shell,
-        allow_network: settings.allow_shell_network,
+        network: settings.shell_network_tier(),
     };
 
     if let Some(planned) = plan_builtin(tool, input, &roots, shell) {
@@ -962,10 +1053,15 @@ fn plan(
         .find(|config| &config.name == server)
         .ok_or("that MCP server was removed")?
         .clone();
+    // Planned here, and compared when the approval is re-checked, so a change to the shared folders, the tier or
+    // the sandbox setting while the prompt was open cancels the call instead of running it under the old terms.
+    let launch = plan_mcp_launch(&server, &roots, settings.allow_unsandboxed_shell)?;
 
     Ok(Action::Mcp {
         arguments: input.clone(),
         read_only: *read_only,
+        sandbox: launch.policy,
+        sandbox_note: launch.note,
         server,
         tool: tool.clone(),
     })
@@ -1110,27 +1206,51 @@ fn valid_pairing(device_id: &str, secret: &str, account_label: &str) -> bool {
 pub struct SettingsView {
     pub account_label: Option<String>,
     pub allow_rules: Vec<String>,
+    /// `shell_network == On`; kept for a window that predates the tiers.
     pub allow_shell_network: bool,
     pub audit_path: String,
+    /// `None` when the "common dependencies only" tier can be enforced here, else why not.
+    pub dependencies_unavailable: Option<String>,
     pub hosts: Vec<hosts::HostView>,
+    /// One per server in `mcp_servers`, in order.
+    pub mcp_status: Vec<McpServerStatus>,
     pub mcp_servers: Vec<McpServerConfig>,
     pub paired: bool,
     pub require_shell_sandbox: bool,
     pub roots: Vec<String>,
     /// `None` when shell commands can be sandboxed here, else why not.
     pub sandbox_unavailable: Option<String>,
+    /// How far shell commands may reach into the network.
+    pub shell_network: NetworkTier,
+}
+
+/// Whether a configured server will run sandboxed on this computer, as the settings view shows it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerStatus {
+    pub name: String,
+    /// Why a sandboxed server's network tier is not fully enforced here (Linux on a CPU the filter does not
+    /// cover, with the user having allowed that): the server runs sandboxed but its network is NOT blocked.
+    pub network_gap: Option<String>,
+    /// What the approval prompt says about its sandbox and network tier. Empty when it cannot run.
+    pub note: String,
+    /// Why it cannot start (no sandbox here and one is required, or its tier is unavailable).
+    pub problem: Option<String>,
+    pub sandboxed: bool,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
     pub allow_rules: Option<Vec<String>>,
+    /// The legacy switch: `true` is `On`, `false` is `Off`. `shell_network` wins when both are given.
     pub allow_shell_network: Option<bool>,
     /// One server's folders and shell policy.
     pub host: Option<HostUpdate>,
     pub mcp_servers: Option<Vec<McpServerConfig>>,
     pub require_shell_sandbox: Option<bool>,
     pub roots: Option<Vec<String>>,
+    pub shell_network: Option<NetworkTier>,
     #[serde(default)]
     pub unpair: bool,
 }
@@ -1377,12 +1497,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The next prompt a worker thread raises. Bounded: a call that is refused before it asks (a computer without
+    /// the sandbox the test assumed) raises none, and the sender lives in `state`, so an unbounded `recv` would
+    /// block until CI's job timeout instead of failing the test.
+    fn next_prompt(received: &std::sync::mpsc::Receiver<Event>) -> Prompt {
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+
+        loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+
+            match received.recv_timeout(left) {
+                Ok(Event::Prompt { prompt }) => return prompt,
+                Ok(_) => continue,
+                Err(_) => {
+                    panic!("no prompt was raised within 30 s: the call was refused before it asked")
+                }
+            }
+        }
+    }
+
     fn server(name: &str, command: &str) -> McpServerConfig {
         McpServerConfig {
             args: Vec::new(),
             command: command.to_owned(),
             env: Default::default(),
             name: name.to_owned(),
+            // What a server saved without a tier gets here: "dependencies only" exists on macOS alone, so a
+            // fixed tier would differ from the one a settings update parses on Linux and Windows.
+            network: mcp::default_network(),
         }
     }
 
@@ -1509,10 +1651,13 @@ mod tests {
             command: "git".into(),
             env: Default::default(),
             name: "git".into(),
+            network: NetworkTier::Dependencies,
         };
         let mcp = |read_only| Action::Mcp {
             arguments: json!({}),
             read_only,
+            sandbox: None,
+            sandbox_note: String::new(),
             server: server.clone(),
             tool: "status".into(),
         };
@@ -1654,6 +1799,207 @@ mod tests {
     }
 
     #[test]
+    fn an_mcp_prompt_names_the_sandbox_and_the_servers_network_tier() {
+        let dir = std::env::temp_dir();
+        let tools = HashMap::from([(
+            "mcp__files__read".to_owned(),
+            McpToolRef {
+                server: "files".into(),
+                tool: "read".into(),
+                read_only: true,
+            },
+        )]);
+        let planned = |network| {
+            let settings = Settings {
+                allow_unsandboxed_shell: true,
+                mcp_servers: vec![McpServerConfig {
+                    network,
+                    ..server("files", "files-mcp")
+                }],
+                roots: vec![dir.to_string_lossy().into_owned()],
+                ..Settings::default()
+            };
+
+            plan("mcp__files__read", &json!({}), &settings, &tools)
+        };
+
+        // Posed by this computer: sandboxed servers say so, and the tier they run under.
+        match sandbox::support() {
+            sandbox::Support::Available(_) => {
+                let off = planned(NetworkTier::Off).unwrap();
+                let on = planned(NetworkTier::On).unwrap();
+
+                assert!(off.detail().starts_with("Sandboxed ("), "{}", off.detail());
+                assert!(off.detail().contains("private folder"));
+                assert!(
+                    matches!(&off, Action::Mcp { sandbox: Some(policy), .. } if policy.network == NetworkTier::Off)
+                );
+                assert!(
+                    matches!(&on, Action::Mcp { sandbox: Some(policy), .. } if policy.network == NetworkTier::On)
+                );
+                assert!(off != on);
+                assert!(sandbox_state(&off).is_some_and(|state| state.confined));
+
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                {
+                    assert!(off.detail().contains("blocked"), "{}", off.detail());
+                    assert!(on.detail().contains("Network access is allowed"));
+                }
+
+                #[cfg(target_os = "macos")]
+                assert!(planned(NetworkTier::Dependencies)
+                    .unwrap()
+                    .detail()
+                    .contains("common package registries and source hosts"));
+                #[cfg(target_os = "linux")]
+                assert!(planned(NetworkTier::Dependencies)
+                    .err()
+                    .unwrap()
+                    .contains("Common dependencies only"));
+            }
+            sandbox::Support::Unavailable(_) => {
+                // Allowed unsandboxed in this test: it runs, and the prompt says it is not confined.
+                let action = planned(NetworkTier::Off).unwrap();
+
+                assert!(action.detail().starts_with("NOT sandboxed"));
+                assert!(sandbox_state(&action).is_some_and(|state| !state.confined));
+            }
+        }
+    }
+
+    #[test]
+    fn an_mcp_server_is_refused_where_there_is_no_sandbox_and_one_is_required() {
+        // Only meaningful on a computer without a sandbox; elsewhere the same refusal is pinned in `sandbox.rs`.
+        if !matches!(sandbox::support(), sandbox::Support::Unavailable(_)) {
+            return;
+        }
+
+        let settings = Settings {
+            mcp_servers: vec![server("files", "files-mcp")],
+            ..Settings::default()
+        };
+        let tools = HashMap::from([(
+            "mcp__files__read".to_owned(),
+            McpToolRef {
+                server: "files".into(),
+                tool: "read".into(),
+                read_only: true,
+            },
+        )]);
+        let error = plan("mcp__files__read", &json!({}), &settings, &tools)
+            .err()
+            .unwrap();
+
+        assert!(error.contains("local MCP servers must run sandboxed"));
+        assert!(error.contains("Require sandbox for shell commands and local MCP servers"));
+
+        let status = mcp_status(&settings);
+
+        assert!(!status[0].sandboxed && status[0].problem.is_some());
+    }
+
+    #[test]
+    fn a_status_carries_the_network_gap_of_a_sandboxed_server() {
+        let launch = |gap: Option<&str>| McpLaunch {
+            note: "Sandboxed".into(),
+            policy: Some(sandbox::Policy {
+                network_gap: gap.map(str::to_owned),
+                ..sandbox::Policy::for_roots(&[], None)
+            }),
+        };
+
+        let gapped = server_status("a", Ok(launch(Some("no seccomp here"))));
+
+        assert!(gapped.sandboxed);
+        assert_eq!(gapped.network_gap.as_deref(), Some("no seccomp here"));
+        assert_eq!(server_status("a", Ok(launch(None))).network_gap, None);
+        assert_eq!(
+            server_status(
+                "a",
+                Ok(McpLaunch {
+                    note: String::new(),
+                    policy: None
+                })
+            )
+            .network_gap,
+            None
+        );
+        assert_eq!(server_status("a", Err("no".into())).network_gap, None);
+    }
+
+    #[test]
+    fn the_settings_view_reports_each_servers_sandbox_and_whether_the_dependencies_tier_exists() {
+        let settings = Settings {
+            allow_unsandboxed_shell: true,
+            mcp_servers: vec![server("a", "a-mcp")],
+            ..Settings::default()
+        };
+        let status = mcp_status(&settings);
+
+        assert_eq!(status.len(), 1);
+        assert_eq!(status[0].name, "a");
+        assert_eq!(
+            status[0].sandboxed,
+            matches!(sandbox::support(), sandbox::Support::Available(_))
+        );
+
+        #[cfg(target_os = "macos")]
+        assert!(sandbox::dependencies_support().is_ok());
+        #[cfg(target_os = "linux")]
+        assert!(sandbox::dependencies_support().is_err());
+    }
+
+    #[test]
+    fn the_shell_network_tier_is_set_by_name_or_by_the_legacy_switch() {
+        let dir = std::env::temp_dir().join(format!("neore-device-tier-{}", std::process::id()));
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+        let tier = |json: &str| {
+            state
+                .settings_update(serde_json::from_str(json).unwrap())
+                .unwrap()
+                .shell_network
+        };
+
+        assert_eq!(state.settings_view().shell_network, NetworkTier::Off);
+        assert_eq!(
+            tier(r#"{"shellNetwork":"dependencies"}"#),
+            NetworkTier::Dependencies
+        );
+        assert!(!state.settings_view().allow_shell_network);
+        assert_eq!(tier(r#"{"shellNetwork":"on"}"#), NetworkTier::On);
+        assert!(state.settings_view().allow_shell_network);
+        assert_eq!(tier(r#"{"allowShellNetwork":false}"#), NetworkTier::Off);
+        // Both given: the named tier wins.
+        assert_eq!(
+            tier(r#"{"allowShellNetwork":true,"shellNetwork":"dependencies"}"#),
+            NetworkTier::Dependencies
+        );
+
+        // The new tier reaches the shell planner, and an unknown name is not a tier.
+        assert!(serde_json::from_str::<SettingsUpdate>(r#"{"shellNetwork":"all"}"#).is_err());
+        assert_eq!(
+            state.settings().shell_network_tier(),
+            NetworkTier::Dependencies
+        );
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn only_removed_servers_and_changed_commands_lose_their_caches() {
+        let old = vec![
+            server("keep", "k"),
+            server("gone", "g"),
+            server("swap", "s"),
+        ];
+        let mut tier_only = server("keep", "k");
+        tier_only.network = NetworkTier::On;
+        let new = vec![tier_only, server("swap", "other")];
+
+        assert_eq!(servers_to_wipe(&old, &new), vec!["gone", "swap"]);
+    }
+
+    #[test]
     fn signs_progress_reports_for_the_backend() {
         let secret = "0123456789abcdef".repeat(4);
         let report = progress_report(&secret, "dev1", "call1", "prompting", 42);
@@ -1745,12 +2091,7 @@ mod tests {
 
                 std::thread::spawn(move || state.execute(&signed))
             };
-            let prompt = loop {
-                match received.recv().unwrap() {
-                    Event::Prompt { prompt } => break prompt,
-                    _ => continue,
-                }
-            };
+            let prompt = next_prompt(&received);
 
             state.prompt_answer(prompt.id, answer).unwrap();
 
@@ -1904,11 +2245,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         state
             .settings_update(serde_json::from_str(r#"{"roots":[]}"#).unwrap())
@@ -1946,6 +2283,8 @@ mod tests {
                     device_id: "dev1".into(),
                     secret: secret.clone(),
                 }),
+                // Windows has no sandbox: the call only gets as far as asking if it may run without one.
+                allow_unsandboxed_shell: true,
                 mcp_servers: vec![server("git", "git-mcp")],
                 ..Settings::default()
             },
@@ -1981,11 +2320,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         state
             .settings_update(
@@ -2133,11 +2468,7 @@ mod tests {
 
             std::thread::spawn(move || state.execute(&signed))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
 
         (state, worker, prompt.id, dir)
     }
@@ -2309,11 +2640,7 @@ mod tests {
 
             std::thread::spawn(move || state.pair("dev-repair", &"b".repeat(64), "me"))
         };
-        let prompt = loop {
-            if let Event::Prompt { prompt } = received.recv().unwrap() {
-                break prompt;
-            }
-        };
+        let prompt = next_prompt(&received);
         state.prompt_answer(prompt.id, "once").unwrap();
         assert!(worker.join().unwrap().unwrap());
 
@@ -2335,6 +2662,8 @@ mod tests {
         store::save(
             &dir.join("device.json"),
             &Settings {
+                // Windows has no sandbox: planning a call to a server needs leave to run it without one.
+                allow_unsandboxed_shell: true,
                 mcp_servers: vec![server("x", "x-mcp")],
                 ..Settings::default()
             },

@@ -713,6 +713,9 @@ export const vThreadDocFields = {
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
     snoozedUntil: v.optional(v.number()),
     status: vThreadStatus,
+    // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).
+    summaryEpoch: v.optional(v.number()),
+    summaryPathTooLongAt: v.optional(v.number()),
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),

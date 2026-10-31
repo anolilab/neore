@@ -3009,7 +3009,7 @@ msgstr "Âmbar"
 msgid "Amount"
 msgstr "Valor"
 
-#: src/features/settings/components/account/account-settings.tsx:95
+#: src/features/settings/components/account/account-settings.tsx:97
 msgid "Amsterdam"
 msgstr "Amsterdã"
 
@@ -3314,7 +3314,7 @@ msgstr "App Secret em App settings > Basic do seu app da Meta, usado para verifi
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:232
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:152
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
 msgstr "Aparência"
@@ -3678,7 +3678,7 @@ msgstr "Tentativa"
 msgid "Attempts: {0}"
 msgstr "Tentativas: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Auckland"
 msgstr "Auckland"
 
@@ -3805,7 +3805,7 @@ msgstr ""
 msgid "Auto-merge is on."
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:334
+#: src/features/settings/components/account/account-settings.tsx:358
 msgid "Auto-read replies"
 msgstr "Ler respostas automaticamente"
 
@@ -3817,15 +3817,15 @@ msgstr "Salvamento automático"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Automático: executa sem perguntar. Perguntar: pausa para você Aprovar / Negar. Desativado: o assistente nunca vê a ferramenta. Automações (gatilhos, bots de mensageiros, fluxos de trabalho) não podem perguntar, então ferramentas em \"Perguntar\" ficam indisponíveis nelas. Ferramentas MCP usam Perguntar por padrão, a menos que o servidor as marque como somente leitura."
 
-#: src/features/settings/components/account/account-settings.tsx:397
+#: src/features/settings/components/account/account-settings.tsx:421
 msgid "Autocomplete disabled"
 msgstr "Preenchimento automático desativado"
 
-#: src/features/settings/components/account/account-settings.tsx:397
+#: src/features/settings/components/account/account-settings.tsx:421
 msgid "Autocomplete enabled"
 msgstr "Preenchimento automático ativado"
 
-#: src/features/settings/components/account/account-settings.tsx:386
+#: src/features/settings/components/account/account-settings.tsx:410
 msgid "Autocomplete while typing"
 msgstr "Preenchimento automático ao digitar"
 
@@ -4157,7 +4157,7 @@ msgstr "Antes"
 msgid "beginner"
 msgstr "iniciante"
 
-#: src/features/settings/components/account/account-settings.tsx:177
+#: src/features/settings/components/account/account-settings.tsx:179
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Behavior"
 msgstr "Comportamento"
@@ -4190,7 +4190,7 @@ msgstr "Bengali"
 msgid "Bengali (Bangladesh)"
 msgstr "Bengali (Bangladesh)"
 
-#: src/features/settings/components/account/account-settings.tsx:92
+#: src/features/settings/components/account/account-settings.tsx:94
 msgid "Berlin"
 msgstr "Berlim"
 
@@ -5151,7 +5151,7 @@ msgstr "CB até {circuitBreakerUntil}"
 msgid "Center"
 msgstr "Centro"
 
-#: src/features/settings/components/account/account-settings.tsx:85
+#: src/features/settings/components/account/account-settings.tsx:87
 msgid "Central Time (US & Canada)"
 msgstr "Horário Central (EUA e Canadá)"
 
@@ -5282,7 +5282,7 @@ msgstr "chat"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/settings/components/account/account-settings.tsx:310
+#: src/features/settings/components/account/account-settings.tsx:312
 #: src/features/settings/components/chat/bots-settings.tsx:172
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
@@ -5511,7 +5511,7 @@ msgstr "Escolha como o Neore avisa sobre trabalho concluído e o que precisa de 
 #~ msgid "Choose how to send messages in the chat."
 #~ msgstr "Escolha como enviar mensagens no chat."
 
-#: src/features/settings/components/account/account-settings.tsx:183
+#: src/features/settings/components/account/account-settings.tsx:185
 msgid "Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends."
 msgstr ""
 
@@ -5776,7 +5776,7 @@ msgstr "Clicar em \"{selector}\""
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clique em ★ em qualquer modelo em Todos os modelos para adicioná-lo aqui."
 
-#: src/features/settings/components/account/account-settings.tsx:197
+#: src/features/settings/components/account/account-settings.tsx:199
 msgid "Click button to send"
 msgstr "Clique no botão para enviar"
 
@@ -6509,7 +6509,7 @@ msgstr "Ramificação condicional"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Configure módulos avançados do agente de IA para executar tarefas melhor"
 
-#: src/features/settings/components/account/account-settings.tsx:310
+#: src/features/settings/components/account/account-settings.tsx:312
 msgid "Configure chat behavior and preferences."
 msgstr "Configure o comportamento e as preferências do chat."
 
@@ -6517,11 +6517,11 @@ msgstr "Configure o comportamento e as preferências do chat."
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configure o modelo padrão, o esforço de raciocínio e os recursos para novos chats criados neste projeto."
 
-#: src/features/settings/components/account/account-settings.tsx:177
+#: src/features/settings/components/account/account-settings.tsx:179
 msgid "Configure how the application behaves."
 msgstr "Configure como o aplicativo se comporta."
 
-#: src/features/settings/components/account/account-settings.tsx:204
+#: src/features/settings/components/account/account-settings.tsx:206
 msgid "Configure language preferences and location settings."
 msgstr "Configure as preferências de idioma e as configurações de localização."
 
@@ -6546,7 +6546,7 @@ msgstr "Configure o contato de cobrança e os modelos de IA disponíveis"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "Configure os limites e os tamanhos de lote para a limpeza de usuários anônimos"
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:517
 msgid "Configure UI preferences and display options."
 msgstr "Configure as preferências da interface e as opções de exibição."
 
@@ -7033,7 +7033,7 @@ msgstr "Controle as políticas de tratamento e retenção de dados dos provedore
 msgid "Control depth of field with aperture setting"
 msgstr "Controle a profundidade de campo com a abertura"
 
-#: src/features/settings/components/account/account-settings.tsx:129
+#: src/features/settings/components/account/account-settings.tsx:131
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Controle como suas informações pessoais são exibidas na interface."
 
@@ -8263,7 +8263,7 @@ msgstr "Personalizar e gerar novamente"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "Personalize os atalhos de teclado para ações comuns. Clique em \"Gravar\" e pressione a combinação de teclas desejada."
 
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:152
 msgid "Customize the appearance of the application."
 msgstr "Personalize a aparência do aplicativo."
 
@@ -8567,7 +8567,7 @@ msgstr "Padrão"
 msgid "Default agent"
 msgstr "Agente padrão"
 
-#: src/features/settings/components/account/account-settings.tsx:208
+#: src/features/settings/components/account/account-settings.tsx:210
 #: src/features/settings/lib/settings-keywords.ts:29
 msgid "Default AI Response Language"
 msgstr "Idioma padrão das respostas da IA"
@@ -8580,20 +8580,20 @@ msgstr "Configurações padrão da IA"
 msgid "Default branch"
 msgstr "Branch padrão"
 
-#: src/features/settings/components/account/account-settings.tsx:233
+#: src/features/settings/components/account/account-settings.tsx:235
 #: src/features/settings/lib/settings-keywords.ts:30
 msgid "Default Dictation Language"
 msgstr "Idioma padrão de ditado"
 
-#: src/features/settings/components/account/account-settings.tsx:235
+#: src/features/settings/components/account/account-settings.tsx:237
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "Idioma padrão de ditado para novas conversas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:210
+#: src/features/settings/components/account/account-settings.tsx:212
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "Idioma padrão das respostas da IA em novas conversas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:213
+#: src/features/settings/components/account/account-settings.tsx:215
 msgid "Default language updated"
 msgstr "Idioma padrão atualizado"
 
@@ -9334,7 +9334,7 @@ msgstr "Tema de diagramas atualizado"
 msgid "Diamond"
 msgstr "Losango"
 
-#: src/features/settings/components/account/account-settings.tsx:238
+#: src/features/settings/components/account/account-settings.tsx:240
 msgid "Dictation language updated"
 msgstr "Idioma de ditado atualizado"
 
@@ -9489,7 +9489,7 @@ msgstr "Exibir os nomes dos modelos nos resultados"
 msgid "Display results"
 msgstr "Exibir resultados"
 
-#: src/features/settings/components/account/account-settings.tsx:500
+#: src/features/settings/components/account/account-settings.tsx:524
 msgid "Display timestamps on messages."
 msgstr "Exibir data e hora nas mensagens."
 
@@ -9848,7 +9848,7 @@ msgstr "Simulação (só pré-visualização — nada é excluído)"
 msgid "Dry run complete"
 msgstr "Simulação concluída"
 
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Dubai"
 msgstr "Dubai"
 
@@ -10004,7 +10004,7 @@ msgstr "Acesso antecipado aos próximos recursos de modelos da Alibaba"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "Early adopters que querem experimentar os recursos Flash de nova geração do Google"
 
-#: src/features/settings/components/account/account-settings.tsx:84
+#: src/features/settings/components/account/account-settings.tsx:86
 msgid "Eastern Time (US & Canada)"
 msgstr "Horário do Leste (EUA e Canadá)"
 
@@ -10493,7 +10493,7 @@ msgstr "Ativar o modo Deep Work"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "Ative o modo Deep Work para tarefas complexas em várias etapas. A IA fará até 25 iterações para concluir sua solicitação."
 
-#: src/features/settings/components/account/account-settings.tsx:315
+#: src/features/settings/components/account/account-settings.tsx:317
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "Enable Follow-up Suggestions"
 msgstr "Ativar sugestões de continuação"
@@ -10854,7 +10854,7 @@ msgstr "Digite seu nome completo ou nome de exibição"
 msgid "Enter your information to create an account"
 msgstr "Preencha seus dados para criar uma conta"
 
-#: src/features/settings/components/account/account-settings.tsx:280
+#: src/features/settings/components/account/account-settings.tsx:282
 msgid "Enter your location"
 msgstr "Digite sua localização"
 
@@ -12180,7 +12180,7 @@ msgstr "Não foi possível salvar o provedor"
 msgid "Failed to save rating"
 msgstr "Falha ao salvar a avaliação"
 
-#: src/features/settings/components/account/account-settings.tsx:119
+#: src/features/settings/components/account/account-settings.tsx:121
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
 #: src/features/settings/components/personalization/personalization-settings.tsx:113
 #: src/features/settings/components/personalization/personalization-settings.tsx:190
@@ -13180,11 +13180,11 @@ msgstr "Siga estas etapas para conectar sua conta do {platform}."
 msgid "follow up"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:326
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Follow-up suggestions disabled"
 msgstr "Sugestões de continuação desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:326
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Follow-up suggestions enabled"
 msgstr "Sugestões de continuação ativadas"
 
@@ -14569,7 +14569,7 @@ msgstr "Modo mãos-livres desativado"
 msgid "Hands-free mode stopped: {0}"
 msgstr "Modo mãos-livres interrompido: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:353
+#: src/features/settings/components/account/account-settings.tsx:377
 msgid "Hands-free voice"
 msgstr "Voz do modo mãos-livres"
 
@@ -14577,7 +14577,7 @@ msgstr "Voz do modo mãos-livres"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "Modo de voz mãos-livres — fale, e as respostas são lidas em voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:364
+#: src/features/settings/components/account/account-settings.tsx:388
 msgid "Hands-free voice updated"
 msgstr "Voz do modo mãos-livres atualizada"
 
@@ -14684,7 +14684,7 @@ msgstr "Ocultar saída"
 msgid "Hide password"
 msgstr "Ocultar senha"
 
-#: src/features/settings/components/account/account-settings.tsx:134
+#: src/features/settings/components/account/account-settings.tsx:136
 #: src/features/settings/lib/settings-keywords.ts:26
 msgid "Hide Personal Information"
 msgstr "Ocultar informações pessoais"
@@ -14702,7 +14702,7 @@ msgstr "Ocultar histórico de execuções"
 msgid "Hide translation"
 msgstr "Ocultar tradução"
 
-#: src/features/settings/components/account/account-settings.tsx:136
+#: src/features/settings/components/account/account-settings.tsx:138
 msgid "Hides your name and email from the UI."
 msgstr "Oculta seu nome e e-mail da interface."
 
@@ -14922,7 +14922,7 @@ msgid "Honduras"
 msgstr "Honduras"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:100
+#: src/features/settings/components/account/account-settings.tsx:102
 msgid "Hong Kong"
 msgstr "Hong Kong"
 
@@ -14985,7 +14985,7 @@ msgstr "Como funciona o roteamento inteligente?"
 msgid "How is Neore different from ChatGPT?"
 msgstr "Qual é a diferença entre o Neore e o ChatGPT?"
 
-#: src/features/settings/components/account/account-settings.tsx:443
+#: src/features/settings/components/account/account-settings.tsx:467
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "Por quanto tempo os chats temporários são mantidos antes de serem excluídos automaticamente. Padrão: 24 horas."
 
@@ -16443,7 +16443,7 @@ msgstr ""
 msgid "Language"
 msgstr "Linguagem"
 
-#: src/features/settings/components/account/account-settings.tsx:204
+#: src/features/settings/components/account/account-settings.tsx:206
 #: src/features/settings/lib/settings-keywords.ts:29
 #: src/features/settings/lib/settings-keywords.ts:30
 #: src/features/settings/lib/settings-keywords.ts:31
@@ -16784,7 +16784,7 @@ msgstr "Esquerda"
 msgid "Left organization successfully"
 msgstr "Você saiu da organização"
 
-#: src/features/settings/components/account/account-settings.tsx:169
+#: src/features/settings/components/account/account-settings.tsx:171
 msgid "Left to Right (LTR)"
 msgstr "Da esquerda para a direita (LTR)"
 
@@ -17327,12 +17327,12 @@ msgstr ""
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "Somente localhost ou 127.0.0.1. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:258
+#: src/features/settings/components/account/account-settings.tsx:260
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "Location"
 msgstr "Localização"
 
-#: src/features/settings/components/account/account-settings.tsx:268
+#: src/features/settings/components/account/account-settings.tsx:270
 msgid "Location updated"
 msgstr "Localização atualizada"
 
@@ -17398,9 +17398,17 @@ msgstr "Logo"
 msgid "logos"
 msgstr "logotipos"
 
-#: src/features/settings/components/account/account-settings.tsx:90
+#: src/features/settings/components/account/account-settings.tsx:92
 msgid "London"
 msgstr "Londres"
+
+#: src/features/settings/components/account/account-settings.tsx:350
+msgid "Long chats will be summarised"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:350
+msgid "Long chats will no longer be summarised"
+msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:386
 msgid "Long code blocks limited"
@@ -17563,7 +17571,7 @@ msgstr "Macro"
 msgid "Macro telephoto, tight framing"
 msgstr "Macro teleobjetiva, enquadramento fechado"
 
-#: src/features/settings/components/account/account-settings.tsx:94
+#: src/features/settings/components/account/account-settings.tsx:96
 msgid "Madrid"
 msgstr "Madri"
 
@@ -17997,7 +18005,7 @@ msgstr "Médio-baixo"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "Geração de vídeo de qualidade média com as melhorias mais recentes do Wan da Alibaba para uso geral"
 
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Melbourne"
 msgstr "Melbourne"
 
@@ -18797,7 +18805,7 @@ msgstr "Prompt de movimento"
 msgid "Motion: {motionPercent}%"
 msgstr "Movimento: {motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:86
+#: src/features/settings/components/account/account-settings.tsx:88
 msgid "Mountain Time (US & Canada)"
 msgstr "Horário das Montanhas (EUA e Canadá)"
 
@@ -18967,7 +18975,7 @@ msgstr "Tarefas multimodais em que o M2 da MiniMax oferece compreensão confiáv
 msgid "multiple images"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Mumbai, Kolkata"
 msgstr "Mumbai, Calcutá"
 
@@ -20585,6 +20593,10 @@ msgstr ""
 msgid "Off"
 msgstr "Desativado"
 
+#: src/features/settings/components/account/account-settings.tsx:339
+msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
+msgstr ""
+
 #: src/features/devices/components/device-scope.tsx:126
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
 msgstr ""
@@ -21377,7 +21389,7 @@ msgstr ""
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:434
+#: src/features/settings/components/account/account-settings.tsx:458
 msgid "Opening a blank chat"
 msgstr "Abrindo um chat em branco"
 
@@ -21389,7 +21401,7 @@ msgstr "Abrindo um pull request — o progresso está no log"
 msgid "Opening pull request…"
 msgstr "Abrindo pull request…"
 
-#: src/features/settings/components/account/account-settings.tsx:425
+#: src/features/settings/components/account/account-settings.tsx:449
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Abrir o assistente sem uma conversa leva você à mais recente, em vez de um chat em branco."
 
@@ -21785,7 +21797,7 @@ msgstr "Substituir pela minha"
 msgid "Owner"
 msgstr "Proprietário"
 
-#: src/features/settings/components/account/account-settings.tsx:87
+#: src/features/settings/components/account/account-settings.tsx:89
 msgid "Pacific Time (US & Canada)"
 msgstr "Horário do Pacífico (EUA e Canadá)"
 
@@ -21899,7 +21911,7 @@ msgstr "Comparação paralela"
 msgid "Parent chat"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:91
+#: src/features/settings/components/account/account-settings.tsx:93
 msgid "Paris"
 msgstr "Paris"
 
@@ -22251,11 +22263,11 @@ msgstr "Pessoal"
 msgid "Personal Account"
 msgstr "Conta pessoal"
 
-#: src/features/settings/components/account/account-settings.tsx:143
+#: src/features/settings/components/account/account-settings.tsx:145
 msgid "Personal information is now hidden"
 msgstr "Suas informações pessoais agora estão ocultas"
 
-#: src/features/settings/components/account/account-settings.tsx:143
+#: src/features/settings/components/account/account-settings.tsx:145
 msgid "Personal information is now visible"
 msgstr "Suas informações pessoais agora estão visíveis"
 
@@ -22457,7 +22469,7 @@ msgstr "Plataforma"
 msgid "Play"
 msgstr "Reproduzir"
 
-#: src/features/settings/components/account/account-settings.tsx:516
+#: src/features/settings/components/account/account-settings.tsx:540
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Tocar um som curto quando uma resposta terminar. Aplica-se apenas a este navegador."
 
@@ -22826,7 +22838,7 @@ msgstr ""
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:195
+#: src/features/settings/components/account/account-settings.tsx:197
 msgid "Press Enter to send"
 msgstr "Pressione Enter para enviar"
 
@@ -22834,7 +22846,7 @@ msgstr "Pressione Enter para enviar"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Pressione Enter para enviar, Shift+Enter para nova linha"
 
-#: src/features/settings/components/account/account-settings.tsx:407
+#: src/features/settings/components/account/account-settings.tsx:431
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, w b, 0 $, i a I A, o O, x, dd, D e u. Enter continua enviando. Desativado por padrão."
 
@@ -22842,7 +22854,7 @@ msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, 
 msgid "Press keys..."
 msgstr "Pressione as teclas..."
 
-#: src/features/settings/components/account/account-settings.tsx:196
+#: src/features/settings/components/account/account-settings.tsx:198
 msgid "Press Shift+Enter to send"
 msgstr "Pressione Shift+Enter para enviar"
 
@@ -23021,7 +23033,7 @@ msgstr ""
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:129
+#: src/features/settings/components/account/account-settings.tsx:131
 #: src/features/settings/components/chat/model-filter-settings.tsx:361
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:115
@@ -23734,7 +23746,7 @@ msgstr "Seed aleatória"
 msgid "Range to keep"
 msgstr "Intervalo a manter"
 
-#: src/features/settings/components/account/account-settings.tsx:487
+#: src/features/settings/components/account/account-settings.tsx:511
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "Intervalo: de 1 hora a 7 dias (168 horas)"
 
@@ -23806,7 +23818,7 @@ msgstr "Leitura e escrita"
 msgid "Read aloud"
 msgstr "Ler em voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:336
+#: src/features/settings/components/account/account-settings.tsx:360
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "Ler em voz alta cada resposta do assistente ao terminar, usando a voz do navegador."
 
@@ -24727,11 +24739,11 @@ msgstr "As respostas podem pesquisar, gerar imagens e mais, cobradas na sua cont
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "As respostas usam o reply token gratuito quando a resposta é rápida e, quando não é, recorrem a uma push message (que conta na sua cota do LINE)."
 
-#: src/features/settings/components/account/account-settings.tsx:345
+#: src/features/settings/components/account/account-settings.tsx:369
 msgid "Replies will be read aloud"
 msgstr "As respostas serão lidas em voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:345
+#: src/features/settings/components/account/account-settings.tsx:369
 msgid "Replies will no longer be read aloud"
 msgstr "As respostas não serão mais lidas em voz alta"
 
@@ -25025,16 +25037,16 @@ msgstr "Retomar"
 msgid "Resume import"
 msgstr "Retomar importação"
 
-#: src/features/settings/components/account/account-settings.tsx:422
+#: src/features/settings/components/account/account-settings.tsx:446
 msgid "Resume your latest chat"
 msgstr "Retomar seu último chat"
 
-#: src/features/settings/components/account/account-settings.tsx:434
+#: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
 msgstr "Retomando seu último chat"
 
-#: src/features/settings/components/account/account-settings.tsx:455
-#: src/features/settings/components/account/account-settings.tsx:480
+#: src/features/settings/components/account/account-settings.tsx:479
+#: src/features/settings/components/account/account-settings.tsx:504
 msgid "Retention period updated to {hours} hours"
 msgstr "Período de retenção atualizado para {hours} horas"
 
@@ -25213,7 +25225,7 @@ msgstr "Direita"
 msgid "right to left"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:170
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Right to Left (RTL)"
 msgstr "Da direita para a esquerda (RTL)"
 
@@ -25253,7 +25265,7 @@ msgstr "Romeno"
 msgid "Romanian (Romania)"
 msgstr "Romeno (Romênia)"
 
-#: src/features/settings/components/account/account-settings.tsx:93
+#: src/features/settings/components/account/account-settings.tsx:95
 msgid "Rome"
 msgstr "Roma"
 
@@ -26104,7 +26116,7 @@ msgstr "Selecione uma versão para pré-visualizar"
 msgid "Select a version to see changes"
 msgstr "Selecione uma versão para ver as alterações"
 
-#: src/features/settings/components/account/account-settings.tsx:369
+#: src/features/settings/components/account/account-settings.tsx:393
 msgid "Select a voice"
 msgstr "Selecione uma voz"
 
@@ -26144,7 +26156,7 @@ msgstr "Selecionar como referência"
 msgid "Select by date"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:243
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Select dictation language"
 msgstr "Selecione o idioma de ditado"
 
@@ -26164,7 +26176,7 @@ msgstr "Selecione arquivos para enviar"
 msgid "Select image as reference"
 msgstr "Selecionar imagem como referência"
 
-#: src/features/settings/components/account/account-settings.tsx:218
+#: src/features/settings/components/account/account-settings.tsx:220
 msgid "Select language"
 msgstr "Selecione o idioma"
 
@@ -26343,7 +26355,7 @@ msgstr "Enviar resposta"
 msgid "Send Backward"
 msgstr "Enviar para trás"
 
-#: src/features/settings/components/account/account-settings.tsx:187
+#: src/features/settings/components/account/account-settings.tsx:189
 msgid "Send behavior updated"
 msgstr "Comportamento de envio atualizado"
 
@@ -26370,7 +26382,7 @@ msgstr "Enviar mensagem"
 msgid "Send message ({sendShortcut})"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:181
+#: src/features/settings/components/account/account-settings.tsx:183
 #: src/features/settings/lib/settings-keywords.ts:28
 msgid "Send Message Behavior"
 msgstr "Comportamento de envio de mensagens"
@@ -26540,7 +26552,7 @@ msgstr "Definir senha"
 msgid "Set the focal length in millimeters"
 msgstr "Defina a distância focal em milímetros"
 
-#: src/features/settings/components/account/account-settings.tsx:157
+#: src/features/settings/components/account/account-settings.tsx:159
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "Defina a direção do texto no aplicativo. RTL é usado em idiomas como árabe, hebraico e persa."
 
@@ -26593,7 +26605,7 @@ msgstr "Várias das suas habilidades respondem em uma única conversa. Mencione 
 msgid "Shallow, cinematic separation"
 msgstr "Raso, separação cinematográfica"
 
-#: src/features/settings/components/account/account-settings.tsx:99
+#: src/features/settings/components/account/account-settings.tsx:101
 msgid "Shanghai"
 msgstr "Xangai"
 
@@ -26745,7 +26757,7 @@ msgstr "Mostrar conteúdo anexado"
 msgid "Show follow-up suggestions"
 msgstr "Mostrar sugestões de continuação"
 
-#: src/features/settings/components/account/account-settings.tsx:317
+#: src/features/settings/components/account/account-settings.tsx:319
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "Mostrar sugestões de continuação depois das mensagens do assistente."
 
@@ -26818,7 +26830,7 @@ msgstr "Mostrar as tarefas desta meta"
 msgid "Show this help"
 msgstr "Mostrar esta ajuda"
 
-#: src/features/settings/components/account/account-settings.tsx:498
+#: src/features/settings/components/account/account-settings.tsx:522
 msgid "Show Timestamps"
 msgstr "Mostrar data e hora"
 
@@ -27044,7 +27056,7 @@ msgstr "Simplificar"
 msgid "since replaced"
 msgstr "substituída desde então"
 
-#: src/features/settings/components/account/account-settings.tsx:101
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Singapore"
 msgstr "Singapura"
 
@@ -27439,15 +27451,15 @@ msgstr "Custo-benefício de ponta com contexto de 2M tokens"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "SOTA com arte vetorial e tipografia via Replicate"
 
-#: src/features/settings/components/account/account-settings.tsx:514
+#: src/features/settings/components/account/account-settings.tsx:538
 msgid "Sound Effects"
 msgstr "Efeitos sonoros"
 
-#: src/features/settings/components/account/account-settings.tsx:523
+#: src/features/settings/components/account/account-settings.tsx:547
 msgid "Sound effects disabled"
 msgstr "Efeitos sonoros desativados"
 
-#: src/features/settings/components/account/account-settings.tsx:523
+#: src/features/settings/components/account/account-settings.tsx:547
 msgid "Sound effects enabled"
 msgstr "Efeitos sonoros ativados"
 
@@ -28043,7 +28055,7 @@ msgstr ""
 msgid "Stock and currency information"
 msgstr "Informações sobre ações e moedas"
 
-#: src/features/settings/components/account/account-settings.tsx:96
+#: src/features/settings/components/account/account-settings.tsx:98
 msgid "Stockholm"
 msgstr "Estocolmo"
 
@@ -28583,13 +28595,17 @@ msgstr "Sugestão disponível, pressione Seta para a direita para aceitar"
 msgid "suggestions"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:389
+#: src/features/settings/components/account/account-settings.tsx:413
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "Sugere como terminar sua mensagem em texto cinza; pressione Seta para a direita no fim da linha para aceitar ou Esc para descartar. Seu rascunho é enviado a um modelo de IA para gerar a sugestão."
 
 #: src/features/chat/prompt-improvement/hooks/use-optimizer-style-labels.ts:32
 msgid "Suited for complex tasks: Role / Background / Attention / Skills / Goals / Constraints / Workflow."
 msgstr "Ideal para tarefas complexas: Papel / Contexto / Atenção / Habilidades / Objetivos / Restrições / Fluxo de trabalho."
+
+#: src/features/settings/components/account/account-settings.tsx:336
+msgid "Summarise long chats"
+msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:250
 msgid "Summarise my notes in three bullets."
@@ -28765,7 +28781,7 @@ msgstr "Visualização da equipe ativada"
 msgid "Switzerland"
 msgstr "Suíça"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Sydney"
 msgstr "Sydney"
 
@@ -29149,7 +29165,7 @@ msgstr "Modo de chat temporário"
 msgid "Temporary chat mode, on for your next chat"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:440
+#: src/features/settings/components/account/account-settings.tsx:464
 msgid "Temporary Chat Retention (hours)"
 msgstr "Retenção de chats temporários (horas)"
 
@@ -29266,16 +29282,16 @@ msgstr "Alinhamento do texto"
 msgid "Text Content"
 msgstr "Conteúdo de texto"
 
-#: src/features/settings/components/account/account-settings.tsx:155
+#: src/features/settings/components/account/account-settings.tsx:157
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Text Direction"
 msgstr "Direção do texto"
 
-#: src/features/settings/components/account/account-settings.tsx:161
+#: src/features/settings/components/account/account-settings.tsx:163
 msgid "Text direction set to LTR"
 msgstr "Direção do texto definida como LTR"
 
-#: src/features/settings/components/account/account-settings.tsx:161
+#: src/features/settings/components/account/account-settings.tsx:163
 msgid "Text direction set to RTL"
 msgstr "Direção do texto definida como RTL"
 
@@ -29846,7 +29862,7 @@ msgstr "O verificador não aprovou este resultado após as rodadas de correção
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "O verificador só aprova o resultado se todos os critérios forem atendidos."
 
-#: src/features/settings/components/account/account-settings.tsx:356
+#: src/features/settings/components/account/account-settings.tsx:380
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "A voz com que o modo mãos-livres lê as respostas. Uma habilidade com voz própria usa a sua. As respostas faladas contam para uma cota diária; depois dela, a voz do seu navegador assume."
 
@@ -30537,21 +30553,21 @@ msgstr ""
 msgid "Timeline image"
 msgstr "Imagem de linha do tempo"
 
-#: src/features/settings/components/account/account-settings.tsx:507
+#: src/features/settings/components/account/account-settings.tsx:531
 msgid "Timestamps disabled"
 msgstr "Data e hora desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:507
+#: src/features/settings/components/account/account-settings.tsx:531
 msgid "Timestamps enabled"
 msgstr "Data e hora ativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:286
+#: src/features/settings/components/account/account-settings.tsx:288
 #: src/features/settings/components/chat/trigger-settings.tsx:313
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "Fuso horário"
 
-#: src/features/settings/components/account/account-settings.tsx:291
+#: src/features/settings/components/account/account-settings.tsx:293
 msgid "Timezone updated"
 msgstr "Fuso horário atualizado"
 
@@ -30704,7 +30720,7 @@ msgstr "Tokens"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "Os tokens usados no seu próprio endpoint não são cobrados em créditos. Os limites diários de mensagens continuam valendo."
 
-#: src/features/settings/components/account/account-settings.tsx:98
+#: src/features/settings/components/account/account-settings.tsx:100
 msgid "Tokyo"
 msgstr "Tóquio"
 
@@ -30817,7 +30833,7 @@ msgstr "Raciocínio de primeira linha em benchmarks complexos"
 msgid "Top-tier text-to-video quality"
 msgstr "Qualidade de texto para vídeo de primeira linha"
 
-#: src/features/settings/components/account/account-settings.tsx:88
+#: src/features/settings/components/account/account-settings.tsx:90
 msgid "Toronto"
 msgstr "Toronto"
 
@@ -31268,7 +31284,7 @@ msgstr "tipografia"
 msgid "UAE"
 msgstr "Emirados Árabes Unidos"
 
-#: src/features/settings/components/account/account-settings.tsx:493
+#: src/features/settings/components/account/account-settings.tsx:517
 msgid "UI Preferences"
 msgstr "Preferências da interface"
 
@@ -32232,7 +32248,7 @@ msgstr "JSON válido"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Valide a qualidade dos dados e priorize fontes confiáveis. Essencial para tarefas de pesquisa e checagem de fatos."
 
-#: src/features/settings/components/account/account-settings.tsx:89
+#: src/features/settings/components/account/account-settings.tsx:91
 msgid "Vancouver"
 msgstr "Vancouver"
 
@@ -32717,15 +32733,15 @@ msgstr ""
 msgid "Viewing: {selectedNodeId}"
 msgstr "Visualizando: {selectedNodeId}"
 
-#: src/features/settings/components/account/account-settings.tsx:415
+#: src/features/settings/components/account/account-settings.tsx:439
 msgid "Vim keys disabled"
 msgstr "Teclas do Vim desativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:415
+#: src/features/settings/components/account/account-settings.tsx:439
 msgid "Vim keys enabled"
 msgstr "Teclas do Vim ativadas"
 
-#: src/features/settings/components/account/account-settings.tsx:404
+#: src/features/settings/components/account/account-settings.tsx:428
 msgid "Vim keys in the composer"
 msgstr "Teclas do Vim no compositor"
 
@@ -33924,7 +33940,7 @@ msgstr "Suas últimas alterações ainda não foram salvas."
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "Seu servidor local respondeu, mas recusou este site (CORS). Permita a origem deste site — no Ollama, defina OLLAMA_ORIGINS; no LM Studio, ative \"Enable CORS\" — e reinicie o servidor."
 
-#: src/features/settings/components/account/account-settings.tsx:260
+#: src/features/settings/components/account/account-settings.tsx:262
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 
@@ -34006,7 +34022,7 @@ msgstr "Suas tags"
 msgid "Your Team plans will be cancelled"
 msgstr "Seus planos Team serão cancelados"
 
-#: src/features/settings/components/account/account-settings.tsx:288
+#: src/features/settings/components/account/account-settings.tsx:290
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "Seu fuso horário (identificador de fuso horário IANA)."
 
@@ -34136,7 +34152,7 @@ msgstr "Zulu"
 msgid "Zulu (South Africa)"
 msgstr "Zulu (África do Sul)"
 
-#: src/features/settings/components/account/account-settings.tsx:97
+#: src/features/settings/components/account/account-settings.tsx:99
 msgid "Zurich"
 msgstr "Zurique"
 
