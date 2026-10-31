@@ -376,11 +376,17 @@ export const recordGoalVerdict = internalMutation
 
         // The user switched branch, or edited, while the review ran: the verdict is about a reply nobody is looking at, so it
         // neither counts as a win nor opens a round on a branch that is not shown.
-        if (thread?.activeLeafMessageId && args.lastMessage) {
-            const { id, order } = args.lastMessage;
-            const onPath = await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, [{ _id: id, order }]);
+        if (thread?.activeLeafMessageId) {
+            // The round's prompt too: a branch the user switched to that never passes through it can hold no row of the round at
+            // all, which leaves `lastMessage` unset.
+            const prompt = await ctx.db.get(goal.promptMessageId as Id<"messages">);
+            const candidates = [
+                ...(prompt ? [{ _id: goal.promptMessageId, order: prompt.order }] : []),
+                ...(args.lastMessage ? [{ _id: args.lastMessage.id, order: args.lastMessage.order }] : []),
+            ];
+            const onPath = await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, candidates);
 
-            if (!onPath.has(id)) {
+            if (candidates.some((candidate) => !onPath.has(candidate._id))) {
                 return await end("stopped", "superseded");
             }
         }

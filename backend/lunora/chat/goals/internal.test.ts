@@ -519,6 +519,36 @@ describe("a round whose branch was left", () => {
         expect(outcome).toEqual({ outcome: "ended" });
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
+
+    it("ends the goal and charges nothing when the shown branch no longer holds the round's prompt", async () => {
+        await branch();
+
+        // An older branch the user switches back to: it never passes through this round's prompt.
+        const alt = await harness.run(async (ctx: any) => {
+            const base = { status: "success", threadId, tool: false, userId: OWNER };
+            const intro = await ctx.db.insert("messages", { ...base, message: { content: "Hello", role: "user" }, order: -1, stepOrder: 0 });
+
+            return String(
+                await ctx.db.insert("messages", {
+                    ...base,
+                    message: { content: "Elsewhere.", role: "assistant" },
+                    order: 0,
+                    parentMessageId: intro,
+                    stepOrder: 5,
+                }),
+            );
+        });
+        const goalId = await start();
+
+        await setLeaf(alt);
+
+        const outcome = await review(goalId, 1, { met: false });
+
+        expect(outcome).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(chargeRound).not.toHaveBeenCalled();
+        expect(await count("persistentStreams")).toBe(0);
+    });
 });
 
 describe("a goal whose thread is gone", () => {
