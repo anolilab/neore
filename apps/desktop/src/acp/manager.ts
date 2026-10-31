@@ -217,9 +217,16 @@ export class AcpManager {
             this.runners.set(session.id, runner);
         }
 
+        // The window may ask for the hooks while the session starts: the runner is looking at the folder from here on,
+        // and fires nothing until the session is idle.
+        this.watchFolder(runner);
+
         try {
             await session.start();
-            this.watchFolder(runner);
+        } catch (error) {
+            runner?.stop();
+
+            throw error;
         } finally {
             // A start that failed after the handshake still told what the agent can do.
             if (session.handshake !== undefined) {
@@ -295,8 +302,8 @@ export class AcpManager {
         await this.requireRunner(sessionId).approve(hash);
     }
 
-    public revokeHooks(sessionId: string): void {
-        this.requireRunner(sessionId).revoke();
+    public async revokeHooks(sessionId: string): Promise<void> {
+        await this.requireRunner(sessionId).revoke();
     }
 
     /** Sends a manual hook's prompt to the open session; never starts one. */

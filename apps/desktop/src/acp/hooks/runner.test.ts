@@ -588,3 +588,114 @@ describe("approval scope", () => {
         expect(await stateOf()).toBe("approved");
     });
 });
+
+describe("when the folder is watched, and how", () => {
+    const bare = (): HookRunner => new HookRunner({ agentKey: AGENT, approvals, folder: ROOT, fs, isIdle: () => idle, onChange: () => { changes += 1; }, send: (prompt) => { sent.push(prompt); } });
+
+    it("keeps manual hooks working after the watcher fails, and tells the window", async () => {
+        await setup([review, manual]);
+
+        const hash = await hashOf();
+        const before = changes;
+
+        fs.fail("ENOSPC: System limit for number of file watchers reached");
+
+        expect(changes).toBeGreaterThan(before);
+        expect((await runner.view()).watching).toBe(false);
+        await runner.runManual("summary", hash);
+        expect(sent).toHaveLength(1);
+
+        fs.emit("change", "src/old.ts");
+        await settle();
+        expect(sent).toHaveLength(1);
+    });
+
+    it("answers the window while the folder is still being scanned", async () => {
+        fs.write(".neore/hooks.json", hooksFile([review]));
+        runner = bare();
+
+        const started = runner.start();
+        const view = await runner.view();
+
+        await started;
+
+        expect(view.state).toBe("unapproved");
+        expect(view.hooks.map((hook) => hook.id)).toEqual(["review"]);
+    });
+
+    it("is already watching when it scans, so a file created meanwhile is not lost", async () => {
+        fs.write(".neore/hooks.json", hooksFile([added]));
+        runner = bare();
+
+        let watchingWhileScanning: boolean | undefined;
+        const scan = fs.scan;
+
+        fs.scan = async (...args) => {
+            watchingWhileScanning = fs.watching;
+
+            return await scan(...args);
+        };
+        await runner.start();
+
+        expect(watchingWhileScanning).toBe(true);
+    });
+
+    it.runIf(process.platform !== "win32")("keeps a backslash in a file name as part of the name", async () => {
+        await setup([{ ...review, glob: "src/**/*.ts" }]);
+        // `src/x.ts` exists and is a hook match; the name the watcher reports has a backslash in it and is another file.
+        fs.write("src/x.ts");
+        fs.emit("change", "src\\x.ts");
+        await settle();
+
+        expect(sent).toEqual([]);
+    });
+
+    it("does not start a second look at the folder while one is still running", async () => {
+        await setup([{ ...review, glob: "**" }]);
+
+        let inFlight = 0;
+        let most = 0;
+        let release = (): void => {};
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const lstat = fs.lstat;
+
+        fs.lstat = async (target) => {
+            inFlight += 1;
+            most = Math.max(most, inFlight);
+            await gate;
+
+            try {
+                return await lstat(target);
+            } finally {
+                inFlight -= 1;
+            }
+        };
+
+        fs.write("src/one.ts");
+        fs.emit("change", "src/one.ts");
+        await settle();
+        fs.write("src/two.ts");
+        fs.emit("change", "src/two.ts");
+        await settle();
+        release();
+        await settle();
+
+        expect(most).toBe(1);
+        expect(sent.length).toBeGreaterThan(0);
+    });
+
+    it("does not call a file new when the files known at the start were capped", async () => {
+        for (let index = 0; index < 5000; index += 1) {
+            fs.write(`big/f${String(index)}.ts`);
+        }
+
+        await setup([{ ...added, glob: "**" }]);
+        fs.write("big/f5000.ts");
+        fs.emit("rename", "big/f5000.ts");
+        await settle();
+
+        expect(sent).toEqual([]);
+    });
+});

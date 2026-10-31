@@ -66,7 +66,8 @@ const relativeOf = (filename: string | null): string | undefined => {
         return undefined;
     }
 
-    const normal = filename.replaceAll("\\", "/");
+    // Only where the watcher reports backslash separators: elsewhere a backslash is part of a file's name.
+    const normal = process.platform === "win32" ? filename.replaceAll("\\", "/") : filename;
     const segments = normal.split("/");
 
     if (normal.startsWith("/") || DRIVE.test(normal) || segments.some((segment) => ["", ".", ".."].includes(segment))) {
@@ -130,6 +131,16 @@ export class HookRunner {
 
     private root: string | undefined;
 
+    /** The folder's real path, once resolved: the window may ask before `start` has finished looking at the folder. */
+    private rootReady: Promise<string | undefined> | undefined;
+
+    /** False once the files known at the start were capped: a path that is not known may well have existed. */
+    private baselineComplete = true;
+
+    private flushing = false;
+
+    private flushAgain = false;
+
     private pending = new Map<string, boolean>();
 
     private debounce: ReturnType<typeof setTimeout> | undefined;
@@ -152,9 +163,11 @@ export class HookRunner {
 
     public constructor(private readonly options: HookRunnerOptions) {}
 
-    /** Resolves the folder's real path, learns which files exist, and starts watching. Hooks fire only after this. */
+    /** Resolves the folder's real path, starts watching, then learns which files exist. Hooks fire only after this. */
     public async start(): Promise<void> {
-        const root = await this.options.fs.realpath(this.options.folder);
+        this.rootReady = this.options.fs.realpath(this.options.folder);
+
+        const root = await this.rootReady;
 
         if (root === undefined || this.stopped) {
             return;
@@ -162,25 +175,21 @@ export class HookRunner {
 
         this.root = root;
 
+        // Watching first: a file created while the folder is being looked at is an event, not a gap between the two.
+        this.watcher = this.options.fs.watch(
+            root,
+            (eventType, filename) => this.onEvent(eventType, filename),
+            (error) => this.watcherFailed(error),
+            { limit: MAX_KNOWN, skip: ignored },
+        );
+
         const existing = await this.options.fs.scan(root, MAX_KNOWN, ignored);
+
+        this.baselineComplete = existing.length < MAX_KNOWN;
 
         for (const file of existing) {
             this.known.add(file);
         }
-
-        if (this.stopped) {
-            return;
-        }
-
-        this.watcher = this.options.fs.watch(
-            root,
-            (eventType, filename) => this.onEvent(eventType, filename),
-            (error) => {
-                this.options.log?.(`[acp-hooks] the watcher stopped: ${error.message}`);
-                this.stop();
-            },
-            { limit: MAX_KNOWN, skip: ignored },
-        );
     }
 
     public turnStarted(): void {
@@ -217,7 +226,7 @@ export class HookRunner {
 
     /** What the window shows for this folder: every hook in full, read from the file now. */
     public async view(): Promise<HooksView> {
-        const root = this.requireRoot();
+        const root = await this.readyRoot();
         const file = await loadHooksFile(this.options.fs, root);
 
         if (file.state === "none") {
@@ -242,7 +251,7 @@ export class HookRunner {
 
     /** Approves the file with this hash, if it is still the file on disk. What the person read is what is approved. */
     public async approve(hash: string): Promise<void> {
-        const root = this.requireRoot();
+        const root = await this.readyRoot();
         const file = await loadHooksFile(this.options.fs, root);
 
         if (file.state !== "ok" || file.hash !== hash) {
@@ -253,8 +262,8 @@ export class HookRunner {
         this.options.onChange();
     }
 
-    public revoke(): void {
-        this.options.approvals.revoke(this.options.agentKey, this.requireRoot());
+    public async revoke(): Promise<void> {
+        this.options.approvals.revoke(this.options.agentKey, await this.readyRoot());
         this.options.onChange();
     }
 
@@ -278,6 +287,27 @@ export class HookRunner {
         this.options.send(promptFor(chosen, []));
     }
 
+    private async readyRoot(): Promise<string> {
+        const root = await this.rootReady;
+
+        if (root === undefined) {
+            throw new Error("the folder is not being watched");
+        }
+
+        return root;
+    }
+
+    /** The watcher gave up (out of watches, say): file hooks cannot fire any more, but manual hooks and the approval still work. */
+    private watcherFailed(error: Error): void {
+        this.options.log?.(`[acp-hooks] the watcher stopped: ${error.message}`);
+        clearTimeout(this.debounce);
+        this.debounce = undefined;
+        this.pending.clear();
+        this.watcher?.close();
+        this.watcher = undefined;
+        this.options.onChange();
+    }
+
     private requireRoot(): string {
         if (this.root === undefined) {
             throw new Error("the folder is not being watched");
@@ -288,7 +318,7 @@ export class HookRunner {
 
     /** The hooks of the file now on disk, if it is the approved one and (when given) the one named. */
     private async approvedHooks(expectedHash?: string): Promise<Hook[]> {
-        const root = this.requireRoot();
+        const root = await this.readyRoot();
         const file = await loadHooksFile(this.options.fs, root);
 
         if (file.state !== "ok") {
@@ -348,11 +378,27 @@ export class HookRunner {
         }, DEBOUNCE_MS);
     }
 
+    /** One look at the folder at a time: events that arrive during one are looked at in the next, not in a second one beside it. */
     private async runFlush(): Promise<void> {
+        if (this.flushing) {
+            this.flushAgain = true;
+
+            return;
+        }
+
+        this.flushing = true;
+
         try {
             await this.flush();
         } catch (error) {
             this.options.log?.(`[acp-hooks] ${(error as Error).message}`);
+        } finally {
+            this.flushing = false;
+
+            if (this.flushAgain && !this.stopped) {
+                this.flushAgain = false;
+                this.runFlush();
+            }
         }
     }
 
@@ -396,6 +442,8 @@ export class HookRunner {
         if (info?.file === true) {
             if (this.known.size < MAX_KNOWN) {
                 this.known.add(relative);
+            } else {
+                this.baselineComplete = false;
             }
 
             return "file";
@@ -420,7 +468,7 @@ export class HookRunner {
             if (now === "gone" && wasKnown) {
                 add("deleted", relative);
             } else if (now === "file") {
-                add(!wasKnown && renamed ? "created" : "saved", relative);
+                add(!wasKnown && renamed && this.baselineComplete ? "created" : "saved", relative);
             }
         }
 
