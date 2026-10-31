@@ -67,6 +67,7 @@ export const userSettingsFieldsWithoutUserId = {
     keyboardShortcuts: v.optional(
         v.object({
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),
+            askAside: v.optional(v.string().max(MAX_LENGTH.short)),
             audioRecord: v.optional(v.string().max(MAX_LENGTH.short)),
             commandPalette: v.optional(v.string().max(MAX_LENGTH.short)),
             copyLastCodeBlock: v.optional(v.string().max(MAX_LENGTH.short)),
