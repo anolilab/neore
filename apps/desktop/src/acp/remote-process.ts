@@ -157,6 +157,14 @@ export class RemoteAgents {
                     this.core.hostAgentWrite(handle, chunk);
                     callback();
                 } catch (error) {
+                    // The server cannot take the input (it stopped reading, or the connection is going): the agent would
+                    // wait for a message that never arrives, so it is stopped and its end fails the session and its turn.
+                    try {
+                        this.core.hostAgentStop(handle);
+                    } catch {
+                        // The connection is gone; the agent's end is reported with it.
+                    }
+
                     callback(error as Error);
                 }
             },

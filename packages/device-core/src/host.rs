@@ -450,14 +450,28 @@ where
 }
 
 /// [`serve`] as the launch `own` (its id), which a `reap` request never stops.
-pub fn serve_launch<R, W>(mut reader: R, writer: W, own: Option<&str>) -> io::Result<()>
+pub fn serve_launch<R, W>(reader: R, writer: W, own: Option<&str>) -> io::Result<()>
+where
+    R: Read,
+    W: Write + Send + 'static,
+{
+    serve_launch_within(reader, writer, own, OUTBOX_BYTES)
+}
+
+/// [`serve_launch`] with room for `limit` bytes waiting for the pipe.
+fn serve_launch_within<R, W>(
+    mut reader: R,
+    writer: W,
+    own: Option<&str>,
+    limit: usize,
+) -> io::Result<()>
 where
     R: Read,
     W: Write + Send + 'static,
 {
     // Nothing but the writer thread touches the pipe, so a desktop that stops reading it holds back the work that
     // writes to it, and never the loop that reads requests.
-    let (writer, flush) = Outbox::new(writer, OUTBOX_BYTES);
+    let (writer, flush) = Outbox::new(writer, limit);
     let in_flight = Arc::new(AtomicUsize::new(0));
     let reply_failed = Arc::new(AtomicBool::new(false));
     let stops = Stops::default();
@@ -484,13 +498,22 @@ where
 
     agents.inputs.lock().unwrap().clear();
 
+    // A connection that broke (or stalled past what a cancel may use) has nobody to answer: whatever waits for room in
+    // the queue gives up, and the writer thread, which may be stuck in a write nobody will ever read, is left to
+    // die with the process.
+    if served.is_err() {
+        writer.close();
+    }
+
     for request in running {
         let _ = request.join();
     }
 
-    // What the requests answered is written out before the host returns.
-    writer.close();
-    let _ = flush.join();
+    // The stream ended cleanly: what the requests answered is written out before the host returns.
+    if served.is_ok() {
+        writer.close();
+        let _ = flush.join();
+    }
 
     served
 }
@@ -847,5 +870,47 @@ mod tests {
             inputs.lock().unwrap().get(&9).is_none(),
             "an empty chunk closes it"
         );
+    }
+
+    /// The desktop stopped reading the host's stdout: the loop that reads requests refuses to wait on it, ends the
+    /// connection, and the host returns (it would have hung in a blocked write, with every agent running).
+    #[test]
+    fn a_host_whose_pipe_stopped_draining_ends_the_connection_instead_of_hanging() {
+        struct Stalled(std::sync::mpsc::Receiver<()>);
+
+        impl Write for Stalled {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                let _ = self.0.recv();
+
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut requests = Vec::new();
+
+        for id in 0..60_000u64 {
+            let frame = serde_json::json!({
+                "kind": "request", "id": id, "op": "cancel", "params": { "target": 1 }
+            });
+
+            crate::frame::write_frame(&mut requests, &serde_json::to_vec(&frame).unwrap()).unwrap();
+        }
+
+        let (release, stalled) = channel();
+        let (done, finished) = channel();
+
+        thread::spawn(move || {
+            let served =
+                serve_launch_within(io::Cursor::new(requests), Stalled(stalled), None, 1024);
+
+            let _ = done.send(served.is_err());
+        });
+
+        assert_eq!(finished.recv_timeout(Duration::from_secs(30)), Ok(true));
+        drop(release);
     }
 }

@@ -69,7 +69,7 @@ pub struct AgentParams {
     pub roots: Vec<String>,
 }
 
-/// Variables the host sets itself, from what this machine has. The person's list cannot name them: with forwarding on,
+/// Variables the host sets itself, from what this machine has. The person's list is ignored for them: with forwarding on,
 /// `SSH_AUTH_SOCK` is the socket the person approved for this server, and another value would point the agent's SSH
 /// clients at a socket of someone else's choosing.
 const HOST_SET: [&str; 1] = ["SSH_AUTH_SOCK"];
@@ -94,13 +94,14 @@ fn agent_environment(
     }
 
     for (name, value) in user {
+        validate_env_var(name, value)?;
+
+        // Left out, not refused: a variable set for the person's own agents (a password manager's socket, say) also
+        // reaches the servers' agents, and must not make every start there fail.
         if HOST_SET.contains(&name.as_str()) {
-            return Err(format!(
-                "{name} is set by the host and cannot be overridden"
-            ));
+            continue;
         }
 
-        validate_env_var(name, value)?;
         env.insert(name.clone(), value.clone());
     }
 
@@ -556,10 +557,24 @@ mod tests {
         let mut user = BTreeMap::new();
 
         user.insert("SSH_AUTH_SOCK".to_owned(), "/tmp/attacker.sock".to_owned());
+        user.insert("HTTPS_PROXY".to_owned(), "http://proxy:3128".to_owned());
 
-        // With a socket forwarded, and without one: the name is the host's to set, never the person's.
-        assert!(agent_environment(vars(&[("SSH_AUTH_SOCK", "/run/agent.sock")]), &user).is_err());
-        assert!(agent_environment(vars(&[]), &user).is_err());
+        // With a socket forwarded the host's wins; without one there is none. The other variables still apply.
+        let forwarded =
+            agent_environment(vars(&[("SSH_AUTH_SOCK", "/run/agent.sock")]), &user).unwrap();
+
+        assert_eq!(
+            forwarded.get("SSH_AUTH_SOCK").map(String::as_str),
+            Some("/run/agent.sock")
+        );
+        assert_eq!(
+            forwarded.get("HTTPS_PROXY").map(String::as_str),
+            Some("http://proxy:3128")
+        );
+
+        let none = agent_environment(vars(&[]), &user).unwrap();
+
+        assert!(!none.contains_key("SSH_AUTH_SOCK"));
     }
 
     #[test]

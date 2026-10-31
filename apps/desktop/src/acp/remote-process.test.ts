@@ -174,4 +174,26 @@ describe("an agent on a server as a process", () => {
         expect(heard).toEqual([[], ["for-two"]]);
         expect(agents.dispatch({ type: "changed" })).toBe(false);
     });
+
+    it("stops the agent when the core refuses its input, so the session fails instead of waiting for a reply", async () => {
+        const calls: number[] = [];
+        const core: RemoteAgentCore = {
+            hostAgentStart: () => "{}",
+            hostAgentStop: (handle) => {
+                calls.push(handle);
+            },
+            hostAgentWrite: () => {
+                throw new Error("the server is not keeping up with what is sent to it");
+            },
+        };
+        const child = new RemoteAgents(core).spawner("srv-1")(plan(), "claude");
+        const failed = new Promise<Error | null | undefined>((resolve) => {
+            child.stdin.write("hello\n", resolve);
+        });
+
+        const error = await failed;
+
+        expect(error?.message).toContain("not keeping up");
+        expect(calls).toEqual([1]);
+    });
 });
