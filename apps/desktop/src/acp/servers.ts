@@ -46,6 +46,10 @@ export interface ServerAgentsOptions {
     userData: string;
 }
 
+/** How long a removed server's last posts (the ends of its live turns) get to reach the backend. */
+const REMOVAL_FLUSH_MS = 5000;
+const REMOVAL_POLL_MS = 25;
+
 /** The file one server's poster keeps its running turns in; undefined for any other file name. */
 const STATE_FILE = /^acp-host-turns-(.{1,64})\.json$/;
 
@@ -93,6 +97,40 @@ export class ServerAgents {
     /** Ends the sessions the person's approvals for a server no longer cover. */
     public async closeUnapproved(deviceId: string, view: Pick<AcpView, "agents" | "consents">): Promise<void> {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);
+    }
+
+    /**
+     * Forgets a server whose secret is about to go: its sessions end through the normal path, so each live turn posts its
+     * end and the backend closes its stream, and the runtime waits for those posts (the core signs them with the server's
+     * secret, which is deleted right after). Call BEFORE the core removes the server. An end that cannot reach the
+     * backend in time stays in the server's file, which nothing reads once the server is gone.
+     */
+    public async remove(deviceId: string): Promise<void> {
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime === undefined) {
+            return;
+        }
+
+        await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+
+        const deadline = Date.now() + REMOVAL_FLUSH_MS;
+
+        while (runtime.poster.busy && Date.now() < deadline) {
+            // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
+            await new Promise((resolve) => {
+                setTimeout(resolve, REMOVAL_POLL_MS);
+            });
+        }
+
+        await runtime.poster.persisted();
+        runtime.poster.stop();
+        this.runtimes.delete(deviceId);
+    }
+
+    /** Ends and forgets every server with a runtime: the computer is being unpaired. */
+    public async removeAll(): Promise<void> {
+        await Promise.all(Array.from(this.runtimes.keys(), async (deviceId) => this.remove(deviceId)));
     }
 
     /**

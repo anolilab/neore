@@ -506,14 +506,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         // for each server's file: a held message that fails for a server opens a channel through that server's poster.
         const read = host.readLeftovers();
         const serversRead = requireServers().readLeftovers();
-        // The gate goes up now, not once the read is done: a start delivered meanwhile would be replayed as well.
+        // The gate goes up now, not once the reads are done: a start delivered meanwhile would be replayed as well. It
+        // waits for the servers' files too: a replayed message that fails for a server opens a channel through that
+        // server's poster, and the first channel rewrites that server's file, dropping the turns a read had not found yet.
         const recovered = requireCommands().recover(
             (async () => {
-                try {
-                    await read;
-                } catch {
-                    // The restart recovery below reports it.
-                }
+                // Each read reports its own failure to the recovery below.
+                await Promise.allSettled([read, serversRead]);
             })(),
         );
         let leftovers: Awaited<typeof read>;
@@ -667,15 +666,33 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return result.canceled || result.filePath === "" ? null : requireTransport().hostDownload(id, serverPath, result.filePath);
     });
 
-    local(LOCAL_CHANNEL.hostRemove, (deviceId) => {
-        requireTransport().hostRemove(readDeviceId(deviceId));
+    local(LOCAL_CHANNEL.hostRemove, async (deviceId) => {
+        const id = readDeviceId(deviceId);
+
+        // The server's sessions end while the core still holds its secret: the end of each live turn is signed with it.
+        await state.servers?.remove(id);
+        requireTransport().hostRemove(id);
     });
 
     local(LOCAL_CHANNEL.settingsGet, () => requireTransport().settingsGet());
 
-    local(LOCAL_CHANNEL.settingsUpdate, (update) =>
+    local(LOCAL_CHANNEL.settingsUpdate, async (update) => {
+        const json = readSettingsUpdate(update);
+
+        // Unpairing forgets every server and its secret: their sessions end first, while the end of each turn can be signed.
+        if ((JSON.parse(json) as { unpair?: unknown }).unpair === true) {
+            await state.servers?.removeAll();
+        }
+
         // The core emits `changed` itself, so the site resends its manifest.
-        requireTransport().settingsUpdate(readSettingsUpdate(update)));
+        const view = requireTransport().settingsUpdate(json);
+
+        // A server's shared folders may have shrunk, and the core dropped the approvals outside them: the agents that
+        // were started under those approvals stop.
+        await state.servers?.reviewApprovals();
+
+        return view;
+    });
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
         const dialogOptions = { properties: ["openDirectory" as const] };

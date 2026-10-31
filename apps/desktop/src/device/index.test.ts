@@ -138,6 +138,8 @@ vi.mock("../acp/process", () => {
 const registryFetch = vi.hoisted(() => vi.fn());
 
 const { registerDeviceIpc } = await import("./index");
+const { HostCommands } = await import("../acp/commands");
+const { ServerAgents } = await import("../acp/servers");
 const { dialog } = await import("electron");
 const { REGISTRY_FIXTURE, SHA } = await import("../acp/fixtures/registry");
 const { REGISTRY_URL } = await import("../acp/registry");
@@ -493,7 +495,7 @@ describe("servers over SSH", () => {
     it("let the device window manage a server", async () => {
         invoke(DEVICE_CHANNEL.openSettings, siteEvent());
         invoke(LOCAL_CHANNEL.hostForgetKey, localEvent(), "host-1");
-        invoke(LOCAL_CHANNEL.hostRemove, localEvent(), "host-1");
+        await invoke(LOCAL_CHANNEL.hostRemove, localEvent(), "host-1");
         invoke(LOCAL_CHANNEL.hostDisconnect, localEvent(), "host-1");
         await invoke(LOCAL_CHANNEL.hostConnect, localEvent(), "host-1");
 
@@ -578,6 +580,111 @@ describe("coding agents on a server", () => {
         await invoke(LOCAL_CHANNEL.hostAcpUpdate, localEvent(), "srv-1", update);
 
         expect(core.hostAcpUpdate).toHaveBeenCalledWith("srv-1", JSON.stringify(update));
+    });
+
+    /** A start for a server, delivered, so the server's agents exist. */
+    const startOnServer = async (): Promise<void> => {
+        core.settingsGet.mockReturnValue(JSON.stringify(SERVER_VIEW));
+        core.acpPrepare.mockReturnValue(prepared({ deviceId: "srv-1", server: "build-box" }));
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+        await vi.waitFor(() => expect(core.hostAgentStart).toHaveBeenCalled());
+    };
+
+    it("ends a removed server's sessions while the core still holds its secret", async () => {
+        await startOnServer();
+
+        const remove = vi.spyOn(ServerAgents.prototype, "remove");
+
+        try {
+            await invoke(LOCAL_CHANNEL.hostRemove, localEvent(), "srv-1");
+
+            expect(remove).toHaveBeenCalledWith("srv-1");
+            expect(core.hostRemove).toHaveBeenCalledWith("srv-1");
+            expect(remove.mock.invocationCallOrder[0]).toBeLessThan(core.hostRemove.mock.invocationCallOrder[0] ?? 0);
+        } finally {
+            remove.mockRestore();
+        }
+    });
+
+    it("ends every server's sessions before the computer is unpaired, and only then", async () => {
+        await startOnServer();
+
+        const removeAll = vi.spyOn(ServerAgents.prototype, "removeAll");
+
+        try {
+            await invoke(LOCAL_CHANNEL.settingsUpdate, localEvent(), { roots: ["/x"] });
+            expect(removeAll).not.toHaveBeenCalled();
+
+            await invoke(LOCAL_CHANNEL.settingsUpdate, localEvent(), { unpair: true });
+
+            expect(removeAll).toHaveBeenCalledTimes(1);
+            expect(removeAll.mock.invocationCallOrder[0]).toBeLessThan(core.settingsUpdate.mock.invocationCallOrder[1] ?? 0);
+        } finally {
+            removeAll.mockRestore();
+        }
+    });
+
+    it("stops the agents a narrowed shared folder no longer covers", async () => {
+        await startOnServer();
+
+        const review = vi.spyOn(ServerAgents.prototype, "reviewApprovals");
+
+        try {
+            await invoke(LOCAL_CHANNEL.settingsUpdate, localEvent(), { host: { deviceId: "srv-1", roots: ["/srv/other"] } });
+
+            expect(core.settingsUpdate).toHaveBeenCalledWith(JSON.stringify({ host: { deviceId: "srv-1", roots: ["/srv/other"] } }));
+            // Reviewed after the core applied it: the approvals it dropped are what the review reads.
+            expect(review).toHaveBeenCalledTimes(1);
+            expect(review.mock.invocationCallOrder[0]).toBeGreaterThan(core.settingsUpdate.mock.invocationCallOrder[0] ?? Infinity);
+        } finally {
+            review.mockRestore();
+        }
+    });
+
+    it("does not replay held commands until every server's unfinished turns have been read", async () => {
+        let finishRead!: (leftovers: []) => void;
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- this app's TypeScript library does not have it yet
+        const serversRead = new Promise<[]>((resolve) => {
+            finishRead = resolve;
+        });
+        const read = vi.spyOn(ServerAgents.prototype, "readLeftovers").mockReturnValue(serversRead);
+        const recoverServers = vi.spyOn(ServerAgents.prototype, "recover").mockResolvedValue();
+        let gate: Promise<unknown> | undefined;
+        const recover = vi.spyOn(HostCommands.prototype, "recover").mockImplementation(async (before) => {
+            gate = before;
+            await before;
+        });
+
+        try {
+            fake.handlers.clear();
+            registerDeviceIpc(options);
+
+            await vi.waitFor(() => expect(gate).toBeDefined());
+
+            let open = false;
+
+            const watch = async (): Promise<void> => {
+                await gate;
+                open = true;
+            };
+
+            watch();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 50);
+            });
+            // The local file was read long ago; the servers' read has not finished: the gate stays down.
+            expect(open).toBe(false);
+
+            finishRead([]);
+
+            await vi.waitFor(() => expect(open).toBe(true));
+            await vi.waitFor(() => expect(recoverServers).toHaveBeenCalledWith([]));
+        } finally {
+            read.mockRestore();
+            recoverServers.mockRestore();
+            recover.mockRestore();
+        }
     });
 
     it("is not on the relay: the site can start no agent on a server by itself", () => {

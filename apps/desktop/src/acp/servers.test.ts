@@ -30,6 +30,8 @@ let posts: { post: Post; signature: string; url: string }[];
 let signed: string[];
 let children: Map<number, AgentProcess>;
 let records: ServerRecord[] | undefined;
+/** Set once the core has dropped a server: its secret is gone, so nothing can be signed for it any more. */
+let secretGone: boolean;
 
 const SERVER = "srv-1";
 
@@ -106,6 +108,10 @@ const setup = (): { remote: RemoteAgents; servers: ServerAgents } => {
                 return JSON.stringify(scratch.plan({}, folder));
             },
             signTurn: (payload) => {
+                if (secretGone) {
+                    throw new Error("that server is not paired with this computer");
+                }
+
                 signed.push(payload);
 
                 return `signed-as:${(JSON.parse(payload) as { deviceId: string }).deviceId}`;
@@ -131,6 +137,7 @@ beforeEach(() => {
     signed = [];
     children = new Map();
     records = undefined;
+    secretGone = false;
 });
 
 afterEach(() => {
@@ -247,5 +254,26 @@ describe("coding agents on a server", () => {
         records = [{ ...record(), acpConsents: [] }];
         await servers.reviewApprovals();
         expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+    });
+
+    it("ends a removed server's live turns through the normal end path before its secret is gone", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const sessionId = await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-4", threadId: "thread-4" });
+
+        runtime.acp.send(sessionId, "tool", "turn-4");
+        await expect.poll(() => posts.some(({ post }) => post.turnId === "turn-4"), { timeout: 8000 }).toBe(true);
+        expect(posts.some(({ post }) => post.events.some((event) => event.kind === "turn_end"))).toBe(false);
+
+        // The app removes a server in this order: its sessions end first, then the core forgets the secret.
+        await servers.remove(SERVER);
+        secretGone = true;
+
+        const ended = posts.filter(({ post }) => post.turnId === "turn-4").flatMap(({ post }) => post.events).filter((event) => event.kind === "turn_end");
+
+        expect(ended).toHaveLength(1);
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+        // The runtime is gone with the server: a later command cannot conjure it again.
+        expect(() => servers.get("someone-else")).toThrow("not paired");
     });
 });
