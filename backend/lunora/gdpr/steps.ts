@@ -71,6 +71,7 @@ export const collectSettings = internalQuery
                       ...aiPreferences,
                       customAIProviders: undefined,
                       generalProviders: undefined,
+                      mcpSecretHeaders: undefined,
                       messengerKeys: undefined,
                       providerApiKeys: undefined,
                   }
@@ -514,6 +515,8 @@ export const generateExportFile = internalAction
         threadTags: v.optional(v.any()),
         userEmail: v.string(),
         userId: v.string(),
+        // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
+        watchedRepositories: v.optional(v.any()),
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
@@ -550,6 +553,7 @@ export const generateExportFile = internalAction
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
             usageDaily: activity?.usageDaily ?? [],
+            watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
         const jsonString = JSON.stringify(exportData, null, 2);

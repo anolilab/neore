@@ -299,6 +299,9 @@ export interface ApiTypes {
         rate_limit_retry: {
             retryRateLimitedRun: FunctionReference<"mutation", { threadId: Id<"threads">; unlockProof?: string }, { resumed: boolean }>;
         };
+        request_secret: {
+            answerSecretRequest: FunctionReference<"mutation", { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }, { alreadyResolved: boolean; streamId: string | null }> & { readonly sensitive: true };
+        };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
@@ -453,7 +456,7 @@ export interface ApiTypes {
     };
     home: {
         overview: {
-            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
+            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
         };
     };
     knowledge: {
@@ -527,7 +530,7 @@ export interface ApiTypes {
             setDailyBriefEnabled: FunctionReference<"mutation", { enabled: boolean }, null>;
         };
         functions: {
-            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
+            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; unreadCount: number }>;
             markAllNotificationsRead: FunctionReference<"mutation", {}, { hasMore: boolean }>;
             markNotificationRead: FunctionReference<"mutation", { notificationId: Id<"notifications"> }, null>;
         };
@@ -676,6 +679,14 @@ export interface ApiTypes {
         };
     };
     source_control: {
+        freshness: {
+            disableWatchWebhook: FunctionReference<"mutation", { repository: string }, { disabled: boolean }>;
+            enableWatchWebhook: FunctionReference<"mutation", { repository: string }, { id: string; secret: string; status: "ok" } | { status: "not_found" | "unsupported" }>;
+            listWatchedRepositories: FunctionReference<"query", {}, { limit: number; watched: Array<{ checkedAt: number; dirty: boolean; id: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhook: { enabled: boolean; seenAt: number } }> }>;
+            refreshWatchedRepositories: FunctionReference<"action", {}, { polled: number; status: "ok" }>;
+            unwatchRepo: FunctionReference<"mutation", { repository: string }, { removed: boolean }>;
+            watchRepo: FunctionReference<"mutation", { repository: string }, { status: "invalid" | "limit" | "ok" }>;
+        };
         functions: {
             getDevelopHost: FunctionReference<"action", {}, { connected: boolean; host: { capabilities: { groups: Record<string, Record<string, { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }>>; reportedAt: number; version: 1 }; connectorSlug: string; label: string; limits: { commits: number; files: number }; requestNoun: "merge request" | "pull request" } }>;
             getInbox: FunctionReference<"action", { page?: number; section: "needsMyReview" | "mine" | "readyToMerge" | "drafts" }, { hasMore: boolean; items: Array<{ authorLogin: string; commentCount: number; createdAt: number; draft: boolean; labels: Array<string>; number: number; repository: string; title: string; updatedAt: number; url: string }>; page: number; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
@@ -1132,6 +1143,9 @@ export const api: ApiTypes = {
         rate_limit_retry: {
             retryRateLimitedRun: { __lunoraRef: "chat_rate_limit_retry:retryRateLimitedRun" },
         },
+        request_secret: {
+            answerSecretRequest: { __lunoraRef: "chat_request_secret:answerSecretRequest", sensitive: true },
+        },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },
         },
@@ -1509,6 +1523,14 @@ export const api: ApiTypes = {
         },
     },
     source_control: {
+        freshness: {
+            disableWatchWebhook: { __lunoraRef: "source_control_freshness:disableWatchWebhook" },
+            enableWatchWebhook: { __lunoraRef: "source_control_freshness:enableWatchWebhook" },
+            listWatchedRepositories: { __lunoraRef: "source_control_freshness:listWatchedRepositories" },
+            refreshWatchedRepositories: { __lunoraRef: "source_control_freshness:refreshWatchedRepositories" },
+            unwatchRepo: { __lunoraRef: "source_control_freshness:unwatchRepo" },
+            watchRepo: { __lunoraRef: "source_control_freshness:watchRepo" },
+        },
         functions: {
             getDevelopHost: { __lunoraRef: "source_control_functions:getDevelopHost" },
             getInbox: { __lunoraRef: "source_control_functions:getInbox" },

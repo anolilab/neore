@@ -438,6 +438,19 @@ written here is what is not.
   guide row, session, prompt; a refusal throws so none of it stays) and finished by `endHostTurn` →
   `settleHostGuide` → `finalizeHostGuide`, which re-reads the diff and refuses an answer for another head
   (`head_moved`). The host prompt is capped in BYTES of the signed call's JSON (`hostPromptBytes`), not characters.
+
+- **Develop freshness** (`backend/lunora/source-control/freshness*.ts`, `webhook.ts`) — the user
+  CHOOSES the repositories (`watchedRepositories`, max 20); only those are polled, through the shard tick
+  (`dispatchDueRepoPolls` in `runShardTick`, plus `shardSweeps()` as backstop), never a global loop.
+  A row is leased by moving `nextPollAt` out; `recordRepoPoll` applies the answer only while the poll's
+  `leasedAt` still matches, so an unwatch (row deleted) or a redelivery records and notifies nothing.
+  Polling reads `GET /repos/{o}/{r}/pulls` with `If-None-Match` (`HostRequestOptions.ifNoneMatch` is the
+  one place a 304 resolves instead of throwing); the login is stored on the row so an unchanged poll is
+  ONE request. The first poll is a silent baseline. The webhook route is `onRoutedShard(…, "watch", id)`;
+  the handler never parses the body and `acceptWatchDelivery` only sets `dirtyAt` — keep it that way, what
+  changed is read from the host with the user's token. `review_request` notifications dedupe on
+  origin + repo + number + the pull request's `updated_at`.
+
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
   `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
@@ -608,6 +621,16 @@ written here is what is not.
   Outbound media ships only when a reply's assistant rows carry file parts
   (`listReplyMedia`, owner-granted storage only) — so without reply tools
   (`tools: "none"`, the default) nothing ever attaches one.
+
+- **Requested secrets** (`backend/lunora/chat/{request-secret,lib/secret-*}.ts`) — the `requestSecret` card hands a
+  value to the server once; the agent only ever holds a `ref`. A header secret is stored ENCRYPTED in
+  `aiUserPreferences.mcpSecretHeaders`, bound to the server's name AND url, never in `mcpServers[].headers` (plaintext
+  Settings shows and the audit history snapshots); it is joined to its server only in `getMCPServersQuery`,
+  `getMcpSecretHeadersQuery` (connection test), and left out of `redactPreferences`. Settings does not list these
+  headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
+  a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
+  snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
@@ -829,6 +852,24 @@ written here is what is not.
   ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
+  **Coding agents on a server** (`device-core/src/{agent_host,engine/host_agents}.rs`, `apps/desktop/src/acp/{remote-process,servers}.ts`,
+  plans/ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
+  shared with the computer's own agents. The `agent` request streams stdout/stderr as chunk frames (tag 1/2) and takes stdin as
+  chunk frames of the same id; `hello.agents` announces it (no protocol bump), and the host kills the agent's process group on
+  cancel, on its stdin ending and on SIGTERM. A server's agents and approvals live on its `Host` row, the core picks the secret by
+  the DEVICE a payload names (`acp_prepare`/`acp_sign`/`sign_turn`), and a server's poster is its own. `TurnChanges` and media read
+  the desktop's disk, so they are off for a server (`folderIsRemote`): a new reader of the agent's folder must stay off for it too.
+  The agent's environment is built on the server, not copied from the desktop.
+  **No write waits on a pipe** (`device-core/src/outbox.rs`): `neore-host` writes its stdout, and the desktop writes
+  ssh's stdin, through one writer thread with a byte-bounded queue. The host's request reader and the app's synchronous
+  napi calls (`host_agent_write`/`_stop`) only queue, a cancel with extra room (`URGENT_HEADROOM`); a connection too far
+  behind for even that is closed, which makes the host stop every agent. Producers (an agent's output, an archive) wait
+  for room instead, holding the agent back. An agent that does not read its stdin is stopped at `INPUT_BUDGET`
+  (8 MiB), not buffered further. Every thread a launch spawns is joined before its request ends (the pumps `poll`, so a
+  `setsid` descendant holding a pipe cannot keep one). Narrowing a server's shared folders drops the approvals outside
+  them in the core (`apply_update`) and the desktop stops those sessions (`reviewApprovals`); removing a server or
+  unpairing ends its sessions FIRST (`ServerAgents.remove`), because the end of each turn is signed with a secret the
+  core deletes right after. The person's variables can never replace `SSH_AUTH_SOCK`.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

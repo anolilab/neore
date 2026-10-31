@@ -1,6 +1,6 @@
 /**
- * The review draft's column validators, declared once: `schema.ts` builds the
- * `reviewDrafts` table from them and the procedures reuse them for outputs.
+ * The column validators of Develop's tables, declared once: `schema.ts` builds the
+ * `reviewDrafts` and `watchedRepositories` tables from them and the procedures reuse them for outputs.
  *
  * Inline `v.union(...)` / `v.object({...})` literals only: codegen resolves an
  * inline validator expression, not one built by a call or a spread const.
@@ -21,6 +21,26 @@ export const vDraftComment = v.object({
     side: v.union(v.literal("new"), v.literal("old")),
     startLine: v.union(v.number(), v.null()),
 });
+
+/** A pull request that asks the user for a review, as a watched repository's cached list keeps it. */
+export const vCachedRequest = v.object({
+    authorLogin: v.string(),
+    number: v.number(),
+    title: v.string(),
+    updatedAt: v.number(),
+    url: v.string(),
+});
+
+/** How the last poll of a watched repository ended: `ok` (including a 304), or what a person can act on. */
+export const vPollStatus = v.union(
+    v.literal("ok"),
+    v.literal("forbidden"),
+    v.literal("host_error"),
+    v.literal("needs_reconnect"),
+    v.literal("not_connected"),
+    v.literal("not_found"),
+    v.literal("rate_limited"),
+);
 
 /** What a person can act on when a host call does not succeed. */
 export const vFailed = v.object({

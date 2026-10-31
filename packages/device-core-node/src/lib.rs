@@ -546,6 +546,71 @@ impl DeviceCore {
         to_json(&plan)
     }
 
+    /// Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
+    /// (an `acpUpdate` operation, JSON; JSON back: `{ agents, consents }` of that server). Local window only.
+    #[napi]
+    pub fn host_acp_update(&self, device_id: String, update: String) -> Result<String> {
+        let update: AcpUpdate = serde_json::from_str(&update)
+            .map_err(|_| Error::from_reason("invalid coding-agent update"))?;
+        let result = self
+            .state
+            .host_acp_update(&device_id, update)
+            .map_err(Error::from_reason)?;
+
+        to_json(&result)
+    }
+
+    /// What to start for an approved agent on a server (JSON, like `acpSpawnPlan`): the person's variables only, since
+    /// the server builds the rest of the environment from its own. Refuses a pair the person did not approve for it.
+    #[napi]
+    pub fn acp_host_spawn_plan(
+        &self,
+        device_id: String,
+        agent_key: String,
+        folder: String,
+    ) -> Result<String> {
+        let (plan, _) = self
+            .state
+            .acp_host_spawn_plan(&device_id, &agent_key, &folder)
+            .map_err(Error::from_reason)?;
+
+        to_json(&plan)
+    }
+
+    /// Starts an approved agent on a connected server under `handle`, a number the caller chose and has not used. Its
+    /// output and end arrive as `hostAgent` and `hostAgentEnded` events. Returns the plan (JSON).
+    #[napi]
+    pub fn host_agent_start(
+        &self,
+        device_id: String,
+        handle: f64,
+        agent_key: String,
+        folder: String,
+    ) -> Result<String> {
+        let plan = self
+            .state
+            .host_agent_start(&device_id, request_id(handle)?, &agent_key, &folder)
+            .map_err(Error::from_reason)?;
+
+        to_json(&plan)
+    }
+
+    /// Bytes for the agent's stdin; an empty buffer closes it.
+    #[napi]
+    pub fn host_agent_write(&self, handle: f64, bytes: Buffer) -> Result<()> {
+        self.state
+            .host_agent_write(request_id(handle)?, &bytes)
+            .map_err(Error::from_reason)
+    }
+
+    /// Stops the agent's whole process group on its server. Its end arrives as an event.
+    #[napi]
+    pub fn host_agent_stop(&self, handle: f64) -> Result<()> {
+        self.state.host_agent_stop(request_id(handle)?);
+
+        Ok(())
+    }
+
     /// Registers a permission request from a coding agent and resolves with the outcome the agent receives
     /// (JSON `{"outcome":"selected","optionId":…}` or `{"outcome":"cancelled"}`) once the user has answered it
     /// in the device window, the session was cancelled, or the request timed out.

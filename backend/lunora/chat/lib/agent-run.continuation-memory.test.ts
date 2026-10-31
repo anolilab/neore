@@ -159,3 +159,58 @@ describe("a tool-approval continuation", () => {
 });
 
 const jobs0 = (run: { jobs: (ref: unknown) => unknown[] }) => run.jobs(internal.memory.extract.extractMemories);
+
+describe("who started the turn a continuation resumes", () => {
+    const resumeWith = async (config: ToolRunConfig) => {
+        const ctx: Record<string, unknown> & { startedBy?: string } = {
+            runMutation: vi.fn(async () => null),
+            runQuery: vi.fn(async (ref: unknown) => {
+                if (ref === internal.chat.tool_permissions.getPendingToolApproval) {
+                    return { toolName: null };
+                }
+
+                if (ref === internal.auth.functions.getUserPreferencesQuery) {
+                    return { memoryEnabled: false };
+                }
+
+                return ref === internal.auth.functions.getDecryptedProviderKeysQuery ? {} : null;
+            }),
+            scheduler: { runAfter: vi.fn(async () => "job") },
+        };
+        let seen: string | undefined;
+        const agent = {
+            approveToolCall: vi.fn(async () => {
+                seen = ctx.startedBy;
+
+                return {
+                    consumeStream: async () => {},
+                    fullStream: (async function* none() {})(),
+                    order: 2,
+                    promptMessageId: "tool-result-1",
+                    savedMessages: [],
+                };
+            }),
+            options: {},
+        };
+
+        vi.mocked(getAgent).mockResolvedValue(agent as never);
+        await resumeApprovedRun(ctx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        });
+
+        return seen;
+    };
+
+    it("is the starter the snapshot names, not the owner the continuation runs as", async () => {
+        expect(await resumeWith({ ...BASE_CONFIG, startedBy: "collaborator-1" })).toBe("collaborator-1");
+    });
+
+    it("is nobody for a snapshot that does not say", async () => {
+        expect(await resumeWith(BASE_CONFIG)).toBeUndefined();
+    });
+});

@@ -136,4 +136,7 @@ export const redactPreferences = (doc: Record<string, unknown>): void => {
             doc[field] = redactKeyEntries(doc[field]);
         }
     }
+
+    // Header secrets (`chat/lib/mcp-secret-headers.ts`) are server-only: not even ciphertext leaves.
+    delete doc.mcpSecretHeaders;
 };

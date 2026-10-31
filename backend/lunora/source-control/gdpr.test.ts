@@ -1,5 +1,6 @@
+/* eslint-disable unicorn/no-await-expression-member -- the assertions read one field of an awaited result */
 /**
- * Review drafts leave with the account and travel with the export: the user's own only,
+ * Review drafts, guides and watched repositories leave with the account and travel with the export: the user's own only,
  * and past one batch (130 > 100, and not a multiple of it, so "deleted one page" cannot
  * pass for "deleted everything").
  */
@@ -11,11 +12,19 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { collectAllGuides, collectAllReviewDrafts } from "./export-pages";
-import { collectGuidesForExport, collectReviewDraftsForExport, deleteUserGuides, deleteUserReviewDrafts } from "./gdpr";
+import {
+    collectGuidesForExport,
+    collectReviewDraftsForExport,
+    collectWatchedRepositoriesForExport,
+    deleteUserGuides,
+    deleteUserReviewDrafts,
+    deleteUserWatchedRepositories,
+} from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
 const MANY = 130;
+const WATCHED_EXPORT_ARGS = /generateExportFile[\s\S]*watchedRepositories,/u;
 const EXPORT_FILE_ARGS = /generateExportFile[\s\S]*reviewDrafts,/u;
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -136,6 +145,61 @@ describe("review drafts in the account workflows", () => {
 
         expect(source).toContain('"delete-user-review-drafts"');
         expect(source).toContain("internal.source_control.gdpr.deleteUserReviewDrafts");
+    });
+});
+
+describe("watched repositories in GDPR flows", () => {
+    const watch = async (userId: string, repo: string, extra: Record<string, unknown> = {}): Promise<void> => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("watchedRepositories", {
+                checkedAt: 5,
+                createdAt: 1,
+                dirtyAt: 0,
+                etag: 'W/"x"',
+                hostOrigin: "https://github.com",
+                lastStatus: "ok",
+                leasedAt: 0,
+                login: "me",
+                nextPollAt: 9,
+                repository: repo,
+                requested: [{ authorLogin: "alice", number: 3, title: "Pull", updatedAt: 2, url: "https://github.com/o/r/pull/3" }],
+                seeded: true,
+                userId,
+                webhookSeenAt: 0,
+                ...extra,
+            });
+        });
+    };
+
+    it("exports the user's own watch list with its cache, never the webhook secret, and nobody else's", async () => {
+        await watch(A, "o/r", { webhookSecret: "v1:ciphertext" });
+        await watch(B, "o/other");
+
+        const exported = await harness.run(async (ctx: any) => await ctx.runQuery(collectWatchedRepositoriesForExport, { userId: A }));
+
+        expect(exported.watched).toEqual([expect.objectContaining({ repository: "o/r", webhookEnabled: true })]);
+        expect(JSON.stringify(exported)).not.toContain("ciphertext");
+        expect(JSON.stringify(exported)).not.toContain("o/other");
+    });
+
+    it("deletes every row of the user and nobody else's", async () => {
+        await watch(A, "o/one");
+        await watch(A, "o/two");
+        await watch(B, "o/three");
+
+        const { hasMore } = await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserWatchedRepositories, { userId: A }));
+        const left = await harness.run(async (ctx: any) => (await ctx.db.query("watchedRepositories").collect()).map((row: { userId: string }) => row.userId));
+
+        expect(hasMore).toBe(false);
+        expect(left).toEqual([B]);
+    });
+
+    it("is collected for the export and deleted with the account", () => {
+        const directory = join(import.meta.dirname, "../gdpr/workflows");
+
+        expect(readFileSync(join(directory, "export-workflow.ts"), "utf8")).toContain("internal.source_control.gdpr.collectWatchedRepositoriesForExport");
+        expect(readFileSync(join(directory, "export-workflow.ts"), "utf8")).toMatch(WATCHED_EXPORT_ARGS);
+        expect(readFileSync(join(directory, "deletion-workflow.ts"), "utf8")).toContain("internal.source_control.gdpr.deleteUserWatchedRepositories");
     });
 });
 
