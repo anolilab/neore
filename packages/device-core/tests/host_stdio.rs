@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use device_core::frame::{chunk_of, read_frame, write_frame};
+use device_core::frame::{read_frame, stream_chunk_of, write_frame, CHUNK_TAG};
 use device_core::host::{run_request, RunParams};
 use serde_json::{json, Value};
 use vectors::{Observed, Sandbox};
@@ -78,7 +78,13 @@ struct Host {
 
 impl Host {
     fn start() -> Host {
+        Self::start_with(&[])
+    }
+
+    /// A host that also has `extra` in its environment, as a forwarded agent socket would be.
+    fn start_with(extra: &[(&str, &str)]) -> Host {
         let mut child = host_command()
+            .envs(extra.iter().copied())
             .arg("--stdio")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -99,10 +105,15 @@ impl Host {
             let Ok(Some(bytes)) = read_frame(&mut stdout) else {
                 break;
             };
-            // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, bytes: [..] }`.
-            let frame = chunk_of(&bytes).map_or_else(
+            // A chunk is raw bytes; the tests see it as `{ kind: "chunk", id, stream, bytes: [..] }`.
+            let frame = stream_chunk_of(&bytes).map_or_else(
                 || serde_json::from_slice(&bytes).unwrap(),
-                |(id, data)| json!({ "kind": "chunk", "id": id, "bytes": data }),
+                |(tag, id, data)| {
+                    json!({
+                        "kind": "chunk", "id": id, "bytes": data,
+                        "stream": if tag == CHUNK_TAG { "stdout" } else { "stderr" },
+                    })
+                },
             );
 
             if sender.send(frame).is_err() {
@@ -200,6 +211,7 @@ fn the_host_says_what_it_can_sandbox_before_anything_else() {
 
     assert_eq!(hello["kind"], "hello");
     assert_eq!(hello["protocol"], 3);
+    assert_eq!(hello["agents"], cfg!(unix));
     assert_eq!(hello["platform"], device_core::actions::platform());
     assert_eq!(hello["sandbox"]["available"], confines);
 }
@@ -694,4 +706,338 @@ mod tar {
         assert_eq!(tar["error"], "the download was stopped");
         assert!(archive < 24 * 1024 * 1024, "{archive} bytes were sent");
     }
+}
+
+// ─── Coding agents (S7) ──────────────────────────────────────────────────
+
+/// Sends bytes to the agent started by request `id`, as a chunk frame; no bytes close its stdin.
+#[cfg(unix)]
+fn agent_input(host: &mut Host, id: u64, bytes: &[u8]) {
+    let mut frame = vec![CHUNK_TAG];
+
+    frame.extend_from_slice(&id.to_be_bytes());
+    frame.extend_from_slice(bytes);
+    write_frame(host.stdin.as_mut().unwrap(), &frame).unwrap();
+}
+
+#[cfg(unix)]
+fn agent_params(root: &Path, script: &str, env: &Value) -> Value {
+    json!({
+        "args": ["-c", script], "command": "/bin/sh", "cwd": root, "env": env,
+        "roots": [root],
+    })
+}
+
+/// What an agent printed, by stream, and the response that ended it. Reads until the response of request `id`.
+#[cfg(unix)]
+fn agent_run(host: &Host, id: u64) -> (String, String, Value) {
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+
+    loop {
+        let frame = host.next();
+
+        match frame["kind"].as_str() {
+            Some("chunk") if frame["id"] == id => {
+                let bytes: Vec<u8> = frame["bytes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|byte| byte.as_u64().unwrap() as u8)
+                    .collect();
+
+                if frame["stream"] == "stdout" {
+                    out.extend(bytes);
+                } else {
+                    err.extend(bytes);
+                }
+            }
+            Some("response") if frame["id"] == id => {
+                return (
+                    String::from_utf8(out).unwrap(),
+                    String::from_utf8(err).unwrap(),
+                    frame,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(unix)]
+fn alive(pid: i64) -> bool {
+    // SAFETY: signal 0 only asks whether the process exists.
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
+
+#[cfg(unix)]
+fn wait_gone(what: &str, pid: i64) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+
+    while alive(pid) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{what} ({pid}) is still running"
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(unix)]
+fn wait_for_file(file: &Path) -> String {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+
+    loop {
+        if let Ok(text) = std::fs::read_to_string(file) {
+            if text.ends_with('\n') {
+                return text.trim().to_owned();
+            }
+        }
+
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{} never appeared",
+            file.display()
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[cfg(unix)]
+fn agent_folder(label: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("neore-host-agent-{label}-{}", std::process::id()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    dir.canonicalize().unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_streams_both_outputs_takes_input_and_ends_with_its_status() {
+    let root = agent_folder("stream");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            "echo ready; echo oops >&2; read line; echo got:$line; exit 3",
+            &json!({}),
+        ),
+    );
+    // The agent waits for a line; the desktop's bytes for request 1 are its stdin.
+    agent_input(&mut host, 1, b"hello\n");
+
+    let (out, err, response) = agent_run(&host, 1);
+
+    assert_eq!(out, "ready\ngot:hello\n");
+    assert_eq!(err, "oops\n");
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["code"], 3);
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_gets_the_hosts_own_environment_and_the_persons_variables_and_no_agent_socket() {
+    let root = agent_folder("env");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            "env",
+            &json!({ "EXTRA": "from-the-person", "PATH": "/usr/bin:/bin:/opt/x" }),
+        ),
+    );
+
+    let (out, _, response) = agent_run(&host, 1);
+    let names: BTreeSet<&str> = out
+        .lines()
+        .filter_map(|line| line.split('=').next())
+        .collect();
+
+    assert_eq!(response["result"]["code"], 0, "{response}");
+    assert!(out.contains("EXTRA=from-the-person"));
+    assert!(out.contains("PATH=/usr/bin:/bin:/opt/x"));
+    assert!(out.contains("HOME="));
+    assert!(!names.contains("SSH_AUTH_SOCK"));
+    // Nothing of cargo's environment, which the host was started from, reaches the agent.
+    assert!(!names.contains("CARGO_MANIFEST_DIR"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_forwarded_agent_socket_reaches_the_agent_only_when_the_host_has_one() {
+    let root = agent_folder("socket");
+    let mut host = Host::start_with(&[("SSH_AUTH_SOCK", "/run/forwarded.sock")]);
+
+    host.next();
+    host.request(1, "agent", agent_params(&root, "env", &json!({})));
+
+    let (out, _, _) = agent_run(&host, 1);
+
+    assert!(out.contains("SSH_AUTH_SOCK=/run/forwarded.sock"));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_does_not_start_outside_the_shared_folders_or_with_a_reserved_variable() {
+    let root = agent_folder("refuse");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(1, "agent", agent_params(Path::new("/"), "true", &json!({})));
+    host.request(
+        2,
+        "agent",
+        agent_params(&root, "true", &json!({ "NODE_OPTIONS": "--require x" })),
+    );
+    host.request(3, "agent", agent_params(&root, "true", &json!({})));
+
+    let responses: Vec<Value> = (0..3).map(|_| host.next()).collect();
+    let by_id = |id: u64| responses.iter().find(|r| r["id"] == id).unwrap();
+
+    assert_eq!(by_id(1)["ok"], false, "{}", by_id(1));
+    assert_eq!(by_id(2)["ok"], false, "{}", by_id(2));
+    assert_eq!(by_id(3)["ok"], true, "{}", by_id(3));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_cancel_stops_the_agent_and_its_group() {
+    let root = agent_folder("cancel");
+    let pidfile = root.join("child.pid");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; exec sleep 300",
+                pidfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+
+    host.request(2, "cancel", json!({ "target": 1 }));
+
+    let (_, _, response) = agent_run(&host, 1);
+
+    assert_eq!(response["result"]["signal"], libc::SIGTERM);
+    // The shell's background child was in the agent's group and goes with it.
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_desktop_that_goes_away_takes_the_whole_agent_tree_with_it() {
+    let root = agent_folder("eof");
+    let (pidfile, leaderfile) = (root.join("child.pid"), root.join("leader.pid"));
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; echo $$ > {}; exec sleep 300",
+                pidfile.display(),
+                leaderfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+    let leader: i64 = wait_for_file(&leaderfile).parse().unwrap();
+
+    // The desktop quit: ssh ends and the host's stdin with it.
+    host.close_stdin();
+
+    assert_eq!(host.exit_code(), Some(0));
+    wait_gone("the agent", leader);
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_host_told_to_stop_takes_the_whole_agent_tree_with_it() {
+    let root = agent_folder("term");
+    let pidfile = root.join("child.pid");
+    let mut host = Host::start();
+
+    host.next();
+    host.request(
+        1,
+        "agent",
+        agent_params(
+            &root,
+            &format!(
+                "sleep 300 & echo $! > {}; exec sleep 300",
+                pidfile.display()
+            ),
+            &json!({}),
+        ),
+    );
+
+    let child: i64 = wait_for_file(&pidfile).parse().unwrap();
+
+    // SAFETY: SIGTERM to the host this test started.
+    unsafe {
+        libc::kill(host.child.id() as libc::pid_t, libc::SIGTERM);
+    }
+
+    host.exit_code();
+    wait_gone("the agent's child", child);
+}
+
+#[cfg(unix)]
+#[test]
+fn agents_have_slots_of_their_own_and_do_not_use_up_the_requests() {
+    let root = agent_folder("slots");
+    let mut host = Host::start();
+
+    host.next();
+
+    for id in 1..=8 {
+        host.request(
+            id,
+            "agent",
+            agent_params(&root, "exec sleep 300", &json!({})),
+        );
+    }
+
+    // A ninth is refused; the file and command requests still have all their slots.
+    host.request(
+        9,
+        "agent",
+        agent_params(&root, "exec sleep 300", &json!({})),
+    );
+
+    let refusal = host.next();
+
+    assert_eq!(refusal["id"], 9);
+    assert_eq!(refusal["ok"], false);
+    assert_eq!(refusal["error"], "too many coding agents on this server");
+
+    host.run(10, params(&root, "fs_list", &json!({})));
+
+    let listing = host.next();
+
+    assert_eq!(listing["id"], 10);
+    assert_eq!(listing["ok"], true, "{listing}");
 }

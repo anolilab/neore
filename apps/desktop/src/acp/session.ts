@@ -73,6 +73,8 @@ export interface SessionOptions {
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
+    /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
+    folderIsRemote?: boolean;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
@@ -346,7 +348,7 @@ export class AgentSession {
     private run(prompt: string, turnId?: string): void {
         const turn = new Turn(prompt, this.options.process.scrub, turnId);
 
-        if (this.options.observer !== undefined) {
+        if (this.options.observer !== undefined && this.options.folderIsRemote !== true) {
             this.changes.set(turn, new TurnChanges(this.options.folder, this.options.process.scrub));
         }
 
