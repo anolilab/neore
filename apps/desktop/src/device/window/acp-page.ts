@@ -5,8 +5,10 @@
  */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { HooksView } from "../../acp/hooks/types";
 import type { RegistryListing } from "../../acp/registry";
 import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import { HooksPanelModel } from "./hooks-panel";
 import { canImportSessions } from "./import-control";
 import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
@@ -532,6 +534,189 @@ const renderSession = (snapshot: SessionSnapshot | undefined): void => {
     $<HTMLButtonElement>("acp-end").textContent = ended ? "Remove session" : "End session";
 };
 
+/** An approval is for one agent in one folder: it covers every session of that agent there, and no other agent's. */
+const hookStateText = (phase: HooksView["state"], agent: string): string => {
+    const scope = `any session of ${agent} in this folder`;
+    const text: Record<HooksView["state"], string> = {
+        approved: `Approved for ${scope}. File events and the manual hooks below can prompt it.`,
+        changed: `This file changed since you approved it for ${scope}. Nothing fires until you approve it again.`,
+        invalid: "This file is not a valid hooks file, so nothing fires.",
+        none: "",
+        unapproved: `Not approved. Nothing fires until you approve this file for ${scope}.`,
+    };
+
+    return text[phase];
+};
+
+const hookWhen = (hook: HooksView["hooks"][number]): string => hook.event === "manual" ? "Run by a button" : `When a file matching ${hook.glob ?? ""} is ${hook.event}`;
+
+const hookLine = (view: HooksView, sessionId: string, hook: HooksView["hooks"][number]): HTMLLIElement => {
+    const li = document.createElement("li");
+    const title = document.createElement("strong");
+    const when = document.createElement("span");
+    const prompt = document.createElement("pre");
+
+    title.textContent = hook.name;
+    when.className = "muted";
+    when.textContent = ` — ${hookWhen(hook)}. Sends:`;
+    prompt.textContent = hook.prompt;
+    li.append(title, when, prompt);
+
+    if (hook.event === "manual" && view.state === "approved" && view.hash !== undefined) {
+        const { hash } = view;
+
+        li.append(button("Run", `Run the hook ${hook.name}`, () => guarded(async () => {
+            // A button drawn for another session than the one on show never sends anything.
+            if (!hooksPanel.model.canAct(sessionId, state.selected)) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHookRun(sessionId, hook.id, hash);
+            $("acp-notice").textContent = `${hook.name} sent to the agent.`;
+        })));
+    }
+
+    return li;
+};
+
+/** Streamed text re-renders the session many times a second; the file is read again at most this often unless the session or its status changed. */
+const HOOKS_REFRESH_MS = 1500;
+const hooksPanel: { drawn: number; model: HooksPanelModel; read?: { at: number; id: string; status: string }; serial: number; sessionId?: string; trailing?: ReturnType<typeof setTimeout> } = {
+    drawn: 0,
+    model: new HooksPanelModel(),
+    serial: 0,
+};
+
+/** Empties the panel at once: nothing drawn for another session (or none) may stay on screen, with a button that still works. */
+const clearHooks = (): void => {
+    hooksPanel.model.clear();
+    hooksPanel.sessionId = undefined;
+    hooksPanel.serial += 1;
+    hooksPanel.drawn += 1;
+    hooksPanel.read = undefined;
+    clearTimeout(hooksPanel.trailing);
+    hooksPanel.trailing = undefined;
+    $("acp-hooks").hidden = true;
+    $("acp-hooks-list").replaceChildren();
+    $("acp-hooks-actions").replaceChildren();
+    $("acp-hooks-state").textContent = "";
+};
+
+const readHooks = async (snapshot: SessionSnapshot): Promise<HooksView> => {
+    try {
+        return snapshot.status === "ended" ? { hooks: [], state: "none", watching: false } : await globalThis.neoreDevice.acpHooks(snapshot.id);
+    } catch {
+        return { hooks: [], state: "none", watching: false };
+    }
+};
+
+const drawHooks = (snapshot: SessionSnapshot, view: HooksView, approveDelayMs: number): void => {
+    hooksPanel.drawn += 1;
+
+    const mine = hooksPanel.drawn;
+    const panel = $("acp-hooks");
+
+    panel.hidden = view.state === "none";
+    const unwatched = view.state !== "invalid" && !view.watching ? " The folder is not being watched, so file hooks cannot fire; manual hooks still work." : "";
+
+    $("acp-hooks-state").textContent = `${view.state === "invalid" ? `${hookStateText("invalid", snapshot.agentLabel)} ${view.error ?? ""}` : hookStateText(view.state, snapshot.agentLabel)}${unwatched}`;
+    $("acp-hooks-list").replaceChildren(...view.hooks.map((hook) => hookLine(view, snapshot.id, hook)));
+
+    const actions: HTMLElement[] = [];
+    const { hash } = view;
+
+    if (hash !== undefined && (view.state === "unapproved" || view.state === "changed")) {
+        const approve = button(`Approve for ${snapshot.agentLabel} in this folder`, "Approve the hooks file shown above for this agent in this folder", () => guarded(async () => {
+            if (!hooksPanel.model.canAct(snapshot.id, state.selected) || approve.disabled) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHooksApprove(snapshot.id, hash);
+            await renderHooks(snapshot, true, true);
+        }));
+
+        // The button is held back for a moment after it is drawn, so a click aimed at something else cannot land on it.
+        approve.disabled = approveDelayMs > 0;
+
+        if (approveDelayMs > 0) {
+            setTimeout(() => {
+                if (hooksPanel.drawn === mine) {
+                    approve.disabled = false;
+                }
+            }, approveDelayMs);
+        }
+
+        actions.push(approve);
+    }
+
+    if (view.state === "approved" || view.state === "changed") {
+        actions.push(button("Revoke approval", "Revoke the approval of this hooks file", () => guarded(async () => {
+            if (!hooksPanel.model.canAct(snapshot.id, state.selected)) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHooksRevoke(snapshot.id);
+            await renderHooks(snapshot, true, true);
+        })));
+    }
+
+    $("acp-hooks-actions").replaceChildren(...actions);
+};
+
+/** The file changed while an Approve button for the old one was on screen: nothing is swapped in under the person's pointer. */
+const drawHooksChanged = (snapshot: SessionSnapshot): void => {
+    hooksPanel.drawn += 1;
+    $("acp-hooks").hidden = false;
+    $("acp-hooks-state").textContent = "The hooks file changed — review again. Nothing was approved.";
+    $("acp-hooks-list").replaceChildren();
+    $("acp-hooks-actions").replaceChildren(button("Review the hooks again", "Read the changed hooks file and show it in full", () => guarded(async () => {
+        await renderHooks(snapshot, true, true);
+    })));
+};
+
+/** `review`: the person asked for this read (after approving, revoking or "review again"), so it replaces what is on screen. */
+const renderHooks = async (snapshot: SessionSnapshot, force = false, review = false): Promise<void> => {
+    const now = Date.now();
+
+    // Another session than the panel was last drawn for: its buttons go before anything of this one is read.
+    if (hooksPanel.sessionId !== snapshot.id) {
+        clearHooks();
+        hooksPanel.sessionId = snapshot.id;
+    }
+
+    if (!force && hooksPanel.read?.id === snapshot.id && hooksPanel.read.status === snapshot.status && now - hooksPanel.read.at < HOOKS_REFRESH_MS) {
+        // A change that arrives inside the window (the file itself being edited, say) is still read once the window is over.
+        hooksPanel.trailing ??= setTimeout(() => {
+            hooksPanel.trailing = undefined;
+
+            if (state.selected === snapshot.id) {
+                renderHooks(snapshot, true);
+            }
+        }, HOOKS_REFRESH_MS);
+
+        return;
+    }
+
+    hooksPanel.read = { at: now, id: snapshot.id, status: snapshot.status };
+    hooksPanel.serial += 1;
+
+    const mine = hooksPanel.serial;
+    const view = await readHooks(snapshot);
+
+    // Another session was opened, or the panel was emptied, while the file was read.
+    if (mine !== hooksPanel.serial) {
+        return;
+    }
+
+    const step = review ? hooksPanel.model.review(snapshot.id, state.selected, view) : hooksPanel.model.receive(snapshot.id, state.selected, view);
+
+    if (step.kind === "show") {
+        drawHooks(snapshot, step.view, step.approveDelayMs);
+    } else if (step.kind === "notice") {
+        drawHooksChanged(snapshot);
+    }
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
@@ -555,7 +740,21 @@ const refreshSessions = async (): Promise<void> => {
             }),
     );
 
-    renderSession(state.selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(state.selected));
+    const { selected } = state;
+    const snapshot = selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(selected);
+
+    // Another session was opened while this one loaded: its own refresh draws it.
+    if (state.selected !== selected) {
+        return;
+    }
+
+    renderSession(snapshot);
+
+    if (snapshot === undefined) {
+        clearHooks();
+    } else {
+        await renderHooks(snapshot);
+    }
 };
 
 const selectedId = (): string => {
