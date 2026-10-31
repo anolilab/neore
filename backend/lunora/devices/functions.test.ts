@@ -583,7 +583,7 @@ describe("the relay", () => {
                 { ...(await signedResult(deviceId, secret, callId)), ...(claimId !== undefined && { claimId }) } as never,
             );
 
-        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId, claimId: "window-a" } as never);
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, claimId: "window-a", deviceId } as never);
 
         // A window whose lease lapsed reports late: its result is not the claimant's, so the call stays open.
         await expect(complete("window-b")).resolves.toEqual({ accepted: false });
