@@ -561,6 +561,10 @@ for a schema table that is neither policed nor listed:
 | `skills_builder.attachSkillTestDrive` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `skills_builder.refineBuilderDraft` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `skills_builder.runBuilderTurn` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
+| `skills_bundle.exportBundle` | action | authAction + RL | skills, threads, triggers | owner only: `loadBundleSources` NOT_FOUNDs any id that is not the caller's; participants of an exported group chat are read through `getSkill`; output built from a field whitelist, no secret, owner or organization | ok |
+| `skills_bundle.importBundle` | action | authAction + RL | skills, threads, triggers | caller-scoped (ctx.user); parsed and re-planned server-side, skills created through `createSkill` switched off, triggers through `createTrigger` disabled, group chats through the internal `createImportedGroupChat` (participants must be the caller's readable skills); one `importId` imports once (`lib/claim-once`, keyed by caller); rolled back on failure through the internal `removeImportedItem` (owner-only, hard delete) | ok |
+| `skills_bundle.listBundleCandidates` | query | authQuery | skills, threads, triggers | caller-scoped (ctx.user): the caller's own skills, threads and triggers; also reads, by id, the skill row of each participant of the caller's group chats that the caller does not own, only to decide whether that group is exportable (`canReadSkill`, organization-shared); nothing of those rows is returned beyond the participant ids already stored in the caller's own thread | ok |
+| `skills_bundle.previewBundle` | action | authAction + RL | skills | caller-scoped (ctx.user); reads, creates nothing | ok |
 | `skills_functions.createSkill` | mutation | authMutation + RL | skillHistory, skillStats, skills, userSkills | caller-scoped (ctx.user) | ok |
 | `skills_functions.deleteSkill` | mutation | authMutation + RL | skillStats, skills | skill access | ok |
 | `skills_functions.getAvailableSkillTools` | query | authQuery | — | static registry | ok |
