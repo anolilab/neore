@@ -22,6 +22,7 @@ import { getCurrentUserInternal } from "../auth/lib/helper";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import { createHostStream } from "../chat/streaming/persistent/host";
 import { createAcpCall } from "../devices/lib/acp-call";
+import type { DeviceTaintSource } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -59,6 +60,8 @@ const vSendResult = v.union(
 export interface SendToHostInput {
     plan: "free" | "premium";
     requestId: string;
+    /** Untrusted content the text carries; signed into the call so the computer never offers "Always allow" for the turn. */
+    taintedBy?: ReadonlyArray<DeviceTaintSource>;
     text: string;
     threadId: string;
     /** The owner's passcode proof for a locked chat. */
@@ -120,7 +123,7 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     const turnId = crypto.randomUUID();
     const call = await createAcpCall(
         ctx,
-        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text: args.text, turnId }, kind: "acp_send", threadId, userId },
+        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text: args.text, turnId }, kind: "acp_send", taintedBy: args.taintedBy, threadId, userId },
         now,
     );
 

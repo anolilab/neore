@@ -415,7 +415,8 @@ export const pickGuide = <T extends Pickable>(guides: ReadonlyArray<T>, headSha:
 
 // ─── Host guides ────────────────────────────────────────────────────────────
 
-const MAX_JSON_ATTEMPTS = 20;
+/** The characters of a reply read in looking for the answer, summed over every candidate start. */
+const MAX_JSON_SCAN_CHARS = 4_000_000;
 
 const BRACE_STEP: Readonly<Record<string, number>> = { "{": 1, "}": -1 };
 
@@ -447,25 +448,38 @@ const objectEnd = (source: string, start: number): number => {
     return -1;
 };
 
+const hasStops = (value: unknown): boolean => typeof value === "object" && value !== null && Array.isArray((value as { stops?: unknown }).stops);
+
 /**
- * The JSON object a coding agent answered with, out of whatever text surrounds it (prose, a fenced block). `null` when
- * there is none. Bounded: a reply full of braces is tried a few times, not scanned for ever.
+ * The JSON object a coding agent answered with, out of whatever text surrounds it (prose, a fenced block): the LAST
+ * object that has a `stops` array. The transcript can echo text a pull request planted, and an agent that echoes a diff
+ * has any number of braces before its answer, so the scan runs from the end and the first hit is the agent's last word.
+ * Objects nested in the answer are met first and skipped, because only the top level has `stops`. `null` when there is
+ * none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
  */
 export const extractJsonObject = (reply: string): unknown => {
-    let from = reply.indexOf("{");
+    let budget = MAX_JSON_SCAN_CHARS;
 
-    for (let attempt = 0; from !== -1 && attempt < MAX_JSON_ATTEMPTS; attempt += 1) {
+    for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0; from = reply.lastIndexOf("{", from - 1)) {
         const end = objectEnd(reply, from);
+
+        budget -= (end === -1 ? reply.length : end + 1) - from;
 
         if (end !== -1) {
             try {
-                return JSON.parse(reply.slice(from, end + 1)) as unknown;
+                const parsed = JSON.parse(reply.slice(from, end + 1)) as unknown;
+
+                if (hasStops(parsed)) {
+                    return parsed;
+                }
             } catch {
-                // Not JSON: try the next opening brace.
+                // Not JSON: try the previous opening brace.
             }
         }
 
-        from = reply.indexOf("{", from + 1);
+        if (from === 0) {
+            break;
+        }
     }
 
     return null;

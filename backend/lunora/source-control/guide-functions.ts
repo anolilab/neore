@@ -1,8 +1,8 @@
 /**
  * Develop mode, guides: ask for the AI guide of a pull request, read it, and act on what it proposes.
  *
- * - `generateGuide` is an ACTION that reads the pull request's head from the host, reserves the row, charges the
- *   daily text quota like other utility work and puts the generation on the jobs queue (`guide-job.ts`).
+ * - `generateGuide` is an ACTION that reads the pull request's head from the host, reserves the row, puts the generation
+ *   on the jobs queue (`guide-job.ts`) and then charges the daily text quota like other utility work.
  * - `getGuide` is a live query: the page sees the guide fill in, and whether the pull request has moved past it.
  * - A proposal is a SUGGESTION. `applyGuideProposal` writes a comment into the user's review DRAFT through the same
  *   path as the Files tab, and nothing reaches the host until the user submits that review.
@@ -121,6 +121,29 @@ export const generateGuide = authAction
             return { status: "running" as const };
         }
 
+        // Queued BEFORE the quota is charged: there is no way to give a unit back, so a queue that refuses the send must not
+        // have cost one. `once` keeps a redelivery from paying for the model twice, and a row failed below (quota) makes the
+        // job a no-op (`readGuideForJob` finds nothing generating, and the job looks again right before the model call).
+        try {
+            await enqueueJob(
+                internal.source_control.guide_job.runCloudGuide,
+                { guideId: begun.guideId, userId },
+                {
+                    once: {
+                        jobId,
+                        onLapse: { args: { guideId: begun.guideId, userId }, ref: internal.source_control.guide_internal.failAbandonedGuide },
+                        userId,
+                    },
+                    shardKey: userId,
+                },
+            );
+        } catch (error) {
+            // No job was accepted: the row must not sit `generating` and answer the retry with "running".
+            await ctx.runMutation(internal.source_control.guide_internal.failGuide, { failure: "abandoned", guideId: begun.guideId, userId });
+
+            throw error;
+        }
+
         // The model call is paid for: one unit of the daily text quota, like a translation. Charged after the row is reserved,
         // so a double click is not charged twice, and the row is failed again when the quota refuses.
         const charge = await chargeDailyLimit(ctx, { _id: userId, isAnonymous: false, plan: plan ?? null, role: role ?? null }, "Text");
@@ -130,19 +153,6 @@ export const generateGuide = authAction
 
             return { status: "quota" as const, ...(charge.retryAfter !== undefined && { retryAfter: charge.retryAfter }) };
         }
-
-        await enqueueJob(
-            internal.source_control.guide_job.runCloudGuide,
-            { guideId: begun.guideId, userId },
-            {
-                once: {
-                    jobId,
-                    onLapse: { args: { guideId: begun.guideId, userId }, ref: internal.source_control.guide_internal.failAbandonedGuide },
-                    userId,
-                },
-                shardKey: userId,
-            },
-        );
 
         ctx.log.event("source_control.guide_requested", { source: "cloud" });
 
@@ -157,10 +167,11 @@ const vApplied = v.union(
 /**
  * Puts a proposed comment into the user's review draft. This is the ONLY thing applying does: the host hears nothing
  * until the user submits the review. A proposal applies once, and only a comment (a label has no write to apply).
+ * `headSha` is the head the page shows: a guide of an earlier head is refused (`head_moved`).
  */
 export const applyGuideProposal = authMutation
     .use(rateLimit("sourceControl/draft"))
-    .input({ guideId: v.id("pullRequestGuides"), proposalId: v.string().max(MAX_LENGTH.id) })
+    .input({ guideId: v.id("pullRequestGuides"), headSha: v.string().max(MAX_LENGTH.short), proposalId: v.string().max(MAX_LENGTH.id) })
     .output(vApplied)
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
@@ -173,6 +184,11 @@ export const applyGuideProposal = authMutation
 
         if (guide.status !== "ready" || proposal.status !== "proposed") {
             return { status: "not_ready" as const };
+        }
+
+        // The head the page shows. An empty draft has no commit to compare with, so this is what refuses a guide of an earlier head.
+        if (guide.headSha !== args.headSha) {
+            return { status: "head_moved" as const };
         }
 
         const saved = await saveDraftCommentFor(ctx, userId, {

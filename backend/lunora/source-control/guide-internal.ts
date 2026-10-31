@@ -101,7 +101,7 @@ export const readGuideForJob = internalQuery
         return { headSha: guide.headSha, instructions: guide.instructions, number: guide.number, repository: guide.repository };
     });
 
-/** Fills the row. Only a row still `generating` takes it: a redelivered job, or one that outlived its run, writes nothing. */
+/** Fills the row. Only a row still running takes it: a redelivered job, or an answer that arrives after the run's window (the page already reads it as abandoned), writes nothing. */
 export const saveGuide = internalMutation
     .input({
         guideId: v.id("pullRequestGuides"),
@@ -116,7 +116,7 @@ export const saveGuide = internalMutation
     .mutation(async ({ args, ctx }) => {
         const guide = await ctx.db.pullRequestGuides.findFirst({ where: { _id: args.guideId, userId: args.userId } });
 
-        if (!guide || guide.status !== "generating") {
+        if (!guide || !isRunning(guide, ctx.now)) {
             return false;
         }
 

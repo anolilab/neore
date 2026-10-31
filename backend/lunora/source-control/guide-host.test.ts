@@ -126,6 +126,18 @@ describe("beginHostGuide", () => {
         expect(await rows("persistentStreams")).toHaveLength(1);
     });
 
+    it("signs the prompt's send as tainted, because it carries a pull request's own text", async () => {
+        const deviceId = await pairedDevice(ownerId);
+
+        await begin(deviceId);
+
+        const calls = await rows("deviceCalls");
+        const send = calls.find((call) => call.toolName === "acp_send");
+
+        expect(send?.taintedBy).not.toEqual([]);
+        expect(JSON.parse(send?.envelope as string)).toMatchObject({ taintedBy: send?.taintedBy, tool: "acp_send" });
+    });
+
     it("refuses a folder that is not offered for that agent, or not this repository, and writes nothing", async () => {
         const deviceId = await pairedDevice(ownerId);
 

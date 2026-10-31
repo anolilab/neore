@@ -21,6 +21,7 @@ import { sendToHostFor } from "../acp/send";
 import { authAction, rateLimit } from "../lib/crpc";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { isDeviceOnline } from "../devices/lib/state";
+import type { DeviceTaintSource } from "../devices/lib/taint";
 import { getUserTier } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
@@ -32,6 +33,9 @@ import { readFromHost } from "./read-host";
 import { vFailed } from "./validators";
 
 const HOST_ROLLBACK = "guide_host:";
+
+/** What a guide prompt reads: text other people wrote on the host. */
+const GUIDE_TAINT: ReadonlyArray<DeviceTaintSource> = ["web"];
 
 /** The refusals of a send that the page words for itself; any other is a "busy" in effect. */
 const REPORTED_OUTCOMES: ReadonlySet<string> = new Set(["busy", "offline", "rate_limited", "session_ended", "too_large"]);
@@ -106,7 +110,15 @@ export const beginHostGuide = internalMutation
             throw new LunoraError("INTERNAL", "The guide's session did not start");
         }
 
-        const sent = await sendToHostFor(ctx, { plan: args.plan, requestId: crypto.randomUUID(), text: args.text, threadId: started.threadId, userId });
+        // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
+        const sent = await sendToHostFor(ctx, {
+            plan: args.plan,
+            requestId: crypto.randomUUID(),
+            taintedBy: GUIDE_TAINT,
+            text: args.text,
+            threadId: started.threadId,
+            userId,
+        });
 
         if (sent.outcome !== "sent") {
             // A brand-new thread has no turn running and is its owner's: the outcomes below that are not on the user's list are a "busy" in effect.

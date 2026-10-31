@@ -158,6 +158,17 @@ describe("a guide and the head commit", () => {
         expect(await guideFor(A, HEAD)).toMatchObject({ guide: { headSha: HEAD } });
     });
 
+    it("does not take a result that arrives after the run's window: that run is already read as abandoned", async () => {
+        const first = await begin(A);
+
+        await run(async (ctx) => {
+            await ctx.db.patch(first.guideId, { updatedAt: Date.now() - GUIDE_RUN_WINDOW_MS - 1000 });
+        });
+
+        expect(await finish(A, first.guideId)).toBe(false);
+        expect(await guideFor(A, HEAD)).toMatchObject({ guide: { failure: "abandoned", status: "failed" } });
+    });
+
     it("fails an abandoned run only for the claim that owns it", async () => {
         const started = await begin(A, HEAD, "job-1");
 
@@ -186,28 +197,28 @@ describe("applying a proposal", () => {
 
     it("writes the comment into the review draft, once, and nowhere else", async () => {
         const guideId = await readyGuide();
-        const applied = await as(A).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-1" } as never);
+        const applied = await as(A).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-1" } as never);
 
         expect(applied).toMatchObject({ status: "applied" });
         expect(await draft(A)).toMatchObject({ comments: [{ body: "Rename this", line: 3, path: "src/a.ts", side: "new" }] });
         expect(await draft(A)).toMatchObject({ commitId: HEAD });
         expect(await guideFor(A, HEAD)).toMatchObject({ guide: { proposals: [{ status: "applied" }, { status: "proposed" }] } });
         // A second apply does not double the comment.
-        expect(await as(A).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "not_ready" });
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-1" } as never)).toEqual({ status: "not_ready" });
         expect(await draft(A)).toMatchObject({ comments: [expect.anything()] });
     });
 
     it("cannot apply a label: there is no write to apply it with", async () => {
         const guideId = await readyGuide();
 
-        expect(await as(A).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-2" } as never)).toEqual({ status: "not_found" });
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-2" } as never)).toEqual({ status: "not_found" });
         expect(await draft(A)).toBeNull();
     });
 
     it("is refused for a guide that is not finished", async () => {
         const started = await begin(A);
 
-        expect(await as(A).mutation(applyGuideProposal as never, { guideId: started.guideId, proposalId: "proposal-1" } as never)).toEqual({
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId: started.guideId, headSha: HEAD, proposalId: "proposal-1" } as never)).toEqual({
             status: "not_found",
         });
     });
@@ -216,15 +227,25 @@ describe("applying a proposal", () => {
         const guideId = await readyGuide(A, HEAD);
         const newer = await readyGuide(A, NEWER);
 
-        await as(A).mutation(applyGuideProposal as never, { guideId: newer, proposalId: "proposal-1" } as never);
+        await as(A).mutation(applyGuideProposal as never, { guideId: newer, headSha: NEWER, proposalId: "proposal-1" } as never);
 
-        expect(await as(A).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "head_moved" });
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-1" } as never)).toEqual({ status: "head_moved" });
+    });
+
+    it("is refused when the page's head is no longer the guide's, even with no draft to compare against", async () => {
+        const guideId = await readyGuide(A, HEAD);
+
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId, headSha: NEWER, proposalId: "proposal-1" } as never)).toEqual({
+            status: "head_moved",
+        });
+        expect(await draft(A)).toBeNull();
+        expect(await guideFor(A, HEAD)).toMatchObject({ guide: { proposals: [{ status: "proposed" }, { status: "proposed" }] } });
     });
 
     it("never touches another user's guide", async () => {
         const guideId = await readyGuide(A);
 
-        expect(await as(B).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "not_found" });
+        expect(await as(B).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-1" } as never)).toEqual({ status: "not_found" });
         expect(await as(B).mutation(dismissGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "not_found" });
         expect(await draft(B)).toBeNull();
     });
@@ -233,7 +254,7 @@ describe("applying a proposal", () => {
         const guideId = await readyGuide();
 
         expect(await as(A).mutation(dismissGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "dismissed" });
-        expect(await as(A).mutation(applyGuideProposal as never, { guideId, proposalId: "proposal-1" } as never)).toEqual({ status: "not_ready" });
+        expect(await as(A).mutation(applyGuideProposal as never, { guideId, headSha: HEAD, proposalId: "proposal-1" } as never)).toEqual({ status: "not_ready" });
         expect(await draft(A)).toBeNull();
     });
 });

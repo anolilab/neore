@@ -45813,12 +45813,16 @@
                         "type": "string",
                         "x-lunora-table": "pullRequestGuides"
                       },
+                      "headSha": {
+                        "type": "string"
+                      },
                       "proposalId": {
                         "type": "string"
                       }
                     },
                     "required": [
                       "guideId",
+                      "headSha",
                       "proposalId"
                     ],
                     "type": "object"

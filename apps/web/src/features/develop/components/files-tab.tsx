@@ -82,6 +82,7 @@ const FileRow = ({
     const [open, setOpen] = useState(wanted);
     const panelId = useId();
     const row = useRef<HTMLLIElement>(null);
+    const toggle = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         if (!wanted) {
@@ -90,6 +91,8 @@ const FileRow = ({
 
         setOpen(true);
         row.current?.scrollIntoView({ block: "start" });
+        // The button that asked (a guide stop) is gone with its tab: keyboard focus follows the file.
+        toggle.current?.focus({ preventScroll: true });
     }, [wanted, focus?.token]);
 
     const statuses: Record<string, string> = {
@@ -120,6 +123,7 @@ const FileRow = ({
                     aria-expanded={open}
                     className="hover:bg-muted focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:ring-2"
                     onClick={() => setOpen((current) => !current)}
+                    ref={toggle}
                     type="button"
                 >
                     <ChevronRight aria-hidden className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />

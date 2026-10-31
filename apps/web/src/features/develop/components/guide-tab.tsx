@@ -230,7 +230,7 @@ const GuideTab = ({
                                 hostLabel={hostLabel}
                                 onApply={async (proposalId) =>
                                     await proposalOutcome(
-                                        async () => await actions.apply.mutateAsync({ guideId: current.id as Id<"pullRequestGuides">, proposalId }),
+                                        async () => await actions.apply.mutateAsync({ guideId: current.id as Id<"pullRequestGuides">, headSha, proposalId }),
                                     )
                                 }
                                 onDismiss={async (proposalId) =>

@@ -130,7 +130,7 @@ export const buildCloudGuidePrompt = (input: GuidePromptInput): { prompt: string
 export const buildHostGuidePrompt = (input: GuidePromptInput): string => {
     const head = `${RULES}
 
-You are in a checkout of the repository. Check that the remote matches ${input.repository}, then read the change with read-only git commands: the head commit is ${input.headSha}; compare it with the merge base of ${input.baseBranch}. Do not edit files, do not run the project's code, scripts or tests, and do not push.
+You are in a checkout of the repository. Check that the remote matches the "repository" of the pull request in the evidence below, then read the change with read-only git commands: the head commit is its "headSha"; compare it with the merge base of its "baseBranch". Do not edit files, do not run the project's code, scripts or tests, and do not push.
 
 Reviewer's instructions: ${instructionsOf(input.instructions)}
 

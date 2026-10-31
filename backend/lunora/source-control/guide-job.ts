@@ -7,6 +7,7 @@
  * come through `GuideReads` and the model's answer only becomes a proposal.
  */
 import { generateObject } from "ai";
+import { v } from "lunorash/server";
 import z from "zod/v4";
 
 import { internal } from "../_generated/internal";
@@ -15,7 +16,6 @@ import { resolveGithubToken } from "../connectors/lib/github-token";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
-import { v } from "lunorash/server";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { buildGuide, readPullRequestForGuide } from "./guide-generate";
 import type { AskModel } from "./guide-generate";
@@ -86,6 +86,11 @@ export const runCloudGuide = internalAction
 
         if (read.status !== "ok") {
             return await fail(read.status === "not_connected" || read.status === "needs_reconnect" ? "not_connected" : "host_error");
+        }
+
+        // The quota may have refused while the pull request was being read: the row is failed then, and nothing is spent.
+        if (!(await ctx.runQuery(internal.source_control.guide_internal.readGuideForJob, { guideId, userId }))) {
+            return null;
         }
 
         const ask: AskModel = async ({ prompt, system }) => {
