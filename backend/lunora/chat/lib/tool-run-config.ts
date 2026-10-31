@@ -34,6 +34,11 @@ export const vToolRunConfig = v.object({
      */
     memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
+    /**
+     * The prompt row the paused run answered. The continuation's stream is keyed on the approval id, so this is
+     * how a goal recognises the resumed run as its own round (`chat/goals/internal.ts#runPromptId`).
+     */
+    promptMessageId: v.optional(v.string()),
     reasoningEffort: v.optional(v.number()),
     /**
      * Names the reply this snapshot belongs to (the stream its first run wrote to), carried unchanged through every

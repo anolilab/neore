@@ -6,6 +6,7 @@ import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../_generated/server";
 
+import { internal } from "../_generated/internal";
 import { action, internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mutation, query, rateLimit } from "../lib/crpc";
 import { getAuth, getSession } from "../auth";
@@ -27,6 +28,7 @@ import { getCurrentUserInternal } from "./lib/helper";
 import { resolveActiveMembership } from "./lib/organization-helpers";
 import { resolveUserPlan } from "./lib/plan";
 import roleGuard from "./lib/role-guard";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
@@ -283,6 +285,12 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             userId,
             ...toStore,
         });
+    }
+
+    // Context summaries are opt-in: switching them off erases the ones already made (`agent/thread-summaries.ts`),
+    // on the user's own shard, where they live.
+    if (tableName === "userSettings" && toStore.threadSummariesEnabled !== undefined && toStore.threadSummariesEnabled !== true) {
+        await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { before: now, userId }, userId);
     }
 };
 
@@ -1052,6 +1060,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
         }),
@@ -1073,6 +1082,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
             };
@@ -1087,6 +1097,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,
             };

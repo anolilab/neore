@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { registeredApi } from "../../test/registered-api";
 
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
+import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
 import schema from "../schema";
 import { collectConversations, collectThreadTags } from "./steps";
@@ -37,6 +38,7 @@ describe("collectConversations", () => {
         registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -103,10 +105,61 @@ describe("collectConversations", () => {
             harness.close();
         }
     });
+    it("exports each thread's context summaries with it, and only that thread's", async () => {
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
+        registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
+        registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const withSummary = await context.db.insert("threads", { status: "active", title: "Summarised", userId: "user-s" });
+                const without = await context.db.insert("threads", { status: "active", title: "Short", userId: "user-s" });
+                const row = async (threadId: string) =>
+                    await context.db.insert("messages", {
+                        message: { content: "hi", role: "user" },
+                        order: 0,
+                        status: "success",
+                        stepOrder: 0,
+                        text: "hi",
+                        threadId,
+                        tool: false,
+                        userId: "user-s",
+                    });
+
+                await context.db.insert("threadContextSummaries", {
+                    coveredCount: 50,
+                    coveredUpToMessageId: await row(withSummary),
+                    createdAt: 1_700_000_000_000,
+                    summary: "The user planned a trip.",
+                    taintedBy: ["web"],
+                    threadId: withSummary,
+                    userId: "user-s",
+                });
+                await row(without);
+            });
+
+            const exported = (await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-s" }))) as {
+                contextSummaries?: { coveredCount: number; summary: string }[];
+                thread: { title?: string };
+            }[];
+
+            expect(exported.find((conversation) => conversation.thread.title === "Summarised")?.contextSummaries).toMatchObject([
+                { coveredCount: 50, summary: "The user planned a trip." },
+            ]);
+            expect(exported.find((conversation) => conversation.thread.title === "Short")?.contextSummaries).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("exports each message's parent and each thread's active leaf, so a re-import can keep the active branch", async () => {
         registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -213,6 +266,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("agent_threads:getThreadInternal", getThreadInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

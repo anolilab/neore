@@ -11,7 +11,7 @@ import { findPendingApprovalOnLatestTurn } from "../chat/lib/tool-approval-claim
 import schema from "../schema";
 import type { BranchTree } from "./branch-tree";
 import { buildBranchTree, continuationOrder, resolveActivePath } from "./branch-tree";
-import { editAssistantReplyHandler, getForkContextIds, listActivePathPage, resolveForkEnd } from "./branches";
+import { editAssistantReplyHandler, getForkContextIds, listActivePathPage, resolveForkEnd, saveEditedSiblingHandler } from "./branches";
 import { addMessagesHandler, cloneMessageBatch, getMaxMessage } from "./messages";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -437,6 +437,33 @@ describe("editing an assistant reply in place", () => {
         expect(after.get(idOf("rA2"))?.parentMessageId).toBe(before.get(idOf("rA2"))?.parentMessageId);
     });
 
+    it("drops the context summaries that cover the edited reply, keeps the ones that end above it, and moves the epoch", async () => {
+        const summary = async (coveredUpToMessageId: string, text: string) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("threadContextSummaries", {
+                        coveredCount: 1,
+                        coveredUpToMessageId,
+                        createdAt: 1,
+                        summary: text,
+                        taintedBy: [],
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+        // u3 (turn 2) is above the edited reply (turn 3); rA2 is the reply itself.
+        await summary(ids.u3 as string, "Earlier turns.");
+        await summary(ids.rA2 as string, "The old answer said A.");
+
+        await edit(ids.rA0 as string, "Revised answer.");
+
+        const left = (await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect())) as { summary: string }[];
+
+        expect(left.map((row) => row.summary)).toStrictEqual(["Earlier turns."]);
+        expect(((await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { summaryEpoch?: number }).summaryEpoch).toBe(1);
+    });
+
     it("writes nothing when the same text is saved again", async () => {
         await edit(ids.rA0 as string, "Revised answer.");
 
@@ -453,5 +480,40 @@ describe("editing an assistant reply in place", () => {
 
     it("refuses a sibling reply that is not on the displayed path", async () => {
         await expect(edit(ids.rB0 as string, "Off path.")).rejects.toThrow();
+    });
+});
+
+describe("saving an edited prompt", () => {
+    it("ends the goal the thread was working toward", async () => {
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "m" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 1,
+                    maxRounds: 5,
+                    promptMessageId: ids.u1,
+                    round: 1,
+                    startMessageId: ids.u1,
+                    status: "active",
+                    text: "Ship it",
+                    threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await saveEditedSiblingHandler(ctx, {
+                    message: { content: [{ text: "edited", type: "text" }], role: "user" },
+                    originalMessageId: ids.u1 as never,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 });

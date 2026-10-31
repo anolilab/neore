@@ -8,6 +8,7 @@ import { throwBadRequest, throwForbidden, throwThreadNotFound } from "../lib/err
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
 import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
+import { endActiveGoals } from "../chat/goals/rows";
 import { addMessagesHandler, getMaxMessage } from "./messages";
 import { requireOwnedThread } from "./thread-read-access";
 import { isLockedWithoutProof } from "./thread-passcode";
@@ -16,6 +17,7 @@ import { extractText } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
 import { patchRow } from "../lib/patch";
+import { dropSummariesFromEdit } from "./thread-summaries";
 import { MAX_LENGTH } from "../lib/validators";
 
 /**
@@ -261,6 +263,10 @@ export const saveEditedSiblingHandler = async (
     }
 
     const threadId = original.threadId as Id<"threads">;
+
+    // An edit rewrites the prompt a goal was working from: the goal does not carry over to the new branch.
+    await endActiveGoals(ctx, threadId, "superseded");
+
     const parent = await parentOf(ctx, threadId, original);
     const { messages } = await addMessagesHandler(ctx, {
         fromUser: true,
@@ -377,6 +383,9 @@ export const editAssistantReplyHandler = async (
 
         await patchRow(ctx.db, row, patch);
     }
+
+    // A summary covering the edited turns may quote the old text, and a run under way has read it (`thread-summaries.ts`).
+    await dropSummariesFromEdit(ctx, args.threadId, Math.min(...reply.map((row) => row.order)));
 
     return null;
 };

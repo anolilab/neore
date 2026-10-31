@@ -14,6 +14,7 @@ import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
@@ -2579,6 +2580,69 @@ export const schema = defineSchema({
             };
         }),
 
+    /**
+     * A rolling summary of the older rows of ONE path of a thread, made while it
+     * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
+     * recent rows. Keyed on the thread and the last row it covers: the context
+     * builder uses it only while that row is still an ancestor of the prompt, so
+     * a branch the user switched away from never leaks into the other. A few rows
+     * per thread (`SUMMARIES_KEPT_PER_THREAD`), erased with the thread.
+     */
+    threadContextSummaries: defineTable({
+        /** Rows of the path covered, counted from its top; orders the rows of one thread. */
+        coveredCount: v.number(),
+        coveredUpToMessageId: v.id("messages"),
+        createdAt: v.number(),
+        summary: v.string(),
+        /**
+         * The untrusted sources (`devices/lib/taint.ts`) of the rows folded into the summary and of the one it
+         * extends. A device call made while the thread holds a summary carries them, so text the model read
+         * once, then lost to the window, still makes the call ask. Empty = clean.
+         */
+        taintedBy: v.array(vDeviceTaintSource),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard this row lives on and whose account erases it. */
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
+    threadGoals: defineTable({
+        // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
+        // the review job is queued at least once, and only the delivery that claims a round reviews it.
+        claimedRound: v.optional(v.number()),
+        config: vGoalRunConfig,
+        costMicrodollars: v.number(),
+        createdAt: v.number(),
+        endedAt: v.optional(v.number()),
+        maxCostMicrodollars: v.number(),
+        maxRounds: v.number(),
+        organizationId: v.optional(v.string()),
+        // The user row that opened the latest round; the review reads the rows after it.
+        promptMessageId: v.string(),
+        // Reviews recorded so far.
+        round: v.number(),
+        // The user's own message that started the goal: where the thread shows it.
+        startMessageId: v.string(),
+        status: vThreadGoalStatus,
+        stopReason: v.optional(vGoalStopReason),
+        text: v.string(),
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+        verdicts: v.array(vGoalVerdict),
+    })
+        .shardBy("userId")
+        .index("by_thread", ["threadId"])
+        .index("by_thread_and_status", ["threadId", "status"])
+        .index("by_user", ["userId"])
+        .index("by_status_and_updatedAt", ["status", "updatedAt"])
+        .relations((r) => {
+            return {
+                thread: r.one("threads", { field: "threadId" }),
+            };
+        }),
+
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -2725,6 +2789,11 @@ export const schema = defineSchema({
         statelessMode: v.optional(v.boolean()),
         status: v.string(),
         summary: v.optional(v.string()),
+        // Moves each time a reply is edited in place; a context summary is stored only if it did not move since the
+        // run was prepared (`agent/thread-summaries.ts`). Unset = never edited.
+        summaryEpoch: v.optional(v.number()),
+        // When a summary run found the path too long to read from the top; later runs skip the walk.
+        summaryPathTooLongAt: v.optional(v.number()),
         // User-defined `threadTags` ids. NOT `tags` — that column holds
         // system-assigned source labels ("chat", "telegram", ...).
         tagIds: v.optional(v.array(v.string())),
@@ -3104,6 +3173,8 @@ export const schema = defineSchema({
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
+        // Summaries of a long thread's older turns, made while it sits idle (`agent/thread-summaries.ts`). OPT-IN: absent means off.
+        threadSummariesEnabled: v.optional(v.boolean()),
         // How the user wants thread titles worded; appended to the title prompt (`chat/functions.ts#createTitleChat`). Blank or absent = none.
         threadTitleInstructions: v.optional(v.string().max(MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH)),
         timezone: v.optional(v.string()),

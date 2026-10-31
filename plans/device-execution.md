@@ -202,9 +202,11 @@ by RFC 4231 test vectors) — **no new crate**.
   `XDG_CACHE_HOME`, `npm_config_cache`, `PIP_CACHE_DIR`, `UV_CACHE_DIR`,
   `GOCACHE`, `GOMODCACHE`, `YARN_CACHE_FOLDER`, `BUN_INSTALL_CACHE_DIR`, unless
   already set inside a shared folder); reads only system folders and a fixed list of per-user
-  toolchain folders; the rest of `$HOME` is invisible. Network is blocked on
-  macOS and Linux while "Allow network for shell commands" (`allow_shell_network`,
-  default off) is off; Windows does not restrict it. On Linux that is a seccomp-bpf
+  toolchain folders; the rest of `$HOME` is invisible. Network has three tiers
+  (`shell_network`: off / dependencies / on, default off; `allow_shell_network` is
+  its legacy form): Off blocks it on macOS and Linux, "common dependencies only"
+  reaches a fixed list of package registries and source hosts through a loopback
+  filter that also checks each tunnel's TLS server name against the host it was opened for (macOS; refused on Linux), On leaves it open; Windows does not restrict it. On Linux that is a seccomp-bpf
   filter that makes `socket(2)` fail with `EPERM` for every family except `AF_UNIX` and
   `AF_NETLINK` (and refuses `io_uring_setup`); local Unix and netlink sockets stay open. The filter exists for little-endian x86_64 and aarch64 only: on other CPUs the call is refused unless unsandboxed shells are allowed, and then it keeps Landlock and the prompt says its network is NOT blocked. Linux uses Landlock (best effort across ABIs; no Landlock → no
   sandbox) with `PR_SET_NO_NEW_PRIVS`, macOS `sandbox-exec` with a generated
@@ -218,7 +220,15 @@ by RFC 4231 test vectors) — **no new crate**.
   first use, speaks JSON-RPC 2.0 over stdio (hand-rolled: `initialize`,
   `tools/list`, `tools/call` — no new crate), kills it after 10 min idle and on
   exit, restarts once on crash, drains stderr to a capped log. Tool names are
-  `mcp__<server>__<tool>` sanitised to `[a-z0-9_]`.
+  `mcp__<server>__<tool>` sanitised to `[a-z0-9_]`. **Servers run in the same OS
+  sandbox as `shell_run`** — listing the tools for the manifest starts one too, so
+  both paths plan through `actions::plan_mcp_launch`. They write only the shared
+  folders and a private per-server folder that also holds their package caches
+  (`<app data>/mcp/<name>/`, which the user's own caches never touch), see a cleared
+  environment, and are refused where there is no sandbox unless "Require sandbox"
+  is off. Each server has a network tier (Off / Common dependencies only / On); the
+  approval prompt's sandbox line names it. The paths and variables allowed, and the
+  host list of the middle tier, are in `packages/device-core/README.md`.
 - **Mobile** has none of this (`cfg(desktop)`); the shell simply never pairs.
 
 ### 3.6 Headless runs
@@ -359,9 +369,12 @@ A looping model therefore cannot stack up approval prompts.
   only offer page context — separate feature).
 - Headless / background use of devices (would need a device-side standing
   policy with its own consent design).
-- OS-level sandboxing of local MCP server processes, a Windows shell sandbox
-  (AppContainer), and network restriction for `shell_run` on Windows
-  (macOS and Linux already block it by default; see the shell section).
+- A Windows shell and MCP sandbox (AppContainer), and network restriction on
+  Windows (macOS and Linux block the network by default; see the shell section).
+  Local MCP servers already run in the shell sandbox (below).
+- Enforcing "Common dependencies only" on Linux (needs a network namespace with
+  a socket bridge; see `packages/device-core/README.md`), and the network tiers
+  for SSH servers.
 - Device tools in shared, group or public threads.
 - Remote MCP servers proxied through the device (network from the user's LAN).
 - Streaming partial output of long commands into the chat.

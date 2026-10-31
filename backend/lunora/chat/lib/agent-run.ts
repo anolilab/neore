@@ -22,6 +22,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
@@ -466,6 +467,7 @@ export const loadRunContext = async (
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization: toPersonalization(prefs),
+            threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
         researchDepth: toResearchDepth(args.researchDepth),
@@ -538,6 +540,11 @@ export const afterRun = async (
         skill?: ReplySkill;
         /** What the user sent into the reply while it ran (`createRunSteering`); memory extraction reads it with the prompt. */
         steeredTexts?: ReadonlyArray<string>;
+        /**
+         * The replying user's `threadSummariesEnabled`. Off (the default) schedules no summary job at all; the job
+         * re-checks the thread owner's own setting, which is the one that decides.
+         */
+        summarizeThread: boolean;
         threadId: string;
         /** The user's IANA zone, so the usage heatmap files the reply under their calendar day. */
         timeZone?: string;
@@ -602,6 +609,20 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
                 memories: [...args.retrievedMemories],
                 messageId: firstReplyRow._id as Id<"messages">,
                 userId,
+            }),
+        );
+    }
+
+    // A long thread's older turns are summarised once it has been idle (`agent/thread-summaries.ts`). The job
+    // names this reply's last row; a newer reply makes it a no-op, which is the debounce. It belongs to the thread,
+    // so it runs on the thread's shard whoever replied.
+    const lastSaved = lastRowOf(savedMessages);
+
+    if (args.summarizeThread && lastSaved && lastSaved.order >= SUMMARY_MIN_ORDER) {
+        scheduled.push(
+            ctx.scheduler.runAfter(SUMMARY_IDLE_MS, internal.agent.thread_summaries.runThreadSummary, {
+                afterMessageId: lastSaved._id as Id<"messages">,
+                threadId: threadId as Id<"threads">,
             }),
         );
     }
@@ -1097,6 +1118,7 @@ export const resumeApprovedRun = async (
                 firstTokenTime,
                 prompt: steered.join("\n\n"),
                 savedMessages,
+                summarizeThread: prefs.threadSummariesEnabled,
                 threadId,
                 ...(prefs.timezone && { timeZone: prefs.timezone }),
                 timingStart,
@@ -1218,10 +1240,28 @@ export const failRun = async (
         }
     }
 
+    // A goal that replaced this run's own owns the thread: its status is not this run's to set.
+    const replaced = await ctx
+        .runQuery(internal.chat.goals.internal.otherGoalHoldsThread, { streamId: streamId as Id<"persistentStreams">, threadId: threadId as Id<"threads"> })
+        .catch(() => false);
+
+    if (!replaced) {
+        try {
+            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
+
+    // A failed run ends the goal it belonged to, and only that one: no review follows a run that never finished.
     try {
-        await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+        await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, {
+            reason: "error",
+            streamId: streamId as Id<"persistentStreams">,
+            threadId: threadId as Id<"threads">,
+        });
     } catch {
-        // Ignore cleanup errors
+        // The goal's own stall sweep ends it (`reapStalledGoals`).
     }
 
     await discardRunSecrets(ctx, { streamId, threadId });

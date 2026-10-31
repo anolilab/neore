@@ -90,8 +90,8 @@ pub fn shareable_roots(roots: &[String]) -> Vec<PathBuf> {
 pub struct ShellSettings {
     /// The owner turned OFF "Require sandbox for shell commands".
     pub allow_unsandboxed: bool,
-    /// The owner turned ON "Allow network for shell commands".
-    pub allow_network: bool,
+    /// How far the owner lets shell commands reach into the network.
+    pub network: sandbox::NetworkTier,
 }
 
 /// One call, planned and checked before the user is asked, so the prompt shows
@@ -117,6 +117,10 @@ pub enum Action {
     Mcp {
         arguments: Value,
         read_only: bool,
+        /// `None` = unsandboxed, which the user allowed.
+        sandbox: Option<sandbox::Policy>,
+        /// The prompt's line about the sandbox and the server's network tier.
+        sandbox_note: String,
         server: McpServerConfig,
         tool: String,
     },
@@ -169,12 +173,13 @@ impl Action {
             }
             Action::Mcp {
                 arguments,
+                sandbox_note,
                 server,
                 tool,
                 ..
             } => {
                 format!(
-                    "Call {tool} on the local MCP server \"{}\" ({} {})",
+                    "{sandbox_note}\n\nCall {tool} on the local MCP server \"{}\" ({} {})",
                     server.name,
                     server.command,
                     server.args.join(" ")
@@ -253,7 +258,7 @@ fn plan_shell(input: &Value, roots: &[PathBuf], shell: ShellSettings) -> Result<
     let policy = sandbox::policy_for_call(
         &support,
         shell.allow_unsandboxed,
-        shell.allow_network,
+        shell.network,
         roots,
         sandbox::home().as_deref(),
     )?;
@@ -264,6 +269,37 @@ fn plan_shell(input: &Value, roots: &[PathBuf], shell: ShellSettings) -> Result<
         sandbox_note: sandbox::describe(&support, policy.as_ref()),
         sandbox: policy,
         timeout,
+    })
+}
+
+/// How a local MCP server will run: the sandbox policy it is planned under (`None` = unsandboxed, which the user
+/// allowed) and the prompt's line about it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct McpLaunch {
+    pub note: String,
+    pub policy: Option<sandbox::Policy>,
+}
+
+/// Plans how `server` starts against the shared `roots` (already [`shareable_roots`]): the same sandbox as
+/// `shell_run`, the server's own network tier, and the same refusal where there is no sandbox and the user left
+/// "Require sandbox" on. Every start goes through this, the listing of its tools included.
+pub fn plan_mcp_launch(
+    server: &McpServerConfig,
+    roots: &[PathBuf],
+    allow_unsandboxed: bool,
+) -> Result<McpLaunch, String> {
+    let support = sandbox::support();
+    let policy = sandbox::policy_for_mcp(
+        &support,
+        allow_unsandboxed,
+        server.network,
+        roots,
+        sandbox::home().as_deref(),
+    )?;
+
+    Ok(McpLaunch {
+        note: sandbox::describe_for(sandbox::Subject::Mcp, &support, policy.as_ref()),
+        policy,
     })
 }
 
@@ -358,6 +394,7 @@ pub fn run(
         },
         Action::Mcp {
             arguments,
+            sandbox,
             server,
             tool,
             ..
@@ -366,7 +403,7 @@ pub fn run(
                 return Outcome::failed("MCP servers are not available here");
             };
 
-            match mcp.with(&server, |process| {
+            match mcp.with(&server, sandbox.as_ref(), |process| {
                 process.call_tool(&tool, arguments.clone(), MCP_CALL_TIMEOUT.min(remaining))
             }) {
                 Ok((text, false)) => Outcome::completed(text),

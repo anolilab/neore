@@ -84,6 +84,7 @@ const pauseRun = (runAfter: ReturnType<typeof vi.fn>) =>
         prompt: "Plan my dinner",
         savedMessages: [{ _id: "r0", message: { content: "Let me check.", role: "assistant" }, order: 1, stepOrder: 1 }] as never,
         steeredTexts: ["no nuts"],
+        summarizeThread: false,
         threadId: "thread-1",
         timingStart: Date.now(),
         userId: "owner-1",

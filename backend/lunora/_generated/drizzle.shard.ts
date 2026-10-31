@@ -1374,6 +1374,49 @@ export const temporaryThreads = sqliteTable("temporaryThreads", {
     by_thread: index("by_thread").on(t.threadId),
 }));
 
+export const threadContextSummaries = sqliteTable("threadContextSummaries", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    coveredCount: real("coveredCount").notNull(),
+    coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
+    createdAt: real("createdAt").notNull(),
+    summary: text("summary").notNull(),
+    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>().notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+}));
+
+export const threadGoals = sqliteTable("threadGoals", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    claimedRound: real("claimedRound"),
+    config: text("config", { mode: "json" }).$type<{ customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }>().notNull(),
+    costMicrodollars: real("costMicrodollars").notNull(),
+    createdAt: real("createdAt").notNull(),
+    endedAt: real("endedAt"),
+    maxCostMicrodollars: real("maxCostMicrodollars").notNull(),
+    maxRounds: real("maxRounds").notNull(),
+    organizationId: text("organizationId"),
+    promptMessageId: text("promptMessageId").notNull(),
+    round: real("round").notNull(),
+    startMessageId: text("startMessageId").notNull(),
+    status: text("status", { mode: "json" }).$type<"active" | "met" | "stopped">().notNull(),
+    stopReason: text("stopReason", { mode: "json" }).$type<"cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user">(),
+    text: text("text").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+    verdicts: text("verdicts", { mode: "json" }).$type<Array<{ at: number; met: boolean; order?: number; reason: string; round: number }>>().notNull(),
+}, (t) => ({
+    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+    by_user: index("by_user").on(t.userId),
+    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
+    by_thread: index("by_thread").on(t.threadId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1472,6 +1515,8 @@ export const threads = sqliteTable("threads", {
     statelessMode: integer("statelessMode", { mode: "boolean" }),
     status: text("status").notNull(),
     summary: text("summary"),
+    summaryEpoch: real("summaryEpoch"),
+    summaryPathTooLongAt: real("summaryPathTooLongAt"),
     tagIds: text("tagIds", { mode: "json" }).$type<Array<string>>(),
     tags: text("tags", { mode: "json" }).$type<Array<string>>(),
     teamId: text("teamId"),
@@ -1524,7 +1569,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }>().notNull(),
     createdAt: real("createdAt").notNull(),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
@@ -1709,6 +1754,7 @@ export const userSettings = sqliteTable("userSettings", {
     sendBehavior: text("sendBehavior"),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
+    threadSummariesEnabled: integer("threadSummariesEnabled", { mode: "boolean" }),
     threadTitleInstructions: text("threadTitleInstructions"),
     timezone: text("timezone"),
     userId: text("userId").notNull(),

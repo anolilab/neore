@@ -9,6 +9,7 @@ import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
+import { deleteGoalsForThread, endActiveGoals } from "../chat/goals/rows";
 
 /**
  * Thread operations.
@@ -27,6 +28,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadDocFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
+import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     const result = omit(thread, ["parentThreadIds"]);
@@ -421,6 +423,8 @@ export const deleteAllForThreadIdAsync = internalMutation
             if (passcode) {
                 await ctx.db.delete(passcode._id);
             }
+
+            await deleteThreadSummaries(ctx, args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,
@@ -444,6 +448,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         if (host) {
             await endHostThread(context, host, context.now);
         }
+
+        // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.
+        await endActiveGoals(context, args.threadId, "user");
     }
 
     const messages = await context.db
@@ -465,6 +472,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         // So do the values `requestSecret` saved for its replies: nobody can spend them once the thread is gone.
         await deleteThreadSecrets(context, { threadId: args.threadId });
+
+        // A goal is about this thread; a queued review or round must find it ended, not point at a deleted chat.
+        await deleteGoalsForThread(context, args.threadId);
 
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
@@ -698,8 +708,9 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
-        // A coding agent's turn does not outlive the thread it writes into.
+        // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
+        await endActiveGoals(ctx, args.threadId, "user");
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Remove from aggregates when soft deleted

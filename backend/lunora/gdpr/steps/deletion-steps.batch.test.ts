@@ -104,6 +104,39 @@ describe("batched account-deletion steps", () => {
         expect(await count("persistentChunks", { streamId: otherStream })).toBe(1);
     });
 
+    it("deletes more than one batch of goals with the run state, and leaves another user's", async () => {
+        const goal = (userId: string) => {
+            return {
+                config: { model: "test-model" },
+                costMicrodollars: 0,
+                createdAt: 1,
+                maxCostMicrodollars: 2_000_000,
+                maxRounds: 5,
+                promptMessageId: "m",
+                round: 0,
+                startMessageId: "m",
+                status: "stopped",
+                text: "A goal",
+                threadId: "t",
+                updatedAt: 1,
+                userId,
+                verdicts: [],
+            };
+        };
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < BATCH + 3; index += 1) {
+                await ctx.db.insert("threadGoals", goal(A));
+            }
+
+            await ctx.db.insert("threadGoals", goal(B));
+        });
+
+        expect(await drain(deleteUserPersistentStreams, A)).toBeGreaterThan(1);
+        expect(await count("threadGoals", { userId: A })).toBe(0);
+        expect(await count("threadGoals", { userId: B })).toBe(1);
+    });
+
     it("deletes more than one batch of vault files, then the folders", async () => {
         await harness.run(async (ctx: any) => {
             const folderId = await ctx.db.insert("folders", { createdAt: 0, name: "Docs", updatedAt: 0, userId: A });
@@ -145,9 +178,26 @@ describe("batched account-deletion steps", () => {
 
             for (let index = 0; index < threadCount; index += 1) {
                 const threadId = await ctx.db.insert("threads", { status: "active", title: `t${String(index)}`, userId: A });
+                const messageId = await ctx.db.insert("messages", {
+                    message: { content: "m", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId,
+                    tool: false,
+                    userId: A,
+                });
 
                 ids.push(threadId);
                 await ctx.db.insert("followupSuggestions", { createdAt: 0, lastMessageId: "m", suggestions: ["next?"], threadId, updatedAt: 0 });
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: messageId,
+                    createdAt: 0,
+                    summary: "s",
+                    threadId,
+                    userId: A,
+                });
                 await ctx.db.insert("threadInvites", {
                     expiresAt: 0,
                     invitedBy: A,
@@ -199,6 +249,7 @@ describe("batched account-deletion steps", () => {
 
         expect(remaining).toStrictEqual({ invites: 0, suggestionThreads: [others] });
         expect(await count("followupSuggestions", { threadId: crowded })).toBe(0);
+        expect(await count("threadContextSummaries", { userId: A })).toBe(0);
         // The threads themselves stay for the later step, which deletes them with their messages.
         expect(await count("threads", { userId: A })).toBe(threadCount);
     });

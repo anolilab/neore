@@ -78,7 +78,7 @@ pub fn sandbox() -> Sandbox {
 
     let found = match (
         &support,
-        sandbox::policy_for_call(&support, false, false, &[], None),
+        sandbox::policy_for_call(&support, false, sandbox::NetworkTier::Off, &[], None),
     ) {
         (Support::Unavailable(_), _) => Sandbox::None,
         (Support::Available(_), Ok(_)) => Sandbox::Confines,

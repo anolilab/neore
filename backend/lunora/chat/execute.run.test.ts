@@ -19,6 +19,7 @@ import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { scriptedModel, textStep } from "./group/test-models";
@@ -117,6 +118,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_streams", await import("../agent/streams"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 
@@ -159,6 +161,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
+    jobsQueueMessages.length = 0;
     vi.mocked(scheduleReplyUsage).mockClear();
     vi.mocked(runGroupTurn).mockClear();
     groupState.calls = 0;
@@ -199,7 +202,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { userPrompt?: string } = {}) =>
+const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -289,6 +292,21 @@ describe("runStreamingAgent: a redelivered job", () => {
     });
 });
 
+describe("runStreamingAgent: a goal's queued round", () => {
+    it("does not run when its goal ended after the round was queued, and gives the thread back", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(ids.messageId as never, { agentName: "neore:goal" }));
+
+        await run();
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(0);
+        expect(state.replies).toHaveLength(0);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+});
+
 describe("runStreamingAgent: a failed run", () => {
     it("finishes the stream with the error and resets the thread to `error` when the model call fails", async () => {
         modelState.model = new MockLanguageModelV3({
@@ -350,6 +368,12 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         expect(modelState.builtAgents).toBe(1);
     });
 
+    it("runs the skill a goal carried into a later round, whose own text starts with no slash", async () => {
+        await run({ skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "Goal: summarise the thread" });
+
+        expect(skillState.calls).toStrictEqual([{ skillSlug: "summarise" }]);
+    });
+
     it("records the invoked skill on the reply's usage", async () => {
         skillState.answer = {
             enabledSkills: [],
@@ -375,5 +399,53 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         expect(state.chunkText).toContain("The skill is disabled.");
         expect(state.streamStatus).toBe("done");
         expect(state.threadStatus).toBe("error");
+    });
+});
+
+describe("runStreamingAgent: a run that belongs to a goal", () => {
+    const insertGoal = async (): Promise<string> =>
+        await harness.run(async (ctx: any) =>
+            String(
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "test-model" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 2_000_000,
+                    maxRounds: 5,
+                    promptMessageId: ids.messageId,
+                    round: 0,
+                    startMessageId: ids.messageId,
+                    status: "active",
+                    text: "Say hello twice",
+                    threadId: ids.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+            ),
+        );
+
+    it("queues the round's review and leaves the thread running until the goal ends", async () => {
+        const goalId = await insertGoal();
+
+        await run();
+
+        const state = await readState();
+        const reviews = jobsQueueMessages.filter((message) => message.body.functionPath.includes("reviewGoalRound"));
+
+        expect(reviews).toHaveLength(1);
+        expect(reviews[0]!.body.args).toEqual({ goalId, round: 1 });
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("running");
+    });
+
+    it("settles the thread as usual for a run with no goal", async () => {
+        await run();
+
+        expect(jobsQueueMessages.filter((message) => message.body.functionPath.includes("reviewGoalRound"))).toHaveLength(0);
+
+        const state = await readState();
+
+        expect(state.threadStatus).toBe("active");
     });
 });
