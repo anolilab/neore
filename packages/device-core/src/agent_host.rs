@@ -89,7 +89,7 @@ fn agent_environment(
 
 /// The working folder on this machine: an existing folder inside the shared folders.
 fn working_folder(params: &AgentParams) -> Result<PathBuf, String> {
-    if !params.cwd.starts_with('/') {
+    if !std::path::Path::new(&params.cwd).is_absolute() {
         return Err("the agent's folder is not an absolute path".into());
     }
 
