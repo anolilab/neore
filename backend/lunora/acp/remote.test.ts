@@ -615,8 +615,11 @@ describe("sendToHost", () => {
             });
         };
 
-        const proofFor = async (threadId: string, userId = ownerId): Promise<string> =>
-            (await mintUnlockProof({ epoch, threadId, userId }, SECRET, Date.now())).proof;
+        const proofFor = async (threadId: string, userId = ownerId): Promise<string> => {
+            const { proof } = await mintUnlockProof({ epoch, threadId, userId }, SECRET, Date.now());
+
+            return proof;
+        };
 
         beforeEach(() => {
             vi.stubEnv("STORAGE_SIGNING_SECRET", SECRET);
@@ -642,7 +645,8 @@ describe("sendToHost", () => {
             const stale = await proofFor(threadId);
 
             await run(async (ctx) => {
-                const [passcode] = (await ctx.db.threadPasscodes.findMany({ where: { threadId } })).page;
+                const { page } = await ctx.db.threadPasscodes.findMany({ where: { threadId } });
+                const [passcode] = page;
 
                 await ctx.db.patch(passcode._id, { epoch: newPasscodeEpoch() });
             });
