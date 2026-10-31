@@ -376,6 +376,8 @@ const Chat = () => {
             </Pressable>
             );
 
+    // The home indicator's inset, which the open keyboard already covers.
+    const safeBottom = keyboardShown ? 0 : insets.bottom;
     const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
@@ -401,7 +403,7 @@ const Chat = () => {
                     </Text>
                     )
                     : null}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendControl.reason ? 12 : 12 + (keyboardShown ? 0 : insets.bottom) }}>
+                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendControl.reason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
                         accessibilityLabel="Message"
@@ -426,7 +428,7 @@ const Chat = () => {
                 </View>
                 {sendControl.reason
                     ? (
-                    <Text style={{ fontSize: 12, paddingBottom: 8 + (keyboardShown ? 0 : insets.bottom), paddingHorizontal: 12 }}>{sendControl.reason}</Text>
+                    <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendControl.reason}</Text>
                     )
                     : null}
             </KeyboardAvoidingView>
