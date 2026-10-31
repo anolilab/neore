@@ -701,6 +701,23 @@ describe("activity and waiting on a person", () => {
         expect(await runRow(receipt.runId)).toMatchObject({ status: "running" });
     });
 
+    it("lets only the reaper of the run's latest claim act, so a run put back and claimed again has one chain", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const { startedAt } = await runRow(receipt.runId);
+        const late = Date.now() + SUB_AGENT_STALE_MS + 1000;
+
+        // An earlier claim's reaper does nothing, however late it fires.
+        await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, late, (startedAt as number) - 1));
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "running" });
+
+        await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, late, startedAt as number));
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "failed" });
+    });
+
     it("fails a host run that has been silent for the whole window", async () => {
         const device = await pairedDevice();
         const receipt = await createHostWorker(device);

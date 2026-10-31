@@ -987,7 +987,9 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
     await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
 
     if (run.mode === "worker") {
-        await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { runId: run._id });
+        // Tied to this claim: a busy computer puts the run back and claims it again, and the earlier claim's
+        // reaper must then stop instead of running a second chain beside this one.
+        await ctx.scheduler.runAfter(SUB_AGENT_STALE_MS, internal.sub_agents.functions.reapRun, { claimedAt: now, runId: run._id });
     }
 
     // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
@@ -1361,8 +1363,13 @@ const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "
  * when its quiet window would end, one quiet for all of it fails (and the lead hears of it as an
  * error, like any failed run it asked for), and a queued one is left to a stop or the queue.
  */
-export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
+export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number, claimedAt?: number): Promise<void> => {
     const run = await ctx.db.get(runId);
+
+    // A reaper of an earlier claim of a worker run that was put back and claimed again: the newer claim has its own.
+    if (claimedAt !== undefined && run?.startedAt !== claimedAt) {
+        return;
+    }
 
     if (run?.mode !== "worker") {
         await finishRunFromLoop(ctx, runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
@@ -1374,17 +1381,17 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     const decision = workerReapDecision({ lastActivityAt: activity.at, now, run, waitingOnPerson: activity.waitingOnPerson });
 
     if (decision.kind === "later") {
-        await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.reapRun, { runId });
+        await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.reapRun, { claimedAt, runId });
     } else if (decision.kind === "fail") {
         await finishRunFromLoop(ctx, runId, { error: WORKER_STALE_MESSAGE, kind: "failed" });
     }
 };
 
 export const reapRun = internalMutation
-    .input({ runId: v.id("subAgentRuns") })
+    .input({ claimedAt: v.optional(v.number()), runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await reapSubAgentRun(ctx, args.runId, Date.now());
+        await reapSubAgentRun(ctx, args.runId, Date.now(), args.claimedAt);
 
         return null;
     });

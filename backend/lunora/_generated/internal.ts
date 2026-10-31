@@ -1074,7 +1074,7 @@ export interface InternalApiTypes {
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
             messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
-            reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
+            reapRun: FunctionReference<"mutation", { claimedAt?: number; runId: Id<"subAgentRuns"> }, null>;
             retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
         };

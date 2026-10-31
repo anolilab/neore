@@ -7661,8 +7661,15 @@ return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {})
 installCompiledValidatorMap(lunora_sub_agents_functions_194.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["claimedAt"] !== undefined) {
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+__val1 = source["claimedAt"];
+__has1 = true;
+}
 if (typeof source["runId"] !== "string") return DEFER;
-return { "runId": source["runId"] };
+return { ...(__has1 ? { "claimedAt": __val1 } : {}), "runId": source["runId"] };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_194.retryHostRunStart.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9799,7 +9806,7 @@ export interface Caller {
             listWorkers: (args: { leadThreadId: Id<"threads">; unlockProof?: string }) => Promise<Array<{ activeRunId: Id<"subAgentRuns"> | null; archived: boolean; followUp: "none" | "queue" | "steer" | "steer-restart"; lastActivityAt: number | null; lastRunAt: number; lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled"; leadThreadId: string; name: string; postFailed: string | null; queuedRuns: number; quietAfterMs: number; runs: Array<{ createdAt: number; delivery: "failed" | "none" | "pending" | "posted"; dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent" | null; runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string }>; state: "idle" | "queued" | "running"; stopping: boolean; workerId: string }>>;
             messageWorker: (args: { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }) => Promise<{ runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: (args: { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
-            reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
+            reapRun: (args: { claimedAt?: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             retryHostRunStart: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
             setWorkerPolicy: (args: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; leadThreadId: Id<"threads">; maxDispatchesPerHour?: number; unlockProof?: string }) => Promise<null>;
             shouldRunStop: (args: { runId: Id<"subAgentRuns"> }) => Promise<boolean>;
