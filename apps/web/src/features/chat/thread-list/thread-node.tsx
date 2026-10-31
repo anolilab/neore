@@ -540,6 +540,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </TooltipContent>
             </Tooltip>
 
+            {/* Always mounted, so a thread that starts waiting is announced to a user whose focus is elsewhere. */}
+            <span className="sr-only" role="status">
+                {needsYou === "approval" && t`Waiting for your approval`}
+                {needsYou === "question" && t`Waiting for your answer`}
+            </span>
+
             {isStreaming && !isSelectionMode && (
                 <Tooltip>
                     <TooltipTrigger

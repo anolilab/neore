@@ -209,4 +209,20 @@ describe("ThreadNode", () => {
 
         expect(screen.getByRole("button", { expanded: true, name: "Collapse branches: Quarterly plan" })).toBeTruthy();
     });
+
+    it("announces a thread that starts waiting for the user, and clears when it stops", () => {
+        const { rerender } = render(<ThreadNode {...baseProps} />);
+        const region = screen.getByRole("status");
+
+        expect(region.textContent).toBe("");
+
+        rerender(<ThreadNode {...baseProps} node={{ ...baseProps.node, awaitingInput: "approval" }} />);
+
+        expect(screen.getByRole("status")).toBe(region);
+        expect(region.textContent).toBe("Waiting for your approval");
+
+        rerender(<ThreadNode {...baseProps} node={{ ...baseProps.node, awaitingInput: "question" }} />);
+
+        expect(region.textContent).toBe("Waiting for your answer");
+    });
 });
