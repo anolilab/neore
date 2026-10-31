@@ -382,11 +382,6 @@ const startQueuedRun = async (ctx: MutationCtx, run: Pick<RunDoc, "_id" | "mode"
     }
 };
 
-/**
- * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
- * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
- * lead hears a failure like any other and the queue moves on. Nothing waits on a job that could be lost.
- */
 /** Whether a run's computer may still be used in its lead conversation's project (the device tools' scope rule). */
 const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThreadId" | "runner" | "userId">): Promise<boolean> => {
     const deviceId = run.runner?.kind === "host" ? ctx.db.normalizeId("devices", run.runner.deviceId) : null;
@@ -396,6 +391,11 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
     return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
 };
 
+/**
+ * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
+ * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
+ * lead hears a failure like any other and the queue moves on. Nothing waits on a job that could be lost.
+ */
 const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const claimed = await claimQueuedRun(ctx, runId);
 
