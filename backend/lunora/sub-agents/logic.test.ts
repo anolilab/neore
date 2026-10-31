@@ -128,6 +128,13 @@ describe("buildResultMessage for a cancelled run", () => {
         expect(text).toContain("/chat/child-1");
     });
 
+    it("says a stopped run on a computer was not charged", () => {
+        const text = buildResultMessage({ hostRun: true, started: true, status: "cancelled", task: "Do it" });
+
+        expect(text).not.toContain("billed");
+        expect(text).toContain("not charged");
+    });
+
     it("says a queued one never ran", () => {
         expect(buildResultMessage({ started: false, status: "cancelled", task: "Do it" })).toContain("before it started, so nothing ran");
     });

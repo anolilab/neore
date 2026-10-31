@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { isForwardHostState } from "../../chat/streaming/persistent/host";
 import { MAX_HOST_REPLY_CHARS } from "./constants";
 import type { HostMedia } from "./reply";
-import { addMediaToTranscript, appendChildEvent, appendToTranscript, buildHostReply, emptyTranscript } from "./reply";
+import { addMediaToTranscript, appendChildEvent, appendToTranscript, buildHostReply, emptyTranscript, hostResultText } from "./reply";
 
 const transcript = (text: string, reasoning = "", media: HostMedia[] = []) => {
     return { children: [], media, reasoning, text };
@@ -293,5 +293,23 @@ describe("isForwardHostState", () => {
         expect(isForwardHostState("running", "running")).toBe(false);
         expect(isForwardHostState("running", "ended")).toBe(true);
         expect(isForwardHostState("ended", "running")).toBe(false);
+    });
+});
+
+describe("hostResultText", () => {
+    it("is the agent's words when it wrote any", () => {
+        expect(hostResultText(transcript("Done.", "", [{ name: "report.pdf", size: 10 }]))).toBe("Done.");
+    });
+
+    it("names the files of a reply that has only files, so the lead does not read it as empty", () => {
+        const text = hostResultText(
+            transcript("", "", [
+                { name: "report.pdf", size: 10 },
+                { name: "chart.png", size: 5 },
+            ]),
+        );
+
+        expect(text).toContain("report.pdf");
+        expect(text).toContain("chart.png");
     });
 });

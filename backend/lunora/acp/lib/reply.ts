@@ -63,6 +63,20 @@ export const emptyTranscript = (): HostTranscript => {
     return { children: [], media: [], reasoning: "", text: "" };
 };
 
+/**
+ * What a worker's lead is told the agent returned: its words, or, for a reply of files only, which files, so a
+ * file-only result never reads as an empty one.
+ */
+export const hostResultText = (transcript: HostTranscript): string => {
+    if (transcript.text.trim() !== "" || transcript.media.length === 0) {
+        return transcript.text;
+    }
+
+    const names = transcript.media.map((media) => media.name).join(", ");
+
+    return `The agent returned ${transcript.media.length === 1 ? "a file" : `${String(transcript.media.length)} files`} and no text: ${names}. They are in its thread.`;
+};
+
 /** Keeps a stored `media` event for the reply. Past the per-turn count it is dropped, not the turn. */
 export const addMediaToTranscript = (transcript: HostTranscript, media: HostMedia): void => {
     if (transcript.media.length < MAX_MEDIA_PER_TURN) {

@@ -397,6 +397,8 @@ export const buildResultMessage = (input: {
     /** Who sent the dispatch; named in the message so the lead reads where it came from. */
     dispatchedBy?: DispatchSource;
     error?: string;
+    /** A run on a coding agent of the user's computer: it is never charged, and a stop cancels its turn there. */
+    hostRun?: boolean;
     result?: string;
     /** Whether the run had been claimed — a cancelled one that had not ran nothing. */
     started?: boolean;
@@ -413,10 +415,12 @@ export const buildResultMessage = (input: {
 
     if (input.status === "succeeded") {
         body = input.result?.trim() || "(The sub-agent returned no text.)";
+    } else if (input.status === "cancelled" && !input.started) {
+        body = "This sub-agent was stopped before it started, so nothing ran.";
     } else if (input.status === "cancelled") {
-        body = input.started
-            ? "This sub-agent was stopped before it finished. The step it was working on when it was stopped still ran to its end and was billed; no further steps ran. Its work so far is in its thread."
-            : "This sub-agent was stopped before it started, so nothing ran.";
+        body = input.hostRun
+            ? "This sub-agent was stopped before it finished. Its turn on the computer was cancelled; runs on a computer are not charged. Its work so far is in its thread."
+            : "This sub-agent was stopped before it finished. The step it was working on when it was stopped still ran to its end and was billed; no further steps ran. Its work so far is in its thread.";
     } else {
         body = input.error ?? "The sub-agent stopped without a result.";
     }

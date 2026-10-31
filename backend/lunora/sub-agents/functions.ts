@@ -1115,6 +1115,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
             // Only a worker run names its sender: a one-shot result reads as it always did.
             dispatchedBy: run.mode === "worker" ? run.dispatchedBy : undefined,
             error: run.error,
+            hostRun: run.runner?.kind === "host",
             result: run.result,
             started: run.startedAt !== undefined,
             status: run.status as "cancelled" | "failed" | "succeeded",
