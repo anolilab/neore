@@ -42,6 +42,7 @@ import { sessionOfThread } from "../acp/lib/sessions";
 import { openHostSession } from "../acp/lib/start-session";
 import { isLiveStream } from "../chat/streaming/persistent/host";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { isDeviceInScope } from "../devices/lib/scope";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceOnline } from "../devices/lib/state";
 import { sha256Hex } from "../lib/crypto";
@@ -465,6 +466,8 @@ const HOST_NEEDS_OWN_CONVERSATION =
 const HOST_NO_TOOLS_OR_SKILL =
     "A worker on a computer takes no tool list or skill: the coding agent there uses its own tools, each asked for on the computer, and only the task text reaches it.";
 
+const HOST_OUT_OF_SCOPE = "That computer is not allowed in this conversation's project. Change which projects it may be used in, in its settings.";
+
 const HOST_NOT_APPROVED = "That agent is not approved for that folder on this computer. Approve it in the desktop app first.";
 
 /** The offered pair a new host worker will run, from the caller's own computer; null for a cloud worker. */
@@ -608,6 +611,17 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
     if (host && "error" in host) {
         return await refuse(other(host.error));
+    }
+
+    // A computer limited to some projects runs work only for conversations in them, the rule the device tools follow.
+    if (runnerKind === "host") {
+        const runner = origin?.runner ?? args.runner;
+        const deviceId = runner && "deviceId" in runner ? ctx.db.normalizeId("devices", runner.deviceId) : null;
+        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: args.userId } }) : null;
+
+        if (!device || !isDeviceInScope(device, parent.projectId)) {
+            return await refuse(other(HOST_OUT_OF_SCOPE));
+        }
     }
 
     const hourlyCap = parent.workerPolicy?.maxDispatchesPerHour;

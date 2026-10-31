@@ -338,6 +338,11 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
         return;
     }
 
+    // A prompt the computer has not acknowledged is withdrawn, so a Stop before the computer took it means it never runs.
+    if (stream.hostState === "accepted") {
+        await withdrawSend(ctx, stream, now);
+    }
+
     // The cancel is signed BEFORE the turn ends: ending it can start the worker's next queued message, whose send must
     // follow the cancel, not reach the computer while it is still running the turn that was stopped.
     await sendHostCancel(ctx, stream, now);
@@ -349,9 +354,5 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
  * computer has not acknowledged is withdrawn so it cannot start later, what the agent wrote is kept, and the computer is told to cancel.
  */
 export const cancelHostTurnNow = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
-    if (stream.hostState === "accepted") {
-        await withdrawSend(ctx, stream, now);
-    }
-
     await stopHostTurn(ctx, stream, now);
 };

@@ -126,6 +126,7 @@ const hostWorker = (device: Device, overrides: Row = {}) => {
 };
 
 const HOST_NO_TOOLS_OR_SKILL = /no tool list or skill/u;
+const HOST_OUT_OF_SCOPE = /not allowed in this conversation's project/u;
 
 const createHostWorker = async (device: Device, overrides: Row = {}) =>
     (await as(OWNER).mutation(functions.createWorker as never, hostWorker(device, overrides) as never)) as { runId: string; state: string; workerId: string };
@@ -266,6 +267,20 @@ describe("creating a worker on a computer", () => {
             message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL),
         });
         await expect(createHostWorker(device, { skill: "summarise" })).rejects.toMatchObject({ message: expect.stringMatching(HOST_NO_TOOLS_OR_SKILL) });
+        expect(await table("subAgentRuns")).toHaveLength(0);
+        expect(await table("deviceCalls")).toHaveLength(0);
+    });
+
+    it("refuses a computer limited to other projects, creating nothing", async () => {
+        const device = await pairedDevice();
+
+        await run(async (context) => {
+            const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: OWNER });
+
+            await context.db.patch(device.deviceId, { projectIds: [project] });
+        });
+
+        await expect(createHostWorker(device)).rejects.toMatchObject({ message: expect.stringMatching(HOST_OUT_OF_SCOPE) });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("deviceCalls")).toHaveLength(0);
     });
@@ -843,6 +858,18 @@ describe("a host run that waits while the lead changes", () => {
 });
 
 describe("a worker that is deleted or loses its prompt", () => {
+    it("withdraws a send the computer has not taken when the person presses Stop", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+        const { stopActiveForThread } = await import("../chat/streaming/persistent/library");
+
+        await run(async (context) => await context.runMutation(stopActiveForThread, { threadId: receipt.workerId }));
+
+        const [call] = await sendCalls();
+
+        expect(call).toMatchObject({ status: "expired" });
+    });
+
     it("withdraws the send the computer has not taken, so it cannot run after the delete", async () => {
         const device = await pairedDevice();
         const receipt = await createHostWorker(device);
