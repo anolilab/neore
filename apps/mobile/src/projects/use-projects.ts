@@ -9,13 +9,13 @@ import type { ProjectRow, ProjectThreadRow } from "./projects-api";
 import { watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
 /** Follows one live query while the user is signed in; the subscription ends with the screen. */
-const useLive = <T>(watch: ((onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void) | undefined, key: string): Live<T> => {
+const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void, key: string): Live<T> => {
     const { status, user } = useAuth();
-    const scope = status === "signed-in" && watch && user ? `${user.id}:${key}` : undefined;
+    const scope = status === "signed-in" && user ? `${user.id}:${key}` : undefined;
     const [live, setLive] = useState<Scoped<T>>({ ...EMPTY_LIVE, scope: "" });
 
     useEffect(() => {
-        if (scope === undefined || !watch) {
+        if (scope === undefined) {
             setLive({ ...EMPTY_LIVE, scope: "" });
 
             return undefined;
