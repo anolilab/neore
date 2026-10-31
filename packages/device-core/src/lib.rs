@@ -40,6 +40,7 @@ pub mod launch;
 pub mod lifecycle;
 pub mod mcp;
 pub mod media;
+pub mod outbox;
 pub mod sandbox;
 pub mod shell;
 #[cfg(feature = "keychain")]

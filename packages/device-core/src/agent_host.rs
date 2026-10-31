@@ -15,13 +15,16 @@
 //!   period), and the group is killed again when the agent exits, so the shells and tools it left die with it. A host
 //!   that loses its desktop (the pipe ends) or is told to stop kills every agent group the same way.
 
+// Everything below `run_agent` is for Unix; a Windows server refuses the request, and what only it uses is unused there.
+#![cfg_attr(not(unix), allow(dead_code, unused_imports))]
+
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -29,7 +32,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::agent_env::{app_vars, built_env, validate_env_var};
-use crate::frame::{write_frame, CHUNK_HEADER_BYTES, CHUNK_TAG, STDERR_TAG};
+use crate::frame::{CHUNK_HEADER_BYTES, CHUNK_TAG, STDERR_TAG};
+use crate::outbox::Outbox;
 
 /// Agents running on one host at once.
 pub const MAX_AGENTS: usize = 8;
@@ -43,6 +47,11 @@ const TERM_GRACE: Duration = Duration::from_secs(2);
 /// How long the host waits for the output pipes to drain after the agent is gone. A descendant that left the group and
 /// still holds a pipe must not keep the request open.
 const DRAIN_GRACE: Duration = Duration::from_secs(1);
+/// How often a thread waiting on a pipe looks up to see whether it is told to stop.
+const POLL_SLICE: Duration = Duration::from_millis(100);
+/// Bytes of the desktop's input an agent may leave unread before it is stopped: an agent that does not read its stdin
+/// must not make the host keep what the desktop keeps sending.
+pub const INPUT_BUDGET: usize = 8 * 1024 * 1024;
 
 /// What the desktop asks the host to start.
 #[derive(Deserialize)]
@@ -59,6 +68,11 @@ pub struct AgentParams {
     /// The shared folders for this server.
     pub roots: Vec<String>,
 }
+
+/// Variables the host sets itself, from what this machine has. The person's list cannot name them: with forwarding on,
+/// `SSH_AUTH_SOCK` is the socket the person approved for this server, and another value would point the agent's SSH
+/// clients at a socket of someone else's choosing.
+const HOST_SET: [&str; 1] = ["SSH_AUTH_SOCK"];
 
 /// The environment the agent starts with on this machine: the built one, `SSH_AUTH_SOCK` if forwarding is on, then
 /// the person's variables.
@@ -80,6 +94,12 @@ fn agent_environment(
     }
 
     for (name, value) in user {
+        if HOST_SET.contains(&name.as_str()) {
+            return Err(format!(
+                "{name} is set by the host and cannot be overridden"
+            ));
+        }
+
         validate_env_var(name, value)?;
         env.insert(name.clone(), value.clone());
     }
@@ -133,18 +153,38 @@ fn chunk_frame(tag: u8, id: u64, bytes: &[u8]) -> Vec<u8> {
     frame
 }
 
-/// Runs the agent until it exits or `stop` is set, relaying its output as chunk frames of request `id` on `writer`
+/// What the desktop's chunk frames for an agent's stdin arrive on, and how many of their bytes are still unread.
+pub struct AgentInput {
+    pub bytes: Receiver<Vec<u8>>,
+    /// Added to by whoever queues a chunk, taken from by the thread that writes it to the agent.
+    pub queued: Arc<AtomicUsize>,
+}
+
+/// How the agent ended: its exit code and signal. A wait that failed is a failure of the request, not an exit.
+fn exit_report(status: std::io::Result<std::process::ExitStatus>) -> Result<Value, String> {
+    let status = status.map_err(|error| format!("could not wait for the agent: {error}"))?;
+
+    #[cfg(unix)]
+    let signal = std::os::unix::process::ExitStatusExt::signal(&status);
+    #[cfg(not(unix))]
+    let signal: Option<i32> = None;
+
+    Ok(json!({ "code": status.code(), "signal": signal }))
+}
+
+/// Runs the agent until it exits or `stop` is set, relaying its output as chunk frames of request `id` on `outbox`
 /// and feeding its stdin from `input` (the stream ending closes it). Returns how it ended. An error is a request
-/// that could not be served: nothing was started.
+/// that could not be served: nothing was started, or the agent could not be waited for (its group is killed then).
+/// Every thread it starts has ended when it returns.
 #[cfg(unix)]
-pub fn run_agent<W: Write + Send + 'static>(
+pub fn run_agent(
     params: &AgentParams,
     id: u64,
-    writer: &Arc<Mutex<W>>,
-    input: Receiver<Vec<u8>>,
+    outbox: &Outbox,
+    input: AgentInput,
     stop: &AtomicBool,
 ) -> Result<Value, String> {
-    use std::os::unix::process::{CommandExt, ExitStatusExt};
+    use std::os::unix::process::CommandExt;
 
     validate_command(params)?;
 
@@ -165,23 +205,16 @@ pub fn run_agent<W: Write + Send + 'static>(
     // Noted for as long as the agent lives, so a host told to stop (SIGTERM) ends it with its group.
     let _tracked = crate::shell::Tracked::new(pid);
     let failed = Arc::new(AtomicBool::new(false));
+    // The agent is gone: the writer of its stdin has nothing left to write to.
     let exited = Arc::new(AtomicBool::new(false));
+    // The output has had its chance to drain: a pump still waiting on a pipe a descendant holds open stops now.
+    let drained = Arc::new(AtomicBool::new(false));
+    let mut threads = Vec::new();
 
-    if let Some(mut pipe) = child.stdin.take() {
+    if let Some(pipe) = child.stdin.take() {
         let exited = Arc::clone(&exited);
 
-        // Not joined: it ends with the agent, with the stream of input, or with the pipe.
-        thread::spawn(move || loop {
-            match input.recv_timeout(Duration::from_millis(100)) {
-                Ok(bytes) => {
-                    if pipe.write_all(&bytes).and_then(|()| pipe.flush()).is_err() {
-                        break;
-                    }
-                }
-                Err(RecvTimeoutError::Timeout) if !exited.load(Ordering::SeqCst) => {}
-                Err(_) => break,
-            }
-        });
+        threads.push(thread::spawn(move || feed_stdin(pipe, &input, &exited)));
     }
 
     let mut pumps = Vec::new();
@@ -190,27 +223,11 @@ pub fn run_agent<W: Write + Send + 'static>(
         (child.stdout.take().map(Pipe::Out), CHUNK_TAG),
         (child.stderr.take().map(Pipe::Err), STDERR_TAG),
     ] {
-        let Some(mut pipe) = pipe else { continue };
-        let (writer, failed) = (Arc::clone(writer), Arc::clone(&failed));
+        let Some(pipe) = pipe else { continue };
+        let (outbox, failed, drained) = (outbox.clone(), Arc::clone(&failed), Arc::clone(&drained));
 
         pumps.push(thread::spawn(move || {
-            let mut buffer = vec![0u8; CHUNK_BYTES];
-
-            loop {
-                match pipe.read(&mut buffer) {
-                    Ok(0) | Err(_) => break,
-                    Ok(read) => {
-                        let frame = chunk_frame(tag, id, &buffer[..read]);
-
-                        // The desktop is gone: nobody reads the agent any more.
-                        if write_frame(&mut *writer.lock().unwrap(), &frame).is_err() {
-                            failed.store(true, Ordering::SeqCst);
-
-                            break;
-                        }
-                    }
-                }
-            }
+            pump_output(pipe, tag, id, &outbox, &failed, &drained);
         }));
     }
 
@@ -219,9 +236,14 @@ pub fn run_agent<W: Write + Send + 'static>(
 
     let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
+            Ok(Some(status)) => break Ok(status),
             Ok(None) => {}
-            Err(_) => break None,
+            Err(error) => {
+                // Nobody can say how it ended, and nothing watches it any more: it does not keep running.
+                signal_group(pid, libc::SIGKILL);
+
+                break Err(error);
+            }
         }
 
         if (stop.load(Ordering::SeqCst) || failed.load(Ordering::SeqCst)) && terminated.is_none() {
@@ -249,18 +271,22 @@ pub fn run_agent<W: Write + Send + 'static>(
         thread::sleep(Duration::from_millis(10));
     }
 
-    Ok(match status {
-        Some(status) => json!({ "code": status.code(), "signal": status.signal() }),
-        None => json!({ "code": null, "signal": null }),
-    })
+    drained.store(true, Ordering::SeqCst);
+    threads.extend(pumps);
+
+    for thread in threads {
+        let _ = thread.join();
+    }
+
+    exit_report(status)
 }
 
 #[cfg(not(unix))]
-pub fn run_agent<W: Write + Send + 'static>(
+pub fn run_agent(
     _params: &AgentParams,
     _id: u64,
-    _writer: &Arc<Mutex<W>>,
-    _input: Receiver<Vec<u8>>,
+    _outbox: &Outbox,
+    _input: AgentInput,
     _stop: &AtomicBool,
 ) -> Result<Value, String> {
     Err("coding agents are not supported on a Windows server yet".into())
@@ -283,6 +309,156 @@ impl Read for Pipe {
             Pipe::Out(pipe) => pipe.read(buffer),
         }
     }
+}
+
+#[cfg(unix)]
+impl std::os::fd::AsRawFd for Pipe {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        match self {
+            Pipe::Err(pipe) => pipe.as_raw_fd(),
+            Pipe::Out(pipe) => pipe.as_raw_fd(),
+        }
+    }
+}
+
+/// Waits up to [`POLL_SLICE`] for `fd` to be ready for `events`. `Ok(false)` is the timeout.
+#[cfg(unix)]
+fn ready(fd: std::os::fd::RawFd, events: libc::c_short) -> std::io::Result<bool> {
+    let mut poll = libc::pollfd {
+        fd,
+        events,
+        revents: 0,
+    };
+
+    // SAFETY: one valid pollfd, and a count of one.
+    let result = unsafe { libc::poll(&mut poll, 1, POLL_SLICE.as_millis() as libc::c_int) };
+
+    if result < 0 {
+        let error = std::io::Error::last_os_error();
+
+        return if error.kind() == std::io::ErrorKind::Interrupted {
+            Ok(false)
+        } else {
+            Err(error)
+        };
+    }
+
+    Ok(result > 0)
+}
+
+/// Relays one of the agent's output pipes as chunk frames until it ends, `done` is set, or nobody reads the output
+/// any more (`failed` is set then). It looks up every [`POLL_SLICE`], so a descendant that left the agent's group and
+/// holds the pipe open cannot keep this thread, or the request, alive past `done`.
+#[cfg(unix)]
+fn pump_output<R: Read + std::os::fd::AsRawFd>(
+    mut pipe: R,
+    tag: u8,
+    id: u64,
+    outbox: &Outbox,
+    failed: &AtomicBool,
+    done: &AtomicBool,
+) {
+    let mut buffer = vec![0u8; CHUNK_BYTES];
+
+    loop {
+        match ready(pipe.as_raw_fd(), libc::POLLIN) {
+            Ok(true) => {}
+            Ok(false) if done.load(Ordering::SeqCst) => break,
+            Ok(false) => continue,
+            Err(_) => break,
+        }
+
+        match pipe.read(&mut buffer) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => {
+                if !relay(outbox, &chunk_frame(tag, id, &buffer[..read]), done) {
+                    // The desktop is gone, or the connection stopped taking output: nobody reads the agent.
+                    failed.store(true, Ordering::SeqCst);
+
+                    break;
+                }
+            }
+        }
+
+        if done.load(Ordering::SeqCst) {
+            break;
+        }
+    }
+}
+
+/// Queues an output frame, waiting for room while the connection is behind (that holds the agent back, which is the
+/// point) and giving up once `done` says the request is over.
+#[cfg(unix)]
+fn relay(outbox: &Outbox, frame: &[u8], done: &AtomicBool) -> bool {
+    loop {
+        match outbox.offer(frame) {
+            Ok(()) => return true,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                if done.load(Ordering::SeqCst) {
+                    return false;
+                }
+
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return false,
+        }
+    }
+}
+
+/// Writes the desktop's input to the agent's stdin until the stream ends, the agent exits or the pipe closes. The pipe
+/// is non-blocking, so an agent that does not read it cannot hold this thread past its own exit.
+#[cfg(unix)]
+fn feed_stdin(mut pipe: std::process::ChildStdin, input: &AgentInput, exited: &AtomicBool) {
+    use std::os::fd::AsRawFd;
+
+    let fd = pipe.as_raw_fd();
+
+    // SAFETY: plain fcntl calls on a descriptor this thread owns.
+    unsafe {
+        let flags = libc::fcntl(fd, libc::F_GETFL);
+
+        libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+    }
+
+    loop {
+        match input.bytes.recv_timeout(POLL_SLICE) {
+            Ok(bytes) => {
+                input.queued.fetch_sub(bytes.len(), Ordering::SeqCst);
+
+                if write_until_exit(&mut pipe, &bytes, exited).is_err() {
+                    break;
+                }
+            }
+            Err(RecvTimeoutError::Timeout) if !exited.load(Ordering::SeqCst) => {}
+            Err(_) => break,
+        }
+    }
+}
+
+#[cfg(unix)]
+fn write_until_exit(
+    pipe: &mut std::process::ChildStdin,
+    mut bytes: &[u8],
+    exited: &AtomicBool,
+) -> std::io::Result<()> {
+    use std::os::fd::AsRawFd;
+
+    while !bytes.is_empty() {
+        match pipe.write(bytes) {
+            Ok(written) => bytes = &bytes[written..],
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                if exited.load(Ordering::SeqCst) {
+                    return Err(error);
+                }
+
+                ready(pipe.as_raw_fd(), libc::POLLOUT)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+    }
+
+    Ok(())
 }
 
 /// Signals the process group `process_group(0)` made for the agent. ESRCH (already gone) is the goal, not an error.
@@ -373,5 +549,165 @@ mod tests {
         assert!(working_folder(&params("relative")).is_err());
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_persons_variables_cannot_replace_the_forwarded_agent_socket() {
+        let mut user = BTreeMap::new();
+
+        user.insert("SSH_AUTH_SOCK".to_owned(), "/tmp/attacker.sock".to_owned());
+
+        // With a socket forwarded, and without one: the name is the host's to set, never the person's.
+        assert!(agent_environment(vars(&[("SSH_AUTH_SOCK", "/run/agent.sock")]), &user).is_err());
+        assert!(agent_environment(vars(&[]), &user).is_err());
+    }
+
+    #[test]
+    fn a_failed_wait_is_a_failure_and_not_a_normal_exit() {
+        let failed = exit_report(Err(std::io::Error::other("no child")));
+
+        assert!(failed.unwrap_err().contains("could not wait for the agent"));
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+
+            let report = exit_report(Ok(std::process::ExitStatus::from_raw(0))).unwrap();
+
+            assert_eq!(report["code"], 0);
+        }
+    }
+
+    #[cfg(unix)]
+    fn scratch_roots(name: &str) -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("neore-agent-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (root, outside) = (base.join("shared"), base.join("private"));
+
+        std::fs::create_dir_all(root.join("inside")).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+
+        (root, outside)
+    }
+
+    #[cfg(unix)]
+    fn params_in(root: &std::path::Path, cwd: &std::path::Path) -> AgentParams {
+        AgentParams {
+            args: Vec::new(),
+            command: "true".into(),
+            cwd: cwd.to_string_lossy().into_owned(),
+            env: BTreeMap::new(),
+            roots: vec![root.to_string_lossy().into_owned()],
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_dot_dot_path_and_a_symlink_out_of_the_shared_folder_are_refused_on_the_host() {
+        let (root, outside) = scratch_roots("escape");
+
+        // `..` that climbs out.
+        let climbing = root.join("inside").join("..").join("..").join("private");
+
+        assert!(working_folder(&params_in(&root, &climbing)).is_err());
+
+        // A symlink inside the shared folder that points outside it: resolved here, on this machine, then checked.
+        std::os::unix::fs::symlink(&outside, root.join("inside").join("link")).unwrap();
+
+        let through = root.join("inside").join("link");
+
+        assert!(working_folder(&params_in(&root, &through)).is_err());
+        // A sibling that merely shares the prefix of the shared folder's name is outside too.
+        std::fs::create_dir_all(root.with_file_name("shared-sibling")).unwrap();
+        assert!(working_folder(&params_in(&root, &root.with_file_name("shared-sibling"))).is_err());
+        // The folder itself still works.
+        assert!(working_folder(&params_in(&root, &root.join("inside"))).is_ok());
+
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_pump_ends_when_told_to_even_if_a_descendant_holds_the_pipe_open() {
+        use std::os::fd::FromRawFd;
+
+        let mut fds = [0 as libc::c_int; 2];
+
+        // SAFETY: `fds` is two ints, as pipe(2) wants.
+        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+
+        // SAFETY: both descriptors were just made and are owned here.
+        let (read, _held_write) = unsafe {
+            (
+                std::fs::File::from_raw_fd(fds[0]),
+                std::fs::File::from_raw_fd(fds[1]),
+            )
+        };
+        let (outbox, writer) = crate::outbox::Outbox::new(std::io::sink(), 1 << 20);
+        let done = Arc::new(AtomicBool::new(false));
+        let failed = AtomicBool::new(false);
+        let pump = {
+            let (outbox, done) = (outbox.clone(), Arc::clone(&done));
+
+            thread::spawn(move || pump_output(read, CHUNK_TAG, 7, &outbox, &failed, &done))
+        };
+
+        thread::sleep(Duration::from_millis(150));
+        assert!(!pump.is_finished(), "the write end is still open");
+        done.store(true, Ordering::SeqCst);
+
+        let waited = Instant::now();
+
+        pump.join().unwrap();
+        assert!(waited.elapsed() < Duration::from_secs(2));
+        outbox.close();
+        writer.join().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_agent_that_leaves_a_descendant_holding_its_pipes_still_ends_its_request() {
+        // The agent's PATH is built, not inherited, so the interpreter is named in full.
+        let Ok(python) = Command::new("python3")
+            .args(["-c", "import sys; print(sys.executable)"])
+            .output()
+        else {
+            return;
+        };
+        let python = String::from_utf8_lossy(&python.stdout).trim().to_owned();
+
+        let (root, _outside) = scratch_roots("leak");
+        let mut params = params_in(&root, &root.join("inside"));
+
+        params.command = "/bin/sh".into();
+        params.args = vec![
+            "-c".into(),
+            // The sleeper leaves the agent's process group, and the shell waits to see it has before it exits: the
+            // group is killed the moment the leader is gone.
+            format!(
+                "{python} -c 'import os; os.setsid(); open(\"left\", \"w\").close(); os.execvp(\"/bin/sleep\", [\"sleep\", \"30\"])' & \
+                 while [ ! -e left ]; do /bin/sleep 0.02; done; exit 0"
+            ),
+        ];
+
+        let (outbox, writer) = crate::outbox::Outbox::new(std::io::sink(), 1 << 20);
+        let (_sender, bytes) = std::sync::mpsc::channel();
+        let input = AgentInput {
+            bytes,
+            queued: Arc::default(),
+        };
+        let started = Instant::now();
+        let result = run_agent(&params, 1, &outbox, input, &AtomicBool::new(false)).unwrap();
+
+        // Ended by the agent's exit; the drain gave up on the sleeper after its grace and every thread was joined.
+        assert_eq!(result["code"], 0);
+        assert!(
+            started.elapsed() >= DRAIN_GRACE,
+            "the sleeper held the pipe"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        outbox.close();
+        writer.join().unwrap();
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
     }
 }
