@@ -1531,6 +1531,36 @@
       "to": "table:changelogCache"
     },
     {
+      "from": "function:chat_aside:addAsideToThread",
+      "kind": "read",
+      "to": "table:streamingMessages"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:agent_threads:getThreadInternal"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:auth_functions:getUserAuthFlagsQuery"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:auth_functions:getUserPreferencesQuery"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:chat_aside:readAsideSnapshot"
+    },
+    {
+      "from": "function:chat_aside:askAside",
+      "kind": "call",
+      "to": "function:chat_functions:gateThreadAction"
+    },
+    {
       "from": "function:chat_autocomplete:isComposerAutocompleteEnabled",
       "kind": "read",
       "to": "table:userSettings"
@@ -9668,6 +9698,27 @@
       "id": "function:chat_agent_switch:switchThreadAgent",
       "kind": "function",
       "name": "chat.agent_switch.switchThreadAgent",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_aside:addAsideToThread",
+      "kind": "function",
+      "name": "chat.aside.addAsideToThread",
+      "module": "chat"
+    },
+    {
+      "detail": "action",
+      "id": "function:chat_aside:askAside",
+      "kind": "function",
+      "name": "chat.aside.askAside",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
+      "id": "function:chat_aside:readAsideSnapshot",
+      "kind": "function",
+      "name": "chat.aside.readAsideSnapshot",
       "module": "chat"
     },
     {
@@ -20866,67 +20917,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 126,
+      "line": 133,
       "reason": "\"claimedAtOf\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 126,
+      "line": 133,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 126,
+      "line": 133,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 126,
+      "line": 133,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 126,
+      "line": 133,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 145,
+      "line": 152,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 148,
+      "line": 155,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 209,
+      "line": 216,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 232,
+      "line": 239,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 237,
+      "line": 244,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 354,
+      "line": 361,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

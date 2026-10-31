@@ -21,6 +21,7 @@ import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
@@ -275,6 +276,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
+            <AskAsideShortcutListener />
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}
                 data-find-in-thread-host={composerMode === "text" && !isNewThread ? "" : undefined}

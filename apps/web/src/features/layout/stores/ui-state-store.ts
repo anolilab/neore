@@ -42,6 +42,8 @@ export type AppearanceSettings = {
 };
 
 export type KeyboardShortcuts = {
+    /** Opens the side-question panel beside the thread (`askAside`). */
+    askAside: string;
     audioRecord: string;
     commandPalette: string;
     copyLastCodeBlock: string;
@@ -85,6 +87,7 @@ export type UserPreferences = {
 
 /** What "Reset to Defaults" restores. */
 export const defaultKeyboardShortcuts: KeyboardShortcuts = {
+    askAside: `${platformModifier}+shift+e`,
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,
     copyLastCodeBlock: `${platformModifier}+shift+x`,
