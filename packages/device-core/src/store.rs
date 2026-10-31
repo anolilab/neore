@@ -37,6 +37,13 @@ pub struct Pairing {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Host {
+    /// Coding agents (ACP) registered for THIS server, in the local window: the command is a path on the server.
+    /// The variables the person set globally apply to them too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acp_agents: Vec<AcpAgent>,
+    /// The (agent, folder) pairs approved for this server. The folder is one of its shared folders.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acp_consents: Vec<AcpConsent>,
     pub address: String,
     /// "Allow network for shell commands" turned ON for this server.
     #[serde(default)]
@@ -513,6 +520,8 @@ mod tests {
 
     fn host(device_id: &str, secret: &str) -> Host {
         Host {
+            acp_agents: Vec::new(),
+            acp_consents: Vec::new(),
             address: "build.example.com".into(),
             allow_shell_network: false,
             allow_unsandboxed_shell: false,

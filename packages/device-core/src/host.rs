@@ -15,6 +15,7 @@ use std::io::{self, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -26,13 +27,15 @@ use crate::actions::{
     self, cap_utf8, plan_builtin, shareable_roots, Outcome, ShellSettings, MAX_OUTPUT_BYTES,
     MAX_ROOTS,
 };
+use crate::agent_host::{self, AgentParams};
 use crate::archive;
-use crate::frame::{read_frame, write_frame, CHUNK_HEADER_BYTES, CHUNK_TAG};
+use crate::frame::{read_frame, stream_chunk_of, write_frame, CHUNK_HEADER_BYTES, CHUNK_TAG};
 use crate::fs;
 use crate::launch;
 use crate::sandbox::{self, Support};
 
-/// 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames.
+/// 2: the `reap` request. 3: the `list`, `tar` and `cancel` requests and chunk frames. The `agent` request (S7) is
+/// announced by [`Outgoing::Hello::agents`] instead of a new number, so a host without it still connects.
 pub const PROTOCOL_VERSION: u32 = 3;
 /// Requests being served at once; a further one is refused, not queued behind a ten-minute command.
 const MAX_IN_FLIGHT: usize = 8;
@@ -44,6 +47,8 @@ const CHUNK_BYTES: usize = 256 * 1024;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Outgoing {
     Hello {
+        /// Whether this host runs coding agents (the `agent` request).
+        agents: bool,
         platform: &'static str,
         protocol: u32,
         sandbox: SandboxReport,
@@ -131,7 +136,7 @@ pub struct RunParams {
 
 /// The shared folders a request names, checked against this machine: at most [`MAX_ROOTS`], its home known, and
 /// none that exposes it.
-fn request_roots(roots: &[String]) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn request_roots(roots: &[String]) -> Result<Vec<PathBuf>, String> {
     if roots.len() > MAX_ROOTS {
         return Err(format!("at most {MAX_ROOTS} folders"));
     }
@@ -425,6 +430,7 @@ where
     let in_flight = Arc::new(AtomicUsize::new(0));
     let reply_failed = Arc::new(AtomicBool::new(false));
     let stops = Stops::default();
+    let agents = Agents::default();
     let mut running = Vec::new();
 
     let served = serve_requests(
@@ -433,14 +439,19 @@ where
         &in_flight,
         &reply_failed,
         &stops,
+        &agents,
         &mut running,
         own,
     );
 
-    // Nobody is left to read an archive.
+    // Nobody is left to read an archive, and no agent is left with a desktop to answer to: every agent's group is
+    // stopped before the requests are waited for, so the desktop going away (it quit, or its connection died) takes
+    // the whole tree down with it.
     for stop in stops.lock().unwrap().values() {
         stop.store(true, Ordering::SeqCst);
     }
+
+    agents.inputs.lock().unwrap().clear();
 
     for request in running {
         let _ = request.join();
@@ -451,6 +462,47 @@ where
 
 /// The stop flag of each request in flight, by id: what a `cancel` request sets.
 type Stops = Arc<Mutex<HashMap<u64, Arc<AtomicBool>>>>;
+
+/// Where the desktop's chunk frames for a running agent go (its stdin), by request id.
+type Inputs = Arc<Mutex<HashMap<u64, Sender<Vec<u8>>>>>;
+
+/// The agents running on this host. They are requests like the others, but they last as long as the agent does, so
+/// they are counted apart: a few agents must not use up the slots of file reads and commands.
+#[derive(Default)]
+struct Agents {
+    count: Arc<AtomicUsize>,
+    inputs: Inputs,
+}
+
+/// Forgets an agent's input and its place in the count when its request ends, however it ends.
+struct AgentSlot(Arc<AtomicUsize>, Inputs, u64);
+
+impl Drop for AgentSlot {
+    fn drop(&mut self) {
+        self.1.lock().unwrap().remove(&self.2);
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// The `agent` request: starts the agent and answers when it ends. Its output has already gone out as chunk frames.
+fn serve_agent<W: Write + Send + 'static>(
+    params: Value,
+    id: u64,
+    writer: &Arc<Mutex<W>>,
+    input: std::sync::mpsc::Receiver<Vec<u8>>,
+    stop: &AtomicBool,
+) -> Outgoing {
+    let Ok(params) = serde_json::from_value::<AgentParams>(params) else {
+        return refuse(id, "invalid agent params");
+    };
+
+    match catch_unwind(AssertUnwindSafe(|| {
+        agent_host::run_agent(&params, id, writer, input, stop)
+    })) {
+        Ok(result) => answered(id, result),
+        Err(_) => refuse(id, "the host failed while running the agent"),
+    }
+}
 
 /// Takes a request's stop flag out of [`Stops`] when it ends.
 struct Registered(Stops, u64);
@@ -484,12 +536,14 @@ fn serve_cancel(params: Value, id: u64, stops: &Stops) -> Outgoing {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serve_requests<R, W>(
     reader: &mut R,
     writer: &Arc<Mutex<W>>,
     in_flight: &Arc<AtomicUsize>,
     reply_failed: &Arc<AtomicBool>,
     stops: &Stops,
+    agents: &Agents,
     running: &mut Vec<thread::JoinHandle<()>>,
     own: Option<&str>,
 ) -> io::Result<()>
@@ -500,6 +554,7 @@ where
     send(
         writer,
         &Outgoing::Hello {
+            agents: agent_host::SUPPORTED,
             platform: actions::platform(),
             protocol: PROTOCOL_VERSION,
             sandbox: SandboxReport::probe(),
@@ -518,12 +573,70 @@ where
             ));
         }
 
+        // The desktop's bytes for a running agent's stdin; an empty chunk closes it.
+        if let Some((_, id, data)) = stream_chunk_of(&bytes) {
+            let mut inputs = agents.inputs.lock().unwrap();
+
+            // An empty chunk, or a stdin nobody reads any more, ends the agent's input.
+            let closing = data.is_empty()
+                || inputs
+                    .get(&id)
+                    .is_some_and(|input| input.send(data.to_vec()).is_err());
+
+            if closing {
+                inputs.remove(&id);
+            }
+
+            continue;
+        }
+
         let Incoming::Request { id, op, params } = serde_json::from_slice(&bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
         // Answered here, not on a worker: a cancel must get through when every worker is busy.
         if op == "cancel" {
             send(writer, &serve_cancel(params, id, stops))?;
+
+            continue;
+        }
+
+        if op == "agent" {
+            if !agent_host::SUPPORTED {
+                send(
+                    writer,
+                    &refuse(id, "coding agents are not supported on this server"),
+                )?;
+
+                continue;
+            }
+
+            if agents.count.fetch_add(1, Ordering::SeqCst) >= agent_host::MAX_AGENTS {
+                agents.count.fetch_sub(1, Ordering::SeqCst);
+                send(writer, &refuse(id, "too many coding agents on this server"))?;
+
+                continue;
+            }
+
+            // Registered before the worker starts, so the stdin chunks and a cancel sent right behind the request find it.
+            let (sender, input) = channel();
+            let stop = Arc::new(AtomicBool::new(false));
+
+            agents.inputs.lock().unwrap().insert(id, sender);
+            stops.lock().unwrap().insert(id, Arc::clone(&stop));
+
+            let slot = AgentSlot(Arc::clone(&agents.count), Arc::clone(&agents.inputs), id);
+            let registered = Registered(Arc::clone(stops), id);
+            let writer = Arc::clone(writer);
+            let reply_failed = Arc::clone(reply_failed);
+
+            running.retain(|request| !request.is_finished());
+            running.push(thread::spawn(move || {
+                let (_slot, _registered) = (slot, registered);
+
+                if send(&writer, &serve_agent(params, id, &writer, input, &stop)).is_err() {
+                    reply_failed.store(true, Ordering::SeqCst);
+                }
+            }));
 
             continue;
         }

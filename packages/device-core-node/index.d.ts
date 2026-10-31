@@ -139,6 +139,25 @@ export declare class DeviceCore {
    */
   acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
   /**
+   * Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
+   * (an `acpUpdate` operation, JSON; JSON back: `{ agents, consents }` of that server). Local window only.
+   */
+  hostAcpUpdate(deviceId: string, update: string): string
+  /**
+   * What to start for an approved agent on a server (JSON, like `acpSpawnPlan`): the person's variables only, since
+   * the server builds the rest of the environment from its own. Refuses a pair the person did not approve for it.
+   */
+  acpHostSpawnPlan(deviceId: string, agentKey: string, folder: string): string
+  /**
+   * Starts an approved agent on a connected server under `handle`, a number the caller chose and has not used. Its
+   * output and end arrive as `hostAgent` and `hostAgentEnded` events. Returns the plan (JSON).
+   */
+  hostAgentStart(deviceId: string, handle: number, agentKey: string, folder: string): string
+  /** Bytes for the agent's stdin; an empty buffer closes it. */
+  hostAgentWrite(handle: number, bytes: Buffer): void
+  /** Stops the agent's whole process group on its server. Its end arrives as an event. */
+  hostAgentStop(handle: number): void
+  /**
    * Registers a permission request from a coding agent and resolves with the outcome the agent receives
    * (JSON `{"outcome":"selected","optionId":…}` or `{"outcome":"cancelled"}`) once the user has answered it
    * in the device window, the session was cancelled, or the request timed out.

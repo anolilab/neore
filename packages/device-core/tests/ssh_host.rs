@@ -22,8 +22,8 @@ use std::time::{Duration, Instant};
 
 use device_core::install::{self, target_for_uname, Bundle, Installed, Remote, Root};
 use device_core::ssh::{
-    control_args, forget_keys, pinned_keys, terminal_args, HostConnection, HostKey, HostLink,
-    Interact, SshError, SshPaths, Target, HOST_VERSION,
+    control_args, forget_keys, pinned_keys, terminal_args, AgentExit, AgentSink, HostConnection,
+    HostKey, HostLink, Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
 use device_core::store::{self, test_keychain, Host, Pairing, Settings};
 use device_core::{DeviceState, Event};
@@ -1356,6 +1356,8 @@ impl Desktop {
             &data_dir.join("device.json"),
             &Settings {
                 hosts: vec![Host {
+                    acp_agents: Vec::new(),
+                    acp_consents: Vec::new(),
                     address: target.address.clone(),
                     allow_shell_network: false,
                     allow_unsandboxed_shell: false,
@@ -2045,4 +2047,137 @@ fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
 
     let _ = fs::remove_dir_all(&dir);
     finish(&connection, &target, &paths);
+}
+
+// ─── Coding agents on the server (S7) ────────────────────────────────────
+
+/// Collects what an agent printed and how it ended.
+#[derive(Default)]
+struct Collected {
+    ended: Mutex<Option<Result<AgentExit, String>>>,
+    err: Mutex<Vec<u8>>,
+    out: Mutex<Vec<u8>>,
+}
+
+impl AgentSink for Collected {
+    fn output(&self, stderr: bool, bytes: &[u8]) {
+        if stderr { &self.err } else { &self.out }
+            .lock()
+            .unwrap()
+            .extend_from_slice(bytes);
+    }
+
+    fn ended(&self, result: Result<AgentExit, String>) {
+        *self.ended.lock().unwrap() = Some(result);
+    }
+}
+
+impl Collected {
+    fn stdout(&self) -> String {
+        String::from_utf8_lossy(&self.out.lock().unwrap()).into_owned()
+    }
+}
+
+fn eventually(what: &str, condition: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+
+    while !condition() {
+        assert!(Instant::now() < deadline, "{what}");
+        thread::sleep(Duration::from_millis(30));
+    }
+}
+
+fn process_alive(pid: i64) -> bool {
+    // SAFETY: signal 0 only asks whether the process exists.
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
+
+fn agent_request(root: &Path, script: &str) -> serde_json::Value {
+    json!({
+        "args": ["-c", script], "command": "/bin/sh", "cwd": root, "env": {},
+        "roots": [root],
+    })
+}
+
+#[test]
+fn a_coding_agent_runs_on_the_server_without_the_clients_agent_socket_and_dies_with_the_connection()
+{
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "codag");
+    let (target, paths) = (server.target("client"), server.paths("c"));
+    let interact = trusting();
+    let connection = connect(&server, &target, &paths, &interact).unwrap();
+    let root = vectors::fixture("ssh-agent");
+
+    assert!(
+        connection.hello().agents,
+        "the host should announce coding agents"
+    );
+
+    // The environment the agent starts with is the host's own: forwarding is off, so no agent socket is in it.
+    let printed = Arc::new(Collected::default());
+
+    connection
+        .agent_start(
+            &agent_request(&root, "env"),
+            Arc::clone(&printed) as Arc<dyn AgentSink>,
+        )
+        .unwrap();
+    eventually("the agent never ended", || {
+        printed.ended.lock().unwrap().is_some()
+    });
+
+    let environment = printed.stdout();
+
+    assert!(environment.contains("HOME="), "{environment}");
+    assert!(!environment.contains("SSH_AUTH_SOCK"), "{environment}");
+    assert!(!environment.contains("SSH_CONNECTION"), "{environment}");
+
+    // A round trip over the connection, then the connection goes away with the agent and a child it started.
+    let pidfile = root.join("agent-child.pid");
+    let _ = fs::remove_file(&pidfile);
+
+    let live = Arc::new(Collected::default());
+    let handle = connection
+        .agent_start(
+            &agent_request(
+                &root,
+                &format!(
+                    "sleep 300 & echo $! > {}; echo $$; read line; echo got:$line; exec sleep 300",
+                    pidfile.display()
+                ),
+            ),
+            Arc::clone(&live) as Arc<dyn AgentSink>,
+        )
+        .unwrap();
+
+    eventually("the agent never said its pid", || {
+        live.stdout().contains('\n')
+    });
+    connection.agent_write(handle, b"hello\n").unwrap();
+    eventually("the agent never answered", || {
+        live.stdout().contains("got:hello")
+    });
+
+    let leader: i64 = live.stdout().lines().next().unwrap().parse().unwrap();
+    let child: i64 = fs::read_to_string(&pidfile)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+
+    assert!(process_alive(leader) && process_alive(child));
+
+    // The desktop quit: its ssh is gone, and the host with it.
+    finish(&connection, &target, &paths);
+    eventually("the agent outlived the connection", || {
+        !process_alive(leader)
+    });
+    eventually("the agent's child outlived the connection", || {
+        !process_alive(child)
+    });
+    assert!(
+        live.ended.lock().unwrap().is_some(),
+        "the sink should be told the connection ended"
+    );
 }

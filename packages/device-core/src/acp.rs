@@ -10,7 +10,6 @@
 //! that shows names, so a stray `{:?}` of the settings or a plan cannot leak a value.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,60 +20,19 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::acp_permission::{Answered, Outcome, PendingView, PermissionRequest};
+pub use crate::agent_env::validate_env_var;
+#[cfg(test)]
+use crate::agent_env::MAX_ENV_VALUE_BYTES;
+use crate::agent_env::{app_vars, built_env};
 use crate::engine::{now_ms, validate_roots, DeviceState, Event};
 use crate::fs::{self as confined_fs, MediaRead};
 use crate::hmac::to_hex;
 
 pub(crate) const MAX_AGENTS: usize = 20;
-const MAX_CONSENTS: usize = 100;
+pub(crate) const MAX_CONSENTS: usize = 100;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
-const MAX_ENV_VARS: usize = 50;
-const MAX_ENV_NAME: usize = 128;
-const MAX_ENV_VALUE_BYTES: usize = 8 * 1024;
-
-/// Variables copied from the app's own environment into an agent's. Everything else is dropped, so no Neore
-/// or Electron variable, token or `NODE_OPTIONS` reaches the agent. Matched case-insensitively (Windows).
-const BUILT_ENV_NAMES: &[&str] = &[
-    "PATH",
-    "HOME",
-    "USER",
-    "LOGNAME",
-    "SHELL",
-    "LANG",
-    "LANGUAGE",
-    "TZ",
-    "TERM",
-    "TMPDIR",
-    "XDG_CONFIG_HOME",
-    "XDG_DATA_HOME",
-    "XDG_STATE_HOME",
-    "XDG_CACHE_HOME",
-    "XDG_RUNTIME_DIR",
-    // Windows
-    "SYSTEMROOT",
-    "SYSTEMDRIVE",
-    "WINDIR",
-    "COMSPEC",
-    "PATHEXT",
-    "USERPROFILE",
-    "USERNAME",
-    "HOMEDRIVE",
-    "HOMEPATH",
-    "APPDATA",
-    "LOCALAPPDATA",
-    "PROGRAMDATA",
-    "PROGRAMFILES",
-    "TEMP",
-    "TMP",
-];
-/// Locale variables are many (`LC_ALL`, `LC_CTYPE`, …); all of them pass.
-const BUILT_ENV_PREFIXES: &[&str] = &["LC_"];
-
-/// Names Neore keeps for itself. A user variable with one of these is refused, so the agent can never be handed
-/// a Neore or Electron setting, or a Node option that loads code, through this list.
-const RESERVED_PREFIXES: &[&str] = &["NEORE_", "ELECTRON_"];
-const RESERVED_NAMES: &[&str] = &["NODE_OPTIONS"];
+pub(crate) const MAX_ENV_VARS: usize = 50;
 
 /// A set of environment variables. The values are secrets: `Debug` lists the names only.
 #[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -151,7 +109,7 @@ pub struct SpawnPlan {
     pub secret_names: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpAgentView {
     pub args: Vec<String>,
@@ -210,11 +168,11 @@ pub enum AcpUpdate {
     },
 }
 
-fn folder_id(canonical: &str) -> String {
+pub(crate) fn folder_id(canonical: &str) -> String {
     to_hex(&Sha256::digest(canonical.as_bytes())[..8])
 }
 
-fn folder_label(canonical: &str) -> String {
+pub(crate) fn folder_label(canonical: &str) -> String {
     Path::new(canonical).file_name().map_or_else(
         || canonical.to_owned(),
         |name| name.to_string_lossy().into_owned(),
@@ -264,41 +222,6 @@ pub fn validate_agent(agent: &AcpAgent) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether `name` is one Neore keeps for itself (case-insensitive: Windows names are).
-pub fn is_reserved_env_name(name: &str) -> bool {
-    let upper = name.to_ascii_uppercase();
-
-    RESERVED_NAMES.contains(&upper.as_str())
-        || RESERVED_PREFIXES
-            .iter()
-            .any(|prefix| upper.starts_with(prefix))
-}
-
-/// The error never repeats a value.
-pub fn validate_env_var(name: &str, value: &str) -> Result<(), String> {
-    let name_ok = (1..=MAX_ENV_NAME).contains(&name.len())
-        && name
-            .bytes()
-            .enumerate()
-            .all(|(i, b)| b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit()));
-
-    if !name_ok {
-        return Err(
-            "a variable name is letters, digits and _, and does not start with a digit".into(),
-        );
-    }
-
-    if is_reserved_env_name(name) {
-        return Err(format!("{name} is reserved by Neore"));
-    }
-
-    if value.len() > MAX_ENV_VALUE_BYTES || value.contains('\0') {
-        return Err(format!("{name}: the value is too long or contains a NUL"));
-    }
-
-    Ok(())
-}
-
 /// `layer` over `base`. Windows names are case-insensitive, so `Path` replaces `PATH` there.
 fn overlay(base: &mut BTreeMap<String, String>, layer: &EnvVars) {
     for (name, value) in &layer.0 {
@@ -308,29 +231,6 @@ fn overlay(base: &mut BTreeMap<String, String>, layer: &EnvVars) {
 
         base.insert(name.clone(), value.clone());
     }
-}
-
-/// The variables an agent starts with before the user's: only what [`BUILT_ENV_NAMES`] lists, from `vars`
-/// (the app's own environment). Not inherited.
-pub fn built_env(vars: impl Iterator<Item = (String, String)>) -> BTreeMap<String, String> {
-    vars.filter(|(name, value)| {
-        let upper = name.to_ascii_uppercase();
-
-        (BUILT_ENV_NAMES.contains(&upper.as_str())
-            || BUILT_ENV_PREFIXES
-                .iter()
-                .any(|prefix| upper.starts_with(prefix)))
-            && !value.contains('\0')
-    })
-    .collect()
-}
-
-/// The app's own environment as text. A variable whose name or value is not UTF-8 is skipped: `env::vars`
-/// panics on one, and a panic here would take the Electron main process down with it.
-pub fn app_vars(
-    vars: impl Iterator<Item = (OsString, OsString)>,
-) -> impl Iterator<Item = (String, String)> {
-    vars.filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
 }
 
 /// An empty folder of its own for one version probe, so concurrent probes share nothing and nothing is left
@@ -1020,6 +920,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_variable_that_is_not_utf8_is_skipped_rather_than_aborting_the_app() {
+        use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
 
         let vars = vec![
