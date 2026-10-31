@@ -24858,10 +24858,6 @@ msgstr "Saved"
 msgid "Saved — continuing"
 msgstr "Saved — continuing"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:127
-#~ msgid "Saved — the assistant can use it once"
-#~ msgstr "Saved — the assistant can use it once"
-
 #: src/features/chat/thread/request-secret-prompt.tsx:182
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr "Saved — the assistant can use it once, in this reply"
@@ -25728,10 +25724,6 @@ msgstr "Sessions Revoked"
 #: src/features/auth/components/settings/security/change-password-card.tsx:224
 msgid "Set a password for your account"
 msgstr "Set a password for your account"
-
-#: src/features/chat/thread/request-secret-prompt.tsx:87
-#~ msgid "Set as the {header} header on your {server} MCP server"
-#~ msgstr "Set as the {header} header on your {server} MCP server"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:140
 msgid "Set as the {header} header on your {serverName} MCP server"
