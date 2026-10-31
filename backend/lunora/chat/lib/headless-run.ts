@@ -24,6 +24,9 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { sumMessageCosts } from "../../agent/message-cost";
+import { type GoalRoundResult, runHeadlessGoalRounds, stepsTranscript } from "../goals/headless";
+import type { HeadlessGoalOutcome } from "../goals/headless";
+import { reviewRound } from "../goals/review";
 import type { SkillConfig } from "../../skills/validators";
 import type { DispatchOrigin } from "../../sub-agents/logic";
 import {
@@ -69,6 +72,13 @@ export interface HeadlessRunOptions {
     beforeThread?: () => Promise<void>;
     /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
     botId?: string;
+    /**
+     * Run until done: after the run, a short review decides whether `text` is met, and if not the run goes on
+     * in the same thread with the reviewer's reason as the next instruction, up to `maxRounds` (default 5, at
+     * most 10) and a cost cap. Each further round is charged to the user's daily limits. Unset, the run is one
+     * `generateText`. The rounds run inside this call, so they also stop at a time budget (`headless.ts`).
+     */
+    goal?: { maxRounds?: number; text: string };
     /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
     keepThreadStatus?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
@@ -125,6 +135,8 @@ export interface HeadlessRunOptions {
 export interface HeadlessRunResult {
     /** What the gateway priced the run's steps at, summed; absent when no step carried a price. */
     costMicrodollars?: number;
+    /** With {@link HeadlessRunOptions.goal}: how the goal ended. */
+    goal?: Pick<HeadlessGoalOutcome, "ended" | "reason" | "rounds">;
     text: string;
     threadId: string;
     /** Tokens across every step, when the provider reported usage. */
@@ -245,6 +257,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
         await options.onGenerationStart?.();
 
+        // The goal's time budget is the invocation's, so it starts before the first generation.
+        const startedAt = Date.now();
         const result = await thread.generateText(generateArgs as never);
         const text = result.text ?? "";
 
@@ -254,31 +268,69 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             threadId: threadId as Id<"threads">,
         });
 
-        if (extractMemory && text && prompt && servesUser(userId)) {
-            void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
-                assistantResponse: text.slice(0, 4000),
-                ...(options.botId && { botId: options.botId }),
-                threadId: threadId as Id<"threads">,
-                userId,
-                userMessage: prompt,
-            });
+        // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
+        // redelivered record counts once. Every round of a goal is a reply of its own.
+        const settle = (round: typeof result): GoalRoundResult & { priced: number | undefined } => {
+            scheduleReplyUsage(
+                ctx.scheduler as never,
+                replyUsageArgs((round as { savedMessages?: ReadonlyArray<SavedRowLike> }).savedMessages ?? [], {
+                    at: Date.now(),
+                    userId,
+                    ...(options.usageSkill && { skill: options.usageSkill }),
+                    ...(prefs.timezone && { timeZone: prefs.timezone }),
+                }),
+            );
+
+            const cost = sumMessageCosts((round.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
+
+            return {
+                costMicrodollars: cost?.microdollars ?? 0,
+                priced: cost?.microdollars,
+                text: round.text ?? "",
+                totalTokens: round.totalUsage?.totalTokens ?? 0,
+                transcript: stepsTranscript(round.steps ?? []),
+            };
+        };
+        const first = settle(result);
+        // Memory learns from the answer the run ends on: a goal's interim rounds are not what the user was given.
+        const extract = (answer: string): void => {
+            if (extractMemory && answer && prompt && servesUser(userId)) {
+                void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
+                    assistantResponse: answer.slice(0, 4000),
+                    ...(options.botId && { botId: options.botId }),
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                    userMessage: prompt,
+                });
+            }
+        };
+
+        if (!options.goal) {
+            extract(text);
+
+            return { costMicrodollars: first.priced, text, threadId, totalTokens: result.totalUsage?.totalTokens };
         }
 
-        // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
-        // redelivered record counts once.
-        scheduleReplyUsage(
-            ctx.scheduler as never,
-            replyUsageArgs((result as { savedMessages?: ReadonlyArray<SavedRowLike> }).savedMessages ?? [], {
-                at: Date.now(),
-                userId,
-                ...(options.usageSkill && { skill: options.usageSkill }),
-                ...(prefs.timezone && { timeZone: prefs.timezone }),
-            }),
-        );
+        const goalText = options.goal.text;
+        const outcome = await runHeadlessGoalRounds({
+            charge: async () => await ctx.runMutation(internal.chat.goals.internal.chargeGoalRound, { userId }),
+            first,
+            goal: { ...options.goal },
+            review: async ({ round, transcript }) => await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, threadId, transcript, userId }),
+            runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
+            startedAt,
+            stopped: options.shouldStop,
+        });
 
-        const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
+        extract(outcome.result.text);
 
-        return { costMicrodollars: cost?.microdollars, text, threadId, totalTokens: result.totalUsage?.totalTokens };
+        return {
+            costMicrodollars: outcome.costMicrodollars || undefined,
+            goal: { ended: outcome.ended, reason: outcome.reason, rounds: outcome.rounds },
+            text: outcome.result.text,
+            threadId,
+            totalTokens: outcome.totalTokens,
+        };
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }

@@ -36,6 +36,9 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
+import { GoalBanner, GoalReviewNote, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
+import { anchorVerdicts, goalReviewNotes, withoutGoalInstructions, withoutNotedVerdicts } from "@/features/chat/goal/goal-view";
+import { useThreadGoal } from "@/features/chat/goal/use-thread-goal";
 import type { UIMessage } from "@/lib/agent";
 import { showInfo } from "@/lib/toast";
 
@@ -226,8 +229,14 @@ interface MessageListProps {
 const MessageList: FC<MessageListProps> = memo(({ className, editComposerComponent: EditComposer, emptyComponent, maxWidth: maxWidthProp }) => {
     const maxWidth = maxWidthProp ?? "65ch";
     const { t } = useLingui();
-    const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
+    const { loadMore, messages: threadMessages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
+    // A goal's own instructions are not the user's messages: each shows as a "Review: …" note after the reply it
+    // followed, and the verdicts that note already says sit under the replies they judged.
+    const goal = useThreadGoal(threadId);
+    const messages = withoutGoalInstructions(threadMessages);
+    const reviewNotes = goalReviewNotes(threadMessages);
+    const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(messages, goal.verdicts, reviewNotes)) : null;
     const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
@@ -426,6 +435,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         const isEntering =
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
+        // One list item per message: the goal's banner and notes belong to it, so the list's count and positions stay the messages'.
         return (
             <div
                 aria-posinset={index + 1}
@@ -435,7 +445,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 role="listitem"
                 tabIndex={-1}
             >
+                {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
                 {renderMessage(message, index)}
+                {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
+                    <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
+                ))}
+                {goal &&
+                    verdictAnchors
+                        ?.get(message.id)
+                        ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
             </div>
         );
     };

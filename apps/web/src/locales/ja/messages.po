@@ -874,6 +874,10 @@ msgstr "{label} をスター内の {position}/{0} 番目に移動しました"
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 msgstr ""
 
+#: src/features/chat/goal/composer-goal.tsx:93
+msgid "{maxRounds} rounds"
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > 1 日あたり {threshold}"
@@ -907,7 +911,7 @@ msgstr "{minutes} 分前"
 msgid "{minutes}m remaining"
 msgstr "残り {minutes} 分"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
@@ -3449,7 +3453,7 @@ msgstr "何でも質問して新しいチャットを始めましょう…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロンプトを FLUX、Imagen、Stable Diffusion で実行できます。既定ではなく、勝者を選びましょう。"
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
@@ -3537,7 +3541,7 @@ msgstr "オークランド"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -8139,7 +8143,7 @@ msgstr "ディベート"
 msgid "Debate rounds"
 msgstr "ディベートのラウンド数"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
@@ -9431,7 +9435,7 @@ msgstr "下書き"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "メール、レポート、エッセイなどの下書き..."
 
@@ -11115,7 +11119,7 @@ msgstr "有効期限：{expiresAt}"
 msgid "Expiring soon"
 msgstr "まもなく期限切れ"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
@@ -13409,7 +13413,7 @@ msgstr "テキストプロンプトから画像を生成し、4 倍にアップ�
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペースの画像を生成して。"
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
@@ -13761,9 +13765,21 @@ msgstr "ボールトへ移動"
 msgid "Go to your pages"
 msgstr "ページ一覧へ移動"
 
+#: src/features/chat/goal/composer-goal.tsx:73
+#: src/features/chat/goal/goal-notes.tsx:70
+#: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:325
 msgid "Goal"
 msgstr "目標"
+
+#: src/features/chat/goal/goal-notes.tsx:63
+msgid "Goal met"
+msgstr ""
+
+#. placeholder {0}: verdict.reason
+#: src/features/chat/goal/goal-notes.tsx:115
+msgid "Goal met: {0}"
+msgstr ""
 
 #: src/features/tasks/components/task-card.tsx:68
 msgid "Goal: {goalTitle}"
@@ -14724,7 +14740,7 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -18764,7 +18780,7 @@ msgstr "Neore - AI テキスト・動画・音声・画像・ドキュメント�
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:656
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -19065,7 +19081,7 @@ msgstr "次の一致"
 msgid "Next option"
 msgstr "次のオプション"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "次の出力モード"
 
@@ -21151,7 +21167,7 @@ msgstr "出力ファイル"
 msgid "Output Format"
 msgstr "出力形式"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "出力モード"
 
@@ -21840,7 +21856,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "プロジェクトの計画やアイデア出しなど..."
 
@@ -22347,7 +22363,7 @@ msgstr "前の一致"
 msgid "Previous option"
 msgstr "前のオプション"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
@@ -24192,7 +24208,7 @@ msgstr "リサーチ"
 msgid "Research a topic"
 msgstr "トピックをリサーチ"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "トピックを深くリサーチ..."
 
@@ -24462,6 +24478,10 @@ msgstr "プライバシーポリシーとデータ処理の方針を確認しま
 msgid "Review requested on a pull request"
 msgstr ""
 
+#: src/features/chat/goal/composer-goal.tsx:87
+msgid "Review rounds: {maxRounds}. Change"
+msgstr ""
+
 #. placeholder {0}: task.title
 #: src/features/home/components/home-page.tsx:163
 msgid "Review task: {0}"
@@ -24474,6 +24494,10 @@ msgstr "以下の最適化されたプロンプトを確認してください。
 #: src/features/skills/components/skill-form-dialog.tsx:354
 msgid "review, security"
 msgstr "レビュー, セキュリティ"
+
+#: src/features/chat/goal/goal-notes.tsx:134
+msgid "Review: {reason}"
+msgstr ""
 
 #: src/features/tasks/components/task-detail-dialog.tsx:242
 msgid "Reviewer note"
@@ -24612,6 +24636,12 @@ msgstr "回転角度"
 msgid "Rotation: {rotation}°"
 msgstr "回転: {rotation}°"
 
+#. placeholder {0}: verdict.round
+#. placeholder {1}: verdict.reason
+#: src/features/chat/goal/goal-notes.tsx:115
+msgid "Round {0}: not yet. {1}"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:515
 msgid "Route, track, <0>optimize.</0>"
 msgstr "ルーティング、追跡、<0>最適化。</0>"
@@ -24709,6 +24739,10 @@ msgstr "PowerShell で次のコマンドを実行してください。"
 #: src/features/evals/components/model-comparison.tsx:76
 msgid "Run this dataset against at least two models to compare them."
 msgstr "比較するには、このデータセットを 2 つ以上のモデルで実行してください。"
+
+#: src/features/chat/goal/composer-goal.tsx:78
+msgid "Run until done"
+msgstr ""
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:29
 msgid "Run workflow"
@@ -27290,6 +27324,7 @@ msgid "Stocks"
 msgstr "株式"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
+#: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
@@ -27346,6 +27381,7 @@ msgstr "6 つの AI ツールにお金を払うのはもう終わり。"
 msgid "Stop reading"
 msgstr "読み上げを停止"
 
+#: src/features/chat/goal/goal-notes.tsx:65
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Stopped"
@@ -27354,6 +27390,38 @@ msgstr ""
 #: src/features/evals/components/run-status.tsx:14
 msgid "Stopped at budget"
 msgstr "予算に達したため停止"
+
+#: src/features/chat/goal/goal-notes.tsx:41
+msgid "Stopped by you"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:23
+msgid "Stopped: cost limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:26
+msgid "Stopped: daily limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:38
+msgid "Stopped: goals are not available in group chats"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:32
+msgid "Stopped: round limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:29
+msgid "Stopped: the review could not run"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:44
+msgid "Stopped: the run failed"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:35
+msgid "Stopped: you sent a new message"
+msgstr ""
 
 #: src/features/local-models/lib/local-errors.ts:166
 msgid "Stopped."
@@ -27828,7 +27896,7 @@ msgstr ""
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "ドキュメントや URL を要約..."
 
@@ -28446,7 +28514,7 @@ msgstr "テキスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28607,7 +28675,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:304
+#: src/features/chat/thread/message-list.tsx:313
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
@@ -28916,6 +28984,10 @@ msgstr "OpenAI の最高のコーディング能力を必要とする、最も�
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Anthropic の最新フロンティアの推論と能力を必要とする、最も要求の厳しいタスク"
 
+#: src/features/chat/goal/composer-goal.tsx:98
+msgid "The most review rounds before it stops"
+msgstr ""
+
 #. placeholder {0}: data.user.email
 #: src/routes/auth/extension.tsx:135
 msgid "The Neore app on this device will be signed in as {0}. Only continue if you started signing in from the app just now."
@@ -29195,7 +29267,7 @@ msgstr "このブラウザーではここでプッシュ通知を受信できま
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
+#: src/features/chat/thread/composer.tsx:585
 msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
@@ -30058,7 +30130,7 @@ msgstr "変換後の画像"
 msgid "Translate"
 msgstr "翻訳"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
@@ -30284,9 +30356,17 @@ msgstr "トルコ語（トルコ）"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "任意の GitHub リポジトリをリモート MCP エンドポイントに変換"
 
+#: src/features/chat/goal/composer-goal.tsx:62
+msgid "Turn off run until done"
+msgstr ""
+
 #: src/features/home/components/home-page.tsx:236
 msgid "Turn on Daily Brief"
 msgstr "Daily Brief をオンにする"
+
+#: src/features/chat/goal/composer-goal.tsx:62
+msgid "Turn on run until done"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:97
 msgid "tutorial"
@@ -31603,7 +31683,7 @@ msgstr "動画"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -32526,6 +32606,11 @@ msgstr "ワークフロー"
 msgid "Working"
 msgstr "作業中"
 
+#. placeholder {0}: goal.maxRounds
+#: src/features/chat/goal/goal-notes.tsx:61
+msgid "Working toward the goal: round {nextRound} of {0}"
+msgstr ""
+
 #: src/features/chat/thread/streaming-placeholder.tsx:630
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
@@ -32560,7 +32645,7 @@ msgstr "チャットと並行して長文コンテンツを作成"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "横並びのキャンバスエディターで長文コンテンツを作成できます。ツールを切り替えずに、チャットから完成したドキュメントまで。"
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "コードを書いて..."
 
@@ -33002,6 +33087,10 @@ msgstr "あなたのメッセージ:"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:261
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
+msgstr ""
+
+#: src/features/chat/goal/composer-goal.tsx:79
+msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:264

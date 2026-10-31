@@ -67,6 +67,7 @@ let harness: ReturnType<typeof lunoraTest>;
 beforeAll(async () => {
     registerModule(registry, "auth_functions", await import("../auth/functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
     registerModule(registry, "chat_tool_permissions", await import("./tool-permissions"));

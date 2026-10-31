@@ -60,6 +60,7 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupExpiredPersistentStreams", ref: internal.chat.streaming.persistent.crons.cleanupExpiredStreams },
     { name: "purgeFinishedStreams", ref: internal.chat.streaming.persistent.purge.purgeFinishedStreams },
     { name: "failStaleMediaRows", ref: internal.chat.media_stale.failStaleMediaRows },
+    { name: "reapStalledGoals", ref: internal.chat.goals.internal.reapStalledGoals },
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },

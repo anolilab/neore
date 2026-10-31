@@ -14,6 +14,7 @@ import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
@@ -2566,6 +2567,41 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+    threadGoals: defineTable({
+        // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
+        // the review job is queued at least once, and only the delivery that claims a round reviews it.
+        claimedRound: v.optional(v.number()),
+        config: vGoalRunConfig,
+        costMicrodollars: v.number(),
+        createdAt: v.number(),
+        endedAt: v.optional(v.number()),
+        maxCostMicrodollars: v.number(),
+        maxRounds: v.number(),
+        organizationId: v.optional(v.string()),
+        // The user row that opened the latest round; the review reads the rows after it.
+        promptMessageId: v.string(),
+        // Reviews recorded so far.
+        round: v.number(),
+        // The user's own message that started the goal: where the thread shows it.
+        startMessageId: v.string(),
+        status: vThreadGoalStatus,
+        stopReason: v.optional(vGoalStopReason),
+        text: v.string(),
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+        verdicts: v.array(vGoalVerdict),
+    })
+        .shardBy("userId")
+        .index("by_thread", ["threadId"])
+        .index("by_thread_and_status", ["threadId", "status"])
+        .index("by_user", ["userId"])
+        .index("by_status_and_updatedAt", ["status", "updatedAt"])
+        .relations((r) => {
+            return {
+                thread: r.one("threads", { field: "threadId" }),
+            };
+        }),
 
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),

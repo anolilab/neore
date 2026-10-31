@@ -309,8 +309,8 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
-            runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
             createCategoryChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
@@ -347,6 +347,25 @@ export interface InternalApiTypes {
             optimizeSystemPrompt: FunctionReference<"action", { improvementInstructions?: string; modelId?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
+        };
+        goals: {
+            execute: {
+                reviewGoalRound: FunctionReference<"action", { goalId: Id<"threadGoals">; round: number }, null>;
+            };
+            internal: {
+                chargeGoalRound: FunctionReference<"mutation", { userId: string }, boolean>;
+                claimGoalRound: FunctionReference<"mutation", { goalId: Id<"threadGoals">; round: number }, { text: string; threadId: Id<"threads">; userId: string } | null>;
+                closeStaleGoalRound: FunctionReference<"mutation", { messageId: string; streamId: Id<"persistentStreams"> }, boolean>;
+                endGoalsForThread: FunctionReference<"mutation", { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, boolean>;
+                failGoalReview: FunctionReference<"mutation", { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }, boolean>;
+                getActiveGoalForRun: FunctionReference<"query", { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, { goalId: Id<"threadGoals">; round: number } | null>;
+                otherGoalHoldsThread: FunctionReference<"query", { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, boolean>;
+                reapStalledGoals: FunctionReference<"mutation", {}, number>;
+                recordGoalVerdict: FunctionReference<"mutation", { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }, { next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
+                roundTranscript: FunctionReference<"query", { goalId: Id<"threadGoals"> }, { costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
+                startGoal: FunctionReference<"mutation", { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; maxRounds?: number; organizationId?: string; promptMessageId: string; text: string; threadId: Id<"threads">; userId: string }, { goalId: Id<"threadGoals">; ok: true } | { error: string; ok: false }>;
+                touchGoal: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
+            };
         };
         group: {
             functions: {
@@ -388,7 +407,7 @@ export interface InternalApiTypes {
             deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
         };
         streaming: {
-            createStreamWithMessage: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
+            createStreamWithMessage: FunctionReference<"mutation", { goalId?: Id<"threadGoals">; messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
             streamRunThread: FunctionReference<"query", { streamId: Id<"persistentStreams">; userId: string }, ({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lastUserMessageAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; runner?: "host" | undefined; summaryEpoch?: number | undefined; summaryPathTooLongAt?: number | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "trigger" | "messenger" | "outside_agent")[]; hostDispatch: "ask"; }) | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
                 crons: {
@@ -415,7 +434,7 @@ export interface InternalApiTypes {
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -1410,6 +1429,25 @@ export const internal: InternalApiTypes = {
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
+        },
+        goals: {
+            execute: {
+                reviewGoalRound: { __lunoraRef: "chat_goals_execute:reviewGoalRound" },
+            },
+            internal: {
+                chargeGoalRound: { __lunoraRef: "chat_goals_internal:chargeGoalRound" },
+                claimGoalRound: { __lunoraRef: "chat_goals_internal:claimGoalRound" },
+                closeStaleGoalRound: { __lunoraRef: "chat_goals_internal:closeStaleGoalRound" },
+                endGoalsForThread: { __lunoraRef: "chat_goals_internal:endGoalsForThread" },
+                failGoalReview: { __lunoraRef: "chat_goals_internal:failGoalReview" },
+                getActiveGoalForRun: { __lunoraRef: "chat_goals_internal:getActiveGoalForRun" },
+                otherGoalHoldsThread: { __lunoraRef: "chat_goals_internal:otherGoalHoldsThread" },
+                reapStalledGoals: { __lunoraRef: "chat_goals_internal:reapStalledGoals" },
+                recordGoalVerdict: { __lunoraRef: "chat_goals_internal:recordGoalVerdict" },
+                roundTranscript: { __lunoraRef: "chat_goals_internal:roundTranscript" },
+                startGoal: { __lunoraRef: "chat_goals_internal:startGoal" },
+                touchGoal: { __lunoraRef: "chat_goals_internal:touchGoal" },
+            },
         },
         group: {
             functions: {

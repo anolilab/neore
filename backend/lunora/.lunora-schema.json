@@ -19632,6 +19632,398 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "threadGoals": {
+      "commitOrdered": false,
+      "fields": {
+        "claimedRound": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "config": {
+          "kind": "object",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "fields": {
+            "customSystemPrompt": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "enabledFeatures": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
+            },
+            "mcpServerNames": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
+            },
+            "model": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "origin": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"outside_agent\""
+            },
+            "reasoningEffort": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "researchDepth": {
+              "kind": "union",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"balanced\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"speed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thorough\""
+                }
+              ]
+            },
+            "searchMode": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "skill": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "rawArgs": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "slug": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            "statelessMode": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
+        "costMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "endedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "maxCostMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "maxRounds": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "promptMessageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "round": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "startMessageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "status": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"active\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"met\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"stopped\""
+            }
+          ]
+        },
+        "stopReason": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"cost_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"daily_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"error\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"review_failed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"round_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"superseded\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"unsupported\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"user\""
+            }
+          ]
+        },
+        "text": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "verdicts": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "at": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "met": {
+                "kind": "boolean",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "order": {
+                "kind": "number",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "reason": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "round": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        }
+      },
+      "indexes": {
+        "by_status_and_updatedAt": {
+          "fields": [
+            "status",
+            "updatedAt"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_status": {
+          "fields": [
+            "threadId",
+            "status"
+          ],
+          "unique": false
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {
+        "thread": {
+          "field": "threadId",
+          "kind": "one",
+          "table": "threads"
+        }
+      },
+      "shardMode": "shardBy:userId"
+    },
     "threadInvites": {
       "commitOrdered": false,
       "fields": {
@@ -21136,6 +21528,12 @@
               "kind": "string",
               "nullable": false,
               "optional": false,
+              "unique": false
+            },
+            "promptMessageId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
               "unique": false
             },
             "reasoningEffort": {

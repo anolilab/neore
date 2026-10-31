@@ -387,6 +387,8 @@ const createUserUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes 
 
     return {
         _creationTime: message.createdAt ?? message._creationTime,
+        // Only a row the app itself wrote carries one (a goal's instruction): the thread hides it by this marker.
+        ...(message.agentName && { agentName: message.agentName }),
         id: message._id,
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
         metadata: message.metadata,

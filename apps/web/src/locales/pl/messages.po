@@ -874,6 +874,10 @@ msgstr "{label} przesunięto na pozycję {position} z {0} na liście oznaczonych
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 msgstr ""
 
+#: src/features/chat/goal/composer-goal.tsx:93
+msgid "{maxRounds} rounds"
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > {threshold} dziennie"
@@ -907,7 +911,7 @@ msgstr "{minutes} min temu"
 msgid "{minutes}m remaining"
 msgstr "Pozostało {minutes} min"
 
-#: src/features/chat/thread/composer.tsx:222
+#: src/features/chat/thread/composer.tsx:223
 msgid "{modeLabel} mode — click to change"
 msgstr "Tryb {modeLabel} — kliknij, aby zmienić"
 
@@ -3449,7 +3453,7 @@ msgstr "Zapytaj o cokolwiek, aby rozpocząć nowy czat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Zadaj to samo pytanie GPT-4, Claude i Gemini. Uruchom ten sam prompt w FLUX, Imagen i Stable Diffusion. Wybierz zwycięzcę — nie domyślną opcję."
 
-#: src/features/chat/thread/composer.tsx:258
+#: src/features/chat/thread/composer.tsx:259
 msgid "Ask me anything..."
 msgstr "Zapytaj o cokolwiek..."
 
@@ -3537,7 +3541,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
 #: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:120
+#: src/features/chat/thread/composer.tsx:121
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -8139,7 +8143,7 @@ msgstr "Debata"
 msgid "Debate rounds"
 msgstr "Rundy debaty"
 
-#: src/features/chat/thread/composer.tsx:264
+#: src/features/chat/thread/composer.tsx:265
 msgid "Debug an error or review my code..."
 msgstr "Zdebuguj błąd lub przejrzyj mój kod..."
 
@@ -9431,7 +9435,7 @@ msgstr "Szkic"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Napisz list motywacyjny na stanowisko inżyniera oprogramowania"
 
-#: src/features/chat/thread/composer.tsx:262
+#: src/features/chat/thread/composer.tsx:263
 msgid "Draft an email, report, or essay..."
 msgstr "Napisz e-mail, raport lub esej..."
 
@@ -11115,7 +11119,7 @@ msgstr "Wygasa: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Wkrótce wygasa"
 
-#: src/features/chat/thread/composer.tsx:265
+#: src/features/chat/thread/composer.tsx:266
 msgid "Explain a concept in simple terms..."
 msgstr "Wyjaśnij pojęcie prostymi słowami..."
 
@@ -13409,7 +13413,7 @@ msgstr "Wygeneruj obraz z promptu tekstowego i powiększ go 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Wygeneruj obraz przytulnego kącika do czytania z ciepłym światłem i roślinami."
 
-#: src/features/chat/thread/composer.tsx:267
+#: src/features/chat/thread/composer.tsx:268
 msgid "Generate an image or video..."
 msgstr "Wygeneruj obraz lub wideo..."
 
@@ -13761,9 +13765,21 @@ msgstr "Przejdź do sejfu"
 msgid "Go to your pages"
 msgstr "Przejdź do swoich stron"
 
+#: src/features/chat/goal/composer-goal.tsx:73
+#: src/features/chat/goal/goal-notes.tsx:70
+#: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:325
 msgid "Goal"
 msgstr "Cel"
+
+#: src/features/chat/goal/goal-notes.tsx:63
+msgid "Goal met"
+msgstr ""
+
+#. placeholder {0}: verdict.reason
+#: src/features/chat/goal/goal-notes.tsx:115
+msgid "Goal met: {0}"
+msgstr ""
 
 #: src/features/tasks/components/task-card.tsx:68
 msgid "Goal: {goalTitle}"
@@ -14724,7 +14740,7 @@ msgstr "ilustracja"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:118
+#: src/features/chat/thread/composer.tsx:119
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:40
@@ -18764,7 +18780,7 @@ msgstr "Neore - platforma do generowania tekstu, wideo, audio, obrazów i dokume
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:655
+#: src/features/chat/thread/composer.tsx:656
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore może popełniać błędy. Sprawdzaj ważne informacje."
 
@@ -19065,7 +19081,7 @@ msgstr "Następne dopasowanie"
 msgid "Next option"
 msgstr "Następna opcja"
 
-#: src/features/chat/thread/composer.tsx:228
+#: src/features/chat/thread/composer.tsx:229
 msgid "Next output mode"
 msgstr "Następny tryb wyjścia"
 
@@ -21151,7 +21167,7 @@ msgstr "Pliki wyjściowe"
 msgid "Output Format"
 msgstr "Format wyjściowy"
 
-#: src/features/chat/thread/composer.tsx:239
+#: src/features/chat/thread/composer.tsx:240
 msgid "Output Mode"
 msgstr "Tryb wyjścia"
 
@@ -21840,7 +21856,7 @@ msgstr ""
 msgid "plan"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:261
+#: src/features/chat/thread/composer.tsx:262
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Zaplanuj projekt lub wymyśl pomysły..."
 
@@ -22347,7 +22363,7 @@ msgstr "Poprzednie dopasowanie"
 msgid "Previous option"
 msgstr "Poprzednia opcja"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Previous output mode"
 msgstr "Poprzedni tryb wyjścia"
 
@@ -24192,7 +24208,7 @@ msgstr "Badanie"
 msgid "Research a topic"
 msgstr "Zbadaj temat"
 
-#: src/features/chat/thread/composer.tsx:263
+#: src/features/chat/thread/composer.tsx:264
 msgid "Research a topic in depth..."
 msgstr "Zbadaj temat dogłębnie..."
 
@@ -24462,6 +24478,10 @@ msgstr "Zapoznaj się z naszą polityką prywatności i praktykami przetwarzania
 msgid "Review requested on a pull request"
 msgstr ""
 
+#: src/features/chat/goal/composer-goal.tsx:87
+msgid "Review rounds: {maxRounds}. Change"
+msgstr ""
+
 #. placeholder {0}: task.title
 #: src/features/home/components/home-page.tsx:163
 msgid "Review task: {0}"
@@ -24474,6 +24494,10 @@ msgstr "Przejrzyj zoptymalizowany prompt poniżej. Możesz go zastosować, aby z
 #: src/features/skills/components/skill-form-dialog.tsx:354
 msgid "review, security"
 msgstr "recenzja, bezpieczeństwo"
+
+#: src/features/chat/goal/goal-notes.tsx:134
+msgid "Review: {reason}"
+msgstr ""
 
 #: src/features/tasks/components/task-detail-dialog.tsx:242
 msgid "Reviewer note"
@@ -24612,6 +24636,12 @@ msgstr "Kąt obrotu"
 msgid "Rotation: {rotation}°"
 msgstr "Obrót: {rotation}°"
 
+#. placeholder {0}: verdict.round
+#. placeholder {1}: verdict.reason
+#: src/features/chat/goal/goal-notes.tsx:115
+msgid "Round {0}: not yet. {1}"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:515
 msgid "Route, track, <0>optimize.</0>"
 msgstr "Kieruj, śledź, <0>optymalizuj.</0>"
@@ -24709,6 +24739,10 @@ msgstr "Uruchom to w PowerShell."
 #: src/features/evals/components/model-comparison.tsx:76
 msgid "Run this dataset against at least two models to compare them."
 msgstr "Uruchom ten zbiór danych na co najmniej dwóch modelach, aby je porównać."
+
+#: src/features/chat/goal/composer-goal.tsx:78
+msgid "Run until done"
+msgstr ""
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:29
 msgid "Run workflow"
@@ -27290,6 +27324,7 @@ msgid "Stocks"
 msgstr "Akcje giełdowe"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
+#: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:310
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:323
@@ -27346,6 +27381,7 @@ msgstr "Przestań płacić za sześć narzędzi AI."
 msgid "Stop reading"
 msgstr "Zatrzymaj czytanie"
 
+#: src/features/chat/goal/goal-notes.tsx:65
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 msgid "Stopped"
@@ -27354,6 +27390,38 @@ msgstr ""
 #: src/features/evals/components/run-status.tsx:14
 msgid "Stopped at budget"
 msgstr "Zatrzymano po osiągnięciu budżetu"
+
+#: src/features/chat/goal/goal-notes.tsx:41
+msgid "Stopped by you"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:23
+msgid "Stopped: cost limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:26
+msgid "Stopped: daily limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:38
+msgid "Stopped: goals are not available in group chats"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:32
+msgid "Stopped: round limit"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:29
+msgid "Stopped: the review could not run"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:44
+msgid "Stopped: the run failed"
+msgstr ""
+
+#: src/features/chat/goal/goal-notes.tsx:35
+msgid "Stopped: you sent a new message"
+msgstr ""
 
 #: src/features/local-models/lib/local-errors.ts:166
 msgid "Stopped."
@@ -27828,7 +27896,7 @@ msgstr ""
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:260
+#: src/features/chat/thread/composer.tsx:261
 msgid "Summarize a document or URL..."
 msgstr "Podsumuj dokument lub URL..."
 
@@ -28446,7 +28514,7 @@ msgstr "tekst"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:117
+#: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:44
@@ -28607,7 +28675,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:304
+#: src/features/chat/thread/message-list.tsx:313
 msgid "That message could not be found in this conversation."
 msgstr "Nie znaleziono tej wiadomości w tej rozmowie."
 
@@ -28916,6 +28984,10 @@ msgstr "Najbardziej wymagające zadania inżynierii oprogramowania wymagające m
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Najbardziej wymagające zadania wymagające najnowszych czołowych możliwości i rozumowania od Anthropic"
 
+#: src/features/chat/goal/composer-goal.tsx:98
+msgid "The most review rounds before it stops"
+msgstr ""
+
 #. placeholder {0}: data.user.email
 #: src/routes/auth/extension.tsx:135
 msgid "The Neore app on this device will be signed in as {0}. Only continue if you started signing in from the app just now."
@@ -29195,7 +29267,7 @@ msgstr "Ta przeglądarka nie może tu odbierać powiadomień push."
 msgid "This chat is locked"
 msgstr ""
 
-#: src/features/chat/thread/composer.tsx:584
+#: src/features/chat/thread/composer.tsx:585
 msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 msgstr ""
 
@@ -30058,7 +30130,7 @@ msgstr "Przekształcony obraz"
 msgid "Translate"
 msgstr "Przetłumacz"
 
-#: src/features/chat/thread/composer.tsx:266
+#: src/features/chat/thread/composer.tsx:267
 msgid "Translate text to another language..."
 msgstr "Przetłumacz tekst na inny język..."
 
@@ -30284,9 +30356,17 @@ msgstr "Turecki (Turcja)"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Zamień dowolne repozytorium GitHub w zdalny punkt końcowy MCP"
 
+#: src/features/chat/goal/composer-goal.tsx:62
+msgid "Turn off run until done"
+msgstr ""
+
 #: src/features/home/components/home-page.tsx:236
 msgid "Turn on Daily Brief"
 msgstr "Włącz Daily Brief"
+
+#: src/features/chat/goal/composer-goal.tsx:62
+msgid "Turn on run until done"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:97
 msgid "tutorial"
@@ -31603,7 +31683,7 @@ msgstr "wideo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
 #: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:119
+#: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -32526,6 +32606,11 @@ msgstr "Przepływy pracy"
 msgid "Working"
 msgstr "W toku"
 
+#. placeholder {0}: goal.maxRounds
+#: src/features/chat/goal/goal-notes.tsx:61
+msgid "Working toward the goal: round {nextRound} of {0}"
+msgstr ""
+
 #: src/features/chat/thread/streaming-placeholder.tsx:630
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
@@ -32560,7 +32645,7 @@ msgstr "Pisz długie teksty obok czatu"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Twórz długie treści w edytorze kanwy obok czatu. Przejdź od rozmowy do gotowego dokumentu bez zmieniania narzędzi."
 
-#: src/features/chat/thread/composer.tsx:259
+#: src/features/chat/thread/composer.tsx:260
 msgid "Write some code for me..."
 msgstr "Napisz dla mnie kod..."
 
@@ -33002,6 +33087,10 @@ msgstr "Twoja wiadomość:"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:261
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
+msgstr ""
+
+#: src/features/chat/goal/composer-goal.tsx:79
+msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr ""
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:264
