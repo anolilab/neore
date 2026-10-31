@@ -34,7 +34,7 @@
 //! as it did before the sandbox. That grants nothing: the policy alone decides what the server may read, so a
 //! working directory outside the shared folders is a name it can stat, not a folder it can open.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -657,6 +657,9 @@ impl Drop for McpProcess {
 /// Running servers by name.
 pub struct McpManager {
     processes: Mutex<HashMap<String, Arc<Mutex<McpProcess>>>>,
+    /// Private folders `forget` is deleting. No server starts into one until it is gone; kept apart from the
+    /// process table so `forget` need not hold that table while it waits for a call in flight.
+    retiring: Mutex<HashSet<String>>,
     /// Where each server's private folder lives (`prepare_state`): always under the app's own data folder, never a
     /// shared temp folder, which is why there is no `Default`.
     state_root: PathBuf,
@@ -666,6 +669,7 @@ impl McpManager {
     pub fn new(state_root: PathBuf) -> Self {
         McpManager {
             processes: Mutex::default(),
+            retiring: Mutex::default(),
             state_root,
         }
     }
@@ -677,6 +681,16 @@ impl McpManager {
     ) -> Result<Arc<Mutex<McpProcess>>, String> {
         let mut processes = self.processes.lock().unwrap();
 
+        self.process_locked(&mut processes, config, policy)
+    }
+
+    /// [`Self::process`] with the table already held, so a caller can check and replace in one step.
+    fn process_locked(
+        &self,
+        processes: &mut HashMap<String, Arc<Mutex<McpProcess>>>,
+        config: &McpServerConfig,
+        policy: Option<&Policy>,
+    ) -> Result<Arc<Mutex<McpProcess>>, String> {
         if let Some(process) = processes.get(&config.name) {
             let mut running = process.lock().unwrap();
 
@@ -695,6 +709,16 @@ impl McpManager {
             stale.lock().unwrap_or_else(PoisonError::into_inner).kill();
         }
 
+        // A server being forgotten does not start again into the folder that is being deleted.
+        if self
+            .retiring
+            .lock()
+            .unwrap()
+            .contains(&sanitize(&config.name))
+        {
+            return Err(format!("MCP server {} is being removed", config.name));
+        }
+
         let process = Arc::new(Mutex::new(McpProcess::spawn(
             config,
             policy,
@@ -705,9 +729,13 @@ impl McpManager {
         Ok(process)
     }
 
-    /// Runs `work` against the server, restarting it ONCE if it died in between. `policy` is what the
-    /// server is confined by (`None` = the user allowed it unsandboxed); it is part of what makes a
+    /// Runs `work` against the server, restarting it ONCE if it died on its own in between. `policy` is
+    /// what the server is confined by (`None` = the user allowed it unsandboxed); it is part of what makes a
     /// running process the right one, so every caller that starts servers goes through here.
+    ///
+    /// A server that was taken out of the table meanwhile (forgotten, stopped, replaced) is not restarted: the
+    /// call's config is what the settings said when it began, and bringing it back would undo the removal. The
+    /// check and the restart happen under one hold of the table, so a removal cannot slip in between.
     pub fn with<T>(
         &self,
         config: &McpServerConfig,
@@ -717,16 +745,24 @@ impl McpManager {
         let process = self.process(config, policy)?;
         let first = work(&mut process.lock().unwrap());
 
-        match first {
-            Err(_) if !process.lock().unwrap().is_alive() => {
-                self.processes.lock().unwrap().remove(&config.name);
-                let process = self.process(config, policy)?;
-                let mut guard = process.lock().unwrap();
-
-                work(&mut guard)
-            }
-            result => result,
+        if first.is_ok() || process.lock().unwrap().is_alive() {
+            return first;
         }
+
+        let restarted = {
+            let mut processes = self.processes.lock().unwrap();
+
+            match processes.get(&config.name) {
+                Some(current) if Arc::ptr_eq(current, &process) => {
+                    processes.remove(&config.name);
+                    self.process_locked(&mut processes, config, policy)?
+                }
+                _ => return first,
+            }
+        };
+        let mut guard = restarted.lock().unwrap();
+
+        work(&mut guard)
     }
 
     /// Stops idle servers and servers no longer configured.
@@ -758,31 +794,49 @@ impl McpManager {
 
     /// Stops these servers and deletes their private folders (caches included).
     ///
-    /// The process table stays locked throughout, so no server starts into a folder this is about to delete. Each
-    /// server is killed through its own lock, which a call in flight holds: the folder goes only after the
-    /// server has stopped. A folder belongs to a name's sanitized form (`old-name` and `old_name` share one), so
-    /// every running server under that folder is stopped, not just the one named.
+    /// The servers leave the process table, and their folders are marked retiring, in one hold of the table, so no
+    /// server starts into a folder this is about to delete. The table is then released before each server is killed
+    /// through its own lock, which a call in flight holds for up to its timeout: other servers keep working
+    /// meanwhile. A folder goes only after its servers have stopped, and is unmarked after. A folder belongs to a
+    /// name's sanitized form (`old-name` and `old_name` share one), so every running server under that folder is
+    /// stopped, not just the one named.
     pub fn forget(&self, names: &[String]) {
-        let mut processes = self.processes.lock().unwrap();
+        let folders: HashSet<String> = names.iter().map(|name| sanitize(name)).collect();
+        let removed: Vec<Arc<Mutex<McpProcess>>> = {
+            let mut processes = self.processes.lock().unwrap();
 
-        for name in names {
-            let folder = sanitize(name);
+            self.retiring
+                .lock()
+                .unwrap()
+                .extend(folders.iter().cloned());
+
             let sharing: Vec<String> = processes
                 .keys()
-                .filter(|running| sanitize(running) == folder)
+                .filter(|running| folders.contains(&sanitize(running)))
                 .cloned()
                 .collect();
 
-            for running in sharing {
-                if let Some(process) = processes.remove(&running) {
-                    process
-                        .lock()
-                        .unwrap_or_else(PoisonError::into_inner)
-                        .kill();
-                }
-            }
+            sharing
+                .iter()
+                .filter_map(|running| processes.remove(running))
+                .collect()
+        };
 
+        for process in removed {
+            process
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .kill();
+        }
+
+        for folder in &folders {
             let _ = std::fs::remove_dir_all(self.state_root.join(folder));
+        }
+
+        let mut retiring = self.retiring.lock().unwrap();
+
+        for folder in &folders {
+            retiring.remove(folder);
         }
     }
 }
@@ -1234,6 +1288,63 @@ sleep 1"#
         assert!(manager.process(&broken, None).is_err());
         assert!(manager.processes.lock().unwrap().is_empty());
         assert!(pid_gone(pid), "the old server is still running");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_forgotten_server_is_not_restarted_by_a_call_in_flight_and_others_keep_working() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::{Duration, Instant};
+
+        let root = temp_root("forget-in-flight");
+        let manager = Arc::new(McpManager::new(root.clone()));
+        let entered = Arc::new(AtomicBool::new(false));
+
+        // A call on `gone` holds its server's lock, then the server dies under it.
+        let call = {
+            let (manager, entered) = (manager.clone(), entered.clone());
+
+            std::thread::spawn(move || {
+                manager.with(&idle_server("gone"), None, |process| {
+                    entered.store(true, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(400));
+                    process.kill();
+
+                    Err::<(), String>("died".into())
+                })
+            })
+        };
+
+        assert!(wait_until(|| entered.load(Ordering::SeqCst)));
+
+        // The settings drop it while the call is still running.
+        let forget = {
+            let manager = manager.clone();
+
+            std::thread::spawn(move || manager.forget(&["gone".to_owned()]))
+        };
+
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Another server starts and answers while `forget` waits for the call: the table is not held.
+        let started = Instant::now();
+
+        manager
+            .with(&idle_server("other"), None, |_| Ok(()))
+            .unwrap();
+        assert!(
+            started.elapsed() < Duration::from_millis(300),
+            "another server waited for forget"
+        );
+
+        assert!(call.join().unwrap().is_err());
+        forget.join().unwrap();
+
+        // The call's error came back; the forgotten server was not started again.
+        let running: Vec<String> = manager.processes.lock().unwrap().keys().cloned().collect();
+
+        assert_eq!(running, vec!["other".to_owned()]);
+        assert!(manager.retiring.lock().unwrap().is_empty());
     }
 
     #[cfg(unix)]
