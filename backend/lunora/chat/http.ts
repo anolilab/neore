@@ -484,10 +484,10 @@ const runChatStartOnShard = async (
         contentType = "video";
     }
 
-    if (body.goal !== undefined) {
-        // The gateway forwards the body unread, so the goal's shape and size are checked here.
-        const goalText = typeof body.goal?.text === "string" ? body.goal.text.trim() : "";
+    // The gateway forwards the body unread, so the goal's shape and size are checked here.
+    const goalText = typeof body.goal?.text === "string" ? body.goal.text.trim() : "";
 
+    if (body.goal !== undefined) {
         if (contentType !== "text" || isAnonymous || body.regenerate) {
             return Response.json({ error: "A goal needs a signed-in account and a new text message." }, { status: 400 });
         }
@@ -859,7 +859,8 @@ const runChatStartOnShard = async (
                 ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
                 ...(activeOrganizationId && { organizationId: activeOrganizationId }),
                 promptMessageId: messageId,
-                text: body.goal.text,
+                // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
+                text: goalText,
                 threadId: threadId as Id<"threads">,
                 userId,
             });

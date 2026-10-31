@@ -2406,6 +2406,21 @@
       "to": "table:persistentStreams"
     },
     {
+      "from": "function:chat_goals_internal:endGoalsForThread",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
+      "from": "function:chat_goals_internal:getActiveGoalForRun",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
+      "from": "function:chat_goals_internal:otherGoalHoldsThread",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
       "from": "function:chat_goals_internal:reapStalledGoals",
       "kind": "read",
       "to": "table:threadGoals"
@@ -18051,49 +18066,49 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 874,
+      "line": 875,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 995,
+      "line": 996,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1010,
+      "line": 1011,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1019,
+      "line": 1020,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1140,
+      "line": 1141,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1148,
+      "line": 1149,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1289,
+      "line": 1290,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1315,
+      "line": 1316,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {

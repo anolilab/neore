@@ -21396,6 +21396,12 @@
               "optional": false,
               "unique": false
             },
+            "promptMessageId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "reasoningEffort": {
               "kind": "number",
               "nullable": false,

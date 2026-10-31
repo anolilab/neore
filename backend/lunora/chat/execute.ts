@@ -431,8 +431,9 @@ export const runStreamingAgent = internalAction
 
             // Record the approval snapshot (if the run paused) and flush. The
             // snapshot is what the continuation rebuilds this exact run from.
-            // A locked chat's content is never mined into memory.
-            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
+            // A locked chat's content is never mined into memory, and neither is a goal round's instruction: it is the
+            // goal plus a reviewer's note drawn from tool output, not something the user said.
+            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread) && sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
 
             let paused: boolean;
 
@@ -449,6 +450,7 @@ export const runStreamingAgent = internalAction
                         // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
                         memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                         model,
+                        promptMessageId: messageId,
                         reasoningEffort: threadReasoningEffort,
                         researchDepth: effectiveResearchDepth,
                         searchMode: effectiveSearchMode,

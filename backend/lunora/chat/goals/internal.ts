@@ -22,6 +22,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { candidatesOnActivePath } from "../../agent/branch-rows";
+import { isThreadLocked } from "../../lib/thread-lock";
 import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
 import { computeTaint } from "../../devices/lib/taint";
@@ -57,7 +58,17 @@ const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string;
 
     const stream = await ctx.db.get(run.streamId);
 
-    return stream?.messageId;
+    if (!stream) {
+        return undefined;
+    }
+
+    // An approval continuation's stream is keyed on the approval id; the paused run's prompt is in its snapshot.
+    const approval = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
+        .first();
+
+    return approval?.config.promptMessageId ?? stream.messageId;
 };
 
 /**
@@ -173,9 +184,8 @@ export const getActiveGoalForRun = internalQuery
     })
     .output(v.union(v.object({ goalId: v.id("threadGoals"), round: v.number() }), v.null()))
     .query(async ({ args, ctx }) => {
-        // A continuation names its run by stream; the stream's `messageId` is the prompt row the run answers.
-        const stream = args.streamId === undefined ? null : await ctx.db.get(args.streamId);
-        const messageId = args.messageId ?? stream?.messageId;
+        // A continuation names its run by stream; `runPromptId` finds the prompt row the run answers.
+        const messageId = await runPromptId(ctx, args);
 
         if (messageId === undefined) {
             return null;
@@ -272,7 +282,11 @@ export const roundTranscript = internalQuery
             .take(ROUND_ROWS_SCAN);
         const prompt = recent.findIndex((row) => row._id === goal.promptMessageId);
         // Newest first; the round is everything newer than its prompt (all of it, if the scan did not reach the prompt).
-        const round = prompt === -1 ? recent : recent.slice(0, prompt);
+        const scanned = prompt === -1 ? recent : recent.slice(0, prompt);
+        // Only the branch on display: a branch the user left must not reach the reviewer (or its taint, cost or last row).
+        const thread = await ctx.db.get(goal.threadId);
+        const onPath = thread?.activeLeafMessageId ? await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, scanned) : undefined;
+        const round = onPath ? scanned.filter((row) => onPath.has(row._id as string)) : scanned;
         const rows = round.toReversed().filter((row) => (row.message as { role?: string } | undefined)?.role !== "user");
         // The round's prompt row carries the taint of every round before it (the reviewer's note), which nothing in this round may drop.
         const taintRows = prompt === -1 ? round : recent.slice(0, prompt + 1);
@@ -355,6 +369,11 @@ export const recordGoalVerdict = internalMutation
 
         const thread = await ctx.db.get(goal.threadId);
 
+        // Locking a chat stops its goal: no further round reads it, writes into it or sends it to the reviewer.
+        if (thread && isThreadLocked(thread)) {
+            return await end("stopped", "user");
+        }
+
         // The user switched branch, or edited, while the review ran: the verdict is about a reply nobody is looking at, so it
         // neither counts as a win nor opens a round on a branch that is not shown.
         if (thread?.activeLeafMessageId && args.lastMessage) {
@@ -412,6 +431,8 @@ export const recordGoalVerdict = internalMutation
                 contentType: "text",
                 ...(config.customSystemPrompt !== undefined && { customSystemPrompt: config.customSystemPrompt }),
                 ...(config.enabledFeatures !== undefined && { enabledFeatures: config.enabledFeatures }),
+                // The MCP servers the user picked for the goal, for every round, not only the first.
+                ...(config.mcpServerNames !== undefined && { mcpServerNames: config.mcpServerNames }),
                 model: config.model,
                 ...(config.reasoningEffort !== undefined && { reasoningEffort: config.reasoningEffort }),
                 ...(config.researchDepth !== undefined && { researchDepth: config.researchDepth }),

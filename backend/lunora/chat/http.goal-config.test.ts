@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
-    return { calls: [] as string[], charged: 0 };
+    return { calls: [] as string[], charged: 0, startGoalArgs: undefined as Record<string, unknown> | undefined };
 });
 
 vi.mock("../auth/lib/helper", () => {
@@ -39,8 +39,21 @@ const { runChatStart } = await import("./http");
 const context = () =>
     ({
         auth: { getIdentity: async () => null },
-        runMutation: async (reference: { __lunoraRef?: string }) => {
-            state.calls.push(String(reference.__lunoraRef ?? reference));
+        runMutation: async (reference: { __lunoraRef?: string }, args?: Record<string, unknown>) => {
+            const name = String(reference.__lunoraRef ?? reference);
+
+            state.calls.push(name);
+
+            if (name.includes("startGoal")) {
+                state.startGoalArgs = args;
+
+                return { error: "stop here", ok: false };
+            }
+
+            // The saved prompt row, so the request reaches the goal.
+            if (name.includes("addMessages")) {
+                return { messages: [{ _id: "message-1" }] };
+            }
 
             return null;
         },
@@ -64,6 +77,7 @@ const context = () =>
 beforeEach(() => {
     state.calls = [];
     state.charged = 0;
+    state.startGoalArgs = undefined;
 });
 
 describe("a goal's settings", () => {
@@ -101,5 +115,15 @@ describe("a goal's settings", () => {
 
         expect(response.status).toBe(400);
         expect(state.charged).toBe(0);
+    });
+
+    it("hand the trimmed goal on, so a padded goal within the limit cannot fail after the charge", async () => {
+        await runChatStart(
+            context(),
+            { goal: { text: `  Ship the report${" ".repeat(2100)}` }, model: "anthropic/claude-sonnet-4", prompt: "Make the report", threadId: "thread-1" },
+            "secret",
+        ).catch(() => null);
+
+        expect(state.startGoalArgs?.text).toBe("Ship the report");
     });
 });

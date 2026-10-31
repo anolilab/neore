@@ -331,6 +331,45 @@ describe("ending a goal from outside", () => {
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
     });
 
+    it("recognises an approval continuation as its goal's own round, through the paused run's snapshot", async () => {
+        const goalId = await start();
+        const streamId = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "approval-1",
+                config: {
+                    autoMediaEnrichment: false,
+                    mcpServerNames: [],
+                    model: "test-model",
+                    promptMessageId: promptId,
+                    researchDepth: "balanced",
+                    searchMode: "auto",
+                    shouldAutoContinue: true,
+                    toolNames: [],
+                },
+                createdAt: Date.now(),
+                status: "approved",
+                threadId,
+                userId: OWNER,
+            });
+
+            // `resumeClaimedRun` keys the continuation's stream on the approval id.
+            return String(
+                await ctx.db.insert("persistentStreams", {
+                    createdAt: Date.now(),
+                    messageId: "approval-1",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                }),
+            );
+        });
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getActiveGoalForRun, { streamId, threadId }))).toMatchObject({ goalId });
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(otherGoalHoldsThread, { streamId, threadId }))).toBe(false);
+        expect(await run(endGoalsForThread, { reason: "error", streamId, threadId })).toBe(true);
+    });
+
     it("failGoalReview ends the goal and gives the thread back, once", async () => {
         const goalId = await start();
 
@@ -385,6 +424,32 @@ describe("the instruction that opens the next round", () => {
     });
 });
 
+describe("the next round's settings", () => {
+    it("keep the MCP servers the user picked for the goal", async () => {
+        const goalId = await start({ config: { ...CONFIG, mcpServerNames: ["github"] } });
+
+        expect(await review(goalId, 1, { met: false })).toMatchObject({ outcome: "continue" });
+
+        const [stream] = await harness.run(async (ctx: any) => await ctx.db.query("persistentStreams").collect());
+
+        expect(stream.streamingConfig.mcpServerNames).toEqual(["github"]);
+    });
+});
+
+describe("a chat locked while its goal runs", () => {
+    it("ends the goal instead of starting another round", async () => {
+        const goalId = await start();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+
+        const outcome = await review(goalId, 1, { met: false });
+
+        expect(outcome).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "user" });
+        expect(await count("persistentStreams")).toBe(0);
+    });
+});
+
 describe("a round whose branch was left", () => {
     /** The round's reply, then a sibling reply the user switched to. Returns both ids. */
     const branch = async (): Promise<{ other: string; reply: string }> =>
@@ -400,6 +465,22 @@ describe("a round whose branch was left", () => {
     const setLeaf = async (leaf: string): Promise<void> => {
         await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: leaf }));
     };
+
+    it("shows the reviewer only the branch on display", async () => {
+        const { other, reply } = await branch();
+        const goalId = await start();
+        const transcript = async (): Promise<string> => (await harness.run(async (ctx: any) => await ctx.runQuery(roundTranscript, { goalId }))).transcript;
+
+        await setLeaf(reply);
+
+        expect(await transcript()).toContain("Draft.");
+        expect(await transcript()).not.toContain("Other.");
+
+        await setLeaf(other);
+
+        expect(await transcript()).toContain("Other.");
+        expect(await transcript()).not.toContain("Draft.");
+    });
 
     it("continues while the displayed branch still ends at the round's last row", async () => {
         const { reply } = await branch();
