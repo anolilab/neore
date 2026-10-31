@@ -32,6 +32,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import { CinemaPanel } from "@/features/chat/components/cinema-studio";
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -775,6 +776,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             <div className="grow" />
+                            {composerMode === "text" && validThreadId && !minimal && <ComposerAskAside />}
                             <ComposerContextCount />
                             <ComposerLanguageSelector />
                         </>
