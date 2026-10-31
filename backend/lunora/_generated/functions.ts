@@ -677,6 +677,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_goals_internal:endGoalsForThread": lunora_chat_goals_internal_56.endGoalsForThread as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:failGoalReview": lunora_chat_goals_internal_56.failGoalReview as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:getActiveGoalForRun": lunora_chat_goals_internal_56.getActiveGoalForRun as unknown as RegisteredLunoraFunction,
+    "chat_goals_internal:otherGoalHoldsThread": lunora_chat_goals_internal_56.otherGoalHoldsThread as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:reapStalledGoals": lunora_chat_goals_internal_56.reapStalledGoals as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:recordGoalVerdict": lunora_chat_goals_internal_56.recordGoalVerdict as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:roundTranscript": lunora_chat_goals_internal_56.roundTranscript as unknown as RegisteredLunoraFunction,
@@ -8400,9 +8401,10 @@ export interface Caller {
                 chargeGoalRound: (args: { userId: string }) => Promise<boolean>;
                 claimGoalRound: (args: { goalId: Id<"threadGoals">; round: number }) => Promise<{ text: string; threadId: Id<"threads">; userId: string } | null>;
                 closeStaleGoalRound: (args: { messageId: string; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
-                endGoalsForThread: (args: { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; threadId: Id<"threads"> }) => Promise<boolean>;
+                endGoalsForThread: (args: { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }) => Promise<boolean>;
                 failGoalReview: (args: { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }) => Promise<boolean>;
                 getActiveGoalForRun: (args: { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }) => Promise<{ goalId: Id<"threadGoals">; round: number } | null>;
+                otherGoalHoldsThread: (args: { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }) => Promise<boolean>;
                 reapStalledGoals: (args?: {}) => Promise<number>;
                 recordGoalVerdict: (args: { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }) => Promise<{ next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
                 roundTranscript: (args: { goalId: Id<"threadGoals"> }) => Promise<{ costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
@@ -10104,6 +10106,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                 endGoalsForThread: (args) => callRegistered(context, "chat_goals_internal:endGoalsForThread", args),
                 failGoalReview: (args) => callRegistered(context, "chat_goals_internal:failGoalReview", args),
                 getActiveGoalForRun: (args) => callRegistered(context, "chat_goals_internal:getActiveGoalForRun", args),
+                otherGoalHoldsThread: (args) => callRegistered(context, "chat_goals_internal:otherGoalHoldsThread", args),
                 reapStalledGoals: (args) => callRegistered(context, "chat_goals_internal:reapStalledGoals", args),
                 recordGoalVerdict: (args) => callRegistered(context, "chat_goals_internal:recordGoalVerdict", args),
                 roundTranscript: (args) => callRegistered(context, "chat_goals_internal:roundTranscript", args),

@@ -24,7 +24,7 @@ import { streamLogger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
-import { handOffToGoalReview, noteGoalPaused } from "./goals/execute";
+import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
@@ -480,7 +480,8 @@ export const runStreamingAgent = internalAction
             // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
             if (paused) {
                 await noteGoalPaused(ctx, threadId);
-            } else if (await handOffToGoalReview(ctx, threadId, { messageId })) {
+            } else if ((await handOffToGoalReview(ctx, threadId, { messageId })) || (await otherGoalHoldsThread(ctx, threadId, { messageId }))) {
+                // Its goal reviews it next; or its goal was replaced while it ran and the new goal owns the thread now.
                 return;
             }
 
@@ -587,7 +588,10 @@ export const continueAfterToolApproval = internalAction
             // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
             if (resumed.paused) {
                 await noteGoalPaused(ctx, threadId);
-            } else if (!resumed.stopped && (await handOffToGoalReview(ctx, threadId, { streamId }))) {
+            } else if (
+                (!resumed.stopped && (await handOffToGoalReview(ctx, threadId, { streamId }))) ||
+                (await otherGoalHoldsThread(ctx, threadId, { streamId }))
+            ) {
                 return;
             }
 

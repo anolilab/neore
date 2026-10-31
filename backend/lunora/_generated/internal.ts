@@ -348,9 +348,10 @@ export interface InternalApiTypes {
                 chargeGoalRound: FunctionReference<"mutation", { userId: string }, boolean>;
                 claimGoalRound: FunctionReference<"mutation", { goalId: Id<"threadGoals">; round: number }, { text: string; threadId: Id<"threads">; userId: string } | null>;
                 closeStaleGoalRound: FunctionReference<"mutation", { messageId: string; streamId: Id<"persistentStreams"> }, boolean>;
-                endGoalsForThread: FunctionReference<"mutation", { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; threadId: Id<"threads"> }, boolean>;
+                endGoalsForThread: FunctionReference<"mutation", { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, boolean>;
                 failGoalReview: FunctionReference<"mutation", { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }, boolean>;
                 getActiveGoalForRun: FunctionReference<"query", { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, { goalId: Id<"threadGoals">; round: number } | null>;
+                otherGoalHoldsThread: FunctionReference<"query", { messageId?: string; streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, boolean>;
                 reapStalledGoals: FunctionReference<"mutation", {}, number>;
                 recordGoalVerdict: FunctionReference<"mutation", { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }, { next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
                 roundTranscript: FunctionReference<"query", { goalId: Id<"threadGoals"> }, { costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
@@ -1414,6 +1415,7 @@ export const internal: InternalApiTypes = {
                 endGoalsForThread: { __lunoraRef: "chat_goals_internal:endGoalsForThread" },
                 failGoalReview: { __lunoraRef: "chat_goals_internal:failGoalReview" },
                 getActiveGoalForRun: { __lunoraRef: "chat_goals_internal:getActiveGoalForRun" },
+                otherGoalHoldsThread: { __lunoraRef: "chat_goals_internal:otherGoalHoldsThread" },
                 reapStalledGoals: { __lunoraRef: "chat_goals_internal:reapStalledGoals" },
                 recordGoalVerdict: { __lunoraRef: "chat_goals_internal:recordGoalVerdict" },
                 roundTranscript: { __lunoraRef: "chat_goals_internal:roundTranscript" },

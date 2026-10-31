@@ -15,6 +15,7 @@ import {
     claimGoalRound,
     closeStaleGoalRound,
     endGoalsForThread,
+    otherGoalHoldsThread,
     failGoalReview,
     getActiveGoalForRun,
     GOAL_STALL_MS,
@@ -286,6 +287,48 @@ describe("ending a goal from outside", () => {
         expect(await run(endGoalsForThread, { reason: "superseded", threadId })).toBe(true);
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "superseded" });
         expect(await run(endGoalsForThread, { reason: "user", threadId })).toBe(false);
+    });
+
+    it("ends only the goal a failed run belonged to, never one that replaced it", async () => {
+        const streamFor = async (messageId: string): Promise<string> =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("persistentStreams", {
+                        createdAt: Date.now(),
+                        messageId,
+                        status: "streaming",
+                        streamingConfig: { contentType: "text", model: "test-model" },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+        const goalId = await start();
+        // A run that answered an earlier prompt, before this goal replaced the one it belonged to.
+        const earlier = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "An older request", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "An older request",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        const oldStream = await streamFor(String(earlier));
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(otherGoalHoldsThread, { streamId: oldStream, threadId }))).toBe(true);
+        expect(await run(endGoalsForThread, { reason: "error", streamId: oldStream, threadId })).toBe(false);
+        expect(await read(goalId)).toMatchObject({ status: "active" });
+
+        // The goal's own run holds nothing against itself, and its failure ends it.
+        const ownStream = await streamFor(promptId);
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(otherGoalHoldsThread, { streamId: ownStream, threadId }))).toBe(false);
+        expect(await run(endGoalsForThread, { reason: "error", streamId: ownStream, threadId })).toBe(true);
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
     });
 
     it("failGoalReview ends the goal and gives the thread back, once", async () => {

@@ -19,7 +19,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { candidatesOnActivePath } from "../../agent/branch-rows";
 import { addMessagesHandler } from "../../agent/messages";
@@ -49,10 +49,54 @@ const ROUND_ROWS_SCAN = 200;
 
 const ANONYMOUS_GOALS_MESSAGE = "Goals need an account. Sign up to run until a goal is met.";
 
+/** The prompt row a run answers: named directly, or read off the run's stream. */
+const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string; streamId?: Id<"persistentStreams"> }): Promise<string | undefined> => {
+    if (run.messageId !== undefined || run.streamId === undefined) {
+        return run.messageId;
+    }
+
+    const stream = await ctx.db.get(run.streamId);
+
+    return stream?.messageId;
+};
+
+/**
+ * Ends the thread's active goals. Given a run (`streamId`), only the goal whose current round that run answers:
+ * a run that fails after its goal was replaced must not stop the replacement.
+ */
 export const endGoalsForThread = internalMutation
-    .input({ reason: vGoalStopReason, threadId: v.id("threads") })
+    .input({ reason: vGoalStopReason, streamId: v.optional(v.id("persistentStreams")), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await endActiveGoals(ctx, args.threadId, args.reason));
+    .mutation(async ({ args, ctx }) => {
+        if (args.streamId === undefined) {
+            return await endActiveGoals(ctx, args.threadId, args.reason);
+        }
+
+        const promptId = await runPromptId(ctx, { streamId: args.streamId });
+        const goals = await activeGoalsOf(ctx, args.threadId);
+        const own = goals.filter((goal) => promptId !== undefined && goal.promptMessageId === promptId);
+
+        for (const goal of own) {
+            await stopGoalRow(ctx, goal, args.reason);
+        }
+
+        return own.length > 0;
+    });
+
+/**
+ * Whether an active goal other than the run's own holds the thread. Such a goal owns the thread's status and
+ * follow-ups, so a run that ends after its own goal was replaced leaves both alone.
+ */
+export const otherGoalHoldsThread = internalQuery
+    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), streamId: v.optional(v.id("persistentStreams")), threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const promptId = await runPromptId(ctx, args);
+
+        const goals = await activeGoalsOf(ctx, args.threadId);
+
+        return goals.some((goal) => goal.promptMessageId !== promptId);
+    });
 
 export const startGoal = internalMutation
     .input({

@@ -47,6 +47,22 @@ export const handOffToGoalReview = async (
 };
 
 /**
+ * Whether the thread belongs to a goal this run is not part of (its own goal was replaced while it ran). The
+ * caller then leaves the thread's status and follow-ups to that goal.
+ */
+export const otherGoalHoldsThread = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    threadId: string,
+    run: { messageId: string } | { streamId: string },
+): Promise<boolean> =>
+    await ctx
+        .runQuery(internal.chat.goals.internal.otherGoalHoldsThread, {
+            ...("messageId" in run ? { messageId: run.messageId } : { streamId: run.streamId as never }),
+            threadId: threadId as never,
+        })
+        .catch(() => false);
+
+/**
  * Called when a run that may belong to a goal pauses on a tool approval: the goal is waiting on a person,
  * so its stall clock restarts (the sweep would otherwise end it an hour later).
  */

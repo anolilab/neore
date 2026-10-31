@@ -9982,6 +9982,13 @@
       "module": "chat"
     },
     {
+      "detail": "query",
+      "id": "function:chat_goals_internal:otherGoalHoldsThread",
+      "kind": "function",
+      "name": "chat.goals.internal.otherGoalHoldsThread",
+      "module": "chat"
+    },
+    {
       "detail": "mutation",
       "id": "function:chat_goals_internal:reapStalledGoals",
       "kind": "function",
@@ -17786,7 +17793,13 @@
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 54,
+      "line": 58,
+      "reason": "\"otherGoalHoldsThread\" is not a registered function"
+    },
+    {
+      "file": "chat/goals/execute",
+      "kind": "call",
+      "line": 70,
       "reason": "\"noteGoalPaused\" is not a registered function"
     },
     {
@@ -18248,7 +18261,13 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1187,
+      "line": 1180,
+      "reason": "\"failRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 1194,
       "reason": "\"failRun\" is not a registered function"
     },
     {
