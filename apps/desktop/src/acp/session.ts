@@ -37,6 +37,18 @@ const MAX_PROMPT_LENGTH = 100_000;
 /** After a cancel, how long the agent has to answer its prompt before the process is ended. */
 const DEFAULT_CANCEL_GRACE_MS = 5000;
 
+/**
+ * After a cancelled turn, how long the next queued prompt waits. An update carries no turn id, so output an agent
+ * flushes after answering the cancelled prompt would otherwise land in the next turn; in this window it stays with
+ * the cancelled one.
+ */
+const DEFAULT_CANCEL_SETTLE_MS = 500;
+
+const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
 
@@ -70,6 +82,7 @@ export interface SessionOptions {
     agentLabel: string;
     appVersion: string;
     cancelGraceMs?: number;
+    cancelSettleMs?: number;
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
@@ -258,7 +271,7 @@ export class AgentSession {
         return true;
     }
 
-    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
+    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later, unless `keepQueue` (a stop by turn id) keeps them to run after it. */
     public cancel(options: { keepQueue?: boolean } = {}): void {
         if (this.status !== "busy" || this.current === undefined) {
             this.dropQueue();
@@ -407,6 +420,8 @@ export class AgentSession {
             return;
         }
 
+        const cancelled = this.cancelRequested || reason === "cancelled";
+
         turn.end(this.cancelRequested ? "cancelled" : reason);
         this.observeUnanswered(turn);
 
@@ -424,10 +439,12 @@ export class AgentSession {
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
 
-        if (delivered === undefined) {
+        const settled = cancelled && this.queue.length > 0 ? sleep(this.options.cancelSettleMs ?? DEFAULT_CANCEL_SETTLE_MS) : undefined;
+
+        if (delivered === undefined && settled === undefined) {
             this.startNext();
         } else {
-            this.startNextAfter(delivered);
+            this.startNextAfter(delivered, settled);
         }
     }
 
@@ -448,8 +465,8 @@ export class AgentSession {
         }
     }
 
-    private async startNextAfter(delivered: Promise<void>): Promise<void> {
-        await delivered;
+    private async startNextAfter(...waits: (Promise<void> | undefined)[]): Promise<void> {
+        await Promise.all(waits);
         this.startNext();
     }
 

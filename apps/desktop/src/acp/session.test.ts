@@ -200,6 +200,25 @@ describe("the end of a turn", () => {
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
     });
 
+    it("keeps a cancelled turn's late output out of the queued turn that runs next", async () => {
+        const { agent, session } = await setup();
+
+        session.send("first", "turn-1");
+        await expect.poll(() => agent.written.length).toBe(3);
+        session.send("second", "turn-2");
+        session.cancelTurn("turn-1");
+
+        agent.say({ id: agent.written[2].id as number, result: { stopReason: "cancelled" } });
+        // An agent that flushes the cancelled turn's output a moment after it answered the prompt.
+        await sleep(30);
+        agent.say(update("agent_message_chunk", { content: { text: "late from the first", type: "text" } }));
+        await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
+
+        const [, second] = session.snapshot().turns;
+
+        expect(second?.text ?? "").not.toContain("late from the first");
+    });
+
     it("is not undone by an update that arrives after the response", async () => {
         const { agent, session } = await setup();
 

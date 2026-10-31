@@ -611,6 +611,24 @@ describe("stopping a host run", () => {
     });
 });
 
+describe("a Stop in the worker's own thread", () => {
+    it("leaves the thread running when the stop starts the next queued message", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+        const { stopActiveForThread } = await import("../chat/streaming/persistent/library");
+
+        await run(async (context) => await context.runMutation(stopActiveForThread, { threadId: receipt.workerId }));
+
+        expect(await runRow(queued.runId)).toMatchObject({ status: "running" });
+        // The next message is live on the computer, so the thread must keep its Stop control.
+        expect((await get(receipt.workerId)).status).toBe("running");
+    });
+});
+
 describe("a worker's thread that is deleted", () => {
     it("ends the run that was waiting on its turn", async () => {
         const device = await pairedDevice();
