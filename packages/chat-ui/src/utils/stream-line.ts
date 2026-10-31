@@ -11,6 +11,20 @@ export interface StreamSpeaker {
 }
 
 /**
+ * A running MCP tool call's latest progress report, or its end (`ended`). `total` is absent when the
+ * server does not know it (an indeterminate task). Untrusted values are clamped by {@link readToolProgress}.
+ */
+export interface ToolProgressEvent {
+    ended?: true;
+    message?: string;
+    progress?: number;
+    serverName: string;
+    toolCallId: string;
+    toolName: string;
+    total?: number;
+}
+
+/**
  * One NDJSON line relayed by the gateway's `/v1/stream`: a `persistentChunks` row
  * (`{ text, reasoning?, speaker?, restart? }`), an error object, or — for a request sent
  * with `resumable: true` — the resume marker
@@ -24,7 +38,7 @@ export type ParsedStreamLine =
     | { kind: "end" }
     | { error: unknown; kind: "error" }
     /** `restart`: the reply continues below a message the user steered into it; what came before is saved. */
-    | { kind: "chunk"; reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string }
+    | { kind: "chunk"; reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string; toolProgress?: ToolProgressEvent }
     | { kind: "resume"; lastChunkIndex: number };
 
 const readSpeaker = (value: unknown): StreamSpeaker | undefined => {
@@ -35,6 +49,65 @@ const readSpeaker = (value: unknown): StreamSpeaker | undefined => {
     const { name, skillId } = value as { name?: unknown; skillId?: unknown };
 
     return typeof name === "string" && typeof skillId === "string" ? { name, skillId } : undefined;
+};
+
+const MAX_MESSAGE_LENGTH = 200;
+
+/**
+ * The server's status message made safe to show: line breaks and tabs become a space, other control characters and
+ * the bidi overrides and isolates (which can reorder the text around them) are removed, and it is cut by code point.
+ */
+const sanitizeMessage = (message: string): string =>
+    [
+        // Cut first, so a huge message costs no more to clean than a short one.
+        ...message
+            .slice(0, MAX_MESSAGE_LENGTH * 8)
+            .replaceAll(/[\t\n\r]+/gu, " ")
+            .replaceAll(/[\p{Cc}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu, "")
+            .trim(),
+    ]
+        .slice(0, MAX_MESSAGE_LENGTH)
+        .join("");
+
+/** A `toolProgress` field off the wire, or `undefined` when it is not one. The numbers and text are the server's: clamped here. */
+export const readToolProgress = (value: unknown): ToolProgressEvent | undefined => {
+    if (typeof value !== "object" || value === null) {
+        return undefined;
+    }
+
+    const { ended, message, progress, serverName, toolCallId, toolName, total } = value as {
+        ended?: unknown;
+        message?: unknown;
+        progress?: unknown;
+        serverName?: unknown;
+        toolCallId?: unknown;
+        toolName?: unknown;
+        total?: unknown;
+    };
+
+    if (typeof toolCallId !== "string" || toolCallId === "" || typeof serverName !== "string" || typeof toolName !== "string") {
+        return undefined;
+    }
+
+    // The names come from the MCP server: cleaned like its message, so they cannot reorder or hide text in the row.
+    const event = { serverName: sanitizeMessage(serverName), toolCallId, toolName: sanitizeMessage(toolName) };
+
+    if (ended === true) {
+        return { ...event, ended: true };
+    }
+
+    if (typeof progress !== "number" || !Number.isFinite(progress) || progress < 0) {
+        return undefined;
+    }
+
+    const text = typeof message === "string" ? sanitizeMessage(message) : "";
+
+    return {
+        ...event,
+        ...(text && { message: text }),
+        progress,
+        ...(typeof total === "number" && Number.isFinite(total) && total > 0 && { total }),
+    };
 };
 
 /**
@@ -61,8 +134,18 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
         restart,
         speaker: rawSpeaker,
         text,
+        toolProgress: rawToolProgress,
         type,
-    } = parsed as { error?: unknown; lastChunkIndex?: unknown; reasoning?: unknown; restart?: unknown; speaker?: unknown; text?: unknown; type?: unknown };
+    } = parsed as {
+        error?: unknown;
+        lastChunkIndex?: unknown;
+        reasoning?: unknown;
+        restart?: unknown;
+        speaker?: unknown;
+        text?: unknown;
+        toolProgress?: unknown;
+        type?: unknown;
+    };
 
     if (error) {
         return { error, kind: "error" };
@@ -77,6 +160,7 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
     }
 
     const speaker = readSpeaker(rawSpeaker);
+    const toolProgress = readToolProgress(rawToolProgress);
 
     return {
         kind: "chunk",
@@ -84,5 +168,6 @@ export const parseStreamLine = (line: string): ParsedStreamLine => {
         ...(restart === true && { restart: true as const }),
         ...(speaker && { speaker }),
         text: typeof text === "string" ? text : "",
+        ...(toolProgress && { toolProgress }),
     };
 };

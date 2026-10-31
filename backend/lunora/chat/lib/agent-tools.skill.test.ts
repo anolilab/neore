@@ -47,10 +47,14 @@ let mcpTools: {
 /** The servers `getMCPTools` was last asked to connect to. */
 let requestedServers: { connectorSlug?: string; name: string }[] = [];
 
+/** The options `getMCPTools` was last given. */
+let requestedOptions: { progress?: unknown } | undefined;
+
 vi.mock("./mcp-tools", () => {
     return {
-        getMCPTools: async (servers: { connectorSlug?: string; name: string }[]) => {
+        getMCPTools: async (servers: { connectorSlug?: string; name: string }[], options?: { progress?: unknown }) => {
             requestedServers = servers;
+            requestedOptions = options;
 
             return { clients: [], errors: [], ...mcpTools };
         },
@@ -88,6 +92,23 @@ beforeEach(() => {
     mcpTools = { descriptors: new Map(), tools: {} };
     connectorServers = [];
     requestedServers = [];
+    requestedOptions = undefined;
+});
+
+describe("buildAgentTools MCP progress", () => {
+    const sink = vi.fn();
+
+    it("hands the progress sink to the MCP tools of an interactive run", async () => {
+        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", searchMode: "web", userId: "user" });
+
+        expect(requestedOptions?.progress).toBe(sink);
+    });
+
+    it("relays none for a run an outside agent started, whose event mapping drops progress chunks", async () => {
+        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", origin: "outside_agent", searchMode: "web", userId: "user" });
+
+        expect(requestedOptions?.progress).toBeUndefined();
+    });
 });
 
 describe("buildAgentTools with a skill", () => {
