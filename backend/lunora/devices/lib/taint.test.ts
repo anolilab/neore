@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildGoalContinuationPrompt } from "../../chat/goals/logic";
 import { computeTaint, mergeTaint, taintOfTool } from "./taint";
 
 describe("taintOfTool", () => {
@@ -51,6 +52,20 @@ describe("computeTaint", () => {
 
     it("treats a missing message list as clean", () => {
         expect(computeTaint(undefined)).toEqual([]);
+    });
+
+    it("carries what a goal round read onto the instruction that opens the next one", () => {
+        const text = buildGoalContinuationPrompt({ goal: "g", reason: "r", taintedBy: ["mcp", "web"] });
+
+        expect(computeTaint([{ content: [{ text, type: "text" }], role: "user" }])).toEqual(["web", "mcp"]);
+        expect(computeTaint([{ content: text, role: "user" }])).toEqual(["web", "mcp"]);
+    });
+
+    it("reads only known sources from a note, and not from an assistant message", () => {
+        const text = buildGoalContinuationPrompt({ goal: "g", reason: "r", taintedBy: ["bogus", "device"] });
+
+        expect(computeTaint([{ content: text, role: "user" }])).toEqual(["device"]);
+        expect(computeTaint([{ content: text, role: "assistant" }])).toEqual([]);
     });
 });
 

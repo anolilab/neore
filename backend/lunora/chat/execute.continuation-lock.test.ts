@@ -21,7 +21,12 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 // The resume itself is the model run; the test is about the lock gate and the stream's end state.
 vi.mock("./lib/agent-run", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("./lib/agent-run")>()), resumeApprovedRun: vi.fn(async () => undefined) };
+    return {
+        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        resumeApprovedRun: vi.fn(async () => {
+            return { lastMessageId: undefined, paused: false, stopped: false };
+        }),
+    };
 });
 
 const OWNER = "owner-1";
@@ -40,6 +45,7 @@ const config = {
 
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 });
