@@ -62,6 +62,7 @@ const OTHER_MODEL = "google/gemini-2.0-flash-001";
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const NOT_THE_OWNER = /owner/u;
+const TOO_MANY = /Too many/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -189,6 +190,53 @@ const acpSends = async (): Promise<string[]> => {
     const sent = await rows("deviceCalls", { toolName: "acp_send" });
 
     return sent.map((call) => (JSON.parse(call.input) as { text: string }).text);
+};
+
+/** A tool result the thread's model read at `order`, between two turns (a tool row sits after the reply that asked for it). */
+const addToolResult = async (threadId: string, order: number, toolName: string) =>
+    await run(
+        async (ctx) =>
+            await ctx.db.insert("messages", {
+                message: { content: [{ output: { type: "text", value: "page text" }, toolCallId: "call-1", toolName, type: "tool-result" }], role: "tool" },
+                order,
+                status: "success",
+                stepOrder: 2,
+                threadId,
+                tool: true,
+                userId: ownerId,
+            }),
+    );
+
+/** The computer reports the turn it was sent as finished, which frees the session for the next prompt. */
+const finishSentTurn = async (device: Device, threadId: string) => {
+    const [call] = (await rows("deviceCalls", { toolName: "acp_send" })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
+    const { sessionId, turnId } = JSON.parse(call?.input as string) as { sessionId: string; turnId: string };
+
+    await run(
+        async (ctx) =>
+            await ctx.runMutation(applyHostEvents, {
+                deviceId: device.deviceId,
+                events: [
+                    { kind: "turn_start", text: "x" },
+                    { kind: "turn_end", reason: "finished" },
+                ],
+                firstSeq: 0,
+                sessionId,
+                threadId,
+                turnId,
+            }),
+    );
+};
+
+/** The taint an `acp_send` was signed with: the stored list and the one inside the signed envelope, which must agree. */
+const sendTaints = async (): Promise<string[][]> => {
+    const sent = (await rows("deviceCalls", { toolName: "acp_send" })).toSorted((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+
+    return sent.map((call) => {
+        expect((JSON.parse(call.envelope) as { taintedBy: string[] }).taintedBy).toEqual(call.taintedBy);
+
+        return call.taintedBy as string[];
+    });
 };
 
 /** The computer's agent opens the session a switch queued, as its `session_open` does. */
@@ -479,6 +527,75 @@ describe("host to cloud", () => {
     });
 });
 
+describe("what a takeover carries into a command on the computer", () => {
+    it("signs the source thread's taint onto every prompt sent to the agent that took over", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await addToolResult(source, 1, "webSearch");
+
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+        expect((await sendText(forked, "now fix the failing test")).outcome).toBe("sent");
+        await finishSentTurn(device, forked);
+        expect((await sendText(forked, "and the next one")).outcome).toBe("sent");
+
+        expect(await sendTaints()).toEqual([["web"], ["web"]]);
+    });
+
+    it("signs none for a source that read nothing untrusted", async () => {
+        const device = await pairedDevice(ownerId);
+        const { forkedThreadId } = await switchTo(await cloudThread(), hostTarget(device));
+
+        await openStartedSession(device, forkedThreadId as string);
+        expect((await sendText(forkedThreadId as string, "go")).outcome).toBe("sent");
+
+        expect(await sendTaints()).toEqual([[]]);
+    });
+
+    it("keeps what a thread read when the next agent takes over from the one before it", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await addToolResult(source, 1, "mcp_notes_read");
+
+        const { forkedThreadId } = await switchTo(source, hostTarget(device, CLAUDE));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+        await converse(forked, 1, 40, 5);
+        await switchTo(forked, hostTarget(device, CODEX));
+        await openStartedSession(device, forked);
+        expect((await sendText(forked, "carry on")).outcome).toBe("sent");
+
+        // The first agent's own commands read pages and files that are in none of this thread's rows: the list says so too.
+        expect(await sendTaints()).toEqual([["web", "mcp", "device"]]);
+    });
+});
+
+describe("the session id of a switch", () => {
+    it("is its own for each thread, so one clientId on two threads makes two sessions", async () => {
+        const device = await pairedDevice(ownerId);
+        const sourceA = await cloudThread();
+        const sourceB = await cloudThread();
+        const first = await switchTo(sourceA, hostTarget(device), ownerId, "shared-id");
+        const second = await switchTo(sourceB, hostTarget(device), ownerId, "shared-id");
+
+        expect(second.forkedThreadId).not.toBe(first.forkedThreadId);
+
+        const sessions = await rows("acpSessions");
+
+        expect(sessions).toHaveLength(2);
+        expect(new Set(sessions.map((session) => session.hostSessionId)).size).toBe(2);
+
+        // A repeat of either click is answered with its own thread.
+        expect((await switchTo(sourceA, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(first.forkedThreadId);
+        expect((await switchTo(sourceB, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(second.forkedThreadId);
+    });
+});
+
 describe("what a client is sent of a divider", () => {
     it("names a coding agent by its labels alone, and leaves the handoff and the ids off", async () => {
         const device = await pairedDevice(ownerId);
@@ -545,7 +662,7 @@ describe("what a switch may target", () => {
 
         // The ten starts a minute allows are spent.
         await run(async (ctx) => await checkRateLimit(ctx, "hosts/start:free", { count: 10, key: ownerId }));
-        await expect(switchTo(source, hostTarget(device))).rejects.toThrow(/Too many/u);
+        await expect(switchTo(source, hostTarget(device))).rejects.toThrow(TOO_MANY);
     });
 
     it("is the owner's alone", async () => {

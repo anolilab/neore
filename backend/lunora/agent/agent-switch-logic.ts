@@ -52,7 +52,8 @@ export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
  * thread (a public copy of it included).
  */
 export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
-    const { from, handoff: _handoff, to, ...rest } = part;
+    const { from, to, ...withHandoff } = part;
+    const rest = Object.fromEntries(Object.entries(withHandoff).filter(([key]) => key !== "handoff")) as Omit<AgentSwitchPart, "from" | "handoff" | "to">;
     const labelsOf = (agent: SwitchAgentRef) =>
         agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
 

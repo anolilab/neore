@@ -33,6 +33,7 @@ import { collectHandoffSource } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
+import { HOST_HANDOFF_TAINT, threadPathTaint } from "../agent/thread-summary-taint";
 import { getUser } from "../auth/lib/better-auth-queries";
 import {
     AGENT_SWITCH_CLAIM_TTL_MS,
@@ -50,6 +51,7 @@ import {
 } from "../chat/agent-switch";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
 import { isDeviceOnline } from "../devices/lib/state";
+import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
@@ -168,7 +170,7 @@ const forkOfEarlierClick = async (
     args: { claimedAt: number; clientId: string; target: ResolvedTarget; thread: Doc<"threads">; userId: string },
 ): Promise<string | undefined> => {
     if (args.target.kind === "host") {
-        const hostSessionId = await webSessionId(args.userId, args.clientId, "switch");
+        const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.thread._id });
         const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: args.target.device._id, hostSessionId } });
 
         return first?.threadId as string | undefined;
@@ -270,7 +272,8 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     }
 
     const handoff = await handoffFor(ctx, thread, leaf, target);
-    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, now, target, thread, to, userId: args.userId });
+    const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
+    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, now, taintedBy, target, thread, to, userId: args.userId });
 
     if (!(await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
         // Another click took it between the check and here: this transaction's writes go with the throw.
@@ -282,12 +285,25 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     return result;
 };
 
+/**
+ * What the agent that takes over has been handed that came from outside: it can run commands on the computer, so every
+ * prompt it is sent is signed with it (`/hosts/send`). From a cloud thread that is what the thread read; from another
+ * agent it is what that agent carried plus the pages and files it read on the computer, which are in none of this
+ * thread's rows (as `HOST_HANDOFF_TAINT` says for the way back).
+ */
+const takeoverTaint = async (
+    ctx: MutationCtx,
+    args: { current: { session?: Session }; fromHost: boolean; leaf: Doc<"messages">; thread: Doc<"threads"> },
+): Promise<DeviceTaintSource[]> =>
+    args.fromHost ? mergeTaint(args.current.session?.taintedBy, HOST_HANDOFF_TAINT) : await threadPathTaint(ctx, args.thread._id, args.leaf);
+
 interface WriteArgs {
     clientId: string;
     current: { agent: SwitchAgentRef; session?: Session };
     handoff: string;
     leaf: Doc<"messages">;
     now: number;
+    taintedBy: DeviceTaintSource[];
     target: ResolvedTarget;
     thread: Doc<"threads">;
     to: SwitchAgentRef;
@@ -295,11 +311,24 @@ interface WriteArgs {
 }
 
 /** Throws the refusal an `acp_start` the computer cannot take is, so the transaction's writes are rolled back. */
-const startOn = async (ctx: MutationCtx, args: { clientId: string; device: Device; now: number; offer: Offer; threadId: Id<"threads">; userId: string }) => {
-    const hostSessionId = await webSessionId(args.userId, args.clientId, "switch");
+const startOn = async (
+    ctx: MutationCtx,
+    args: {
+        clientId: string;
+        device: Device;
+        now: number;
+        offer: Offer;
+        /** The thread the click was made on, which keys the session id; the session itself opens in `threadId`. */
+        sourceThreadId: Id<"threads">;
+        taintedBy: DeviceTaintSource[];
+        threadId: Id<"threads">;
+        userId: string;
+    },
+) => {
+    const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.sourceThreadId });
     const call = await startHostSessionIn(
         ctx,
-        { device: args.device, hostSessionId, offer: args.offer, threadId: args.threadId, userId: args.userId },
+        { device: args.device, hostSessionId, offer: args.offer, taintedBy: args.taintedBy, threadId: args.threadId, userId: args.userId },
         args.now,
     );
 
@@ -309,12 +338,21 @@ const startOn = async (ctx: MutationCtx, args: { clientId: string; device: Devic
 };
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
-    const { current, handoff, leaf, now, target, thread, to, userId } = args;
+    const { current, handoff, leaf, now, taintedBy, target, thread, to, userId } = args;
     const part = { from: current.agent, mode: "portable" as const, startMessageId: leaf._id, to, ...(handoff && { handoff }) };
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.
     if (target.kind === "host" && isHostRunThread(thread)) {
-        await startOn(ctx, { clientId: args.clientId, device: target.device, now, offer: target.offer, threadId: thread._id, userId });
+        await startOn(ctx, {
+            clientId: args.clientId,
+            device: target.device,
+            now,
+            offer: target.offer,
+            sourceThreadId: thread._id,
+            taintedBy,
+            threadId: thread._id,
+            userId,
+        });
 
         if (current.session && current.session.status !== "ended") {
             await ctx.db.patch(current.session._id, { status: "ended", updatedAt: now });
@@ -366,7 +404,16 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
               });
 
     if (target.kind === "host") {
-        await startOn(ctx, { clientId: args.clientId, device: target.device, now, offer: target.offer, threadId: forkId, userId });
+        await startOn(ctx, {
+            clientId: args.clientId,
+            device: target.device,
+            now,
+            offer: target.offer,
+            sourceThreadId: thread._id,
+            taintedBy,
+            threadId: forkId,
+            userId,
+        });
     }
 
     await insertFirstDivider(ctx, { forkId, from: current.agent, handoff, to, userId });
@@ -387,7 +434,7 @@ export const commitHostSwitch = internalMutation
         target: vSwitchTarget,
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({

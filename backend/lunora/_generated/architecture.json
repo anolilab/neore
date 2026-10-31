@@ -17427,7 +17427,7 @@
     {
       "file": "acp/lib/start",
       "kind": "write",
-      "line": 28,
+      "line": 42,
       "reason": "\"startHostSessionIn\" is not a registered function"
     },
     {
@@ -17445,13 +17445,13 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 218,
+      "line": 220,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 320,
+      "line": 358,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
@@ -18303,7 +18303,7 @@
     {
       "file": "agent/thread-summary-taint",
       "kind": "read",
-      "line": 18,
+      "line": 19,
       "reason": "\"threadSummaryTaint\" is not a registered function"
     },
     {
@@ -20121,19 +20121,19 @@
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 73,
+      "line": 83,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "write",
-      "line": 103,
+      "line": 113,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
       "file": "devices/lib/acp-call",
       "kind": "schedule",
-      "line": 105,
+      "line": 115,
       "reason": "\"createAcpCall\" is not a registered function"
     },
     {
