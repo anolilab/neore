@@ -22222,6 +22222,15 @@
                       },
                       "type": "array"
                     },
+                    "grants": {
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
                     "overrides": {
                       "additionalProperties": {
                         "anyOf": [
@@ -22247,6 +22256,7 @@
                   },
                   "required": [
                     "builtIn",
+                    "grants",
                     "overrides"
                   ],
                   "type": "object"
@@ -22426,6 +22436,14 @@
                           {
                             "const": "always",
                             "type": "string"
+                          },
+                          {
+                            "const": "hour",
+                            "type": "string"
+                          },
+                          {
+                            "const": "today",
+                            "type": "string"
                           }
                         ]
                       },
@@ -22498,6 +22516,67 @@
           }
         },
         "summary": "mutation: chat_tool_permissions:respondToToolApproval",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_tool_permissions:revokeToolPermissionGrant": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_tool_permissions:revokeToolPermissionGrant` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_tool_permissions:revokeToolPermissionGrant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_tool_permissions:revokeToolPermissionGrant",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_tool_permissions:revokeToolPermissionGrant",
         "tags": [
           "chat"
         ],

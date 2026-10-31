@@ -7,7 +7,8 @@
  * Built-ins come from a query; MCP tools need a live connection to enumerate, so
  * they come from an action and load separately. Overrides are written one key at
  * a time (`setToolPermission`), and "Reset" removes the override so the tool
- * falls back to its default.
+ * falls back to its default. Tools allowed for an hour or for today
+ * (`respondToToolApproval`) are listed with their expiry and can be revoked early.
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -21,7 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -43,13 +44,15 @@ interface ToolRowData {
 }
 
 interface ToolRowProps {
+    /** A time-boxed allow is running for this tool: choosing its current mode must still end it. */
+    hasGrant: boolean;
     isSaving: boolean;
     onChange: (key: string, mode: Mode | null) => void;
     override: Mode | undefined;
     tool: ToolRowData;
 }
 
-const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
+const ToolRow: FC<ToolRowProps> = ({ hasGrant, isSaving, onChange, override, tool }) => {
     const { t } = useLingui();
     const nameId = useId();
     const effective = override ?? tool.defaultMode;
@@ -74,10 +77,12 @@ const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
                     aria-labelledby={nameId}
                     disabled={isSaving}
                     onValueChange={(value) => {
-                        const next = value?.[0];
+                        // Clicking the pressed mode clears the group's value; with an allow running it is still a choice.
+                        const next = value?.[0] ?? (hasGrant ? effective : undefined);
 
-                        if (isMode(next) && next !== effective) {
-                            onChange(tool.key, next);
+                        if (isMode(next) && (next !== effective || hasGrant)) {
+                            // Choosing the default again resets rather than pinning it as a custom setting.
+                            onChange(tool.key, override === undefined && next === tool.defaultMode ? null : next);
                         }
                     }}
                     size="sm"
@@ -109,6 +114,7 @@ const ToolRow: FC<ToolRowProps> = ({ isSaving, onChange, override, tool }) => {
 interface ToolGroupProps {
     description?: string;
     error?: string | null;
+    grants: Record<string, number>;
     isSaving: boolean;
     onChange: (key: string, mode: Mode | null) => void;
     overrides: Record<string, Mode>;
@@ -116,7 +122,7 @@ interface ToolGroupProps {
     tools: ToolRowData[];
 }
 
-const ToolGroup: FC<ToolGroupProps> = ({ description, error, isSaving, onChange, overrides, title, tools }) => {
+const ToolGroup: FC<ToolGroupProps> = ({ description, error, grants, isSaving, onChange, overrides, title, tools }) => {
     const { t } = useLingui();
 
     return (
@@ -134,11 +140,83 @@ const ToolGroup: FC<ToolGroupProps> = ({ description, error, isSaving, onChange,
                 {!error && tools.length === 0 && <p className="text-muted-foreground text-sm">{t`No tools.`}</p>}
                 <ul className="divide-y">
                     {tools.map((tool) => (
-                        <ToolRow isSaving={isSaving} key={tool.key} onChange={onChange} override={overrides[tool.key]} tool={tool} />
+                        <ToolRow
+                            hasGrant={grants[tool.key] !== undefined}
+                            isSaving={isSaving}
+                            key={tool.key}
+                            onChange={onChange}
+                            override={overrides[tool.key]}
+                            tool={tool}
+                        />
                     ))}
                 </ul>
             </CardContent>
         </Card>
+    );
+};
+
+/** `mcp:<server>:<tool>` / `connector:<slug>:<tool>` / `builtin:<tool>` to a name a person reads. */
+const describeGrantKey = (key: string): { server?: string; tool: string } => {
+    const [source, ...rest] = key.split(":");
+    const tool = rest.at(-1) ?? key;
+
+    return source === "builtin" || rest.length < 2 ? { tool } : { server: rest.slice(0, -1).join(":"), tool };
+};
+
+interface TimedAllowsProps {
+    grants: Record<string, number>;
+    isRevoking: boolean;
+    onRevoke: (key: string) => void;
+}
+
+const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => {
+    const { i18n, t } = useLingui();
+    // Ticks so an allow that lapses while the page is open drops off the list.
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 30_000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const active = Object.entries(grants)
+        .filter(([, expiresAt]) => expiresAt > now)
+        .toSorted(([, a], [, b]) => a - b);
+
+    if (active.length === 0) {
+        return null;
+    }
+
+    return (
+        <section aria-label={t`Allowed for a limited time`} className="space-y-2">
+            <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Allowed for a limited time`}</Heading>
+            <p className="text-muted-foreground text-sm">{t`These tools run without asking until the time shown. Revoke one to be asked again from your next message.`}</p>
+            <ul className="divide-y rounded-lg border px-4">
+                {active.map(([key, expiresAt]) => {
+                    const { server, tool } = describeGrantKey(key);
+                    const until = i18n.date(new Date(expiresAt), { dateStyle: "short", timeStyle: "short" });
+
+                    return (
+                        <li className="flex items-center justify-between gap-2 py-3" key={key}>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">{tool}</p>
+                                <p className="text-muted-foreground truncate text-xs">{server ? t`${server} · until ${until}` : t`Until ${until}`}</p>
+                            </div>
+                            <Button
+                                aria-label={t`Revoke the allow for ${tool}`}
+                                disabled={isRevoking}
+                                onClick={() => onRevoke(key)}
+                                size="sm"
+                                variant="outline"
+                            >
+                                {t`Revoke`}
+                            </Button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 };
 
@@ -159,6 +237,8 @@ const ToolPermissionsSettings: FC = () => {
 
     const { isPending: isSaving, mutate: setToolPermission } = useMutation(crpc.chat.tool_permissions.setToolPermission.mutationOptions());
 
+    const { isPending: isRevoking, mutate: revokeGrant } = useMutation(crpc.chat.tool_permissions.revokeToolPermissionGrant.mutationOptions());
+
     if (isLoading) {
         return (
             <div className="text-muted-foreground text-sm" role="status">
@@ -172,6 +252,18 @@ const ToolPermissionsSettings: FC = () => {
             { key, mode },
             {
                 onError: (error) => showError(error instanceof Error ? error : t`Failed to update tool permission`),
+                onSettled: () => {
+                    void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
+                },
+            },
+        );
+    };
+
+    const handleRevoke = (key: string) => {
+        revokeGrant(
+            { key },
+            {
+                onError: (error) => showError(error instanceof Error ? error : t`Failed to revoke the allow`),
                 onSettled: () => {
                     void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
                 },
@@ -214,12 +306,22 @@ const ToolPermissionsSettings: FC = () => {
                 </AlertDescription>
             </Alert>
 
+            <TimedAllows grants={settings?.grants ?? {}} isRevoking={isRevoking} onRevoke={handleRevoke} />
+
             <HeadingSection>
                 <section aria-label={t`Built-in tools`} className="space-y-4">
                     <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Built-in tools`}</Heading>
                     <HeadingSection>
                         {[...builtInByCategory].map(([category, tools]) => (
-                            <ToolGroup isSaving={isSaving} key={category} onChange={handleChange} overrides={overrides} title={category} tools={tools} />
+                            <ToolGroup
+                                grants={settings?.grants ?? {}}
+                                isSaving={isSaving}
+                                key={category}
+                                onChange={handleChange}
+                                overrides={overrides}
+                                title={category}
+                                tools={tools}
+                            />
                         ))}
                     </HeadingSection>
                 </section>
@@ -237,6 +339,7 @@ const ToolPermissionsSettings: FC = () => {
                             <ToolGroup
                                 description={t`MCP server`}
                                 error={server.error}
+                                grants={settings?.grants ?? {}}
                                 isSaving={isSaving}
                                 key={server.name}
                                 onChange={handleChange}
