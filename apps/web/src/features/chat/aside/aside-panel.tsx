@@ -29,7 +29,7 @@ const errorCodeOf = (error: unknown): string | undefined => {
 };
 
 /** What a failed question or add says, from the server's code (`chat/aside.ts`). */
-export const asideErrorKind = (error: unknown): "busy" | "forbidden" | "locked" | "other" | "quota" | "unavailable" => {
+const asideErrorKind = (error: unknown): "busy" | "forbidden" | "locked" | "other" | "quota" | "unavailable" => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
     const codes = new Set([code, data?.code]);
 
@@ -241,10 +241,6 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
             });
     };
 
-    const handleDismiss = (id: string) => {
-        remove(threadId, id);
-    };
-
     return (
         <section aria-labelledby={headingId} className="space-y-3 py-4 pr-2 pl-1">
             <h2 className="text-foreground text-base font-semibold" id={headingId}>{t`Side question`}</h2>
@@ -269,7 +265,7 @@ const AsidePanel: FC<{ threadId?: string }> = ({ threadId }) => {
             </p>
             <ul className="space-y-3">
                 {entries.map((entry) => (
-                    <AsideItem entry={entry} isRunning={isRunning} key={entry.id} onAdd={handleAdd} onDismiss={handleDismiss} />
+                    <AsideItem entry={entry} isRunning={isRunning} key={entry.id} onAdd={handleAdd} onDismiss={(id) => remove(threadId, id)} />
                 ))}
             </ul>
         </section>
