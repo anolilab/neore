@@ -25,8 +25,10 @@ const fetchThreadPage = async (cursor: string | null, startedAt: number): Promis
         continueCursor: data.threads.continueCursor,
         isDone: data.threads.isDone,
         // A locked thread's title is its content: it is listed, never saved to the device.
-        // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
-        lockedIds: new Set(data.threads.page.filter((thread) => thread.lockedAt !== undefined && thread.lockedAt !== null).map((thread) => thread._id as string)),
+        lockedIds: new Set(
+            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
+            data.threads.page.filter((thread) => thread.lockedAt !== undefined && thread.lockedAt !== null).map((thread) => thread._id as string),
+        ),
         rows: data.threads.page.map((thread): ThreadRow => {
             /* eslint-disable no-underscore-dangle -- `_id` and `_creationTime` are the Lunora document fields, not private ones */
             return {
@@ -45,11 +47,19 @@ const fetchThreadPage = async (cursor: string | null, startedAt: number): Promis
 /** A host or worker status line for a row; any other thread shows one only while it is running. */
 const statusLine = (thread: ThreadRow, tracked: ShownStatus | undefined, isOffline: boolean, isLive: boolean) => {
     if (tracked) {
-        return <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>{displayStatus(tracked.status, { fromCache: tracked.fromCache, isOffline, lastSeenAt: tracked.lastSeenAt })}</Text>;
+        return (
+            <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>
+                {displayStatus(tracked.status, { fromCache: tracked.fromCache, isOffline, lastSeenAt: tracked.lastSeenAt })}
+            </Text>
+        );
     }
 
     if (thread.status === "running") {
-        return <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>{displayStatus(thread.status, { fromCache: !isLive, isOffline, lastSeenAt: thread.syncedAt })}</Text>;
+        return (
+            <Text accessibilityLiveRegion="polite" style={{ fontSize: 12 }}>
+                {displayStatus(thread.status, { fromCache: !isLive, isOffline, lastSeenAt: thread.syncedAt })}
+            </Text>
+        );
     }
 
     return null;
@@ -192,7 +202,13 @@ const ThreadList = () => {
             ListHeaderComponent={(
                 <>
                     <OfflineBanner syncedAt={syncedAt} />
-                    {notice ? <Text accessibilityRole="alert" style={{ padding: 16 }}>{notice}</Text> : null}
+                    {notice
+                        ? (
+                        <Text accessibilityRole="alert" style={{ padding: 16 }}>
+                            {notice}
+                        </Text>
+                        )
+                        : null}
                     <Link asChild href="/chat/new">
                         <Pressable
                             accessibilityHint={startChat.reason}
@@ -203,6 +219,11 @@ const ThreadList = () => {
                         >
                             <Text style={{ fontWeight: "600" }}>New chat</Text>
                             {startChat.reason ? <Text style={{ fontSize: 12 }}>{startChat.reason}</Text> : null}
+                        </Pressable>
+                    </Link>
+                    <Link asChild href="/projects">
+                        <Pressable accessibilityRole="link" style={{ padding: 16 }}>
+                            <Text style={{ fontWeight: "600" }}>Projects</Text>
                         </Pressable>
                     </Link>
                 </>
