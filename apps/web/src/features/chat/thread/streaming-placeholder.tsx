@@ -21,8 +21,10 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { HOST_RUN_METADATA } from "@neore/chat-ui/utils/host-run-text";
-import type { StreamSpeaker } from "@neore/chat-ui/utils/stream-line";
+import type { StreamSpeaker, ToolProgressEvent } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
+import type { ToolProgressState } from "@neore/chat-ui/utils/tool-progress";
+import { applyToolProgress, NO_TOOL_PROGRESS, toolProgressOfBody } from "@neore/chat-ui/utils/tool-progress";
 import { Message, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -34,6 +36,7 @@ import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MessageContent from "./message-content";
+import { ToolProgressRows } from "./tool-progress-rows";
 
 /** Approximate token count from character count (4 chars ≈ 1 token). */
 const approxTokens = (text: string): number => Math.round(text.length / 4);
@@ -50,6 +53,8 @@ type HostState = "accepted" | "ended" | "received" | "running";
 type StreamBody = { hostState?: HostState; reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
 /** `restart`: steering — the reply continues below a message the user sent into it. */
 type StreamDelta = { reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string };
+/** One relayed chunk: text for the reply, or — with no text — a running MCP tool call's progress. */
+type StreamUpdate = StreamDelta & { toolProgress?: ToolProgressEvent };
 
 const STREAM_BODY_POLL_MS = 1000;
 
@@ -134,7 +139,7 @@ type StreamAttemptResult = "done" | "finished" | "failed" | "disconnected" | "re
 const attemptStream = async (
     url: URL,
     _streamId: StreamId,
-    onUpdate: (chunk: StreamDelta) => void,
+    onUpdate: (chunk: StreamUpdate) => void,
     headers: Record<string, string>,
     onFirstToken?: () => void,
     lastChunkIndex?: number,
@@ -199,7 +204,7 @@ const attemptStream = async (
 
         // Called once per relayed chunk, even an empty one: the caller counts calls
         // to resume at the right `lastChunkIndex` after a reconnect.
-        onUpdate({ reasoning: parsed.reasoning, restart: parsed.restart, speaker: parsed.speaker, text: parsed.text });
+        onUpdate({ reasoning: parsed.reasoning, restart: parsed.restart, speaker: parsed.speaker, text: parsed.text, toolProgress: parsed.toolProgress });
 
         return true;
     };
@@ -249,7 +254,7 @@ const attemptStream = async (
 export const startStreaming = async (
     url: URL,
     streamId: StreamId,
-    onUpdate: (chunk: StreamDelta) => void,
+    onUpdate: (chunk: StreamUpdate) => void,
     headers: Record<string, string>,
     onFirstToken?: () => void,
     onReconnecting?: (attempt: number) => void,
@@ -259,7 +264,7 @@ export const startStreaming = async (
     let attempt = 0;
     let chunkCount = 0;
 
-    const trackingOnUpdate = (chunk: StreamDelta) => {
+    const trackingOnUpdate = (chunk: StreamUpdate) => {
         chunkCount += 1;
         onUpdate(chunk);
     };
@@ -340,10 +345,12 @@ const useStream = (
         /** HMAC stream token for gateway auth */
         streamToken?: string;
     },
-): StreamBody & { isReconnecting?: boolean } => {
+): StreamBody & { isReconnecting?: boolean; toolProgress: ToolProgressState } => {
     const crpc = useCRPC();
     const [streamEnded, setStreamEnded] = useState<boolean | null>(null);
     const [isReconnecting, setIsReconnecting] = useState(false);
+    // The MCP tool calls running right now (newest report each). Cleared when the reply restarts or the stream ends.
+    const [toolProgress, setToolProgress] = useState<ToolProgressState>(NO_TOOL_PROGRESS);
     const streamStarted = useRef(false);
     const onFirstTokenRef = useRef(options.onFirstToken);
 
@@ -403,7 +410,22 @@ const useStream = (
 
             frameBatcherRef.current = batcher;
 
-            const appendChunk = (chunk: StreamDelta) => {
+            const appendChunk = (chunk: StreamUpdate) => {
+                // A progress report carries no text: it replaces the call's last one and is not part of the reply.
+                if (chunk.toolProgress) {
+                    const event = chunk.toolProgress;
+
+                    setToolProgress((previous) => applyToolProgress(previous, event));
+                    // Any chunk proves the stream is back, even one that carries no text.
+                    setIsReconnecting(false);
+
+                    return;
+                }
+
+                if (chunk.restart || chunk.speaker) {
+                    setToolProgress(NO_TOOL_PROGRESS);
+                }
+
                 batcher.push(chunk);
             };
 
@@ -427,17 +449,23 @@ const useStream = (
                 // The last chunks must be on screen before the stream reads as ended.
                 batcher.flush();
                 setIsReconnecting(false);
+                setToolProgress(NO_TOOL_PROGRESS);
                 setStreamEnded(success);
             })();
         }
     }, [driven, streamUrl, streamId, options?.headers, options?.streamToken]);
 
-    const body = useMemo<StreamBody & { isReconnecting?: boolean }>(() => {
+    // The calls the persisted body says are running: what is left on screen when the live stream is not the source.
+    // Query results are structurally shared, so this array keeps its identity (and the rows their memo) between polls.
+    const persistedProgress = (persistentBody as { toolProgress?: unknown } | undefined)?.toolProgress;
+    const persistedToolProgress = useMemo(() => toolProgressOfBody(persistedProgress), [persistedProgress]);
+
+    const body = useMemo<StreamBody & { isReconnecting?: boolean; toolProgress: ToolProgressState }>(() => {
         if (persistentBody) {
             // The generated return type for `getStreamBody` points at a module path that
             // does not exist in `_generated`, so it lands as an empty object here. The
             // backend returns the shape declared as `StreamBody` above.
-            return { ...(persistentBody as StreamBody), isReconnecting: false };
+            return { ...(persistentBody as StreamBody), isReconnecting: false, toolProgress: persistedToolProgress };
         }
 
         let status: StreamStatus;
@@ -459,8 +487,9 @@ const useStream = (
             speaker: streamBody.speaker,
             status: status as StreamStatus,
             text: streamBody.text,
+            toolProgress,
         };
-    }, [persistentBody, persistentReadFailed, streamBody, streamEnded, isReconnecting]);
+    }, [persistentBody, persistedToolProgress, persistentReadFailed, streamBody, streamEnded, isReconnecting, toolProgress]);
 
     return body;
 };
@@ -646,7 +675,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
     }, []);
 
     // Use the streaming hook - isDriven=true to trigger the gateway SSE connection
-    const { hostState, isReconnecting, reasoning, speaker, status, text } = useStream(sseUrl, isDriven, streamId as StreamId, {
+    const { hostState, isReconnecting, reasoning, speaker, status, text, toolProgress } = useStream(sseUrl, isDriven, streamId as StreamId, {
         onFirstToken: handleFirstToken,
         streamToken,
     });
@@ -710,6 +739,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                 <div className="message-text">
                     <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                 </div>
+                {isStreaming && <ToolProgressRows state={toolProgress} />}
                 {metricsBar}
             </div>
         );
@@ -731,6 +761,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                     <div className="message-text text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)">
                         <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                     </div>
+                    {isStreaming && <ToolProgressRows state={toolProgress} />}
                     {isStreaming && <HostStateLine state={hostState} />}
                     {metricsBar}
                 </MessageContentWrapper>

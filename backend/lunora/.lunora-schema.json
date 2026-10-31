@@ -3139,6 +3139,24 @@
           "optional": true,
           "unique": false
         },
+        "toolPermissionGrants": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "number",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "toolPermissions": {
           "kind": "record",
           "nullable": false,
@@ -5620,6 +5638,19 @@
               "literal": "\"windows\""
             }
           ]
+        },
+        "projectIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "projects"
+          }
         },
         "revokedAt": {
           "kind": "number",
@@ -18261,6 +18292,60 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "toolProgress": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "ended": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "message": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "progress": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "serverName": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "toolCallId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "toolName": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "total": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         }
       },
       "indexes": {

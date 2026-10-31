@@ -19,11 +19,20 @@ import { endHostSessionsOfDevice } from "../acp/lib/revoke";
 import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { decryptKey, encryptKey } from "../lib/encryption";
-import { ACP_CLAIM_LEASE_MS, DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
+import {
+    ACP_CLAIM_LEASE_MS,
+    DEVICE_SIGNATURE_WINDOW_MS,
+    MAX_DEVICE_OUTPUT_BYTES,
+    MAX_DEVICE_SCOPE_PROJECTS,
+    MAX_DEVICES_PER_USER,
+    MAX_MANIFEST_BYTES,
+} from "./lib/constants";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
+import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isForwardPhase } from "./lib/state";
 import { capUtf8, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
@@ -148,6 +157,12 @@ export const listDevices = authQuery
     .output(v.array(vDeviceView))
     .query(async ({ ctx }) => {
         const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER, orderBy: [{ createdAt: "asc" }], where: { userId: ctx.user.userId } });
+        // A deleted project silently drops out of a device's list.
+        const liveProjects = await filterOwnProjectIds(
+            ctx,
+            ctx.user.userId,
+            page.flatMap((device) => device.projectIds ?? []),
+        );
 
         return page.map((device) => {
             return {
@@ -158,6 +173,7 @@ export const listDevices = authQuery
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
                 ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
+                ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
                 ...(device.transport !== undefined && { transport: device.transport }),
                 ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId as string }),
             };
@@ -179,6 +195,52 @@ export const renameDevice = authMutation
         await ctx.db.patch(device._id, { name: args.name.trim() });
 
         ctx.log.event("devices.rename_device", { renamed: true });
+
+        return null;
+    });
+
+/**
+ * Where a device's tools are offered: any of the owner's chats, or only threads of the listed projects. Applies to
+ * the next turn (the tool set is built per run and re-checked when a call is created). An owner's setting for any
+ * of their devices, a server included, like a rename.
+ */
+export const setDeviceProjectScope = authMutation
+    .use(rateLimit("devices/manage"))
+    .input({
+        deviceId: v.id("devices"),
+        scope: v.union(
+            v.object({ kind: v.literal("any") }),
+            v.object({
+                kind: v.literal("projects"),
+                projectIds: v.array(v.id("projects")).check((ids) => ids.length <= MAX_DEVICE_SCOPE_PROJECTS, { message: "Too many projects" }),
+            }),
+        ),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+
+        if (!device) {
+            throw new LunoraError("NOT_FOUND", "Device not found");
+        }
+
+        let projectIds: Id<"projects">[] | undefined;
+
+        if (args.scope.kind === "projects") {
+            // Only the caller's own projects: another member's project in a shared organization is not theirs to scope by.
+            projectIds = [...new Set(args.scope.projectIds)];
+
+            const own = await filterOwnProjectIds(ctx, userId, projectIds);
+
+            if (projectIds.some((id) => !own.has(id))) {
+                throw new LunoraError("NOT_FOUND", "Project not found");
+            }
+        }
+
+        await patchRow(ctx.db, device, { projectIds });
+
+        ctx.log.event("devices.set_device_project_scope", { projects: projectIds?.length ?? null });
 
         return null;
     });

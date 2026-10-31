@@ -8,6 +8,7 @@ import { threadShardFor } from "../../../lib/thread-shard";
 import { streamLogger } from "../../../lib/logger";
 import { THREAD_LOCKED_CODE } from "../../../lib/thread-lock";
 import { MAX_LENGTH } from "../../../lib/validators";
+import type { ToolProgressChunk } from "../../lib/mcp-progress";
 import type { StreamStatus } from "./schema";
 
 /**
@@ -34,7 +35,13 @@ export const CHUNKS_MAX_WAIT_MS = (CHUNKS_MAX_READS - 1) * CHUNKS_WAIT_TICK_MS;
 const TERMINAL_STATUSES: ReadonlySet<StreamStatus> = new Set(["done", "error", "timeout"]);
 
 export interface ChunkRead {
-    chunks: { reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }[];
+    chunks: {
+        reasoning?: string;
+        restart?: boolean;
+        speaker?: { name: string; skillId: string };
+        text: string;
+        toolProgress?: ToolProgressChunk;
+    }[];
     locked: boolean;
     status: StreamStatus;
     totalChunks: number;

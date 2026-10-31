@@ -64,6 +64,8 @@ export const vDeviceView = v.object({
     lastSeenAt: v.optional(v.number()),
     name: v.string(),
     platform: vDevicePlatform,
+    /** Unset: offered in any chat. A list: only threads of these (still existing) projects; empty: nowhere. */
+    projectIds: v.optional(v.array(v.string())),
     toolNames: v.array(v.string()),
     transport: v.optional(vDeviceTransport),
     viaDeviceId: v.optional(v.string()),

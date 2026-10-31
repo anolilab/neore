@@ -30,6 +30,7 @@ import {
 
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
+import DeviceScope from "./device-scope";
 
 interface DeviceView {
     _id: string;
@@ -39,6 +40,8 @@ interface DeviceView {
     lastSeenAt?: number;
     name: string;
     platform: NativeDevicePlatform;
+    /** Unset: offered in any chat. A list: only threads of these projects (empty: nowhere). */
+    projectIds?: string[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
     transport?: "ssh";
@@ -191,6 +194,7 @@ const DeviceRow: FC<{
                 </Button>
             </div>
             <StartAgents device={device} online={online} />
+            <DeviceScope deviceId={device._id} projectIds={device.projectIds} />
             <ConfirmDialog
                 confirmLabel={t`Remove`}
                 description={t`The agent can no longer ask this device for anything. Its activity log stays until it expires.`}

@@ -781,11 +781,14 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_thread_state:snoozeThread": lunora_chat_thread_state_79.snoozeThread as unknown as RegisteredLunoraFunction,
     "chat_thread_state:unsnoozeThread": lunora_chat_thread_state_79.unsnoozeThread as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_80.getPendingToolApproval as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getToolPermissionGrantsQuery": lunora_chat_tool_permissions_80.getToolPermissionGrantsQuery as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionSettings": lunora_chat_tool_permissions_80.getToolPermissionSettings as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionsQuery": lunora_chat_tool_permissions_80.getToolPermissionsQuery as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:listMcpToolPermissions": lunora_chat_tool_permissions_80.listMcpToolPermissions as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:pruneExpiredToolPermissionGrants": lunora_chat_tool_permissions_80.pruneExpiredToolPermissionGrants as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:recordPendingToolApprovals": lunora_chat_tool_permissions_80.recordPendingToolApprovals as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:respondToToolApproval": lunora_chat_tool_permissions_80.respondToToolApproval as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:revokeToolPermissionGrant": lunora_chat_tool_permissions_80.revokeToolPermissionGrant as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:setToolPermission": lunora_chat_tool_permissions_80.setToolPermission as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:closeBrowserSession": lunora_chat_tools_browser_node_81.closeBrowserSession as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:executeBrowserAction": lunora_chat_tools_browser_node_81.executeBrowserAction as unknown as RegisteredLunoraFunction,
@@ -871,6 +874,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "devices_functions:renameDevice": lunora_devices_functions_94.renameDevice as unknown as RegisteredLunoraFunction,
     "devices_functions:reportDeviceCallProgress": lunora_devices_functions_94.reportDeviceCallProgress as unknown as RegisteredLunoraFunction,
     "devices_functions:revokeDevice": lunora_devices_functions_94.revokeDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:setDeviceProjectScope": lunora_devices_functions_94.setDeviceProjectScope as unknown as RegisteredLunoraFunction,
     "devices_functions:updateDeviceManifest": lunora_devices_functions_94.updateDeviceManifest as unknown as RegisteredLunoraFunction,
     "devices_gdpr:collectDevicesForExport": lunora_devices_gdpr_95.collectDevicesForExport as unknown as RegisteredLunoraFunction,
     "devices_gdpr:deleteUserDevices": lunora_devices_gdpr_95.deleteUserDevices as unknown as RegisteredLunoraFunction,
@@ -4154,39 +4158,6 @@ if (typeof source["streamId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "streamId": source["streamId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_streaming_persistent_library_76.addChunk.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["final"] !== "boolean") return DEFER;
-let __has1 = false;
-let __val1;
-if (source["reasoning"] !== undefined) {
-if (typeof source["reasoning"] !== "string") return DEFER;
-__val1 = source["reasoning"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["restart"] !== undefined) {
-if (typeof source["restart"] !== "boolean") return DEFER;
-__val2 = source["restart"];
-__has2 = true;
-}
-let __has4 = false;
-let __val4;
-if (source["speaker"] !== undefined) {
-if (typeof source["speaker"] !== "object" || source["speaker"] === null || Array.isArray(source["speaker"])) return DEFER;
-if (Object.getPrototypeOf(source["speaker"]) !== Object.prototype && Object.getPrototypeOf(source["speaker"]) !== null) return DEFER;
-if (typeof source["speaker"]["name"] !== "string") return DEFER;
-if (typeof source["speaker"]["skillId"] !== "string") return DEFER;
-const __obj3 = { "name": source["speaker"]["name"], "skillId": source["speaker"]["skillId"] };
-__val4 = __obj3;
-__has4 = true;
-}
-if (typeof source["streamId"] !== "string") return DEFER;
-if (typeof source["text"] !== "string") return DEFER;
-return { "final": source["final"], ...(__has1 ? { "reasoning": __val1 } : {}), ...(__has2 ? { "restart": __val2 } : {}), ...(__has4 ? { "speaker": __val4 } : {}), "streamId": source["streamId"], "text": source["text"] };
-});
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_76.claimStreamRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -4312,6 +4283,12 @@ if (typeof source["approvalId"] !== "string") return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "approvalId": source["approvalId"], "threadId": source["threadId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_chat_tool_permissions_80.getToolPermissionGrantsQuery.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_tool_permissions_80.getToolPermissionsQuery.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8605,20 +8582,20 @@ export interface Caller {
         streaming: {
             createStreamWithMessage: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<string>;
             getActiveStreamForThread: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; streamId: Id<"persistentStreams"> } | null>;
-            getStreamBody: (args: { streamId: Id<"persistentStreams">; unlockProof?: string }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
+            getStreamBody: (args: { streamId: Id<"persistentStreams">; unlockProof?: string }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
             streamRunThread: (args: { streamId: Id<"persistentStreams">; userId: string }) => Promise<({ activeAgent?: ({} & { kind: "model"; model: string; }) | undefined; activeLeafMessageId?: string | undefined; awaitingInput?: "approval" | "question" | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; hasHandoff?: boolean | undefined; lastReplyAt?: number | undefined; lastUserMessageAt?: number | undefined; lastViewedAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; runner?: "host" | undefined; snoozedUntil?: number | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "trigger" | "messenger" | "outside_agent")[]; hostDispatch: "ask"; }) | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "running" | "error" | "active" | "archived" | "abort" | "finish"; }) | null>;
             persistent: {
                 crons: {
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                 };
                 library: {
-                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }) => Promise<void>;
+                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }) => Promise<void>;
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; threadId?: string; userId?: string; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; threadId?: string; userId?: string; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "done" | "timeout" | "pending" | "error">;
-                    getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
+                    getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }>; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
                     settleStoppedRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<null>;
                     stopActiveForThread: (args: { messageId?: string; threadId: string }) => Promise<boolean>;
@@ -8644,11 +8621,14 @@ export interface Caller {
         };
         tool_permissions: {
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
-            getToolPermissionSettings: (args?: {}) => Promise<{ builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
+            getToolPermissionSettings: (args?: {}) => Promise<{ builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
+            pruneExpiredToolPermissionGrants: (args?: {}) => Promise<null>;
             recordPendingToolApprovals: (args: { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }) => Promise<null>;
-            respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
+            respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
+            revokeToolPermissionGrant: (args: { key: string }) => Promise<null>;
             setToolPermission: (args: { key: string; mode: "auto" | "ask" | "off" | null }) => Promise<null>;
         };
         tools: {
@@ -8787,13 +8767,14 @@ export interface Caller {
             getDeviceCallByToolCall: (args: { toolCallId: string }) => Promise<null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: (args: { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }) => Promise<{ paired: boolean }>;
             listDeviceCalls: (args: { deviceId?: Id<"devices">; limit?: number }) => Promise<Array<{ _id: string; claimedAt?: number; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: (args?: {}) => Promise<Array<{ _id: string; acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listDevices: (args?: {}) => Promise<Array<{ _id: string; acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; projectIds?: Array<string>; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
             listPendingDeviceCalls: (args: { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }) => Promise<Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
             registerDevice: (args: { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }) => Promise<{ deviceId: string; secret: string }>;
             releaseDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }) => Promise<null>;
             renameDevice: (args: { deviceId: Id<"devices">; name: string }) => Promise<null>;
             reportDeviceCallProgress: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ accepted: boolean }>;
             revokeDevice: (args: { deviceId: Id<"devices"> }) => Promise<null>;
+            setDeviceProjectScope: (args: { deviceId: Id<"devices">; scope: { kind: "any" } | { kind: "projects"; projectIds: Array<Id<"projects">> } }) => Promise<null>;
             updateDeviceManifest: (args: { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ toolCount: number }>;
         };
         gdpr: {
@@ -10391,11 +10372,14 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         tool_permissions: {
             getPendingToolApproval: (args) => callRegistered(context, "chat_tool_permissions:getPendingToolApproval", args),
+            getToolPermissionGrantsQuery: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionGrantsQuery", args),
             getToolPermissionSettings: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionSettings", args),
             getToolPermissionsQuery: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionsQuery", args),
             listMcpToolPermissions: (args) => callRegistered(context, "chat_tool_permissions:listMcpToolPermissions", args),
+            pruneExpiredToolPermissionGrants: (args) => callRegistered(context, "chat_tool_permissions:pruneExpiredToolPermissionGrants", args),
             recordPendingToolApprovals: (args) => callRegistered(context, "chat_tool_permissions:recordPendingToolApprovals", args),
             respondToToolApproval: (args) => callRegistered(context, "chat_tool_permissions:respondToToolApproval", args),
+            revokeToolPermissionGrant: (args) => callRegistered(context, "chat_tool_permissions:revokeToolPermissionGrant", args),
             setToolPermission: (args) => callRegistered(context, "chat_tool_permissions:setToolPermission", args),
         },
         tools: {
@@ -10541,6 +10525,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             renameDevice: (args) => callRegistered(context, "devices_functions:renameDevice", args),
             reportDeviceCallProgress: (args) => callRegistered(context, "devices_functions:reportDeviceCallProgress", args),
             revokeDevice: (args) => callRegistered(context, "devices_functions:revokeDevice", args),
+            setDeviceProjectScope: (args) => callRegistered(context, "devices_functions:setDeviceProjectScope", args),
             updateDeviceManifest: (args) => callRegistered(context, "devices_functions:updateDeviceManifest", args),
         },
         gdpr: {

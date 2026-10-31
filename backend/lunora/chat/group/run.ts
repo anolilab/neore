@@ -60,7 +60,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { pipeToPersistentChunks, type PipedStream, stopWhenStopped } from "../lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
@@ -241,6 +241,7 @@ const runSpeaker = async (
                   // The group turn runs inside the admitted stream (`runGroupTurn`, after `streamRunThread`).
                   admittedRun: true,
                   autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment,
+                  mcpProgress: toolProgressSink(ctx, turn.streamId),
                   mcpServerNames: turn.mcpServerNames,
                   model,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),

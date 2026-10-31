@@ -374,6 +374,7 @@ for a schema table that is neither policed nor listed:
 | `chat_tool_permissions.getToolPermissionSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.listMcpToolPermissions` | action | authAction + RL | aiUserPreferences | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
 | `chat_tool_permissions.respondToToolApproval` | mutation | authMutation + RL | threads | thread access (owner/grant) | ok |
+| `chat_tool_permissions.revokeToolPermissionGrant` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.setToolPermission` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_translate.translateMessage` | action | authAction + RL | actionCache | caller-scoped (ctx.user); cache key includes the caller id, text comes from the caller; guests refused; a cache miss is charged to the daily text quota, output budget scaled to the text | ok |
 | `coding_agents_execute.createPullRequest` | action | authAction + RL | codingAgentRuns | caller-scoped (ctx.user) | ok |
@@ -400,6 +401,7 @@ for a schema table that is neither policed nor listed:
 | `devices_functions.releaseDeviceCall` | mutation | authMutation + RL | deviceCalls | row.userId == caller AND row.deviceId == arg AND `viaDeviceId` == the row's (as in `claimDeviceCall`) | ok — new; unsigned, but only moves the caller's own CLAIMED call to failed |
 | `devices_functions.renameDevice` | mutation | authMutation + RL | devices | row.userId == caller | ok — new |
 | `devices_functions.revokeDevice` | mutation | authMutation + RL | devices, deviceCalls | row.userId == caller | ok — new; deletes the row and its secret, expires open calls; revoking a desktop deletes the servers it holds in the same mutation, revoking a server alone leaves the desktop |
+| `devices_functions.setDeviceProjectScope` | mutation | authMutation + RL | devices, projects | row.userId == caller (a server included, as `renameDevice`); every listed project must exist with `project.userId == caller` (another member's organization project is NOT_FOUND) | ok — new; limits where the device's tools are offered (unset = any chat); enforced server-side when the tool set is built and again in `createDeviceCall`, never by the client |
 | `devices_functions.updateDeviceManifest` | mutation | authMutation + RL | devices | row.userId == caller; HMAC of the device's secret over the manifest AND `viaDeviceId` == the row's (as in `claimDeviceCall`) | ok — new; fresh, monotonic `issuedAt`, tools re-validated |
 | `evals_functions.cancelRun` | mutation | authMutation + RL | evalRuns | owner helper | ok |
 | `evals_functions.compareModels` | query | authQuery | evalDatasets, evalRuns | owner helper; row.userId == caller | ok |

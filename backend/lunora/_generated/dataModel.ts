@@ -93,6 +93,7 @@ export interface Doc_aiUserPreferences {
     searchProvider?: string;
     selectedModel?: string;
     showTimestamps?: boolean;
+    toolPermissionGrants?: Record<string, number>;
     toolPermissions?: Record<string, "auto" | "ask" | "off">;
     userId: string;
 }
@@ -394,6 +395,7 @@ export interface Doc_devices {
     manifestIssuedAt?: number;
     name: string;
     platform: "macos" | "windows" | "linux";
+    projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
     transport?: "ssh";
     userId: string;
@@ -1154,6 +1156,7 @@ export interface Doc_persistentChunks {
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
     text: string;
+    toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number };
 }
 
 export interface Doc_persistentStreams {
@@ -2905,6 +2908,7 @@ export interface Insert_aiUserPreferences {
     searchProvider?: string;
     selectedModel?: string;
     showTimestamps?: boolean;
+    toolPermissionGrants?: Record<string, number>;
     toolPermissions?: Record<string, "auto" | "ask" | "off">;
     userId: string;
 }
@@ -3206,6 +3210,7 @@ export interface Insert_devices {
     manifestIssuedAt?: number;
     name: string;
     platform: "macos" | "windows" | "linux";
+    projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
     transport?: "ssh";
     userId: string;
@@ -3966,6 +3971,7 @@ export interface Insert_persistentChunks {
     speaker?: { name: string; skillId: string };
     streamId: Id<"persistentStreams">;
     text: string;
+    toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number };
 }
 
 export interface Insert_persistentStreams {

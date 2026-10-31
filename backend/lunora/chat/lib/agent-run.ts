@@ -43,6 +43,7 @@ import {
     type PipedStream,
     type StreamText,
     stopWhenStopped,
+    toolProgressSink,
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
@@ -943,6 +944,7 @@ export const resumeApprovedRun = async (
             autoMediaEnrichment: config.autoMediaEnrichment,
             // A person just answered in the chat, so this run is interactive.
             deviceThreadId: threadId,
+            mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,

@@ -321,7 +321,7 @@ export interface ApiTypes {
         };
         streaming: {
             getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; streamId: Id<"persistentStreams"> } | null>;
-            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
+            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
         };
         tags: {
             functions: {
@@ -338,9 +338,10 @@ export interface ApiTypes {
             unsnoozeThread: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
         };
         tool_permissions: {
-            getToolPermissionSettings: FunctionReference<"query", {}, { builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: FunctionReference<"query", {}, { builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             listMcpToolPermissions: FunctionReference<"action", {}, { servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
-            respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            revokeToolPermissionGrant: FunctionReference<"mutation", { key: string }, null>;
             setToolPermission: FunctionReference<"mutation", { key: string; mode: "auto" | "ask" | "off" | null }, null>;
         };
         translate: {
@@ -388,13 +389,14 @@ export interface ApiTypes {
             getDeviceCallByToolCall: FunctionReference<"query", { toolCallId: string }, null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }, { paired: boolean }>;
             listDeviceCalls: FunctionReference<"query", { deviceId?: Id<"devices">; limit?: number }, Array<{ _id: string; claimedAt?: number; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: FunctionReference<"query", {}, Array<{ _id: string; acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listDevices: FunctionReference<"query", {}, Array<{ _id: string; acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; projectIds?: Array<string>; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
             listPendingDeviceCalls: FunctionReference<"query", { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }, Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
             registerDevice: FunctionReference<"mutation", { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }, { deviceId: string; secret: string }>;
             releaseDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }, null>;
             renameDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; name: string }, null>;
             reportDeviceCallProgress: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { accepted: boolean }>;
             revokeDevice: FunctionReference<"mutation", { deviceId: Id<"devices"> }, null>;
+            setDeviceProjectScope: FunctionReference<"mutation", { deviceId: Id<"devices">; scope: { kind: "any" } | { kind: "projects"; projectIds: Array<Id<"projects">> } }, null>;
             updateDeviceManifest: FunctionReference<"mutation", { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { toolCount: number }>;
         };
     };
@@ -1151,6 +1153,7 @@ export const api: ApiTypes = {
             getToolPermissionSettings: { __lunoraRef: "chat_tool_permissions:getToolPermissionSettings" },
             listMcpToolPermissions: { __lunoraRef: "chat_tool_permissions:listMcpToolPermissions" },
             respondToToolApproval: { __lunoraRef: "chat_tool_permissions:respondToToolApproval" },
+            revokeToolPermissionGrant: { __lunoraRef: "chat_tool_permissions:revokeToolPermissionGrant" },
             setToolPermission: { __lunoraRef: "chat_tool_permissions:setToolPermission" },
         },
         translate: {
@@ -1205,6 +1208,7 @@ export const api: ApiTypes = {
             renameDevice: { __lunoraRef: "devices_functions:renameDevice" },
             reportDeviceCallProgress: { __lunoraRef: "devices_functions:reportDeviceCallProgress" },
             revokeDevice: { __lunoraRef: "devices_functions:revokeDevice" },
+            setDeviceProjectScope: { __lunoraRef: "devices_functions:setDeviceProjectScope" },
             updateDeviceManifest: { __lunoraRef: "devices_functions:updateDeviceManifest" },
         },
     },
