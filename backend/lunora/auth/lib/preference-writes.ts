@@ -16,7 +16,9 @@ import { withoutUndefined } from "../../lib/patch";
 type Database = MutationCtx["db"];
 
 /** The `aiUserPreferences` columns other modules set. */
-export type AiUserPreferencesPatch = Partial<Pick<Doc<"aiUserPreferences">, "browserSettings" | "customAIProviders" | "toolPermissions">>;
+export type AiUserPreferencesPatch = Partial<
+    Pick<Doc<"aiUserPreferences">, "browserSettings" | "customAIProviders" | "toolPermissionGrants" | "toolPermissions">
+>;
 
 /** The `userSettings` columns other modules set. */
 export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled" | "taskEmailEnabled">>;

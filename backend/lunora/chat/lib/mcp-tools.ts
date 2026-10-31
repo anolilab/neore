@@ -12,6 +12,9 @@ import type { ToolSet } from "ai";
 import { toolsLogger } from "../../lib/logger";
 import { validateDomain } from "../tools/utilities";
 import { createAuthRetrySession, renewBearer, retryOnUnauthorized } from "./mcp-auth-retry";
+import { createProgressCall, runWithProgressCall } from "./mcp-progress";
+import type { ToolProgressSink } from "./mcp-progress";
+import { attachProgressTokens } from "./mcp-progress-transport";
 import type { ToolAnnotationHints } from "./tool-permissions";
 import { readMcpAnnotations } from "./tool-permissions";
 
@@ -140,6 +143,8 @@ const connectOnce = async (config: MCPServerConfig, timeoutMs: number): Promise<
         },
     });
 
+    attachProgressTokens(client);
+
     try {
         // Get tools with a timeout to avoid hanging on unresponsive servers
         const toolsPromise = client.tools();
@@ -175,13 +180,72 @@ const connectToMCPServer = async (config: MCPServerConfig, timeoutMs = 10_000): 
     }
 };
 
+type Tool = ToolSet[string];
+
+/** How long a finished call waits for its progress rows to be written before it hands its result back anyway. */
+export const PROGRESS_FINISH_DEADLINE_MS = 2000;
+
+/** `promise`, or nothing once `ms` has passed: progress is display only, so a stalled write never holds a tool's result. */
+const settleWithin = async (promise: Promise<void>, ms: number): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            promise,
+            new Promise<void>((resolve) => {
+                timer = setTimeout(resolve, ms);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+/**
+ * `tool` reporting the server's progress to `sink` while it runs. The call's id
+ * is its `progressToken`; the reports stop, and the row's progress with them,
+ * when the call returns or throws.
+ */
+const withProgress = (tool: Tool, label: { serverName: string; toolName: string }, sink: ToolProgressSink): Tool => {
+    const run = tool.execute;
+
+    if (!run) {
+        return tool;
+    }
+
+    const execute: NonNullable<Tool["execute"]> = async (input, options) => {
+        const toolCallId = options?.toolCallId;
+
+        if (!toolCallId) {
+            return await run(input, options);
+        }
+
+        const progress = sink({ ...label, toolCallId });
+        const call = createProgressCall({ onProgress: progress.push, token: toolCallId });
+
+        try {
+            return await runWithProgressCall(call, async () => await run(input, options));
+        } finally {
+            call.release();
+            await settleWithin(progress.finish(), PROGRESS_FINISH_DEADLINE_MS);
+        }
+    };
+
+    return { ...tool, execute } as Tool;
+};
+
+export interface GetMCPToolsOptions {
+    /** Where a running call's progress goes. Omit it (no stream to show it on) and tools run exactly as before. */
+    progress?: ToolProgressSink;
+}
+
 /**
  * Connect to all enabled MCP servers and return their combined tools.
  *
  * IMPORTANT: The returned clients MUST be closed after streaming completes
  * by calling `closeMCPClients(result.clients)`.
  */
-export const getMCPTools = async (servers: MCPServerConfig[]): Promise<MCPToolsResult> => {
+export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetMCPToolsOptions = {}): Promise<MCPToolsResult> => {
     const enabledServers = servers.filter((s) => s.enabled);
 
     if (enabledServers.length === 0) {
@@ -224,7 +288,9 @@ export const getMCPTools = async (servers: MCPServerConfig[]): Promise<MCPToolsR
                 const runtimeName = mcpRuntimeToolName(server.name, toolName, descriptors);
                 const annotations = readMcpAnnotations(tool);
 
-                tools[runtimeName] = session.wrap(toolName, tool);
+                const wrapped = session.wrap(toolName, tool);
+
+                tools[runtimeName] = progress ? withProgress(wrapped, { serverName: server.name, toolName }, progress) : wrapped;
                 descriptors.set(runtimeName, {
                     ...(annotations && { annotations }),
                     ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),

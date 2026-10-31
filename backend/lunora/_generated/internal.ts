@@ -387,13 +387,13 @@ export interface InternalApiTypes {
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                 };
                 library: {
-                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
+                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }, void>;
                     claimStreamRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, boolean>;
                     createStream: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, Id<"persistentStreams">>;
                     finishStoppedReply: FunctionReference<"mutation", { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }, { messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; withPendingRequest?: boolean }, { chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; withPendingRequest?: boolean }, { chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "timeout" | "done">;
-                    getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
+                    getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }>; userId?: string }>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
                     stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
                 };
@@ -404,7 +404,9 @@ export interface InternalApiTypes {
         };
         tool_permissions: {
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
+            getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
+            pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
             recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
         };
         tools: {
@@ -1457,7 +1459,9 @@ export const internal: InternalApiTypes = {
         },
         tool_permissions: {
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
+            getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },
             getToolPermissionsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionsQuery" },
+            pruneExpiredToolPermissionGrants: { __lunoraRef: "chat_tool_permissions:pruneExpiredToolPermissionGrants" },
             recordPendingToolApprovals: { __lunoraRef: "chat_tool_permissions:recordPendingToolApprovals" },
         },
         tools: {
