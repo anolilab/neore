@@ -142,7 +142,7 @@ export class AgentSession {
     private report: CapabilityReport | undefined;
 
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
-    private reattach: { loaded: boolean; reason?: string } | undefined;
+    private reattach: HostSessionInfo["reattach"];
 
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
