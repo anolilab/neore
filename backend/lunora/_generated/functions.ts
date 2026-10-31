@@ -8116,7 +8116,7 @@ export interface Caller {
             startHostSession: (args: { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }) => Promise<{ started: boolean; threadId?: string }>;
         };
         send: {
-            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "session_starting" | "too_large" | "turn_running" }>;
+            sendToHost: (args: { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }) => Promise<{ messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "session_starting" | "too_large" | "turn_running" }>;
         };
         switch: {
             commitHostSwitch: (args: { clientId: string; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;

@@ -37,6 +37,10 @@ const { assembleHandoffContext } = await import("../agent/handoff-context");
 const { agentSwitchForWire } = await import("../agent/agent-switch-logic");
 const { threadHandoffTaint } = await import("../agent/thread-summary-taint");
 const { checkRateLimit } = await import("../lib/rate-limiter");
+const { hashPasscode, mintUnlockProof, newPasscodeEpoch } = await import("../lib/thread-lock");
+const { readPasscodeRow } = await import("../agent/thread-passcode");
+const { listMessagesByThreadId } = await import("../agent/messages");
+const { agentKeyOf, sameAgent } = await import("../agent/agent-switch-logic");
 const calls = await import("./calls");
 const send = await import("./send");
 const switchModule = await import("./switch");
@@ -65,6 +69,7 @@ const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
 const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
+const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
@@ -1039,5 +1044,135 @@ describe("native reattach (S4)", () => {
         await switchTo(threadId, hostTarget(device, CLAUDE));
 
         expect(await lastStart()).toMatchObject({ nativeSessionId: "native-1" });
+
+describe("what a chat must be to be handed to a computer", () => {
+    it("refuses a chat with a collaborator and a public one, and writes nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const shared = await cloudThread();
+        const published = await cloudThread();
+        const collaborator = await insertUser();
+
+        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "read", threadId: shared, userId: collaborator }));
+        await run(async (ctx) => await ctx.db.patch(published as never, { isPublic: true }));
+
+        await expect(switchTo(shared, hostTarget(device))).rejects.toThrow(SHARED_OR_PUBLIC);
+        await expect(switchTo(published, hostTarget(device))).rejects.toThrow(SHARED_OR_PUBLIC);
+
+        expect(await rows("threads")).toHaveLength(2);
+        expect(await rows("threadRelationships")).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("what a continuation keeps of its source", () => {
+    const SECRET = "c".repeat(40);
+    const PASSCODE = "passcode-1";
+
+    /** A cloud thread with a passcode and a project, and the proof that opens it. */
+    const lockedProjectThread = async () => {
+        vi.stubEnv("STORAGE_SIGNING_SECRET", SECRET);
+
+        const epoch = newPasscodeEpoch();
+        const hashed = await hashPasscode(PASSCODE, 1000);
+        const projectId = (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, title: "Secret project", userId: ownerId }))) as string;
+        const threadId = await cloudThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch(threadId as never, { lockedAt: 1, projectId });
+            await ctx.db.insert("threadPasscodes", {
+                createdAt: 1,
+                epoch,
+                failedAttempts: 0,
+                hash: hashed.hash,
+                iterations: hashed.iterations,
+                salt: hashed.salt,
+                threadId,
+                updatedAt: 1,
+                userId: ownerId,
+            });
+        });
+
+        const { proof } = await mintUnlockProof({ epoch, threadId, userId: ownerId }, SECRET, Date.now());
+
+        return { projectId, proof, threadId };
+    };
+
+    const switchWithProof = async (threadId: string, target: Row, unlockProof: string) =>
+        await runAgentSwitch(runner, { clientId: nextClick(), target: target as never, threadId: threadId as never, unlockProof, userId: ownerId }, summary);
+
+    it.each(["host", "model"] as const)("is locked and in the same project when it leaves a locked chat for a %s", async (kind) => {
+        const device = await pairedDevice(ownerId);
+        const { proof, threadId } = await lockedProjectThread();
+
+        let source = threadId;
+
+        if (kind === "model") {
+            // A host thread is the source of a switch to a model: lock and scope it the same way.
+            source = await hostThread(device);
+            const locked = await lockedProjectThread();
+
+            await run(async (ctx) => {
+                const passcode = await readPasscodeRow(ctx.db, locked.threadId as never);
+
+                await ctx.db.patch(source as never, { lockedAt: 1, projectId: locked.projectId });
+                await ctx.db.insert("threadPasscodes", { ...passcode!, _creationTime: undefined, _id: undefined, threadId: source } as never);
+            });
+        }
+
+        const unlock = kind === "host" ? proof : (await mintUnlockProof({ epoch: (await rows("threadPasscodes", { threadId: source }))[0]?.epoch, threadId: source, userId: ownerId }, SECRET, Date.now())).proof;
+        const target = kind === "host" ? hostTarget(device) : { kind: "model", model: OTHER_MODEL };
+        const result = await switchWithProof(source, target, unlock);
+        const fork = await row(result.forkedThreadId as string);
+        const sourceRow = await row(source);
+
+        expect(fork?.projectId).toBe(sourceRow?.projectId);
+        expect(fork?.lockedAt).toBeTypeOf("number");
+
+        const [passcode] = await rows("threadPasscodes", { threadId: result.forkedThreadId });
+        const [original] = await rows("threadPasscodes", { threadId: source });
+
+        // The same passcode under an epoch of its own: the source's proof does not open the continuation.
+        expect(passcode?.hash).toBe(original?.hash);
+        expect(passcode?.epoch).not.toBe(original?.epoch);
+    });
+});
+
+describe("what a reader who is not the owner is sent of a divider's rows", () => {
+    it("leaves the computer's ids and the handoff off a raw read, and keeps them for the owner", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const { forkedThreadId } = await switchTo(source, { kind: "model", model: MODEL });
+        const fork = forkedThreadId as string;
+        const collaborator = await insertUser();
+
+        await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "write", threadId: fork, userId: collaborator }));
+
+        const read = async (userId: string) =>
+            JSON.stringify(await as(userId).query(listMessagesByThreadId as never, { order: "asc", threadId: fork } as never));
+
+        const theirs = await read(collaborator);
+
+        expect(theirs).toContain("neoreAgentSwitch");
+
+        for (const secret of [device.deviceId, '"agentKey"', '"folderId"', '"hostId"', "question 0"]) {
+            expect(theirs).not.toContain(secret);
+        }
+
+        const mine = await read(ownerId);
+
+        expect(mine).toContain(device.deviceId);
+        expect(mine).toContain("question 0");
+    });
+});
+
+describe("the identity of a coding agent", () => {
+    it("tells two agents apart whose ids contain the separator", () => {
+        const one = { agentKey: "a:b", agentLabel: "A", folderId: "c", folderLabel: "f", hostId: "h", kind: "host" as const };
+        const other = { ...one, agentKey: "a", folderId: "b:c" };
+
+        expect(agentKeyOf(one)).not.toBe(agentKeyOf(other));
+        expect(sameAgent(one, other)).toBe(false);
+        expect(sameAgent(one, { ...one })).toBe(true);
     });
 });

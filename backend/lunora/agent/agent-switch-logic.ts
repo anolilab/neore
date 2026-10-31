@@ -36,7 +36,7 @@ export const agentSwitchRowContent = (
  * A model keeps its bare id, so callers that hold only a model id compare against it directly.
  */
 export const agentKeyOf = (agent: SwitchAgentRef): string =>
-    agent.kind === "model" ? agent.model : `host:${agent.hostId}:${agent.agentKey}:${agent.folderId}`;
+    agent.kind === "model" ? agent.model : `host:${JSON.stringify([agent.hostId, agent.agentKey, agent.folderId])}`;
 
 export const sameAgent = (a: SwitchAgentRef, b: SwitchAgentRef): boolean => agentKeyOf(a) === agentKeyOf(b);
 
@@ -61,4 +61,22 @@ export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart,
         agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
 
     return { ...rest, from: labelsOf(from), to: labelsOf(to) };
+};
+
+/**
+ * A stored row as a reader who is not the thread's owner is sent it: a divider's payload is replaced by the display form
+ * (`agentSwitchForWire`), or dropped when it does not parse, so a raw read carries no computer id, agent key, folder id or
+ * handoff. The stored row is untouched.
+ */
+export const withoutSwitchIds = <T extends { providerMetadata?: unknown }>(row: T): T => {
+    const metadata = row.providerMetadata as Record<string, unknown> | undefined;
+
+    if (!metadata || !(AGENT_SWITCH_KEY in metadata)) {
+        return row;
+    }
+
+    const others = Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== AGENT_SWITCH_KEY));
+    const part = agentSwitchOf(row);
+
+    return { ...row, providerMetadata: part ? { ...others, [AGENT_SWITCH_KEY]: agentSwitchForWire(part) } : others };
 };

@@ -4,12 +4,15 @@
  * dies on the way is retried with the SAME request id and finds the first try, never a second turn. What the turn
  * is doing is read from the stream like any other viewer's (`StreamingPlaceholder`), not from this answer.
  */
+import { withUnlockProofBody } from "@neore/client-runtime";
+
 import getSessionToken from "@/lib/auth/server-functions";
 import env from "@/lib/env";
 
 /** The backend's refusals, by the `error` field of the answer. */
 export type HostSendError =
     | "busy"
+    | "locked"
     | "not_authenticated"
     | "not_found"
     | "offline"
@@ -24,6 +27,7 @@ export type HostSendResult = { ok: true } | { error: HostSendError; ok: false };
 
 const KNOWN: ReadonlySet<string> = new Set([
     "busy",
+    "locked",
     "not_authenticated",
     "not_found",
     "offline",
@@ -56,7 +60,8 @@ export const sendHostMessage = async (
     try {
         const token = await (options.token ?? getSessionToken)();
         const response = await (options.fetch ?? fetch)(new URL("/hosts/send", env.VITE_LUNORA_URL), {
-            body: JSON.stringify(input),
+            // A locked chat takes the message only with its live passcode proof, as /chat/start does.
+            body: JSON.stringify(withUnlockProofBody(input, input.threadId)),
             headers: { "content-type": "application/json", ...(token && { authorization: `Bearer ${token}` }) },
             method: "POST",
             // A stalled connection must not leave the composer in its sending state for good.

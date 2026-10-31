@@ -32,6 +32,7 @@ import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOF
 import { collectHandoffSource, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
+import { inheritPasscodeHandler } from "../agent/thread-lock";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { HOST_HANDOFF_TAINT, threadPathTaint } from "../agent/thread-summary-taint";
 import { getUser } from "../auth/lib/better-auth-queries";
@@ -50,10 +51,12 @@ import {
     vSwitchTarget,
 } from "../chat/agent-switch";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
+import { loadEligibleThread } from "../devices/internal";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
@@ -358,6 +361,12 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         return refuse(AGENT_SWITCH_UNSUPPORTED, hasFixedAgent(thread) ? "This chat runs on a fixed agent" : "Not a coding-agent switch");
     }
 
+    // What reaches a computer is run there as the user, so the chat must be one nobody else's text is in: the rule a device
+    // tool call is held to (`devices/internal.ts`), not copied.
+    if (args.target.kind === "host" && !(await loadEligibleThread(ctx, thread._id, args.userId))) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "A shared, public or group chat cannot be handed to a computer");
+    }
+
     const leaf = await leafRowOf(ctx, thread);
     const current = leaf ? await currentAgent(ctx, thread, leaf) : null;
 
@@ -551,6 +560,7 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   createdBy: userId,
                   mode: "text",
                   model: target.offer.agentKey,
+                  ...(thread.projectId && { projectId: thread.projectId }),
                   runner: "host",
                   status: "active",
                   tags: ["chat", "host"],
@@ -566,12 +576,18 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   ...((handoff || current.agent.kind === "host") && { hasHandoff: true }),
                   mode: "text",
                   model: target.model,
+                  ...(thread.projectId && { projectId: thread.projectId }),
                   status: "active",
                   tags: ["chat"],
                   title: thread.title ?? "",
                   updatedAt: now,
                   userId,
               });
+
+    // A locked chat stays locked: the continuation takes its passcode under an epoch of its own, before any row lands in it.
+    if (isThreadLocked(thread)) {
+        await inheritPasscodeHandler(ctx, { sourceThreadId: thread._id, targetThreadId: forkId });
+    }
 
     if (target.kind === "host") {
         await startOn(ctx, {
