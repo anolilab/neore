@@ -57,6 +57,13 @@ export const taintOfTool = (toolName: string): DeviceTaintSource | null => {
 
 const TAINT_ORDER: ReadonlyArray<DeviceTaintSource> = ["web", "knowledge", "mcp", "device", "files"];
 
+/** The union of taint lists in the stable signed order (a list read from storage may be unsorted or absent). */
+export const mergeTaint = (...lists: ReadonlyArray<ReadonlyArray<DeviceTaintSource> | undefined>): DeviceTaintSource[] => {
+    const found = new Set(lists.flatMap((list) => list ?? []));
+
+    return TAINT_ORDER.filter((source) => found.has(source));
+};
+
 interface MessageLike {
     content?: unknown;
     role?: unknown;
