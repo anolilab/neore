@@ -300,8 +300,11 @@ export const endLiveHostTurns = async (
     }
 };
 
-/** Asks the stream's host to stop the turn. Best effort: a refusal (budget, device gone) leaves the stream ended all the same. */
-export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
+/**
+ * Asks the stream's host to stop the turn. Best effort: a refusal (budget, device gone) leaves the stream ended all the same.
+ * The computer drops the prompts queued behind the turn unless `keepQueue`, which only a worker run's stop passes.
+ */
+export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<void> => {
     if (!stream.hostTurnId) {
         return;
     }
@@ -318,6 +321,7 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
             {
                 deviceId: session.deviceId,
                 hostSessionId: session.hostSessionId,
+                keepQueue,
                 threadId: stream.threadId as Id<"threads">,
                 turnId: stream.hostTurnId,
                 userId: stream.userId,
@@ -337,7 +341,7 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
 };
 
 /** The sidebar's Stop for a host stream: keep what was written, end the stream, tell the host to cancel. */
-export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
+export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<void> => {
     if (!isLiveStream(stream)) {
         return;
     }
@@ -349,7 +353,7 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
 
     // The cancel is signed BEFORE the turn ends: ending it can start the worker's next queued message, whose send must
     // follow the cancel, not reach the computer while it is still running the turn that was stopped.
-    await sendHostCancel(ctx, stream, now);
+    await sendHostCancel(ctx, stream, now, keepQueue);
     await finishHostTurn(ctx, stream, { reason: "stopped" }, now);
 };
 
@@ -358,5 +362,6 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
  * computer has not acknowledged is withdrawn so it cannot start later, what the agent wrote is kept, and the computer is told to cancel.
  */
 export const cancelHostTurnNow = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
-    await stopHostTurn(ctx, stream, now);
+    // What waits on the computer behind this turn is other runs' messages, so the cancel leaves it queued.
+    await stopHostTurn(ctx, stream, now, true);
 };

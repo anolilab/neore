@@ -189,13 +189,25 @@ describe("the end of a turn", () => {
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
     });
 
-    it("keeps the prompts queued behind a turn the backend cancels by id: they run after it, and only Stop drops them", async () => {
+    it("drops the prompts queued behind a turn the backend cancels by id, as Stop does", async () => {
         const { agent, session } = await setup();
 
         session.send("first", "turn-1");
         await expect.poll(() => agent.written.length).toBe(3);
         expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
 
+        expect(session.cancelTurn("turn-1")).toBe(true);
+        expect(session.snapshot().queued).toEqual([]);
+    });
+
+    it("keeps the prompts queued behind a turn cancelled with keepQueue: they run after it, even when the backend's end of the turn cancels again", async () => {
+        const { agent, session } = await setup();
+
+        session.send("first", "turn-1");
+        await expect.poll(() => agent.written.length).toBe(3);
+        expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
+
+        expect(session.cancelTurn("turn-1", { keepQueue: true })).toBe(true);
         expect(session.cancelTurn("turn-1")).toBe(true);
         expect(session.snapshot().queued).toEqual(["second"]);
 
@@ -209,7 +221,7 @@ describe("the end of a turn", () => {
         session.send("first", "turn-1");
         await expect.poll(() => agent.written.length).toBe(3);
         session.send("second", "turn-2");
-        session.cancelTurn("turn-1");
+        session.cancelTurn("turn-1", { keepQueue: true });
 
         agent.say({ id: agent.written[2].id as number, result: { stopReason: "cancelled" } });
         // An agent that flushes the cancelled turn's output a moment after it answered the prompt.

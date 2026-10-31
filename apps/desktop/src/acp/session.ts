@@ -252,11 +252,17 @@ export class AgentSession {
         return { status: "started" };
     }
 
-    /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
-    public cancelTurn(turnId: string): boolean {
+    /**
+     * Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means.
+     * What waits behind it is dropped, as a person's Stop does (those are prompts typed in the desktop window), unless
+     * the backend signed `keepQueue` (a worker's stop: the prompts behind it are other runs' messages).
+     */
+    public cancelTurn(turnId: string, options: { keepQueue?: boolean } = {}): boolean {
         if (this.current?.id === turnId) {
-            // The backend names one turn. What waits behind it was sent after it and has its own id and stream, so it stays queued.
-            this.cancel({ keepQueue: true });
+            // A stop already under way keeps its choice: the backend's end of the same turn arrives as a second cancel.
+            if (!this.cancelRequested) {
+                this.cancel(options);
+            }
 
             return true;
         }
@@ -275,7 +281,7 @@ export class AgentSession {
         return true;
     }
 
-    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later, unless `keepQueue` (a stop by turn id) keeps them to run after it. */
+    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later, unless `keepQueue` keeps them to run after it. */
     public cancel(options: { keepQueue?: boolean } = {}): void {
         if (this.status !== "busy" || this.current === undefined) {
             this.dropQueue();
