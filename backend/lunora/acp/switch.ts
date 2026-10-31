@@ -55,6 +55,7 @@ import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES } from "./lib/pending-handoff";
+import { savedSessionFor } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, startHostSessionIn, webSessionId } from "./lib/start";
 import { liveHostStream } from "./remote";
@@ -295,11 +296,21 @@ interface WriteArgs {
 }
 
 /** Throws the refusal an `acp_start` the computer cannot take is, so the transaction's writes are rolled back. */
-const startOn = async (ctx: MutationCtx, args: { clientId: string; device: Device; now: number; offer: Offer; threadId: Id<"threads">; userId: string }) => {
+const startOn = async (
+    ctx: MutationCtx,
+    args: { clientId: string; device: Device; nativeSessionId?: string; now: number; offer: Offer; threadId: Id<"threads">; userId: string },
+) => {
     const hostSessionId = await webSessionId(args.userId, args.clientId, "switch");
     const call = await startHostSessionIn(
         ctx,
-        { device: args.device, hostSessionId, offer: args.offer, threadId: args.threadId, userId: args.userId },
+        {
+            device: args.device,
+            hostSessionId,
+            ...(args.nativeSessionId !== undefined && { nativeSessionId: args.nativeSessionId }),
+            offer: args.offer,
+            threadId: args.threadId,
+            userId: args.userId,
+        },
         args.now,
     );
 
@@ -310,11 +321,30 @@ const startOn = async (ctx: MutationCtx, args: { clientId: string; device: Devic
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
     const { current, handoff, leaf, now, target, thread, to, userId } = args;
-    const part = { from: current.agent, mode: "portable" as const, startMessageId: leaf._id, to, ...(handoff && { handoff }) };
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.
     if (target.kind === "host" && isHostRunThread(thread)) {
-        await startOn(ctx, { clientId: args.clientId, device: target.device, now, offer: target.offer, threadId: thread._id, userId });
+        // The same agent, folder and computer as one of this thread's earlier sessions that can load itself again: the
+        // agent reattaches to its own session. The portable handoff is stored all the same, for the load that fails.
+        const { page: earlier } = await ctx.db.acpSessions.findMany({ orderBy: [{ _creationTime: "desc" }], where: { threadId: thread._id } });
+        const saved = savedSessionFor(earlier, { agentKey: target.offer.agentKey, deviceId: target.device._id, folderId: target.offer.folderId });
+        const part = {
+            from: current.agent,
+            mode: saved ? ("native" as const) : ("portable" as const),
+            startMessageId: leaf._id,
+            to,
+            ...(handoff && { handoff }),
+        };
+
+        await startOn(ctx, {
+            clientId: args.clientId,
+            device: target.device,
+            ...(saved?.nativeSessionId !== undefined && { nativeSessionId: saved.nativeSessionId }),
+            now,
+            offer: target.offer,
+            threadId: thread._id,
+            userId,
+        });
 
         if (current.session && current.session.status !== "ended") {
             await ctx.db.patch(current.session._id, { status: "ended", updatedAt: now });

@@ -20,10 +20,10 @@ export const webSessionId = async (userId: string, clientId: string, kind: "star
  */
 export const startHostSessionIn = async (
     ctx: MutationCtx,
-    args: { device: Doc<"devices">; hostSessionId: string; offer: Offer; threadId: Id<"threads">; userId: string },
+    args: { device: Doc<"devices">; hostSessionId: string; nativeSessionId?: string; offer: Offer; threadId: Id<"threads">; userId: string },
     now: number,
 ): Promise<AcpCallResult> => {
-    const { device, hostSessionId, offer, threadId, userId } = args;
+    const { device, hostSessionId, nativeSessionId, offer, threadId, userId } = args;
 
     await ctx.db.insert("acpSessions", {
         agentKey: offer.agentKey,
@@ -43,7 +43,13 @@ export const startHostSessionIn = async (
         ctx,
         {
             deviceId: device._id,
-            input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
+            input: {
+                agentKey: offer.agentKey,
+                folderId: offer.folderId,
+                ...(nativeSessionId !== undefined && { nativeSessionId }),
+                sessionId: hostSessionId,
+                threadId: threadId as string,
+            },
             kind: "acp_start",
             threadId,
             userId,

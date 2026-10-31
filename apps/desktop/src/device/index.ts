@@ -384,6 +384,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const startRequestedSession = async (command: Extract<AcpCommand, { kind: "start" }>, call: AppliedCall): Promise<void> => {
         try {
             const sessionId = await requireAcp().startSession(command.agentKey, command.agentLabel, command.folderPath, {
+                ...command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId },
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });

@@ -41,9 +41,10 @@ export type SwitchAgentRef = Infer<typeof vSwitchAgentRef>;
 /**
  * What the new agent was given. `full`: the whole active path, as before the switch.
  * `portable`: the stored handoff in place of everything before the divider. `delta`: what the agent
- * saw before it left, then the stored handoff of what happened since, then the turns after.
+ * saw before it left, then the stored handoff of what happened since, then the turns after. `native`: the same coding
+ * agent loads its own saved session (harness switch S4); the portable handoff is stored too, for the fallback.
  */
-export const vAgentSwitchMode = v.union(v.literal("full"), v.literal("portable"), v.literal("delta"));
+export const vAgentSwitchMode = v.union(v.literal("full"), v.literal("portable"), v.literal("delta"), v.literal("native"));
 
 /**
  * Longest handoff a divider may store, in characters. The budget (`agent/handoff.ts`) is far below it;
@@ -58,6 +59,8 @@ export const HANDOFF_MAX_CHARACTERS = 80_000;
  * summary of older turns, for the divider's note.
  */
 export const vAgentSwitch = v.object({
+    // Why a `native` reattach became `portable`: the agent could not load its saved session.
+    fallbackReason: v.optional(v.string().max(500)),
     from: vSwitchAgentRef,
     handoff: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
     mode: vAgentSwitchMode,

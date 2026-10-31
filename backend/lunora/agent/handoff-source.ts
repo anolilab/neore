@@ -209,4 +209,4 @@ export const findDividerLeaving = async (context: Reader, threadId: Id<"threads"
 
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && part.mode !== "full");
+    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && (part.mode === "portable" || part.mode === "delta"));

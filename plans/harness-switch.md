@@ -245,6 +245,18 @@ report says it can load a saved session, and only when agent, folder and host al
 - Acceptance: a switch to the same agent in a different offered folder, or on another host, uses `portable` and never reattaches the old session; the reattach uses the saved native session id; when the load fails,
   the transcript shows the fallback reason and the turn runs in `portable` mode.
 
+**S4 as built:**
+- `native` is chosen only for a host-to-host switch in a thread, when one of the thread's own earlier sessions has the same agent, folder
+  and computer, recorded the agent's own session id, and its capability report says `sessions.load` is available (`acp/lib/reattach.ts#savedSessionFor`).
+  Another folder, another computer or an agent that never said it loads sessions is `portable`, and no id is sent. A cloud-to-host switch has
+  no earlier session, so it is always `portable`.
+- The signed `acp_start` carries `nativeSessionId` (Rust bounds it at 256 and refuses a malformed one; the pair is checked as for any start).
+  The desktop sends `session/load` only to an agent that advertised it, else opens a new session, and says which in `session_open.reattach`
+  (`{ loaded, reason }`; a fixed phrase, never the agent's own error text).
+- The portable handoff is stored on the `native` divider too. A failed load turns that divider into `portable` with `fallbackReason`, so the
+  transcript says why and the first prompt carries the handoff (`markReattachFailed`); a successful one sends nothing, and no earlier divider's
+  handoff is sent to it.
+
 ## 6. Invariants crossed
 
 - Claim-once on `clientId` for switches. Redelivered handoff summaries do not

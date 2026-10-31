@@ -4,6 +4,7 @@
  * it, and the transcript shows it as a divider. Its payload rides in `providerMetadata`,
  * which already holds opaque per-row facts (`neoreJob`) and is nobody's model input.
  */
+import { omit } from "../lib/collections";
 import { type AgentSwitchPart, type SwitchAgentRef, vAgentSwitch } from "./agent-switch-validators";
 
 import { AGENT_SWITCH_KEY } from "./agent-switch-shape";
@@ -52,7 +53,8 @@ export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
  * thread (a public copy of it included).
  */
 export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
-    const { from, handoff: _handoff, to, ...rest } = part;
+    const { from, to } = part;
+    const rest = omit(part, ["from", "handoff", "to"]);
     const labelsOf = (agent: SwitchAgentRef) =>
         agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
 

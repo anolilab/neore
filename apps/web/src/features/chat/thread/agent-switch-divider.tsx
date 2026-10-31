@@ -15,7 +15,11 @@ const AgentSwitchDivider: FC<{ part: AgentSwitchPart }> = ({ part }) => {
     const label = t`Switched from ${switchAgentName(part.from, nameOf)} to ${switchAgentName(part.to, nameOf)}`;
     let note: string | null = null;
 
-    if (part.mode !== "full") {
+    if (part.mode === "native") {
+        note = t`Resumed its own session`;
+    } else if (part.fallbackReason) {
+        note = t`Could not resume its own session (${part.fallbackReason}), so the conversation was handed over`;
+    } else if (part.mode !== "full") {
         note = part.summarized ? t`Older messages were summarised` : t`Handed over`;
     }
 

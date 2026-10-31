@@ -26,7 +26,7 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, METHOD, newSession, promptParams } from "./protocol";
+import { initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -83,6 +83,13 @@ export interface SessionOptions {
     /** Called when anything the window shows changed. Coalescing is the caller's. */
     onChange: () => void;
     process: AgentProcess;
+
+    /**
+     * The agent's own id of a saved session to load instead of opening a new one (harness switch S4), when the backend
+     * asked for a reattach (`acp_start`). Loaded only if the agent advertised it; otherwise, or when the load fails, a
+     * new session opens and the backend is told why (`reattach` on the session it hears opened).
+     */
+    resumeSessionId?: string;
     /** The id this session goes by on the backend, when the backend started it (`acp_start`); otherwise one is minted. */
     sessionId?: string;
     startupTimeoutMs?: number;
@@ -132,6 +139,9 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
+    /** What happened to the saved session the backend asked to load; unset when it asked for none. */
+    private reattach: { loaded: boolean; reason?: string } | undefined;
+
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
 
@@ -164,7 +174,7 @@ export class AgentSession {
         try {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
-            this.agentSessionId = await newSession(this.connection, this.options.folder, this.options.startupTimeoutMs);
+            this.agentSessionId = await this.openAgentSession();
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
@@ -195,6 +205,7 @@ export class AgentSession {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
                 ...this.report !== undefined && { capabilities: this.report },
+                ...this.reattach !== undefined && { reattach: this.reattach },
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -325,6 +336,32 @@ export class AgentSession {
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
+    /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
+    private async openAgentSession(): Promise<string> {
+        const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+
+        if (resumeSessionId === undefined) {
+            return await newSession(this.connection, folder, startupTimeoutMs);
+        }
+
+        // No `session/load` frame goes to an agent that did not say it loads them.
+        if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
+            try {
+                await loadSession(this.connection, resumeSessionId, folder);
+                this.reattach = { loaded: true };
+
+                return resumeSessionId;
+            } catch {
+                // The agent's own error can quote its environment: the backend is told that it failed, not its text.
+                this.reattach = { loaded: false, reason: "the agent could not load the saved session" };
+            }
+        } else {
+            this.reattach = { loaded: false, reason: "the agent does not load its saved sessions" };
+        }
+
+        return await newSession(this.connection, folder, startupTimeoutMs);
+    }
+
     private dropQueue(reason: StopReason | "failed" = "cancelled", error?: string): void {
         const dropped = [...this.queue];
 

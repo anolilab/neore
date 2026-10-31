@@ -34,6 +34,12 @@ export const pendingHandoffOf = async (ctx: QueryCtx, thread: Doc<"threads">): P
     for (const row of rows) {
         const part = agentSwitchOf(row);
 
+        // A `native` divider stores the handoff for a reattach that fails; until then the agent has its own session, and
+        // no earlier divider's handoff is for it.
+        if (part?.mode === "native") {
+            return undefined;
+        }
+
         if (part?.handoff) {
             return part.handoff;
         }
