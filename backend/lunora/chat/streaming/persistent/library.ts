@@ -24,7 +24,7 @@ import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQue
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
-const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
+export const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
 const LIVE_STREAM_PAGE = 50;
 
 /** The pending row a run writes into; `createStream` and a goal's next round (`chat/goals/internal.ts`) both start one. */
