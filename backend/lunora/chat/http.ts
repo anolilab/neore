@@ -1,5 +1,5 @@
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { enabledModelOf, MODEL_LOOKUP } from "@neore/ai/models";
 import type { CinemaSettings } from "@neore/ai/types/cinema";
 import type { HttpActionCtx } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
@@ -10,6 +10,7 @@ import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
+import { assertPaidModel } from "./lib/enabled-model";
 import { hmacSha256Hex, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import type { Signer } from "../lib/storage-sign";
 import { httpScheduler } from "../lib/http-scheduler";
@@ -20,6 +21,9 @@ import { getUserTier } from "../lib/rate-limiter";
 import { SERVICE_REQUEST_WINDOW_MS } from "../lib/sign-request";
 import { threadShardFor } from "../lib/thread-shard";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
+import { parseSkillCommand } from "../skills/slash-command";
+import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
+import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
@@ -354,6 +358,8 @@ export interface ChatStartBody {
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
+    /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
+    goal?: { maxRounds?: number; text: string };
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -479,6 +485,19 @@ const runChatStartOnShard = async (
         contentType = "video";
     }
 
+    // The gateway forwards the body unread, so the goal's shape and size are checked here.
+    const goalText = typeof body.goal?.text === "string" ? body.goal.text.trim() : "";
+
+    if (body.goal !== undefined) {
+        if (contentType !== "text" || isAnonymous || body.regenerate) {
+            return Response.json({ error: "A goal needs a signed-in account and a new text message." }, { status: 400 });
+        }
+
+        if (goalText.length === 0 || goalText.length > GOAL_TEXT_MAX) {
+            return Response.json({ error: `A goal must be between 1 and ${GOAL_TEXT_MAX} characters.` }, { status: 400 });
+        }
+    }
+
     // Scopes organization-shared skills. `user.activeOrganization` is always
     // null here (no session read from an HTTP action), so resolve it from the
     // session row, which also re-checks membership. It depends on nothing
@@ -595,6 +614,15 @@ const runChatStartOnShard = async (
         return workerThreadResponse();
     }
 
+    // A goal spends the owner's budget over several rounds: refuse it in a shared thread now, before the turn is saved and charged.
+    if (body.goal !== undefined && validThreadId) {
+        const goalThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
+
+        if (goalThread?.userId !== userId) {
+            return Response.json({ error: "A goal can only be set in your own chat." }, { status: 403 });
+        }
+    }
+
     // A coding agent's thread runs on its paired device, not on a cloud model. This is the one turn-start path
     // every caller shares (the app, the public API, the MCP server), so it is also the refusal they hit.
     if (access?.hostRun) {
@@ -606,6 +634,8 @@ const runChatStartOnShard = async (
     // Bots chat in text only, so a media model is refused rather than swapped.
     // A regenerate's gate answer is used only for the worker check above, so it reads the thread itself.
     let threadBotId: string | undefined = access?.botId;
+    // Only a thread that was switched has an agent to look up (`agent/agent-switch.ts`).
+    let threadSwitched = access?.activeAgent !== undefined;
 
     if (validThreadId && body.regenerate && body.parentId) {
         const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
@@ -617,6 +647,7 @@ const runChatStartOnShard = async (
         }
 
         threadBotId ??= ownThread?.botId;
+        threadSwitched = ownThread?.activeAgent !== undefined;
     }
 
     // A chat whose bot was deleted is a plain chat again, so the bot rules apply only to a bot that still exists.
@@ -630,6 +661,22 @@ const runChatStartOnShard = async (
         // Anonymous callers stay on the free model, as they always do: the bot's model does not lift that.
         if (!isAnonymous) {
             effectiveModel = bot.model;
+        }
+    }
+
+    // A switched thread runs on the agent its path ends on, whatever the composer sent: the model a
+    // send brings only stands for a thread that was never switched. A regenerate continues from its
+    // prompt's path, so it runs on what was recorded THERE (`agent/agent-switch.ts`). A model outside the
+    // registry (a custom endpoint) is no switch target, so a send that names one keeps it, and a path
+    // that ends on one (the thread's pre-switch model) does not override the send.
+    if (validThreadId && threadSwitched && !bot && !isAnonymous && contentType === "text" && MODEL_LOOKUP.has(effectiveModel)) {
+        const agentModel = await context.runQuery(internal.agent.agent_switch.getRunAgentModel, {
+            ...(body.regenerate && body.parentId && { promptMessageId: body.parentId as Id<"messages"> }),
+            threadId: validThreadId as Id<"threads">,
+        });
+
+        if (agentModel && MODEL_LOOKUP.has(agentModel)) {
+            effectiveModel = agentModel;
         }
     }
 
@@ -658,10 +705,35 @@ const runChatStartOnShard = async (
         researchDepth: body.researchDepth,
         searchMode: body.searchMode,
         seed: body.seed,
-        shouldAutoContinue: body.shouldAutoContinue === true,
+        // A goal runs Deep Work.
+        shouldAutoContinue: body.shouldAutoContinue === true || body.goal !== undefined,
         statelessMode: body.statelessMode,
         style: body.style,
     };
+
+    // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
+    // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
+    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    const goalConfig =
+        body.goal === undefined
+            ? undefined
+            : vGoalRunConfig.safeParse({
+                  ...(streamingConfig.customSystemPrompt !== undefined && { customSystemPrompt: streamingConfig.customSystemPrompt }),
+                  ...(streamingConfig.enabledFeatures !== undefined && { enabledFeatures: streamingConfig.enabledFeatures }),
+                  ...(streamingConfig.mcpServerNames !== undefined && { mcpServerNames: streamingConfig.mcpServerNames }),
+                  model: streamingConfig.model,
+                  ...(streamingConfig.reasoningEffort !== undefined && { reasoningEffort: clampGoalEffort(streamingConfig.reasoningEffort) }),
+                  ...(streamingConfig.researchDepth !== undefined && { researchDepth: streamingConfig.researchDepth }),
+                  ...(streamingConfig.searchMode !== undefined && { searchMode: streamingConfig.searchMode }),
+                  ...(streamingConfig.statelessMode !== undefined && { statelessMode: streamingConfig.statelessMode }),
+                  // Every round runs as this one does: an API key's tool limits and the invoked skill carry through.
+                  ...(origin && { origin }),
+                  ...(goalSkill && { skill: goalSkill }),
+              });
+
+    if (goalConfig && !goalConfig.ok) {
+        return Response.json({ error: "These chat settings cannot be used with a goal." }, { status: 400 });
+    }
 
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
@@ -733,6 +805,7 @@ const runChatStartOnShard = async (
         // thread at the prompt puts it on the displayed path once it exists.
         await context.runMutation(internal.agent.branches.setActiveLeaf, {
             messageId: prompt._id as Id<"messages">,
+            runModel: effectiveModel,
             threadId: validThreadId as Id<"threads">,
         });
 
@@ -798,7 +871,30 @@ const runChatStartOnShard = async (
     let streamToken: string | undefined;
 
     if (contentType === "text") {
+        const activeOrganizationId = await activeOrganizationPromise;
+        let goalId: Id<"threadGoals"> | undefined;
+
+        if (body.goal !== undefined && goalConfig?.ok) {
+            const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
+                config: goalConfig.value,
+                ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
+                ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+                promptMessageId: messageId,
+                // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
+                text: goalText,
+                threadId: threadId as Id<"threads">,
+                userId,
+            });
+
+            if (!started.ok) {
+                return Response.json({ error: started.error }, { status: 400 });
+            }
+
+            goalId = started.goalId;
+        }
+
         streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
+            ...(goalId && { goalId }),
             messageId,
             streamingConfig,
             threadId,
@@ -806,8 +902,6 @@ const runChatStartOnShard = async (
         });
 
         streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
-
-        const activeOrganizationId = await activeOrganizationPromise;
 
         // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
         // time, so a scheduled run waited behind every other user's run and
@@ -964,6 +1058,36 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             return hostRunThreadResponse();
         }
 
+        // The reply is generated by `streamAsync`, which builds its own agent;
+        // this handler only saves the edit.
+        // A switched thread's reply runs on what the path above the edited prompt ends on.
+        const model =
+            (await context.runQuery(internal.agent.agent_switch.getRunAgentModel, {
+                replacedMessageId: messageId as Id<"messages">,
+                threadId: threadId as Id<"threads">,
+            })) ??
+            ((thread.model as string) || "openrouter/anthropic/claude-3.5-sonnet");
+
+        // The path's model may have been picked before a plan lapsed (or by a collaborator, against their plan):
+        // the edit's reply runs under the owner's plan, so a paid model it can no longer run is refused here, as a
+        // send would be, before the edit is saved.
+        const pathModel = enabledModelOf(model, { mode: "text" });
+
+        if (pathModel) {
+            try {
+                await assertPaidModel(context, userId, pathModel);
+            } catch (error) {
+                if (error instanceof LunoraError) {
+                    return Response.json(
+                        { error: "MODEL_REQUIRES_PLAN", message: error.message },
+                        { headers: { "Content-Type": "application/json" }, status: 403 },
+                    );
+                }
+
+                throw error;
+            }
+        }
+
         // An edit regenerates the reply, so it spends the same daily message quota
         // as `/chat/start` — it used to be an uncounted way to generate.
         const editLimit = await chargeDailyLimit(context, user, "Text");
@@ -974,10 +1098,6 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                 { headers: { "Content-Type": "application/json" }, status: 403 },
             );
         }
-
-        // The reply is generated by `streamAsync`, which builds its own agent;
-        // this handler only saves the edit.
-        const model = (thread.model as string) || "openrouter/anthropic/claude-3.5-sonnet";
 
         // Convert content to message format
         const messageContent: any[] = [];

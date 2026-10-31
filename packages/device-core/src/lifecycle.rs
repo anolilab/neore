@@ -95,7 +95,7 @@ pub enum Phase {
     Connecting {
         attempt: u32,
     },
-    /// Out of attempts, or a failure that needs the person. Only a Retry leaves this.
+    /// Out of attempts, or a failure that needs the person. A Retry leaves this, and so does a page connect, which the attempt window bounds.
     GaveUp {
         reason: String,
     },

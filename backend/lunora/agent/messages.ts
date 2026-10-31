@@ -14,9 +14,8 @@ import { omit } from "../lib/collections";
  *
  * NOTE: fileIds reference 'chatFiles' table (renamed from 'files')
  */
-import { pick } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
-import { MAX_LENGTH, paginationOptionsValidator, partial } from "../lib/validators";
+import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
 import { systemDb } from "../lib/rls/scope";
 import { mergedStream, stream } from "../lib/streams";
@@ -29,12 +28,13 @@ import {
     type MessageDoc,
     type MessageStatus,
     vMessageDoc as vMessageDocument,
-    vMessageDocFields,
+    vMessagePatchFields,
     vMessageEmbeddingsWithDimension,
     vMessageStatus,
     vMessageWithMetadataInternal,
     vPaginationResult,
 } from "./validators";
+import { agentSwitchOf } from "./agent-switch-logic";
 import { loadBranchTree, parentOf, resolveLeafRow } from "./branch-rows";
 import { BRANCH_ROOT, resolveActivePath, resolveBranchParent } from "./branch-tree";
 import { changeMessageFiles, changeRefcount } from "./files";
@@ -196,6 +196,8 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         {
             activeLeafId,
             continuationHasRows: lastInOverrideOrder !== null,
+            dividerUnderPromptId:
+                failPendingSteps && promptMessage && activeLeafId ? await dividerUnder(context, activeLeafId as Id<"messages">, promptMessage._id) : undefined,
             explicitParentId: parentMessageId,
             failPendingSteps,
             firstRole: messages[0]?.message.role,
@@ -435,6 +437,13 @@ const withToolResultFiles = async <M extends { fileIds?: Id<"chatFiles">[]; mess
     return { ...message, fileIds: [...new Set([...(message.fileIds ?? []), ...referenced])] };
 };
 
+/** `leafId` when it is an agent-switch divider hanging directly under `promptId` — what a regenerate of the newest turn points at. */
+const dividerUnder = async (context: MutationContext, leafId: Id<"messages">, promptId: Id<"messages">): Promise<Id<"messages"> | undefined> => {
+    const leaf = await context.db.get(leafId);
+
+    return leaf && leaf.parentMessageId === promptId && agentSwitchOf(leaf) ? leaf._id : undefined;
+};
+
 /**
  * A row with no `parentMessageId` follows the row before it (`branch-tree.ts`).
  * Inserting at the end of an `order` that is NOT the thread's last — a
@@ -443,7 +452,7 @@ const withToolResultFiles = async <M extends { fileIds?: Id<"chatFiles">[]; mess
  * its current parent first, so the insert changes nothing that was there.
  * One indexed read, and nothing more, for an ordinary append at the end.
  */
-const pinFollowingRowParent = async (context: MutationContext, threadId: Id<"threads">, order: number): Promise<void> => {
+export const pinFollowingRowParent = async (context: MutationContext, threadId: Id<"threads">, order: number): Promise<void> => {
     const nextRow = await context.db
         .query("messages")
         .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).gt("order", order))
@@ -561,7 +570,7 @@ export const finalizeMessage = internalMutation
 export const updateMessage = internalMutation
     .input({
         messageId: v.id("messages"),
-        patch: v.object(partial(pick(vMessageDocFields, ["message", "fileIds", "status", "error", "model", "provider", "providerOptions", "finishReason"]))),
+        patch: v.object({ ...vMessagePatchFields }),
     })
     .output(v.from(vMessageDocument))
     .mutation(async ({ args, ctx }) => {
@@ -573,14 +582,9 @@ export const updateMessage = internalMutation
             await changeMessageFiles(ctx, message.threadId, message.fileIds ?? [], args.patch.fileIds as unknown as Id<"chatFiles">[]); // fileIds may be typed as string[] from validator
         }
 
-        // `omit(args.patch, ["_id", "_creationTime"])`: the patch validator is
-        // derived from the full message doc, so it carries the system fields, and
-        // its `_id` is a plain `string` where the Doc wants `Id<"messages">`. They
-        // are not patchable anyway — spreading them in was writing the row's own
-        // id back over itself.
         // Absent keys stay as they are; `embeddingId: undefined` below REMOVES
         // the field, which `patchRow` does by replacing the row.
-        const patch: Partial<Doc<"messages">> = withoutUndefined(omit(args.patch, ["_id", "_creationTime"])) as Partial<Doc<"messages">>;
+        const patch: Partial<Doc<"messages">> = withoutUndefined(args.patch) as Partial<Doc<"messages">>;
 
         if (args.patch.message !== undefined) {
             patch.message = args.patch.message;

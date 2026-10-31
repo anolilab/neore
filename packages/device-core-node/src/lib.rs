@@ -14,13 +14,16 @@
 use std::sync::Arc;
 
 use device_core::acp::AcpUpdate;
+use device_core::acp_install::InstallRequest;
 use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
+use device_core::fs::MediaRead;
 use device_core::install::{Bundle, Root};
+use device_core::media::Kind;
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
-    spawn_blocking, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
+    spawn_blocking, Buffer, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
 };
 use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use napi_derive::napi;
@@ -52,6 +55,53 @@ fn request_id(id: f64) -> Result<u64> {
         Ok(id as u64)
     } else {
         Err(Error::from_reason("invalid request id"))
+    }
+}
+
+/// A file an agent's reply refers to (`acpReadMedia`). `status` is `read`, `too_large` or `refused`; `bytes` is set
+/// only for `read`, and nothing else is filled for `refused`.
+#[napi(object)]
+pub struct AcpMedia {
+    pub bytes: Option<Buffer>,
+    /// `image` (shown in the message) or `file` (offered for download).
+    pub kind: String,
+    pub mime: String,
+    pub name: String,
+    pub size: f64,
+    pub status: String,
+}
+
+fn media_result(read: MediaRead) -> AcpMedia {
+    let kind = |kind: Kind| match kind {
+        Kind::Image => "image",
+        Kind::File => "file",
+    };
+
+    match read {
+        MediaRead::Read(file) => AcpMedia {
+            bytes: Some(Buffer::from(file.bytes)),
+            kind: kind(file.kind).to_owned(),
+            mime: file.mime.to_owned(),
+            name: file.name,
+            size: file.size as f64,
+            status: "read".to_owned(),
+        },
+        MediaRead::TooLarge { mime, name, size } => AcpMedia {
+            bytes: None,
+            kind: "file".to_owned(),
+            mime: mime.to_owned(),
+            name,
+            size: size as f64,
+            status: "too_large".to_owned(),
+        },
+        MediaRead::Refused => AcpMedia {
+            bytes: None,
+            kind: String::new(),
+            mime: String::new(),
+            name: String::new(),
+            size: 0.0,
+            status: "refused".to_owned(),
+        },
     }
 }
 
@@ -146,6 +196,33 @@ impl DeviceCore {
     #[napi]
     pub fn sign_turn(&self, payload: String) -> Result<String> {
         self.state.sign_turn(&payload).map_err(Error::from_reason)
+    }
+
+    /// Signs one request to the backend's device upload route (hex HMAC under the `upload` domain). Refuses a
+    /// payload that is not an upload request for this paired computer.
+    #[napi]
+    pub fn sign_upload(&self, payload: String) -> Result<String> {
+        self.state.sign_upload(&payload).map_err(Error::from_reason)
+    }
+
+    /// Reads a file that an agent's reply refers to, if it is inside the folder the agent was approved for and an
+    /// allowed type. The pair must be an approved one; the path is checked and opened in Rust, never in the page.
+    /// Runs on the blocking pool: the file can be large.
+    #[napi]
+    pub fn acp_read_media<'env>(
+        &self,
+        env: &'env Env,
+        agent_key: String,
+        folder: String,
+        reference: String,
+    ) -> Result<PromiseRaw<'env, AcpMedia>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            Ok(media_result(
+                state.acp_read_media(&agent_key, &folder, &reference),
+            ))
+        })
     }
 
     /// Verifies, asks about (through `onEvent`), runs and signs one relayed call.
@@ -275,6 +352,62 @@ impl DeviceCore {
         })
     }
 
+    /// One page of a folder on a connected server (`{ entries, next, host, … }`, JSON), for the file tree of the
+    /// local window. `after` is the `next` of the page before.
+    #[napi]
+    pub fn host_files_list<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        after: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let page = state.host_files_list(&device_id, &path, after.as_deref())?;
+
+            serde_json::to_string(&page).map_err(|error| error.to_string())
+        })
+    }
+
+    /// A file of a connected server as text (`{ text, truncated, host, path }`, JSON).
+    #[napi]
+    pub fn host_file_read<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let read = state.host_file_read(&device_id, &path)?;
+
+            serde_json::to_string(&read).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
+    /// Resolves what the archive holds (`{ files, folders, bytes, skipped, unreadable, host }`, JSON).
+    #[napi]
+    pub fn host_download<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        destination: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let summary =
+                state.host_download(&device_id, &path, std::path::Path::new(&destination))?;
+
+            serde_json::to_string(&summary).map_err(|error| error.to_string())
+        })
+    }
+
     #[napi]
     pub fn host_disconnect(&self, device_id: String) {
         self.state.host_disconnect(&device_id);
@@ -373,6 +506,34 @@ impl DeviceCore {
         to_json(&view)
     }
 
+    /// A fresh folder for one registry download (its path). Only a file inside it can be installed.
+    #[napi]
+    pub fn acp_install_stage(&self) -> Result<String> {
+        self.state.acp_install_stage().map_err(Error::from_reason)
+    }
+
+    /// Verifies a downloaded registry archive against its published SHA-256, unpacks it, and registers the agent
+    /// with its pinned version (`InstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+    #[napi]
+    pub fn acp_install(&self, request: String) -> Result<String> {
+        // The request can carry variable values; a parse error must not quote them.
+        let request: InstallRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid install request"))?;
+        let view = self
+            .state
+            .acp_install(request)
+            .map_err(Error::from_reason)?;
+
+        to_json(&view)
+    }
+
+    /// Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
+    /// the install took the approval from.
+    #[napi]
+    pub fn acp_install_prune(&self, agent_key: String) {
+        self.state.acp_install_prune(&agent_key);
+    }
+
     /// What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
     /// version probe. The environment holds secrets: it goes to the main process and nowhere else.
     #[napi]
@@ -444,6 +605,54 @@ impl DeviceCore {
     #[napi]
     pub fn acp_permission_cancel_session(&self, session_id: String) {
         self.state.acp_permission_cancel_session(&session_id);
+    }
+
+    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+    /// without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
+    /// writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
+    #[napi]
+    pub fn acp_prepare(&self, envelope: String, signature: String) -> Result<String> {
+        let prepared = self
+            .state
+            .acp_prepare(&Signed {
+                payload: envelope,
+                signature,
+            })
+            .map_err(Error::from_reason)?;
+
+        to_json(&prepared)
+    }
+
+    /// The signed result of a coding-agent command: `accepted`, or the reason it was not carried out
+    /// (`{ payload, signature }`, JSON).
+    #[napi]
+    pub fn acp_sign(&self, envelope: String, signature: String, outcome: String) -> Result<String> {
+        let signed = self
+            .state
+            .acp_sign(
+                &Signed {
+                    payload: envelope,
+                    signature,
+                },
+                &outcome,
+            )
+            .map_err(Error::from_reason)?;
+
+        to_json(&signed)
+    }
+
+    /// Answers the coding-agent request the backend named, under the device window's rules. Throws
+    /// `already_answered` when it is no longer waiting.
+    #[napi]
+    pub fn acp_permission_answer_remote(
+        &self,
+        session_id: String,
+        request_id: String,
+        option_id: String,
+    ) -> Result<()> {
+        self.state
+            .acp_permission_answer_remote(&session_id, &request_id, &option_id)
+            .map_err(Error::from_reason)
     }
 
     /// The most recent audit lines, newest first (each a JSON object).

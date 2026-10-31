@@ -20,6 +20,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { HOST_RUN_METADATA } from "@neore/chat-ui/utils/host-run-text";
 import type { StreamSpeaker, ToolProgressEvent } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 import type { ToolProgressState } from "@neore/chat-ui/utils/tool-progress";
@@ -703,15 +704,18 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
             // still streaming only while it is the LAST part, so the panel collapses as
             // soon as answer text arrives.
             parts: [
-                ...(displayReasoning ? [{ text: displayReasoning, type: "reasoning" }] : []),
-                ...(displayText ? [{ text: displayText, type: "text" }] : []),
+                ...(displayReasoning
+                    ? [{ text: displayReasoning, type: "reasoning", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }]
+                    : []),
+                // A coding agent's text is untrusted: its Markdown images are not loaded (`chat-ui/utils/host-run-text.ts`).
+                ...(displayText ? [{ text: displayText, type: "text", ...(hostState !== undefined && { providerMetadata: HOST_RUN_METADATA }) }] : []),
             ] as UIMessage["parts"],
             role: "assistant",
             status: isStreaming ? "streaming" : "success",
             stepOrder: 0,
             text: displayText,
         };
-    }, [streamId, isStreaming, displayText, displayReasoning, creationTime]);
+    }, [streamId, isStreaming, displayText, displayReasoning, creationTime, hostState]);
 
     // Hide if stream is done AND we have no content (error case)
     // Normal case: parent unmounts us when activeStreamId becomes null
@@ -752,9 +756,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                 <span className="sr-only">
                     <Trans>Assistant Reply:</Trans>{" "}
                 </span>
-                <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word dark:text-white">
+                <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word dark:text-white">
                     {speaker && <SpeakerChip className="mb-1" name={speaker.name} />}
-                    <div className="message-text leading-7">
+                    <div className="message-text text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)">
                         <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                     </div>
                     {isStreaming && <ToolProgressRows state={toolProgress} />}
@@ -790,7 +794,7 @@ export const ThinkingPlaceholder: FC<ThinkingPlaceholderProps> = memo(({ classNa
             <span className="sr-only">
                 <Trans>Assistant Reply:</Trans>{" "}
             </span>
-            <MessageContentWrapper className="message-text text-foreground col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word dark:text-white">
+            <MessageContentWrapper className="message-text text-foreground col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word dark:text-white">
                 <span className="animate-pulse text-gray-400">
                     <Trans>Thinking...</Trans>
                 </span>

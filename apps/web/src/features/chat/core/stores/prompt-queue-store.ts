@@ -22,6 +22,7 @@ import {
     dequeuePrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
+    prependPrompt,
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
@@ -35,6 +36,8 @@ type ThreadQueue = PromptQueueState<PendingAttachment>;
 
 interface PromptQueueStore {
     enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
+    /** Puts the prompt first and lifts a pause, so it is the next one sent. */
+    enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
     /** Loads a thread's queue from sessionStorage once per page load, if memory has none. */
     hydrate: (threadId: string) => void;
     queues: Record<string, ThreadQueue>;
@@ -95,6 +98,10 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
 
     return {
         enqueue: (threadId, prompt) => update(threadId, (queue) => enqueuePrompt(queue, { ...prompt, id: generatePromptId() })),
+        enqueueNext: (threadId, prompt) =>
+            update(threadId, (queue) => {
+                return { ...prependPrompt(queue, { ...prompt, id: generatePromptId() }), paused: false };
+            }),
         hydrate: (threadId) => {
             if (hydratedThreadIds.has(threadId)) {
                 return;

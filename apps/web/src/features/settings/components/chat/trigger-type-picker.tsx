@@ -3,15 +3,16 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { Calendar, Globe } from "lucide-react";
+import { Calendar, Globe, Zap } from "lucide-react";
 import type { FC } from "react";
 
-/** The types a user can create. "event" rows still exist, but nothing dispatches them, so it is not offered. */
-export const SELECTABLE_TRIGGER_TYPES = ["schedule", "webhook"] as const;
+/** The types a user can create. */
+export const SELECTABLE_TRIGGER_TYPES = ["schedule", "webhook", "event"] as const;
 
 export type SelectableTriggerType = (typeof SELECTABLE_TRIGGER_TYPES)[number];
 
 const TRIGGER_TYPE_LABELS: Record<SelectableTriggerType, MessageDescriptor> = {
+    event: msg`Event`,
     schedule: msg`Schedule`,
     webhook: msg`Webhook`,
 };
@@ -41,6 +42,7 @@ const TriggerTypePicker: FC<TriggerTypePickerProps> = ({ disabled = false, onSel
                 >
                     {type === "schedule" && <Calendar aria-hidden="true" className="size-4" />}
                     {type === "webhook" && <Globe aria-hidden="true" className="size-4" />}
+                    {type === "event" && <Zap aria-hidden="true" className="size-4" />}
                     {i18n._(TRIGGER_TYPE_LABELS[type])}
                 </button>
             ))}

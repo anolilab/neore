@@ -47,7 +47,7 @@ export type AutoContinueStreamEvent =
  * Text of a tool result. AI SDK 5+ stores `output: { type, value }`; `content`
  * and `result` are the pre-v5 names, kept for history rebuilt from old rows.
  */
-const toolResultText = (part: { content?: unknown; output?: unknown; result?: unknown }): string => {
+export const toolResultText = (part: { content?: unknown; output?: unknown; result?: unknown }): string => {
     const output = part.output ?? part.content ?? part.result;
     const value = output && typeof output === "object" && "value" in output ? (output as { value: unknown }).value : output;
 

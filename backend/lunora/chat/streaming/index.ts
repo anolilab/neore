@@ -7,8 +7,9 @@ import { internalMutation, internalQuery } from "../../_generated/server";
 import { vHostState } from "../../acp/validators";
 import { patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
-import { publicThread } from "../../agent/threads";
+import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
+import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
@@ -130,6 +131,8 @@ export const getStreamBody = optionalAuthQuery
 
 export const createStreamWithMessage = internalMutation
     .input({
+        /** The goal this message started: `startGoal` already ended the thread's others, so nothing ends here. */
+        goalId: v.optional(v.id("threadGoals")),
         messageId: v.string(),
         streamingConfig: vStreamingConfig,
         threadId: v.string(),
@@ -139,7 +142,13 @@ export const createStreamWithMessage = internalMutation
     // inferring the brand into `api.ts`, where it landed as a bare name with no
     // import.
     .output(v.string())
-    .mutation(async ({ args: { messageId, streamingConfig, threadId, userId }, ctx: context }) => {
+    .mutation(async ({ args: { goalId, messageId, streamingConfig, threadId, userId }, ctx: context }) => {
+        // A new message in a thread ends the goal it was working toward (a goal's own rounds never come through here).
+        // A goal-starting message skips it: `startGoal` ended the others with its insert, and a late stream must not end a later goal.
+        if (!goalId) {
+            await endActiveGoals(context, threadId as Id<"threads">, "superseded");
+        }
+
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,
             streamingConfig,
@@ -266,11 +275,11 @@ export const streamRunThreadHandler = async (ctx: QueryCtx, args: { streamId: Id
     }
 
     if (access.kind === "full") {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     if (access.kind === "locked" && !lockedAfterCreation(access.thread, stream._creationTime)) {
-        return publicThread(access.thread);
+        return threadForViewer(access.thread, args.userId);
     }
 
     return null;

@@ -2617,6 +2617,34 @@
           "optional": false,
           "unique": false
         },
+        "importState": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"done\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"importing\""
+            }
+          ]
+        },
+        "importedTurns": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastEventAt": {
           "kind": "number",
           "nullable": false,
@@ -2703,6 +2731,14 @@
         "by_threadId": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_userId_agentKey_nativeSessionId": {
+          "fields": [
+            "userId",
+            "agentKey",
+            "nativeSessionId"
           ],
           "unique": false
         },
@@ -5148,6 +5184,12 @@
     "deviceCalls": {
       "commitOrdered": false,
       "fields": {
+        "claimId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "claimedAt": {
           "kind": "number",
           "nullable": false,
@@ -5429,6 +5471,48 @@
     "devices": {
       "commitOrdered": false,
       "fields": {
+        "acpOffers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "agentKey": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "agentLabel": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "folderId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "folderLabel": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              }
+            }
+          }
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -14882,6 +14966,2525 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false,
+                  "literal": "\"import_open\""
+                },
+                "nativeSessionId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "title": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "agentKey": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "agentLabel": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "capabilities": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "groups": {
+                      "kind": "object",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "fields": {
+                        "checkpoints": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "fileRollback": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "memoryRollback": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "context": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "compactOnRequest": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "usageMeter": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "identity": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "account": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "models": {
+                              "kind": "array",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "of": {
+                                "kind": "object",
+                                "nullable": false,
+                                "optional": false,
+                                "unique": false,
+                                "fields": {
+                                  "id": {
+                                    "kind": "string",
+                                    "nullable": false,
+                                    "optional": false,
+                                    "unique": false,
+                                    "refined": true
+                                  },
+                                  "name": {
+                                    "kind": "string",
+                                    "nullable": false,
+                                    "optional": false,
+                                    "unique": false,
+                                    "refined": true
+                                  }
+                                }
+                              },
+                              "refined": true
+                            },
+                            "reasoningEffort": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "permissions": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "modes": {
+                              "kind": "array",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "of": {
+                                "kind": "string",
+                                "nullable": false,
+                                "optional": false,
+                                "unique": false,
+                                "refined": true
+                              },
+                              "refined": true
+                            }
+                          }
+                        },
+                        "planning": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "planMode": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "sessions": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "create": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "listNative": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "load": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "streaming": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "reasoning": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "text": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "toolParts": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "subagents": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "ownChildren": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "tools": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "approvalRequest": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "call": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "declinePath": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "turns": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": true,
+                          "unique": false,
+                          "fields": {
+                            "cancel": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"divergent\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"restart\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"synthetic\""
+                                        }
+                                      ]
+                                    },
+                                    "note": {
+                                      "kind": "string",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "refined": true
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "true"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "reason": {
+                                      "kind": "union",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "members": [
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_enforced\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"not_offered\""
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "nullable": false,
+                                          "optional": false,
+                                          "unique": false,
+                                          "literal": "\"unknown\""
+                                        }
+                                      ]
+                                    },
+                                    "supported": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "false"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "followUp": {
+                              "kind": "union",
+                              "nullable": false,
+                              "optional": true,
+                              "unique": false,
+                              "members": [
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "degradation": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": true,
+                                      "unique": false,
+                                      "literal": "\"restart\""
+                                    },
+                                    "kind": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"steer\""
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "kind": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"none\""
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "object",
+                                  "nullable": false,
+                                  "optional": false,
+                                  "unique": false,
+                                  "fields": {
+                                    "kind": {
+                                      "kind": "literal",
+                                      "nullable": false,
+                                      "optional": false,
+                                      "unique": false,
+                                      "literal": "\"queue\""
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "reportedAt": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "version": {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "1"
+                    }
+                  }
+                },
+                "folderId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "folderLabel": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
                   "literal": "\"session_open\""
                 },
                 "nativeSessionId": {
@@ -14905,6 +17508,12 @@
                   "optional": true,
                   "unique": false,
                   "refined": true
+                },
+                "complete": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
                 },
                 "folder": {
                   "kind": "string",
@@ -14985,6 +17594,70 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "contentType": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "fileId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"media\""
+                },
+                "name": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "reference": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "size": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "storageKey": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "uploadId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
                 "error": {
                   "kind": "string",
                   "nullable": false,
@@ -15034,6 +17707,224 @@
                       "literal": "\"interrupted\""
                     }
                   ]
+                },
+                "summary": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "files": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "of": {
+                        "kind": "object",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "fields": {
+                          "added": {
+                            "kind": "number",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "path": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "removed": {
+                            "kind": "number",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          }
+                        }
+                      },
+                      "refined": true
+                    },
+                    "patch": {
+                      "kind": "union",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "members": [
+                        {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "fields": {
+                            "tooLarge": {
+                              "kind": "literal",
+                              "nullable": false,
+                              "optional": false,
+                              "unique": false,
+                              "literal": "true"
+                            }
+                          }
+                        },
+                        {
+                          "kind": "string",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "field": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"reasoning\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"text\""
+                    }
+                  ]
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"child_text\""
+                },
+                "spawnId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "text": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "id": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"child_tool\""
+                },
+                "spawnId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "status": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"cancelled\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"completed\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"declined\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"failed\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"in_progress\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"pending\""
+                    }
+                  ]
+                },
+                "title": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "toolKind": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
                 }
               }
             },
@@ -15115,6 +18006,115 @@
                   "refined": true
                 },
                 "toolKind": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"child_end\""
+                },
+                "spawnId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "status": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"cancelled\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"completed\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"failed\""
+                    }
+                  ]
+                },
+                "text": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"import_end\""
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"import_turn\""
+                },
+                "reasoning": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "text": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "user": {
                   "kind": "string",
                   "nullable": false,
                   "optional": false,
@@ -15601,6 +18601,28 @@
                   "unique": false,
                   "refined": true
                 },
+                "skill": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "rawArgs": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    },
+                    "slug": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
                 "streamId": {
                   "kind": "string",
                   "nullable": false,
@@ -15871,6 +18893,12 @@
             }
           }
         },
+        "stoppedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "streamingConfig": {
           "kind": "object",
           "nullable": false,
@@ -15997,6 +19025,13 @@
         "by_threadId": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_threadId_messageId": {
+          "fields": [
+            "threadId",
+            "messageId"
           ],
           "unique": false
         },
@@ -17038,6 +20073,214 @@
       "memory": false,
       "relations": {},
       "shardMode": "root"
+    },
+    "reviewDrafts": {
+      "commitOrdered": false,
+      "fields": {
+        "body": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "comments": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "body": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "createdAt": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "line": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "path": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "side": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"new\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"old\""
+                  }
+                ]
+              },
+              "startLine": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "null",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  },
+                  {
+                    "kind": "number",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "commitId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "hostOrigin": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "number": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "repository": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "submittingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "verdict": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "null",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"approve\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"comment\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"request_changes\""
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "indexes": {
+        "by_user_and_pull": {
+          "fields": [
+            "userId",
+            "hostOrigin",
+            "repository",
+            "number"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
     },
     "sandboxActions": {
       "commitOrdered": false,
@@ -19918,6 +23161,398 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "threadGoals": {
+      "commitOrdered": false,
+      "fields": {
+        "claimedRound": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "config": {
+          "kind": "object",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "fields": {
+            "customSystemPrompt": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "enabledFeatures": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
+            },
+            "mcpServerNames": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
+            },
+            "model": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "origin": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"outside_agent\""
+            },
+            "reasoningEffort": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "researchDepth": {
+              "kind": "union",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"balanced\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"speed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thorough\""
+                }
+              ]
+            },
+            "searchMode": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "skill": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "rawArgs": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "slug": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            "statelessMode": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
+        "costMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "endedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "maxCostMicrodollars": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "maxRounds": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "promptMessageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "round": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "startMessageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "status": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"active\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"met\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"stopped\""
+            }
+          ]
+        },
+        "stopReason": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"cost_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"daily_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"error\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"review_failed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"round_limit\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"superseded\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"unsupported\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"user\""
+            }
+          ]
+        },
+        "text": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "verdicts": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "at": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "met": {
+                "kind": "boolean",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "order": {
+                "kind": "number",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "reason": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "round": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        }
+      },
+      "indexes": {
+        "by_status_and_updatedAt": {
+          "fields": [
+            "status",
+            "updatedAt"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_status": {
+          "fields": [
+            "threadId",
+            "status"
+          ],
+          "unique": false
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {
+        "thread": {
+          "field": "threadId",
+          "kind": "one",
+          "table": "threads"
+        }
+      },
+      "shardMode": "shardBy:userId"
+    },
     "threadInvites": {
       "commitOrdered": false,
       "fields": {
@@ -20586,11 +24221,55 @@
     "threads": {
       "commitOrdered": false,
       "fields": {
+        "activeAgent": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "kind": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"model\""
+            },
+            "model": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
+        },
         "activeLeafMessageId": {
           "kind": "string",
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "awaitingInput": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"approval\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"question\""
+            }
+          ]
         },
         "botId": {
           "kind": "id",
@@ -20754,6 +24433,12 @@
             }
           }
         },
+        "hasHandoff": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "isPublic": {
           "kind": "boolean",
           "nullable": false,
@@ -20778,7 +24463,19 @@
           "optional": true,
           "unique": false
         },
+        "lastReplyAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastUserMessageAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastViewedAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
@@ -20870,6 +24567,12 @@
           "optional": true,
           "unique": false,
           "literal": "\"host\""
+        },
+        "snoozedUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "source": {
           "kind": "string",
@@ -21424,6 +25127,12 @@
               "optional": false,
               "unique": false
             },
+            "promptMessageId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "reasoningEffort": {
               "kind": "number",
               "nullable": false,
@@ -21624,6 +25333,12 @@
           "optional": true,
           "unique": false
         },
+        "firing": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "pausedTrigger": {
           "kind": "boolean",
           "nullable": false,
@@ -21775,6 +25490,207 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "eventSource": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "at": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"time\""
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "contains": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "cooldownMinutes": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "intervalMinutes": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"page\""
+                },
+                "selector": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "url": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "cooldownMinutes": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "intervalMinutes": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread\""
+                },
+                "threadId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
+            }
+          ]
+        },
+        "eventState": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "armedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "checkFailures": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "checkRetries": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "checkedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "firedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "hash": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastStepOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "leasedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "matched": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "pendingRun": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "coalesced": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "firing": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "payload": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
+            }
+          }
         },
         "eventType": {
           "kind": "string",
@@ -22040,10 +25956,26 @@
           ],
           "unique": false
         },
+        "by_type_enabled_nextTriggerAt": {
+          "fields": [
+            "type",
+            "enabled",
+            "nextTriggerAt"
+          ],
+          "unique": false
+        },
         "by_userId_organizationId": {
           "fields": [
             "userId",
             "organizationId"
+          ],
+          "unique": false
+        },
+        "by_userId_type_enabled": {
+          "fields": [
+            "userId",
+            "type",
+            "enabled"
           ],
           "unique": false
         }

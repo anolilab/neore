@@ -53,7 +53,7 @@ const walk = async (directory: string): Promise<string[]> => {
 let root: string;
 let temporary: string;
 let appData: string;
-let previousTemporary: string | undefined;
+let previousTemporary: Record<string, string | undefined>;
 
 beforeEach(async () => {
     root = await mkdtemp(path.join(os.tmpdir(), "neore-dictation-it-"));
@@ -61,20 +61,22 @@ beforeEach(async () => {
     appData = path.join(root, "app-data");
     await Promise.all([mkdir(temporary), mkdir(path.join(appData, "dictation", "models"), { recursive: true })]);
     await writeFile(path.join(appData, "dictation", "models", spec.file), WEIGHTS);
-    previousTemporary = process.env.TMPDIR;
-    process.env.TMPDIR = temporary;
+    // The variables the helper is given and `os.tmpdir()` reads: TMPDIR on POSIX, TEMP and TMP on Windows.
+    previousTemporary = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+    Object.assign(process.env, { TEMP: temporary, TMP: temporary, TMPDIR: temporary });
 });
 
 afterEach(async () => {
-    // Assigning `undefined` to an environment variable stores the text "undefined": it has to be removed instead.
-    if (previousTemporary === undefined) {
-        delete process.env.TMPDIR;
-    } else {
-        process.env.TMPDIR = previousTemporary;
+    for (const [name, value] of Object.entries(previousTemporary)) {
+        if (value === undefined) {
+            Reflect.deleteProperty(process.env, name);
+        } else {
+            process.env[name] = value;
+        }
     }
 
     vi.restoreAllMocks();
-    await rm(root, { force: true, recursive: true });
+    await rm(root, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 const run = async (): Promise<{ inserted: string[]; notices: string[]; windowClosed: boolean }> => {
@@ -152,7 +154,7 @@ describe("with the switch off", () => {
 
         const directory = path.join(appData, "dictation", "models");
 
-        await rm(directory, { force: true, recursive: true });
+        await rm(directory, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 
         const opened: unknown[] = [];
         const asked: unknown[] = [];
@@ -221,7 +223,7 @@ describe("after a dictation", () => {
             modelPath: await models.ensureVerified(small),
         });
 
-        await expect(recognizer.transcribe(MARKER)).rejects.toMatchObject({ code: "crashed" });
+        await expect(recognizer.transcribe(MARKER)).rejects.toMatchObject({ code: process.platform === "win32" ? "failed" : "crashed" });
 
         for (const file of [...await walk(temporary), ...await walk(appData)]) {
             expect((await readFile(file)).includes(MARKER.subarray(0, 64))).toBe(false);

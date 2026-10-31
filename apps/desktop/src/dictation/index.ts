@@ -16,7 +16,7 @@ import type { BrowserWindow as BrowserWindowInstance, IpcMainEvent, Session } fr
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, net, Notification, session, systemPreferences } from "electron";
 
 import type { ModelSpec } from "./catalog.js";
-import { offeredModels, resolveModel } from "./catalog.js";
+import { offeredModels, resolveModel, unsupportedReason } from "./catalog.js";
 import type { CaptureFailure } from "./channels.js";
 import { CAPTURE_FAILURES, DICTATION_CHANNEL, DICTATION_EVENT } from "./channels.js";
 import type { CaptureWindow, DictationController } from "./controller.js";
@@ -25,7 +25,7 @@ import { DICTATION_SHORTCUT, DICTATION_SHORTCUT_LABEL, isCancel, isChordRelease 
 import { insertDictation } from "./insert.js";
 import { createModelStore } from "./model-store.js";
 import type { PermissionPolicy } from "./permissions.js";
-import { createPermissionPolicy, isDictationAsset } from "./permissions.js";
+import { createPermissionPolicy, isDictationAsset, microphoneAllowed as osAllowsMicrophone, microphoneSettingsPath } from "./permissions.js";
 import type { HelperCommand, Recognizer } from "./recognizer.js";
 import { startRecognizer } from "./recognizer.js";
 import { createSettingsStore } from "./settings.js";
@@ -53,7 +53,7 @@ export interface DictationProbe {
     openSettings?: () => void;
     outcome: () => string | undefined;
     state: () => string;
-    /** Replaces the recogniser and its model with these, skipping the model store. */
+    /** Replaces the recogniser and its model with these, skipping the model store and the OS microphone check (a CI runner has no microphone, and Windows reports it denied). */
     useTestEngine?: (engine: { args: string[]; command: string; modelPath: string }) => void;
 }
 
@@ -261,19 +261,17 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
     const helper = (): HelperCommand => testEngine === undefined ? { args: [], command: helperPath() } : { args: testEngine.args, command: testEngine.command };
 
-    const microphoneAllowed = async (): Promise<boolean | "prompted"> => {
-        if (process.platform !== "darwin") {
-            return true;
+    // `getMediaAccessStatus` exists on macOS and Windows only; Linux has no OS gate and is never asked.
+    const microphoneAllowed = (): Promise<boolean | "prompted"> => {
+        if (testEngine !== undefined) {
+            return Promise.resolve(true);
         }
 
-        const status = systemPreferences.getMediaAccessStatus("microphone");
-
-        if (status === "not-determined") {
-            // The prompt held this press while the key may have come up, and the key-up is only seen from the capture window.
-            return await systemPreferences.askForMediaAccess("microphone") ? "prompted" : false;
-        }
-
-        return status === "granted";
+        return osAllowsMicrophone({
+            ask: () => systemPreferences.askForMediaAccess("microphone"),
+            platform: process.platform,
+            status: () => systemPreferences.getMediaAccessStatus("microphone"),
+        });
     };
 
     const confirmDownload = async (spec: ModelSpec): Promise<boolean> => {
@@ -290,7 +288,8 @@ export const createDictation = (options: DictationOptions): Dictation => {
         return response === 0;
     };
 
-    const hasHelper = (): boolean => testEngine !== undefined || existsSync(helperPath());
+    const unsupported = unsupportedReason(process.platform, process.arch);
+    const hasHelper = (): boolean => unsupported === undefined && (testEngine !== undefined || existsSync(helperPath()));
 
     /** The shortcut is held only while the switch is on and the helper exists: off, other apps keep the key. */
     const syncShortcut = (): void => {
@@ -341,6 +340,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
             settings,
             shortcut: DICTATION_SHORTCUT_LABEL,
             shortcutRefused: () => shortcutRefused,
+            unsupported,
         }),
         log: options.log,
     });
@@ -362,6 +362,7 @@ export const createDictation = (options: DictationOptions): Dictation => {
                 ),
             log: options.log,
             microphoneAllowed,
+            microphoneSettings: microphoneSettingsPath(process.platform),
             model: chosenModel,
             models: {
                 // A download the shortcut started shows in an open settings window too.
@@ -447,7 +448,9 @@ export const createDictation = (options: DictationOptions): Dictation => {
 
         settingsWindow.register();
 
-        if (!existsSync(helperPath())) {
+        if (unsupported !== undefined) {
+            options.log(`dictation: unsupported on ${process.platform} ${process.arch}, so the shortcut is not registered`);
+        } else if (!existsSync(helperPath())) {
             options.log("dictation: the speech helper is not part of this build, so the shortcut is not registered");
         }
 

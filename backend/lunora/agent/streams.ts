@@ -13,6 +13,7 @@ import { getAuthUserIdentity } from "../auth";
 import { pick } from "../lib/collections";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { resolveThreadReadAccess } from "./thread-read-access";
+import { patchThread } from "./table-writes";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { MAX_LENGTH } from "../lib/validators";
 import { mergedStream, stream } from "../lib/streams";
@@ -146,7 +147,7 @@ export const create = internalMutation
         const thread = await ctx.db.get(args.threadId);
 
         if (thread && thread.status === "active") {
-            await ctx.db.patch(args.threadId, { status: "running", updatedAt: ctx.now });
+            await patchThread(ctx.db, args.threadId, { status: "running", updatedAt: ctx.now });
         }
 
         return streamId;
@@ -258,7 +259,7 @@ export const abortActiveForThread = internalMutation
 
 export const abort = internalMutation
     .input({
-        finalDelta: v.optional(v.object(streamDeltasFields)),
+        finalDelta: v.optional(v.object({ ...streamDeltasFields })),
         reason: v.string(),
         streamId: v.id("streamingMessages"),
     })
@@ -326,7 +327,7 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
 
 export const finish = internalMutation
     .input({
-        finalDelta: v.optional(v.object(streamDeltasFields)),
+        finalDelta: v.optional(v.object({ ...streamDeltasFields })),
         streamId: v.id("streamingMessages"),
     })
     .output(v.null())

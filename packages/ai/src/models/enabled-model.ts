@@ -28,7 +28,8 @@ export const enabledModelOf = (model: string | undefined, accepts: ModelAccepts)
 
     const definition = MODEL_LOOKUP.get(model);
 
-    if (definition?.mode !== accepts.mode || definition.enabled === false) {
+    // A text row carries no `mode`, so an unset one reads as text.
+    if (!definition || (definition.mode ?? "text") !== accepts.mode || definition.enabled === false) {
         return undefined;
     }
 

@@ -36,6 +36,11 @@ const contextFor = async (summary: string | null, options: { contextHandler?: ne
             return null;
         }
 
+        // The rows start above order 0, so the handoff lookup runs; this thread was never switched.
+        if (ref === internal.agent.agent_switch.getHandoffAbove) {
+            return [];
+        }
+
         return { page: [...RECENT].toReversed() };
     });
     const { contextHandler, statelessMode, ...contextOptions } = options;
@@ -109,6 +114,10 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         const runQuery = vi.fn(async (ref: unknown) => {
             if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
                 throw new Error("shard busy");
+            }
+
+            if (ref === internal.agent.agent_switch.getHandoffAbove) {
+                return [];
             }
 
             return ref === internal.agent.branches.getContextPathIds ? null : { page: [...RECENT].toReversed() };

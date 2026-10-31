@@ -123,4 +123,35 @@ describe("readFromHost", () => {
     ])("maps %o to %s", (error, failure) => {
         expect(failureOf(error)).toBe(failure);
     });
+
+    it("answers rate_limited, not forbidden, for each way a host says it is throttling", async () => {
+        const answers: Response[] = [
+            new Response("{}", { headers: { "x-ratelimit-remaining": "0" }, status: 403 }),
+            new Response("{}", { headers: { "retry-after": "60" }, status: 403 }),
+            new Response("{}", { status: 429 }),
+            Response.json({ message: "You have exceeded a secondary rate limit." }, { status: 403 }),
+        ];
+
+        for (const answer of answers) {
+            expect(
+                await readFromHost(
+                    githubDriver,
+                    token,
+                    async (request) => await request("/x"),
+                    async () => answer,
+                ),
+            ).toEqual({ status: "rate_limited" });
+        }
+
+        const refusal = Response.json({ message: "Resource not accessible by integration" }, { status: 403 });
+
+        expect(
+            await readFromHost(
+                githubDriver,
+                token,
+                async (request) => await request("/x"),
+                async () => refusal,
+            ),
+        ).toEqual({ status: "forbidden" });
+    });
 });

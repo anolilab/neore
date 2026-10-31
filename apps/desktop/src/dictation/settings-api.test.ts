@@ -32,6 +32,7 @@ let fetched: string[];
 let log: string[];
 let cancelled: number;
 let helper: boolean;
+let unsupported: string | undefined;
 let refused: boolean;
 let beforeCancelDone: (() => Promise<void>) | undefined;
 let shortcut: boolean[];
@@ -46,6 +47,7 @@ beforeEach(async () => {
     log = [];
     cancelled = 0;
     helper = true;
+    unsupported = undefined;
     refused = false;
     beforeCancelDone = undefined;
     shortcut = [];
@@ -78,6 +80,9 @@ beforeEach(async () => {
         settings,
         shortcut: "Ctrl Shift D",
         shortcutRefused: () => refused,
+        get unsupported() {
+            return unsupported;
+        },
     });
 });
 
@@ -159,6 +164,7 @@ describe("with the switch off", () => {
             settings,
             shortcut: "x",
             shortcutRefused: () => false,
+            unsupported: undefined,
         });
 
         await running.update({ enabled: true });
@@ -219,6 +225,27 @@ describe("delete", () => {
         await api.remove("large");
 
         expect(await files()).toStrictEqual([SMALL.file]);
+    });
+});
+
+describe("on a platform that is not supported", () => {
+    it("is unavailable with its own reason, even though a helper exists, and refuses the switch and downloads", async () => {
+        unsupported = "On-device dictation is not available on Windows on ARM yet.";
+
+        const view = await api.view();
+
+        expect(view.available).toBe(false);
+        expect(view.unavailableReason).toBe(unsupported);
+        expect(() => api.download("small")).toThrow("not available");
+        await expect(api.update({ enabled: true })).rejects.toThrow("not available");
+        expect(fetched).toStrictEqual([]);
+        expect(shortcut).toStrictEqual([]);
+    });
+
+    it("gives the generic reason where only the helper is missing", async () => {
+        helper = false;
+
+        expect((await api.view()).unavailableReason).toBe("On-device dictation is not available on this computer yet.");
     });
 });
 

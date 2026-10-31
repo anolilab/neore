@@ -27,6 +27,8 @@ export const runStreamingAgentFields = {
      * (`persistentStreams.pause.id`). It claims that pause instead of the stream's first-run claim.
      */
     resume: v.optional(v.string().max(MAX_LENGTH.short)),
+    /** The skill a goal's first round invoked, so every later round runs it too (the round's own text no longer starts with `/<slug>`). */
+    skill: v.optional(v.object({ rawArgs: v.string().max(MAX_LENGTH.text), slug: v.string().max(MAX_LENGTH.short) })),
     streamId: v.string(),
     streamingConfig: v.object({
         contentType: v.string(),

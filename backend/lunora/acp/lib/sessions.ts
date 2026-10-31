@@ -9,9 +9,13 @@ type SessionStatus = Session["status"];
 export const sessionOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<Session | null> =>
     await ctx.db.acpSessions.findFirst({ where: { threadId } });
 
-/** Writes the session only when something it shows changed; `lastEventAt` moves at most every {@link SESSION_TOUCH_MS}. */
+/**
+ * Writes the session only when something it shows changed; `lastEventAt` moves at most every {@link SESSION_TOUCH_MS}.
+ * A `starting` session is left `starting`: only its agent opening it (`session_open`) or the start failing leaves
+ * that state, and a message held for it (plans/acp-agent-host.md §4.6) must not skip either.
+ */
 export const touchSession = async (ctx: Pick<MutationCtx, "db">, session: Session, status: SessionStatus | undefined, now: number): Promise<void> => {
-    const statusChanged = status !== undefined && status !== session.status && session.status !== "ended";
+    const statusChanged = status !== undefined && status !== session.status && session.status !== "ended" && session.status !== "starting";
     const stale = session.lastEventAt === undefined || now - session.lastEventAt >= SESSION_TOUCH_MS;
 
     if (!statusChanged && !stale) {

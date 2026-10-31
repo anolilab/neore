@@ -11,6 +11,8 @@ export interface PermissionRequest {
     folder: string;
     /** The request as the agent sent it: `sessionId`, `toolCall`, `options`. */
     params: Record<string, unknown>;
+    /** The id the backend knows this request by (`permission_request` in the turn post); a remote answer names it. */
+    requestId?: string;
     /** Replaces the user's variable values in what the window shows: an agent can put its environment in a command. */
     scrub: (text: string) => string;
     /** Our session id, not the agent's. */
@@ -50,6 +52,7 @@ interface DescribedRequest {
     detailsComplete: boolean;
     folder: string;
     options: { kind: string; name: string; optionId: string }[];
+    requestId: string;
     sessionId: string;
     target?: string;
     tool: string;
@@ -107,6 +110,7 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
         folder: request.folder,
         // Ids are the agent's to match and stay as sent; only the names the user reads are scrubbed.
         options: offeredOptions(request.params).map((option) => { return { ...option, name: request.scrub(option.name) }; }),
+        requestId: request.requestId ?? "",
         sessionId: request.sessionId,
         target: shown(targetOf(toolCall)),
         tool: request.scrub(stringOf(toolCall.title) ?? "A tool call"),

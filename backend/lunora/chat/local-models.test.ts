@@ -134,6 +134,20 @@ describe(saveLocalTurnHandler, () => {
         expect(orders).toStrictEqual([0, 0, 1, 1]);
     });
 
+    it("leaves a switched thread's stored model alone, so paths before the switch keep their cloud model", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, {});
+        const agent = { kind: "model", model: "openai/gpt-4.1-mini" };
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
+        await save(OWNER, { prompt: "again", threadId: first.threadId });
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+
+        expect(thread).toMatchObject({ activeAgent: agent, model: "google/gemini-2.0-flash-001" });
+    });
+
     it("refuses a server-side endpoint, so the client cannot write replies under it", async () => {
         await seedEndpoint(OWNER, "openai");
 
@@ -239,6 +253,70 @@ describe("regenerate and edit on the local path", () => {
             { branch: "2/2", role: "user", text: "hello instead" },
             { branch: undefined, role: "assistant", text: "edited answer" },
         ]);
+    });
+
+    it.each([
+        ["a new turn", undefined],
+        ["a regenerate", "regenerate"],
+        ["an edit", "edit"],
+    ] as const)("ends the goal the thread was working toward on %s", async (_name, kind) => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "m" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 1,
+                    maxRounds: 5,
+                    promptMessageId: first.userMessageId,
+                    round: 1,
+                    startMessageId: first.userMessageId,
+                    status: "active",
+                    text: "Ship it",
+                    threadId: first.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        await save(OWNER, { ...(kind && { branch: { kind, messageId: first.userMessageId } }), prompt: "hi again", threadId: first.threadId });
+
+        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
+
+    it("gives the thread back when it ends a goal that was mid-review", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch(first.threadId, { status: "running" });
+            await ctx.db.insert("threadGoals", {
+                config: { model: "m" },
+                costMicrodollars: 0,
+                createdAt: 1,
+                maxCostMicrodollars: 1,
+                maxRounds: 5,
+                promptMessageId: first.userMessageId,
+                round: 0,
+                startMessageId: first.userMessageId,
+                status: "active",
+                text: "Ship it",
+                threadId: first.threadId,
+                updatedAt: 1,
+                userId: OWNER,
+                verdicts: [],
+            });
+        });
+        await save(OWNER, { prompt: "hi again", threadId: first.threadId });
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+
+        expect(thread.status).toBe("active");
     });
 
     it("refuses a branch whose target is not a prompt of the thread", async () => {

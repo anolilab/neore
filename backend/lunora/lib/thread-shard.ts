@@ -27,7 +27,13 @@ const CACHE_TTL_MS = 30_000;
 const CACHE_MAX = 5000;
 const cache = new Map<string, { expiresAt: number; shardKey: string }>();
 
-export const threadShardFor = async (context: ShardAwareContext, userId: string, threadId: string | null | undefined): Promise<string> => {
+export const threadShardFor = async (
+    context: ShardAwareContext,
+    userId: string,
+    threadId: string | null | undefined,
+    /** Reads the grant here instead of through `context.forShard`: a route that verified itself passes `systemRunners(userId)`. */
+    runner?: QueryRunner,
+): Promise<string> => {
     if (!threadId || threadId === "default") {
         return userId;
     }
@@ -39,8 +45,8 @@ export const threadShardFor = async (context: ShardAwareContext, userId: string,
         return hit.shardKey;
     }
 
-    const runner = context.forShard?.(userId) ?? context;
-    const shardKey = (await runner.runQuery(internal.agent.sharing.getGrantOwner, { threadId, userId })) ?? userId;
+    const reader = runner ?? context.forShard?.(userId) ?? context;
+    const shardKey = (await reader.runQuery(internal.agent.sharing.getGrantOwner, { threadId, userId })) ?? userId;
 
     if (cache.size >= CACHE_MAX) {
         cache.clear();

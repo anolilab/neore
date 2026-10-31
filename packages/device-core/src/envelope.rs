@@ -25,6 +25,8 @@ pub enum Domain {
     Progress,
     /// A batch of a coding agent's turn output, posted by the main process straight to the backend.
     Turn,
+    /// One request to the backend's device upload route (`/hosts/uploads`), signed over what the route checks it against.
+    Upload,
 }
 
 impl Domain {
@@ -35,6 +37,7 @@ impl Domain {
             Domain::Manifest => "neore-device:manifest:v1\n",
             Domain::Progress => "neore-device:progress:v1\n",
             Domain::Turn => "neore-device:turn:v1\n",
+            Domain::Upload => "neore-device:upload:v1\n",
         }
     }
 }
@@ -136,6 +139,24 @@ pub fn verify_call(
     now: u64,
     nonces: &mut NonceSet,
 ) -> Result<CallEnvelope, String> {
+    let call = verify_call_unrecorded(secret, device_id, signed, now)?;
+
+    if call.nonce.is_empty() || !nonces.insert(&call.nonce, call.expires_at, now) {
+        return Err("the request was already used or could not be recorded".into());
+    }
+
+    Ok(call)
+}
+
+/// Everything [`verify_call`] checks except the nonce. A coding-agent command is redelivered under the
+/// same envelope when its claim lapses (`acp_call.rs`), so its replay defence is the main process's receipt
+/// log, keyed by the signed call id and kept until the envelope expires, not a nonce spent at the first look.
+pub fn verify_call_unrecorded(
+    secret: &str,
+    device_id: &str,
+    signed: &Signed,
+    now: u64,
+) -> Result<CallEnvelope, String> {
     if !verify(secret, Domain::Call, &signed.payload, &signed.signature) {
         return Err("the request is not signed for this device".into());
     }
@@ -153,10 +174,6 @@ pub fn verify_call(
 
     if call.expires_at > now + MAX_ENVELOPE_AHEAD_MS {
         return Err("the request expires too far ahead".into());
-    }
-
-    if call.nonce.is_empty() || !nonces.insert(&call.nonce, call.expires_at, now) {
-        return Err("the request was already used or could not be recorded".into());
     }
 
     Ok(call)
@@ -200,6 +217,28 @@ mod tests {
             sign(SECRET, Domain::Turn, r#"{"v":1,"kind":"turn"}"#),
             "8b75ddba17829fcc48f06be01cd218becd5ebe06877e6b92800587cba4a946b4"
         );
+        assert_eq!(
+            sign(SECRET, Domain::Upload, r#"{"v":1,"kind":"upload"}"#),
+            "2eb42cf81aa660042f1289aa45be5f1625595dbe5575ddde914114cde70a0d1d"
+        );
+    }
+
+    #[test]
+    fn an_upload_signature_is_not_a_turn_signature() {
+        let payload = r#"{"v":1,"kind":"upload"}"#;
+
+        assert!(!verify(
+            SECRET,
+            Domain::Turn,
+            payload,
+            &sign(SECRET, Domain::Upload, payload)
+        ));
+        assert!(!verify(
+            SECRET,
+            Domain::Upload,
+            payload,
+            &sign(SECRET, Domain::Turn, payload)
+        ));
     }
 
     #[test]

@@ -2,24 +2,28 @@
 
 /**
  * TextSelectionMenu - Floating popup that appears when text is selected in a message.
- * Shows "Pin selection" and "Copy" actions.
+ * Shows "Pin", "Quote in reply" and "Copy" actions as a toolbar; opens for mouse and keyboard selections.
  */
 
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
-import { CopyIcon, PinIcon } from "lucide-react";
+import { CopyIcon, PinIcon, QuoteIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type { FC } from "react";
+import type { FC, KeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
+import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 const WHITESPACE_RE = /\s+/;
+const KEYBOARD_SELECTION_DELAY_MS = 150;
+const ANNOUNCE_MS = 3000;
 
 /**
  * Parse a markdown string into top-level blocks (split on blank lines,
@@ -270,8 +274,12 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
     const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
     const menuRef = useRef<HTMLDivElement>(null);
+    const isPointerDownRef = useRef(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [announcement, setAnnouncement] = useState("");
+    const { t } = useLingui();
 
-    const handleMouseUp = useCallback(() => {
+    const updateSelection = useCallback(() => {
         const sel = globalThis.getSelection();
         const plainText = sel?.toString().trim();
 
@@ -299,14 +307,23 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
         const messageRole = messageElement.dataset.messageRole ?? "assistant";
         const text = resolveSelectionText(range, plainText);
 
+        setActiveIndex(0);
         setSelection({ messageId, messageRole, rect, text });
     }, []);
 
+    const handleMouseUp = useCallback(() => {
+        isPointerDownRef.current = false;
+        updateSelection();
+    }, [updateSelection]);
+
     const handleMouseDown = useCallback((e: MouseEvent) => {
         // Dismiss if click is outside the menu
-        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-            setSelection(null);
+        if (menuRef.current?.contains(e.target as Node)) {
+            return;
         }
+
+        isPointerDownRef.current = true;
+        setSelection(null);
     }, []);
 
     useEffect(() => {
@@ -318,6 +335,98 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
             document.removeEventListener("mousedown", handleMouseDown);
         };
     }, [handleMouseUp, handleMouseDown]);
+
+    // Keyboard selections (Shift+arrows, Select all) never fire mouseup, so follow selectionchange too.
+    // A mouse drag is left to mouseup, and a collapsed selection is left alone so focusing the menu keeps it open.
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const handleSelectionChange = () => {
+            clearTimeout(timer);
+
+            if (isPointerDownRef.current || globalThis.getSelection()?.isCollapsed) {
+                return;
+            }
+
+            timer = setTimeout(updateSelection, KEYBOARD_SELECTION_DELAY_MS);
+        };
+
+        document.addEventListener("selectionchange", handleSelectionChange);
+
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener("selectionchange", handleSelectionChange);
+        };
+    }, [updateSelection]);
+
+    // Tab from a selection inside a message moves into the toolbar; Escape closes it.
+    useEffect(() => {
+        if (!selection) {
+            return undefined;
+        }
+
+        const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+            const target = event.target as Element | null;
+
+            if (
+                event.key === "Tab" &&
+                !event.shiftKey &&
+                globalThis.getSelection()?.anchorNode?.parentElement?.closest("[data-message-id]") &&
+                !menuRef.current?.contains(target)
+            ) {
+                const buttons = menuRef.current?.querySelectorAll("button");
+
+                if (buttons && buttons.length > 0) {
+                    event.preventDefault();
+                    buttons[0]?.focus();
+                }
+            } else if (event.key === "Escape") {
+                setSelection(null);
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [selection]);
+
+    useEffect(() => {
+        if (!announcement) {
+            return undefined;
+        }
+
+        const timer = setTimeout(setAnnouncement, ANNOUNCE_MS, "");
+
+        return () => clearTimeout(timer);
+    }, [announcement]);
+
+    const handleToolbarKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        const buttons = [...(menuRef.current?.querySelectorAll("button") ?? [])];
+        const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const last = buttons.length - 1;
+        const targets: Record<string, number> = {
+            ArrowLeft: current <= 0 ? last : current - 1,
+            ArrowRight: current >= last ? 0 : current + 1,
+            End: last,
+            Home: 0,
+        };
+        const next = targets[event.key];
+
+        if (next !== undefined) {
+            event.preventDefault();
+            buttons[next]?.focus();
+        }
+    };
+
+    const handleQuote = () => {
+        if (!selection) {
+            return;
+        }
+
+        requestComposerRestore({ append: true, files: [], text: formatQuote(selection.text) });
+        setAnnouncement(t`Quoted in composer`);
+        setSelection(null);
+        globalThis.getSelection()?.removeAllRanges();
+    };
 
     // Dismiss on scroll
     useEffect(() => {
@@ -361,32 +470,65 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
     const top = selection ? selection.rect.top - 44 : 0;
     const left = selection ? selection.rect.left + selection.rect.width / 2 : 0;
 
+    // Roving tabindex positions follow the buttons actually rendered (Pin is absent for non-text models).
+    const quoteIndex = isTextModel ? 1 : 0;
+
     const menu = (
-        <AnimatePresence>
-            {selection && threadId && (
-                <motion.div
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    className="bg-background border-border fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border p-1 shadow-md"
-                    exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.1 }, y: 3 }}
-                    initial={{ opacity: 0, scale: 0.92, y: 3 }}
-                    key="text-selection-menu"
-                    ref={menuRef}
-                    style={{ left, top }}
-                    transition={{ duration: 0.12, ease: "easeOut" }}
-                >
-                    {isTextModel && (
-                        <Button className="h-7 gap-1.5 px-2 text-xs" onClick={handlePinSelection} variant="ghost">
-                            <PinIcon className="size-3" />
-                            <Trans>Pin</Trans>
+        <>
+            <div className="sr-only" role="status">
+                {announcement}
+            </div>
+            <AnimatePresence>
+                {selection && threadId && (
+                    <motion.div
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        aria-label={t`Selection actions`}
+                        className="bg-background border-border fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border p-1 shadow-md"
+                        exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.1 }, y: 3 }}
+                        initial={{ opacity: 0, scale: 0.92, y: 3 }}
+                        key="text-selection-menu"
+                        onKeyDown={handleToolbarKeyDown}
+                        ref={menuRef}
+                        role="toolbar"
+                        style={{ left, top }}
+                        transition={{ duration: 0.12, ease: "easeOut" }}
+                    >
+                        {isTextModel && (
+                            <Button
+                                className="h-7 gap-1.5 px-2 text-xs"
+                                onClick={handlePinSelection}
+                                onFocus={() => setActiveIndex(0)}
+                                tabIndex={activeIndex === 0 ? 0 : -1}
+                                variant="ghost"
+                            >
+                                <PinIcon aria-hidden="true" className="size-3" />
+                                <Trans>Pin</Trans>
+                            </Button>
+                        )}
+                        <Button
+                            className="h-7 gap-1.5 px-2 text-xs"
+                            onClick={handleQuote}
+                            onFocus={() => setActiveIndex(quoteIndex)}
+                            tabIndex={activeIndex === quoteIndex ? 0 : -1}
+                            variant="ghost"
+                        >
+                            <QuoteIcon aria-hidden="true" className="size-3" />
+                            <Trans>Quote in reply</Trans>
                         </Button>
-                    )}
-                    <Button className="h-7 gap-1.5 px-2 text-xs" onClick={handleCopy} variant="ghost">
-                        <CopyIcon className="size-3" />
-                        <Trans>Copy</Trans>
-                    </Button>
-                </motion.div>
-            )}
-        </AnimatePresence>
+                        <Button
+                            className="h-7 gap-1.5 px-2 text-xs"
+                            onClick={handleCopy}
+                            onFocus={() => setActiveIndex(quoteIndex + 1)}
+                            tabIndex={activeIndex === quoteIndex + 1 ? 0 : -1}
+                            variant="ghost"
+                        >
+                            <CopyIcon aria-hidden="true" className="size-3" />
+                            <Trans>Copy</Trans>
+                        </Button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </>
     );
 
     // Portalled to the body so no ancestor's stacking context can put the menu under the chat input.

@@ -11,6 +11,14 @@ const FAKE = fileURLToPath(new URL("../../e2e/fixtures/fake-whisper-cli.mjs", im
 const helper = { args: [FAKE], command: process.execPath };
 const pcm = (samples: number): Buffer => Buffer.alloc(samples * 2, 1);
 
+/**
+ * What a helper killed from outside reports: a signal on POSIX. Windows has none for a process another one ended: libuv reports exit
+ * code 1, and the helper is `failed`, not `crashed`. Either is an error to the user; the classification is the platform's.
+ */
+const ENDED = /^(?:crashed|failed)$/u;
+const OUTPUT_FORMAT = /^-o(?:txt|vtt|srt|csv|json|jsn|lrc|wts|ml)$/u;
+const KILLED = process.platform === "win32" ? "failed" : "crashed";
+
 let directory: string;
 let model: string;
 
@@ -21,7 +29,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-    await rm(directory, { force: true, recursive: true });
+    await rm(directory, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 describe("parseTranscript", () => {
@@ -35,6 +43,14 @@ describe("parseTranscript", () => {
 
     it("keeps speech that merely contains a parenthesis", () => {
         expect(parseTranscript("Call me (maybe) tomorrow.").text).toBe("Call me (maybe) tomorrow.");
+    });
+
+    it("drops the timestamp the helper prints before each segment", () => {
+        expect(parseTranscript("\n[00:00:00.000 --> 00:00:03.500]   Hello there.\n[00:00:03.500 --> 00:00:05.000]   And more.\n")).toStrictEqual({
+            segments: ["Hello there.", "And more."],
+            text: "Hello there. And more.",
+        });
+        expect(parseTranscript("[00:00:00.000 --> 00:00:30.000]   [BLANK_AUDIO]\n").text).toBe("");
     });
 
     it("keeps multi-byte text intact", () => {
@@ -97,11 +113,11 @@ describe("startRecognizer", () => {
         expect(started).toBe(false);
     });
 
-    it("tells the helper to detect the language and to write nothing to disk", async () => {
+    it("tells the helper to detect the language, to print its text itself and to write nothing to disk", async () => {
         const seen: string[] = [];
         const { spawn } = await import("node:child_process");
 
-        const recognizer = startRecognizer({
+        await startRecognizer({
             cwd: directory,
             helper,
             language: "auto",
@@ -111,12 +127,12 @@ describe("startRecognizer", () => {
 
                 return spawn(command, args, options);
             },
-        });
+        }).transcribe(pcm(100));
 
-        await recognizer.transcribe(pcm(100));
-
-        expect(seen.slice(seen.indexOf("-m"))).toStrictEqual(["-m", model, "-f", "-", "-otxt", "-nt", "-np", "-l", "auto"]);
-        expect(seen.filter((argument) => argument.startsWith("-o") && argument !== "-otxt")).toStrictEqual([]);
+        // `-otxt` would write to `/dev/stdout` (the console on Windows), which a pipe cannot be opened as: no text would come back.
+        expect(seen.slice(seen.indexOf("-m"))).toStrictEqual(["-m", model, "-f", "-", "-of", "unused", "-np", "-l", "auto"]);
+        // No output format at all: with a name that is not `-`, nothing is opened for writing.
+        expect(seen.filter((argument) => OUTPUT_FORMAT.test(argument))).toStrictEqual([]);
     });
 
     it("rejects with `crashed`, not an unhandled error, when the helper is killed before the audio is written", async () => {
@@ -127,8 +143,8 @@ describe("startRecognizer", () => {
 
         process.kill(recognizer.pid as number, "SIGKILL");
 
-        expect(await early).toBe("crashed");
-        await expect(recognizer.transcribe(pcm(8000))).rejects.toMatchObject({ code: "crashed" });
+        expect(await early).toBe(KILLED);
+        await expect(recognizer.transcribe(pcm(8000))).rejects.toMatchObject({ code: KILLED });
     });
 
     it("reports that the helper has exited once it is killed, and at once when it already has", async () => {
@@ -143,7 +159,7 @@ describe("startRecognizer", () => {
     it("rejects with `crashed` when the helper dies while it holds the audio", async () => {
         await writeFile(model, "die");
 
-        await expect(startRecognizer({ cwd: directory, helper, language: "auto", modelPath: model }).transcribe(pcm(8000))).rejects.toMatchObject({ code: "crashed" });
+        await expect(startRecognizer({ cwd: directory, helper, language: "auto", modelPath: model }).transcribe(pcm(8000))).rejects.toMatchObject({ code: KILLED });
     });
 
     it("rejects with `failed` and keeps the engine's stderr for the log when the helper exits non-zero", async () => {
@@ -190,6 +206,7 @@ describe("startRecognizer", () => {
         const recognizer = startRecognizer({ cwd: directory, helper, language: "auto", modelPath: model });
 
         recognizer.kill();
-        await expect(recognizer.transcribe(pcm(100))).rejects.toMatchObject({ code: "crashed" });
+        // Ended by our own handle, Windows may or may not report a signal; both are an error.
+        await expect(recognizer.transcribe(pcm(100))).rejects.toMatchObject({ code: process.platform === "win32" ? expect.stringMatching(ENDED) : "crashed" });
     });
 });

@@ -163,9 +163,11 @@ export const ReasoningTrigger = memo(({ children, className, getThinkingMessage 
 
 export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & {
     children: string;
+    /** Markdown components for the text, when it is not the model's own (a coding agent's reasoning loads no images). */
+    components?: ComponentProps<typeof Streamdown>["components"];
 };
 
-export const ReasoningContent = memo(({ children, className, ...props }: ReasoningContentProps) => {
+export const ReasoningContent = memo(({ children, className, components, ...props }: ReasoningContentProps) => {
     const { t } = useLingui();
     const plugins = useStreamdownPlugins(children);
     const { isStreaming, setIsOpen, triggerId } = useReasoning();
@@ -196,7 +198,9 @@ export const ReasoningContent = memo(({ children, className, ...props }: Reasoni
             )}
             {...props}
         >
-            <Streamdown plugins={plugins}>{children}</Streamdown>
+            <Streamdown {...(components && { components })} plugins={plugins}>
+                {children}
+            </Streamdown>
             {isStreaming ? null : (
                 <div className="mt-2 flex items-center gap-1">
                     <Button onClick={handleCopy} size="sm" type="button" variant="ghost">

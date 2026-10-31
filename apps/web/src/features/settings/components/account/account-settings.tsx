@@ -182,7 +182,7 @@ const AccountSettings: FC = () => {
                         <Label className="text-base font-medium" htmlFor="send-behavior">
                             {t`Send Message Behavior`}
                         </Label>
-                        <p className="text-muted-foreground text-sm">{t`Choose how to send messages in the chat.`}</p>
+                        <p className="text-muted-foreground text-sm">{t`Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends.`}</p>
                         <Select
                             onValueChange={(value) => {
                                 setSendBehavior(value as typeof sendBehavior);

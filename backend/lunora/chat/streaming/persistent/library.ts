@@ -6,6 +6,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { syncActiveAgent } from "../../../agent/agent-switch";
 import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
 import { parentOf } from "../../../agent/branch-rows";
 import { patchThread } from "../../../agent/table-writes";
@@ -14,6 +15,7 @@ import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
+import { endActiveGoals } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
@@ -27,8 +29,32 @@ import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQue
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
-const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
+export const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
 const LIVE_STREAM_PAGE = 50;
+
+/** The pending row a run writes into; `createStream` and a goal's next round (`chat/goals/internal.ts`) both start one. */
+export const insertPersistentStream = async (
+    ctx: Pick<MutationCtx, "db" | "now">,
+    {
+        messageId,
+        streamingConfig,
+        threadId,
+        userId,
+    }: {
+        messageId: string;
+        streamingConfig: Omit<Doc<"persistentStreams">["streamingConfig"], "researchDepth"> & { researchDepth?: string };
+        threadId: string;
+        userId: string;
+    },
+): Promise<Id<"persistentStreams">> =>
+    (await ctx.db.insert("persistentStreams", {
+        expiresAt: ctx.now + STREAM_TTL_MS,
+        messageId,
+        status: "pending",
+        streamingConfig,
+        threadId,
+        userId,
+    })) as Id<"persistentStreams">;
 
 export const createStream = internalMutation
     .input({
@@ -47,19 +73,7 @@ export const createStream = internalMutation
         threadId: v.string(),
         userId: v.string(),
     })
-    .mutation(async ({ args, ctx }) => {
-        const { now } = ctx;
-        const insertedId = await ctx.db.insert("persistentStreams", {
-            expiresAt: now + STREAM_TTL_MS,
-            messageId: args.messageId,
-            status: "pending",
-            streamingConfig: args.streamingConfig,
-            threadId: args.threadId,
-            userId: args.userId,
-        });
-
-        return insertedId as Id<"persistentStreams">;
-    });
+    .mutation(async ({ args, ctx }) => await insertPersistentStream(ctx, args));
 
 /**
  * Whether a run may start writing `stream`: only once, and only while nothing
@@ -252,18 +266,28 @@ export const stopActiveForThread = internalMutation
                 await recordPausedRunUsage(ctx, stream);
             }
 
-            await patchRow(ctx.db, stream, { status: "done", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
+            // Only a claimed run is still to settle the stop (`finishStoppedReply`); a queued one that has not started
+            // never will (`claimStreamRun` refuses a `done` stream), so it leaves nothing for a switch to wait on.
+            await patchRow(ctx.db, stream, {
+                status: "done",
+                ...(stream.runClaimedAt !== undefined && { stoppedAt: ctx.now }),
+                ...(steers && { steers }),
+                ...(waiting && { pausedRun: undefined }),
+            });
         }
 
+        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
+        const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
+
         // The thread leaves `running` only when no live reply is left to keep running.
-        if (streams.length > 0 && streams.length === live.length) {
+        if ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0)) {
             const threadId = args.threadId as Id<"threads">;
 
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
             await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }
 
-        return streams.length > 0;
+        return streams.length > 0 || goalEnded;
     });
 
 /**
@@ -278,6 +302,10 @@ const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pen
 
     if (thread?.activeLeafMessageId === pending._id) {
         await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+
+        if (parent) {
+            await syncActiveAgent(ctx, threadId, parent._id);
+        }
     }
 };
 
@@ -314,6 +342,11 @@ export const finishStoppedReply = internalMutation
 
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
+
+        // The owed text is saved below, in this transaction, so the stop is settled when it commits.
+        if (stream.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
 
         // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
         // row and the text it owes belong in that message's order, with that message as their prompt.
@@ -372,6 +405,23 @@ export const finishStoppedReply = internalMutation
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
 
         return { stopped: true, ...(messageId !== undefined && { messageId }) };
+    });
+
+/**
+ * A stopped run that ended without saving its owed text (`failRun`: setup or the finish threw) will never
+ * save it, so the stop is as settled as it will get and a model switch need not wait for it (`hasUnsettledStop`).
+ */
+export const settleStoppedRun = internalMutation
+    .input({ streamId: v.id("persistentStreams") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (stream?.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
+
+        return null;
     });
 
 export const getStreamStatus = internalQuery
@@ -529,6 +579,13 @@ export const getChunksAfter = internalQuery
         checkLock: v.optional(v.boolean()),
         streamId: v.id("persistentStreams"),
         /**
+         * The thread and user the caller says the stream belongs to. A stream of anyone else answers as a
+         * missing one. Passed by `/chat/chunks`, which crosses shards as the system and so cannot lean on
+         * the shard's own caller checks.
+         */
+        threadId: v.optional(v.string().max(MAX_LENGTH.id)),
+        userId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /**
          * Say what a run that ended `done` is waiting for: the public API's blocking read and relay
          * ask, because their caller has no composer to show a pending question in.
          */
@@ -578,12 +635,13 @@ export const getChunksAfter = internalQuery
             totalChunks: v.number(),
         }),
     )
-    .query(async ({ args: { afterIndex, checkLock = true, streamId, withPendingRequest }, ctx }) => {
+    .query(async ({ args: { afterIndex, checkLock = true, streamId, threadId, userId, withPendingRequest }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
         // A missing stream is an error, not a lock: an expired one must not read as "This chat is locked."
-        if (!stream) {
+        // Someone else's stream is the same answer, so it cannot be told from a missing one.
+        if (!stream || (userId !== undefined && stream.userId !== userId) || (threadId !== undefined && stream.threadId !== threadId)) {
             return { chunks: [], locked: false, status: "error", totalChunks: afterIndex };
         }
 

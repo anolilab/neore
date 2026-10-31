@@ -16,7 +16,10 @@ import {
 } from "ai";
 import type { Infer } from "lunorash/server";
 
+import type { HostChanges } from "../acp/lib/changes";
+import { readHostChanges, withoutHostChanges } from "../acp/lib/changes";
 import { omit, pick } from "../lib/collections";
+import { agentSwitchOf } from "./agent-switch-logic";
 import type { MessageBranch } from "./branch-tree";
 import { fromModelMessage, toModelMessage, toUIFilePart } from "./mapping";
 import { type MessageCost, type StepUsage, sumMessageCosts, sumStepUsage } from "./message-cost";
@@ -58,6 +61,8 @@ export type UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDat
     /** Gateway cost of the whole assistant turn, summed across its steps. */
     cost?: MessageCost;
     error?: string;
+    /** A host-run turn's changed files and, when kept, its patch (`acp/lib/changes.ts`); older builds ignore it. */
+    hostChanges?: HostChanges;
     key: string;
     /**
      * Set when memories were injected into this reply's prompt: how many, and the
@@ -311,8 +316,15 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
         // `unknown` is not assignable to `JSONValue`. This is the storage/SDK
         // boundary; the cast belongs here rather than at each of the eight part
         // constructors below.
-        ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+        ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
     };
+
+    // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
+    const agentSwitch = agentSwitchOf(message);
+    // The handoff is transcript text for the next model, not for the divider: it stays off the wire.
+    const parts = agentSwitch
+        ? ([{ data: omit(agentSwitch, ["handoff"]), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
+        : [{ text, type: "text", ...partCommon } satisfies TextUIPart];
 
     return {
         _creationTime: message.createdAt ?? message._creationTime,
@@ -321,7 +333,7 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
         metadata: message.metadata,
         order: message.order,
-        parts: [{ text, type: "text", ...partCommon } satisfies TextUIPart],
+        parts,
         role: "system",
         status: message.streaming ? ("streaming" as const) : message.status,
         stepOrder: message.stepOrder,
@@ -350,7 +362,7 @@ const createUserUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes 
         // `unknown` is not assignable to `JSONValue`. This is the storage/SDK
         // boundary; the cast belongs here rather than at each of the eight part
         // constructors below.
-        ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+        ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
     };
 
     const parts: UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"] = [];
@@ -387,6 +399,8 @@ const createUserUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes 
 
     return {
         _creationTime: message.createdAt ?? message._creationTime,
+        // Only a row the app itself wrote carries one (a goal's instruction): the thread hides it by this marker.
+        ...(message.agentName && { agentName: message.agentName }),
         id: message._id,
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
         metadata: message.metadata,
@@ -409,6 +423,19 @@ const memoryUsageOf = (group: ReadonlyArray<MessageDoc>): { memoryUsage?: { coun
     return row ? { memoryUsage: { count: row.retrievedMemories!.length, messageId: row._id } } : {};
 };
 
+/** The group's row that recorded what a host turn changed (the reply, saved once at the end of the turn). */
+const hostChangesOf = (group: ReadonlyArray<MessageDoc>): { hostChanges?: HostChanges } => {
+    for (const row of group) {
+        const hostChanges = readHostChanges(row.providerMetadata);
+
+        if (hostChanges) {
+            return { hostChanges };
+        }
+    }
+
+    return {};
+};
+
 const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDataTypes, TOOLS extends UITools = UITools>(
     groupUnordered: (ExtraFields<METADATA> & MessageDoc)[],
 ): UIMessage<METADATA, DATA_PARTS, TOOLS> => {
@@ -429,6 +456,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         order: firstMessage.order,
         ...(firstMessage.speakerSkillId && { speakerSkillId: firstMessage.speakerSkillId }),
         ...memoryUsageOf(group),
+        ...hostChangesOf(group),
         stepOrder: firstMessage.stepOrder,
         userId: firstMessage.userId,
     };
@@ -490,7 +518,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         const partCommon = {
             state: message.streaming ? ("streaming" as const) : ("done" as const),
             // See the note on the other two `partCommon` blocks — storage/SDK boundary.
-            ...(message.providerMetadata && { providerMetadata: message.providerMetadata as ProviderMetadata }),
+            ...(message.providerMetadata && { providerMetadata: withoutHostChanges(message.providerMetadata) as ProviderMetadata }),
         };
 
         // Add reasoning parts

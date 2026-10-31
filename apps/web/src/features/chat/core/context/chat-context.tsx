@@ -336,7 +336,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // CRITICAL: Validate that initialThread matches current threadId before using it.
     // During navigation, the component can re-render with NEW threadId but OLD initialThread (from previous route).
     // Only use initialThread if its _id matches the current threadId, otherwise fall back to query data.
-    const thread: ThreadData | null = (initialThread && initialThread._id === threadId ? initialThread : null) ?? (threadData as ThreadData | null) ?? null;
+    // The live row wins once there is one: it is seeded from `initialThread`, so it equals it until a switch or an
+    // edit moves the thread, and the loader's snapshot would otherwise keep showing the creation model after one.
+    const thread: ThreadData | null = (threadData as ThreadData | null) ?? (initialThread && initialThread._id === threadId ? initialThread : null) ?? null;
 
     // Backup sync: when Lunora query resolves with fresh data, update store
     // Only if user hasn't explicitly changed model/mode for this thread
@@ -344,7 +346,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // identity of the store snapshot or of the thread row.
     const { loadThreadData } = modelStore;
     const hasThread = Boolean(thread);
-    const threadModel = thread?.model;
+    // The agent a switched thread's path runs on, else the thread's model.
+    const threadModel = thread?.activeAgent?.model ?? thread?.model;
     const threadMode = thread?.mode;
 
     useEffect(() => {
@@ -381,14 +384,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             }
 
             // Use thread's saved model (from initialThread or threadData)
-            if (thread?.model) {
-                return thread.model;
+            if (threadModel) {
+                return threadModel;
             }
         }
 
         // New thread or fallback: use store's selected model (user's last choice or default)
         return modelStore.selectedModel || DEFAULT_CHAT_MODEL;
-    }, [modelProp, modelStore.selectedModel, modelStore.selectedModelThreadId, modelStore.userChangedModel, threadId, thread?.model]);
+    }, [modelProp, modelStore.selectedModel, modelStore.selectedModelThreadId, modelStore.userChangedModel, threadId, threadModel]);
 
     const {
         loadMore,
@@ -887,13 +890,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         return {
             activeStreamId,
             gatewayUrl: gatewayInfo.gatewayUrl,
+            isLocalModel: localTarget !== undefined,
+            isLocalStreaming,
             isStreaming,
             pause,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, streamingMessageId, activeStreamId, gatewayInfo, pause]);
+    }, [isStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {

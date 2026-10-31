@@ -1,3 +1,5 @@
+import { MODEL_LOOKUP } from "@neore/ai/models";
+import { readAgentSwitch } from "@neore/backend/agent/agent-switch-shape";
 import type { Doc } from "@neore/backend/dataModel";
 
 import { buildDocx, DOCX_MIME_TYPE } from "./docx";
@@ -17,8 +19,15 @@ interface StoredToolOutput {
     value?: unknown;
 }
 
+interface StoredPart {
+    content?: string;
+    output?: StoredToolOutput;
+    text?: string;
+}
+
 interface StoredMessagePayload {
-    content?: { content?: string; output?: StoredToolOutput; text?: string }[];
+    // A string on rows that carry no parts (an agent-switch divider stores `""`).
+    content?: StoredPart[] | string;
     role?: string;
 }
 
@@ -72,9 +81,34 @@ const toolOutputText = (output: StoredToolOutput | undefined): string | undefine
 
 const getStoredMessage = (message: Message): StoredMessagePayload | undefined => message.message as StoredMessagePayload | undefined;
 
+/** The stored parts of a row, or none when its content is not a list. */
+const storedParts = (stored: StoredMessagePayload | undefined): StoredPart[] => (Array.isArray(stored?.content) ? stored.content : []);
+
+/** A row's text: the saved text, else its stored text parts. */
+const messageText = (message: Message, stored: StoredMessagePayload | undefined): string =>
+    message.text ??
+    storedParts(stored)
+        .map((part) => part.text)
+        .join("\n");
+
+/** The line a divider row stands for ("Switched from X to Y"), or `undefined` for any other row. */
+const switchNote = (message: Message): string | undefined => {
+    const part = readAgentSwitch(message);
+
+    if (!part) {
+        return undefined;
+    }
+
+    const nameOf = (model: string): string => MODEL_LOOKUP.get(model)?.name ?? model;
+
+    return `Switched from ${nameOf(part.from.model)} to ${nameOf(part.to.model)}`;
+};
+
 /** Every tool-result part as text, in stored order. A reply with no readable output falls back to the row's text. */
 const toolResultText = (message: Message, stored: StoredMessagePayload | undefined): string => {
-    const parts = (stored?.content ?? []).map((part) => toolOutputText(part.output) ?? part.content).filter((part): part is string => part !== undefined);
+    const parts = storedParts(stored)
+        .map((part) => toolOutputText(part.output) ?? part.content)
+        .filter((part): part is string => part !== undefined);
 
     return parts.length > 0 ? parts.join("\n") : (message.text ?? "No result");
 };
@@ -84,6 +118,12 @@ const isToolReply = (message: Message, stored: StoredMessagePayload | undefined)
 
 /** A message as the exporters print it: who said it, and what. */
 const toEntry = (message: Message): { role: string; text: string } => {
+    const note = switchNote(message);
+
+    if (note) {
+        return { role: "System", text: note };
+    }
+
     const stored = getStoredMessage(message);
 
     if (isToolReply(message, stored)) {
@@ -94,7 +134,7 @@ const toEntry = (message: Message): { role: string; text: string } => {
 
     return {
         role: role.charAt(0).toUpperCase() + role.slice(1),
-        text: message.text ?? stored?.content?.map((c) => c.text).join("\n") ?? "",
+        text: messageText(message, stored),
     };
 };
 
@@ -111,6 +151,14 @@ export const formatAsMarkdown = (thread: Chat, messages: Message[]): string => {
     const lines: string[] = [`# ${title}`, "", `_${new Date(thread._creationTime).toLocaleString()}_`, "", "---", ""];
 
     for (const message of sortedMessages) {
+        const note = switchNote(message);
+
+        if (note) {
+            lines.push(`_${note}_`, "");
+
+            continue;
+        }
+
         const stored = getStoredMessage(message);
 
         if (isToolReply(message, stored)) {
@@ -122,9 +170,8 @@ export const formatAsMarkdown = (thread: Chat, messages: Message[]): string => {
         }
 
         const role: string = stored?.role ?? "assistant";
-        const textContent: string = message.text ?? stored?.content?.map((c) => c.text).join("\n") ?? "";
 
-        lines.push(`### ${role.charAt(0).toUpperCase() + role.slice(1)}`, "", textContent, "");
+        lines.push(`### ${role.charAt(0).toUpperCase() + role.slice(1)}`, "", messageText(message, stored), "");
     }
 
     return lines.join("\n");
