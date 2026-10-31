@@ -269,6 +269,31 @@ describe("getLowRiskApprovalContext", () => {
         expect(await ask(await THREAD_ARGS({ createdBy: "import:chatgpt" }))).toBe(false);
     });
 
+    it("stays false once someone else wrote in the thread, as a collaborator before the sharing ended", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const message = async (userId: string, order: number) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("messages", {
+                        message: { content: "hi", role: "user" },
+                        order,
+                        status: "success",
+                        stepOrder: 0,
+                        threadId,
+                        tool: false,
+                        userId,
+                    }),
+            );
+
+        await message(USER, 0);
+        expect(await ask(threadId)).toBe(true);
+
+        await message("former-collaborator", 1);
+        expect(await ask(threadId)).toBe(false);
+    });
+
     it("stays false in a thread longer than the agent's window, where a tool result may have scrolled out unseen", async () => {
         await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
 

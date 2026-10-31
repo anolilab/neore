@@ -142,6 +142,11 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
         return false;
     }
 
+    // A row someone else wrote (a collaborator before the sharing ended) is text the person did not write.
+    if (rows.some((row) => row.userId !== undefined && row.userId !== userId)) {
+        return false;
+    }
+
     const summaryTaint = await threadSummaryTaint(ctx, threadId);
 
     return summaryTaint.length === 0;
