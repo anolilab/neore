@@ -13,6 +13,7 @@ import { createExecution, recordFilteredExecution, setTriggerEnabledInternal, sw
 import {
     EVENT_CHECK_LEASE_MS,
     EVENT_FIRE_CLAIM_TTL_MS,
+    EVENT_PENDING_RUN_HORIZON_MS,
     EVENT_RUN_MAX_ATTEMPTS,
     dispatchDueEventTriggers,
     latestThreadReply,
@@ -76,6 +77,8 @@ const insertWatcher = async (overrides: Record<string, unknown> = {}): Promise<s
                 ...overrides,
             }),
     );
+
+const nextCheckOf = (trigger: { nextTriggerAt: number }): number => trigger.nextTriggerAt;
 
 const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
 
@@ -429,6 +432,29 @@ describe("handing a firing to the queue", () => {
     });
 });
 
+describe("a queued run whose delivery dies", () => {
+    it("names the switch-off of its own firing as the compensation, and that switches a consumed moment off", async () => {
+        const id = await insertWatcher({ eventSource: { at: NOW + 1000, kind: "time" }, nextTriggerAt: NOW + 1000 });
+
+        vi.setSystemTime(NOW + 1000);
+        await check(id, "", NOW + 1000);
+
+        const [args] = scheduledRuns();
+
+        await queueEventRun(args);
+
+        const { onLapse } = (enqueueJob.mock.calls[0]?.[2] as { once: { onLapse: { args: Record<string, unknown>; ref: { __lunoraRef: string } } } }).once;
+
+        expect(onLapse.args).toEqual({ firing: NOW + 1000, triggerId: id });
+        expect(onLapse.ref.__lunoraRef).toContain("switchOffConsumedMoment");
+
+        // `reapLapsedClaims` runs the target with its onLapse args plus the claim key.
+        await harness.run(async (ctx: any) => await ctx.runMutation(switchOffConsumedMoment, { ...onLapse.args, claimKey: `event:${id}:${NOW + 1000}` }));
+
+        expect(await readTrigger(id)).toMatchObject({ enabled: false });
+    });
+});
+
 describe("a send that fails", () => {
     const fireMoment = async (): Promise<{ args: any; id: string }> => {
         const id = await insertWatcher({ eventSource: { at: NOW + 1000, kind: "time" }, nextTriggerAt: NOW + 1000 });
@@ -517,6 +543,72 @@ describe("a send that fails", () => {
 
         expect(enqueueJob).not.toHaveBeenCalled();
         expect(id).not.toBe(again.id);
+    });
+});
+
+describe("an occurrence that fires while an earlier one is still waiting for the queue", () => {
+    const MINUTE = 60_000;
+    const changeAt = async (id: string, html: string, now: number): Promise<void> => {
+        vi.setSystemTime(now);
+        await check(id, html, now);
+    };
+
+    it("keeps the earlier run being retried and folds the newer occurrence into it, instead of replacing it", async () => {
+        const id = await insertWatcher();
+
+        await check(id, "<p>v1</p>");
+        await check(id, "<p>v2</p>");
+
+        const [first] = scheduledRuns();
+        const before = harness.scheduler.list().length;
+
+        // The queue refuses the send, so the firing stays pending and a retry is scheduled.
+        enqueueJob.mockRejectedValueOnce(new Error("queue unavailable"));
+        await harness.run(async (ctx: any) => await performEventRun(ctx, first));
+
+        const [retry] = harness.scheduler.list().slice(before);
+
+        expect(retry!.args).toMatchObject({ attempt: 1, firing: NOW });
+
+        // The outage outlasts the cooldown (60 min): the page changes again.
+        await changeAt(id, "<p>v3</p>", NOW + 61 * MINUTE);
+
+        const row = await readTrigger(id);
+
+        expect(row.eventState.pendingRun).toMatchObject({ coalesced: 1, firing: NOW, payload: first.payload });
+        expect(row.eventState.firedAt).toBe(NOW + 61 * MINUTE);
+        expect(scheduledRuns().filter((args) => args.firing === NOW + 61 * MINUTE)).toHaveLength(0);
+
+        // The retry of the earlier firing still matches, and the queue takes it once.
+        await harness.run(async (ctx: any) => await performEventRun(ctx, retry!.args));
+
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(enqueueJob.mock.calls[1]?.[2]).toMatchObject({ once: { jobId: `event:${id}:${NOW}` } });
+
+        const settled = await readTrigger(id);
+
+        expect(Object.hasOwn(settled.eventState, "pendingRun")).toBe(false);
+    });
+
+    it("replaces a pending run that is past the horizon, which no retry can still be settling", async () => {
+        const id = await insertWatcher();
+
+        await check(id, "<p>v1</p>");
+        await check(id, "<p>v2</p>");
+
+        const [first] = scheduledRuns();
+
+        await changeAt(id, "<p>v3</p>", NOW + EVENT_PENDING_RUN_HORIZON_MS + MINUTE);
+
+        const row = await readTrigger(id);
+
+        expect(row.eventState.pendingRun).toMatchObject({ firing: NOW + EVENT_PENDING_RUN_HORIZON_MS + MINUTE });
+        expect(row.eventState.pendingRun.coalesced).toBeUndefined();
+        expect(scheduledRuns()).toHaveLength(2);
+
+        await harness.run(async (ctx: any) => await performEventRun(ctx, first));
+
+        expect(enqueueJob).not.toHaveBeenCalled();
     });
 });
 
@@ -762,6 +854,63 @@ describe("dispatching due watchers", () => {
 
         expect(await readTrigger(id)).toMatchObject({ enabled: false });
         expect(harness.scheduler.list()).toEqual([]);
+    });
+});
+
+describe("a check that never reports back", () => {
+    const dispatch = async (now: number): Promise<void> => {
+        vi.setSystemTime(now);
+        await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueEventTriggers, {}));
+    };
+
+    it("counts a lapsed lease as a failed check and pauses the watcher on the third, telling its owner once", async () => {
+        const id = await insertWatcher();
+        let now = NOW;
+
+        await dispatch(now);
+        expect(harness.scheduler.list()).toHaveLength(1);
+
+        for (let failure = 1; failure < TRIGGER_PAUSE_AFTER_FAILURES; failure += 1) {
+            // The check died: the lease lapses and the next dispatch finds it still stamped.
+            now += EVENT_CHECK_LEASE_MS + 1;
+            await dispatch(now);
+
+            expect(await readTrigger(id)).toMatchObject({ enabled: true, eventState: { checkFailures: failure } });
+
+            now = nextCheckOf(await readTrigger(id));
+            await dispatch(now);
+        }
+
+        now += EVENT_CHECK_LEASE_MS + 1;
+        await dispatch(now);
+
+        const row = await readTrigger(id);
+        const notices = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
+
+        expect(row.enabled).toBe(false);
+        expect(row.nextTriggerAt).toBeUndefined();
+        expect(row.lastError).toContain("did not finish");
+        expect(notices).toHaveLength(1);
+    });
+
+    it("counts nothing for a check that reported, however often the watcher is dispatched", async () => {
+        const id = await insertWatcher();
+        let now = NOW;
+
+        for (let round = 0; round < 4; round += 1) {
+            await dispatch(now);
+            await check(id, `<p>v${round}</p>`, now);
+
+            const row = await readTrigger(id);
+
+            expect(Object.hasOwn(row.eventState, "leasedAt")).toBe(false);
+            expect(Object.hasOwn(row.eventState, "checkFailures")).toBe(false);
+            now = row.nextTriggerAt + 1;
+        }
+
+        const final = await readTrigger(id);
+
+        expect(final.enabled).toBe(true);
     });
 });
 

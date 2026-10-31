@@ -56,9 +56,12 @@ export const vEventState = v.object({
     hash: v.optional(v.string()),
     lastOrder: v.optional(v.number()),
     lastStepOrder: v.optional(v.number()),
+    // When the check now in flight was dispatched; `recordEventCheck` clears it. Found still set at the next dispatch, that check never reported.
+    leasedAt: v.optional(v.number()),
     matched: v.optional(v.boolean()),
     // A firing whose run the jobs queue has not accepted yet; kept so a send that fails is tried again (`startEventRun`) and never lost.
-    pendingRun: v.optional(v.object({ firing: v.number(), payload: v.string() })),
+    // `coalesced`: later occurrences folded into it while it waited.
+    pendingRun: v.optional(v.object({ coalesced: v.optional(v.number()), firing: v.number(), payload: v.string() })),
 });
 
 export type EventState = Infer<typeof vEventState>;

@@ -42,6 +42,8 @@ import { MAX_ACTIVE_EVENT_WATCHERS, MINUTE_MS } from "./event-sources/types";
 import type { EventState } from "./validators";
 import { vEventSource, vEventState } from "./validators";
 
+type PendingRun = NonNullable<EventState["pendingRun"]>;
+
 /** Claim scope for "this occurrence already started a run" (`claimOnce`). */
 export const EVENT_FIRE_SCOPE = "event-fire";
 /**
@@ -56,10 +58,18 @@ const EVENT_DISPATCH_BATCH = 25;
 const EVENT_RUN_RETRY_MS = 2 * MINUTE_MS;
 
 export const EVENT_RUN_MAX_ATTEMPTS = 6;
+/**
+ * A firing still waiting for the queue after this long is presumed dead (the action that would have settled it was
+ * evicted): a newer occurrence replaces it instead of being folded into it. Past the last retry's wait by design.
+ */
+export const EVENT_PENDING_RUN_HORIZON_MS = EVENT_RUN_RETRY_MS * 2 ** EVENT_RUN_MAX_ATTEMPTS;
 /** Rows read per scan of a thread. A longer stretch is read over several checks: the baseline moves to the last row read. */
 const THREAD_SCAN_ROWS = 60;
 /** The longest a transient failure delays the next check. */
 const EVENT_MAX_BACKOFF_MS = 6 * 60 * MINUTE_MS;
+
+/** The failure recorded for a check that was dispatched and never reported back. */
+const UNREPORTED_CHECK_ERROR = "The last check did not finish (it ran out of time or memory).";
 
 /** What the owner is told when repeated failed checks switch the watcher off. */
 const pausedWatcherNoticeBody = (error: string): string =>
@@ -119,15 +129,20 @@ const withoutPendingRun = (state: EventState | undefined): EventState => {
     return kept;
 };
 
-/** The baseline without the counters of failed checks. */
-const withoutCounters = (state: EventState | undefined): EventState => {
+/** The baseline without the counters of failed checks and the stamp of the lease that was taken for this check. */
+const withoutCheckMarks = (state: EventState | undefined): EventState => {
     const kept = { ...state };
 
     delete kept.checkFailures;
     delete kept.checkRetries;
+    delete kept.leasedAt;
 
     return kept;
 };
+
+/** The run waiting for the queue after an occurrence: the earlier one with the newer folded in, or the newer one alone. */
+const nextPending = (pending: PendingRun | undefined, fold: boolean, fresh: PendingRun): PendingRun =>
+    fold && pending ? { ...pending, coalesced: (pending.coalesced ?? 0) + 1 } : fresh;
 
 /** When a watcher is looked at next after a check that worked; `undefined` for a moment that has come. */
 const nextCheckAfterSuccess = (
@@ -140,6 +155,46 @@ const nextCheckAfterSuccess = (
     }
 
     return now + (started ? Math.max(interval, cooldownMs(config)) : interval);
+};
+
+/**
+ * Counts one failed check against a watcher and sets its next look: a failure the owner can fix counts toward the pause
+ * (and the third in a row switches the watcher off and tells its owner), an outage backs the next check off instead.
+ * Shared by a check that reported a failure and by a lease that lapsed without any report.
+ */
+const failCheck = async (ctx: MutationCtx, trigger: Doc<"triggers">, error: string, transient: boolean): Promise<void> => {
+    const { now } = ctx;
+    const interval = Math.max(checkIntervalMs(trigger.eventSource!), EVENT_CHECK_LEASE_MS);
+    const retries = transient ? (trigger.eventState?.checkRetries ?? 0) + 1 : 0;
+    const { pause, streak } = advanceStreak(trigger.eventState?.checkFailures ?? 0, transient ? "transient" : "user-fixable");
+    // An outage waits twice as long after each check it spoils, up to a cap; a failure the owner must fix keeps the usual pace until the pause.
+    const wait = retries > 0 ? Math.min(interval * 2 ** (retries - 1), Math.max(EVENT_MAX_BACKOFF_MS, interval)) : interval;
+    const counters = { ...(streak > 0 && { checkFailures: streak }), ...(retries > 0 && { checkRetries: retries }) };
+
+    await patchRow(ctx.db, trigger, {
+        eventState: { ...withoutCheckMarks(trigger.eventState), checkedAt: now, ...counters },
+        lastError: error,
+        nextTriggerAt: pause ? undefined : now + wait,
+        updatedAt: now,
+        ...(pause && { enabled: false }),
+    });
+
+    if (!pause) {
+        await noteShardDue(ctx, now + wait, trigger.userId);
+
+        return;
+    }
+
+    console.info(`[Triggers] Event trigger ${trigger._id} paused after ${streak} failed checks in a row`);
+    await notifyQuietly(ctx, {
+        body: pausedWatcherNoticeBody(error),
+        dedupeKey: `trigger-paused:${trigger._id}:${now}`,
+        link: "/dashboard/settings/chat/triggers",
+        outcome: "failure",
+        title: trigger.name,
+        type: "trigger",
+        userId: trigger.userId,
+    });
 };
 
 // ─── Dispatch ────────────────────────────────────────────────────────────────
@@ -174,6 +229,14 @@ export const dispatchDueEventTriggers = internalMutation
                 continue;
             }
 
+            // Still stamped: the check of the last lease never reported (it died, e.g. on the CPU limit). That counts as a
+            // failed check the owner can fix, so a page that kills every check ends up paused instead of retried for good.
+            if (trigger.eventState?.leasedAt !== undefined) {
+                await failCheck(ctx, trigger, UNREPORTED_CHECK_ERROR, false);
+
+                continue;
+            }
+
             try {
                 await ctx.scheduler.runAfter(0, internal.triggers.events.runEventCheck, { triggerId: trigger._id });
             } catch (error) {
@@ -182,7 +245,7 @@ export const dispatchDueEventTriggers = internalMutation
                 continue;
             }
 
-            await ctx.db.patch(trigger._id, { nextTriggerAt: now + EVENT_CHECK_LEASE_MS });
+            await ctx.db.patch(trigger._id, { eventState: { ...trigger.eventState, leasedAt: now }, nextTriggerAt: now + EVENT_CHECK_LEASE_MS });
             dispatched += 1;
         }
 
@@ -383,7 +446,15 @@ export const queueEventRun = async ({
     await enqueueJob(
         internal.triggers.execute.executeTrigger,
         { firing, payload, triggerId },
-        { once: { jobId: `event:${triggerId}:${String(firing)}`, userId }, shardKey: userId },
+        {
+            once: {
+                jobId: `event:${triggerId}:${String(firing)}`,
+                // A delivery that dies after claiming the job is never re-run; a moment it consumed must still be switched off.
+                onLapse: { args: { firing, triggerId }, ref: internal.triggers.functions.switchOffConsumedMoment },
+                userId,
+            },
+            shardKey: userId,
+        },
     );
 };
 
@@ -545,63 +616,37 @@ export const recordEventCheck = internalMutation
             return { fired: false };
         }
 
-        const { now } = ctx;
-        const config = trigger.eventSource;
-        const interval = Math.max(checkIntervalMs(config), EVENT_CHECK_LEASE_MS);
-
         if (error !== undefined) {
-            const retries = transient === true ? (trigger.eventState?.checkRetries ?? 0) + 1 : 0;
-            const { pause, streak } = advanceStreak(trigger.eventState?.checkFailures ?? 0, transient === true ? "transient" : "user-fixable");
-            // An outage waits twice as long after each check it spoils, up to a cap; a failure the owner must fix keeps the usual pace until the pause.
-            const wait = retries > 0 ? Math.min(interval * 2 ** (retries - 1), Math.max(EVENT_MAX_BACKOFF_MS, interval)) : interval;
-
-            const counters = { ...(streak > 0 && { checkFailures: streak }), ...(retries > 0 && { checkRetries: retries }) };
-
-            await patchRow(ctx.db, trigger, {
-                eventState: { ...withoutCounters(trigger.eventState), checkedAt: now, ...counters },
-                lastError: error,
-                nextTriggerAt: pause ? undefined : now + wait,
-                updatedAt: now,
-                ...(pause && { enabled: false }),
-            });
-
-            if (pause) {
-                console.info(`[Triggers] Event trigger ${trigger._id} paused after ${streak} failed checks in a row`);
-                await notifyQuietly(ctx, {
-                    body: pausedWatcherNoticeBody(error),
-                    dedupeKey: `trigger-paused:${trigger._id}:${now}`,
-                    link: "/dashboard/settings/chat/triggers",
-                    outcome: "failure",
-                    title: trigger.name,
-                    type: "trigger",
-                    userId: trigger.userId,
-                });
-            } else {
-                await noteShardDue(ctx, now + wait, trigger.userId);
-            }
+            await failCheck(ctx, trigger, error, transient === true);
 
             return { fired: false };
         }
+
+        const { now } = ctx;
+        const config = trigger.eventSource;
+        const interval = Math.max(checkIntervalMs(config), EVENT_CHECK_LEASE_MS);
 
         const fireKey = fire ? `${trigger._id}:${fire.key}` : undefined;
         const claimed = fireKey !== undefined && (await claimOnce(ctx, EVENT_FIRE_SCOPE, fireKey, EVENT_FIRE_CLAIM_TTL_MS, trigger.userId));
         const { checkFailures, checkRetries } = state ?? trigger.eventState ?? {};
         // The pending run is the watcher's own record, settled by `settleEventRun`: a check that read it earlier must not bring it back.
-        const kept = withoutPendingRun(withoutCounters(state ?? trigger.eventState));
+        const kept = withoutPendingRun(withoutCheckMarks(state ?? trigger.eventState));
         const pendingRun = trigger.eventState?.pendingRun;
         // A moment in time fires once and is done; the others keep watching, after a cooldown.
         const nextTriggerAt = nextCheckAfterSuccess(config, { fired: fire !== undefined, interval, now, started: claimed });
         const recovered = (checkFailures ?? 0) > 0 || (checkRetries ?? 0) > 0;
-
-        // A newer firing replaces an older one still pending: only a queue outage longer than the cooldown could leave two.
         const payload = claimed && fire ? buildEventPayload(fire.summary, fire.excerpt) : undefined;
+        // An earlier firing the queue has not taken yet keeps its place — it is still being retried — and the newer occurrence
+        // is folded into it (counted in `coalesced`); only one presumed dead (past the horizon) is replaced.
+        const foldIntoPending = payload !== undefined && pendingRun !== undefined && now - pendingRun.firing < EVENT_PENDING_RUN_HORIZON_MS;
+        const nextPendingRun = payload === undefined ? pendingRun : nextPending(pendingRun, foldIntoPending, { firing: now, payload });
 
         await patchRow(ctx.db, trigger, {
             eventState: {
                 ...kept,
                 checkedAt: now,
                 ...(claimed && { firedAt: now }),
-                ...(payload === undefined ? pendingRun && { pendingRun } : { pendingRun: { firing: now, payload } }),
+                ...(nextPendingRun && { pendingRun: nextPendingRun }),
             },
             nextTriggerAt,
             updatedAt: now,
@@ -612,7 +657,7 @@ export const recordEventCheck = internalMutation
             await noteShardDue(ctx, nextTriggerAt, trigger.userId);
         }
 
-        if (payload !== undefined) {
+        if (payload !== undefined && !foldIntoPending) {
             // Scheduled, not sent: a job scheduled by a mutation is dropped with it if it fails, a queue send is not.
             await ctx.scheduler.runAfter(0, internal.triggers.events.startEventRun, {
                 firing: now,

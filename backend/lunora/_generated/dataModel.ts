@@ -1788,7 +1788,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; leasedAt?: number; matched?: boolean; pendingRun?: { coalesced?: number; firing: number; payload: string } };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
@@ -4572,7 +4572,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; leasedAt?: number; matched?: boolean; pendingRun?: { coalesced?: number; firing: number; payload: string } };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;

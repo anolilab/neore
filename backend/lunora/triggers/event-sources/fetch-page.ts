@@ -51,6 +51,15 @@ const readCapped = async (response: Response): Promise<FetchedPage> => {
     }
 };
 
+/** Where a redirect leads. A `Location` that is no address is the owner's to fix, like a redirect that names none. */
+const redirectTarget = (location: string, from: string): string => {
+    try {
+        return new URL(location, from).href;
+    } catch (error) {
+        throw new EventCheckError("The page redirects to an address that cannot be read.", { cause: error });
+    }
+};
+
 export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
     let target = url;
     const deadline = Date.now() + PAGE_DEADLINE_MS;
@@ -84,7 +93,7 @@ export const fetchWatchedPage = async (url: string): Promise<FetchedPage> => {
             }
 
             // `fetchWithTimeout` checks this target on the next turn.
-            target = new URL(location, target).href;
+            target = redirectTarget(location, target);
 
             continue;
         }

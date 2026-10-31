@@ -990,7 +990,7 @@ export interface InternalApiTypes {
             dispatchDueEventTriggers: FunctionReference<"mutation", {}, { dispatched: number }>;
             isEventRunPending: FunctionReference<"query", { firing: number; triggerId: Id<"triggers"> }, boolean>;
             latestThreadReply: FunctionReference<"query", { after?: { order: number; stepOrder: number }; now: number; threadId: string; userId: string }, { accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } }; transient?: boolean; triggerId: Id<"triggers"> }, { fired: boolean }>;
+            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; leasedAt?: number; matched?: boolean; pendingRun?: { coalesced?: number; firing: number; payload: string } }; transient?: boolean; triggerId: Id<"triggers"> }, { fired: boolean }>;
             runEventCheck: FunctionReference<"action", { triggerId: Id<"triggers"> }, null>;
             settleEventRun: FunctionReference<"mutation", { attempt: number; firing: number; sent: boolean; triggerId: Id<"triggers"> }, null>;
             startEventRun: FunctionReference<"action", { attempt?: number; firing: number; payload: string; triggerId: Id<"triggers">; userId: string }, null>;
@@ -1008,7 +1008,7 @@ export interface InternalApiTypes {
             releaseQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers"> }, null>;
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
-            switchOffConsumedMoment: FunctionReference<"mutation", { firing?: number; triggerId: Id<"triggers"> }, null>;
+            switchOffConsumedMoment: FunctionReference<"mutation", { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }, null>;
             updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };

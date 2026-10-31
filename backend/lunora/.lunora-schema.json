@@ -21523,6 +21523,12 @@
               "optional": true,
               "unique": false
             },
+            "leasedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "matched": {
               "kind": "boolean",
               "nullable": false,
@@ -21535,6 +21541,12 @@
               "optional": true,
               "unique": false,
               "fields": {
+                "coalesced": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "firing": {
                   "kind": "number",
                   "nullable": false,

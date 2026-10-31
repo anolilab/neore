@@ -987,7 +987,12 @@ const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">, 
  * would hold one of its owner's watcher slots for good. A moment that has not fired, or is already off, is left alone.
  */
 export const switchOffConsumedMoment = internalMutation
-    .input({ firing: v.optional(v.number()), triggerId: v.id("triggers") })
+    .input({
+        // Added by `reapLapsedClaims` when this is the `onLapse` of a firing's queued run (`events.ts#queueEventRun`); unused.
+        claimKey: v.optional(v.string().max(MAX_LENGTH.key)),
+        firing: v.optional(v.number()),
+        triggerId: v.id("triggers"),
+    })
     .output(v.null())
     .mutation(async ({ args: { firing, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
