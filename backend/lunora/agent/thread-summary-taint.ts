@@ -11,6 +11,7 @@
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
+import { agentSwitchOf } from "./agent-switch-logic";
 import { SUMMARIES_KEPT_PER_THREAD } from "./thread-summary-logic";
 
 export const threadSummaryTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<DeviceTaintSource[]> => {
@@ -20,4 +21,26 @@ export const threadSummaryTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id
         .take(SUMMARIES_KEPT_PER_THREAD + 2);
 
     return mergeTaint(...rows.map((row) => row.taintedBy));
+};
+
+/**
+ * What a handoff taken over from a coding agent carries into a device call. Such a thread (harness switch S3) starts with a
+ * `portable` divider holding the agent's output, written by an agent that ran commands and read files and pages on the
+ * user's computer. None of those tool results exist in this thread, so `computeTaint` cannot see them: the thread is
+ * treated as having read a page and a device, for as long as it lasts.
+ */
+export const HOST_HANDOFF_TAINT: DeviceTaintSource[] = ["web", "device"];
+
+export const threadHandoffTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<DeviceTaintSource[]> => {
+    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
+
+    if (!thread?.hasHandoff) {
+        return [];
+    }
+
+    // The divider that makes a thread a takeover is its first row.
+    const first = await ctx.db.messages.findFirst({ orderBy: [{ order: "asc" }, { stepOrder: "asc" }], where: { threadId } });
+    const part = first && agentSwitchOf(first);
+
+    return part?.from.kind === "host" && part.handoff ? HOST_HANDOFF_TAINT : [];
 };

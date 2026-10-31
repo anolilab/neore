@@ -45,3 +45,16 @@ export const lastAgentSwitch = (rows: ReadonlyArray<{ providerMetadata?: unknown
     rows.map((row) => agentSwitchOf(row)).find((part) => part !== undefined);
 
 export { AGENT_SWITCH_KEY } from "./agent-switch-shape";
+
+/**
+ * The part as a client is sent it. The handoff is transcript text for the next model, not for the divider, and a coding agent
+ * is named by its label and folder alone: the computer's id, the agent's key and the folder's id are not for a reader of a
+ * thread (a public copy of it included).
+ */
+export const agentSwitchForWire = (part: AgentSwitchPart): Omit<AgentSwitchPart, "from" | "handoff" | "to"> & { from: unknown; to: unknown } => {
+    const { from, handoff: _handoff, to, ...rest } = part;
+    const labelsOf = (agent: SwitchAgentRef) =>
+        agent.kind === "host" ? { agentLabel: agent.agentLabel, folderLabel: agent.folderLabel, kind: agent.kind } : agent;
+
+    return { ...rest, from: labelsOf(from), to: labelsOf(to) };
+};

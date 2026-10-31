@@ -17400,7 +17400,7 @@
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 309,
+      "line": 320,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
@@ -18252,7 +18252,7 @@
     {
       "file": "agent/thread-summary-taint",
       "kind": "read",
-      "line": 17,
+      "line": 18,
       "reason": "\"threadSummaryTaint\" is not a registered function"
     },
     {

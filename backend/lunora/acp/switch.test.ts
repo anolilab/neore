@@ -34,6 +34,9 @@ const { runAgentSwitch } = await import("../chat/agent-switch");
 const { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } = await import("./lib/pending-handoff");
 const { jsonBytes } = await import("../agent/handoff");
 const { assembleHandoffContext } = await import("../agent/handoff-context");
+const { agentSwitchForWire } = await import("../agent/agent-switch-logic");
+const { threadHandoffTaint } = await import("../agent/thread-summary-taint");
+const { checkRateLimit } = await import("../lib/rate-limiter");
 const calls = await import("./calls");
 const send = await import("./send");
 const switchModule = await import("./switch");
@@ -452,6 +455,18 @@ describe("host to cloud", () => {
         expect(blocks[0]?.text).toContain("answer 2");
     });
 
+    it("makes the new thread count as having read what the agent read, for a device call", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+        const { forkedThreadId } = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+        const taintOf = async (threadId: string) => await run(async (ctx) => await threadHandoffTaint(ctx, threadId as never));
+
+        expect(await taintOf(forkedThreadId as string)).toEqual(["web", "device"]);
+        // A thread that took over from a model, and the host thread itself, carry none of it.
+        expect(await taintOf(source)).toEqual([]);
+        expect(await taintOf(await cloudThread())).toEqual([]);
+    });
+
     it("answers a repeated click with the thread the first one made", async () => {
         const device = await pairedDevice(ownerId);
         const source = await hostThread(device);
@@ -461,6 +476,24 @@ describe("host to cloud", () => {
         expect(again.switched).toBe(false);
         expect(again.forkedThreadId).toBe(first.forkedThreadId);
         expect(await rows("threads")).toHaveLength(2);
+    });
+});
+
+describe("what a client is sent of a divider", () => {
+    it("names a coding agent by its labels alone, and leaves the handoff and the ids off", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const [part] = await dividers(forkedThreadId as string);
+        const wire = agentSwitchForWire(part as never);
+
+        expect(wire).toEqual({
+            from: { kind: "model", model: MODEL },
+            mode: "portable",
+            startMessageId: part?.startMessageId,
+            to: { agentLabel: "Codex", folderLabel: "neore", kind: "host" },
+        });
+        expect(JSON.stringify(wire)).not.toContain(device.deviceId);
     });
 });
 
@@ -504,6 +537,15 @@ describe("what a switch may target", () => {
 
         await expect(switchTo(source, hostTarget(device, CLAUDE))).rejects.toThrow(NOT_ONLINE);
         expect(await rows("threads")).toHaveLength(1);
+    });
+
+    it("draws on the budget of starting coding agents", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        // The ten starts a minute allows are spent.
+        await run(async (ctx) => await checkRateLimit(ctx, "hosts/start:free", { count: 10, key: ownerId }));
+        await expect(switchTo(source, hostTarget(device))).rejects.toThrow(/Too many/u);
     });
 
     it("is the owner's alone", async () => {

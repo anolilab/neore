@@ -51,6 +51,7 @@ import {
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
 import { isDeviceOnline } from "../devices/lib/state";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
+import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES } from "./lib/pending-handoff";
@@ -256,6 +257,16 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
 
         return ALREADY(current.agent);
+    }
+
+    // Both ways of reaching a computer start something on it: a host target and a thread that takes over from one draw on
+    // the same budget a direct start does (`hosts/start`, one limit for both plans).
+    if (target.kind === "host") {
+        const limited = await checkRateLimit(ctx, "hosts/start:free", { key: args.userId });
+
+        if (!limited.ok) {
+            throw new LunoraError("TOO_MANY_REQUESTS", "Too many coding agents were started in a short while. Try again in a minute.");
+        }
     }
 
     const handoff = await handoffFor(ctx, thread, leaf, target);
