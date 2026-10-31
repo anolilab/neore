@@ -25,6 +25,14 @@ describe("which references are looked at", () => {
         expect(imageReferences("see [the readme](README.md) and [config](.env)")).toEqual([]);
     });
 
+    it("ignores an image in code or with its marker escaped, which a reader sees as text", () => {
+        const text = ["`![a](a.png)`", "``![b](b.png)``", "```md", "![c](c.png)", "```", "~~~", "![d](d.png)", String.raw`\![e](e.png)`, "![f](f.png)"].join("\n");
+
+        // An unclosed fence runs to the end, so only what precedes it counts.
+        expect(imageReferences(text)).toEqual([]);
+        expect(imageReferences(["```", "![c](c.png)", "```", "![f](f.png) \\![e](e.png) `x` ![g](g.png)"].join("\n"))).toEqual(["f.png", "g.png"]);
+    });
+
     it("passes a path that leaves the folder on to the core, which refuses it (nothing here judges a path)", () => {
         expect(imageReferences("![a](../secret.png) ![b](/etc/passwd.png) ![c](#anchor)")).toEqual(["../secret.png", "/etc/passwd.png"]);
     });

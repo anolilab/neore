@@ -30,13 +30,54 @@ const SIGNATURE_HEADER = "neore-device-signature";
 
 /** `![alt](target "title")`; the target is `&lt;…>` or runs to the first space or `)`. */
 // eslint-disable-next-line sonarjs/regex-complexity -- one Markdown shape; `reply.ts` on the backend reads the same
-const IMAGE = /!\[[^\]]*\]\(\s*(<[^>\n]*>|[^\s)]+)(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/gu;
+const IMAGE = /(?<!\\)!\[[^\]]*\]\(\s*(<[^>\n]*>|[^\s)]+)(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/gu;
 
-/** The targets of the Markdown images in `text`, each once, in order, at most {@link MAX_REFERENCES}. */
+const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
+const BACKTICKS = /`+/gu;
+
+/** `text` without its fenced blocks (an unclosed one runs to the end) and inline code spans: shown as written, never rendered as Markdown. */
+const withoutCode = (text: string): string => {
+    let fence: string | undefined;
+    const lines = text.split("\n").map((line) => {
+        const marker = FENCE.exec(line)?.[1];
+
+        if (fence === undefined) {
+            fence = marker;
+
+            return marker === undefined ? line : "";
+        }
+
+        if (marker?.[0] === fence[0] && marker.length >= fence.length) {
+            fence = undefined;
+        }
+
+        return "";
+    });
+    const joined = lines.join("\n");
+    // eslint-disable-next-line unicorn/prefer-iterator-to-array -- `toArray` is fixed back to a spread by `no-useless-spread`; the runs are indexed below
+    const runs = [...joined.matchAll(BACKTICKS)];
+    let masked = joined;
+    let resumeAt = 0;
+
+    for (const [position, open] of runs.entries()) {
+        const close = position < resumeAt ? undefined : runs.slice(position + 1).find((run) => run[0].length === open[0].length);
+
+        if (close !== undefined) {
+            const end = close.index + close[0].length;
+
+            masked = `${masked.slice(0, open.index)}${" ".repeat(end - open.index)}${masked.slice(end)}`;
+            resumeAt = runs.indexOf(close) + 1;
+        }
+    }
+
+    return masked;
+};
+
+/** The targets of the Markdown images in `text` that a reader would see rendered, each once, in order, at most {@link MAX_REFERENCES}. */
 export const imageReferences = (text: string): string[] => {
     const found = new Set<string>();
 
-    for (const match of text.matchAll(IMAGE)) {
+    for (const match of withoutCode(text).matchAll(IMAGE)) {
         let target = match[1] ?? "";
 
         if (target.startsWith("<") && target.endsWith(">")) {
