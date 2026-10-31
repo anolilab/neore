@@ -9,6 +9,8 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
+
 const { sessionFrom } = vi.hoisted(() => {
     return {
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
@@ -145,8 +147,8 @@ const openSession = async (device: Device, hostSessionId = "host-s1"): Promise<s
     return result.threadId as string;
 };
 
-const sendText = async (threadId: string, text = "fix the bug", requestId = crypto.randomUUID(), userId = ownerId) =>
-    await run(async (ctx) => await ctx.runMutation(send.sendToHost, { plan: "free", requestId, text, threadId, userId }));
+const sendText = async (threadId: string, text = "fix the bug", requestId = crypto.randomUUID(), userId = ownerId, unlockProof?: string) =>
+    await run(async (ctx) => await ctx.runMutation(send.sendToHost, { plan: "free", requestId, text, threadId, unlockProof, userId }));
 
 const outcomeOfSend = async (...args: Parameters<typeof sendText>): Promise<unknown> => {
     const result = await sendText(...args);
@@ -586,6 +588,88 @@ describe("sendToHost", () => {
         expect(await outcomeOfSend(threadId, "one")).toBe("sent");
         expect(await outcomeOfSend(threadId, "two")).toBe("turn_running");
         expect(await rows("messages", { threadId })).toHaveLength(1);
+    });
+
+    describe("a locked thread", () => {
+        const SECRET = "unlock-secret-for-host-send";
+        let epoch: string;
+
+        const lock = async (threadId: string) => {
+            epoch = newPasscodeEpoch();
+
+            const hashed = await hashPasscode("a passcode", 1000);
+
+            await run(async (ctx) => {
+                await ctx.db.patch(threadId as never, { lockedAt: Date.now() });
+                await ctx.db.insert("threadPasscodes", {
+                    createdAt: 1,
+                    epoch,
+                    failedAttempts: 0,
+                    hash: hashed.hash,
+                    iterations: hashed.iterations,
+                    salt: hashed.salt,
+                    threadId: threadId as never,
+                    updatedAt: 1,
+                    userId: ownerId,
+                });
+            });
+        };
+
+        const proofFor = async (threadId: string, userId = ownerId): Promise<string> => {
+            const { proof } = await mintUnlockProof({ epoch, threadId, userId }, SECRET, Date.now());
+
+            return proof;
+        };
+
+        beforeEach(() => {
+            vi.stubEnv("STORAGE_SIGNING_SECRET", SECRET);
+        });
+
+        it("takes a message with the owner's unlock proof", async () => {
+            const { threadId } = await readyThread();
+
+            await lock(threadId);
+
+            const result = await sendText(threadId, "one", "r1", ownerId, await proofFor(threadId));
+
+            expect(result.outcome).toBe("sent");
+            expect(await rows("messages", { threadId })).toHaveLength(1);
+        });
+
+        it("refuses a message without a proof, with a stale one and with another thread's, and writes nothing", async () => {
+            const { threadId } = await readyThread();
+            const other = await openSession(await pairedDevice(ownerId), "host-s9");
+
+            await lock(threadId);
+
+            const stale = await proofFor(threadId);
+
+            await run(async (ctx) => {
+                const { page } = await ctx.db.threadPasscodes.findMany({ where: { threadId } });
+                const [passcode] = page;
+
+                await ctx.db.patch(passcode._id, { epoch: newPasscodeEpoch() });
+            });
+
+            expect(await outcomeOfSend(threadId, "one", "r1")).toBe("locked");
+            expect(await outcomeOfSend(threadId, "one", "r2", ownerId, "garbage")).toBe("locked");
+            expect(await outcomeOfSend(threadId, "one", "r3", ownerId, stale)).toBe("locked");
+            expect(await outcomeOfSend(other, "one", "r4", ownerId, stale)).toBe("sent");
+            expect(await rows("messages", { threadId })).toHaveLength(0);
+            expect(await rows("deviceCalls", { toolName: "acp_send" })).toHaveLength(1);
+        });
+
+        it("answers a retry of a message that was sent before the lock as a duplicate", async () => {
+            const { threadId } = await readyThread();
+            const first = await sendText(threadId, "one", "r1");
+
+            expect(first.outcome).toBe("sent");
+
+            await lock(threadId);
+
+            expect(await sendText(threadId, "one", "r1")).toMatchObject({ messageId: first.messageId, outcome: "duplicate", streamId: first.streamId });
+            expect(await outcomeOfSend(threadId, "two", "r2")).toBe("locked");
+        });
     });
 
     it("refuses a session that has ended, an offline computer and a prompt past the call's cap", async () => {
@@ -1051,5 +1135,7 @@ describe("POST /hosts/send", () => {
         // A body far past a prompt's worth is refused unread, with or without a Content-Length.
         await expect(post({ extra: "x".repeat(200_000), requestId: "r", text: "hi", threadId: "t" })).resolves.toBe(413);
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
+        await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: 5 })).resolves.toBe(400);
+        await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: "x".repeat(5000) })).resolves.toBe(400);
     });
 });
