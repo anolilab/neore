@@ -71,6 +71,7 @@ const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
 const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
+const WORKER_CHAT = /takes its messages from its lead/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -883,6 +884,33 @@ describe("what a chat must be to be handed to a computer", () => {
 
         expect(await rows("threads")).toHaveLength(2);
         expect(await rows("threadRelationships")).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("a worker's chat", () => {
+    it("is never switched: its lead names the computer it runs on", async () => {
+        const device = await pairedDevice(ownerId);
+        const worker = await cloudThread();
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId: worker,
+                    createdAt: 1,
+                    depth: 1,
+                    mode: "worker",
+                    name: "Coder",
+                    parentThreadId: worker,
+                    status: "queued",
+                    task: "t",
+                    updatedAt: 1,
+                    userId: ownerId,
+                }),
+        );
+
+        await expect(switchTo(worker, hostTarget(device))).rejects.toThrow(WORKER_CHAT);
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
     });

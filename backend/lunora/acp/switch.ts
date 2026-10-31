@@ -65,6 +65,7 @@ import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
 import { liveHostStream } from "./remote";
+import { isWorkerThread } from "../sub-agents/worker-thread";
 
 type Device = Doc<"devices">;
 type Offer = NonNullable<Device["acpOffers"]>[number];
@@ -291,6 +292,11 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
 
     if (caller?.isAnonymous === true) {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Guests run on the free model");
+    }
+
+    // A worker's chat belongs to its lead, which names the computer it runs on: a switch would leave the worker pointing at the old one.
+    if (await isWorkerThread(ctx, thread._id)) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "A worker's chat takes its messages from its lead");
     }
 
     const fromHost = isHostRunThread(thread);
