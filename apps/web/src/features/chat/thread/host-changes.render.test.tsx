@@ -15,6 +15,11 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+// The draft reaches for the backend; it has its own suite (`host/diff-comments.render.test.tsx`).
+vi.mock("@/features/chat/host/diff-comments-draft", () => {
+    return { default: () => null };
+});
+
 const ONE_FILE = /1 file changed/u;
 
 const files = [

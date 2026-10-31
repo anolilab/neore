@@ -526,7 +526,9 @@ const MessageItem: FC<MessageItemProps> = memo(
             <>
                 {message.role !== "system" && <MessageSelectCheckbox disabled={messageIsStreaming || message.status === "pending"} message={message} />}
                 <MessageContent isStreaming={messageIsStreaming} message={message} />
-                {message.role === "assistant" && message.hostChanges && <HostChanges changes={message.hostChanges} />}
+                {message.role === "assistant" && message.hostChanges && (
+                    <HostChanges changes={message.hostChanges} messageId={message.id} threadId={threadId} />
+                )}
             </>
         );
 

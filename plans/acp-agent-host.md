@@ -379,6 +379,16 @@ the folder and refers to it in its reply. Rules:
   route. Patches are stored as a part on the reply row, capped in size; a patch
   over the cap keeps its file list and line counts and says the diff is too large
   to keep. The phone reads the same part.
+- **Comments on the diff.** In **Open diff** a person can select a line or a range in one file (keyboard or
+  click) and comment on it, or comment on a whole file; a turn whose patch was too large to keep offers
+  file-level comments only. Comments are a client draft per thread (`diff-comments-store.ts`): each keeps the diff
+  lines it was made on, copied when it was made, so the message quotes the frozen patch and never re-reads
+  anything. **Send to agent** composes ONE ordinary user message (path, line range, quoted hunk lines, comment)
+  and sends it through `/hosts/send` like any prompt, so owner-only, the local approval rules, "no usage, no
+  charge" and the refusal of a locked chat (`locked`, added to `sendToHost`) all hold; no new message kind, no
+  second ingest path. The message is capped at 28 KiB of JSON (the signed call's envelope is 32 KiB): quoted lines
+  are cut, fairly, and the message says so; comments are never cut, and a draft whose comments alone do not fit is
+  not sent. The draft clears only when the send is accepted, and only the comments that were in it.
 
 ## 5. Data changes
 

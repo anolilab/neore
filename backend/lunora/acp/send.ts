@@ -22,6 +22,7 @@ import { createHostStream } from "../chat/streaming/persistent/host";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
@@ -42,6 +43,7 @@ const vSendResult = v.union(
     v.object({
         outcome: v.union(
             v.literal("busy"),
+            v.literal("locked"),
             v.literal("not_found"),
             v.literal("offline"),
             v.literal("rate_limited"),
@@ -72,6 +74,11 @@ export const sendToHost = internalMutation
         // A host thread is the owner's alone: anyone else's, a cloud thread and a missing one read the same.
         if (!threadId || !thread || thread.userId !== userId || thread.deleted === true || !isHostRunThread(thread)) {
             return { outcome: "not_found" as const };
+        }
+
+        // A locked chat takes no new message without its passcode proof, which this route does not carry.
+        if (isThreadLocked(thread)) {
+            return { outcome: "locked" as const };
         }
 
         const claimedAt = await claimedAtOf(ctx, "host-send", key);
@@ -144,6 +151,7 @@ const json = (body: unknown, status: number): Response => Response.json(body, { 
 
 const STATUS: Record<string, number> = {
     busy: 429,
+    locked: 403,
     not_found: 404,
     offline: 409,
     rate_limited: 429,

@@ -192,7 +192,7 @@ msgid "{0, plural, one {# check is still running} other {# checks are still runn
 msgstr ""
 
 #. placeholder {0}: files.length
-#: src/features/chat/thread/host-changes.tsx:44
+#: src/features/chat/thread/host-changes.tsx:45
 msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr ""
 
@@ -771,6 +771,10 @@ msgstr "{count, plural, other {# 個のセルをコピーしました}}"
 #: ../../packages/ui/src/hooks/use-data-grid.ts:385
 msgid "{count, plural, one {# cell cut} other {# cells cut}}"
 msgstr "{count, plural, other {# 個のセルを切り取りました}}"
+
+#: src/features/chat/host/diff-comments-draft.tsx:38
+msgid "{count, plural, one {# comment ready to send to the agent} other {# comments ready to send to the agent}}"
+msgstr ""
 
 #: src/features/chat/forward/forward-selection-bar.tsx:69
 msgid "{count, plural, one {# message selected} other {# messages selected}}"
@@ -2038,6 +2042,10 @@ msgstr "チェックを追加"
 msgid "Add Circle"
 msgstr "円を追加"
 
+#: src/features/chat/host/diff-comment-form.tsx:65
+msgid "Add comment"
+msgstr ""
+
 #: src/features/canvas/components/canvas-toolbar.tsx:40
 msgid "Add comments"
 msgstr "コメントを追加"
@@ -2221,6 +2229,10 @@ msgstr ""
 #: src/features/workflow/components/nodes/object-editor-node.tsx:26
 msgid "Add/Replace Object"
 msgstr "オブジェクトを追加/置換"
+
+#: src/features/chat/thread/host-diff-viewer.tsx:81
+msgid "added"
+msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:66
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
@@ -2964,7 +2976,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:63
+#: src/features/chat/host/host-composer.tsx:64
 msgid "Allow once"
 msgstr ""
 
@@ -4966,6 +4978,7 @@ msgstr "カナダ"
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
+#: src/features/chat/host/diff-comment-form.tsx:68
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5264,8 +5277,13 @@ msgstr ""
 msgid "Changes from the last refinement"
 msgstr "前回の改善からの変更点"
 
-#: src/features/chat/thread/host-changes.tsx:75
+#: src/features/chat/thread/host-changes.tsx:102
 msgid "Changes in this turn"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:169
+msgid "Changes to {0}"
 msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:129
@@ -6261,10 +6279,35 @@ msgstr "コメント"
 msgid "Comment color"
 msgstr "コメントの色"
 
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-changes.tsx:68
+msgid "Comment on {0}"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:231
+msgid "Comment on {0}, lines {rangeLabel}"
+msgstr ""
+
+#: src/features/chat/thread/host-diff-viewer.tsx:174
+msgid "Comment on file"
+msgstr ""
+
 #. placeholder {0}: target.line
 #: src/features/develop/components/review-diff.tsx:169
 #: src/features/develop/components/review-diff.tsx:190
 msgid "Comment on line {0}"
+msgstr ""
+
+#: src/features/chat/thread/host-diff-viewer.tsx:224
+msgid "Comment on lines {rangeLabel}"
+msgstr ""
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-changes.tsx:81
+#: src/features/chat/thread/host-diff-viewer.tsx:172
+#: src/features/chat/thread/host-diff-viewer.tsx:243
+msgid "Comment on the whole file {0}"
 msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:135
@@ -6272,6 +6315,10 @@ msgstr ""
 #: src/features/pages/components/page-view.tsx:439
 msgid "Comments"
 msgstr "コメント"
+
+#: src/features/chat/host/diff-comments-draft.tsx:36
+msgid "Comments for the agent"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:58
 #: src/features/marketing/data/models-data.ts:78
@@ -7035,12 +7082,12 @@ msgid "Context-aware generation"
 msgstr "コンテキストを考慮した生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:194
+#: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "続行"
 
-#: src/features/chat/host/host-composer.tsx:188
+#: src/features/chat/host/host-composer.tsx:180
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7615,7 +7662,7 @@ msgstr "{0} を取得できませんでした：{1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:99
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "Could not reach the server. Try again."
 msgstr ""
 
@@ -7681,7 +7728,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:147
+#: src/features/chat/host/host-composer.tsx:138
 msgid "Could not send your answer."
 msgstr ""
 
@@ -8510,7 +8557,7 @@ msgstr "ディベートのラウンド数"
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
-#: src/features/chat/host/host-composer.tsx:68
+#: src/features/chat/host/host-composer.tsx:69
 msgid "Decline"
 msgstr ""
 
@@ -9459,6 +9506,10 @@ msgstr "無効化しています..."
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "破棄"
+
+#: src/features/chat/host/diff-comments-draft.tsx:89
+msgid "Discard comments"
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:275
 msgid "Discard the review"
@@ -12936,7 +12987,7 @@ msgstr "ファイル名を空にすることはできません"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:41
+#: src/features/chat/thread/host-changes.tsx:42
 msgid "Files changed by this turn"
 msgstr ""
 
@@ -15583,7 +15634,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:54
+#: src/features/chat/host/host-composer.tsx:55
 msgid "In {0}"
 msgstr ""
 
@@ -16978,6 +17029,12 @@ msgstr "{line} 行目、{column} 列目"
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr "この記録の {number} 行目が有効な JSON ではないため、インポートを停止しました。"
 
+#. placeholder {0}: kindWord[line.kind]
+#. placeholder {1}: line.text
+#: src/features/chat/thread/host-diff-viewer.tsx:192
+msgid "Line {number}, {0}: {1}"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:171
 msgid "LINE Channel Access Token"
 msgstr "LINE Channel Access Token"
@@ -17006,6 +17063,11 @@ msgstr "Linear の Issue {0}"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:25
 msgid "Linear multistep"
 msgstr "Linear multistep"
+
+#. placeholder {0}: file.path
+#: src/features/chat/thread/host-diff-viewer.tsx:177
+msgid "Lines of {0}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:47
 msgid "Lines that are not valid JSON"
@@ -18245,7 +18307,7 @@ msgstr "メッセージ入力"
 msgid "Message selection"
 msgstr "メッセージの選択"
 
-#: src/features/chat/host/host-composer.tsx:206
+#: src/features/chat/host/host-composer.tsx:198
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18257,7 +18319,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:200
+#: src/features/chat/host/host-composer.tsx:192
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -21026,7 +21088,7 @@ msgstr "現在の URL を開く"
 msgid "Open Develop"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:50
+#: src/features/chat/thread/host-changes.tsx:51
 msgid "Open diff"
 msgstr ""
 
@@ -22322,7 +22384,7 @@ msgstr "アカウントと関連するすべてのデータを完全に削除し
 msgid "Permission Level"
 msgstr "権限レベル"
 
-#: src/features/chat/host/host-composer.tsx:160
+#: src/features/chat/host/host-composer.tsx:151
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -23766,6 +23828,10 @@ msgstr "引用カード"
 msgid "Quote in reply"
 msgstr ""
 
+#: src/features/chat/host/diff-comments-draft.tsx:68
+msgid "Quoted diff lines will be shortened to fit; your comments are sent in full."
+msgstr ""
+
 #: src/features/chat/thread/text-selection-menu.tsx:426
 msgid "Quoted in composer"
 msgstr ""
@@ -24736,6 +24802,11 @@ msgstr "並べ替えを解除 (フォーカス時)"
 msgid "Remove tag {tag}"
 msgstr "タグ {tag} を削除"
 
+#. placeholder {0}: placeOf(comment)
+#: src/features/chat/host/diff-comments-draft.tsx:50
+msgid "Remove the comment on {0}"
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:407
 msgid "Remove These Files"
 msgstr "これらのファイルを削除"
@@ -24747,6 +24818,10 @@ msgstr "ユーザーを削除"
 #. placeholder {0}: variable.name
 #: src/features/prompts/components/variable-definitions.tsx:98
 msgid "Remove variable {0}"
+msgstr ""
+
+#: src/features/chat/thread/host-diff-viewer.tsx:81
+msgid "removed"
 msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:70
@@ -26462,7 +26537,7 @@ msgstr "プロンプトへの忠実度が高いセミリアルなモデル"
 msgid "Semi-realistic visual style"
 msgstr "セミリアルなビジュアルスタイル"
 
-#: src/features/chat/host/host-composer.tsx:222
+#: src/features/chat/host/host-composer.tsx:214
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -26538,6 +26613,10 @@ msgstr ""
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:194
 msgid "Send this to the bot from your account:"
 msgstr "自分のアカウントからボットにこれを送信してください："
+
+#: src/features/chat/host/diff-comments-draft.tsx:86
+msgid "Send to agent"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:373
 msgid "Send verification code"
@@ -27049,7 +27128,7 @@ msgstr "サインイン"
 msgid "Sign In Again"
 msgstr "再度サインイン"
 
-#: src/features/chat/host/host-composer.tsx:92
+#: src/features/chat/host/host-send-errors.ts:14
 msgid "Sign in again to send."
 msgstr ""
 
@@ -28091,7 +28170,7 @@ msgstr "インポートを開始しています..."
 msgid "Starting test drive…"
 msgstr "試用を開始しています…"
 
-#: src/features/chat/host/host-composer.tsx:174
+#: src/features/chat/host/host-composer.tsx:166
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -28203,7 +28282,7 @@ msgstr "株式"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:211
+#: src/features/chat/host/host-composer.tsx:203
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:313
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:326
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -29584,7 +29663,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
-#: src/features/chat/host/host-composer.tsx:97
+#: src/features/chat/host/host-send-errors.ts:19
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -29592,7 +29671,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:141
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -29604,8 +29683,12 @@ msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モー
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
-#: src/features/chat/host/host-composer.tsx:98
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "The agent is still working on the last message."
+msgstr ""
+
+#: src/features/chat/host/diff-comments-draft.tsx:73
+msgid "The agent is working. You can send these when it is done."
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:56
@@ -29709,11 +29792,11 @@ msgstr ""
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
 
-#: src/features/chat/thread/host-changes.tsx:78
+#: src/features/chat/thread/host-changes.tsx:105
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:67
+#: src/features/chat/thread/host-changes.tsx:94
 msgid "The diff is too large to keep. The files and their line counts are shown."
 msgstr ""
 
@@ -29843,7 +29926,7 @@ msgstr "前回の削除リクエストは失敗しました。もう一度リク
 msgid "the last time"
 msgstr "でサインインしました"
 
-#: src/features/chat/host/host-composer.tsx:184
+#: src/features/chat/host/host-composer.tsx:176
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -30101,6 +30184,10 @@ msgstr ""
 msgid "There's a problem with your internet connection or our servers."
 msgstr "インターネット接続または当社のサーバーに問題があります。"
 
+#: src/features/chat/host/diff-comments-draft.tsx:63
+msgid "These comments are too long to send as one message. Remove or shorten some."
+msgstr ""
+
 #: src/features/chat/thread/memory-usage-action.tsx:43
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "これらのメモリはメッセージに一致したため、この返信の AI のコンテキストに追加されました。"
@@ -30220,12 +30307,16 @@ msgstr ""
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/chat/host/host-composer.tsx:93
+#: src/features/chat/host/host-send-errors.ts:15
 msgid "This chat could not be found."
 msgstr ""
 
 #: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
+msgstr ""
+
+#: src/features/chat/host/host-send-errors.ts:13
+msgid "This chat is locked. Unlock it to send."
 msgstr ""
 
 #: src/features/chat/thread/composer.tsx:585
@@ -30464,7 +30555,7 @@ msgstr "このプロンプトで設定される内容："
 msgid "This removes the model files from your computer. You can pull it again later."
 msgstr "コンピューターからモデルファイルを削除します。後で再度取得できます。"
 
-#: src/features/chat/host/host-composer.tsx:57
+#: src/features/chat/host/host-composer.tsx:58
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -30492,8 +30583,8 @@ msgstr "このサーバーにはサインインが必要です。保存してか
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "このサーバーのレジストリエントリでは、以下の値が求められます。URL とヘッダーに入力されます。"
 
-#: src/features/chat/host/host-composer.tsx:96
-#: src/features/chat/host/host-composer.tsx:179
+#: src/features/chat/host/host-composer.tsx:171
+#: src/features/chat/host/host-send-errors.ts:18
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
 
@@ -31607,6 +31698,10 @@ msgstr "未分類（{0}）"
 #: src/features/skills/components/skill-item.tsx:142
 msgid "Uncategorized"
 msgstr "未分類"
+
+#: src/features/chat/thread/host-diff-viewer.tsx:81
+msgid "unchanged"
+msgstr ""
 
 #: src/features/develop/components/files-tab.tsx:72
 #: src/features/evals/components/run-comparison.tsx:56
@@ -33451,6 +33546,10 @@ msgstr "何を変更しますか？"
 msgid "What should happen with these messages?"
 msgstr "これらのメッセージをどうしますか？"
 
+#: src/features/chat/host/diff-comment-form.tsx:59
+msgid "What should the agent change?"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-dialog.tsx:208
 #: src/features/tasks/components/task-form-dialog.tsx:208
 msgid "What should the agent do?"
@@ -33898,7 +33997,7 @@ msgstr "オフラインです。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "オフラインです。ネットワークが戻ると Neore が再接続します。"
 
-#: src/features/chat/host/host-composer.tsx:95
+#: src/features/chat/host/host-send-errors.ts:17
 msgid "You are sending too fast. Wait a moment."
 msgstr ""
 
@@ -34103,12 +34202,12 @@ msgstr ""
 msgid "your computer"
 msgstr "このコンピューター"
 
-#: src/features/chat/host/host-composer.tsx:91
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:141
+#: src/features/chat/host/host-send-errors.ts:12
 msgid "Your computer is busy. Try again in a moment."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:94
+#: src/features/chat/host/host-send-errors.ts:16
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr ""
 

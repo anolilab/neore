@@ -588,6 +588,18 @@ describe("sendToHost", () => {
         expect(await rows("messages", { threadId })).toHaveLength(1);
     });
 
+    it("refuses a locked thread, whether or not the computer is ready, and writes nothing", async () => {
+        const { threadId } = await readyThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch(threadId as never, { lockedAt: Date.now() });
+        });
+
+        expect(await outcomeOfSend(threadId, "one")).toBe("locked");
+        expect(await rows("messages", { threadId })).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_send" })).toHaveLength(0);
+    });
+
     it("refuses a session that has ended, an offline computer and a prompt past the call's cap", async () => {
         const device = await pairedDevice(ownerId);
 
