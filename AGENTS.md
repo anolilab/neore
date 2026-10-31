@@ -788,6 +788,14 @@ written here is what is not.
   ends the download; an idle minute ends one too. A `list` page reads the folder's names but keeps only the page. The save path comes from a native dialog in the main
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
+  **Coding agents on a server** (`device-core/src/{agent_host,engine/host_agents}.rs`, `apps/desktop/src/acp/{remote-process,servers}.ts`,
+  plans/ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
+  shared with the computer's own agents. The `agent` request streams stdout/stderr as chunk frames (tag 1/2) and takes stdin as
+  chunk frames of the same id; `hello.agents` announces it (no protocol bump), and the host kills the agent's process group on
+  cancel, on its stdin ending and on SIGTERM. A server's agents and approvals live on its `Host` row, the core picks the secret by
+  the DEVICE a payload names (`acp_prepare`/`acp_sign`/`sign_turn`), and a server's poster is its own. `TurnChanges` and media read
+  the desktop's disk, so they are off for a server (`folderIsRemote`): a new reader of the agent's folder must stay off for it too.
+  The agent's environment is built on the server, not copied from the desktop.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

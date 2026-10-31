@@ -1160,6 +1160,34 @@ describe("ingest refusals", () => {
         expect(await rateLimitCount()).toBe(rowsBefore);
     });
 
+    it("takes a server's turn under the server's own device, and only when it is signed with the server's own secret", async () => {
+        const desktop = await pair(ownerId);
+        const registered = (await as(ownerId).mutation(
+            devices.registerDevice as never,
+            { name: "build-box", platform: "linux", viaDeviceId: desktop.deviceId } as never,
+        )) as { deviceId: string; secret: string };
+        const server: Paired = { ...registered, userId: ownerId };
+
+        // The server is a device of its own: the post names it, and it opens a host thread like any computer.
+        const threadId = await openSession(server);
+        const posted = await turn(server, threadId, "srv-1", 0, [START(), TEXT("built")]);
+
+        expect(posted.status).toBe(200);
+        const stream = await streamFor("srv-1");
+
+        expect(stream?.hostState).toBe("running");
+
+        // The desktop signs for itself with its own secret. A post naming the server and signed with that secret is
+        // forged, whoever holds it, and so is a post naming the desktop signed with the server's.
+        const rowsBefore = await rateLimitCount();
+        const events = [TEXT("more")];
+
+        await expect(ingest(server, { events, firstSeq: 2, threadId, turnId: "srv-1" }, { secret: desktop.secret })).resolves.toMatchObject({ status: 401 });
+        await expect(ingest(desktop, { events, firstSeq: 0, threadId, turnId: "srv-2" }, { secret: server.secret })).resolves.toMatchObject({ status: 401 });
+        expect(await rateLimitCount()).toBe(rowsBefore);
+        expect(await streamFor("srv-2")).toBeNull();
+    });
+
     it("answers 401 to a body that is not a signed post, 413 past the cap", async () => {
         await expect(hostIngestHttpAction(httpContext(), request("not json"))).resolves.toHaveProperty("status", 401);
         await expect(hostIngestHttpAction(httpContext(), request({ payload: "{}", signature: "x" }))).resolves.toHaveProperty("status", 401);
