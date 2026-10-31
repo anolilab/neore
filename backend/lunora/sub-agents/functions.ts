@@ -38,15 +38,18 @@ import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
 import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { sessionOfThread } from "../acp/lib/sessions";
 import { openHostSession } from "../acp/lib/start-session";
 import { isLiveStream } from "../chat/streaming/persistent/host";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { loadEligibleThread } from "../devices/internal";
 import { isDeviceOnline } from "../devices/lib/state";
 import { sha256Hex } from "../lib/crypto";
 import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE, WORKER_STOP_SCOPE } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
+import { systemDb } from "../lib/rls/scope";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
@@ -449,6 +452,9 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
 
 const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
 
+const HOST_NEEDS_OWN_CONVERSATION =
+    "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";
+
 const HOST_NOT_APPROVED = "That agent is not approved for that folder on this computer. Approve it in the desktop app first.";
 
 /** The offered pair a new host worker will run, from the caller's own computer; null for a cloud worker. */
@@ -552,8 +558,12 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     };
 
     // An existing worker keeps its runner; a request for another is refused rather than followed.
-    if (origin && args.runner !== undefined && (origin.runner?.kind !== "host" || origin.runner.deviceId !== args.runner.deviceId)) {
-        return await refuse(other("A worker keeps the runner it started with."));
+    if (origin && args.runner !== undefined) {
+        const session = origin.runner?.kind === "host" ? await sessionOfThread(ctx, args.childThreadId as Id<"threads">) : null;
+
+        if (!session || session.deviceId !== args.runner.deviceId || session.agentKey !== args.runner.agentKey || session.folderId !== args.runner.folderId) {
+            return await refuse(other("A worker keeps the runner it started with."));
+        }
     }
 
     // The runner this dispatch reaches: the worker's own, or the one a new worker was asked for.
@@ -570,6 +580,12 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     // The tool asks first (`needsApproval`); a headless run cannot be asked, and an unattended source never was.
     if (runnerKind === "host" && (args.headless === true || (source !== "lead" && source !== "user"))) {
         return await refuse({ error: HOST_NEEDS_A_PERSON, kind: "forbidden" });
+    }
+
+    // The same rule as the device tools: the agent acts with the user's rights on their computer, so nobody else's text may
+    // be in the lead's context. The grant lookup decides past RLS: a hidden grant row must not read as "not shared".
+    if (runnerKind === "host" && !(await loadEligibleThread({ db: systemDb(ctx) }, parent._id, args.userId))) {
+        return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
     }
 
     const host = origin ? null : await resolveHostRunner(ctx, args);
@@ -632,6 +648,13 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
     if (!ok) {
         return await refuse({ error: "You have started too many sub-agents recently. Try again later.", kind: "limit" });
+    }
+
+    // Opening a session is starting an agent on a computer, so it spends the budget `startHostSession` spends.
+    const startBudget = host ? await createRatelimit(`hosts/start:${account.tier}`, ctx.db as never).limit(args.userId) : null;
+
+    if (startBudget && !startBudget.ok) {
+        return await refuse({ error: "You have started too many agents on your computers recently. Try again later.", kind: "limit" });
     }
 
     const now = Date.now();

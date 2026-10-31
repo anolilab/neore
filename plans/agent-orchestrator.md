@@ -336,6 +336,11 @@ capability-gated steer.
   (offline, busy, no session) fails the run at once through `finishRun`, so the lead gets the per-run failure post. The
   turn's end (`turn_end`, the reaper, a revoke, Stop, a deleted thread) finishes the run that sent it (`hostTurnId`).
   A stop or a stale-run failure on this side cancels the turn on the computer and releases the line at once.
+  Releasing the line before the computer confirms is safe: the desktop session keeps one turn at a time and queues an
+  `acp_send` that arrives while it is still cancelling, and a cancel by turn id leaves the prompts behind that turn
+  queued (`session.test.ts`). The cancel is still signed before the next send (`stopHostTurn`, the reaper).
+  A dispatch needs the same lead as the device tools (`loadEligibleThread`: the user's own conversation, not shared,
+  public, group or messenger), for a new worker and for every message to one. Creating a worker spends `hosts/start` too.
   `messageWorker` and `delegateToSubAgent` carry a `needsApproval` function that asks for a host target whatever the
   mode or a timed allow says; a headless run is not asked and `headless` makes admission refuse it.
   `/hosts/send` refuses a worker's thread. Left out: no UI to pick a computer when creating a worker, and the model

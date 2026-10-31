@@ -70,6 +70,9 @@ const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/iu;
 const NOT_ANSWERED = /host did not answer/iu;
 const NEEDS_A_PERSON = /needs a person/iu;
+const SESSION_ENDED = /session has ended/iu;
+const REFUSED_THREAD = /alone|own|computer/iu;
+const KEEPS_RUNNER = /keeps the runner/iu;
 const NO_OUTSIDE_AGENT = /outside agent/iu;
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -196,6 +199,17 @@ const accountCharges = async (): Promise<string[]> => {
 
 const runLimitRows = async (): Promise<Row[]> => (await table("rateLimits")).filter((row) => decodeURIComponent(row.key as string).includes("subAgents/run"));
 
+const startLimitRows = async (): Promise<Row[]> => (await table("rateLimits")).filter((row) => decodeURIComponent(row.key as string).includes("hosts/start"));
+
+/** The computer closes the worker's session (its agent process ended). */
+const closeSession = async (device: Device, workerId: string) => {
+    const session = await sessionOf(workerId);
+
+    return await run(
+        async (context) => await context.runMutation(applyHostEvents, { close: true, deviceId: device.deviceId, events: [], sessionId: session.hostSessionId }),
+    );
+};
+
 const leadMessages = async (): Promise<string[]> => (await table("messages", { threadId: leadId })).map((message) => JSON.stringify(message.message.content));
 
 const makeDeviceOffline = async (device: Device) => await run(async (context) => await context.db.patch(device.deviceId, { lastSeenAt: 0 }));
@@ -313,6 +327,14 @@ describe("the charge", () => {
         // The second dispatch moved the same counter on.
         expect(JSON.stringify(await runLimitRows())).not.toBe(afterCreate);
         expect(await sendCalls()).toHaveLength(2);
+    });
+
+    it("spends the start limit of a host session as well as the dispatch limit when a worker is created", async () => {
+        const device = await pairedDevice();
+
+        expect(await startLimitRows()).toHaveLength(0);
+        await createHostWorker(device);
+        expect(await startLimitRows()).not.toHaveLength(0);
     });
 
     it("charges a cloud worker's run when it is claimed, which is what the host run skips", async () => {
@@ -500,6 +522,20 @@ describe("who may reach a host worker", () => {
         });
 
         expect(refused).toMatchObject({ error: expect.any(String) });
+
+        // The same computer is not enough: the agent and the folder are part of the runner.
+        for (const [index, pair] of [
+            { agentKey: "codex", folderId: "f1" },
+            { agentKey: "claude", folderId: "f2" },
+        ].entries()) {
+            expect(
+                await dispatchFromLead(receipt.workerId, `call-r${String(index)}`, { runner: { ...pair, deviceId: device.deviceId, kind: "host" } }),
+            ).toMatchObject({
+                error: expect.stringMatching(KEEPS_RUNNER),
+            });
+        }
+
+        expect(await sendCalls()).toHaveLength(1);
     });
 });
 
@@ -611,5 +647,138 @@ describe("the worker's thread", () => {
 
         expect(result.outcome).toBe("worker_thread");
         expect(remote).toBeDefined();
+    });
+});
+
+describe("a session that closes with runs behind its turn", () => {
+    it("fails the queued run at once and sends nothing more to the closing session", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+        expect(await sendCalls()).toHaveLength(1);
+
+        await closeSession(device, receipt.workerId);
+
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "failed" });
+        expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(SESSION_ENDED), status: "failed" });
+        expect(await sendCalls()).toHaveLength(1);
+        expect((await table("persistentStreams", { threadId: receipt.workerId })).filter((stream) => stream.hostState !== "ended")).toHaveLength(0);
+        expect((await sessionOf(receipt.workerId)).status).toBe("ended");
+    });
+});
+
+describe("which conversations may reach a computer", () => {
+    const createFrom = async (lead: string, device: Device) =>
+        await as(OWNER).mutation(functions.createWorker as never, hostWorker(device, { leadThreadId: lead }) as never);
+
+    it("refuses a group, a shared, a public and a messenger conversation, creating nothing", async () => {
+        const device = await pairedDevice();
+        const group = await newThread({ groupChat: { mode: "parallel", participants: [] } });
+        const shared = await newThread();
+        const published = await newThread({ isPublic: true });
+        const messenger = await newThread({ externalThreadId: "tg-1" });
+
+        await run(
+            async (context) =>
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: OWNER,
+                    ownerId: OWNER,
+                    permission: "read",
+                    threadId: shared,
+                    userId: "user-guest",
+                } as never),
+        );
+
+        for (const lead of [group, shared, published, messenger]) {
+            await expect(createFrom(lead, device)).rejects.toMatchObject({ message: expect.stringMatching(REFUSED_THREAD) });
+        }
+
+        expect(await table("subAgentRuns")).toHaveLength(0);
+        expect(await table("acpSessions")).toHaveLength(0);
+        expect(await table("deviceCalls")).toHaveLength(0);
+    });
+
+    it("lets a conversation the user owns alone create one", async () => {
+        const device = await pairedDevice();
+
+        expect(await createFrom(leadId, device)).toMatchObject({ state: "running" });
+    });
+
+    it("refuses a message to an existing host worker once the lead is shared", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+        await finishTurn(device, receipt.workerId);
+        await run(
+            async (context) =>
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: OWNER,
+                    ownerId: OWNER,
+                    permission: "read",
+                    threadId: leadId,
+                    userId: "user-guest",
+                } as never),
+        );
+
+        expect(await dispatchFromLead(receipt.workerId, "call-shared")).toMatchObject({ error: expect.stringMatching(REFUSED_THREAD) });
+        expect(await sendCalls()).toHaveLength(1);
+    });
+});
+
+describe("a turn that ends from this side with a message waiting behind it", () => {
+    /** The signed calls to the computer, in the order they were made. */
+    const callOrder = async (): Promise<string[]> =>
+        (await table("deviceCalls"))
+            .filter((call) => call.toolName === "acp_send" || call.toolName === "acp_cancel")
+            .toSorted((a, b) => a._creationTime - b._creationTime)
+            .map((call) => call.toolName as string);
+
+    let paired: Device | undefined;
+    const deviceOf = async (_workerId: string): Promise<Device> => paired!;
+
+    const runningWithOneBehind = async () => {
+        const device = await pairedDevice();
+
+        paired = device;
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+        await dispatchFromUser(receipt.workerId, "second");
+
+        return { receipt, stream: await liveStream(receipt.workerId) };
+    };
+
+    it("tells the computer to cancel the stopped turn before it sends the next message", async () => {
+        const { stream } = await runningWithOneBehind();
+        const { stopHostTurn } = await import("../acp/lib/finish");
+
+        await run(async (context) => await stopHostTurn(context, await context.db.get(stream._id), Date.now()));
+
+        expect(await callOrder()).toEqual(["acp_send", "acp_cancel", "acp_send"]);
+    });
+
+    it("tells the computer to cancel a timed-out turn before it sends the next message", async () => {
+        const { receipt } = await runningWithOneBehind();
+
+        // The computer took the prompt and went quiet: a turn it never acknowledged is withdrawn instead, with no cancel.
+        await hostTurn(await deviceOf(receipt.workerId), receipt.workerId, [
+            { kind: "turn_start", text: "x" },
+            { kind: "text", text: "working" },
+        ]);
+
+        const stream = await liveStream(receipt.workerId);
+        const { expireHostStream } = await import("../acp/lib/reap");
+
+        await run(async (context) => await expireHostStream(context, await context.db.get(stream._id), Date.now()));
+
+        expect(await callOrder()).toEqual(["acp_send", "acp_cancel", "acp_send"]);
     });
 });

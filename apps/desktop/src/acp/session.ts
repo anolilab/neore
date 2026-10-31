@@ -194,7 +194,7 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...this.report !== undefined && { capabilities: this.report },
+                ...(this.report !== undefined && { capabilities: this.report }),
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -238,7 +238,8 @@ export class AgentSession {
     /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
     public cancelTurn(turnId: string): boolean {
         if (this.current?.id === turnId) {
-            this.cancel();
+            // The backend names one turn. What waits behind it was sent after it and has its own id and stream, so it stays queued.
+            this.cancel({ keepQueue: true });
 
             return true;
         }
@@ -258,7 +259,7 @@ export class AgentSession {
     }
 
     /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
-    public cancel(): void {
+    public cancel(options: { keepQueue?: boolean } = {}): void {
         if (this.status !== "busy" || this.current === undefined) {
             this.dropQueue();
             this.options.onChange();
@@ -266,7 +267,10 @@ export class AgentSession {
             return;
         }
 
-        this.dropQueue();
+        if (options.keepQueue !== true) {
+            this.dropQueue();
+        }
+
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
         // The spec requires pending permission requests to be answered `cancelled`.
@@ -569,7 +573,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
+        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
     }
 
     private observeTool(tool: ToolState): void {
@@ -651,9 +655,9 @@ export class AgentSession {
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
-                ...described.command !== undefined && { command: described.command },
-                ...described.target !== undefined && { target: described.target },
+                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
+                ...(described.command !== undefined && { command: described.command }),
+                ...(described.target !== undefined && { target: described.target }),
             }),
         );
     }

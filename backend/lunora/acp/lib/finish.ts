@@ -332,9 +332,14 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
 
 /** The sidebar's Stop for a host stream: keep what was written, end the stream, tell the host to cancel. */
 export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number): Promise<void> => {
-    if (await finishHostTurn(ctx, stream, { reason: "stopped" }, now)) {
-        await sendHostCancel(ctx, stream, now);
+    if (!isLiveStream(stream)) {
+        return;
     }
+
+    // The cancel is signed BEFORE the turn ends: ending it can start the worker's next queued message, whose send must
+    // follow the cancel, not reach the computer while it is still running the turn that was stopped.
+    await sendHostCancel(ctx, stream, now);
+    await finishHostTurn(ctx, stream, { reason: "stopped" }, now);
 };
 
 /**

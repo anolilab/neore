@@ -167,8 +167,9 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
         return { ended: true, next: 0, outcome: "applied" };
     }
 
-    await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
+    // Ended first: a worker run that finishes with its turn starts the next queued message, and must find the session gone.
     await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
 
     return { ended: true, next: 0, outcome: "applied", threadId: session.threadId as string };
 };

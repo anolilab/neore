@@ -41,9 +41,9 @@ export const expireHostStream = async (ctx: MutationCtx, stream: Stream, now: nu
         return;
     }
 
-    if (await endHostTurn(ctx, stream, { idle: true, reason: "timeout" }, now)) {
-        await sendHostCancel(ctx, stream, now);
-    }
+    // Cancel first, as `stopHostTurn` does: ending the turn can send the worker's next message.
+    await sendHostCancel(ctx, stream, now);
+    await endHostTurn(ctx, stream, { idle: true, reason: "timeout" }, now);
 };
 
 /** Reaps the expired host streams of this shard. Returns when the next live one expires, to re-arm the tick. */

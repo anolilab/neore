@@ -37,7 +37,8 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
     thread.externalThreadId === undefined &&
     !hasGrants;
 
-const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
+/** The thread when {@link isDeviceEligibleThread} admits it for this user (a grant is looked up here), else null. */
+export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.get(threadId);
     const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
