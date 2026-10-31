@@ -60,15 +60,24 @@
                     <button type="button" id="open-terminal">Open terminal in folder…</button>
                 </div>
 
-                <h2 id="sandbox-heading">Shell sandbox</h2>
+                <h2 id="sandbox-heading">Sandbox</h2>
+                <p class="muted">Shell commands and local MCP servers run in the same sandbox: they change files only in the shared folders and a private folder of their own.</p>
                 <label class="check">
                     <input type="checkbox" id="require-sandbox" aria-describedby="sandbox-status" />
-                    Require sandbox for shell commands
+                    Require sandbox for shell commands and local MCP servers
                 </label>
-                <label class="check">
-                    <input type="checkbox" id="allow-network" aria-describedby="sandbox-status" />
-                    Allow network for shell commands (macOS and Linux only: Windows does not block network access)
-                </label>
+                <div class="row">
+                    <label for="shell-network">Network for shell commands</label>
+                    <select id="shell-network" aria-describedby="sandbox-status network-help">
+                        <option value="off">Off</option>
+                        <option value="dependencies">Common dependencies only</option>
+                        <option value="on">On</option>
+                    </select>
+                </div>
+                <p id="network-help" class="muted">
+                    “Common dependencies only” reaches package registries and source hosts (npm, PyPI, crates.io, Go modules, RubyGems, GitHub) and nothing else.
+                    Those hosts can still receive what a program sends them. Windows does not restrict the network.
+                </p>
                 <p id="sandbox-status" class="muted"></p>
 
                 <h2 id="hosts-heading">Servers over SSH</h2>
@@ -79,7 +88,9 @@
                 <div id="hosts" aria-labelledby="hosts-heading"></div>
 
                 <h2 id="servers-heading">Local MCP servers</h2>
-                <p class="muted">Started on this computer when the agent first uses them. Only add commands you trust.</p>
+                <p class="muted">
+                    Started on this computer when the agent first uses them, inside the sandbox above. Each keeps its package caches in a private folder. Only add commands you trust.
+                </p>
                 <ul id="servers" aria-labelledby="servers-heading"></ul>
                 <form id="server-form" novalidate>
                     <label for="server-name">Name</label>
@@ -90,6 +101,12 @@
                     <textarea id="server-args" rows="3" spellcheck="false"></textarea>
                     <label for="server-env">Environment, one KEY=value per line</label>
                     <textarea id="server-env" rows="2" spellcheck="false"></textarea>
+                    <label for="server-network">Network</label>
+                    <select id="server-network">
+                        <option value="dependencies" selected>Common dependencies only</option>
+                        <option value="off">Off</option>
+                        <option value="on">On</option>
+                    </select>
                     <button type="submit">Add server</button>
                 </form>
 

@@ -6,9 +6,33 @@
 //! [`IDLE_TIMEOUT`] without a call and when the app exits, and restarted once
 //! if it died between calls. Its stderr is drained and discarded (last few KiB
 //! kept for errors).
+//!
+//! **Sandbox.** Given a [`Policy`] a server runs in the same OS sandbox as `shell_run`
+//! (`sandbox.rs`), with the same network tiers: it writes only the shared folders and
+//! a private state folder of its own, and the rest of `$HOME` is hidden. Without a
+//! policy (only where the user turned off "Require sandbox") it runs as the user.
+//!
+//! The private folder, `<state root>/<sanitised server name>/`, is why package
+//! launchers (`npx`, `uvx`, `bunx`, `deno`…) still work without opening the user's
+//! own caches:
+//!
+//! - `tmp/` is `$TMPDIR`, emptied at every start.
+//! - `cache/<tool>/` receives each package manager's cache variable ([`shell::cache_env`]:
+//!   npm, pip, uv, yarn, bun, go, deno, corepack, XDG). It persists across restarts, so a
+//!   server installed once starts again from its cache and keeps working offline.
+//! - The user's real caches (`~/.npm`, `~/.cache/uv`…) are neither readable nor writable:
+//!   a writable one would let a sandboxed server plant a package the user later runs
+//!   outside the sandbox, and a readable one can hold private-registry tarballs. The
+//!   price is one download per server, through the network tier.
+//! - Toolchains (`node`, `python`, `uv`…) stay readable where they live, through the
+//!   policy's `HOME_TOOLCHAINS` list (`sandbox.rs`); user and global `.npmrc` are
+//!   pointed at files in the state folder so a hidden `~/.npmrc` is never consulted, and
+//!   git is told to use no global config for the same reason.
+//! - It is removed when the server is removed or its command changes.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
@@ -18,6 +42,10 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::egress::{self, Proxy};
+use crate::sandbox::{self, NetworkTier, Policy};
+use crate::shell;
 
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 pub const IDLE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
@@ -32,6 +60,14 @@ pub struct McpServerConfig {
     #[serde(default)]
     pub env: BTreeMap<String, String>,
     pub name: String,
+    /// How far the server may reach into the network. A server saved before the tiers existed has
+    /// the middle one: it can fetch its packages and nothing else.
+    #[serde(default = "default_network")]
+    pub network: NetworkTier,
+}
+
+fn default_network() -> NetworkTier {
+    NetworkTier::Dependencies
 }
 
 /// `[a-z0-9_]` only, lower case — what a device tool name may contain.
@@ -70,6 +106,11 @@ pub struct McpProcess {
     child: Child,
     /// The config it was started from; a changed config in settings means a restart.
     config: McpServerConfig,
+    /// The policy it was planned under (`None` = unsandboxed). The shared folders and the
+    /// network tier are in it, so changing either restarts the server.
+    policy: Option<Policy>,
+    /// The network filter of a `Dependencies` server; stops with the process.
+    proxy: Option<Proxy>,
     /// Set by the reader once the server's output closed.
     closed: Arc<AtomicBool>,
     last_used: Instant,
@@ -119,11 +160,150 @@ pub fn route_line(line: &str, pending: &Pending, stdin: &Mutex<ChildStdin>) {
     }
 }
 
+/// The server's private folder under `state_root`, created owner-only, with an empty `tmp/`. Canonical, since
+/// the sandbox matches resolved paths (`/var` is `/private/var` on macOS).
+fn prepare_state(state_root: &Path, name: &str) -> Result<PathBuf, String> {
+    let fail = |error: std::io::Error| format!("could not prepare the server's folder: {error}");
+    let folder = state_root.join(sanitize(name));
+
+    create_private(&folder).map_err(fail)?;
+
+    let folder = std::fs::canonicalize(&folder).map_err(fail)?;
+    let tmp = folder.join("tmp");
+
+    let _ = std::fs::remove_dir_all(&tmp);
+    create_private(&tmp).map_err(fail)?;
+
+    Ok(folder)
+}
+
+fn create_private(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+    }
+
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(path)
+    }
+}
+
+/// The only variables a sandboxed server inherits from the app, as for `shell_run`. Anything else it needs the
+/// user wrote into the server's own `env`.
+const INHERITED_ENV: &[&str] = &["PATH", "HOME", "LANG", "TERM"];
+
+/// What a sandboxed server's environment holds besides [`INHERITED_ENV`] and the user's own `env`: the temp and
+/// cache variables pointing into `state`, no user or global npm config, and the offline switches that make a
+/// server with nothing to download start from its cache instead of waiting on a network it does not have.
+fn sandbox_env(state: &Path, policy: &Policy) -> Vec<(String, std::ffi::OsString)> {
+    let tmp = state.join("tmp");
+    let mut env: Vec<(String, std::ffi::OsString)> = ["TMPDIR", "TMP", "TEMP"]
+        .into_iter()
+        .map(|name| (name.to_owned(), tmp.clone().into_os_string()))
+        .collect();
+
+    env.extend(
+        shell::cache_env(state, &policy.writable, |name| std::env::var_os(name))
+            .into_iter()
+            .map(|(name, path)| (name.to_owned(), path.into_os_string())),
+    );
+    // The user's `~/.gitconfig` is hidden, and git treats an unreadable one as fatal rather than absent.
+    env.push(("GIT_CONFIG_GLOBAL".to_owned(), "/dev/null".into()));
+    env.push((
+        "npm_config_userconfig".to_owned(),
+        state.join("npmrc").into_os_string(),
+    ));
+    env.push((
+        "npm_config_globalconfig".to_owned(),
+        state.join("npmrc-global").into_os_string(),
+    ));
+
+    match policy.network {
+        NetworkTier::Off => {
+            env.push(("npm_config_offline".to_owned(), "true".into()));
+            env.push(("UV_OFFLINE".to_owned(), "1".into()));
+        }
+        NetworkTier::Dependencies | NetworkTier::On => {
+            env.push(("npm_config_prefer_offline".to_owned(), "true".into()));
+        }
+    }
+
+    env
+}
+
 impl McpProcess {
-    pub fn spawn(config: &McpServerConfig) -> Result<Self, String> {
-        let mut child = Command::new(&config.command)
-            .args(&config.args)
-            .envs(&config.env)
+    /// Starts `config`. With a `policy` the server is confined by it, with its private folder under
+    /// `state_root` added to what it may write; without one it runs as the user.
+    pub fn spawn(
+        config: &McpServerConfig,
+        policy: Option<&Policy>,
+        state_root: &Path,
+    ) -> Result<Self, String> {
+        let mut proxy = None;
+        let mut command;
+        // Holds the Landlock ruleset open until the child has it.
+        let _guard;
+
+        match policy {
+            None => {
+                command = Command::new(&config.command);
+                command.args(&config.args).envs(&config.env);
+                _guard = sandbox::Guard::default();
+            }
+            Some(policy) => {
+                let state = prepare_state(state_root, &config.name)?;
+                let mut confined = policy.clone();
+
+                confined.writable.push(state.clone());
+
+                if confined.network == NetworkTier::Dependencies {
+                    let started = Proxy::start()
+                        .map_err(|error| format!("could not start the network filter: {error}"))?;
+
+                    confined.proxy_port = Some(started.port());
+                    proxy = Some(started);
+                }
+
+                let args: Vec<&str> = config.args.iter().map(String::as_str).collect();
+
+                (command, _guard) = sandbox::sandboxed_command(&confined, &config.command, &args)?;
+                command.env_clear();
+
+                for name in INHERITED_ENV {
+                    if let Some(value) = std::env::var_os(name) {
+                        command.env(name, value);
+                    }
+                }
+
+                // The user's own variables win over ours, except the proxy: the sandbox allows no other way out
+                // anyway, but a server must not be configured past the tier it was shown under.
+                command
+                    .envs(sandbox_env(&state, &confined))
+                    .envs(&config.env);
+
+                if let Some(proxy) = &proxy {
+                    command.envs(egress::proxy_env(proxy.port()));
+                }
+
+                command.current_dir(&state);
+            }
+        }
+
+        // Its own process group, so stopping the server also stops what a launcher (`npx`, `uvx`) started.
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+
+            command.process_group(0);
+        }
+
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -178,6 +358,8 @@ impl McpProcess {
         let mut process = McpProcess {
             child,
             config: config.clone(),
+            policy: policy.cloned(),
+            proxy,
             closed,
             last_used: Instant::now(),
             next_id: 1,
@@ -228,13 +410,19 @@ impl McpProcess {
         let Some(response) = response else {
             self.pending.lock().unwrap().remove(&id);
 
+            let blocked = self
+                .proxy
+                .as_ref()
+                .map(Proxy::refused_note)
+                .unwrap_or_default();
+
             return Err(if self.closed.load(Ordering::SeqCst) || !self.is_alive() {
                 format!(
-                    "the server exited: {}",
+                    "the server exited: {}{blocked}",
                     String::from_utf8_lossy(&self.stderr.lock().unwrap()).trim()
                 )
             } else {
-                format!("{method} timed out")
+                format!("{method} timed out{blocked}")
             });
         };
 
@@ -342,6 +530,13 @@ impl McpProcess {
     }
 
     pub fn kill(&mut self) {
+        #[cfg(unix)]
+        // SAFETY: plain syscall with no memory arguments; the group is the one `process_group(0)` made for this
+        // server. Not checked: ESRCH means it already ended.
+        unsafe {
+            libc::kill(-(self.child.id() as libc::pid_t), libc::SIGKILL);
+        }
+
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
@@ -354,43 +549,70 @@ impl Drop for McpProcess {
 }
 
 /// Running servers by name.
-#[derive(Default)]
 pub struct McpManager {
     processes: Mutex<HashMap<String, Arc<Mutex<McpProcess>>>>,
+    /// Where each server's private folder lives (`prepare_state`).
+    state_root: PathBuf,
+}
+
+impl Default for McpManager {
+    fn default() -> Self {
+        McpManager::new(std::env::temp_dir().join("neore-mcp"))
+    }
 }
 
 impl McpManager {
-    fn process(&self, config: &McpServerConfig) -> Result<Arc<Mutex<McpProcess>>, String> {
+    pub fn new(state_root: PathBuf) -> Self {
+        McpManager {
+            processes: Mutex::default(),
+            state_root,
+        }
+    }
+
+    fn process(
+        &self,
+        config: &McpServerConfig,
+        policy: Option<&Policy>,
+    ) -> Result<Arc<Mutex<McpProcess>>, String> {
         let mut processes = self.processes.lock().unwrap();
 
         if let Some(process) = processes.get(&config.name) {
             let mut running = process.lock().unwrap();
 
-            // Same name, edited command/args/env: the old process is not the server settings describe.
-            if running.config == *config && running.is_alive() {
+            // Same name, edited command/args/env, another network tier or other shared folders: the old
+            // process is not the server settings describe.
+            if running.config == *config && running.policy.as_ref() == policy && running.is_alive()
+            {
                 return Ok(process.clone());
             }
         }
 
-        let process = Arc::new(Mutex::new(McpProcess::spawn(config)?));
+        let process = Arc::new(Mutex::new(McpProcess::spawn(
+            config,
+            policy,
+            &self.state_root,
+        )?));
         processes.insert(config.name.clone(), process.clone());
 
         Ok(process)
     }
 
-    /// Runs `work` against the server, restarting it ONCE if it died in between.
+    /// Runs `work` against the server, restarting it ONCE if it died in between. `policy` is what the
+    /// server is confined by (`None` = the user allowed it unsandboxed); it is part of what makes a
+    /// running process the right one, so every caller that starts servers goes through here.
     pub fn with<T>(
         &self,
         config: &McpServerConfig,
+        policy: Option<&Policy>,
         work: impl Fn(&mut McpProcess) -> Result<T, String>,
     ) -> Result<T, String> {
-        let process = self.process(config)?;
+        let process = self.process(config, policy)?;
         let first = work(&mut process.lock().unwrap());
 
         match first {
             Err(_) if !process.lock().unwrap().is_alive() => {
                 self.processes.lock().unwrap().remove(&config.name);
-                let process = self.process(config)?;
+                let process = self.process(config, policy)?;
                 let mut guard = process.lock().unwrap();
 
                 work(&mut guard)
@@ -412,11 +634,30 @@ impl McpManager {
     pub fn stop_all(&self) {
         self.processes.lock().unwrap().clear();
     }
+
+    /// Stops these servers and deletes their private folders (caches included).
+    pub fn forget(&self, names: &[String]) {
+        for name in names {
+            self.processes.lock().unwrap().remove(name);
+
+            let _ = std::fs::remove_dir_all(self.state_root.join(sanitize(name)));
+        }
+    }
+
+    /// The folder a server's caches live in, for the settings view and the tests.
+    pub fn state_folder(&self, name: &str) -> PathBuf {
+        self.state_root.join(sanitize(name))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A state root of this test's own, under the OS temp folder.
+    fn temp_root(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("neore-mcp-test-{name}-{}", std::process::id()))
+    }
 
     #[test]
     fn names_tools_within_the_manifest_rules() {
@@ -443,8 +684,9 @@ sleep 1
             command: "sh".into(),
             env: BTreeMap::new(),
             name: "fake".into(),
+            network: NetworkTier::Off,
         };
-        let mut process = McpProcess::spawn(&config).unwrap();
+        let mut process = McpProcess::spawn(&config, None, &temp_root("speaks")).unwrap();
 
         let tools = process.list_tools().unwrap();
         assert_eq!(tools.len(), 1);
@@ -468,14 +710,18 @@ sleep 1
             command: "sh".into(),
             env: BTreeMap::from([("MARK".to_owned(), mark.to_owned())]),
             name: "fake".into(),
+            network: NetworkTier::Off,
         };
         let manager = McpManager::default();
 
-        let first = manager.process(&config("1")).unwrap();
-        assert!(Arc::ptr_eq(&first, &manager.process(&config("1")).unwrap()));
+        let first = manager.process(&config("1"), None).unwrap();
+        assert!(Arc::ptr_eq(
+            &first,
+            &manager.process(&config("1"), None).unwrap()
+        ));
         assert!(!Arc::ptr_eq(
             &first,
-            &manager.process(&config("2")).unwrap()
+            &manager.process(&config("2"), None).unwrap()
         ));
     }
 
@@ -487,8 +733,367 @@ sleep 1
             command: "sh".into(),
             env: BTreeMap::new(),
             name: "dead".into(),
+            network: NetworkTier::Off,
         };
 
-        assert!(McpProcess::spawn(&config).is_err());
+        assert!(McpProcess::spawn(&config, None, &temp_root("dead")).is_err());
+    }
+
+    // ── Sandboxed servers ────────────────────────────────────────────────────
+
+    /// Folders for a sandbox test: a shared folder, an outside one holding a secret, and a stand-in home.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    struct Folders {
+        base: PathBuf,
+        home: PathBuf,
+        outside: PathBuf,
+        shared: PathBuf,
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    impl Folders {
+        fn new(name: &str) -> Folders {
+            let base = temp_root(name);
+            let make = |dir: &str| {
+                std::fs::create_dir_all(base.join(dir)).unwrap();
+                std::fs::canonicalize(base.join(dir)).unwrap()
+            };
+            let folders = Folders {
+                home: make("home"),
+                outside: make("outside"),
+                shared: make("shared"),
+                base,
+            };
+
+            std::fs::write(folders.home.join("secret.txt"), "TOP-SECRET-CONTENT").unwrap();
+
+            folders
+        }
+
+        fn policy(&self, network: NetworkTier) -> Policy {
+            Policy {
+                network,
+                ..Policy::for_roots(std::slice::from_ref(&self.shared), Some(&self.home))
+            }
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    impl Drop for Folders {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.base);
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn sandbox_or_skip() -> bool {
+        #[cfg(target_os = "linux")]
+        if let Err(reason) = sandbox::network_filter() {
+            eprintln!("skipping: {reason}");
+            return false;
+        }
+
+        match sandbox::support() {
+            sandbox::Support::Available(_) => true,
+            sandbox::Support::Unavailable(reason) => {
+                eprintln!("skipping: {reason}");
+                false
+            }
+        }
+    }
+
+    /// A server in `sh` that finishes the handshake, then answers its first tool call with what `probe` printed.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn probing_server(
+        name: &str,
+        folders: &Folders,
+        probe: &str,
+        network: NetworkTier,
+    ) -> McpServerConfig {
+        let script = format!(
+            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"p","version":"1"}}}}}}'
+read l
+read l
+r=$({probe})
+echo "{{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{{\"content\":[{{\"type\":\"text\",\"text\":\"$r\"}}]}}}}"
+sleep 1"#
+        );
+
+        McpServerConfig {
+            args: vec!["-c".into(), script],
+            command: "/bin/sh".into(),
+            env: BTreeMap::from([
+                ("FAKEHOME".to_owned(), folders.home.display().to_string()),
+                ("OUTSIDE".to_owned(), folders.outside.display().to_string()),
+                ("SHARED".to_owned(), folders.shared.display().to_string()),
+            ]),
+            name: name.into(),
+            network,
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn probe_output(config: &McpServerConfig, policy: Option<&Policy>, root: &Path) -> String {
+        let mut process = McpProcess::spawn(config, policy, root).unwrap();
+        let (text, _) = process
+            .call_tool("probe", json!({}), Duration::from_secs(10))
+            .unwrap();
+
+        text
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_sandboxed_server_writes_only_the_shared_folders_and_its_own_folder() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let folders = Folders::new("mcp-write");
+        let probe = r#"
+            (echo x > "$SHARED/ok.txt") 2>/dev/null && printf 'shared:wrote '
+            (echo x > "$OUTSIDE/bad.txt") 2>/dev/null && printf 'outside:WROTE ' || printf 'outside:denied '
+            (echo x > "$HOME/bad.txt") 2>/dev/null && printf 'home:WROTE ' || printf 'home:denied '
+            (echo x > "$TMPDIR/t") 2>/dev/null && printf 'tmp:wrote '
+            (mkdir -p "$npm_config_cache/x" && echo x > "$npm_config_cache/x/c") 2>/dev/null && printf 'cache:wrote '
+            (mkdir -p "$UV_CACHE_DIR" && echo x > "$UV_CACHE_DIR/c") 2>/dev/null && printf 'uv:wrote '
+            [ "$PWD" = "$(dirname "$TMPDIR")" ] && printf 'cwd:state '
+        "#;
+        let config = probing_server("write", &folders, probe, NetworkTier::Off);
+        let policy = folders.policy(NetworkTier::Off);
+        // The app's data folder lives under the user's home, which the sandbox hides: the server's own folder
+        // is still readable and writable there, and nothing else under it is.
+        let state_root = folders.home.join("app-data").join("mcp");
+        let text = probe_output(&config, Some(&policy), &state_root);
+
+        for allowed in [
+            "shared:wrote",
+            "tmp:wrote",
+            "cache:wrote",
+            "uv:wrote",
+            "cwd:state",
+            "outside:denied",
+            "home:denied",
+        ] {
+            assert!(text.contains(allowed), "{allowed} missing from: {text}");
+        }
+
+        assert!(!text.contains("WROTE"), "{text}");
+        assert!(folders.shared.join("ok.txt").exists());
+        assert!(!folders.outside.join("bad.txt").exists());
+
+        // The caches landed in the server's own folder, which survives the process.
+        let state = state_root.join("write");
+
+        assert!(state.join("cache").join("npm").join("x").join("c").exists());
+        assert!(state.join("tmp").join("t").exists());
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_sandboxed_server_cannot_read_the_hidden_home_folder() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let folders = Folders::new("mcp-home");
+        let probe = r#"
+            (cat "$FAKEHOME/secret.txt") 2>/dev/null && printf 'LEAKED ' || printf 'hidden '
+            [ -z "$HOME_SECRET" ] && printf 'env:clean '
+            [ -z "$NEORE_TEST_TOKEN" ] && printf 'env:no-token '
+            [ "$USER_VAR" = "kept" ] && printf 'env:own-kept '
+        "#;
+        let mut config = probing_server("home", &folders, probe, NetworkTier::Off);
+
+        config.env.insert("USER_VAR".into(), "kept".into());
+        std::env::set_var("NEORE_TEST_TOKEN", "not-for-the-server");
+
+        let policy = folders.policy(NetworkTier::Off);
+        let text = probe_output(&config, Some(&policy), &folders.base.join("state"));
+
+        assert!(text.contains("hidden"), "{text}");
+        assert!(!text.contains("LEAKED"), "{text}");
+        assert!(text.contains("env:no-token"), "{text}");
+        assert!(text.contains("env:own-kept"), "{text}");
+
+        // The control: unsandboxed, the same probe reads the file and sees the variable.
+        let control = probe_output(&config, None, &folders.base.join("control"));
+
+        assert!(control.contains("LEAKED"), "{control}");
+        assert!(!control.contains("env:no-token"), "{control}");
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn the_network_tier_sets_the_offline_switches_and_never_a_proxy_unless_dependencies() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let folders = Folders::new("mcp-env");
+        let probe = r#"printf 'offline=%s prefer=%s uv=%s proxy=%s ' "$npm_config_offline" "$npm_config_prefer_offline" "$UV_OFFLINE" "${HTTPS_PROXY:-none}""#;
+        let read = |network| {
+            let config = probing_server("env", &folders, probe, network);
+            let policy = folders.policy(network);
+
+            probe_output(&config, Some(&policy), &folders.base.join("state"))
+        };
+
+        let off = read(NetworkTier::Off);
+
+        assert!(
+            off.contains("offline=true") && off.contains("uv=1") && off.contains("proxy=none"),
+            "{off}"
+        );
+
+        let on = read(NetworkTier::On);
+
+        assert!(
+            on.contains("prefer=true") && on.contains("proxy=none"),
+            "{on}"
+        );
+
+        #[cfg(target_os = "macos")]
+        {
+            let deps = read(NetworkTier::Dependencies);
+
+            assert!(deps.contains("proxy=http://127.0.0.1:"), "{deps}");
+        }
+    }
+
+    #[test]
+    fn a_missing_sandbox_refuses_the_server_unless_the_user_allowed_it() {
+        // The planning every start goes through, on a computer posed as having no sandbox.
+        let roots = vec![PathBuf::from("/srv/p")];
+        let missing = sandbox::Support::Unavailable("no Landlock".into());
+        let refused =
+            sandbox::policy_for_mcp(&missing, false, NetworkTier::Dependencies, &roots, None);
+
+        assert!(refused
+            .unwrap_err()
+            .contains("local MCP servers must run sandboxed"));
+        assert_eq!(
+            sandbox::policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None),
+            Ok(None)
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_changed_policy_or_tier_restarts_the_server_but_the_same_one_is_reused() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let folders = Folders::new("mcp-restart");
+        let script = r#"read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; sleep 30"#;
+        let config = McpServerConfig {
+            args: vec!["-c".into(), script.into()],
+            command: "/bin/sh".into(),
+            env: BTreeMap::new(),
+            name: "restart".into(),
+            network: NetworkTier::Off,
+        };
+        let manager = McpManager::new(folders.base.join("state"));
+        let policy = folders.policy(NetworkTier::Off);
+        let first = manager.process(&config, Some(&policy)).unwrap();
+
+        assert!(Arc::ptr_eq(
+            &first,
+            &manager.process(&config, Some(&policy)).unwrap()
+        ));
+
+        // Another shared folder: the process does not hold the folders settings describe.
+        let mut wider = policy.clone();
+        wider.writable.push(folders.outside.clone());
+        let second = manager.process(&config, Some(&wider)).unwrap();
+
+        assert!(!Arc::ptr_eq(&first, &second));
+
+        // Another tier.
+        let on = folders.policy(NetworkTier::On);
+        let third = manager.process(&config, Some(&on)).unwrap();
+
+        assert!(!Arc::ptr_eq(&second, &third));
+
+        // And sandboxed to unsandboxed.
+        assert!(!Arc::ptr_eq(
+            &third,
+            &manager.process(&config, None).unwrap()
+        ));
+    }
+
+    #[test]
+    fn forgetting_a_server_removes_its_private_folder() {
+        let root = temp_root("forget");
+        let manager = McpManager::new(root.clone());
+        let state = prepare_state(&root, "Docs Server").unwrap();
+
+        std::fs::write(state.join("cache.bin"), "x").unwrap();
+        assert!(state.starts_with(std::fs::canonicalize(&root).unwrap()));
+        assert!(state.join("tmp").is_dir());
+
+        manager.forget(&["Docs Server".to_owned()]);
+
+        assert!(!state.exists());
+        assert!(!manager.state_folder("Docs Server").exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_server_saved_before_the_tiers_gets_the_dependencies_tier() {
+        let config: McpServerConfig =
+            serde_json::from_str(r#"{"name":"git","command":"git-mcp"}"#).unwrap();
+
+        assert_eq!(config.network, NetworkTier::Dependencies);
+        assert_eq!(
+            serde_json::from_str::<McpServerConfig>(
+                r#"{"name":"g","command":"c","network":"off"}"#
+            )
+            .unwrap()
+            .network,
+            NetworkTier::Off
+        );
+    }
+
+    /// A real package-launched server through the whole path: sandbox, private caches, the dependencies filter.
+    /// `cargo test --lib a_real_npx_server -- --ignored --nocapture`; needs the network on macOS.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "downloads a package through the dependencies tier"]
+    fn a_real_npx_server_starts_sandboxed_and_lists_its_tools() {
+        let folders = Folders::new("mcp-npx");
+        let config = McpServerConfig {
+            args: vec![
+                "-y".into(),
+                "@modelcontextprotocol/server-filesystem@2025.8.21".into(),
+                folders.shared.display().to_string(),
+            ],
+            command: "npx".into(),
+            env: BTreeMap::new(),
+            name: "files".into(),
+            network: NetworkTier::Dependencies,
+        };
+        let policy = folders.policy(NetworkTier::Dependencies);
+        let state = folders.base.join("state");
+        let mut process = McpProcess::spawn(&config, Some(&policy), &state).unwrap();
+        let tools = process.list_tools().unwrap();
+
+        println!("{} tools", tools.len());
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "read_file" || tool.name == "read_text_file"));
+        drop(process);
+
+        // Second start, nothing to download: the offline tier starts it from the private cache.
+        let offline = folders.policy(NetworkTier::Off);
+        let config = McpServerConfig {
+            network: NetworkTier::Off,
+            ..config
+        };
+        let mut again = McpProcess::spawn(&config, Some(&offline), &state).unwrap();
+
+        assert!(!again.list_tools().unwrap().is_empty());
     }
 }

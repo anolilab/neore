@@ -16,6 +16,7 @@ pub mod acp_permission;
 pub mod actions;
 #[cfg(feature = "keychain")]
 pub mod approval;
+pub mod egress;
 #[cfg(feature = "keychain")]
 pub mod engine;
 #[cfg(feature = "keychain")]
