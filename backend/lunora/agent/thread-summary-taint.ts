@@ -26,7 +26,7 @@ export const threadSummaryTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id
 
 /**
  * What a handoff taken over from a coding agent carries into a device call. Such a thread (harness switch S3) starts with a
- * `portable` divider holding the agent's output, written by an agent that ran commands and read files and pages on the
+ * `portable` divider holding the agent's output (or nothing, when it said nothing in words), written by an agent that ran commands and read files and pages on the
  * user's computer. None of those tool results exist in this thread, so `computeTaint` cannot see them: the thread is
  * treated as having read a page and a device, for as long as it lasts.
  */
@@ -43,7 +43,7 @@ export const threadHandoffTaint = async (ctx: Pick<QueryCtx, "db">, threadId: Id
     const first = await ctx.db.messages.findFirst({ orderBy: [{ order: "asc" }, { stepOrder: "asc" }], where: { threadId } });
     const part = first && agentSwitchOf(first);
 
-    return part?.from.kind === "host" && part.handoff ? HOST_HANDOFF_TAINT : [];
+    return part?.from.kind === "host" ? HOST_HANDOFF_TAINT : [];
 };
 
 /** Rows of a path read for its taint: 3,000, as far as a search for an earlier divider goes (`handoff-source.ts`). */
