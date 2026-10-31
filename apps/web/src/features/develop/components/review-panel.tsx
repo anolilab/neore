@@ -169,6 +169,12 @@ const ReviewPanel = ({
         setFeedback(null);
 
         try {
+            // A verdict or summary chosen a moment ago may still be saving: the review posts what is stored, so it goes
+            // first, and if it did not store, nothing is posted.
+            if (pendingSaves.current > 0 && !(await saveQueue.current)) {
+                return;
+            }
+
             // The summary typed last goes with the review even if the box never lost focus; if it is not stored, nothing is posted.
             if (dirty && !(await saveReview({ body: summary }))) {
                 return;
