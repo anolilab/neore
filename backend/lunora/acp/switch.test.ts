@@ -516,6 +516,20 @@ describe("host to cloud", () => {
         expect(await taintOf(await cloudThread())).toEqual([]);
     });
 
+    it("counts a takeover as having read what the agent read even when the agent said nothing in words", async () => {
+        const device = await pairedDevice(ownerId);
+        // The agent ran a command and returned its output, with no user or assistant text to hand over.
+        const source = await hostThread(device, 0);
+
+        await addToolResult(source, 0, "shell");
+
+        const { forkedThreadId } = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+        const [divider] = await dividers(forkedThreadId as string);
+
+        expect(divider?.handoff).toBeUndefined();
+        expect(await run(async (ctx) => await threadHandoffTaint(ctx, forkedThreadId as never))).toEqual(["web", "device"]);
+    });
+
     it("answers a repeated click with the thread the first one made", async () => {
         const device = await pairedDevice(ownerId);
         const source = await hostThread(device);
