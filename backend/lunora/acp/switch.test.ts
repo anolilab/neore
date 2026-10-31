@@ -646,6 +646,30 @@ describe("the session id of a switch", () => {
     });
 });
 
+describe("a click id that comes back after its claim expired", () => {
+    it("is refused and creates nothing, for the session id it would share with the first click's", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await switchTo(source, hostTarget(device), ownerId, "old-click");
+
+        const before = { calls: await rows("deviceCalls"), sessions: await rows("acpSessions"), threads: await rows("threads") };
+
+        // Past the claim's 10 minutes, with the computer seen again so it still counts as online.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.now() + 11 * 60_000);
+        await run(async (ctx) => {
+            await ctx.db.patch(device.deviceId as never, { lastSeenAt: Date.now() } as never);
+        });
+
+        await expect(switchTo(source, hostTarget(device), ownerId, "old-click")).rejects.toThrow(/already made/);
+
+        expect(await rows("acpSessions")).toHaveLength(before.sessions.length);
+        expect(await rows("threads")).toHaveLength(before.threads.length);
+        expect(await rows("deviceCalls")).toHaveLength(before.calls.length);
+    });
+});
+
 describe("a repeated click", () => {
     const takeOffline = async (device: Device) => {
         await run(async (ctx) => {

@@ -421,6 +421,13 @@ const startOn = async (
     },
 ) => {
     const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.sourceThreadId });
+
+    // The claim that made a click one switch outlives it by minutes only, and the same click id gives the same session id: a
+    // session already on this computer under it is the click's earlier one, and a second row would share its (device, id) pair.
+    if (await ctx.db.acpSessions.findFirst({ where: { deviceId: args.device._id, hostSessionId } })) {
+        throw new LunoraError("CONFLICT", "That switch was already made. Reload the chat and switch again.");
+    }
+
     const call = await openHostSession(
         ctx,
         { device: args.device, hostSessionId, offer: args.offer, taintedBy: args.taintedBy, threadId: args.threadId, userId: args.userId },
