@@ -352,7 +352,7 @@ export interface InternalApiTypes {
             fetchMcpRegistryPage: FunctionReference<"action", { cursor: string | null; search: string | null }, { nextCursor?: string; servers: Array<{ description: string; icon?: string; id: string; remotes: Array<{ headers: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }>; protocol: "http" | "sse"; url: string; variables: Array<{ choices?: Array<string>; description?: string; isRequired: boolean; isSecret: boolean; name: string; placeholder?: string; value?: string }> }>; repositoryUrl?: string; title: string; version: string; websiteUrl?: string }> }>;
         };
         mcp_tool_labels: {
-            labelToolCalls: FunctionReference<"mutation", { labels: Record<string, { serverName: string; toolName: string }>; messageIds: Array<string>; userId: string }, null>;
+            labelToolCalls: FunctionReference<"mutation", { autoApprovals?: Record<string, { at: number; by: "quick-check"; model: string; reason: string }>; labels: Record<string, { serverName: string; toolName: string }>; messageIds: Array<string>; userId: string }, null>;
         };
         media_abandon: {
             failAbandonedMediaJob: FunctionReference<"mutation", { claimKey: string; threadId: Id<"threads"> }, boolean>;
@@ -403,6 +403,7 @@ export interface InternalApiTypes {
             };
         };
         tool_permissions: {
+            getLowRiskApprovalContext: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, boolean>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
@@ -1448,6 +1449,7 @@ export const internal: InternalApiTypes = {
             },
         },
         tool_permissions: {
+            getLowRiskApprovalContext: { __lunoraRef: "chat_tool_permissions:getLowRiskApprovalContext" },
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
             getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },
             getToolPermissionsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionsQuery" },

@@ -2841,6 +2841,11 @@
       "to": "table:threadTags"
     },
     {
+      "from": "function:chat_tool_permissions:getLowRiskApprovalContext",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
       "from": "function:chat_tool_permissions:getToolPermissionGrantsQuery",
       "kind": "read",
       "to": "table:aiUserPreferences"
@@ -2872,6 +2877,11 @@
     },
     {
       "from": "function:chat_tool_permissions:revokeToolPermissionGrant",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
+      "from": "function:chat_tool_permissions:setAutoApproveLowRisk",
       "kind": "read",
       "to": "table:aiUserPreferences"
     },
@@ -10486,6 +10496,13 @@
     },
     {
       "detail": "query",
+      "id": "function:chat_tool_permissions:getLowRiskApprovalContext",
+      "kind": "function",
+      "name": "chat.tool_permissions.getLowRiskApprovalContext",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
       "id": "function:chat_tool_permissions:getPendingToolApproval",
       "kind": "function",
       "name": "chat.tool_permissions.getPendingToolApproval",
@@ -10545,6 +10562,13 @@
       "id": "function:chat_tool_permissions:revokeToolPermissionGrant",
       "kind": "function",
       "name": "chat.tool_permissions.revokeToolPermissionGrant",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_tool_permissions:setAutoApproveLowRisk",
+      "kind": "function",
+      "name": "chat.tool_permissions.setAutoApproveLowRisk",
       "module": "chat"
     },
     {
@@ -17940,85 +17964,91 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 790,
+      "line": 803,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 798,
+      "line": 811,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 810,
+      "line": 823,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 855,
+      "line": 868,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 949,
+      "line": 963,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 956,
+      "line": 970,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1048,
+      "line": 1062,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1133,
+      "line": 1148,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1153,
+      "line": 1168,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1160,
+      "line": 1175,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1171,
+      "line": 1186,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 127,
+      "line": 139,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 128,
+      "line": 140,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 130,
+      "line": 142,
+      "reason": "\"buildAgentTools\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-tools",
+      "kind": "call",
+      "line": 146,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
@@ -18324,19 +18354,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 227,
+      "line": 256,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 268,
+      "line": 315,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 413,
+      "line": 460,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
@@ -19722,19 +19752,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 799,
+      "line": 802,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 895,
+      "line": 898,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 937,
+      "line": 940,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {

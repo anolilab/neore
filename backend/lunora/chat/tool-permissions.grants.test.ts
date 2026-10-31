@@ -8,10 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import {
+    getLowRiskApprovalContext,
     getToolPermissionSettings,
     pruneExpiredToolPermissionGrants,
     recordApprovalPreference,
     revokeToolPermissionGrant,
+    setAutoApproveLowRisk,
     setToolPermission,
 } from "./tool-permissions";
 
@@ -206,5 +208,57 @@ describe("pruneExpiredToolPermissionGrants", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(pruneExpiredToolPermissionGrants, {}));
 
         expect(await grantsOf()).toStrictEqual({ [KEY]: later });
+    });
+});
+
+describe("the quick check setting", () => {
+    it("is off until the user turns it on, and off again when they turn it off", async () => {
+        const read = async (): Promise<boolean> => {
+            const settings: any = await as().query(getToolPermissionSettings as never, {} as never);
+
+            return settings.autoApproveLowRisk;
+        };
+
+        expect(await read()).toBe(false);
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+        expect(await read()).toBe(true);
+
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: false } as never);
+        expect(await read()).toBe(false);
+    });
+
+    it("does not touch the tool permissions or time-boxed allows", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { toolPermissions: { [KEY]: "ask" }, userId: USER }));
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const row = await stored();
+
+        expect(row?.toolPermissions).toStrictEqual({ [KEY]: "ask" });
+    });
+});
+
+describe("getLowRiskApprovalContext", () => {
+    const THREAD_ARGS = async (extra: Record<string, unknown> = {}) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("threads", { title: "t", userId: USER, ...extra }));
+    const ask = async (threadId: unknown): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { threadId, userId: USER }));
+
+    it("is false while the setting is off, even for the user's own thread", async () => {
+        expect(await ask(await THREAD_ARGS())).toBe(false);
+    });
+
+    it("is true for the user's own thread once it is on", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        expect(await ask(await THREAD_ARGS())).toBe(true);
+    });
+
+    it("stays false in a thread someone else can write to or read publicly", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        expect(await ask(await THREAD_ARGS({ isPublic: true }))).toBe(false);
+        expect(await ask(await THREAD_ARGS({ deleted: true }))).toBe(false);
+        expect(await ask(await THREAD_ARGS({ userId: "someone-else" }))).toBe(false);
     });
 });

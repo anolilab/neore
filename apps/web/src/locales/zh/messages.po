@@ -440,7 +440,7 @@ msgstr "{0} 个失败"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:93
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:95
 msgid "{0} for {1}"
 msgstr "{1} 的{0}"
 
@@ -1077,7 +1077,7 @@ msgstr "{selectedCount, plural, other {已选中 # 个对话}}"
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
 msgid "{server} · until {until}"
 msgstr ""
 
@@ -2458,7 +2458,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:350
+#: ../../packages/chat-ui/src/chat/message-content.tsx:353
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -2776,8 +2776,8 @@ msgstr "允许此网站（{0}）"
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:193
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:195
 msgid "Allowed for a limited time"
 msgstr ""
 
@@ -2869,7 +2869,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1040
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1050
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -2885,7 +2885,7 @@ msgstr "具有 bedrock:InvokeModel 权限的 IAM 用户的秘密访问密钥。�
 msgid "An image in the file is corrupt."
 msgstr "文件中的某张图片已损坏。"
 
-#: src/features/devices/components/device-scope.tsx:100
+#: src/features/devices/components/device-scope.tsx:114
 msgid "An older project not listed here"
 msgstr ""
 
@@ -3054,7 +3054,7 @@ msgstr "任意模型"
 msgid "Any name from ollama.com/library, e.g. llama3.2, qwen3:8b or gemma3:4b. Downloads run on your computer and can take a while."
 msgstr "ollama.com/library 中的任意名称，例如 llama3.2、qwen3:8b 或 gemma3:4b。下载在你的电脑上进行，可能需要一些时间。"
 
-#: src/features/devices/components/device-scope.tsx:55
+#: src/features/devices/components/device-scope.tsx:69
 msgid "Any of my chats"
 msgstr ""
 
@@ -3214,6 +3214,10 @@ msgstr "已批准——正在运行工具"
 
 #: src/features/develop/components/inbox-list.tsx:56
 msgid "Approved and not a draft. Branch protection is not checked."
+msgstr ""
+
+#: src/features/chat/thread/tool-auto-approval.tsx:19
+msgid "Approved automatically — low risk"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
@@ -3409,7 +3413,7 @@ msgstr "升序"
 msgid "ask"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Ask"
 msgstr "询问"
 
@@ -3568,7 +3572,7 @@ msgstr ""
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "自动"
 
@@ -3620,7 +3624,7 @@ msgstr "自动朗读回复"
 msgid "Auto-save"
 msgstr "自动保存"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:305
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:360
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自动：无需询问直接运行。询问：暂停等待你批准/拒绝。关闭：助手完全看不到该工具。自动化（触发器、消息机器人、工作流）无法询问，因此“询问”类工具在那里不可用。MCP 工具默认为“询问”，除非服务器将其标记为只读。"
 
@@ -3950,6 +3954,10 @@ msgstr "Bedrock 控制台 → API 密钥。加密存储，不会再次显示。"
 #: src/features/canvas/components/canvas-text-diff-viewer.tsx:41
 msgid "Before"
 msgstr "之前"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+msgid "Before a tool set to Ask pauses the chat, a short model check reads the tool's name and arguments. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Anything else still asks you. Off by default."
+msgstr ""
 
 #: src/features/workflow/templates/index.ts:126
 msgid "beginner"
@@ -4377,11 +4385,11 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:691
+#: ../../packages/chat-ui/src/chat/message-content.tsx:694
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:713
+#: ../../packages/chat-ui/src/chat/message-content.tsx:716
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -4389,7 +4397,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:711
+#: ../../packages/chat-ui/src/chat/message-content.tsx:714
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -4398,7 +4406,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:674
+#: ../../packages/chat-ui/src/chat/message-content.tsx:677
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -4406,7 +4414,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:635
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -4493,8 +4501,8 @@ msgstr "内置画布编辑器"
 msgid "Built-in reasoning before generating"
 msgstr "生成前内置推理"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:313
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:369
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:370
 #: src/features/settings/lib/settings-keywords.ts:101
 msgid "Built-in tools"
 msgstr "内置工具"
@@ -5195,7 +5203,7 @@ msgstr "复选框"
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建立任何连接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:367
+#: ../../packages/chat-ui/src/chat/message-content.tsx:370
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -5296,7 +5304,7 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:299
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "选择哪些工具助手可以自行使用、哪些需要你批准、哪些关闭。"
 
@@ -5574,7 +5582,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:624
+#: ../../packages/chat-ui/src/chat/message-content.tsx:627
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -5689,7 +5697,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:603
+#: ../../packages/chat-ui/src/chat/message-content.tsx:606
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -5705,7 +5713,7 @@ msgstr "代码高亮主题已更新"
 msgid "Code is required"
 msgstr "代码为必填项"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:562
+#: ../../packages/chat-ui/src/chat/message-content.tsx:565
 msgid "Code output"
 msgstr "代码输出"
 
@@ -6484,7 +6492,7 @@ msgstr "已连接到 {0}"
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:334
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:391
 msgid "Connecting to your MCP servers..."
 msgstr "正在连接你的 MCP 服务器..."
 
@@ -7094,7 +7102,7 @@ msgstr "无法取消运行。"
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
-#: src/features/devices/components/device-scope.tsx:35
+#: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
 msgstr ""
 
@@ -7192,7 +7200,7 @@ msgstr "无法加载技能明细。"
 msgid "Could not load this"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:137
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:139
 msgid "Could not load tools: {error}"
 msgstr "无法加载工具：{error}"
 
@@ -7349,6 +7357,10 @@ msgstr "无法更新参与者"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
+msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+msgid "Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to."
 msgstr ""
 
 #: src/features/marketing/data/models-data.ts:239
@@ -7622,7 +7634,7 @@ msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:291
+#: ../../packages/chat-ui/src/chat/message-content.tsx:294
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -7863,7 +7875,7 @@ msgid "Custom rate limits"
 msgstr "自定义速率限制"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Custom setting (default: {0})"
 msgstr "自定义设置（默认：{0}）"
 
@@ -8189,7 +8201,7 @@ msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "默认"
 
@@ -8850,7 +8862,7 @@ msgstr "制作 logo、图标和品牌素材、最注重文字与排版精度的�
 msgid "Desktop"
 msgstr "桌面"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:69
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
 msgid "destructive"
 msgstr "破坏性"
 
@@ -9166,7 +9178,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:266
+#: ../../packages/chat-ui/src/chat/message-content.tsx:269
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 msgid "Document"
 msgstr "文档"
@@ -9314,7 +9326,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:429
+#: ../../packages/chat-ui/src/chat/message-content.tsx:432
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "下载文件"
@@ -9607,6 +9619,10 @@ msgstr "例如：严格 JSON 编码器"
 #: src/features/evals/components/run-dialog.tsx:118
 msgid "Each case runs once, one after another. Every case counts toward your daily message and task limits, and the run stops when it reaches its cost cap."
 msgstr "每个用例依次运行一次。每个用例都会计入你每日的消息和任务限额，运行达到费用上限时会停止。"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:257
+msgid "Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual."
+msgstr ""
 
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:71
 msgid "Each code can only be used once. Keep them secure and treat them like passwords."
@@ -10623,7 +10639,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:227
+#: ../../packages/chat-ui/src/chat/message-content.tsx:230
 msgid "Error:"
 msgstr "错误："
 
@@ -10881,7 +10897,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:593
+#: ../../packages/chat-ui/src/chat/message-content.tsx:596
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -11206,11 +11222,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:682
+#: ../../packages/chat-ui/src/chat/message-content.tsx:685
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:625
+#: ../../packages/chat-ui/src/chat/message-content.tsx:628
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -11730,7 +11746,7 @@ msgstr "撤销会话失败"
 msgid "Failed to revoke sessions"
 msgstr "撤销会话失败"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:266
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:321
 msgid "Failed to revoke the allow"
 msgstr ""
 
@@ -11962,11 +11978,15 @@ msgstr "更新标签失败"
 msgid "Failed to update the case"
 msgstr "无法更新用例"
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:309
+msgid "Failed to update the quick check"
+msgstr ""
+
 #: src/features/chat/sharing/thread-share-button.tsx:146
 msgid "Failed to update thread visibility"
 msgstr "更新对话可见性失败"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:297
 msgid "Failed to update tool permission"
 msgstr "更新工具权限失败"
 
@@ -13446,7 +13466,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:444
+#: ../../packages/chat-ui/src/chat/message-content.tsx:447
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -13454,12 +13474,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:445
+#: ../../packages/chat-ui/src/chat/message-content.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:288
+#: ../../packages/chat-ui/src/chat/message-content.tsx:291
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -13467,7 +13487,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:446
+#: ../../packages/chat-ui/src/chat/message-content.tsx:449
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -14665,7 +14685,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:396
+#: ../../packages/chat-ui/src/chat/message-content.tsx:399
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -15227,7 +15247,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:211
+#: ../../packages/chat-ui/src/chat/message-content.tsx:214
 msgid "Input:"
 msgstr "输入："
 
@@ -15568,7 +15588,7 @@ msgstr "它可能已被删除，或者你已无权访问。"
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "它可能已过期、被撤销或已被使用。请索取新的链接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:373
+#: ../../packages/chat-ui/src/chat/message-content.tsx:376
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -16311,6 +16331,10 @@ msgstr "镜头类型"
 msgid "Less"
 msgstr "少"
 
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:243
+msgid "Let a quick check approve low-risk calls"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:64
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
@@ -16650,7 +16674,7 @@ msgstr "正在加载编辑器..."
 msgid "Loading editor…"
 msgstr "正在加载编辑器…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:310
+#: ../../packages/chat-ui/src/chat/message-content.tsx:313
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -16778,7 +16802,7 @@ msgstr "正在加载工作流..."
 msgid "Loading your overview…"
 msgstr "正在加载概览…"
 
-#: src/features/devices/components/device-scope.tsx:106
+#: src/features/devices/components/device-scope.tsx:120
 msgid "Loading your projects…"
 msgstr ""
 
@@ -16793,7 +16817,7 @@ msgstr ""
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:288
 #: src/features/settings/components/chat/trigger-settings.tsx:903
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -16801,7 +16825,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:313
+#: ../../packages/chat-ui/src/chat/message-content.tsx:316
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -17395,7 +17419,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP 注册表"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:340
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:397
 msgid "MCP server"
 msgstr "MCP 服务器"
 
@@ -17436,8 +17460,8 @@ msgstr "MCP 服务器"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "MCP 服务器提供额外的工具，供 AI 在对话中使用。已连接服务器的工具会在聊天时自动可用。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:329
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:330
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:386
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:387
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "MCP tools"
 msgstr "MCP 工具"
@@ -18643,11 +18667,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:683
+#: ../../packages/chat-ui/src/chat/message-content.tsx:686
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:632
+#: ../../packages/chat-ui/src/chat/message-content.tsx:635
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -18787,6 +18811,14 @@ msgstr "中性"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:41
 msgid "Neutral color, blockbuster look"
 msgstr "中性色彩，大片质感"
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:256
+msgid "Never covers a call after the chat has read web pages, files, knowledge or other tool results: those can carry hidden instructions."
+msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:255
+msgid "Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes."
+msgstr ""
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:61
@@ -19255,7 +19287,7 @@ msgstr "没有已配对的设备。"
 msgid "No diff data available for this version"
 msgstr "此版本没有可用的差异数据"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:337
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:394
 msgid "No enabled MCP servers."
 msgstr "没有已启用的 MCP 服务器。"
 
@@ -19645,7 +19677,7 @@ msgstr "暂无套餐等级数据。网关升级后，新请求会记录等级信
 msgid "No tools shared yet"
 msgstr "尚未共享任何工具"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:140
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:142
 msgid "No tools."
 msgstr "没有工具。"
 
@@ -19792,7 +19824,7 @@ msgstr "未批准"
 msgid "Not attached:"
 msgstr "未附加："
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:72
 msgid "not configured"
 msgstr "未配置"
 
@@ -19822,7 +19854,7 @@ msgstr ""
 msgid "not measured"
 msgstr "未测量"
 
-#: src/features/devices/components/device-scope.tsx:111
+#: src/features/devices/components/device-scope.tsx:125
 msgid "Not offered in any chat until you choose a project."
 msgstr ""
 
@@ -19991,11 +20023,11 @@ msgstr ""
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Off"
 msgstr "关闭"
 
-#: src/features/devices/components/device-scope.tsx:112
+#: src/features/devices/components/device-scope.tsx:126
 msgid "Offered only in chats that belong to the projects above. It applies from the next message."
 msgstr ""
 
@@ -20245,7 +20277,7 @@ msgstr "仅扫描了最新的运行记录，因此可能缺少较早的模型。
 msgid "Only the owner can change who sees this skill."
 msgstr "只有所有者可以更改谁能看到此技能。"
 
-#: src/features/devices/components/device-scope.tsx:59
+#: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
 msgstr ""
 
@@ -20261,7 +20293,7 @@ msgstr "只有你可以查看和使用。"
 msgid "Only you."
 msgstr "仅你自己。"
 
-#: src/features/devices/components/device-scope.tsx:108
+#: src/features/devices/components/device-scope.tsx:122
 msgid "Only your 100 most recent projects are listed."
 msgstr ""
 
@@ -20278,7 +20310,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:669
+#: ../../packages/chat-ui/src/chat/message-content.tsx:672
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:65
@@ -21058,7 +21090,7 @@ msgstr "每个模型每个用例的结果"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:540
+#: ../../packages/chat-ui/src/chat/message-content.tsx:543
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/components/model-picker/model-picker.tsx:204
 #: src/features/devices/components/device-tool-call.tsx:95
@@ -21097,7 +21129,7 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:219
+#: ../../packages/chat-ui/src/chat/message-content.tsx:222
 msgid "Output:"
 msgstr "输出："
 
@@ -21137,7 +21169,7 @@ msgstr "所有者"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:631
+#: ../../packages/chat-ui/src/chat/message-content.tsx:634
 msgid "page"
 msgstr "页面"
 
@@ -22580,7 +22612,7 @@ msgstr "需要更长的 10 秒视频片段和高度创意控制的项目"
 msgid "Projects that require full 1080p video resolution from a frontier model"
 msgstr "需要前沿模型输出完整 1080p 视频分辨率的项目"
 
-#: src/features/devices/components/device-scope.tsx:65
+#: src/features/devices/components/device-scope.tsx:79
 msgid "Projects this device is offered in"
 msgstr ""
 
@@ -23106,7 +23138,7 @@ msgstr "阅读文档"
 msgid "Read what needs you: the description, commits, files, diff and checks of each change."
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:68
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "read-only"
 msgstr "只读"
 
@@ -24131,12 +24163,12 @@ msgstr "重新发送验证邮件"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:106
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Reset"
 msgstr "重置"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:100
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:102
 msgid "Reset {0} to default"
 msgstr "将 {0} 重置为默认"
 
@@ -24393,7 +24425,7 @@ msgstr "审核备注"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/pages/components/page-share-dialog.tsx:209
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:215
 msgid "Revoke"
 msgstr "撤销"
 
@@ -24405,7 +24437,7 @@ msgstr "撤销所有会话"
 msgid "Revoke Session"
 msgstr "撤销会话"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:209
 msgid "Revoke the allow for {tool}"
 msgstr ""
 
@@ -24644,7 +24676,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:501
+#: ../../packages/chat-ui/src/chat/message-content.tsx:504
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -24652,7 +24684,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:188
+#: ../../packages/chat-ui/src/chat/message-content.tsx:191
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -24963,7 +24995,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:668
 msgid "Screenshot"
 msgstr "截图"
 
@@ -26413,7 +26445,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:982
+#: ../../packages/chat-ui/src/chat/message-content.tsx:992
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -26618,8 +26650,8 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1110
-#: src/features/chat/thread/message-content.tsx:125
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1120
+#: src/features/chat/thread/message-content.tsx:126
 msgid "Source {index}"
 msgstr "来源 {index}"
 
@@ -27997,7 +28029,7 @@ msgstr "输入一张图像，移除背景，然后应用风格迁移"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:626
+#: ../../packages/chat-ui/src/chat/message-content.tsx:629
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -28992,7 +29024,7 @@ msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上�
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:196
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
 msgstr ""
 
@@ -29063,7 +29095,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1036
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1046
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
 #: src/features/chat/thread/streaming-placeholder.tsx:795
 msgid "Thinking..."
@@ -29210,7 +29242,7 @@ msgstr ""
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:372
+#: ../../packages/chat-ui/src/chat/message-content.tsx:375
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -29784,7 +29816,7 @@ msgstr "工具调用"
 msgid "Tool Calling"
 msgstr "工具调用"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:353
 #: src/features/settings/lib/settings-navigation.ts:95
 msgid "Tool Permissions"
 msgstr "工具权限"
@@ -30274,7 +30306,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:627
+#: ../../packages/chat-ui/src/chat/message-content.tsx:630
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -30575,7 +30607,7 @@ msgstr "不支持的类型"
 msgid "until {0}"
 msgstr "至 {0}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:206
 msgid "Until {until}"
 msgstr ""
 
@@ -30723,11 +30755,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:990
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:980
+#: ../../packages/chat-ui/src/chat/message-content.tsx:990
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -32278,7 +32310,7 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
 
-#: src/features/devices/components/device-scope.tsx:40
+#: src/features/devices/components/device-scope.tsx:54
 msgid "Where this device is offered"
 msgstr ""
 
@@ -32650,7 +32682,7 @@ msgstr "你还没有评测数据集。"
 msgid "You have no indexed knowledge files yet."
 msgstr "你还没有已索引的知识文件。"
 
-#: src/features/devices/components/device-scope.tsx:106
+#: src/features/devices/components/device-scope.tsx:120
 msgid "You have no projects yet."
 msgstr ""
 

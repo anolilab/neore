@@ -17,7 +17,7 @@ type Database = MutationCtx["db"];
 
 /** The `aiUserPreferences` columns other modules set. */
 export type AiUserPreferencesPatch = Partial<
-    Pick<Doc<"aiUserPreferences">, "browserSettings" | "customAIProviders" | "toolPermissionGrants" | "toolPermissions">
+    Pick<Doc<"aiUserPreferences">, "autoApproveLowRisk" | "browserSettings" | "customAIProviders" | "toolPermissionGrants" | "toolPermissions">
 >;
 
 /** The `userSettings` columns other modules set. */

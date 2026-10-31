@@ -31,6 +31,7 @@ export const acpSessions = sqliteTable("acpSessions", {
 export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    autoApproveLowRisk: integer("autoApproveLowRisk", { mode: "boolean" }),
     autoDetectComplexity: integer("autoDetectComplexity", { mode: "boolean" }),
     autoMediaEnrichment: integer("autoMediaEnrichment", { mode: "boolean" }),
     browserSettings: text("browserSettings", { mode: "json" }).$type<{ domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean }>(),

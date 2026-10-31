@@ -427,6 +427,20 @@ written here is what is not.
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
 
+- **Low-risk quick check** (`chat/lib/low-risk-approval.ts`, `low-risk-check.ts`) — opt-in
+  (`aiUserPreferences.autoApproveLowRisk`, absent = off, set only by `setAutoApproveLowRisk`).
+  An eligible `ask` tool's `needsApproval` becomes a function: taint, then the per-user budget
+  (`chat/toolAutoApprove`), then one utility-model call (no tools, strict `{lowRisk, reason}`, 8 s
+  deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
+  model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
+  defaults to `ask` is a person tool or a delegation), no user override (only the DEFAULT `ask`), no
+  destructive/open-world annotation, no outward/destructive word in the tool name, not headless, not
+  an API-key run, and the thread must pass `isDeviceEligibleThread` (the owner alone — a collaborator's
+  turn would otherwise replace the owner's consent). Taint is `computeTaint(options.messages)`, the
+  device-call signal, so after any web/knowledge/MCP result or attached file in the context the tool
+  asks again. The approval is stamped on the saved call at `finishRun` (`providerOptions.neore.autoApproval`,
+  by tool call id, next to the MCP label), and a `chat.low_risk_check` event is logged per decision.
+
 - **Sub-agents** (`sub-agents/`) — `delegateToSubAgent` admits a
   `subAgentRuns` row (owner of the parent thread only; depth ≤ 2 counted via
   `by_childThreadId`; ≤ 3 queued/running per PARENT THREAD — the tool cannot

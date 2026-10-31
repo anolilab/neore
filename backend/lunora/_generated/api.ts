@@ -322,10 +322,11 @@ export interface ApiTypes {
             };
         };
         tool_permissions: {
-            getToolPermissionSettings: FunctionReference<"query", {}, { builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: FunctionReference<"query", {}, { autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             listMcpToolPermissions: FunctionReference<"action", {}, { servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: FunctionReference<"mutation", { key: string }, null>;
+            setAutoApproveLowRisk: FunctionReference<"mutation", { enabled: boolean }, null>;
             setToolPermission: FunctionReference<"mutation", { key: string; mode: "auto" | "ask" | "off" | null }, null>;
         };
         translate: {
@@ -1101,6 +1102,7 @@ export const api: ApiTypes = {
             listMcpToolPermissions: { __lunoraRef: "chat_tool_permissions:listMcpToolPermissions" },
             respondToToolApproval: { __lunoraRef: "chat_tool_permissions:respondToToolApproval" },
             revokeToolPermissionGrant: { __lunoraRef: "chat_tool_permissions:revokeToolPermissionGrant" },
+            setAutoApproveLowRisk: { __lunoraRef: "chat_tool_permissions:setAutoApproveLowRisk" },
             setToolPermission: { __lunoraRef: "chat_tool_permissions:setToolPermission" },
         },
         translate: {

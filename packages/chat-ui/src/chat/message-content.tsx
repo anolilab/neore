@@ -26,6 +26,7 @@ import { Streamdown } from "streamdown";
 
 import type { ChatMessage, FilePart, ImagePart, MessagePart, ReasoningPart, SourceDocumentPart, SourceUrlPart, TextPart, ToolPart } from "../types/message";
 import type { SandboxOutputs } from "../types/sandbox";
+import { resolveAutoApproval } from "../utils/auto-approval";
 import { createCitationMarker, safeHttpUrl } from "../utils/citation-marker";
 import cn from "../utils/cn";
 import { resolveDeviceToolName } from "../utils/device-tool-name";
@@ -86,6 +87,8 @@ interface MessageContentProps {
         Text?: FC<{ isAnimating: boolean; text: string }>;
         /** Rendered for a tool call awaiting the user's approval (`state: "approval-requested"`). */
         ToolApproval?: FC<{ part: ToolPart }>;
+        /** Rendered above any tool call the user's quick check approved (`utils/auto-approval.ts`), in every state after the call. */
+        ToolAutoApproval?: FC<{ reason: string }>;
         ToolCall?: FC<{ part: ToolPart }>;
         toolMeta?: Map<string, { resourceUri: string; serverName: string }>;
 
@@ -741,6 +744,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         SourceGroup = DefaultSourceGroup,
         Text = DefaultText,
         ToolApproval,
+        ToolAutoApproval,
         ToolCall,
         toolMeta,
         toolViews,
@@ -871,6 +875,12 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     if (toolPart.state === "approval-requested" && ToolApproval) {
                         renderedParts.push(<ToolApproval key={key} part={toolPart} />);
                         break;
+                    }
+
+                    const autoApproval = ToolAutoApproval ? resolveAutoApproval(toolPart) : null;
+
+                    if (ToolAutoApproval && autoApproval) {
+                        renderedParts.push(<ToolAutoApproval key={`${key}-auto`} reason={autoApproval.reason} />);
                     }
 
                     if (DeviceToolCall && resolveDeviceToolName(toolPart)) {

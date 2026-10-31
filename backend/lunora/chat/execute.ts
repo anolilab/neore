@@ -257,9 +257,10 @@ export const runStreamingAgent = internalAction
                           skillTools: invokedSkill?.config
                               ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
                               : undefined,
+                          threadId,
                           userId,
                       })
-                    : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
+                    : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
                 runContextPromise,
             ]);
 
@@ -419,6 +420,7 @@ export const runStreamingAgent = internalAction
 
             try {
                 await finishRun(ctx, {
+                    autoApprovals: toolResult.autoApprovals,
                     mcpLabels: toolResult.mcpLabels,
                     pending,
                     savedMessages: result.savedMessages,

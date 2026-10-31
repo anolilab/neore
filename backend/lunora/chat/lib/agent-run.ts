@@ -32,7 +32,7 @@ import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
-import type { McpToolLabels } from "./mcp-tool-labels";
+import type { AutoApprovalStamps, McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
 import {
@@ -771,6 +771,8 @@ export const createRunSteering = (
 export const finishRun = async (
     ctx: Pick<ActionCtx, "runMutation">,
     args: {
+        /** Calls the quick check let run unasked (`BuildAgentToolsResult.autoApprovals`), stamped onto the saved calls. */
+        autoApprovals?: AutoApprovalStamps;
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
         pending: { reasoning: string; text: string };
@@ -783,11 +785,22 @@ export const finishRun = async (
         userId: string;
     },
 ): Promise<{ paused: boolean }> => {
-    const { keepOpenUnlessPaused, mcpLabels, pending, savedMessages, snapshot, streamId, threadId, unsaved = { reasoning: "", text: "" }, userId } = args;
-    const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels) ? [m._id] : []));
+    const {
+        autoApprovals = {},
+        keepOpenUnlessPaused,
+        mcpLabels,
+        pending,
+        savedMessages,
+        snapshot,
+        streamId,
+        threadId,
+        unsaved = { reasoning: "", text: "" },
+        userId,
+    } = args;
+    const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels, autoApprovals) ? [m._id] : []));
 
     if (labelledIds.length > 0) {
-        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { labels: mcpLabels, messageIds: labelledIds, userId });
+        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { autoApprovals, labels: mcpLabels, messageIds: labelledIds, userId });
     }
 
     const approvalIds = collectApprovalRequestIds(savedMessages);
@@ -943,6 +956,7 @@ export const resumeApprovedRun = async (
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
+            threadId,
             userId,
         }),
         loadUserProviderKeys(ctx, userId),
@@ -1107,6 +1121,7 @@ export const resumeApprovedRun = async (
 
         try {
             ({ paused } = await finishRun(ctx, {
+                autoApprovals: toolResult.autoApprovals,
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,

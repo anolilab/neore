@@ -71,6 +71,7 @@ export interface Doc_actionCache {
 export interface Doc_aiUserPreferences {
     _id: Id<"aiUserPreferences">;
     _creationTime: number;
+    autoApproveLowRisk?: boolean;
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };
@@ -2853,6 +2854,7 @@ export interface Insert_actionCache {
 export interface Insert_aiUserPreferences {
     _id?: Id<"aiUserPreferences">;
     _creationTime?: number;
+    autoApproveLowRisk?: boolean;
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };

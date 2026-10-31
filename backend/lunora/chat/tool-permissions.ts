@@ -33,6 +33,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
+import { isDeviceEligibleThread } from "../devices/internal";
 import { getConnectorMcpServers, withMcpServerGrants } from "../connectors/lib/grant-runtime";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { notifyQuietly } from "../notifications/notify";
@@ -91,6 +92,31 @@ export const getToolPermissionGrantsQuery = internalQuery
     });
 
 /**
+ * Whether the quick check may judge this run's `ask` calls: the user turned it on AND the thread is one only they
+ * can write to (`isDeviceEligibleThread`: not shared, public, a group chat or a messenger conversation). In anyone
+ * else's thread the tool would run with the owner's servers and keys on a collaborator's turn, which only the owner
+ * may approve.
+ */
+export const getLowRiskApprovalContext = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { threadId, userId }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        if (prefs?.autoApproveLowRisk !== true) {
+            return false;
+        }
+
+        const thread = await ctx.db.get(threadId);
+        const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
+
+        return isDeviceEligibleThread(thread, userId, grant !== null);
+    });
+
+/**
  * Built-in tools plus the caller's stored overrides. MCP tools need a live
  * connection to enumerate, so they come from {@link listMcpToolPermissions}.
  */
@@ -98,6 +124,8 @@ export const getToolPermissionSettings = authQuery
     .input({})
     .output(
         v.object({
+            // The opt-in quick check for low-risk calls (`chat/lib/low-risk-approval.ts`). Off unless the user turned it on.
+            autoApproveLowRisk: v.boolean(),
             builtIn: v.array(
                 v.object({
                     available: v.boolean(),
@@ -119,6 +147,7 @@ export const getToolPermissionSettings = authQuery
             .unique();
 
         return {
+            autoApproveLowRisk: prefs?.autoApproveLowRisk === true,
             builtIn: listBuiltInTools().map(({ available, category, name }) => {
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
@@ -258,6 +287,24 @@ export const setToolPermission = authMutation
         await writeToolGrant(ctx, key, null);
 
         ctx.log.event("chat.set_tool_permission", { cleared: mode === null });
+
+        return null;
+    });
+
+/** Turn the opt-in quick check for low-risk `ask` calls on or off. Off is the default. */
+export const setAutoApproveLowRisk = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ enabled: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args: { enabled }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { autoApproveLowRisk: enabled });
+
+        ctx.log.event("chat.set_auto_approve_low_risk", { enabled });
 
         return null;
     });

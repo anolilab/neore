@@ -16,6 +16,7 @@ import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
 import useMCPToolMeta from "@/features/chat/core/hooks/use-mcp-tool-meta";
 import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
+import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
 import type { UIMessage } from "@/lib/agent";
@@ -132,6 +133,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
             SandboxFiles,
             SourceGroup: KnowledgeSourceGroup,
             ToolApproval,
+            ToolAutoApproval,
             toolMeta,
             toolViews: TOOL_VIEWS,
             toolWidgets: TOOL_WIDGETS,
