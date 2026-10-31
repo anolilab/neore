@@ -32,6 +32,8 @@ export interface DraftCommentEntry {
     line: number;
     path: string;
     side: DiffSide;
+    /** The first line of a range comment, kept through an edit. */
+    startLine: number | null;
 }
 
 /** Where a new comment on this line would go: a removed line is on the old side, everything else on the new. */
@@ -82,7 +84,7 @@ export const DraftComment = ({
                     line: comment.line,
                     path: comment.path,
                     side: comment.side,
-                    startLine: null,
+                    startLine: comment.startLine,
                 });
 
                 return outcome.status === "ok" ? null : messages.edit(outcome.status);
