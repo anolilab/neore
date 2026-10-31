@@ -430,10 +430,13 @@ written here is what is not.
 - **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
   READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
   nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the
-  thread, falling back to the utility model for a non-text model or a plan that lapsed; a `local-browser`
-  thread is refused, and a host-run thread sends the QUESTION ALONE (its messages never reach a cloud
-  model, as with follow-up suggestions). Billed like translate (`chargeDailyLimit` "Text", gateway meters
-  the call), not as a reply row, so no `scheduleReplyUsage`. The answer arrives whole: an action returns
+  thread, falling back to the utility model for a non-text model or a plan that lapsed. A thread on a
+  custom endpoint the caller cannot reach (deleted, a collaborator's account, `local-browser`, a malformed
+  id) is refused, never rerouted to a hosted model; a host-run thread sends the QUESTION ALONE (its
+  messages never reach a cloud model, as with follow-up suggestions). Billed like translate
+  (`chargeDailyLimit` "Text" right before the model call, gateway meters it); an aside on the thread's own
+  model is also recorded with `scheduleReplyUsage` under `aside:<entryId>`, a utility-model or host-run one
+  is not, and the usage backfill skips the added "Side question" row. The answer arrives whole: an action returns
   once and an HTTP action has no service binding, so token streaming needs a chunk table. "Add to
   thread" (`addAsideToThread`) writes ONE assistant row (`agentName` "Side question") and is refused
   while a reply runs, because a row landing after the run's pending row would split the reply across
