@@ -393,6 +393,13 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
         return;
     }
 
+    // A message that waited in line is sent under the rule it was admitted by: the lead may have been shared since.
+    if (!(await loadEligibleThread({ db: systemDb(ctx) }, claimed.parentThreadId as Id<"threads">, claimed.userId))) {
+        await finishRun(ctx, runId, { error: HOST_NEEDS_OWN_CONVERSATION, kind: "failed" });
+
+        return;
+    }
+
     const sent = await sendHostRunTurn(ctx, claimed, Date.now());
 
     if ("error" in sent) {

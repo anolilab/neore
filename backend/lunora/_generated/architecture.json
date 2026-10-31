@@ -17431,13 +17431,13 @@
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 60,
+      "line": 64,
       "reason": "\"endHostThread\" is not a registered function"
     },
     {
       "file": "acp/lib/thread-removed",
       "kind": "write",
-      "line": 81,
+      "line": 85,
       "reason": "\"restoreHostThread\" is not a registered function"
     },
     {
@@ -21997,67 +21997,67 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 411,
+      "line": 418,
       "reason": "\"admitSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 411,
+      "line": 418,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 424,
+      "line": 431,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 438,
+      "line": 445,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 498,
+      "line": 505,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "write",
-      "line": 736,
+      "line": 743,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 887,
+      "line": 894,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1098,
+      "line": 1105,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1127,
+      "line": 1134,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1273,
+      "line": 1280,
       "reason": "\"reapSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1335,
+      "line": 1342,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {

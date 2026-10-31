@@ -5,6 +5,7 @@ import { isWorkerThread } from "../../sub-agents/worker-thread";
 import { LIVE_STREAM_BATCH, sendHostCancel, settleWorkerRun } from "./finish";
 import { isHostRunThread } from "./host-thread";
 import { sessionOfThread } from "./sessions";
+import { withdrawPermissionAnswers, withdrawSend } from "./withdraw";
 
 /**
  * A host thread was deleted (soft or hard): its live turn and its session go with it. Without this the turn stays
@@ -42,6 +43,9 @@ export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads"
             const wasLive = await endHostStream(ctx, stream, { reason: "stopped", status: "done" }, now);
 
             if (wasLive) {
+                // A prompt or answer the computer has not taken must not be delivered once the thread is gone.
+                await withdrawSend(ctx, stream, now);
+                await withdrawPermissionAnswers(ctx, stream, now);
                 await sendHostCancel(ctx, stream, now);
                 // A worker run waiting on this turn ends with the thread.
                 await settleWorkerRun(ctx, stream, { kind: "cancelled" });

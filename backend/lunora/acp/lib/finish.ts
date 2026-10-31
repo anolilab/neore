@@ -139,20 +139,21 @@ const saveHostReply = async (
 ): Promise<string> => {
     const threadId = stream.threadId as Id<"threads">;
     const thread = await ctx.db.get(threadId);
+    // What the agent wrote is read first: the worker run waiting on this turn is told it, whether or not there is a row to save.
+    const transcript = await readHostTranscript(ctx, stream._id);
 
     // The thread was deleted while the turn ran: a reply saved now would outlive its cleanup.
     if (!thread || thread.deleted) {
-        return "";
+        return transcript.text;
     }
 
     // The prompt the reply answers is gone (a deleted message): saving would assert, and the reaper would
     // fail the whole shard tick on it.
     if (stream.messageId && !(await ctx.db.get(stream.messageId as Id<"messages">))) {
-        return "";
+        return transcript.text;
     }
 
     const session = await sessionOfThread(ctx, threadId);
-    const transcript = await readHostTranscript(ctx, stream._id);
     const reply = buildHostReply({ agentKey: session?.agentKey ?? "host", changes, error, reason, transcript });
 
     if (!reply) {

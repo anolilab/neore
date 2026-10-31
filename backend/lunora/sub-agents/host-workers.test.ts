@@ -782,3 +782,59 @@ describe("a turn that ends from this side with a message waiting behind it", () 
         expect(await callOrder()).toEqual(["acp_send", "acp_cancel", "acp_send"]);
     });
 });
+
+describe("a host run that waits while the lead changes", () => {
+    it("fails the queued run when the lead was shared in the meantime, sending nothing", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+        await run(
+            async (context) =>
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: OWNER,
+                    ownerId: OWNER,
+                    permission: "read",
+                    threadId: leadId,
+                    userId: "user-guest",
+                } as never),
+        );
+        await finishTurn(device, receipt.workerId);
+
+        expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(REFUSED_THREAD), status: "failed" });
+        expect(await sendCalls()).toHaveLength(1);
+    });
+});
+
+describe("a worker that is deleted or loses its prompt", () => {
+    it("withdraws the send the computer has not taken, so it cannot run after the delete", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+        const { endHostThread } = await import("../acp/lib/thread-removed");
+
+        await run(async (context) => await endHostThread(context, await context.db.get(receipt.workerId), Date.now()));
+
+        const [call] = await sendCalls();
+
+        expect(call).toMatchObject({ status: "expired" });
+    });
+
+    it("reports what the agent wrote even when the prompt message was deleted meanwhile", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const stream = await liveStream(receipt.workerId);
+
+        await run(async (context) => await context.db.delete(stream.messageId));
+        await finishTurn(device, receipt.workerId, "Fixed it anyway.");
+
+        expect(await runRow(receipt.runId)).toMatchObject({ result: expect.stringContaining("Fixed it anyway."), status: "succeeded" });
+    });
+});
