@@ -41,10 +41,19 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
     );
 
     useEffect(() => {
-        const subscription = addNetworkStateListener((state) => dispatch({ network: isReachable(state), type: "network" }));
+        // The first read can settle after the listener has reported a newer state; only the listener is current then.
+        let isSettled = false;
+        const subscription = addNetworkStateListener((state) => {
+            isSettled = true;
+            dispatch({ network: isReachable(state), type: "network" });
+        });
         const initial = async () => {
             try {
-                dispatch({ network: isReachable(await getNetworkStateAsync()), type: "network" });
+                const state = await getNetworkStateAsync();
+
+                if (!isSettled) {
+                    dispatch({ network: isReachable(state), type: "network" });
+                }
             } catch {
                 // Unknown stays "not known to be offline"; a failed read will say otherwise.
             }
@@ -55,6 +64,7 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
         const unsubscribe = getClient().onConnectionStatus((socket) => dispatch({ socket, type: "socket" }));
 
         return () => {
+            isSettled = true;
             subscription.remove();
             unsubscribe();
         };
