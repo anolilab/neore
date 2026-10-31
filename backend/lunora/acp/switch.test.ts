@@ -625,6 +625,37 @@ describe("what a takeover carries into a command on the computer", () => {
     });
 });
 
+describe("the organisation of a switched thread", () => {
+    const inOrganisation = async (threadId: string) =>
+        await run(async (ctx) => {
+            await ctx.db.patch(threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
+        });
+
+    it("is carried to the continuation that opens on a computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await inOrganisation(source);
+
+        const result = await switchTo(source, hostTarget(device));
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+
+    it("is carried to the continuation that takes over in a cloud model", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+
+        await inOrganisation(source);
+
+        const result = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+});
+
 describe("the session id of a switch", () => {
     it("is its own for each thread, so one clientId on two threads makes two sessions", async () => {
         const device = await pairedDevice(ownerId);
