@@ -1,7 +1,7 @@
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import type { MutationCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
 import { agentSwitchOf } from "../../agent/agent-switch-logic";
 import { walkPath } from "../../agent/branch-rows";
@@ -39,13 +39,13 @@ export const savedSessionFor = (
  */
 export const markReattachFailed = async (ctx: MutationCtx, threadId: Id<"threads">, reason: string): Promise<void> => {
     const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
-    const leaf = thread && (await leafRowOf(ctx as unknown as QueryCtx, thread));
+    const leaf = thread && (await leafRowOf(ctx, thread));
 
     if (!leaf) {
         return;
     }
 
-    const { rows } = await walkPath(ctx as unknown as QueryCtx, threadId, leaf, { limit: SCAN_ROWS });
+    const { rows } = await walkPath(ctx, threadId, leaf, { limit: SCAN_ROWS });
 
     for (const row of rows) {
         const part = agentSwitchOf(row);
