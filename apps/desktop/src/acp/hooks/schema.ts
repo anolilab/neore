@@ -7,6 +7,7 @@
 import * as z from "zod";
 
 import { globProblem } from "./glob";
+import { hasHiddenText } from "./hidden-text";
 
 export const HOOKS_VERSION = 1;
 export const MAX_HOOKS = 8;
@@ -16,25 +17,23 @@ export const MAX_FILE_BYTES = 64 * 1024;
 
 export type HookEvent = "created" | "deleted" | "manual" | "saved";
 
-// eslint-disable-next-line no-control-regex -- control characters are what is being refused
-const CONTROL = /[\u{0}-\u{1F}\u{7F}]/u;
-
 const idSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/u, "an id is lowercase letters, digits and dashes");
 const nameSchema = z
     .string()
     .trim()
     .min(1)
     .max(MAX_NAME)
-    .refine((value) => !CONTROL.test(value), "a name has no control characters");
+    .refine((value) => !hasHiddenText(value), "a name has no control or invisible characters");
 const promptSchema = z
     .string()
     .max(MAX_PROMPT)
-    .refine((value) => value.trim() !== "", "a prompt is not empty");
+    .refine((value) => value.trim() !== "", "a prompt is not empty")
+    .refine((value) => !hasHiddenText(value, { layout: true }), "a prompt has no control or invisible characters (a newline and a tab are fine)");
 
 const fileHook = <Event extends "created" | "deleted" | "saved">(on: Event) =>
     z.strictObject({
         glob: z.string().superRefine((value, context) => {
-            const problem = globProblem(value);
+            const problem = hasHiddenText(value) ? "a glob has no control or invisible characters" : globProblem(value);
 
             if (problem !== null) {
                 context.addIssue({ code: "custom", message: problem });
