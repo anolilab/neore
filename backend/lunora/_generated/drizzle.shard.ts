@@ -1352,6 +1352,21 @@ export const temporaryThreads = sqliteTable("temporaryThreads", {
     by_thread: index("by_thread").on(t.threadId),
 }));
 
+export const threadContextSummaries = sqliteTable("threadContextSummaries", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    coveredCount: real("coveredCount").notNull(),
+    coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
+    createdAt: real("createdAt").notNull(),
+    summary: text("summary").notNull(),
+    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>().notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+}));
+
 export const threadGoals = sqliteTable("threadGoals", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1378,21 +1393,6 @@ export const threadGoals = sqliteTable("threadGoals", {
     by_user: index("by_user").on(t.userId),
     by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
     by_thread: index("by_thread").on(t.threadId),
-}));
-
-export const threadContextSummaries = sqliteTable("threadContextSummaries", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    coveredCount: real("coveredCount").notNull(),
-    coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
-    createdAt: real("createdAt").notNull(),
-    summary: text("summary").notNull(),
-    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>().notNull(),
-    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
-    userId: text("userId").notNull(),
-}, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_threadId: index("by_threadId").on(t.threadId),
 }));
 
 export const threadKnowledge = sqliteTable("threadKnowledge", {

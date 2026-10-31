@@ -2540,6 +2540,33 @@ export const schema = defineSchema({
             };
         }),
 
+    /**
+     * A rolling summary of the older rows of ONE path of a thread, made while it
+     * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
+     * recent rows. Keyed on the thread and the last row it covers: the context
+     * builder uses it only while that row is still an ancestor of the prompt, so
+     * a branch the user switched away from never leaks into the other. A few rows
+     * per thread (`SUMMARIES_KEPT_PER_THREAD`), erased with the thread.
+     */
+    threadContextSummaries: defineTable({
+        /** Rows of the path covered, counted from its top; orders the rows of one thread. */
+        coveredCount: v.number(),
+        coveredUpToMessageId: v.id("messages"),
+        createdAt: v.number(),
+        summary: v.string(),
+        /**
+         * The untrusted sources (`devices/lib/taint.ts`) of the rows folded into the summary and of the one it
+         * extends. A device call made while the thread holds a summary carries them, so text the model read
+         * once, then lost to the window, still makes the call ask. Empty = clean.
+         */
+        taintedBy: v.array(vDeviceTaintSource),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard this row lives on and whose account erases it. */
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -2575,33 +2602,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-    /**
-     * A rolling summary of the older rows of ONE path of a thread, made while it
-     * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
-     * recent rows. Keyed on the thread and the last row it covers: the context
-     * builder uses it only while that row is still an ancestor of the prompt, so
-     * a branch the user switched away from never leaks into the other. A few rows
-     * per thread (`SUMMARIES_KEPT_PER_THREAD`), erased with the thread.
-     */
-    threadContextSummaries: defineTable({
-        /** Rows of the path covered, counted from its top; orders the rows of one thread. */
-        coveredCount: v.number(),
-        coveredUpToMessageId: v.id("messages"),
-        createdAt: v.number(),
-        summary: v.string(),
-        /**
-         * The untrusted sources (`devices/lib/taint.ts`) of the rows folded into the summary and of the one it
-         * extends. A device call made while the thread holds a summary carries them, so text the model read
-         * once, then lost to the window, still makes the call ask. Empty = clean.
-         */
-        taintedBy: v.array(vDeviceTaintSource),
-        threadId: v.id("threads"),
-        /** The thread's owner, whose shard this row lives on and whose account erases it. */
-        userId: v.string(),
-    })
-        .shardBy("userId")
-        .index("by_threadId", ["threadId"])
-        .index("by_userId", ["userId"]),
 
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
