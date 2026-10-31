@@ -7082,12 +7082,12 @@ msgid "Context-aware generation"
 msgstr "Geração com reconhecimento de contexto"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:194
+#: src/features/chat/host/host-composer.tsx:195
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continuar"
 
-#: src/features/chat/host/host-composer.tsx:188
+#: src/features/chat/host/host-composer.tsx:189
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7670,7 +7670,7 @@ msgstr "Não foi possível baixar {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:99
+#: src/features/chat/host/host-composer.tsx:100
 msgid "Could not reach the server. Try again."
 msgstr ""
 
@@ -7740,7 +7740,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:147
+#: src/features/chat/host/host-composer.tsx:148
 msgid "Could not send your answer."
 msgstr ""
 
@@ -14677,7 +14677,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:35
 msgid "Handed over"
 msgstr ""
 
@@ -18313,7 +18313,7 @@ msgstr "Entrada de mensagem"
 msgid "Message selection"
 msgstr "Seleção de mensagens"
 
-#: src/features/chat/host/host-composer.tsx:206
+#: src/features/chat/host/host-composer.tsx:207
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18325,7 +18325,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:200
+#: src/features/chat/host/host-composer.tsx:201
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -20796,7 +20796,7 @@ msgstr "Modelo cinematográfico de geração antiga com maior consistência"
 msgid "Older"
 msgstr "Mais antigas"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:35
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -22399,7 +22399,7 @@ msgstr "Excluir permanentemente sua conta e todos os dados associados"
 msgid "Permission Level"
 msgstr "Nível de permissão"
 
-#: src/features/chat/host/host-composer.tsx:160
+#: src/features/chat/host/host-composer.tsx:161
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -25235,6 +25235,10 @@ msgstr "Retomar importação"
 msgid "Resume your latest chat"
 msgstr "Retomar seu último chat"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:31
+msgid "Resumed its own session"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
 msgstr "Retomando seu último chat"
@@ -26563,7 +26567,7 @@ msgstr "Modelo semirrealista com boa aderência ao prompt"
 msgid "Semi-realistic visual style"
 msgstr "Estilo visual semirrealista"
 
-#: src/features/chat/host/host-composer.tsx:222
+#: src/features/chat/host/host-composer.tsx:223
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -28205,7 +28209,7 @@ msgstr "Iniciando importação..."
 msgid "Starting test drive…"
 msgstr "Iniciando teste…"
 
-#: src/features/chat/host/host-composer.tsx:174
+#: src/features/chat/host/host-composer.tsx:175
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -28317,7 +28321,7 @@ msgstr "Ações"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:211
+#: src/features/chat/host/host-composer.tsx:212
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
@@ -29051,7 +29055,7 @@ msgstr "Trocar espaço de trabalho: atualmente {triggerLabel}"
 
 #. placeholder {0}: switchAgentName(part.from, nameOf)
 #. placeholder {1}: switchAgentName(part.to, nameOf)
-#: src/features/chat/thread/agent-switch-divider.tsx:15
+#: src/features/chat/thread/agent-switch-divider.tsx:27
 msgid "Switched from {0} to {1}"
 msgstr ""
 
@@ -29699,7 +29703,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "Não foi possível encontrar essa mensagem nesta conversa."
 
-#: src/features/chat/host/host-composer.tsx:97
+#: src/features/chat/host/host-composer.tsx:98
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -29707,7 +29711,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:151
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -29719,7 +29723,11 @@ msgstr "A EncodingAESKey de 43 caracteres (a criptografia de mensagens deve esta
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "O agente não poderá mais pedir nada a este dispositivo. O registro de atividade permanece até expirar."
 
-#: src/features/chat/host/host-composer.tsx:98
+#: src/features/chat/host/host-composer.tsx:97
+msgid "The agent is still opening its session. Try again in a moment."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:99
 msgid "The agent is still working on the last message."
 msgstr ""
 
@@ -29958,7 +29966,7 @@ msgstr "A última solicitação de exclusão falhou. Você pode solicitar novame
 msgid "the last time"
 msgstr "da última vez"
 
-#: src/features/chat/host/host-composer.tsx:184
+#: src/features/chat/host/host-composer.tsx:185
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -30636,7 +30644,7 @@ msgid "This server's registry entry asks for the values below. They fill in the 
 msgstr "A entrada deste servidor no registro pede os valores abaixo. Eles preenchem a URL e os cabeçalhos."
 
 #: src/features/chat/host/host-composer.tsx:96
-#: src/features/chat/host/host-composer.tsx:179
+#: src/features/chat/host/host-composer.tsx:180
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
 
@@ -34269,7 +34277,7 @@ msgid "your computer"
 msgstr "seu computador"
 
 #: src/features/chat/host/host-composer.tsx:91
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:151
 msgid "Your computer is busy. Try again in a moment."
 msgstr ""
 

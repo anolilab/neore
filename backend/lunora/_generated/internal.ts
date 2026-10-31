@@ -26,7 +26,7 @@ export interface InternalApiTypes {
             verifyHostPost: FunctionReference<"query", { deviceId: string; now: number; payload: string; signature: string }, null | { userId: string }>;
         };
         send: {
-            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
+            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "not_found" | "offline" | "rate_limited" | "session_ended" | "session_starting" | "too_large" | "turn_running" }>;
         };
         switch: {
             commitHostSwitch: FunctionReference<"mutation", { clientId: string; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;

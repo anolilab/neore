@@ -7081,12 +7081,12 @@ msgid "Context-aware generation"
 msgstr "Context-aware generation"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:194
+#: src/features/chat/host/host-composer.tsx:195
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continue"
 
-#: src/features/chat/host/host-composer.tsx:188
+#: src/features/chat/host/host-composer.tsx:189
 msgid "Continue where you left off."
 msgstr "Continue where you left off."
 
@@ -7669,7 +7669,7 @@ msgstr "Could not pull {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Could not reach the server to start generating. Check your connection and try again."
 
-#: src/features/chat/host/host-composer.tsx:99
+#: src/features/chat/host/host-composer.tsx:100
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
@@ -7739,7 +7739,7 @@ msgstr "Could not save this. Try again."
 msgid "Could not send the message."
 msgstr "Could not send the message."
 
-#: src/features/chat/host/host-composer.tsx:147
+#: src/features/chat/host/host-composer.tsx:148
 msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
@@ -14676,7 +14676,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:35
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -18312,7 +18312,7 @@ msgstr "Message input"
 msgid "Message selection"
 msgstr "Message selection"
 
-#: src/features/chat/host/host-composer.tsx:206
+#: src/features/chat/host/host-composer.tsx:207
 msgid "Message the agent on your computer"
 msgstr "Message the agent on your computer"
 
@@ -18324,7 +18324,7 @@ msgstr "Message the worker"
 msgid "Message the worker..."
 msgstr "Message the worker..."
 
-#: src/features/chat/host/host-composer.tsx:200
+#: src/features/chat/host/host-composer.tsx:201
 msgid "Message to the coding agent"
 msgstr "Message to the coding agent"
 
@@ -20795,7 +20795,7 @@ msgstr "Old generation cinematic model with higher consistency"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:35
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -22398,7 +22398,7 @@ msgstr "Permanently delete your account and all associated data"
 msgid "Permission Level"
 msgstr "Permission Level"
 
-#: src/features/chat/host/host-composer.tsx:160
+#: src/features/chat/host/host-composer.tsx:161
 msgid "Permission requests from the agent"
 msgstr "Permission requests from the agent"
 
@@ -25234,6 +25234,10 @@ msgstr "Resume import"
 msgid "Resume your latest chat"
 msgstr "Resume your latest chat"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:31
+msgid "Resumed its own session"
+msgstr "Resumed its own session"
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
 msgstr "Resuming your latest chat"
@@ -26562,7 +26566,7 @@ msgstr "Semi-realistic model with good prompt adherence"
 msgid "Semi-realistic visual style"
 msgstr "Semi-realistic visual style"
 
-#: src/features/chat/host/host-composer.tsx:222
+#: src/features/chat/host/host-composer.tsx:223
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr "Send"
@@ -28204,7 +28208,7 @@ msgstr "Starting import..."
 msgid "Starting test drive…"
 msgstr "Starting test drive…"
 
-#: src/features/chat/host/host-composer.tsx:174
+#: src/features/chat/host/host-composer.tsx:175
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr "Starting the agent on your computer. A message you send now goes out once it is up."
 
@@ -28316,7 +28320,7 @@ msgstr "Stocks"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:211
+#: src/features/chat/host/host-composer.tsx:212
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
@@ -29050,7 +29054,7 @@ msgstr "Switch workspace: currently {triggerLabel}"
 
 #. placeholder {0}: switchAgentName(part.from, nameOf)
 #. placeholder {1}: switchAgentName(part.to, nameOf)
-#: src/features/chat/thread/agent-switch-divider.tsx:15
+#: src/features/chat/thread/agent-switch-divider.tsx:27
 msgid "Switched from {0} to {1}"
 msgstr "Switched from {0} to {1}"
 
@@ -29698,7 +29702,7 @@ msgstr "That link could not be read."
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
 
-#: src/features/chat/host/host-composer.tsx:97
+#: src/features/chat/host/host-composer.tsx:98
 msgid "That message is too long to send from here."
 msgstr "That message is too long to send from here."
 
@@ -29706,7 +29710,7 @@ msgstr "That message is too long to send from here."
 msgid "That passcode is not right."
 msgstr "That passcode is not right."
 
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:151
 msgid "That request is no longer waiting."
 msgstr "That request is no longer waiting."
 
@@ -29718,7 +29722,11 @@ msgstr "The 43-character EncodingAESKey (message encryption must be set to safe 
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 
-#: src/features/chat/host/host-composer.tsx:98
+#: src/features/chat/host/host-composer.tsx:97
+msgid "The agent is still opening its session. Try again in a moment."
+msgstr "The agent is still opening its session. Try again in a moment."
+
+#: src/features/chat/host/host-composer.tsx:99
 msgid "The agent is still working on the last message."
 msgstr "The agent is still working on the last message."
 
@@ -29957,7 +29965,7 @@ msgstr "The last deletion request failed. You can request it again."
 msgid "the last time"
 msgstr "the last time"
 
-#: src/features/chat/host/host-composer.tsx:184
+#: src/features/chat/host/host-composer.tsx:185
 msgid "The last turn stopped before it finished."
 msgstr "The last turn stopped before it finished."
 
@@ -30635,7 +30643,7 @@ msgid "This server's registry entry asks for the values below. They fill in the 
 msgstr "This server's registry entry asks for the values below. They fill in the URL and headers."
 
 #: src/features/chat/host/host-composer.tsx:96
-#: src/features/chat/host/host-composer.tsx:179
+#: src/features/chat/host/host-composer.tsx:180
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "This session has ended. Start a new one from the desktop app."
 
@@ -34268,7 +34276,7 @@ msgid "your computer"
 msgstr "your computer"
 
 #: src/features/chat/host/host-composer.tsx:91
-#: src/features/chat/host/host-composer.tsx:150
+#: src/features/chat/host/host-composer.tsx:151
 msgid "Your computer is busy. Try again in a moment."
 msgstr "Your computer is busy. Try again in a moment."
 
