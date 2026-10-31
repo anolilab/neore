@@ -16879,7 +16879,7 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 197,
+      "line": 208,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
@@ -20168,6 +20168,12 @@
       "file": "lib/claim-once",
       "kind": "read",
       "line": 125,
+      "reason": "\"claimedAtOf\" is not a registered function"
+    },
+    {
+      "file": "lib/claim-once",
+      "kind": "read",
+      "line": 125,
       "reason": "\"claimFence\" is not a registered function"
     },
     {
@@ -20203,25 +20209,25 @@
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 201,
+      "line": 208,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 224,
+      "line": 231,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 229,
+      "line": 236,
       "reason": "\"releaseClaimsWithPrefix\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 346,
+      "line": 353,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

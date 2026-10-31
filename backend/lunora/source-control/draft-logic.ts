@@ -71,9 +71,12 @@ export const submitBlocker = (draft: Pick<DraftState, "body" | "comments" | "ver
     return draft.verdict === "comment" && !hasText && draft.comments.length === 0 ? "needs_text" : null;
 };
 
-/** The comments left on a draft that was edited while its submit ran: only those the host did not receive. */
-export const withoutSent = (comments: DraftComment[], sentIds: ReadonlyArray<string>): DraftComment[] => {
-    const sent = new Set(sentIds);
+/**
+ * The comments left on a draft that was edited while its submit ran: those the host did not receive, and those
+ * edited since (same id, new text), which were not posted as they read now.
+ */
+export const withoutSent = (comments: DraftComment[], sent: ReadonlyArray<{ body: string; id: string }>): DraftComment[] => {
+    const posted = new Map(sent.map(({ body, id }) => [id, body]));
 
-    return comments.filter((comment) => !sent.has(comment.id));
+    return comments.filter((comment) => posted.get(comment.id) !== comment.body);
 };

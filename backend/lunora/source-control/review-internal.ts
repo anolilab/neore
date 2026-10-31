@@ -60,7 +60,16 @@ export const claimDraftForSubmit = internalMutation
  * A row another submit has claimed since (`lease` no longer matches) is that submit's: untouched.
  */
 export const finishDraftSubmit = internalMutation
-    .input({ ...address, lease: v.number(), revision: v.number(), sentIds: v.array(v.string().max(MAX_LENGTH.id)) })
+    .input({
+        ...address,
+        lease: v.number(),
+        revision: v.number(),
+        sent: v.object({
+            body: v.string().max(MAX_LENGTH.long),
+            comments: v.array(v.object({ body: v.string().max(MAX_LENGTH.long), id: v.string().max(MAX_LENGTH.id) })),
+            verdict: v.union(v.literal("approve"), v.literal("comment"), v.literal("request_changes")),
+        }),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const draft = await draftFor(ctx, args.userId, args.repository, args.number);
@@ -75,8 +84,14 @@ export const finishDraftSubmit = internalMutation
             return null;
         }
 
-        // The summary and verdict went out with the review too.
-        await ctx.db.patch(draft._id, { body: "", comments: withoutSent(draft.comments, args.sentIds), submittingAt: 0, verdict: null });
+        // The summary and verdict went out with the review too, unless they were changed since: a submit that
+        // finishes after its lease ran out must not erase what the person wrote meanwhile.
+        await ctx.db.patch(draft._id, {
+            body: draft.body === args.sent.body ? "" : draft.body,
+            comments: withoutSent(draft.comments, args.sent.comments),
+            submittingAt: 0,
+            verdict: draft.verdict === args.sent.verdict ? null : draft.verdict,
+        });
 
         return null;
     });

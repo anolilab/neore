@@ -9470,7 +9470,7 @@ export interface Caller {
         };
         review_internal: {
             claimDraftForSubmit: (args: { number: number; repository: string; userId: string }) => Promise<{ draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
-            finishDraftSubmit: (args: { number: number; repository: string; userId: string; lease: number; revision: number; sentIds: Array<string> }) => Promise<null>;
+            finishDraftSubmit: (args: { number: number; repository: string; userId: string; lease: number; revision: number; sent: { body: string; comments: Array<{ body: string; id: string }>; verdict: "approve" | "comment" | "request_changes" } }) => Promise<null>;
             releaseDraftSubmit: (args: { number: number; repository: string; userId: string; lease: number }) => Promise<null>;
         };
     };

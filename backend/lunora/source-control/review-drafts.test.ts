@@ -88,8 +88,8 @@ const portsFor = (userId: string, host: (submission: ReviewSubmission) => Promis
     const posted: ReviewSubmission[] = [];
     const value: SubmitPorts = {
         claim: async () => (await harness.run(async (ctx: any) => await ctx.runMutation(claimDraftForSubmit, address))) as never,
-        finish: async (revision, sentIds, lease) => {
-            await harness.run(async (ctx: any) => await ctx.runMutation(finishDraftSubmit, { ...address, lease, revision, sentIds }));
+        finish: async (revision, sent, lease) => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(finishDraftSubmit, { ...address, lease, revision, sent }));
         },
         post: async (submission) => {
             posted.push(submission);
@@ -322,7 +322,13 @@ describe("submitting", () => {
         if (claim.status === "claimed") {
             await value.finish(
                 claim.draft.revision,
-                claim.draft.comments.map((entry) => entry.id),
+                {
+                    body: claim.draft.body,
+                    comments: claim.draft.comments.map(({ body, id }) => {
+                        return { body, id };
+                    }),
+                    verdict: claim.draft.verdict ?? "comment",
+                },
                 claim.lease,
             );
         }
@@ -330,6 +336,44 @@ describe("submitting", () => {
         expect(await idsOf(A)).toEqual(["late"]);
         // What went out with the review (the summary and the verdict) is not left to go out a second time.
         expect(await read(A)).toMatchObject({ body: "", verdict: null });
+    });
+
+    it("keeps a summary and a comment edited under a late finish: they were not posted as they read now", async () => {
+        await seedReady();
+
+        const { value } = portsFor(A, confirmed);
+        const claim = await value.claim();
+
+        expect(claim.status).toBe("claimed");
+
+        await harness.run(async (ctx: any) => {
+            const [row] = await ctx.db.query("reviewDrafts").collect();
+
+            await ctx.db.patch(row._id, {
+                body: "rewritten summary",
+                comments: row.comments.map((entry: { body: string }, index: number) => (index === 0 ? { ...entry, body: "rewritten" } : entry)),
+                revision: row.revision + 1,
+            });
+        });
+
+        if (claim.status === "claimed") {
+            await value.finish(
+                claim.draft.revision,
+                {
+                    body: claim.draft.body,
+                    comments: claim.draft.comments.map(({ body, id }) => {
+                        return { body, id };
+                    }),
+                    verdict: claim.draft.verdict ?? "comment",
+                },
+                claim.lease,
+            );
+        }
+
+        const draft = await read(A);
+
+        expect(draft).toMatchObject({ body: "rewritten summary" });
+        expect(draft?.comments.map((entry: { body: string }) => entry.body)).toEqual(["rewritten"]);
     });
 
     it("leaves a draft another submit has claimed since alone when a late finish or release arrives", async () => {
@@ -357,11 +401,11 @@ describe("submitting", () => {
             await value.release(stale.lease);
             expect(await read(A)).toMatchObject({ submitting: true });
 
-            await value.finish(stale.draft.revision, [], stale.lease);
+            await value.finish(stale.draft.revision, { body: "", comments: [], verdict: "comment" }, stale.lease);
             expect(await read(A)).toMatchObject({ body: "Two nits", submitting: true });
             expect(await commentsOf(A)).toHaveLength(2);
 
-            await value.finish(fresh.draft.revision, [], fresh.lease);
+            await value.finish(fresh.draft.revision, { body: "", comments: [], verdict: "comment" }, fresh.lease);
             expect(await read(A)).toBeNull();
         }
     });

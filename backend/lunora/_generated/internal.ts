@@ -984,7 +984,7 @@ export interface InternalApiTypes {
         };
         review_internal: {
             claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
-            finishDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number; revision: number; sentIds: Array<string> }, null>;
+            finishDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number; revision: number; sent: { body: string; comments: Array<{ body: string; id: string }>; verdict: "approve" | "comment" | "request_changes" } }, null>;
             releaseDraftSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string; lease: number }, null>;
         };
     };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DraftComment } from "./draft-logic";
-import type { Claim, ClaimedDraft, SubmitPorts } from "./submit-review";
+import type { Claim, ClaimedDraft, SentReview, SubmitPorts } from "./submit-review";
 import { submitDraft } from "./submit-review";
 import type { ReviewSubmission, SubmittedReview } from "./types";
 import type { WriteOutcome } from "./write-host";
@@ -27,7 +27,7 @@ const ports = (
     finish: () => Promise<void> = async () => {},
 ) => {
     const calls: string[] = [];
-    const finished: { lease: number; revision: number; sentIds: string[] }[] = [];
+    const finished: { lease: number; revision: number; sent: SentReview }[] = [];
     const released: number[] = [];
     const posted: ReviewSubmission[] = [];
     const value: SubmitPorts = {
@@ -36,9 +36,9 @@ const ports = (
 
             return claim;
         },
-        finish: async (revision, sentIds, lease) => {
+        finish: async (revision, sent, lease) => {
             calls.push("finish");
-            finished.push({ lease, revision, sentIds });
+            finished.push({ lease, revision, sent });
             await finish();
         },
         post: async (submission) => {
@@ -69,7 +69,20 @@ describe("submitDraft", () => {
         expect(posted).toHaveLength(1);
         expect(posted[0]).toMatchObject({ body: "Looks fine", commitId: COMMIT, verdict: "approve" });
         expect(posted[0]?.comments).toHaveLength(2);
-        expect(finished).toEqual([{ lease: 1234, revision: 5, sentIds: ["c1", "c2"] }]);
+        expect(finished).toEqual([
+            {
+                lease: 1234,
+                revision: 5,
+                sent: {
+                    body: "Looks fine",
+                    comments: [
+                        { body: "nit", id: "c1" },
+                        { body: "nit", id: "c2" },
+                    ],
+                    verdict: "approve",
+                },
+            },
+        ]);
     });
 
     it.each([

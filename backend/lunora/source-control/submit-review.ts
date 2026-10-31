@@ -27,13 +27,20 @@ export interface ClaimedDraft {
     verdict: ReviewSubmission["verdict"] | null;
 }
 
+/** What one submit posted: finishing clears from the draft only what still matches it. */
+export interface SentReview {
+    body: string;
+    comments: { body: string; id: string }[];
+    verdict: ReviewSubmission["verdict"];
+}
+
 /** `lease` is what the claim wrote to the row: finish and release act only while the row still holds it. */
 export type Claim = { draft: ClaimedDraft; lease: number; status: "claimed" } | { status: "in_progress" } | { status: "no_draft" };
 
 export interface SubmitPorts {
     claim: () => Promise<Claim>;
     /** The draft was posted: take off it what the host received. */
-    finish: (revision: number, sentIds: string[], lease: number) => Promise<void>;
+    finish: (revision: number, sent: SentReview, lease: number) => Promise<void>;
     post: (submission: ReviewSubmission) => Promise<WriteOutcome<{ review: SubmittedReview }>>;
     /** Gives the claim back and keeps the draft. */
     release: (lease: number) => Promise<void>;
@@ -79,11 +86,17 @@ export const submitDraft = async (ports: SubmitPorts): Promise<SubmitOutcome> =>
     // The host has the review. If clearing the draft fails, that is not a failed submit: telling the
     // person so would have them post the review a second time. Once the lease runs out another submit may
     // claim the draft and post it again, so clearing is retried before it is given up.
-    const sentIds = draft.comments.map((comment) => comment.id);
+    const sent: SentReview = {
+        body: draft.body,
+        comments: draft.comments.map(({ body, id }) => {
+            return { body, id };
+        }),
+        verdict: draft.verdict,
+    };
 
     for (let attempt = 0; attempt < FINISH_ATTEMPTS; attempt += 1) {
         try {
-            await ports.finish(draft.revision, sentIds, lease);
+            await ports.finish(draft.revision, sent, lease);
 
             break;
         } catch {

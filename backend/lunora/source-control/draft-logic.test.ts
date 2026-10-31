@@ -52,7 +52,12 @@ describe("submitBlocker", () => {
 });
 
 describe("withoutSent", () => {
-    it("keeps the comments the host did not receive", () => {
-        expect(withoutSent([comment("1"), comment("2"), comment("3")], ["1", "3"]).map((entry) => entry.id)).toEqual(["2"]);
+    it("keeps the comments the host did not receive, and those edited since they were sent", () => {
+        const sent = [comment("1"), comment("3")].map(({ body, id }) => {
+            return { body, id };
+        });
+
+        expect(withoutSent([comment("1"), comment("2"), comment("3")], sent).map((entry) => entry.id)).toEqual(["2"]);
+        expect(withoutSent([{ ...comment("1"), body: "edited" }], sent).map((entry) => entry.id)).toEqual(["1"]);
     });
 });
