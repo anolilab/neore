@@ -112,7 +112,19 @@ const prune = (layout: Layout, isValid: (tabId: string) => boolean): Layout => {
 
     const unchanged = panes.every((pane, i) => pane.active === layout.panes[i]!.active && pane.tabs.length === layout.panes[i]!.tabs.length);
 
-    return unchanged ? layout : { ...layout, panes };
+    if (unchanged) {
+        return layout;
+    }
+
+    // The pane in focus lost its last tab: move to one that still has tabs, or the phone shows an empty pane alone.
+    const activePane = panes[layout.activePane]?.tabs.length
+        ? layout.activePane
+        : Math.max(
+              0,
+              panes.findIndex((pane) => pane.tabs.length > 0),
+          );
+
+    return { ...layout, activePane, panes };
 };
 
 export const layoutReducer = (layout: Layout, action: LayoutAction): Layout => {

@@ -102,6 +102,26 @@ describe("layoutReducer", () => {
     });
 });
 
+describe("prune and the focused pane", () => {
+    it("moves focus to a pane that still has tabs when the focused one is emptied", () => {
+        const layout = {
+            activePane: 1,
+            panes: [
+                { active: "run:r-1", tabs: ["run:r-1"] },
+                { active: "host:a", tabs: ["host:a"] },
+            ],
+            split: 50,
+        };
+        const pruned = layoutReducer(layout, { isValid: (id) => id !== "host:a", type: "prune" });
+
+        expect(pruned.activePane).toBe(0);
+
+        const kept = layoutReducer(layout, { isValid: (id) => id !== "run:r-1", type: "prune" });
+
+        expect(kept.activePane).toBe(1);
+    });
+});
+
 describe("parseLayout", () => {
     it("round-trips a valid layout", () => {
         const layout = layoutReducer(opened("host:a", "run:r-1"), { paneIndex: 0, type: "split" });
