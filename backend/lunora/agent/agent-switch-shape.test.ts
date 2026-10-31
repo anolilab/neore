@@ -13,9 +13,15 @@ describe("readAgentSwitch", () => {
         expect(readAgentSwitch({ providerMetadata })).toStrictEqual(agentSwitchOf({ providerMetadata }));
     });
 
+    it.each(["full", "portable", "delta"] as const)("reads a %s handoff divider", (mode) => {
+        const { providerMetadata } = agentSwitchRowContent({ ...part, mode });
+
+        expect(readAgentSwitch({ providerMetadata })?.mode).toBe(mode);
+    });
+
     it("reads nothing from a row that is not a switch or has the wrong shape", () => {
         expect(readAgentSwitch({})).toBeUndefined();
-        expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, mode: "delta" } } })).toBeUndefined();
+        expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, mode: "native" } } })).toBeUndefined();
         expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, to: { kind: "host", model: 3 } } } })).toBeUndefined();
         expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: "x" } })).toBeUndefined();
     });

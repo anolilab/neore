@@ -175,6 +175,22 @@ describe("chat export", () => {
             expect(xml).toContain("Switched from GPT-4.1 Mini to custom/unlisted");
         });
 
+        it.each(["portable", "delta"] as const)("annotates a %s handoff divider too", (mode) => {
+            const handoff = {
+                ...divider,
+                providerMetadata: {
+                    neoreAgentSwitch: {
+                        from: { kind: "model", model: "openai/gpt-4.1-mini" },
+                        mode,
+                        startMessageId: "m1",
+                        to: { kind: "model", model: "custom/unlisted" },
+                    },
+                },
+            } as unknown as Doc<"messages">;
+
+            expect(formatAsMarkdown(thread, [handoff])).toContain("_Switched from GPT-4.1 Mini to custom/unlisted_");
+        });
+
         it("keeps a row whose stored content is not a list out of the way of its neighbours", async () => {
             const bare = { _creationTime: 2, message: { content: "", role: "system" }, tool: false } as unknown as Doc<"messages">;
             const blob = await exported("txt", [bare]);

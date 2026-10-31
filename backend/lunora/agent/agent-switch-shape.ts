@@ -8,6 +8,10 @@ import type { AgentSwitchPart } from "./agent-switch-validators";
 /** The `providerMetadata` key that marks a row as an agent switch. */
 export const AGENT_SWITCH_KEY = "neoreAgentSwitch";
 
+const SWITCH_MODES: ReadonlySet<unknown> = new Set(["delta", "full", "portable"]);
+
+const isSwitchMode = (value: unknown): value is AgentSwitchPart["mode"] => SWITCH_MODES.has(value);
+
 const isModelRef = (value: unknown): value is { kind: "model"; model: string } => {
     if (typeof value !== "object" || value === null) {
         return false;
@@ -28,5 +32,5 @@ export const readAgentSwitch = (row: { providerMetadata?: unknown }): AgentSwitc
 
     const { from, mode, startMessageId, to } = stored as { from?: unknown; mode?: unknown; startMessageId?: unknown; to?: unknown };
 
-    return isModelRef(from) && isModelRef(to) && mode === "full" && typeof startMessageId === "string" ? { from, mode, startMessageId, to } : undefined;
+    return isModelRef(from) && isModelRef(to) && isSwitchMode(mode) && typeof startMessageId === "string" ? { from, mode, startMessageId, to } : undefined;
 };
