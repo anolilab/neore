@@ -225,6 +225,23 @@ describe("making a summary", () => {
         expect(await summaries()).toHaveLength(1);
     });
 
+    it("moves the cover on when the model answers with nothing, instead of paying for the same rows again", async () => {
+        expect.assertions(3);
+
+        generateText.mockResolvedValueOnce({ text: "   ", usage: {} });
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        const [cover] = await summaries();
+
+        expect(cover?.coveredUpToMessageId).toBe(rowIds[49]);
+
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).toHaveBeenCalledTimes(1);
+        expect(await contextSummary()).toBeNull();
+    });
+
     it("extends the summary on its own path from where it ended, replacing the row", async () => {
         expect.assertions(4);
 

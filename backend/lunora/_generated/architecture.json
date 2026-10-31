@@ -17284,25 +17284,25 @@
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 498,
+      "line": 500,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 507,
+      "line": 509,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 549,
+      "line": 551,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 555,
+      "line": 557,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {

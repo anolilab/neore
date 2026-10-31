@@ -418,7 +418,9 @@ export const runThreadSummary = internalAction
         await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, {
             ...done,
             ...(job.previousSummaryId && { previousSummaryId: job.previousSummaryId }),
-            ...(summary !== "" && { summary }),
+            // An empty answer is still an answer: the cover moves on with the summary it had, rather than paying for
+            // the same rows again on every later job.
+            summary: summary === "" ? (job.previousSummary ?? "") : summary,
         });
 
         return null;
