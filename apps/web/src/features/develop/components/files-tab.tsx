@@ -10,7 +10,7 @@ import { Checkbox } from "@neore/ui/components/checkbox";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { countViewed, viewedStatesOf } from "../lib/review";
 import type { PullRequestAddress } from "../lib/use-develop";
@@ -58,10 +58,40 @@ const ownsPath = (file: FileEntry, path: string): boolean => path === file.path 
 const failureOf = (pages: ReadonlyArray<{ status: string }>, isError: boolean): ReadFailureStatus | undefined =>
     (pages.find((page) => page.status !== "ok")?.status as ReadFailureStatus | undefined) ?? (isError ? "host_error" : undefined);
 
-const FileRow = ({ context, file, review, showDiff }: { context: ReviewContext; file: FileEntry; review: FileReview; showDiff: boolean }) => {
+/** A file to open and bring into view, e.g. one the guide pointed at. `token` changes with each request. */
+export interface FileFocus {
+    path: string;
+    token: number;
+}
+
+const FileRow = ({
+    context,
+    file,
+    focus,
+    review,
+    showDiff,
+}: {
+    context: ReviewContext;
+    file: FileEntry;
+    focus: FileFocus | null;
+    review: FileReview;
+    showDiff: boolean;
+}) => {
     const { t } = useLingui();
-    const [open, setOpen] = useState(false);
+    const wanted = focus !== null && ownsPath(file, focus.path);
+    const [open, setOpen] = useState(wanted);
     const panelId = useId();
+    const row = useRef<HTMLLIElement>(null);
+
+    useEffect(() => {
+        if (!wanted) {
+            return;
+        }
+
+        setOpen(true);
+        row.current?.scrollIntoView({ block: "start" });
+    }, [wanted, focus?.token]);
+
     const statuses: Record<string, string> = {
         added: t`Added`,
         changed: t`Changed`,
@@ -83,7 +113,7 @@ const FileRow = ({ context, file, review, showDiff }: { context: ReviewContext; 
     const reviewable = isHostCapabilityAvailable(context.capabilities, "review.lineComments");
 
     return (
-        <li className="border-b last:border-b-0">
+        <li className="border-b last:border-b-0" ref={row}>
             <div className="flex items-center">
                 <button
                     aria-controls={panelId}
@@ -173,6 +203,7 @@ const FilesTab = ({
     capabilities,
     fileCount,
     fileLimit,
+    focus,
     headSha,
     hostLabel,
     leftOut,
@@ -182,6 +213,7 @@ const FilesTab = ({
     capabilities: HostCapabilityReportInput;
     fileCount: number;
     fileLimit: number;
+    focus?: FileFocus | null;
     headSha: string;
     hostLabel: string;
     leftOut: number;
@@ -289,6 +321,7 @@ const FilesTab = ({
                     <FileRow
                         context={{ address, capabilities, headSha, hostLabel }}
                         file={file}
+                        focus={focus ?? null}
                         key={`${file.previousPath ?? ""}→${file.path}`}
                         review={{
                             draftComments: draftComments.filter((comment) => ownsPath(file, comment.path)),

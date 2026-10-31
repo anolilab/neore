@@ -130,6 +130,10 @@ msgstr "(microdollari; 1.000.000 = 1 $)"
 msgid "(none)"
 msgstr "(nessuno)"
 
+#: src/features/develop/components/guide-view.tsx:120
+msgid "(old side)"
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:250
 #: src/features/settings/connectors/connector-card.tsx:199
 msgid "(opens in a new tab)"
@@ -199,8 +203,8 @@ msgstr ""
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:265
-#: src/features/develop/components/files-tab.tsx:273
+#: src/features/develop/components/files-tab.tsx:297
+#: src/features/develop/components/files-tab.tsx:305
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, one {# file} other {# file}}"
 
@@ -260,7 +264,7 @@ msgid "{0, plural, one {# optional check failed.} other {# optional checks faile
 msgstr ""
 
 #. placeholder {0}: review.draftComments.length
-#: src/features/develop/components/files-tab.tsx:104
+#: src/features/develop/components/files-tab.tsx:134
 msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr ""
 
@@ -322,7 +326,7 @@ msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, one {# slide} other {# slide}}"
 
 #. placeholder {0}: review.threads.length
-#: src/features/develop/components/files-tab.tsx:99
+#: src/features/develop/components/files-tab.tsx:129
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr ""
 
@@ -604,6 +608,13 @@ msgstr "{0} di {MAX_REFERENCE_IMAGES} riferimenti selezionati"
 msgid "{0} of {maxReferences} selected"
 msgstr "{0} di {maxReferences} selezionati"
 
+#. placeholder {0}: offer.agentLabel
+#. placeholder {1}: offer.deviceName
+#. placeholder {2}: offer.folderLabel
+#: src/features/develop/components/guide-tab.tsx:176
+msgid "{0} on {1}, in {2}"
+msgstr ""
+
 #. placeholder {0}: stats.pinned
 #: src/features/settings/components/personalization/memory-settings.tsx:176
 msgid "{0} pinned"
@@ -669,7 +680,7 @@ msgstr "{0} utilizzi"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:96
+#: src/features/develop/components/pull-request-view.tsx:101
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -911,6 +922,10 @@ msgstr ""
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:92
+msgid "{hostLabel} could not be reached. Try again in a moment."
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:70
 #: src/features/develop/components/merge-panel.tsx:145
 msgid "{hostLabel} does not show which ways of merging this repository allows to your account."
@@ -922,6 +937,24 @@ msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:78
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:65
+#: src/features/develop/components/guide-tab.tsx:94
+msgid "{hostLabel} is not connected."
+msgstr ""
+
+#. placeholder {0}: current.leftOut
+#: src/features/develop/components/guide-tab.tsx:219
+msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:62
+msgid "{hostLabel} or your computer could not be reached while the guide was written."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:90
+msgid "{hostLabel} refused this request."
 msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:79
@@ -1178,7 +1211,7 @@ msgstr "{providerName} · il tuo account Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} rich."
 
-#: src/features/develop/components/pull-request-view.tsx:112
+#: src/features/develop/components/pull-request-view.tsx:117
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -1602,6 +1635,10 @@ msgstr ""
 msgid "A goal groups tasks. Its progress follows from how many of them are done."
 msgstr "Un obiettivo raggruppa più attività. Il suo avanzamento dipende da quante sono completate."
 
+#: src/features/develop/components/guide-tab.tsx:98
+msgid "A guide for this {requestNoun} is already being written."
+msgstr ""
+
 #: src/features/evals/components/case-fields.tsx:26
 msgid "A JSON Schema the answer must satisfy"
 msgstr "Un JSON Schema che la risposta deve rispettare"
@@ -1690,6 +1727,10 @@ msgstr "Un breve riepilogo ogni mattina di ciò che è finito, di ciò che è in
 #: src/features/skills/components/skill-form-dialog.tsx:178
 msgid "A skill is a reusable set of instructions you can run with a slash command."
 msgstr "Una skill è un insieme riutilizzabile di istruzioni che puoi eseguire con un comando slash."
+
+#: src/features/develop/components/guide-view.tsx:130
+msgid "A suggestion only. Add the label on {hostLabel} yourself if you agree."
+msgstr ""
 
 #: src/features/settings/components/chat/event-trigger-fields.tsx:236
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
@@ -2213,6 +2254,10 @@ msgstr "Aggiungi ai preferiti"
 msgid "Add to Favorites"
 msgstr "Aggiungi ai preferiti"
 
+#: src/features/develop/components/guide-view.tsx:137
+msgid "Add to my review"
+msgstr ""
+
 #: src/features/develop/components/review-diff.tsx:201
 msgid "Add to review"
 msgstr ""
@@ -2238,7 +2283,7 @@ msgstr "Aggiungi/sostituisci oggetto"
 msgid "added"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:66
+#: src/features/develop/components/files-tab.tsx:96
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:99
 msgid "Added"
 msgstr "Aggiunto"
@@ -2268,6 +2313,14 @@ msgstr "Aggiunto ai preferiti"
 #: src/features/chat/aside/aside-panel.tsx:155
 #: src/features/chat/aside/aside-panel.tsx:275
 msgid "Added to the thread"
+msgstr ""
+
+#: src/features/develop/components/guide-view.tsx:110
+msgid "Added to your review"
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:125
+msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr ""
 
 #: src/features/skills/components/skill-builder-diff.tsx:40
@@ -5315,8 +5368,8 @@ msgstr "Cambia il nome visualizzato della tua organizzazione"
 msgid "Change your organization's unique identifier"
 msgstr "Cambia l'identificatore univoco della tua organizzazione"
 
-#: src/features/develop/components/files-tab.tsx:67
-#: src/features/develop/components/files-tab.tsx:107
+#: src/features/develop/components/files-tab.tsx:97
+#: src/features/develop/components/files-tab.tsx:137
 msgid "Changed"
 msgstr ""
 
@@ -5543,7 +5596,7 @@ msgstr "Verifica in corso..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:71
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6025,7 +6078,7 @@ msgstr "Chiudi traduzione"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:67
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Closed"
 msgstr "Chiuso"
 
@@ -6385,7 +6438,7 @@ msgstr "design commerciale"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Progetti commerciali che richiedono la massima qualità d'immagine di Black Forest Labs"
 
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:71
 msgid "Commits"
 msgstr ""
 
@@ -7236,7 +7289,7 @@ msgstr "Cronologia della conversazione"
 msgid "Conversation not available"
 msgstr "Conversazione non disponibile"
 
-#: src/features/develop/components/files-tab.tsx:328
+#: src/features/develop/components/files-tab.tsx:361
 msgid "Conversations and pending comments on files this list does not show"
 msgstr ""
 
@@ -7299,7 +7352,7 @@ msgstr ""
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:215
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:34
-#: src/features/develop/components/files-tab.tsx:68
+#: src/features/develop/components/files-tab.tsx:98
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -7451,6 +7504,10 @@ msgstr "Copia URL del webhook"
 #: src/features/pages/components/page-kept-draft.tsx:25
 msgid "Copy your unsaved version"
 msgstr "Copia la tua versione non salvata"
+
+#: src/features/develop/components/guide-view.tsx:34
+msgid "Core change"
+msgstr ""
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:335
 msgid "Corner radius"
@@ -9218,6 +9275,10 @@ msgstr "Partenza:"
 msgid "Depends on"
 msgstr "Dipende da"
 
+#: src/features/develop/components/guide-view.tsx:34
+msgid "Depends on it"
+msgstr ""
+
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
 msgid "Deployment names"
 msgstr "Nomi delle distribuzioni"
@@ -9316,7 +9377,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aumentane la risoluzione, poi rimuovi lo sfondo\""
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:71
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -9501,7 +9562,7 @@ msgstr "Non superato"
 msgid "Did you mean: {suggestion}?"
 msgstr "Forse intendevi: {suggestion}?"
 
-#: src/features/develop/components/files-tab.tsx:164
+#: src/features/develop/components/files-tab.tsx:194
 msgid "Diffs are not available from this host."
 msgstr ""
 
@@ -9611,6 +9672,7 @@ msgstr "Chiave pubblica Discord"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:189
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
@@ -9639,6 +9701,10 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:724
 msgid "Dismiss webhook secret"
 msgstr "Ignora segreto del webhook"
+
+#: src/features/develop/components/guide-view.tsx:110
+msgid "Dismissed"
+msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:118
 msgid "Dismissed — continuing without an answer"
@@ -9915,7 +9981,7 @@ msgstr "I download aprono la pagina delle release su GitHub. Se lì non compaion
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:75
+#: src/features/develop/components/pull-request-view.tsx:80
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Bozza"
@@ -13047,7 +13113,7 @@ msgstr "Caricamento del file rifiutato."
 msgid "Filename cannot be empty"
 msgstr "Il nome del file non può essere vuoto"
 
-#: src/features/develop/components/pull-request-view.tsx:66
+#: src/features/develop/components/pull-request-view.tsx:71
 msgid "Files"
 msgstr ""
 
@@ -13387,6 +13453,10 @@ msgstr "Ad esempio: \"Concentrati sulle best practice di Python\", \"Mantieni un
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:311
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:156
+msgid "For example: look hard at error handling, skip the generated files."
 msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:118
@@ -14695,6 +14765,10 @@ msgstr "Gli account ospite usano solo modelli gratuiti."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gli account ospite usano solo modelli gratuiti. Registrati per sbloccare tutti i modelli."
 
+#: src/features/develop/components/pull-request-view.tsx:71
+msgid "Guide"
+msgstr ""
+
 #: src/features/workflow/types/index.ts:479
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "Guida la generazione con rilevamento di posa, profondità o bordi"
@@ -15697,7 +15771,7 @@ msgid "Improving..."
 msgstr "Miglioramento..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:101
+#: src/features/develop/components/pull-request-view.tsx:106
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -16222,6 +16296,10 @@ msgstr ""
 msgid "Issue tracking and project management"
 msgstr "Tracciamento delle issue e gestione dei progetti"
 
+#: src/features/develop/components/guide-tab.tsx:95
+msgid "It does not exist, or your {hostLabel} account cannot see it."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:20
 #: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
@@ -16576,6 +16654,7 @@ msgstr "Kirghiso (Kirghizistan)"
 msgid "Kyrgyzstan"
 msgstr "Kirghizistan"
 
+#: src/features/develop/components/guide-view.tsx:127
 #: src/features/evals/components/run-dialog.tsx:262
 msgid "Label"
 msgstr "Etichetta"
@@ -17103,6 +17182,10 @@ msgstr "La riga {number} di questa trascrizione non è JSON valido, quindi l'imp
 msgid "Line {number}, {0}: {1}"
 msgstr ""
 
+#: src/features/develop/components/guide-view.tsx:43
+msgid "line {text}"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:171
 msgid "LINE Channel Access Token"
 msgstr "LINE Channel Access Token"
@@ -17131,6 +17214,10 @@ msgstr "Issue Linear {0}"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:25
 msgid "Linear multistep"
 msgstr "Multistep lineare"
+
+#: src/features/develop/components/guide-view.tsx:43
+msgid "lines {text}"
+msgstr ""
 
 #. placeholder {0}: file.path
 #: src/features/chat/thread/host-diff-viewer.tsx:213
@@ -17268,7 +17355,7 @@ msgstr "Carica altri"
 msgid "Load more commits"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:353
+#: src/features/develop/components/files-tab.tsx:386
 msgid "Load more files"
 msgstr ""
 
@@ -17282,7 +17369,7 @@ msgstr "Carica preset"
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:269
+#: src/features/develop/components/files-tab.tsx:301
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr ""
 
@@ -17295,7 +17382,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:26
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:51
+#: src/features/develop/components/pull-request-view.tsx:56
 msgid "Loading"
 msgstr "Caricamento"
 
@@ -17357,11 +17444,11 @@ msgstr "Caricamento dell'editor…"
 msgid "Loading file…"
 msgstr "Caricamento file…"
 
-#: src/features/develop/components/files-tab.tsx:234
+#: src/features/develop/components/files-tab.tsx:266
 msgid "Loading files"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:265
+#: src/features/develop/components/files-tab.tsx:297
 msgid "Loading files…"
 msgstr ""
 
@@ -17458,6 +17545,10 @@ msgstr ""
 #: src/features/tasks/components/tasks-page.tsx:212
 msgid "Loading tasks…"
 msgstr "Caricamento delle attività…"
+
+#: src/features/develop/components/guide-tab.tsx:54
+msgid "Loading the guide"
+msgstr ""
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
@@ -18157,6 +18248,10 @@ msgstr "I server MCP forniscono strumenti aggiuntivi che l'IA può usare durante
 msgid "MCP tools"
 msgstr "Strumenti MCP"
 
+#: src/features/develop/components/guide-view.tsx:34
+msgid "Mechanical changes"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:59
 msgid "media"
 msgstr ""
@@ -18351,7 +18446,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:67
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Merged"
 msgstr "Unito"
 
@@ -18834,7 +18929,7 @@ msgid "Modern gradient background"
 msgstr "Sfondo sfumato moderno"
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:771
-#: src/features/develop/components/files-tab.tsx:69
+#: src/features/develop/components/files-tab.tsx:99
 msgid "Modified"
 msgstr "Modificato"
 
@@ -19517,6 +19612,10 @@ msgstr "Neore Gateway supporta OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore include oltre 30 modelli: GPT-4, Claude, Gemini e DeepSeek per la chat. FLUX, Imagen, Stable Diffusion e Recraft per le immagini. Runway, Luma, Kling e Pika per i video. Passa dall’uno all’altro anche a metà conversazione."
 
+#: src/features/develop/components/guide-tab.tsx:169
+msgid "Neore, from the diff"
+msgstr ""
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:230
 #: src/routes/(public)/models/$modelSlug.tsx:111
@@ -20019,7 +20118,7 @@ msgstr "Ancora nessun dataset"
 msgid "No description"
 msgstr "Nessuna descrizione"
 
-#: src/features/develop/components/pull-request-view.tsx:122
+#: src/features/develop/components/pull-request-view.tsx:127
 msgid "No description provided."
 msgstr ""
 
@@ -20069,6 +20168,10 @@ msgstr "Nessuna lunghezza focale selezionata"
 #: src/features/tasks/components/task-form-dialog.tsx:340
 msgid "No goal"
 msgstr "Nessun obiettivo"
+
+#: src/features/develop/components/guide-tab.tsx:205
+msgid "No guide"
+msgstr ""
 
 #: src/features/prompts/components/prompt-history-dialog.tsx:112
 msgid "No history available"
@@ -20602,6 +20705,10 @@ msgstr "Non configurato dall'operatore"
 msgid "Not confirmed"
 msgstr ""
 
+#: src/features/develop/components/guide-view.tsx:34
+msgid "Not covered by the guide"
+msgstr ""
+
 #: src/features/sub-agents/components/worker-run-log.tsx:36
 msgid "Not delivered to the lead"
 msgstr ""
@@ -20610,7 +20717,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:77
+#: src/features/develop/components/files-tab.tsx:107
 msgid "Not loaded: the diffs on this page were already large."
 msgstr ""
 
@@ -20852,6 +20959,14 @@ msgstr "Pittura a olio"
 #: src/lib/model-descriptions.ts:175
 msgid "Old generation cinematic model with higher consistency"
 msgstr "Modello cinematografico di vecchia generazione con maggiore coerenza"
+
+#: src/features/develop/components/guide-view.tsx:40
+msgid "old line {text}"
+msgstr ""
+
+#: src/features/develop/components/guide-view.tsx:40
+msgid "old lines {text}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:558
@@ -21113,7 +21228,7 @@ msgstr "Opacità"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:676
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:67
+#: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Apri"
@@ -21236,7 +21351,7 @@ msgid "Open new chat"
 msgstr "Apri nuova chat"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:87
+#: src/features/develop/components/pull-request-view.tsx:92
 msgid "Open on {0}"
 msgstr ""
 
@@ -21315,6 +21430,10 @@ msgstr "Apri Attività"
 
 #: src/features/code/components/host-details.tsx:41
 msgid "Open terminal"
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:197
+msgid "Open the agent's conversation"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("commandPalette")
@@ -21890,7 +22009,7 @@ msgstr "Altro"
 msgid "Other clients (JSON)"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:327
+#: src/features/develop/components/files-tab.tsx:360
 msgid "Other conversations"
 msgstr ""
 
@@ -24111,6 +24230,10 @@ msgstr "Conversazione condivisa in sola lettura"
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Lettura di «{attachmentName}»…"
 
+#: src/features/develop/components/guide-view.tsx:53
+msgid "Reading order"
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:237
 msgid "Ready"
 msgstr "Pronto"
@@ -24918,7 +25041,7 @@ msgstr ""
 msgid "removed"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:70
+#: src/features/develop/components/files-tab.tsx:100
 msgid "Removed"
 msgstr ""
 
@@ -24930,8 +25053,12 @@ msgstr "Rimosso dai preferiti"
 msgid "Removed:"
 msgstr "Rimossi:"
 
-#: src/features/develop/components/files-tab.tsx:71
+#: src/features/develop/components/files-tab.tsx:101
 msgid "Renamed"
+msgstr ""
+
+#: src/features/develop/components/guide-view.tsx:48
+msgid "Renames, lockfiles, snapshots and generated files. Read last, and only as far as you need to."
 msgstr ""
 
 #: src/features/develop/components/review-thread.tsx:104
@@ -27251,6 +27378,10 @@ msgstr "Accedere su un altro sito?"
 msgid "Sign in to {label} again"
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:91
+msgid "Sign in to an account to write a guide."
+msgstr ""
+
 #: src/routes/(chat)/workflow/shared/$token.tsx:140
 msgid "Sign in to fork this workflow"
 msgstr "Accedi per duplicare questo workflow"
@@ -28961,6 +29092,11 @@ msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 msgid "suggestions"
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:226
+#: src/features/develop/components/guide-view.tsx:113
+msgid "Suggestions"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:413
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "Suggerisce come completare il messaggio in testo grigio; premi Freccia destra a fine riga per accettarlo o Esc per ignorarlo. La bozza viene inviata a un modello di IA per generare il suggerimento."
@@ -29763,8 +29899,28 @@ msgstr "Thailandia"
 msgid "Thanks for rating"
 msgstr "Grazie per la valutazione"
 
+#: src/features/develop/components/guide-tab.tsx:105
+msgid "That agent session has ended."
+msgstr ""
+
 #: src/features/develop/lib/use-review-messages.ts:14
 msgid "That comment is already gone."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:102
+msgid "That computer is busy. Try again in a moment."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:103
+msgid "That computer is not online."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:141
+msgid "That did not work. Try again."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:89
+msgid "That folder is not offered for this repository on that computer."
 msgstr ""
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:174
@@ -29791,6 +29947,22 @@ msgstr ""
 msgid "That request is no longer waiting."
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:128
+msgid "That suggestion cannot be added any more."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:127
+msgid "That suggestion is gone."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:61
+msgid "The {requestNoun} changed while the guide was being written. Write it again."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:126
+msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:260
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "L'EncodingAESKey di 43 caratteri (la crittografia dei messaggi deve essere impostata sulla modalità sicura)"
@@ -29798,6 +29970,10 @@ msgstr "L'EncodingAESKey di 43 caratteri (la crittografia dei messaggi deve esse
 #: src/features/devices/components/devices-settings.tsx:200
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "L'agente non potrà più chiedere nulla a questo dispositivo. Il registro delle attività resta finché non scade."
+
+#: src/features/develop/components/guide-tab.tsx:64
+msgid "The agent finished without giving a guide. Write it again."
+msgstr ""
 
 #: src/features/chat/host/host-send-errors.ts:20
 msgid "The agent is still working on the last message."
@@ -29814,6 +29990,10 @@ msgstr "Il ciclo dell’agente è sempre attivo per un’esecuzione sistematica 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:220
 msgid "The agent made no file changes."
 msgstr "L'agente non ha modificato alcun file."
+
+#: src/features/develop/components/guide-tab.tsx:192
+msgid "The agent on your computer is reading the change…"
+msgstr ""
 
 #: src/features/settings/components/personalization/memory-settings.tsx:155
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
@@ -29900,7 +30080,7 @@ msgstr "Il limite di costo deve essere un numero positivo di dollari."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Il dataset, i suoi casi e tutte le sue esecuzioni vengono rimossi."
 
-#: src/features/develop/components/pull-request-view.tsx:124
+#: src/features/develop/components/pull-request-view.tsx:129
 msgid "The description is cut short."
 msgstr ""
 
@@ -29998,6 +30178,23 @@ msgstr "Il prompt di sistema completo da inviare al modello..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "L'obiettivo viene rimosso; le sue attività restano, senza obiettivo."
 
+#: src/features/develop/components/guide-tab.tsx:114
+#: src/features/develop/components/guide-tab.tsx:117
+msgid "The guide could not be started."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:63
+msgid "The guide could not be written. Try again in a moment."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:60
+msgid "The guide did not finish. Write it again."
+msgstr ""
+
+#: src/features/develop/components/guide-view.tsx:49
+msgid "The guide did not place these files. They are listed so none is missed."
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:423
 msgid "The highest-quality AI video model available"
 msgstr "Il modello video IA di qualità più alta disponibile"
@@ -30014,7 +30211,7 @@ msgstr ""
 #~ msgid "The host lists at most {commitLimit} commits for one change. {leftOut} more are not shown here."
 #~ msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:278
+#: src/features/develop/components/files-tab.tsx:310
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr ""
 
@@ -30022,7 +30219,7 @@ msgstr ""
 #~ msgid "The host lists at most {fileLimit} files for one change. {leftOut} more are not shown here."
 #~ msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:76
+#: src/features/develop/components/files-tab.tsx:106
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr ""
 
@@ -30450,6 +30647,14 @@ msgstr "Questo browser non può ricevere notifiche push qui."
 msgid "This cannot be added to this chat."
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:67
+msgid "This change is too large to write a guide for."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:87
+msgid "This change, or your instructions, are too large for that computer to take in one message."
+msgstr ""
+
 #: src/features/chat/host/host-send-errors.ts:15
 msgid "This chat could not be found."
 msgstr ""
@@ -30532,7 +30737,7 @@ msgstr "Questa conversazione non è disponibile"
 msgid "This CSV file appears to be empty or invalid."
 msgstr "Questo file CSV sembra vuoto o non valido."
 
-#: src/features/develop/components/files-tab.tsx:78
+#: src/features/develop/components/files-tab.tsx:108
 msgid "This diff is cut short."
 msgstr ""
 
@@ -30572,6 +30777,10 @@ msgstr "Questo file è troppo grande ({0} KB) per essere visualizzato o modifica
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "Questo file è troppo grande (~{0} token) e supera la finestra di contesto del modello. Il modello potrebbe non riuscire a elaborarlo in modo efficace."
 
+#: src/features/develop/components/guide-tab.tsx:213
+msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
+msgstr ""
+
 #: src/features/develop/components/inbox-list.tsx:45
 msgid "This host does not offer an inbox yet."
 msgstr ""
@@ -30581,7 +30790,7 @@ msgstr ""
 #~ msgid "This host does not offer any view of a {0} yet."
 #~ msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:109
+#: src/features/develop/components/pull-request-view.tsx:114
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -31185,6 +31394,10 @@ msgstr "troppi file"
 msgid "Too many requests right now. Try again in a moment."
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:86
+msgid "Too many requests. Try again in a few minutes."
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:64
 msgid "Too many rows to preview · Click to download"
 msgstr ""
@@ -31535,7 +31748,7 @@ msgstr "Prova a modificare i termini di ricerca."
 
 #: src/components/error-component.tsx:40
 #: src/features/connection/components/offline-screen.tsx:59
-#: src/features/develop/components/files-tab.tsx:239
+#: src/features/develop/components/files-tab.tsx:271
 #: src/features/home/components/home-page.tsx:144
 msgid "Try again"
 msgstr "Riprova"
@@ -31856,7 +32069,7 @@ msgstr "Senza categoria"
 msgid "unchanged"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:72
+#: src/features/develop/components/files-tab.tsx:102
 #: src/features/evals/components/run-comparison.tsx:56
 msgid "Unchanged"
 msgstr "Invariati"
@@ -33182,16 +33395,16 @@ msgstr "Visualizza pull request"
 msgid "View Sessions"
 msgstr "Visualizza sessioni"
 
-#: src/features/develop/components/files-tab.tsx:120
+#: src/features/develop/components/files-tab.tsx:150
 msgid "Viewed"
 msgstr ""
 
-#: src/features/develop/components/files-tab.tsx:120
+#: src/features/develop/components/files-tab.tsx:150
 msgid "Viewed (changed since)"
 msgstr ""
 
 #. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:281
+#: src/features/develop/components/files-tab.tsx:313
 msgid "Viewed {viewedCount} of {0} files"
 msgstr ""
 
@@ -33720,6 +33933,10 @@ msgstr "Cosa dovrebbe fare l'agente?"
 msgid "What should the AI call you?"
 msgstr "Come dovrebbe chiamarti l'IA?"
 
+#: src/features/develop/components/guide-tab.tsx:149
+msgid "What should the guide pay attention to?"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:500
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Ciò che l'agente ha chiesto ai tuoi dispositivi negli ultimi 30 giorni."
@@ -33806,6 +34023,10 @@ msgstr "Se impostato, verranno usati solo questi provider. Lascia vuoto per cons
 #: src/features/skills/components/skill-form-dialog.tsx:261
 msgid "When should the assistant use this skill?"
 msgstr "Quando dovrebbe usare questa skill l'assistente?"
+
+#: src/features/develop/components/guide-tab.tsx:161
+msgid "Where the guide is written"
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:54
 msgid "Where this device is offered"
@@ -33974,6 +34195,10 @@ msgstr "Scrivi la descrizione di un video per il lancio di un prodotto"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "Scrivi codice con l’IA, eseguilo nella sandbox e documenta i risultati, tutto in un’unica conversazione."
 
+#: src/features/develop/components/guide-tab.tsx:182
+msgid "Write it again"
+msgstr ""
+
 #: src/features/marketing/components/landing-page.tsx:284
 msgid "Write long-form content alongside chat"
 msgstr "Scrivi contenuti lunghi accanto alla chat"
@@ -33990,6 +34215,10 @@ msgstr "Scrivi del codice per me..."
 msgid "Write something"
 msgstr "Scrivi qualcosa"
 
+#: src/features/develop/components/guide-tab.tsx:182
+msgid "Write the guide"
+msgstr ""
+
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:161
 msgid "Write, or type '/' for commands…"
 msgstr "Scrivi, oppure digita '/' per i comandi…"
@@ -33999,6 +34228,10 @@ msgstr "Scrivi, oppure digita '/' per i comandi…"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:113
 msgid "Writing"
 msgstr "Scrittura"
+
+#: src/features/develop/components/guide-tab.tsx:192
+msgid "Writing the guide…"
+msgstr ""
 
 #: src/features/chat/thread/composer-search-mode.tsx:51
 msgid "X"
@@ -34304,6 +34537,10 @@ msgstr "Hai raggiunto il limite di frequenza. Riprova tra {minutes, plural, one 
 msgid "You've successfully joined the thread. Redirecting..."
 msgstr "Ti sei unito alla conversazione. Reindirizzamento..."
 
+#: src/features/develop/components/guide-tab.tsx:93
+msgid "Your {hostLabel} sign-in has expired. Connect it again."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr ""
@@ -34396,6 +34633,11 @@ msgstr "La tua sessione anonima attuale verrà convertita in un account permanen
 #: src/features/notifications/lib/notification-labels.ts:36
 msgid "Your daily brief"
 msgstr "Il tuo Daily Brief"
+
+#: src/features/develop/components/guide-tab.tsx:66
+#: src/features/develop/components/guide-tab.tsx:96
+msgid "Your daily limit for AI requests is used up."
+msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:39
 msgid "Your data export is ready"
@@ -34500,6 +34742,14 @@ msgstr "La tua valutazione"
 #: src/features/tasks/components/task-detail-dialog.tsx:88
 msgid "Your review"
 msgstr "La tua revisione"
+
+#: src/features/develop/components/guide-tab.tsx:130
+msgid "Your review already holds as many comments as {hostLabel} takes in one review."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:129
+msgid "Your review is being submitted. Try again when it is done."
+msgstr ""
 
 #: src/features/develop/lib/use-review-messages.ts:15
 msgid "Your review is being submitted. Wait for it to finish."

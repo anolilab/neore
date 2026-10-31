@@ -1,7 +1,7 @@
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { INBOX_SECTIONS } from "@neore/backend/source-control/types";
 
-export const DEVELOP_TABS = ["description", "commits", "files", "checks"] as const;
+export const DEVELOP_TABS = ["description", "commits", "files", "checks", "guide"] as const;
 
 export type DevelopTab = (typeof DEVELOP_TABS)[number];
 
