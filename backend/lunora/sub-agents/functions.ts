@@ -38,20 +38,31 @@ import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
 import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { sessionOfThread } from "../acp/lib/sessions";
+import { openHostSession } from "../acp/lib/start-session";
+import { isLiveStream } from "../chat/streaming/persistent/host";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { isDeviceInScope } from "../devices/lib/scope";
+import { loadEligibleThread } from "../devices/internal";
+import { isDeviceOnline } from "../devices/lib/state";
+import { sha256Hex } from "../lib/crypto";
 import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_SCOPE, WORKER_STOP_SCOPE } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
+import { systemDb } from "../lib/rls/scope";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { MAX_LENGTH } from "../lib/validators";
+import { HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
+
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     buildResultMessage,
+    resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
     dispatchSourceProblem,
@@ -85,7 +96,7 @@ import {
     WORKER_POLICY_MAX_PER_HOUR,
 } from "./logic";
 import type { vWorkerPolicy } from "./validators";
-import { vDispatchSource, vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
+import { vDispatchSource, vHostRunnerRequest, vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -264,12 +275,26 @@ export interface WorkerRunArgs extends CreateSubAgentRunArgs {
     childThreadId?: string;
     /** A user-typed dispatch's dedupe key; a lead's dispatch carries `toolCallId` instead. */
     clientId?: string;
+    /** Set by a tool call of a headless run: nobody there can approve, so a host worker is out of reach. */
+    headless?: boolean;
     /** The lead run's effective tool names; unset when a person creates the worker. */
     leadTools?: string[];
     /** A new worker's model. */
     model?: string;
     /** A new worker's name, which is its thread title. */
     name?: string;
+    /**
+     * Where a new worker's runs execute: a coding agent on one of the caller's computers, for a pair that computer offered.
+     * A worker keeps the runner its first run had; asking an existing worker for another is refused.
+     */
+    runner?: HostRunnerRequest;
+}
+
+export interface HostRunnerRequest {
+    agentKey: string;
+    deviceId: string;
+    folderId: string;
+    kind: "host";
 }
 
 export interface WorkerReceipt {
@@ -344,7 +369,13 @@ const latestWorkerRuns = async (ctx: Pick<MutationCtx | QueryCtx, "db">, childTh
  * run. A worker run's reaper starts at its claim (`claimQueuedRun`), so a run that waits in line, or
  * for a consumer, never runs its clock down while it has not started.
  */
-const startQueuedRun = async (ctx: Pick<MutationCtx, "scheduler">, run: Pick<RunDoc, "_id" | "mode">): Promise<void> => {
+const startQueuedRun = async (ctx: MutationCtx, run: Pick<RunDoc, "_id" | "mode" | "runner">): Promise<void> => {
+    if (run.runner?.kind === "host") {
+        await startHostRun(ctx, run._id);
+
+        return;
+    }
+
     await enqueueJob(internal.sub_agents.execute.runSubAgent, { runId: run._id });
 
     if (run.mode !== "worker") {
@@ -352,15 +383,89 @@ const startQueuedRun = async (ctx: Pick<MutationCtx, "scheduler">, run: Pick<Run
     }
 };
 
-/** Whether `threadId` is a worker's thread — a turn there runs only through a dispatch. */
-export const isWorkerThread = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> => {
-    const first = await ctx.db
-        .query("subAgentRuns")
-        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", threadId))
-        .first();
+/** Whether a run's computer may still be used in its lead conversation's project (the device tools' scope rule). */
+const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThreadId" | "runner" | "userId">): Promise<boolean> => {
+    const deviceId = run.runner?.kind === "host" ? ctx.db.normalizeId("devices", run.runner.deviceId) : null;
+    const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: run.userId } }) : null;
+    const lead = await systemDb(ctx).get(run.parentThreadId as Id<"threads">);
 
-    return first?.mode === "worker";
+    return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
 };
+
+/**
+ * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
+ * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
+ * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
+ * or a turn holds the session) is not a failure: the run goes back to the head of the line and
+ * {@link retryHostRunStart} tries it again, so the messages behind it wait too instead of meeting the same refusal.
+ */
+const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
+    const claimed = await claimQueuedRun(ctx, runId);
+
+    if (!claimed) {
+        return;
+    }
+
+    // A message that waited in line is sent under the rule it was admitted by: the lead may have been shared since.
+    if (!(await loadEligibleThread({ db: systemDb(ctx) }, claimed.parentThreadId as Id<"threads">, claimed.userId))) {
+        await finishRun(ctx, runId, { error: HOST_NEEDS_OWN_CONVERSATION, kind: "failed" });
+
+        return;
+    }
+
+    // ...and the computer's projects may have changed, or the lead moved to another project.
+    if (!(await isHostInLeadScope(ctx, claimed))) {
+        await finishRun(ctx, runId, { error: HOST_OUT_OF_SCOPE, kind: "failed" });
+
+        return;
+    }
+
+    const sent = await sendHostRunTurn(ctx, claimed, Date.now());
+
+    if (!("error" in sent)) {
+        return;
+    }
+
+    const attempts = (claimed.hostStartAttempts ?? 0) + 1;
+
+    if (!sent.retry || attempts >= HOST_START_MAX_ATTEMPTS) {
+        await finishRun(ctx, runId, { error: sent.error, kind: "failed" });
+
+        return;
+    }
+
+    await putHostRunBack(ctx, claimed, attempts);
+};
+
+/**
+ * Undoes a host run's claim after a busy answer and schedules the next try. The run keeps its place at the head of the
+ * line, so a later message is never started ahead of it (`claimQueuedRun` starts the head only). A retry that finds
+ * the run started, cancelled or ended is a no-op: the claim decides, so a duplicate retry is harmless.
+ */
+const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number): Promise<void> => {
+    const now = Date.now();
+
+    await patchById(ctx.db, run._id, { hostStartAttempts: attempts, startedAt: undefined, status: "queued", updatedAt: now });
+
+    const worker = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
+    // The claim marked the thread running; a reply the person started there meanwhile keeps it so.
+    if (worker?.status === "running" && !(await isThreadStreaming(ctx, worker._id))) {
+        await patchThread(ctx.db, worker._id, { status: "active", updatedAt: now });
+    }
+
+    await ctx.scheduler.runAfter(hostStartRetryDelayMs(attempts), internal.sub_agents.functions.retryHostRunStart, { runId: run._id });
+};
+
+/** Tries again to start a host run that met a busy computer (a no-op unless it is still the queued head of its line). */
+export const retryHostRunStart = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await startHostRun(ctx, args.runId);
+
+        return null;
+    });
 
 /** Lifetime runs of a lead read to count its distinct children; the depth cap keeps real counts tiny. */
 const SUB_AGENT_LIFETIME_SCAN = 200;
@@ -410,6 +515,45 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
     }
 
     return null;
+};
+
+const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
+
+const HOST_NEEDS_OWN_CONVERSATION =
+    "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";
+
+const HOST_NO_TOOLS_OR_SKILL =
+    "A worker on a computer takes no tool list or skill: the coding agent there uses its own tools, each asked for on the computer, and only the task text reaches it.";
+
+const TOO_MANY_HOST_STARTS = "You have started too many agents on your computers recently. Try again later.";
+
+const HOST_OUT_OF_SCOPE = "That computer is not allowed in this conversation's project. Change which projects it may be used in, in its settings.";
+
+const HOST_NOT_APPROVED = "That agent is not approved for that folder on this computer. Approve it in the desktop app first.";
+
+/** The offered pair a new host worker will run, from the caller's own computer; null for a cloud worker. */
+const resolveHostRunner = async (
+    ctx: MutationCtx,
+    args: Pick<WorkerRunArgs, "runner" | "userId">,
+): Promise<{ device: Doc<"devices">; offer: NonNullable<Doc<"devices">["acpOffers"]>[number] } | { error: string } | null> => {
+    if (args.runner === undefined) {
+        return null;
+    }
+
+    const deviceId = ctx.db.normalizeId("devices", args.runner.deviceId);
+    const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: args.userId } }) : null;
+    // Only a pair that computer itself offered (approved in its own window): Rust checks it again when the call arrives.
+    const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.runner!.agentKey && candidate.folderId === args.runner!.folderId);
+
+    if (!device?.encryptedSecret || !offer) {
+        return { error: HOST_NOT_APPROVED };
+    }
+
+    if (!isDeviceOnline(device, Date.now())) {
+        return { error: "That computer is not online." };
+    }
+
+    return { device, offer };
 };
 
 const HOUR_MS = 60 * 60_000;
@@ -487,11 +631,59 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return refusal;
     };
 
+    // An existing worker keeps its runner; a request for another is refused rather than followed.
+    if (origin && args.runner !== undefined) {
+        const session = origin.runner?.kind === "host" ? await sessionOfThread(ctx, args.childThreadId as Id<"threads">) : null;
+
+        if (!session || session.deviceId !== args.runner.deviceId || session.agentKey !== args.runner.agentKey || session.folderId !== args.runner.folderId) {
+            return await refuse(other("A worker keeps the runner it started with."));
+        }
+    }
+
+    // The runner this dispatch reaches: the worker's own, or the one a new worker was asked for.
+    const runnerKind = origin?.runner?.kind ?? args.runner?.kind ?? "headless";
     // The lead's policy, before the caps and the rate limit: a source it refuses consumes nothing.
-    const sourceProblem = dispatchSourceProblem({ policy: parent.workerPolicy, runner: origin?.runner, source: args.dispatchedBy ?? "lead" });
+    const source = args.dispatchedBy ?? "lead";
+    const sourceProblem = dispatchSourceProblem({ policy: parent.workerPolicy, runner: { kind: runnerKind }, source });
 
     if (sourceProblem) {
         return await refuse({ error: sourceProblem, kind: "forbidden" });
+    }
+
+    // An agent on a computer acts with the user's rights there: a person in the conversation must stand behind each message.
+    // The tool asks first (`needsApproval`); a headless run cannot be asked, and an unattended source never was.
+    if (runnerKind === "host" && (args.headless === true || (source !== "lead" && source !== "user"))) {
+        return await refuse({ error: HOST_NEEDS_A_PERSON, kind: "forbidden" });
+    }
+
+    // The same rule as the device tools: the agent acts with the user's rights on their computer, so nobody else's text may
+    // be in the lead's context. The grant lookup decides past RLS: a hidden grant row must not read as "not shared".
+    if (runnerKind === "host" && !(await loadEligibleThread({ db: systemDb(ctx) }, parent._id, args.userId))) {
+        return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
+    }
+
+    // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
+    // limit that nothing applies there. (The lead's own tool names, which a cloud worker inherits, are not one: a host
+    // worker never stores them, below.)
+    if (runnerKind === "host" && (common.allowlist !== undefined || skillSlug !== undefined)) {
+        return await refuse(other(HOST_NO_TOOLS_OR_SKILL));
+    }
+
+    const host = origin ? null : await resolveHostRunner(ctx, args);
+
+    if (host && "error" in host) {
+        return await refuse(other(host.error));
+    }
+
+    // A computer limited to some projects runs work only for conversations in them, the rule the device tools follow.
+    if (runnerKind === "host") {
+        const runner = origin?.runner ?? args.runner;
+        const deviceId = runner && "deviceId" in runner ? ctx.db.normalizeId("devices", runner.deviceId) : null;
+        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: args.userId } }) : null;
+
+        if (!device || !isDeviceInScope(device, parent.projectId)) {
+            return await refuse(other(HOST_OUT_OF_SCOPE));
+        }
     }
 
     const hourlyCap = parent.workerPolicy?.maxDispatchesPerHour;
@@ -529,7 +721,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             return await refuse(other(tools.error));
         }
 
-        allowlist = tools.tools;
+        // A host worker keeps no tool list: its agent uses its own tools, each asked for on the computer.
+        allowlist = runnerKind === "host" ? undefined : tools.tools;
     }
 
     const depth = origin?.depth ?? (await threadDepth(ctx, parent._id)) + 1;
@@ -544,10 +737,27 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse(other(capProblem));
     }
 
+    // Opening a session is starting an agent on a computer, so it spends the budget `startHostSession` spends. It is
+    // read before anything is spent: a refusal here is an answer, not a thrown error, so a spent sub-agent start would stay
+    // spent for a worker that was never created.
+    const startLimit = host ? createRatelimit(`hosts/start:${account.tier}`, ctx.db as never) : null;
+
+    const startsLeft = startLimit ? await startLimit.getRemaining(args.userId) : null;
+
+    if (startsLeft && startsLeft.remaining < 1) {
+        return await refuse({ error: TOO_MANY_HOST_STARTS, kind: "limit" });
+    }
+
     const { ok } = await createRatelimit(`subAgents/run:${account.tier}`, ctx.db as never).limit(args.userId);
 
     if (!ok) {
         return await refuse({ error: "You have started too many sub-agents recently. Try again later.", kind: "limit" });
+    }
+
+    const startSpent = startLimit ? await startLimit.limit(args.userId) : null;
+
+    if (startSpent && !startSpent.ok) {
+        return await refuse({ error: TOO_MANY_HOST_STARTS, kind: "limit" });
     }
 
     const now = Date.now();
@@ -564,8 +774,10 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
         childThreadId = await insertThread(ctx.db, {
             createdAt: now,
-            model,
+            // A host worker runs on its agent, not on a cloud model.
+            model: host ? host.offer.agentKey : model,
             organizationId: parent.organizationId,
+            ...(host && { runner: "host" as const }),
             status: "active",
             tags: ["sub-agent", "worker"],
             title: name,
@@ -580,6 +792,28 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             threadId: childThreadId,
             userId: args.userId,
         });
+
+        if (host) {
+            const opened = await openHostSession(
+                ctx,
+                {
+                    device: host.device,
+                    hostSessionId: `sub-${await sha256Hex(`${args.userId}:${childThreadId}`)}`,
+                    offer: host.offer,
+                    threadId: childThreadId,
+                    userId: args.userId,
+                },
+                now,
+            );
+
+            // Thrown, not returned: the thread, the session and the claim are written, and only a throw takes them back.
+            if ("error" in opened) {
+                throw new LunoraError(
+                    "BAD_REQUEST",
+                    opened.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
+                );
+            }
+        }
     }
 
     const row: Omit<RunDoc, "_creationTime" | "_id"> = {
@@ -592,7 +826,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         organizationId: parent.organizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
-        runner: origin?.runner ?? { kind: "headless" },
+        runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),
         skillSlug: origin?.skillSlug ?? skillSlug,
         status: "queued",
         task,
@@ -623,12 +857,20 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
         await startQueuedRun(ctx, admitted.run);
     }
 
-    return { runId: admitted.run._id, state: admitted.run.status, workerId: admitted.run.childThreadId! };
+    // A host run starts (or fails) inside the start itself, so the receipt reads the row, not the snapshot admission took.
+    const started = admitted.run.runner?.kind === "host" ? await ctx.db.get(admitted.run._id) : null;
+    const state = started?.status ?? admitted.run.status;
+
+    return { runId: admitted.run._id, state, workerId: admitted.run.childThreadId! };
 };
 
 export const createRun = internalMutation
     .input({
         dispatchedBy: vDispatchSource,
+        // Set by a headless run's tool call: nobody there can approve a message to a computer.
+        headless: v.optional(v.boolean()),
+        // A new worker's runner: a coding agent on one of the caller's computers (checked against what it offered).
+        host: v.optional(vHostRunnerRequest),
         // Bounded at the boundary; the name is cut to its display length further down, and a tool name has its own pattern.
         leadTools: v.optional(v.array(v.string().max(128))),
         model: v.optional(v.string().max(256)),
@@ -644,9 +886,9 @@ export const createRun = internalMutation
         userId: v.string(),
     })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
-    .mutation(async ({ args: { persistent, ...args }, ctx }) => {
+    .mutation(async ({ args: { host, persistent, ...args }, ctx }) => {
         if (persistent) {
-            const dispatched = await dispatchWorkerRun(ctx, args);
+            const dispatched = await dispatchWorkerRun(ctx, { ...args, ...(host && { runner: { ...host, kind: "host" as const } }) });
 
             return "error" in dispatched ? { error: dispatched.error } : { runId: dispatched.runId, workerId: dispatched.workerId };
         }
@@ -672,6 +914,7 @@ export const createRun = internalMutation
 export const messageWorker = internalMutation
     .input({
         dispatchedBy: vDispatchSource,
+        headless: v.optional(v.boolean()),
         message: v.string().max(SUB_AGENT_TASK_MAX),
         parentThreadId: v.string(),
         toolCallId: v.string(),
@@ -683,6 +926,7 @@ export const messageWorker = internalMutation
         const dispatched = await dispatchWorkerRun(ctx, {
             childThreadId: args.workerId,
             dispatchedBy: args.dispatchedBy,
+            ...(args.headless !== undefined && { headless: args.headless }),
             parentThreadId: args.parentThreadId,
             task: args.message,
             toolCallId: args.toolCallId,
@@ -726,12 +970,15 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
             return null;
         }
 
-        const account = await loadTaskAccount(ctx, run.userId);
+        // The agent on a computer bills its own account: no round of ours is spent on its runs.
+        if (run.runner?.kind !== "host") {
+            const account = await loadTaskAccount(ctx, run.userId);
 
-        if (!account || !(await chargeRound(ctx, run.userId, account))) {
-            await finishRun(ctx, run._id, { error: account ? DAILY_LIMIT_MESSAGE : "Your account no longer exists.", kind: "failed" });
+            if (!account || !(await chargeRound(ctx, run.userId, account))) {
+                await finishRun(ctx, run._id, { error: account ? DAILY_LIMIT_MESSAGE : "Your account no longer exists.", kind: "failed" });
 
-            return null;
+                return null;
+            }
         }
     }
 
@@ -872,7 +1119,7 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
 
     await addMessagesHandler(ctx, {
         agentName: SUB_AGENT_NAME,
-        messages: [{ message: { content: text, role: "assistant" }, status: "success" }],
+        messages: [{ message: { content: resultContent(text, run.runner?.kind === "host"), role: "assistant" }, status: "success" }],
         overrideOrder: (last?.order ?? -1) + 1,
         ...(leaf && { parentMessageId: leaf._id }),
         threadId: thread._id,
@@ -907,6 +1154,17 @@ const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRu
 
         await patchById(ctx.db, run._id, { loopExitedAt: now, updatedAt: now });
         await startNextWorkerRun(ctx, run.childThreadId);
+    }
+};
+
+/** Stops the live host turn a run sent, if it is still going: what was written is kept, and the computer is told to cancel. */
+const stopHostTurnOf = async (ctx: MutationCtx, run: RunDoc, now: number): Promise<void> => {
+    const stream = run.hostTurnId === undefined ? null : await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: run.hostTurnId } });
+
+    if (stream && isLiveStream(stream)) {
+        const { cancelHostTurnNow } = await import("../acp/lib/finish");
+
+        await cancelHostTurnNow(ctx, stream, now);
     }
 };
 
@@ -953,6 +1211,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
             // Only a worker run names its sender: a one-shot result reads as it always did.
             dispatchedBy: run.mode === "worker" ? run.dispatchedBy : undefined,
             error: run.error,
+            hostRun: run.runner?.kind === "host",
             result: run.result,
             started: run.startedAt !== undefined,
             status: run.status as "cancelled" | "failed" | "succeeded",
@@ -995,6 +1254,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // The run the worker's line waits on: the one going, or the head of the queue. Ending one further
     // back changes nothing, the head already has its job. Read before the patch takes it out of the line.
     const wasRunning = run.status === "running";
+    const hostRun = run.runner?.kind === "host";
     const wasHead =
         run.mode === "worker" &&
         run.childThreadId !== undefined &&
@@ -1003,7 +1263,16 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     const result = outcome.kind === "succeeded" ? truncateResult(outcome.result) : undefined;
     const error = outcome.kind === "failed" ? outcome.error.slice(0, 1000) : undefined;
 
-    await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now });
+    // A host run has no loop that lingers after a stop: the turn is ended below, before anything else reads the line.
+    const loopGone = hostRun && wasRunning && outcome.kind === "cancelled";
+
+    await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now, ...(loopGone && { loopExitedAt: now }) });
+
+    // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
+    // its turn's own end finds the stream over already.
+    if (hostRun && wasRunning) {
+        await stopHostTurnOf(ctx, run, now);
+    }
 
     // The child thread was marked "running" when it was linked (`linkChildThread`). A chat reply
     // the user started there meanwhile holds that status too, so it stays while one is live.
@@ -1017,7 +1286,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     await postRunResult(ctx, run._id, 0);
 
     // A stopped running run is still mid-step: its line moves on when its loop exits, not before.
-    if (wasHead && !(wasRunning && outcome.kind === "cancelled")) {
+    if (wasHead && (!(wasRunning && outcome.kind === "cancelled") || hostRun)) {
         await startNextWorkerRun(ctx, run.childThreadId!);
     }
 
@@ -1071,13 +1340,18 @@ export const completeRun = internalMutation
     .mutation(async ({ args, ctx }) => await finishRunFromLoop(ctx, args.runId, args.outcome));
 
 /**
- * When the worker's thread last showed progress: its newest message row. A headless run writes one per
- * step (the pending row of the step that follows), so a loop that is working keeps this moving.
+ * When a worker run last showed progress. A headless run writes a message row per step (the pending row of the step
+ * that follows), so its thread's newest row keeps this moving. A host run's thread shows nothing until the turn ends,
+ * so its activity is its host events ({@link hostRunActivity}), and it may be waiting on a person, which is not being stuck.
  */
-const workerActivityAt = async (ctx: QueryCtx, childThreadId: string): Promise<number | undefined> => {
-    const newest = await getMaxMessage(ctx, childThreadId as Id<"threads">);
+const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "session"): Promise<{ at: number | undefined; waitingOnPerson: boolean }> => {
+    if (run.runner?.kind === "host") {
+        return await hostRunActivity(ctx, run, precision);
+    }
 
-    return newest?._creationTime;
+    const newest = run.childThreadId === undefined ? null : await getMaxMessage(ctx, run.childThreadId as Id<"threads">);
+
+    return { at: newest?._creationTime, waitingOnPerson: false };
 };
 
 /**
@@ -1096,11 +1370,8 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
         return;
     }
 
-    const decision = workerReapDecision({
-        lastActivityAt: run.childThreadId === undefined ? undefined : await workerActivityAt(ctx, run.childThreadId),
-        now,
-        run,
-    });
+    const activity = await workerActivity(ctx, run, "chunk");
+    const decision = workerReapDecision({ lastActivityAt: activity.at, now, run, waitingOnPerson: activity.waitingOnPerson });
 
     if (decision.kind === "later") {
         await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.reapRun, { runId });
@@ -1141,6 +1412,20 @@ export const shouldRunStop = internalQuery
  * ended run is a no-op, so a second cancel changes and posts nothing.
  */
 export const cancelSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => await finishRun(ctx, runId, { kind: "cancelled" });
+
+/**
+ * Cancels the messages queued behind a worker's current run, newest first so ending the head does not start the one
+ * behind it just to cancel that too. For a worker whose thread is going away: a hard delete does not mark the thread
+ * deleted before it ends the host turn, and the line must not start a message on it.
+ */
+export const cancelQueuedWorkerRuns = async (ctx: MutationCtx, threadId: string): Promise<void> => {
+    const runs = await latestWorkerRuns(ctx, threadId);
+    const queued = runs.filter((run) => run.status === "queued");
+
+    for (const run of queued) {
+        await cancelSubAgentRun(ctx, run._id);
+    }
+};
 
 /** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
 const CANCEL_THREAD_MAX = 20;
@@ -1314,6 +1599,8 @@ const dispatchOrThrow = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<W
 export const createWorker = authMutation
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
+        // Run the worker on a coding agent on one of the caller's computers instead of in the cloud.
+        host: v.optional(vHostRunnerRequest),
         leadThreadId: v.id("threads"),
         model: v.optional(v.string().max(200)),
         name: v.string().max(WORKER_NAME_MAX),
@@ -1335,6 +1622,7 @@ export const createWorker = authMutation
         return await dispatchOrThrow(ctx, {
             clientId: args.clientId,
             dispatchedBy: "user",
+            ...(args.host && { runner: { ...args.host, kind: "host" as const } }),
             ...(lead?.model !== undefined && { parentModel: lead.model }),
             ...(args.model !== undefined && { model: args.model }),
             name: args.name,
@@ -1373,6 +1661,19 @@ export const dispatchToWorker = authMutation
             task: args.message,
             userId: ctx.user.userId,
         });
+    });
+
+/**
+ * Whether `workerId` is a worker of this user's that runs on a computer. The tools ask it before a call runs, to make
+ * a message to such a worker need a person's approval whatever the tool's mode says.
+ */
+export const isHostWorker = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id), workerId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const origin = await workerOrigin(ctx, args.workerId);
+
+        return origin?.userId === args.userId && origin.runner?.kind === "host";
     });
 
 /**
@@ -1542,10 +1843,11 @@ const progressFields = async (
     working: RunDoc | undefined,
     locked: boolean,
 ): Promise<{ lastActivityAt: number | null; queuedRuns: number; quietAfterMs: number; runs: Infer<typeof vWorkerRunView>[]; stopping: boolean }> => {
-    const activityAt = working?.status === "running" && working.childThreadId !== undefined ? await workerActivityAt(ctx, working.childThreadId) : undefined;
+    const activity = working?.status === "running" ? await workerActivity(ctx, working, "session") : undefined;
 
     return {
-        lastActivityAt: working?.status === "running" ? Math.max(working.startedAt ?? 0, activityAt ?? 0) : null,
+        // No quiet notice while the agent waits on a person's answer: that is not being stuck.
+        lastActivityAt: working?.status === "running" && !activity?.waitingOnPerson ? Math.max(working.startedAt ?? 0, activity?.at ?? 0) : null,
         queuedRuns: group.filter((run) => run.status === "queued").length,
         quietAfterMs: SUB_WORKER_QUIET_MS,
         // A locked chat shows none of its content: the run list (task, times, delivery, source) is withheld whole.
@@ -1713,3 +2015,5 @@ export const listActiveWorkerRuns = authQuery
 
         return views;
     });
+
+export { isWorkerThread } from "./worker-thread";

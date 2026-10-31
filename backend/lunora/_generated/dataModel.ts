@@ -1556,6 +1556,8 @@ export interface Doc_subAgentRuns {
     depth: number;
     dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
+    hostStartAttempts?: number;
+    hostTurnId?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;
@@ -4501,6 +4503,8 @@ export interface Insert_subAgentRuns {
     depth: number;
     dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent";
     error?: string;
+    hostStartAttempts?: number;
+    hostTurnId?: string;
     loopExitedAt?: number;
     mode?: "run" | "worker";
     organizationId?: string;

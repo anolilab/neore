@@ -211,6 +211,28 @@ export const resolveToolPermissionWithGrant = (
 export const readMcpAnnotations = (tool: unknown): ToolAnnotationHints | undefined =>
     (tool as { metadata?: { annotations?: ToolAnnotationHints } } | undefined)?.metadata?.annotations;
 
+type OwnApproval = ToolSet[string]["needsApproval"];
+
+/**
+ * A timed allow's check: the tool asks once the grant has lapsed, and still asks whenever its own check does. A tool can
+ * decide per call that a person must click (a message to a worker on a computer), and no grant lifts that.
+ */
+const withLapse = (own: OwnApproval, expiresAt: number): OwnApproval => {
+    if (own === true) {
+        return true;
+    }
+
+    if (typeof own !== "function") {
+        return () => Date.now() >= expiresAt;
+    }
+
+    return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
+
+        return typeof ownAnswer === "boolean" ? ownAnswer || Date.now() >= expiresAt : ownAnswer.then((asked) => asked || Date.now() >= expiresAt);
+    } as OwnApproval;
+};
+
 /**
  * Apply permissions to a tool set.
  *
@@ -248,7 +270,7 @@ export const applyToolPermissions = (
         }
 
         // Tools are built once per run and a run can outlast the grant, so the lapse is checked at every call.
-        result[name] = timedUntil === undefined ? tool : ({ ...tool, needsApproval: () => Date.now() >= timedUntil } as ToolSet[string]);
+        result[name] = timedUntil === undefined ? tool : ({ ...tool, needsApproval: withLapse(tool.needsApproval, timedUntil) } as ToolSet[string]);
     }
 
     return { removed, requiresApproval, tools: result };

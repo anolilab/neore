@@ -11,26 +11,25 @@
  * `/hosts/ingest`. The reply is saved by the turn's end (`acp/lib/finish.ts`), not by a pending row written now.
  */
 import type { HttpActionCtx, Infer } from "lunorash/server";
-import { LunoraError, v } from "lunorash/server";
+import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
-import { addMessagesHandler } from "../agent/messages";
 import { isUnlockProofValid } from "../agent/thread-passcode";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
-import { createHostStream } from "../chat/streaming/persistent/host";
-import { createAcpCall } from "../devices/lib/acp-call";
 import type { DeviceTaintSource } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
 import { checkRateLimit, getUserTier } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
+import { isWorkerThread } from "../sub-agents/worker-thread";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
-import { sessionOfThread, touchSession } from "./lib/sessions";
+import { queueHostTurn } from "./lib/send-turn";
+import { sessionOfThread } from "./lib/sessions";
 
 /** How many of a thread's latest streams a retry looks through for its own; a turn is one stream, and a day holds few. */
 const DUPLICATE_SCAN_STREAMS = 50;
@@ -53,6 +52,7 @@ const vSendResult = v.union(
             v.literal("session_ended"),
             v.literal("too_large"),
             v.literal("turn_running"),
+            v.literal("worker_thread"),
         ),
     }),
 );
@@ -97,6 +97,11 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "duplicate" as const, ...(first && { messageId: first.messageId, streamId: first._id as string }) };
     }
 
+    // A worker's thread takes a turn only through `dispatchToWorker`: a prompt sent here would run with no run behind it.
+    if (await isWorkerThread(ctx, threadId)) {
+        return { outcome: "worker_thread" as const };
+    }
+
     // A locked chat takes a new message only with a live proof of its passcode. This comes after the duplicate
     // check, so the retry of a message that went out before the lock is still told so.
     if (isThreadLocked(thread) && !(await isUnlockProofValid(ctx.db, thread, userId, args.unlockProof, now))) {
@@ -120,45 +125,17 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "rate_limited" as const };
     }
 
-    const turnId = crypto.randomUUID();
-    const call = await createAcpCall(
-        ctx,
-        {
-            deviceId: session.deviceId,
-            input: { sessionId: session.hostSessionId, text: args.text, turnId },
-            kind: "acp_send",
-            taintedBy: args.taintedBy,
-            threadId,
-            userId,
-        },
-        now,
-    );
+    const queued = await queueHostTurn(ctx, { session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
 
-    if ("error" in call) {
+    if ("error" in queued) {
         const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline" } as const;
 
-        return { outcome: outcomes[call.error] };
+        return { outcome: outcomes[queued.error] };
     }
 
-    const { messages } = await addMessagesHandler(ctx, {
-        fromUser: true,
-        messages: [{ message: { content: args.text, role: "user" }, status: "success" }],
-        threadId,
-        userId,
-    });
-    const prompt = messages[0];
-
-    if (!prompt) {
-        throw new LunoraError("INTERNAL", "The prompt was not saved");
-    }
-
-    const streamId = await createHostStream(ctx, { hostState: "accepted", messageId: prompt._id, threadId, turnId, userId }, now);
-
-    // A session still `starting` stays so (`touchSession`): the computer holds the message until the agent opens it.
-    await touchSession(ctx, session, "busy", now);
     await claimOnce(ctx, "host-send", key, SEND_CLAIM_TTL_MS, userId);
 
-    return { messageId: prompt._id as string, outcome: "sent" as const, streamId: streamId as string };
+    return { messageId: queued.messageId, outcome: "sent" as const, streamId: queued.streamId as string };
 };
 
 export const sendToHost = internalMutation
@@ -186,6 +163,7 @@ const STATUS: Record<string, number> = {
     session_ended: 409,
     too_large: 413,
     turn_running: 409,
+    worker_thread: 409,
 };
 
 export const hostSendHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {

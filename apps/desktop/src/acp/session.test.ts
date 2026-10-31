@@ -81,7 +81,12 @@ describe("a recorded session", () => {
         const { agent, player } = await setup();
 
         await player.play(readTranscript("unsupported-requests"));
-        expect(agent.written.map((frame) => frame.error)).toEqual([undefined, undefined, { code: -32_601, message: "method not found" }, { code: -32_601, message: "method not found" }]);
+        expect(agent.written.map((frame) => frame.error)).toEqual([
+            undefined,
+            undefined,
+            { code: -32_601, message: "method not found" },
+            { code: -32_601, message: "method not found" },
+        ]);
     });
 
     it("sends session/cancel and answers a waiting permission request 'cancelled'", async () => {
@@ -162,6 +167,59 @@ describe("the end of a turn", () => {
         agent.say({ id: agent.written[2].id as number, result: { stopReason: "end_turn" } });
         await expect.poll(() => agent.written.length).toBe(4);
         expect(agent.written[3]).toMatchObject({ method: "session/prompt", params: { prompt: [{ text: "second", type: "text" }] } });
+    });
+
+    it("queues a prompt that arrives while a cancel is still settling: it runs after the cancelled turn's response, never beside it", async () => {
+        const { agent, session } = await setup();
+
+        session.send("first", "turn-1");
+        await expect.poll(() => agent.written.length).toBe(3);
+        session.cancel();
+
+        // The agent has not answered the cancel yet: the session is still busy, so the next message waits.
+        expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
+        expect(session.snapshot().status).toBe("busy");
+        await sleep(60);
+        expect(agent.written.filter((frame) => frame.method === "session/prompt")).toHaveLength(1);
+
+        const prompt = agent.written.find((frame) => frame.method === "session/prompt");
+
+        expect(prompt).toBeDefined();
+        agent.say({ id: prompt?.id as number, result: { stopReason: "cancelled" } });
+        await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
+    });
+
+    it("keeps the prompts queued behind a turn the backend cancels by id: they run after it, and only Stop drops them", async () => {
+        const { agent, session } = await setup();
+
+        session.send("first", "turn-1");
+        await expect.poll(() => agent.written.length).toBe(3);
+        expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
+
+        expect(session.cancelTurn("turn-1")).toBe(true);
+        expect(session.snapshot().queued).toEqual(["second"]);
+
+        agent.say({ id: agent.written[2].id as number, result: { stopReason: "cancelled" } });
+        await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
+    });
+
+    it("keeps a cancelled turn's late output out of the queued turn that runs next", async () => {
+        const { agent, session } = await setup();
+
+        session.send("first", "turn-1");
+        await expect.poll(() => agent.written.length).toBe(3);
+        session.send("second", "turn-2");
+        session.cancelTurn("turn-1");
+
+        agent.say({ id: agent.written[2].id as number, result: { stopReason: "cancelled" } });
+        // An agent that flushes the cancelled turn's output a moment after it answered the prompt.
+        await sleep(30);
+        agent.say(update("agent_message_chunk", { content: { text: "late from the first", type: "text" } }));
+        await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
+
+        const [, second] = session.snapshot().turns;
+
+        expect(second?.text ?? "").not.toContain("late from the first");
     });
 
     it("is not undone by an update that arrives after the response", async () => {
@@ -260,7 +318,10 @@ describe("a request the user declined", () => {
 
         session.send("go");
         await expect.poll(() => agent.written.length).toBe(3);
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { kind: "execute", sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { kind: "execute", sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } },
+        });
         agent.say(ask(9, "c1"));
         await expect.poll(() => agent.written.length).toBe(4);
 
@@ -268,20 +329,28 @@ describe("a request the user declined", () => {
         expect(session.snapshot().turns[0].tools[0].status).toBe("declined");
 
         // The agent reports the call in progress anyway: it stays declined.
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call_update", status: "in_progress", toolCallId: "c1" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call_update", status: "in_progress", toolCallId: "c1" } },
+        });
         await expect.poll(() => session.snapshot().turns[0].tools[0].status).toBe("declined");
     });
 
     it("leaves a call the user allowed to the agent's own reports", async () => {
         const allow: PermissionGate = {
-            ask: async () => { return { optionId: "allow", outcome: "selected" }; },
+            ask: async () => {
+                return { optionId: "allow", outcome: "selected" };
+            },
             cancelSession: () => {},
         };
         const { agent, session } = await setup(allow);
 
         session.send("go");
         await expect.poll(() => agent.written.length).toBe(3);
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { sessionUpdate: "tool_call", status: "pending", title: "Run it", toolCallId: "c1" } },
+        });
         agent.say(ask(9, "c1"));
         await expect.poll(() => agent.written.length).toBe(4);
 
