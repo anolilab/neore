@@ -75,6 +75,10 @@ describe("fetchContextWithPrompt after a portable switch", () => {
                 return {};
             }
 
+            if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
+                return null;
+            }
+
             return { page: rows.toReversed() };
         });
         const { messages } = await fetchContextWithPrompt(
@@ -144,6 +148,10 @@ describe("fetchContextWithPrompt after a switch back whose earlier divider has l
 
             if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
                 return {};
+            }
+
+            if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
+                return null;
             }
 
             if (ref === internal.agent.agent_switch.getHandoffAbove) {
