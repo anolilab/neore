@@ -155,7 +155,12 @@ const SharedThread: FC<{ thread: PublicThread }> = ({ thread }) => {
                             {speakerName && <SpeakerChip name={speakerName} />}
                             <PlaceholderChips attachments={attachments} tools={tools} />
                             {message.parts.length > 0 && (
-                                <div className="message-text w-full">
+                                <div
+                                    className={cn(
+                                        "message-text w-full",
+                                        message.role === "assistant" && "text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)",
+                                    )}
+                                >
                                     <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
                                         <MessageItem message={message} />
                                     </FetchableOriginsProvider>

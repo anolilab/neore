@@ -13,6 +13,7 @@ const VECTORS = [
     { domain: "manifest", payload: '{"v":1,"kind":"manifest"}', signature: "594692da0c9e03e5b885fcecd59e21c8f9cc61c2bf6ca11f75da1ace7da8687f" },
     { domain: "progress", payload: '{"v":1,"kind":"progress"}', signature: "11754e18ca1e841537e220af075d8908a42cb8bca86d8f0f133068e3a5d479c0" },
     { domain: "turn", payload: '{"v":1,"kind":"turn"}', signature: "8b75ddba17829fcc48f06be01cd218becd5ebe06877e6b92800587cba4a946b4" },
+    { domain: "upload", payload: '{"v":1,"kind":"upload"}', signature: "2eb42cf81aa660042f1289aa45be5f1625595dbe5575ddde914114cde70a0d1d" },
 ] as const;
 
 describe("device signing", () => {
@@ -35,6 +36,14 @@ describe("device signing", () => {
         }
 
         await expect(verifyDevicePayload(SECRET, "turn", VECTORS[0].payload, VECTORS[0].signature)).resolves.toBe(false);
+    });
+
+    it("refuses an upload signature presented as a turn signature, and the reverse", async () => {
+        const upload = VECTORS.find(({ domain }) => domain === "upload")!;
+        const turn = VECTORS.find(({ domain }) => domain === "turn")!;
+
+        await expect(verifyDevicePayload(SECRET, "turn", upload.payload, upload.signature)).resolves.toBe(false);
+        await expect(verifyDevicePayload(SECRET, "upload", turn.payload, turn.signature)).resolves.toBe(false);
     });
 
     it("refuses an altered payload, another secret and a malformed signature", async () => {

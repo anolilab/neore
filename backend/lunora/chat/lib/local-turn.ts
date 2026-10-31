@@ -9,6 +9,7 @@
  */
 import { parseCustomModelId } from "@neore/ai/models";
 
+import type { MutationCtx as MutationContext, QueryCtx as QueryContext } from "../../_generated/server";
 import { isLocalBrowserProvider, type StoredCustomProvider } from "./custom-providers";
 
 /** The `provider` stamped on every assistant row a local turn saves. */
@@ -66,6 +67,27 @@ export const resolveLocalModel = (
     }
 
     return parsed;
+};
+
+/** Whether `model` names a `local-browser` endpoint of `providers` — decided by the endpoint's TYPE, never by a model name. */
+export const isLocalBrowserModel = (model: string | undefined, providers: Readonly<Record<string, StoredCustomProvider>>): boolean => {
+    const parsed = parseCustomModelId(model);
+
+    return parsed !== null && isLocalBrowserProvider(providers[parsed.providerId]?.type);
+};
+
+/** A user's custom endpoints — `customAIProviders` is `v.any()` at rest. */
+export const loadCustomProviders = async (
+    ctx: { db: MutationContext["db"] | QueryContext["db"] },
+    userId: string,
+): Promise<Record<string, StoredCustomProvider>> => {
+    const prefs = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+    const raw = prefs?.customAIProviders;
+
+    return raw && typeof raw === "object" ? (raw as Record<string, StoredCustomProvider>) : {};
 };
 
 export interface LocalTurnInput {

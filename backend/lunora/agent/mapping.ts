@@ -12,6 +12,7 @@
  * checked where it actually applies, and says what happened when it fails.
  */
 import { toStorageRef } from "../lib/storage-ref";
+import { agentSwitchOf } from "./agent-switch-logic";
 import { storageRefsForUrls } from "../lib/storage-sign";
 import { convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
@@ -138,6 +139,8 @@ export const toModelMessage = (message: SerializedMessage | ModelMessage): Model
 
 export const docsToModelMessages = (messages: MessageDoc[]): ModelMessage[] =>
     messages
+        // A switch divider is for the transcript; no model is shown it.
+        .filter((m) => agentSwitchOf(m) === undefined)
         .map((m) => m.message)
         .filter((m) => !!m)
         .filter((m) => m.content.length > 0)

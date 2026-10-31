@@ -294,14 +294,83 @@ Where S5 departs from the text above:
   exit -1; check exit -1`), so ControlMaster does not work there and the fixed `false` stands. The step fails only when
   it cannot reach a verdict (no sshd, no login), so a broken setup still gets fixed.
 
-**S6 — Files on the host.** File tree and reads over the device file actions.
+**S6 — Files on the host (built).** File tree and reads over the device file actions.
 Folder download as one tar stream.
 - Acceptance: a 10,000-file folder lists and downloads within a budget set from
   a first measurement and then pinned in the test.
 
-**S7 — ACP on the host.** `HostTransport = ssh` for ACP sessions. Needs ACP S3.
+Where S6 departs from the text above:
+- The tree, reads and the download are for the person at the LOCAL window, not for the agent or a page: three
+  channels of the local window (`hostFilesList`, `hostFileRead`, `hostDownload`), no signed call and no prompt, because
+  the person is the one asking and "Always allow" does not exist for a server. Nothing about them reaches a model, so
+  they add nothing to `taintedBy`; what an agent's `fs_list`/`fs_read` on a server returns is a `device_*` result and
+  is already `device`-tainted. What a server lists or holds is shown as text and labelled with the server's name.
+- `fs_list` keeps its 1000-entry cut (the agent's); the tree uses a new host op `list` that pages a folder by name
+  (`after` cursor, 2,000 per page). A page reads the folder's names (one pass, at most 1,000,000) but keeps and looks at only the page, so it costs a pass over the folder and memory for the page. Reads
+  go through the existing `fs_read` action (1 MiB, text).
+- The download is the host op `tar` (protocol 3, which a protocol-2 host does not speak: install the host software
+  again). The host writes ustar by hand over the descriptor walk of `fs.rs` (a tar library opens by name); long paths
+  use a prefix or a PAX `path` record. Symlinks (inside the folder or out), hard-linked files (another name may lie outside the folder), FIFOs, devices and
+  sockets are left out and counted as `skipped`; modes lose setuid/setgid/sticky, owners are 0. Limits: 200,000 entries, 4 GiB, 64 levels.
+  The archive streams as raw chunk frames (256 KiB) followed by the normal response with what it holds; a `cancel` op
+  stops it, and so does a connection that ends. The reader of the connection never waits for the disk (it carries every
+  other request's answer): chunks queue by bytes and a writer 64 MiB behind ends the download. The desktop writes a
+  `<file>.<pid>-<n>.part` of its own (created new) and renames it when the answer says the archive is complete, and never
+  unpacks it. Each list, read and download is an audit line (`files_list`, `files_read`, `files_download`, decision `window`).
+- A Windows host does not archive (no `openat`; the handle walk of `fs.rs` has no directory recursion yet).
+- Measured (debug build, local sshd, Apple silicon macOS 26, 10,000 files of 440 bytes in one folder, six runs): listing
+  the 10,001 entries in six pages took 0.46–0.78 s (0.28–0.42 s over three runs once a page kept only its own names); the
+  10.2 MB tar took 0.69–1.29 s. Pinned in `tests/ssh_host.rs`:
+  5 s and 8 s. These are from a laptop: the first green CI run's Ubuntu and macOS numbers (logged by the test) are to
+  be added here, and the budgets re-pinned if they leave less than 3× headroom. PENDING.
+- Not built: a progress bar or cancel button for a download (a disconnect or an idle minute ends one), and listing a
+  whole tree in one request.
+
+**S7 — ACP on the host (built).** `HostTransport = ssh` for ACP sessions. Needs ACP S3.
 - Acceptance: an ACP turn on the SSH host streams into the thread through the
   desktop's ingest; quitting the desktop kills the remote agent tree.
+
+Where S7 departs from the text above:
+- **The desktop speaks ACP, the host owns the process.** The session stack (JSON-RPC, permissions, turns, early sends,
+  the receipt log, the ingest poster) is the one the computer's own agents use. An agent on a server is an
+  `AgentProcess` (`apps/desktop/src/acp/remote-process.ts`) whose stdin and stdout are the `agent` request of
+  `neore-host`: its stdout is chunk frames of that request (tag 1), its stderr tag 2 (`frame.rs`), the desktop's chunk
+  frames for the same id are its stdin (an empty one closes it), and the request answers with how the agent ended. The host
+  announces it with `hello.agents`, not a new protocol number: a host installed earlier still connects and the window says
+  to install the host software again. Agents have slots of their own (8) and do not use up the 8 requests of file reads
+  and commands.
+- **The agent dies with the connection.** The host kills the process group (SIGTERM, then SIGKILL after 2 s) on a
+  `cancel` of the request, when the desktop's pipe ends (the desktop quit, or ssh died) and on its own SIGTERM; the group
+  is killed again when the agent exits, so the shells and tools it left die with it. Tested against the real binary and
+  against a real sshd (`tests/ssh_host.rs`).
+- **Each server has agents and approvals of its own** (`Host.acp_agents`, `Host.acp_consents`), edited only in the local
+  window (`hostAcpUpdate`, with a native confirmation that names the server and, for an agent, the exact command line). The
+  command is a path ON the server. A folder is approved only inside a folder shared for that server and is resolved on the
+  server again when the agent starts. The computer's own approvals mean nothing for a server and the other way round.
+  The server's manifest carries its own `acpOffers`, so the web and the phone offer its pairs under the server.
+- **Signed as the server.** The desktop's core picks the secret by the device a payload names: `acp_prepare` and
+  `acp_sign` verify and sign a command for a server with that server's secret (the desktop's secret does not sign for a
+  server and the server's does not sign for the desktop), and `sign_turn` signs a turn post only for the device it names.
+  The ingest needs no change: the server is a device of its own, its `shardRoutes` row exists, and the backend test pins
+  that a post signed with the desktop's secret naming the server is a 401. Each server has its own poster, running-turns
+  file (`acp-host-turns-<deviceId>.json`) and 401 streak. The files are read before the held commands are replayed, as the
+  computer's own is, so a turn a restart cut off still ends as `interrupted`.
+- **The environment is built on the server**, from the host's own (`agent_env.rs`, shared with the desktop's list), plus
+  `SSH_AUTH_SOCK` only when forwarding put one there, then the variables the person set (this computer's global ones, then
+  the agent's), validated again on the host. The launch starts from `PATH=/usr/bin:/bin`, so an agent installed elsewhere
+  needs an absolute command or its own `PATH` variable.
+- **Approvals follow the program.** A variable for every agent that changes which program runs (`PATH`, `NODE_*`, …) takes the
+  approvals of the servers' agents with it, as it does the computer's own, and ends their running sessions; so does
+  registering a different command for an agent of a server.
+- **The prompts name the server.** The agent's label is `<agent> on <server>`, in the permission prompt, the thread and
+  the audit log; there is still no "Always allow".
+- **The computer's disk is never read for a server's folder.** A turn's changes (S9) and the images a reply names (S8) are
+  read from the folder with this computer's filesystem, so they are not collected for a server's session
+  (`folderIsRemote`, and no `media` on its poster). Reading them over the host's file actions is not built.
+- **Not built:** a version probe, import of saved sessions and the registry install for a server's agents; the sessions of a
+  server in the local window's session list (they are driven from the web or the phone); coding agents on a Windows
+  desktop (`acpSupported`) or a Windows server. After a restart nothing reconnects by itself, so a start or send held
+  across it ends with an error, as the other held commands do.
 
 ## 10. Risks
 

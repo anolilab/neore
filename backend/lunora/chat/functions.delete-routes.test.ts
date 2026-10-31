@@ -17,6 +17,7 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
+    registerModule(registry, "acp_functions", await import("../acp/functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
 });

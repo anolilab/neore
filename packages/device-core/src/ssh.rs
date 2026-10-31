@@ -18,9 +18,9 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -29,9 +29,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::frame::{read_frame, write_frame};
+use crate::frame::{chunk_of, read_frame, stream_chunk_of, CHUNK_TAG, STDERR_TAG};
 use crate::host::PROTOCOL_VERSION;
 use crate::launch::Reaped;
+use crate::outbox::Outbox;
 
 /// The `neore-host` version the desktop expects to find in `~/.neore/host/<version>/` (S4 uploads it).
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -495,7 +496,7 @@ fn base64_decode(text: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-fn base64_encode_unpadded(bytes: &[u8]) -> String {
+pub(crate) fn base64_encode_unpadded(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
 
     for chunk in bytes.chunks(3) {
@@ -929,6 +930,9 @@ fn write_script(paths: &SshPaths) -> io::Result<()> {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hello {
+    /// Whether the host runs coding agents (S7). A host installed before that does not say, and reads as `false`.
+    #[serde(default)]
+    pub agents: bool,
     pub platform: String,
     pub protocol: u32,
     pub sandbox: RemoteSandbox,
@@ -954,7 +958,91 @@ pub struct RemoteOutcome {
 }
 
 type Reply = Result<Value, String>;
-type Pending = Arc<Mutex<HashMap<u64, Sender<Reply>>>>;
+type Pending = Arc<Mutex<HashMap<u64, Waiter>>>;
+
+/// A request in flight: where its response goes, and where the chunks of a streaming one go.
+struct Waiter {
+    /// Set for a coding agent: its output and its end go here instead of to `reply`.
+    agent: Option<Arc<dyn AgentSink>>,
+    chunks: Option<Chunks>,
+    reply: Sender<Reply>,
+}
+
+/// A chunk frame for request `id` going to the host: an agent's stdin.
+fn stream_frame(id: u64, bytes: &[u8]) -> Vec<u8> {
+    let mut frame = Vec::with_capacity(crate::frame::CHUNK_HEADER_BYTES + bytes.len());
+
+    frame.push(CHUNK_TAG);
+    frame.extend_from_slice(&id.to_be_bytes());
+    frame.extend_from_slice(bytes);
+    frame
+}
+
+/// The coding agents running over the connections, by the handle the main process chose: the connection and the
+/// request that started each.
+pub type RunningAgents = Arc<Mutex<HashMap<u64, (Arc<dyn HostLink>, u64)>>>;
+
+/// How a coding agent on a server ended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentExit {
+    pub code: Option<i32>,
+    pub signal: Option<i32>,
+}
+
+/// Where a coding agent's output goes. Called on the connection's reader thread, so it must not block: it hands the
+/// bytes on and returns.
+pub trait AgentSink: Send + Sync {
+    /// The agent's stdout (`stderr` false) or stderr, in order.
+    fn output(&self, stderr: bool, bytes: &[u8]);
+    /// The agent is gone, after every byte of its output; `Err` is the connection or the host failing instead.
+    fn ended(&self, result: Result<AgentExit, String>);
+}
+
+/// Tells the agents still running over a connection that it is gone, and wakes the other requests waiting.
+fn fail_pending(pending: &Pending) {
+    let waiters: Vec<Waiter> = pending
+        .lock()
+        .unwrap()
+        .drain()
+        .map(|(_, waiter)| waiter)
+        .collect();
+
+    for waiter in waiters {
+        if let Some(agent) = waiter.agent {
+            agent.ended(Err("the connection to the server was lost".into()));
+        }
+    }
+}
+
+fn exit_of(result: &Value) -> AgentExit {
+    AgentExit {
+        code: result["code"]
+            .as_i64()
+            .and_then(|code| i32::try_from(code).ok()),
+        signal: result["signal"]
+            .as_i64()
+            .and_then(|code| i32::try_from(code).ok()),
+    }
+}
+
+/// The chunks of a download between the reader of the connection and whoever writes them out. The reader never
+/// waits for the writer, because it also carries every other request's answer: it hands a chunk over and goes on.
+/// A writer that falls more than [`MAX_BACKLOG`] bytes behind has the download ended instead.
+#[derive(Clone)]
+struct Chunks {
+    /// Bytes handed over and not yet written.
+    backlog: Arc<AtomicUsize>,
+    /// Set by the reader when it dropped a chunk for want of room.
+    overflowed: Arc<AtomicBool>,
+    sender: Sender<Vec<u8>>,
+}
+
+/// Bytes of a download that may wait for the disk at once.
+const MAX_BACKLOG: usize = 64 * 1024 * 1024;
+/// Bytes of an agent's input waiting for ssh's stdin before a write is refused; requests and cancels have more room.
+const OUTBOX_BYTES: usize = 8 * 1024 * 1024;
+/// How long a download may go without a byte before it is given up.
+pub const DOWNLOAD_IDLE: Duration = Duration::from_secs(60);
 
 /// What the engine needs of a connection to a server: the seam that lets its tests stand in for ssh.
 pub trait HostLink: Send + Sync {
@@ -982,6 +1070,32 @@ pub trait HostLink: Send + Sync {
     fn target(&self) -> Option<&Target>;
     /// Runs one approved action (`host::RunParams` as JSON) and waits at most `wait` for its answer.
     fn run(&self, params: &Value, wait: Duration) -> Result<RemoteOutcome, String>;
+    /// One page of a folder (`host::FilesParams` as JSON), as the server lists it.
+    fn list_files(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
+        Err("this connection cannot list files".into())
+    }
+    /// Starts a coding agent on the server (`agent_host::AgentParams` as JSON). Its output and its end go to `sink`;
+    /// the returned handle names it for [`Self::agent_write`] and [`Self::agent_stop`].
+    fn agent_start(&self, _params: &Value, _sink: Arc<dyn AgentSink>) -> Result<u64, String> {
+        Err("this connection cannot run coding agents".into())
+    }
+    /// Sends bytes to the agent's stdin; no bytes close it.
+    fn agent_write(&self, _handle: u64, _bytes: &[u8]) -> Result<(), String> {
+        Err("this connection cannot run coding agents".into())
+    }
+    /// Asks the host to stop the agent's whole process group (a polite signal, then a kill). Not waited for: the sink
+    /// is told when it has ended.
+    fn agent_stop(&self, _handle: u64) {}
+    /// Writes the tar of a folder (`host::FilesParams` as JSON) to `out` as it arrives, giving up after `idle`
+    /// without a byte. What the server held is the answer; `out` is not an archive if this fails.
+    fn download(
+        &self,
+        _params: &Value,
+        _out: &mut dyn Write,
+        _idle: Duration,
+    ) -> Result<Value, String> {
+        Err("this connection cannot download files".into())
+    }
 }
 
 /// A live `neore-host --stdio` behind an `ssh` child.
@@ -994,8 +1108,10 @@ pub struct HostConnection {
     /// The ssh child's exit code, read once when the session is closed: `i64::MIN` while unknown.
     exit_code: AtomicI64,
     next_id: AtomicU64,
+    /// Everything this side writes to ssh's stdin goes through here, in order. Nothing waits on the pipe: a server that
+    /// stops reading must not freeze the Electron main process (which calls in synchronously) or its quit.
+    outbox: Outbox,
     pending: Pending,
-    stdin: Mutex<ChildStdin>,
     stderr: Arc<Mutex<String>>,
     target: Target,
 }
@@ -1054,6 +1170,7 @@ impl HostConnection {
             .spawn()
             .map_err(|error| SshError::Other(format!("ssh could not run: {error}")))?;
         let stdin = child.stdin.take().expect("piped stdin");
+        let (outbox, _writer) = Outbox::new(stdin, OUTBOX_BYTES);
         let mut stdout = child.stdout.take().expect("piped stdout");
         let mut stderr_pipe = child.stderr.take().expect("piped stderr");
         let stderr = Arc::new(Mutex::new(String::new()));
@@ -1113,8 +1230,8 @@ impl HostConnection {
             }
 
             alive.store(false, Ordering::SeqCst);
-            // Dropping the senders wakes every request still waiting.
-            pending.lock().unwrap().clear();
+            // Dropping the senders wakes every request still waiting; a coding agent is told it is gone.
+            fail_pending(&pending);
         });
 
         let started = Instant::now();
@@ -1186,9 +1303,9 @@ impl HostConnection {
             launch_id,
             exit_code: AtomicI64::new(i64::MIN),
             next_id: AtomicU64::new(1),
+            outbox,
             pending,
             stderr,
-            stdin: Mutex::new(stdin),
             target: target.clone(),
         })
     }
@@ -1202,8 +1319,23 @@ impl HostConnection {
         &self.target
     }
 
-    /// Sends one request and waits at most `wait` for its answer.
-    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+    /// Sends one request. Its response arrives on the receiver; with `chunks` the bytes it streams arrive there first.
+    fn send(
+        &self,
+        op: &str,
+        params: &Value,
+        chunks: Option<Chunks>,
+    ) -> Result<(u64, Receiver<Reply>), String> {
+        self.send_with(op, params, chunks, None)
+    }
+
+    fn send_with(
+        &self,
+        op: &str,
+        params: &Value,
+        chunks: Option<Chunks>,
+        agent: Option<Arc<dyn AgentSink>>,
+    ) -> Result<(u64, Receiver<Reply>), String> {
         if !self.is_alive() {
             return Err("the connection to the server was lost".into());
         }
@@ -1212,14 +1344,18 @@ impl HostConnection {
         let (sender, receiver) = channel();
         let frame = json!({ "kind": "request", "id": id, "op": op, "params": params });
 
-        self.pending.lock().unwrap().insert(id, sender);
+        self.pending.lock().unwrap().insert(
+            id,
+            Waiter {
+                agent,
+                chunks,
+                reply: sender,
+            },
+        );
 
         let sent = serde_json::to_vec(&frame)
             .map_err(|error| error.to_string())
-            .and_then(|bytes| {
-                write_frame(&mut *self.stdin.lock().unwrap(), &bytes)
-                    .map_err(|error| error.to_string())
-            });
+            .and_then(|bytes| self.queue(&bytes, true));
 
         if let Err(error) = sent {
             self.pending.lock().unwrap().remove(&id);
@@ -1227,6 +1363,38 @@ impl HostConnection {
             return Err(format!("the request could not be sent: {error}"));
         }
 
+        Ok((id, receiver))
+    }
+
+    /// Queues a frame for the server without waiting. A pipe that has not drained for [`OUTBOX_BYTES`] more than the
+    /// data allowance is a connection that stalled: it is closed (the host stops every agent when its pipe ends), so a
+    /// stop never waits on it and nothing is left half-sent. `urgent` frames (requests, cancels) have room beyond
+    /// what an agent's input may use.
+    fn queue(&self, frame: &[u8], urgent: bool) -> Result<(), String> {
+        let queued = if urgent {
+            self.outbox.offer_urgent(frame)
+        } else {
+            self.outbox.offer(frame)
+        };
+
+        queued.map_err(|error| {
+            if urgent && error.kind() == io::ErrorKind::WouldBlock {
+                self.close();
+
+                return "the connection to the server stopped taking data and was closed"
+                    .to_owned();
+            }
+
+            if error.kind() == io::ErrorKind::WouldBlock {
+                return "the server is not keeping up with what is sent to it".to_owned();
+            }
+
+            error.to_string()
+        })
+    }
+
+    /// Waits at most `wait` for the response to request `id`.
+    fn await_reply(&self, id: u64, receiver: &Receiver<Reply>, wait: Duration) -> Reply {
         match receiver.recv_timeout(wait) {
             Ok(reply) => reply,
             Err(_) => {
@@ -1239,6 +1407,18 @@ impl HostConnection {
                 })
             }
         }
+    }
+
+    /// Sends one request and waits at most `wait` for its answer.
+    fn request(&self, op: &str, params: &Value, wait: Duration) -> Result<Value, String> {
+        let (id, receiver) = self.send(op, params, None)?;
+
+        self.await_reply(id, &receiver, wait)
+    }
+
+    /// Asks the server to stop request `target`. Its answer is not waited for: nobody is listening for it.
+    fn cancel(&self, target: u64) {
+        let _ = self.send("cancel", &json!({ "target": target }), None);
     }
 }
 
@@ -1256,6 +1436,99 @@ impl HostLink for HostConnection {
 
         serde_json::from_value::<RemoteOutcome>(result)
             .map_err(|error| format!("the host's answer was not understood: {error}"))
+    }
+
+    fn list_files(&self, params: &Value, wait: Duration) -> Result<Value, String> {
+        self.request("list", params, wait)
+    }
+
+    fn download(
+        &self,
+        params: &Value,
+        out: &mut dyn Write,
+        idle: Duration,
+    ) -> Result<Value, String> {
+        let (sender, incoming) = channel();
+        let chunks = Chunks {
+            backlog: Arc::default(),
+            overflowed: Arc::default(),
+            sender,
+        };
+        let (backlog, overflowed) = (Arc::clone(&chunks.backlog), Arc::clone(&chunks.overflowed));
+        let (id, reply) = self.send("tar", params, Some(chunks))?;
+        let mut failure = None;
+
+        loop {
+            if overflowed.load(Ordering::SeqCst) {
+                self.pending.lock().unwrap().remove(&id);
+                self.cancel(id);
+
+                return Err("the disk cannot keep up with the server".into());
+            }
+
+            match incoming.recv_timeout(idle) {
+                Ok(bytes) if failure.is_none() => {
+                    backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+
+                    if let Err(error) = out.write_all(&bytes) {
+                        failure = Some(format!("the file could not be written: {error}"));
+
+                        self.cancel(id);
+                    }
+                }
+                // The server is stopping; what is still on the way is dropped.
+                Ok(bytes) => {
+                    backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+                }
+                // The response arrived (or the connection ended): every chunk before it was queued.
+                Err(RecvTimeoutError::Disconnected) => break,
+                Err(RecvTimeoutError::Timeout) => {
+                    self.pending.lock().unwrap().remove(&id);
+                    self.cancel(id);
+
+                    return Err(failure.unwrap_or_else(|| "the server stopped sending".to_owned()));
+                }
+            }
+        }
+
+        let answer = self.await_reply(id, &reply, Duration::from_secs(30));
+
+        match failure {
+            Some(failure) => Err(failure),
+            None => answer,
+        }
+    }
+
+    fn agent_start(&self, params: &Value, sink: Arc<dyn AgentSink>) -> Result<u64, String> {
+        if !self.hello.agents {
+            return Err("the host software on this server does not run coding agents yet: install it again from the server's settings".into());
+        }
+
+        let (id, _) = self.send_with("agent", params, None, Some(sink))?;
+
+        Ok(id)
+    }
+
+    fn agent_write(&self, handle: u64, bytes: &[u8]) -> Result<(), String> {
+        if !self.is_alive() {
+            return Err("the connection to the server was lost".into());
+        }
+
+        // A frame is capped well under the stream: a long prompt goes in several. The end of the input is tiny and
+        // urgent like a cancel; the bytes are what a stalled server must refuse.
+        if bytes.is_empty() {
+            return self.queue(&stream_frame(handle, &[]), true);
+        }
+
+        for piece in bytes.chunks(256 * 1024) {
+            self.queue(&stream_frame(handle, piece), false)?;
+        }
+
+        Ok(())
+    }
+
+    fn agent_stop(&self, handle: u64) {
+        self.cancel(handle);
     }
 
     fn launch_id(&self) -> Option<&str> {
@@ -1277,6 +1550,7 @@ impl HostLink for HostConnection {
 
     fn close(&self) {
         self.alive.store(false, Ordering::SeqCst);
+        self.outbox.close();
 
         let mut child = self.child.lock().unwrap();
 
@@ -1332,8 +1606,47 @@ impl Drop for HostConnection {
     }
 }
 
-/// Hands a response frame to the request waiting for it; events and strays are dropped.
+/// Hands a response frame to the request waiting for it, and a chunk to the download it belongs to; events and
+/// strays are dropped.
 fn route(pending: &Pending, frame: &[u8]) {
+    // A coding agent's output, in order, straight to its sink.
+    if let Some((tag, id, bytes)) = stream_chunk_of(frame) {
+        let agent = pending
+            .lock()
+            .unwrap()
+            .get(&id)
+            .and_then(|waiter| waiter.agent.clone());
+
+        if let Some(agent) = agent {
+            agent.output(tag == STDERR_TAG, bytes);
+
+            return;
+        }
+
+        if tag != CHUNK_TAG {
+            return;
+        }
+    }
+
+    if let Some((id, bytes)) = chunk_of(frame) {
+        let chunks = pending
+            .lock()
+            .unwrap()
+            .get(&id)
+            .and_then(|waiter| waiter.chunks.clone());
+
+        if let Some(chunks) = chunks {
+            if chunks.backlog.fetch_add(bytes.len(), Ordering::SeqCst) + bytes.len() > MAX_BACKLOG {
+                chunks.backlog.fetch_sub(bytes.len(), Ordering::SeqCst);
+                chunks.overflowed.store(true, Ordering::SeqCst);
+            } else {
+                let _ = chunks.sender.send(bytes.to_vec());
+            }
+        }
+
+        return;
+    }
+
     let Ok(value) = serde_json::from_slice::<Value>(frame) else {
         return;
     };
@@ -1342,7 +1655,7 @@ fn route(pending: &Pending, frame: &[u8]) {
         return;
     }
 
-    let Some(sender) = value["id"]
+    let Some(waiter) = value["id"]
         .as_u64()
         .and_then(|id| pending.lock().unwrap().remove(&id))
     else {
@@ -1357,7 +1670,13 @@ fn route(pending: &Pending, frame: &[u8]) {
             .to_owned())
     };
 
-    let _ = sender.send(reply);
+    if let Some(agent) = waiter.agent {
+        agent.ended(reply.map(|result| exit_of(&result)));
+
+        return;
+    }
+
+    let _ = waiter.reply.send(reply);
 }
 
 /// How `child` ended, if it does within a moment: a shell reports a command it cannot find as 127, and the host
@@ -1477,7 +1796,7 @@ pub fn exec(
 /// What a failed remote command means to the reader. Only ssh itself exits 255, and only then is a "Permission
 /// denied" a refused login; from the command it is a file the account may not write.
 fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
-    if code == Some(255) && said.contains("Permission denied") {
+    if code == Some(255) && refused_login(said) {
         explain(target, said, &Mutex::new(said.to_owned()))
     } else if said.is_empty() {
         match code {
@@ -1492,6 +1811,17 @@ fn exec_failure(target: &Target, code: Option<i32>, said: &str) -> String {
     }
 }
 
+/// Whether ssh's own message says the server turned the login down, however it words it.
+fn refused_login(said: &str) -> bool {
+    [
+        "Permission denied",
+        "Too many authentication failures",
+        "No supported authentication methods",
+    ]
+    .iter()
+    .any(|phrase| said.contains(phrase))
+}
+
 /// What the user needs to read when a connection failed, from what ssh said.
 fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
     // The reader sees the stream end a moment before the stderr thread has everything.
@@ -1504,14 +1834,7 @@ fn explain(target: &Target, reason: &str, stderr: &Mutex<String>) -> String {
         said
     };
 
-    if [
-        "Permission denied",
-        "Too many authentication failures",
-        "No supported authentication methods available",
-    ]
-    .iter()
-    .any(|phrase| said.contains(phrase))
-    {
+    if refused_login(&said) {
         return format!(
             "{} refused the login ({said}). Passwords and one-time codes are not supported yet: use a key or an SSH agent.",
             target.label()
@@ -1583,6 +1906,19 @@ mod tests {
         );
 
         assert!(login.contains("refused the login"), "{login}");
+    }
+
+    #[test]
+    fn every_wording_of_a_refused_login_is_called_one() {
+        for said in [
+            "Too many authentication failures",
+            "No supported authentication methods available (server sent: publickey)",
+        ] {
+            let message = explain(&target(), said, &Mutex::new(said.to_owned()));
+
+            assert!(message.contains("refused the login"), "{message}");
+            assert!(!SshError::from_connect_failure(message).retryable());
+        }
     }
 
     #[test]
@@ -1923,7 +2259,14 @@ mod tests {
         let pending: Pending = Arc::default();
         let (sender, receiver) = channel();
 
-        pending.lock().unwrap().insert(7, sender);
+        pending.lock().unwrap().insert(
+            7,
+            Waiter {
+                agent: None,
+                chunks: None,
+                reply: sender,
+            },
+        );
         route(&pending, br#"{"kind":"event","name":"x","data":{}}"#);
         route(
             &pending,
@@ -1941,5 +2284,243 @@ mod tests {
             (Some("completed"), Some("hi"))
         );
         assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[derive(Default)]
+    struct Heard {
+        ended: Mutex<Vec<Result<AgentExit, String>>>,
+        heard: Mutex<Vec<(bool, Vec<u8>)>>,
+    }
+
+    impl AgentSink for Heard {
+        fn output(&self, stderr: bool, bytes: &[u8]) {
+            self.heard.lock().unwrap().push((stderr, bytes.to_vec()));
+        }
+
+        fn ended(&self, result: Result<AgentExit, String>) {
+            self.ended.lock().unwrap().push(result);
+        }
+    }
+
+    #[test]
+    fn an_agents_output_and_end_reach_its_sink_in_order_and_a_lost_connection_ends_it() {
+        let pending: Pending = Arc::default();
+        let heard = Arc::new(Heard::default());
+        let (reply, _) = channel();
+
+        pending.lock().unwrap().insert(
+            5,
+            Waiter {
+                agent: Some(Arc::clone(&heard) as Arc<dyn AgentSink>),
+                chunks: None,
+                reply,
+            },
+        );
+
+        let frame = |tag: u8, id: u64, bytes: &[u8]| {
+            let mut frame = vec![tag];
+
+            frame.extend_from_slice(&id.to_be_bytes());
+            frame.extend_from_slice(bytes);
+            frame
+        };
+
+        route(&pending, &frame(CHUNK_TAG, 5, b"out"));
+        route(&pending, &frame(STDERR_TAG, 5, b"err"));
+        // Another request's chunks and an unknown id are dropped.
+        route(&pending, &frame(CHUNK_TAG, 6, b"stray"));
+        route(
+            &pending,
+            br#"{"kind":"response","id":5,"ok":true,"result":{"code":3,"signal":null}}"#,
+        );
+
+        assert_eq!(
+            heard.heard.lock().unwrap().as_slice(),
+            [(false, b"out".to_vec()), (true, b"err".to_vec())]
+        );
+        assert_eq!(
+            heard.ended.lock().unwrap().as_slice(),
+            [Ok(AgentExit {
+                code: Some(3),
+                signal: None
+            })]
+        );
+        assert!(pending.lock().unwrap().is_empty());
+
+        // An agent still running when the connection dies is told, once.
+        let lost = Arc::new(Heard::default());
+        let (reply, _) = channel();
+
+        pending.lock().unwrap().insert(
+            9,
+            Waiter {
+                agent: Some(Arc::clone(&lost) as Arc<dyn AgentSink>),
+                chunks: None,
+                reply,
+            },
+        );
+        fail_pending(&pending);
+
+        assert_eq!(
+            lost.ended.lock().unwrap().as_slice(),
+            [Err("the connection to the server was lost".to_owned())]
+        );
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    fn chunk_frame(id: u64, bytes: usize) -> Vec<u8> {
+        let mut frame = vec![crate::frame::CHUNK_TAG];
+
+        frame.extend_from_slice(&id.to_be_bytes());
+        frame.resize(frame.len() + bytes, 0);
+
+        frame
+    }
+
+    /// The reader of the connection carries every other request's answer: a download nobody is draining must
+    /// neither stop it nor make it wait.
+    #[test]
+    fn chunks_nobody_drains_never_hold_up_the_reader_and_a_late_writer_is_told() {
+        let pending: Pending = Arc::default();
+        let (sender, incoming) = channel();
+        let (reply, _) = channel();
+        let chunks = Chunks {
+            backlog: Arc::default(),
+            overflowed: Arc::default(),
+            sender,
+        };
+
+        pending.lock().unwrap().insert(
+            3,
+            Waiter {
+                agent: None,
+                chunks: Some(chunks.clone()),
+                reply,
+            },
+        );
+
+        for _ in 0..40 {
+            route(&pending, &chunk_frame(3, 256 * 1024));
+        }
+
+        assert!(!chunks.overflowed.load(Ordering::SeqCst));
+        assert_eq!(incoming.try_iter().count(), 40);
+
+        // The ten MiB above are still counted as waiting (nothing wrote them), so the cap is reached.
+        for _ in 0..(MAX_BACKLOG / (1024 * 1024) + 1) {
+            route(&pending, &chunk_frame(3, 1024 * 1024));
+        }
+
+        assert!(chunks.overflowed.load(Ordering::SeqCst));
+        assert!(chunks.backlog.load(Ordering::SeqCst) <= MAX_BACKLOG);
+    }
+
+    /// A stdin the far side never reads.
+    struct Stalled(std::sync::mpsc::Receiver<()>);
+
+    impl Write for Stalled {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let _ = self.0.recv();
+
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[cfg(unix)]
+    fn over_a_stalled_pipe() -> (HostConnection, std::sync::mpsc::Sender<()>) {
+        let (release, stalled) = channel();
+        let (outbox, _writer) = Outbox::new(Stalled(stalled), OUTBOX_BYTES);
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let connection = HostConnection {
+            alive: Arc::new(AtomicBool::new(true)),
+            child: Mutex::new(child),
+            exit_master: Vec::new(),
+            hello: Hello {
+                agents: true,
+                platform: "linux".into(),
+                protocol: PROTOCOL_VERSION,
+                sandbox: RemoteSandbox {
+                    available: true,
+                    detail: String::new(),
+                },
+                version: "test".into(),
+            },
+            launch_id: "test".into(),
+            exit_code: AtomicI64::new(i64::MIN),
+            next_id: AtomicU64::new(1),
+            outbox,
+            pending: Arc::default(),
+            stderr: Arc::default(),
+            target: target(),
+        };
+
+        (connection, release)
+    }
+
+    /// The Electron main process calls in synchronously: a server that stopped reading must not hold the call.
+    #[cfg(unix)]
+    #[test]
+    fn stopping_an_agent_never_waits_on_a_pipe_the_server_stopped_reading() {
+        let (connection, release) = over_a_stalled_pipe();
+        let started = Instant::now();
+
+        // Fill what the input may use; the writer thread is stuck on the first frame.
+        let mut refused = false;
+
+        for _ in 0..64 {
+            if connection.agent_write(9, &vec![0u8; 1024 * 1024]).is_err() {
+                refused = true;
+
+                break;
+            }
+        }
+
+        assert!(refused, "the input is bounded and refuses past it");
+        // A stop still queues behind the full buffer, and returns at once.
+        connection.agent_stop(9);
+        assert!(
+            connection.is_alive(),
+            "room beyond the data allowance remains"
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+
+        drop(release);
+        connection.close();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_connection_whose_pipe_is_stalled_past_even_a_cancel_is_closed() {
+        let (connection, release) = over_a_stalled_pipe();
+        let started = Instant::now();
+
+        for _ in 0..64 {
+            if connection.agent_write(9, &vec![0u8; 1024 * 1024]).is_err() {
+                break;
+            }
+        }
+
+        // Cancels fill the headroom; the one that does not fit ends the connection.
+        for target in 0..1_000_000u64 {
+            if !connection.is_alive() {
+                break;
+            }
+
+            connection.cancel(target);
+        }
+
+        assert!(!connection.is_alive());
+        assert!(started.elapsed() < Duration::from_secs(5));
+        drop(release);
     }
 }

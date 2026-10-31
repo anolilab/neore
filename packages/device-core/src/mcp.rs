@@ -1375,8 +1375,10 @@ sleep 1"#
     fn a_dead_server_is_not_reaped_until_it_is_stopped_so_its_group_stays_ours() {
         let root = temp_root("dead-group");
         let pidfile = root.join("orphan.pid");
+        // The leader exits only after the client's `initialized` notification: a write to an already-closed pipe
+        // fails the handshake, and what is under test is a server that dies afterwards.
         let script = format!(
-            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; sleep 30 & echo $! > '{}'; exit 0"#,
+            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; read l; sleep 30 & echo $! > '{}'; exit 0"#,
             pidfile.display()
         );
 

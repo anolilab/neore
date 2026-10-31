@@ -47,6 +47,8 @@ import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
+import type { EventFormState, EventSource } from "./event-trigger-fields";
+import EventTriggerFields, { EMPTY_EVENT, eventFormFromSource, eventIsIncomplete, eventSourceFromForm, useDescribeEventSource } from "./event-trigger-fields";
 import TriggerTypePicker from "./trigger-type-picker";
 import type { WebhookFormState } from "./webhook-trigger-fields";
 import {
@@ -70,6 +72,8 @@ interface TriggerFormData {
     botId: string;
     cronExpression: string;
     description: string;
+    /** What an event trigger watches. */
+    event: EventFormState;
     inputTemplate: string;
     model: string;
     name: string;
@@ -100,6 +104,8 @@ interface TriggerRow {
     cronExpression: string | null;
     description: string | null;
     enabled: boolean;
+    eventSource: EventSource | null;
+    eventStatus: { checkedAt: number | null; checkFailures: number; firedAt: number | null } | null;
     filters: { op: FilterOp; path: string; value: string | null }[];
     inputTemplate: string | null;
     lastError: string | null;
@@ -134,6 +140,7 @@ const EMPTY_FORM: TriggerFormData = {
     botId: "",
     cronExpression: "0 8 * * *",
     description: "",
+    event: EMPTY_EVENT,
     inputTemplate: "",
     model: "",
     name: "",
@@ -278,11 +285,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Type */}
                 <div className="space-y-1.5">
                     <Label>{t`Trigger Type`}</Label>
-                    <TriggerTypePicker
-                        disabled={isExisting || formData.type === "event"}
-                        onSelect={(type) => onChange(withBotOptions({ ...formData, type }))}
-                        value={formData.type}
-                    />
+                    <TriggerTypePicker disabled={isExisting} onSelect={(type) => onChange(withBotOptions({ ...formData, type }))} value={formData.type} />
                 </div>
 
                 {/* Schedule config */}
@@ -334,17 +337,8 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     </div>
                 )}
 
-                {/* An existing event trigger: nothing dispatches it, so it cannot be saved. */}
-                {formData.type === "event" && (
-                    <div className="bg-muted rounded-lg p-3 text-sm" role="status">
-                        <p className="text-muted-foreground">
-                            <Trans>
-                                Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a
-                                schedule or webhook trigger instead.
-                            </Trans>
-                        </p>
-                    </div>
-                )}
+                {/* Event config */}
+                {formData.type === "event" && <EventTriggerFields event={formData.event} onChange={(event) => onChange({ ...formData, event })} />}
 
                 <Separator />
 
@@ -380,7 +374,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         disabled={
                             isPending ||
                             !formData.name.trim() ||
-                            formData.type === "event" ||
+                            (formData.type === "event" && eventIsIncomplete(formData.event)) ||
                             (formData.type === "webhook" && webhookHasIncompleteFilters(formData.webhook))
                         }
                         onClick={onSubmit}
@@ -453,6 +447,7 @@ const TriggerTypeBadge = ({ type }: { type: string }) => {
 const TriggerSettings: FC = () => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
+    const describeEventSource = useDescribeEventSource();
     const executionStatusLabel = (status: string): string => {
         const label = EXECUTION_STATUS_LABELS[status];
 
@@ -507,6 +502,7 @@ const TriggerSettings: FC = () => {
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
+                eventSource: formData.type === "event" ? eventSourceFromForm(formData.event) : undefined,
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
@@ -544,6 +540,8 @@ const TriggerSettings: FC = () => {
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
+                // The server compares it with the stored one: watching something else starts over with a new baseline.
+                eventSource: editFormData.type === "event" ? eventSourceFromForm(editFormData.event) : undefined,
                 // The whole set replaces the stored one; an empty set clears it.
                 filters: editFormData.type === "webhook" ? webhookUpdateFilters(editFormData.webhook) : undefined,
                 inputTemplate: editFormData.inputTemplate || undefined,
@@ -645,6 +643,7 @@ const TriggerSettings: FC = () => {
             botId: trigger.botId ?? "",
             cronExpression: trigger.cronExpression ?? "0 8 * * *",
             description: trigger.description ?? "",
+            event: eventFormFromSource(trigger.eventSource),
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
@@ -688,7 +687,7 @@ const TriggerSettings: FC = () => {
             <div className="flex items-start justify-between">
                 <div>
                     <Heading className="text-2xl font-bold tracking-tight">{t`Triggers`}</Heading>
-                    <p className="text-muted-foreground">{t`Automate agent execution on schedules or webhooks`}</p>
+                    <p className="text-muted-foreground">{t`Automate agent execution on schedules, webhooks or events`}</p>
                 </div>
                 <Button disabled={showCreateForm} onClick={() => setShowCreateForm(true)} size="sm">
                     <Plus aria-hidden="true" className="mr-1.5 size-4" />
@@ -796,6 +795,17 @@ const TriggerSettings: FC = () => {
                                                             {trigger.timezone && ` (${trigger.timezone})`}
                                                         </span>
                                                     )}
+                                                    {trigger.eventSource && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Zap aria-hidden="true" className="size-3" />
+                                                            {describeEventSource(trigger.eventSource)}
+                                                        </span>
+                                                    )}
+                                                    {trigger.eventStatus?.checkedAt ? (
+                                                        <span
+                                                            suppressHydrationWarning
+                                                        >{t`Checked: ${formatDateTime(trigger.eventStatus.checkedAt, i18n.locale)}`}</span>
+                                                    ) : null}
                                                     <span>
                                                         <Trans>Runs: {runCount}</Trans>
                                                     </span>

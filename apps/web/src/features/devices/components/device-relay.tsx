@@ -203,14 +203,17 @@ const DeviceRelay: FC = () => {
                 viaDeviceId: viaDeviceFor(deviceId, call.deviceId) as Id<"devices"> | undefined,
             };
         };
+        // This window's name for its claims. A retry after a lost answer carries it, so the backend knows the claim
+        // it already holds is this window's own and answers it again; another window has another id.
+        const windowId = crypto.randomUUID();
         const ports: DeviceRelayPorts = {
             claim: async (call) => {
-                const result = await mutations.current.claim(addressed(call));
+                const result = await mutations.current.claim({ ...addressed(call), claimId: windowId });
 
                 return result.claimed;
             },
             complete: async (call, result) => {
-                await mutations.current.complete({ ...addressed(call), ...result });
+                await mutations.current.complete({ ...addressed(call), ...result, claimId: windowId });
             },
             execute: ({ envelope, signature }) => executeOnNativeDevice({ envelope, signature }),
             release: async (call, reason) => {

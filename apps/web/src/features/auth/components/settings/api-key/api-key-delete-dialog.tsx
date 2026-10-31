@@ -3,7 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Card } from "@neore/ui/components/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import cn from "@neore/ui/utils/cn";
 import { useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon, Loader2 } from "lucide-react";

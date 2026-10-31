@@ -21,7 +21,12 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 // The resume itself is the model run; the test is about the lock gate and the stream's end state.
 vi.mock("./lib/agent-run", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("./lib/agent-run")>()), resumeApprovedRun: vi.fn(async () => undefined) };
+    return {
+        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        resumeApprovedRun: vi.fn(async () => {
+            return { lastMessageId: undefined, paused: false, stopped: false };
+        }),
+    };
 });
 
 const OWNER = "owner-1";
@@ -40,6 +45,7 @@ const config = {
 
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 });
@@ -134,6 +140,73 @@ describe("continueAfterToolApproval and the chat lock", () => {
             const rows = await readRows(harness, ids);
 
             expect(rows.streamStatus).toBe("pending");
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("continueAfterToolApproval and the pause it answered", () => {
+    const awaitingOf = async (harness: ReturnType<typeof lunoraTest>, ids: { threadId: string }) =>
+        await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get(ids.threadId as never);
+
+            return { awaitingInput: thread?.awaitingInput, status: thread?.status };
+        });
+
+    it("removes the pause when the user stops the resumed run", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await seedPausedRun(harness, undefined);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { awaitingInput: "approval" }));
+            // A stop ends the stream before the run returns.
+            vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
+                await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { status: "done" }));
+
+                return { lastMessageId: undefined, paused: false, stopped: true };
+            });
+
+            await resume(harness, ids);
+
+            expect(await awaitingOf(harness, ids)).toEqual({ awaitingInput: undefined, status: "active" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves the pause alone while a newer run holds the thread", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await seedPausedRun(harness, undefined);
+
+            // The stream is still live: a newer run owns `awaitingInput` now.
+            await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { awaitingInput: "question" }));
+            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ lastMessageId: undefined, paused: false, stopped: true });
+
+            await resume(harness, ids);
+
+            const { awaitingInput } = await awaitingOf(harness, ids);
+
+            expect(awaitingInput).toBe("question");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps the request a resumed run paused on again", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await seedPausedRun(harness, undefined);
+
+            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ awaitingInput: "question", lastMessageId: undefined, paused: true, stopped: false });
+
+            await resume(harness, ids);
+
+            expect(await awaitingOf(harness, ids)).toEqual({ awaitingInput: "question", status: "active" });
         } finally {
             harness.close();
         }

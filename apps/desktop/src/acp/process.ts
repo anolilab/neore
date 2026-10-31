@@ -13,10 +13,11 @@ import type { SpawnPlan } from "./types";
 
 /** How long a polite stop waits before the group is killed. */
 const TERM_GRACE_MS = 2000;
+
 /** What is kept of an agent's stderr, for an error message. */
-const STDERR_KEEP_BYTES = 4096;
+export const STDERR_KEEP_BYTES = 4096;
 /** Secrets shorter than this are not worth scrubbing: they would garble ordinary text. */
-const MIN_SCRUBBED_LENGTH = 4;
+export const MIN_SCRUBBED_LENGTH = 4;
 
 export const acpSupported = process.platform !== "win32";
 
@@ -36,13 +37,14 @@ export interface AgentProcess {
     stop: () => Promise<void>;
 }
 
-export type Spawner = (plan: SpawnPlan) => AgentProcess;
+/** Starts the agent `agentKey` as planned. The plan alone says what to run; the key tells a spawner that runs agents elsewhere which of its own to ask for. */
+export type Spawner = (plan: SpawnPlan, agentKey: string) => AgentProcess;
 
 /**
  * Replaces every occurrence of a variable the user set. Agents sometimes echo their environment. The built
  * variables (`HOME`, `PATH`, …) are not secrets and stay readable, or every path in a message would be garbled.
  */
-const scrub = (text: string, plan: SpawnPlan): string => {
+export const scrub = (text: string, plan: SpawnPlan): string => {
     let result = text;
 
     for (const name of plan.secretNames) {

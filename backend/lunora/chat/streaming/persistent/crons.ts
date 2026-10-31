@@ -2,6 +2,8 @@ import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { expireHostStream } from "../../../acp/lib/reap";
 import { patchThread } from "../../../agent/table-writes";
+import { patchRow } from "../../../lib/patch";
+import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 
@@ -33,7 +35,15 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
 
         const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-        await ctx.db.patch(stream._id, { status: "timeout", ...(steers && { steers }) });
+        // A run that was waiting out a rate limit and never resumed (its resume was lost and nobody asked again) has no
+        // run left to record the steps it finished: do it here, once.
+        const waiting = stream.pause !== undefined && stream.pausedRun !== undefined;
+
+        if (waiting) {
+            await recordPausedRunUsage(ctx, stream);
+        }
+
+        await patchRow(ctx.db, stream, { status: "timeout", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
 
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the

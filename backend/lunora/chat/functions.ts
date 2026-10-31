@@ -1,5 +1,6 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
 import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
+import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -53,7 +54,7 @@ import {
     resolveThreadReadAccess,
     type ThreadPermission,
 } from "../agent/thread-read-access";
-import { publicThread } from "../agent/threads";
+import { publicThread, threadForViewer } from "../agent/threads";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
@@ -728,7 +729,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -736,11 +737,13 @@ export const gateThreadActionHandler = async (
     }
 
     // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
-    // runs on a paired device, never on a cloud model: `runChatStart` refuses it.
+    // runs on a paired device, never on a cloud model: `runChatStart` refuses it. A switched thread runs on its
+    // path's agent (`agent/agent-switch.ts`); the send only looks that up for one that was.
     const thread = await context.db.get(args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
     return {
+        activeAgent: thread?.activeAgent,
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
@@ -757,6 +760,7 @@ export const gateThreadAction = internalQuery
     })
     .output(
         v.object({
+            activeAgent: v.optional(vAgentRef),
             botId: v.optional(v.id("bots")),
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
@@ -1192,7 +1196,7 @@ export const getThread = optionalAuthQuery
 
         // Anyone but the owner or a grantee sees a public thread only redacted —
         // no owner id, system prompt or org/team ids.
-        return access.kind === "full" ? publicThread(access.thread) : redactThreadForPublicViewer(publicThread(access.thread));
+        return access.kind === "full" ? threadForViewer(access.thread, context.user?.userId) : redactThreadForPublicViewer(publicThread(access.thread));
     });
 
 export const getThreadsWithTemporaryFilter = internalQuery
@@ -1403,10 +1407,14 @@ export const updateThread = authAction
             throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
 
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+            // A switched thread's stored `model` is where the paths before its first switch recover their agent: only
+            // a switch changes what it runs on, so the argument is ignored there (the palette's archive passes the model of
+            // whichever thread is open).
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
-            const effectiveModel = model ?? threadData?.model;
+            const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
 
             if (!effectiveModel) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
@@ -1468,7 +1476,7 @@ export const updateThread = authAction
             }
 
             context.log.event("chat.update_thread", {
-                modelChanged: model !== undefined,
+                modelChanged: model !== undefined && !threadData?.activeAgent,
                 statusChanged: status ?? null,
                 summaryChanged: summary !== undefined,
                 titleChanged: title !== undefined,
@@ -2940,6 +2948,11 @@ export const branchThread = authAction
                     unlockProof,
                     upToAndIncludingMessageId: forkEnd.endId,
                 });
+
+                // The copy carries any agent-switch divider; the fork must run on what it says.
+                if (parentThread.activeAgent) {
+                    await context.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId as Id<"threads"> });
+                }
             } catch (error) {
                 // If cloning fails, clean up the thread
                 chatLogger.error("Failed to clone messages for branch:", error);
@@ -3021,6 +3034,7 @@ export const hardDeleteThread = internalMutation
 
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
         // Record audit history for hard delete
         if (threadBeforeDelete) {

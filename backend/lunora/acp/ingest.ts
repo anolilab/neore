@@ -32,16 +32,15 @@ import {
     updateHostStream,
 } from "../chat/streaming/persistent/host";
 import { noteShardDue } from "../lib/shard-housekeeping";
-import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_SIGNATURE_WINDOW_MS } from "../devices/lib/constants";
-import { isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "../devices/lib/signing";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
+import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { sessionOfThread, touchSession } from "./lib/sessions";
+import { verifyDeviceRequest } from "./lib/verify-device";
 import { vHostEvent } from "./validators";
 
 type Event = Infer<typeof vHostEvent>;
@@ -51,26 +50,14 @@ export const verifyHostPost = internalQuery
     .input({ deviceId: v.string().max(MAX_LENGTH.id), now: v.number(), payload: v.string().max(MAX_LENGTH.document), signature: v.string().max(128) })
     .output(v.union(v.null(), v.object({ userId: v.string() })))
     .query(async ({ args, ctx }) => {
-        const deviceId = ctx.db.normalizeId("devices", args.deviceId);
-        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId } }) : null;
+        const verified = await verifyDeviceRequest(ctx, { ...args, domain: "turn" });
 
-        if (!device?.encryptedSecret) {
-            return null;
-        }
-
-        const secret = await decryptKey(device.encryptedSecret, "device-secrets");
-
-        if (!(await verifyDevicePayload(secret, "turn", args.payload, args.signature))) {
-            return null;
-        }
-
-        const post = parseSignedPayload(args.payload, "turn", device._id as string);
-
-        return post && isFreshTimestamp(post.issuedAt, args.now, DEVICE_SIGNATURE_WINDOW_MS) ? { userId: device.userId } : null;
+        return verified ? { userId: verified.userId } : null;
     });
 
 const vApplyResult = v.union(
-    v.object({ ended: v.boolean(), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
+    // `existing`: an import found the agent session already here (imported before, or run here).
+    v.object({ ended: v.boolean(), existing: v.optional(v.boolean()), next: v.number(), outcome: v.literal("applied"), threadId: v.optional(v.string()) }),
     v.object({ next: v.number(), outcome: v.literal("gap") }),
     v.object({ outcome: v.literal("refused") }),
     v.object({ outcome: v.literal("limited") }),
@@ -107,9 +94,30 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             return { ended: true, next: 0, outcome: "applied", threadId: existing.threadId as string };
         }
 
-        // The agent can report more once it has been used; the thread and session stay as they are.
-        if (open.capabilities && existing.status !== "ended") {
-            await ctx.db.patch(existing._id, { capabilities: open.capabilities, updatedAt: now });
+        // A session started from the web (`startHostSession`) waits as `starting` for this: the agent is up. The agent
+        // can also report more once it has been used; the thread and session stay as they are. A delayed or
+        // replayed open carries an older report and must not roll the stored one back: only a strictly newer one
+        // replaces it (an equal time keeps what is stored), and a time ahead of this clock is taken as now, so one
+        // future-dated report cannot shut out every later one.
+        const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
+        const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
+        const opened = existing.status === "starting";
+        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
+        const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
+        // A message sent while the agent was still starting (§4.6) is waiting for it: the session opens already busy.
+        const opening =
+            opened &&
+            (await ctx.db.persistentStreams.findFirst({
+                where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId },
+            })) !== null;
+
+        if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
+            await ctx.db.patch(existing._id, {
+                updatedAt: now,
+                ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
+                ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
+                ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
+            });
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };
@@ -140,7 +148,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         threadId,
         updatedAt: now,
         userId: device.userId,
-        ...(open.capabilities && { capabilities: open.capabilities }),
+        ...(open.capabilities && { capabilities: { ...open.capabilities, reportedAt: Math.min(open.capabilities.reportedAt, now) } }),
         ...(open.nativeSessionId !== undefined && { nativeSessionId: open.nativeSessionId }),
     });
 
@@ -178,7 +186,12 @@ const chunkFor = (event: Event): Pick<Doc<"persistentChunks">, "event" | "reason
         return { reasoning: event.text, text: "" };
     }
 
-    // The prompt is the user's saved message; the chunk only claims the slot.
+    // The prompt is the user's saved message; the chunk only claims the slot. A turn's summary lives on the saved
+    // reply, so its patch is not kept a second time for every reader of the stream.
+    if (event.kind === "turn_end") {
+        return { event: { kind: "turn_end", reason: event.reason, ...(event.error !== undefined && { error: event.error }) }, text: "" };
+    }
+
     return { event: event.kind === "turn_start" ? { kind: "turn_start", text: "" } : event, text: "" };
 };
 
@@ -209,7 +222,7 @@ const applyTurnPost = async (
         firstSeq === undefined ||
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
-        events.some((event) => event.kind === "session_open")
+        events.some((event) => event.kind === "session_open" || isImportEvent(event))
     ) {
         return REFUSED;
     }
@@ -329,7 +342,7 @@ const applyTurnPost = async (
         const end = fresh.find((event) => event.kind === "turn_end");
 
         if (end?.kind === "turn_end") {
-            await finishHostTurn(ctx, live, { error: end.error, reason: end.reason }, now);
+            await finishHostTurn(ctx, live, { changes: end.summary?.files.length ? end.summary : undefined, error: end.error, reason: end.reason }, now);
         }
 
         return { ended: true, next: seq, outcome: "applied" };
@@ -365,6 +378,8 @@ const applyTurnPost = async (
  */
 export const applyHostEvents = internalMutation
     .input({
+        // The caller already spent this post's budget (`spendHostBudget`), so it is not charged twice.
+        budgetSpent: v.optional(v.boolean()),
         // A session-level post with no events: the desktop's session ended.
         close: v.optional(v.boolean()),
         deviceId: v.string().max(MAX_LENGTH.id),
@@ -377,7 +392,7 @@ export const applyHostEvents = internalMutation
     .output(vApplyResult)
     .mutation(async ({ args, ctx }) => {
         // Keyed by the VERIFIED device, so a forged post cannot spend a victim's budget.
-        const limited = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+        const limited = args.budgetSpent === true ? { ok: true } : await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
 
         if (!limited.ok) {
             return { outcome: "limited" as const };
@@ -397,7 +412,18 @@ export const applyHostEvents = internalMutation
         }
 
         if (args.threadId === undefined) {
-            return await openSession(ctx, device, args.sessionId, args.events, now);
+            return args.events[0]?.kind === "import_open"
+                ? await openImport(ctx, device, args.sessionId, args.events, now)
+                : await openSession(ctx, device, args.sessionId, args.events, now);
+        }
+
+        if (args.events.some((event) => isImportEvent(event))) {
+            return await applyImportTurns(
+                ctx,
+                device,
+                { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId },
+                now,
+            );
         }
 
         return await applyTurnPost(
@@ -406,6 +432,20 @@ export const applyHostEvents = internalMutation
             { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId, turnId: args.turnId },
             now,
         );
+    });
+
+/**
+ * Spends one post's share of a device's budget before the ingest does anything costly for it (finalizing the files
+ * it names). `false` when the device is over it. The post's `applyHostEvents` then skips its own check, so the post
+ * is charged once.
+ */
+export const spendHostBudget = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const spent = await checkRateLimit(ctx, "hosts/ingest:free", { key: args.deviceId });
+
+        return spent.ok;
     });
 
 /** The shard tick (`lib/shard-housekeeping.ts#runShardTick`): reap silent host streams, then re-arm for the next. */

@@ -13,17 +13,27 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { ACP_CLEARED } from "../acp/lib/constants";
+import { onAcpCallEnded } from "../acp/lib/calls";
 import { endHostSessionsOfDevice } from "../acp/lib/revoke";
+import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { decryptKey, encryptKey } from "../lib/encryption";
-import { DEVICE_SIGNATURE_WINDOW_MS, MAX_DEVICE_OUTPUT_BYTES, MAX_DEVICE_SCOPE_PROJECTS, MAX_DEVICES_PER_USER, MAX_MANIFEST_BYTES } from "./lib/constants";
-import { parseManifestTools } from "./lib/manifest";
+import {
+    ACP_CLAIM_LEASE_MS,
+    DEVICE_SIGNATURE_WINDOW_MS,
+    MAX_DEVICE_OUTPUT_BYTES,
+    MAX_DEVICE_SCOPE_PROJECTS,
+    MAX_DEVICES_PER_USER,
+    MAX_MANIFEST_BYTES,
+} from "./lib/constants";
+import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
-import { claimWindowMs, expireOpenCalls, isForwardPhase } from "./lib/state";
+import { claimWindowMs, expireOpenCalls, isAcpTool, isForwardPhase } from "./lib/state";
 import { capUtf8, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
@@ -161,6 +171,7 @@ export const listDevices = authQuery
                 name: device.name,
                 platform: device.platform,
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
+                ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
                 ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
                 ...(device.transport !== undefined && { transport: device.transport }),
@@ -346,12 +357,13 @@ export const updateDeviceManifest = authMutation
         }
 
         const tools = parseManifestTools(manifest.tools);
+        const offers = parseAcpOffers(manifest.acpOffers);
 
-        if (!tools) {
+        if (!tools || !offers) {
             throw new LunoraError("BAD_REQUEST", "Manifest tools are invalid");
         }
 
-        await ctx.db.patch(device._id, { lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        await ctx.db.patch(device._id, { acpOffers: offers, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 
@@ -401,23 +413,44 @@ export const listPendingDeviceCalls = authQuery
 /**
  * Claim-once: the first relay to claim a call runs it; a second window, a
  * stale page or a late claim past the claim window gets `claimed: false`.
+ *
+ * A coding-agent command is claimed on a lease (plans/acp-agent-host.md §4.1): one that is not completed in time
+ * goes back to `pending` (`acp/calls.ts`) and is claimed again, until its deadline, however long ago it was first
+ * taken. The claim window only decides whether it is ever taken.
  */
 export const claimDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
+    .input({ callId: v.id("deviceCalls"), claimId: v.optional(v.string().max(MAX_LENGTH.id)), deviceId: v.id("devices"), viaDeviceId: vViaDeviceId })
     .output(v.object({ claimed: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
         const { now } = ctx;
 
-        if (call?.status !== "pending" || now - call.createdAt > claimWindowMs(call.toolName)) {
+        // The same window asking again: its claim was saved and the answer was lost, so it is told so. No other
+        // window, and no claim without an id, is ever handed a call that is already taken.
+        if (call?.status === "claimed" && args.claimId !== undefined && call.claimId === args.claimId) {
+            return { claimed: true };
+        }
+
+        if (call?.status !== "pending" || now >= call.deadline) {
+            return { claimed: false };
+        }
+
+        // `claimedAt` on a pending call means it was claimed before and its lease lapsed.
+        const withinWindow = call.claimedAt === undefined ? now - call.createdAt <= claimWindowMs(call.toolName) : isAcpTool(call.toolName);
+
+        if (!withinWindow) {
             return { claimed: false };
         }
 
         await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
 
-        await ctx.db.patch(call._id, { claimedAt: now, status: "claimed" });
+        await ctx.db.patch(call._id, { claimedAt: now, status: "claimed", ...(args.claimId !== undefined && { claimId: args.claimId }) });
+
+        if (isAcpTool(call.toolName)) {
+            await ctx.scheduler.runAfter(ACP_CLAIM_LEASE_MS + 1000, internal.acp.calls.checkAcpCall, { callId: call._id });
+        }
 
         ctx.log.event("devices.claim_device_call", { claimed: true });
 
@@ -427,10 +460,20 @@ export const claimDeviceCall = authMutation
 /**
  * Records a device's SIGNED result. A terminal call is never rewritten, so a
  * replayed result for a finished call is ignored (`accepted: false`).
+ *
+ * A call claimed under a `claimId` takes its result only from that window: a coding-agent command whose lease
+ * lapsed is claimed again, and the first window's late result must not finish it under the second.
  */
 export const completeDeviceCall = authMutation
     .use(rateLimit("devices/relay"))
-    .input({ callId: v.id("deviceCalls"), deviceId: v.id("devices"), payload: vResultPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
+    .input({
+        callId: v.id("deviceCalls"),
+        claimId: v.optional(v.string().max(MAX_LENGTH.id)),
+        deviceId: v.id("devices"),
+        payload: vResultPayload,
+        signature: vSignature,
+        viaDeviceId: vViaDeviceId,
+    })
     .output(v.object({ accepted: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
@@ -449,7 +492,7 @@ export const completeDeviceCall = authMutation
 
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: device._id, userId } });
 
-        if (call?.status !== "claimed") {
+        if (call?.status !== "claimed" || (call.claimId !== undefined && args.claimId !== call.claimId)) {
             return { accepted: false };
         }
 
@@ -459,14 +502,18 @@ export const completeDeviceCall = authMutation
         const decision = typeof result.decision === "string" && DECISIONS.has(result.decision) ? result.decision : undefined;
         const exitCode = typeof result.exitCode === "number" && Number.isSafeInteger(result.exitCode) ? result.exitCode : undefined;
 
+        const status = result.status as "completed" | "denied" | "failed";
+
         await ctx.db.patch(call._id, {
             completedAt: now,
-            status: result.status as "completed" | "denied" | "failed",
+            status,
             ...(output && { output: output.text, truncated: output.truncated || result.truncated === true }),
             ...(error !== undefined && { error }),
             ...(decision !== undefined && { decision }),
             ...(exitCode !== undefined && { exitCode }),
+            ...(isAcpTool(call.toolName) && ACP_CLEARED),
         });
+        await onAcpCallEnded(ctx, call, { status, ...(error !== undefined && { error }) }, now);
 
         ctx.log.event("devices.complete_device_call", { accepted: true, status: result.status });
 
@@ -543,7 +590,10 @@ export const releaseDeviceCall = authMutation
         const released = call?.status === "claimed" && device !== null && device.viaDeviceId === args.viaDeviceId;
 
         if (released) {
-            await ctx.db.patch(call._id, { completedAt: ctx.now, error: `The device refused the request: ${args.reason}`, status: "failed" });
+            const error = `The device refused the request: ${args.reason}`;
+
+            await ctx.db.patch(call._id, { completedAt: ctx.now, error, status: "failed", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
+            await onAcpCallEnded(ctx, call, { error, status: "failed" }, ctx.now);
         }
 
         ctx.log.event("devices.release_device_call", { released });
@@ -576,6 +626,7 @@ export const listDeviceCalls = authQuery
                 taintedBy: call.taintedBy,
                 threadId: call.threadId as string,
                 toolName: call.toolName,
+                ...(call.claimedAt !== undefined && { claimedAt: call.claimedAt }),
                 ...(call.completedAt !== undefined && { completedAt: call.completedAt }),
                 ...(call.decision !== undefined && { decision: call.decision }),
                 ...(call.error !== undefined && { error: call.error }),

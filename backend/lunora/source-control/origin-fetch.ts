@@ -1,9 +1,10 @@
 /**
  * The one way a driver reaches a host with a token: a requester bound to ONE
  * origin. It sends the token to that origin only. A path that resolves anywhere
- * else is refused, and a redirect is followed only while it stays on the origin
- * (a renamed repository answers 301 on the same host); one that leaves it is an
- * error and the token never goes along. Every response has a deadline, and a
+ * else is refused, and a redirect of a read is followed only while it stays on the
+ * origin (a renamed repository answers 301 on the same host); one that leaves it is
+ * an error and the token never goes along. A redirect of a WRITE is never followed:
+ * it would resend the body, and a write must not run twice. Every response has a deadline, and a
  * failed response's body is cancelled before the error is thrown.
  */
 import type { FetchWithDeadlineInit } from "../lib/fetch-timeout";
@@ -11,19 +12,54 @@ import { assertOk, FETCH_TIMEOUT_MS, fetchWithDeadline, HttpError } from "../lib
 
 /** A host request that did not succeed. `status` is the host's; `0` means the request itself was refused. */
 export class HostApiError extends Error {
+    /** The host's own words for a refused write, untrusted text; set only for a write the host answered. */
+    public readonly detail: string | undefined;
+
     public readonly rateLimited: boolean;
 
     public readonly status: number;
 
-    public constructor(message: string, status: number, rateLimited = false) {
+    /** A write that may have reached the host: the answer never arrived, so the host may have acted on it. */
+    public readonly unconfirmed: boolean;
+
+    public constructor(message: string, status: number, rateLimited = false, extra: { detail?: string; unconfirmed?: boolean } = {}) {
         super(message);
         this.name = "HostApiError";
+        this.detail = extra.detail;
         this.rateLimited = rateLimited;
         this.status = status;
+        this.unconfirmed = extra.unconfirmed ?? false;
     }
 }
 
+/** The host's words in a JSON error body: `message`, else the first of GraphQL's `errors`; `undefined` when there are none. */
+const messageOf = (body: string | undefined): string | undefined => {
+    try {
+        const parsed = JSON.parse(body ?? "") as { errors?: unknown; message?: unknown };
+
+        if (typeof parsed.message === "string") {
+            return parsed.message;
+        }
+
+        const [first] = Array.isArray(parsed.errors) ? (parsed.errors as unknown[]) : [];
+
+        if (typeof first === "string") {
+            return first;
+        }
+
+        const nested = (first as { message?: unknown } | null | undefined)?.message;
+
+        return typeof nested === "string" ? nested : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 export interface HostRequestOptions {
+    /** A JSON body. Sent only with a non-GET method, and never replayed after a redirect. */
+    json?: unknown;
+    /** `GET` unless a write says otherwise. */
+    method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
     query?: Record<string, number | string>;
 }
 
@@ -42,8 +78,13 @@ export interface BoundRequesterConfig {
 
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
 
-const isRateLimited = (response: Response): boolean =>
-    response.status === 429 || (response.status === 403 && (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after")));
+const isRateLimited = (response: Response, body: string | undefined): boolean =>
+    response.status === 429 ||
+    (response.status === 403 &&
+        (response.headers.get("x-ratelimit-remaining") === "0" ||
+            response.headers.has("retry-after") ||
+            // A secondary limit can answer a bare 403 whose only signal is its message. A plain substring test: linear, no pattern.
+            (body?.toLowerCase().includes("rate limit") ?? false)));
 
 export const createBoundRequester = ({
     headers = {},
@@ -66,6 +107,8 @@ export const createBoundRequester = ({
             throw new HostApiError("A host path must start with a single slash", 0);
         }
 
+        const method = options.method ?? "GET";
+        const body = method === "GET" || options.json === undefined ? undefined : JSON.stringify(options.json);
         let url = new URL(path, boundOrigin);
 
         const queryEntries = Object.entries(options.query ?? {});
@@ -80,20 +123,25 @@ export const createBoundRequester = ({
             }
 
             const response = await fetchWithDeadline(url, {
-                headers: { ...headers, Authorization: `Bearer ${token}` },
+                body,
+                headers: { ...headers, ...(body !== undefined && { "Content-Type": "application/json" }), Authorization: `Bearer ${token}` },
+                method,
                 // Followed by hand below, so a Location header cannot carry the token elsewhere.
                 redirect: "manual",
                 timeoutMs,
                 via,
             }).catch(() => {
-                throw new HostApiError("The host could not be reached", 0);
+                throw new HostApiError("The host could not be reached", 0, false, { unconfirmed: method !== "GET" });
             });
 
             if (!REDIRECT_STATUSES.has(response.status)) {
                 try {
-                    return await assertOk(response, "Host API error");
+                    // A 403 is the one status that is a refusal or a rate limit: its message tells which, so it is read on a GET too.
+                    return await assertOk(response, "Host API error", { includeBody: method !== "GET" || response.status === 403 });
                 } catch (error) {
-                    throw error instanceof HttpError ? new HostApiError(error.message, error.status, isRateLimited(response)) : error;
+                    throw error instanceof HttpError
+                        ? new HostApiError(error.message, error.status, isRateLimited(response, error.body), { detail: messageOf(error.body) })
+                        : error;
                 }
             }
 
@@ -101,6 +149,11 @@ export const createBoundRequester = ({
 
             // A body that fails to cancel is already gone: the redirect is judged on its headers alone.
             await response.body?.cancel().catch(() => undefined);
+
+            if (method !== "GET") {
+                // The request reached the host, which may have acted before it redirected: the caller must not retry blind.
+                throw new HostApiError("The host redirected a write", 0, false, { unconfirmed: true });
+            }
 
             if (location === null || hop >= maxRedirects) {
                 throw new HostApiError("The host redirected the request too many times", 0);

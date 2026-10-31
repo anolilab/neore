@@ -36,6 +36,9 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
+import { GoalBanner, GoalReviewNote, GoalVerdictNote } from "@/features/chat/goal/goal-notes";
+import { anchorVerdicts, goalReviewNotes, withoutGoalInstructions, withoutNotedVerdicts } from "@/features/chat/goal/goal-view";
+import { useThreadGoal } from "@/features/chat/goal/use-thread-goal";
 import type { UIMessage } from "@/lib/agent";
 import { showInfo } from "@/lib/toast";
 
@@ -51,6 +54,7 @@ import {
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
 } from "./message-windowing";
+import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -61,6 +65,8 @@ const ESTIMATED_ROW_HEIGHT = 160;
 const JUMP_PAGE_SIZE = 50;
 
 interface ScrollToMessageDetail {
+    /** Move focus to the message after scrolling. Defaults to true; the find bar keeps focus in its field. */
+    focus?: boolean;
     messageId: string;
     /** Where the message sits, for a stored step that renders merged into an earlier message. */
     position?: MessagePosition;
@@ -70,6 +76,7 @@ interface ScrollToMessageDetail {
 const scrollToMessageChannel = createRequestChannel<ScrollToMessageDetail>();
 
 interface PendingJump {
+    focus?: boolean;
     messageId: string;
     pagesLoaded: number;
     position?: MessagePosition;
@@ -83,7 +90,7 @@ interface PendingJump {
  * `threadId` when the request races a navigation to that thread: the jump then
  * waits until that thread's messages are showing.
  */
-export const scrollToMessage = (messageId: string, options: { position?: MessagePosition; threadId?: string } = {}): void => {
+export const scrollToMessage = (messageId: string, options: { focus?: boolean; position?: MessagePosition; threadId?: string } = {}): void => {
     scrollToMessageChannel.request({ messageId, ...options });
 };
 
@@ -226,9 +233,15 @@ interface MessageListProps {
 const MessageList: FC<MessageListProps> = memo(({ className, editComposerComponent: EditComposer, emptyComponent, maxWidth: maxWidthProp }) => {
     const maxWidth = maxWidthProp ?? "65ch";
     const { t } = useLingui();
-    const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
+    const { loadMore, messages: threadMessages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
-    const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
+    // A goal's own instructions are not the user's messages: each shows as a "Review: …" note after the reply it
+    // followed, and the verdicts that note already says sit under the replies they judged.
+    const goal = useThreadGoal(threadId);
+    const messages = withoutGoalInstructions(threadMessages);
+    const reviewNotes = goalReviewNotes(threadMessages);
+    const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(messages, goal.verdicts, reviewNotes)) : null;
+    const { activeStreamId, gatewayUrl, isStreaming, pause, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
@@ -251,7 +264,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         virtualizerRef.current = virtualizer;
     }, []);
 
-    const jumpTo = useCallback((requestedId: string, position?: MessagePosition): boolean => {
+    const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
         const { messages: currentMessages, plan: currentPlan } = jumpStateRef.current;
         const messageId = resolveJumpMessageId(currentMessages, requestedId, position);
 
@@ -277,8 +290,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             }
 
             element.scrollIntoView({ block: "center" });
+
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
-            element.focus({ preventScroll: true });
+            if (focus) {
+                element.focus({ preventScroll: true });
+            }
         };
 
         if (target.kind === "head" && virtualizerRef.current) {
@@ -305,8 +321,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     });
 
     useEffect(() => {
-        const request = ({ messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
-            pendingJumpRef.current = { messageId, pagesLoaded: 0, position, threadId: targetThreadId };
+        const request = ({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
+            pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
             setJumpRequest((value) => value + 1);
         };
         const readHash = (): PendingJump | undefined => {
@@ -348,7 +364,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 return;
             }
 
-            if (jumpTo(pending.messageId, pending.position)) {
+            if (jumpTo(pending.messageId, pending.position, pending.focus)) {
                 pendingJumpRef.current = undefined;
 
                 return;
@@ -426,6 +442,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         const isEntering =
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
+        // One list item per message: the goal's banner and notes belong to it, so the list's count and positions stay the messages'.
         return (
             <div
                 aria-posinset={index + 1}
@@ -435,7 +452,15 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 role="listitem"
                 tabIndex={-1}
             >
+                {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
                 {renderMessage(message, index)}
+                {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
+                    <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
+                ))}
+                {goal &&
+                    verdictAnchors
+                        ?.get(message.id)
+                        ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
             </div>
         );
     };
@@ -475,6 +500,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                                 maxWidth={maxWidth}
                                 streamId={streamIdToShow}
                             />
+                        )}
+                        {/* The run is waiting out a provider's rate limit: when it resumes, and what a person can do meanwhile. */}
+                        {streamIdToShow && pause && threadId && (
+                            <RateLimitPauseNotice className="mx-auto w-full max-w-(--thread-max-width) pb-3" pause={pause} threadId={threadId} />
                         )}
                         {/* Simple "Thinking..." placeholder when regenerating but no stream yet */}
                         {!streamIdToShow && <ThinkingPlaceholder maxWidth={maxWidth} />}

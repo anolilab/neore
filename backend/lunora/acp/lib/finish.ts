@@ -10,8 +10,19 @@ import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
-import { appendToTranscript, buildHostReply, emptyTranscript, isTranscriptFull, type HostReplyReason } from "./reply";
+import type { HostChanges } from "./changes";
+import {
+    addMediaToTranscript,
+    appendChildEvent,
+    appendToTranscript,
+    buildHostReply,
+    emptyTranscript,
+    isChildEvent,
+    isTranscriptFull,
+    type HostReplyReason,
+} from "./reply";
 import { sessionOfThread, touchSession } from "./sessions";
+import { withdrawPermissionAnswers } from "./withdraw";
 
 type Stream = Doc<"persistentStreams">;
 
@@ -30,20 +41,38 @@ export const MAX_TAIL_PAGES = 5;
 /** Joins the front of a long turn to its end, so the reply says that the middle was left out. */
 export const OMITTED_MARKER = "\n\n[… output omitted …]\n\n";
 
-type ChunkRead = Pick<Doc<"persistentChunks">, "reasoning" | "seq" | "text">;
+type ChunkRead = Pick<Doc<"persistentChunks">, "event" | "reasoning" | "seq" | "text">;
 
 const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: ChunkRead[]): void => {
     for (const chunk of chunks) {
         // Tool and permission events ride as `event` with no text of their own.
         if (chunk.text.length > 0 || chunk.reasoning) {
-            appendToTranscript(transcript, chunk);
+            // Past the cap the words are not kept; the paging goes on for the children and files that come after.
+            if (!isTranscriptFull(transcript)) {
+                appendToTranscript(transcript, chunk);
+            }
+        } else if (isChildEvent(chunk.event)) {
+            appendChildEvent(transcript, chunk.event);
+        }
+
+        if (chunk.event?.kind === "media") {
+            const { contentType, fileId, name, reference, size, storageKey } = chunk.event;
+
+            addMediaToTranscript(transcript, {
+                name,
+                reference,
+                size,
+                ...(contentType !== undefined && { contentType }),
+                ...(fileId !== undefined && { fileId }),
+                ...(storageKey !== undefined && { storageKey }),
+            });
         }
     }
 };
 
 /**
- * What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks and stops once the text
- * is full (reasoning after that point is not kept). When the page budget is spent first, the last pages are read
+ * What the host wrote to a stream, in order, up to the reply cap. Pages through the chunks; once the text is full
+ * only children and files are still collected (reasoning after that point is not kept), within the same page budget. When the page budget is spent first, the last pages are read
  * too and joined on after a marker, so the answer that follows a long run of tool events is not lost.
  */
 export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
@@ -60,7 +89,7 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
         appendChunks(transcript, page.page);
         lastSeq = page.page.at(-1)?.seq ?? lastSeq;
         exhausted = page.isDone;
-        cursor = exhausted || isTranscriptFull(transcript) || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
+        cursor = exhausted || pages >= MAX_TRANSCRIPT_PAGES ? undefined : (page.continueCursor ?? undefined);
     } while (cursor);
 
     if (exhausted || isTranscriptFull(transcript)) {
@@ -99,7 +128,13 @@ export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId:
  * prompt first and fails the earlier pending step, which makes the new reply the prompt's SIBLING
  * (the rule `saveLocalTurnHandler` follows). Returns the saved row, or undefined when there was nothing to save.
  */
-const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReplyReason, error: string | undefined): Promise<Id<"messages"> | undefined> => {
+const saveHostReply = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    reason: HostReplyReason,
+    error: string | undefined,
+    changes: HostChanges | undefined,
+): Promise<Id<"messages"> | undefined> => {
     const threadId = stream.threadId as Id<"threads">;
     const thread = await ctx.db.get(threadId);
 
@@ -117,6 +152,7 @@ const saveHostReply = async (ctx: MutationCtx, stream: Stream, reason: HostReply
     const session = await sessionOfThread(ctx, threadId);
     const reply = buildHostReply({
         agentKey: session?.agentKey ?? "host",
+        changes,
         error,
         reason,
         transcript: await readHostTranscript(ctx, stream._id),
@@ -152,18 +188,29 @@ const STATUS_OF: Record<HostReplyReason, "done" | "error" | "timeout"> = {
  * Saves the reply and ends the stream, whoever ends it. A stream that already ended is left alone (false). The
  * session is not touched: the caller knows whether it goes idle (a turn's end) or is already ended (a revoke).
  */
-export const endHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+export const endHostTurn = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
+    now: number,
+): Promise<boolean> => {
     if (!isLiveStream(stream)) {
         return false;
     }
 
-    await saveHostReply(ctx, stream, end.reason, end.error);
+    await saveHostReply(ctx, stream, end.reason, end.error, end.changes);
+    await withdrawPermissionAnswers(ctx, stream, now);
 
     return await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
 };
 
 /** The host's `turn_end` or Stop: {@link endHostTurn}, then the session is free again. */
-export const finishHostTurn = async (ctx: MutationCtx, stream: Stream, end: { error?: string; reason: HostReplyReason }, now: number): Promise<boolean> => {
+export const finishHostTurn = async (
+    ctx: MutationCtx,
+    stream: Stream,
+    end: { changes?: HostChanges; error?: string; reason: HostReplyReason },
+    now: number,
+): Promise<boolean> => {
     const ended = await endHostTurn(ctx, stream, end, now);
 
     if (ended) {

@@ -62,13 +62,23 @@ const PHASE_RANK = { prompting: 1, running: 2 } as const;
 export const isForwardPhase = (current: Doc<"deviceCalls">["phase"], next: NonNullable<Doc<"deviceCalls">["phase"]>): boolean =>
     PHASE_RANK[next] > (current === undefined ? 0 : PHASE_RANK[current]);
 
-/** Expires every open call of a device (revoke). */
+/** Expires every open call of a device (revoke). A coding-agent call also loses its prompt (`acp/lib/calls.ts`). */
 export const expireOpenCalls = async (ctx: Pick<MutationCtx, "db">, deviceId: Id<"devices">, reason: string): Promise<void> => {
     const now = Date.now();
 
     for (const status of OPEN_CALL_STATUSES) {
         const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
 
-        await Promise.all(page.map(async (call) => await ctx.db.patch(call._id, { completedAt: now, error: reason, status: "expired" })));
+        await Promise.all(
+            page.map(
+                async (call) =>
+                    await ctx.db.patch(call._id, {
+                        completedAt: now,
+                        error: reason,
+                        status: "expired",
+                        ...(isAcpTool(call.toolName) && { envelope: "", input: "" }),
+                    }),
+            ),
+        );
     }
 };

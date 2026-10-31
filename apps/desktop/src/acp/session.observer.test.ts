@@ -12,6 +12,17 @@ import { memoryAgent, readTranscript, transcriptPlayer } from "./testing/harness
 
 const HOST_INFO: HostSessionInfo = { agentKey: "example", agentLabel: "Example", folderId: "f1", folderLabel: "neore" };
 
+/** What the backend is told when the session opens: the labels, the agent's own session id and what it advertised at the handshake. */
+const OPENED = {
+    ...HOST_INFO,
+    capabilities: {
+        groups: { sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } } },
+        reportedAt: expect.any(Number),
+        version: 1,
+    },
+    nativeSessionId: "sess_1",
+};
+
 const recorder = () => {
     const calls: unknown[][] = [];
     const record
@@ -23,22 +34,29 @@ const recorder = () => {
         permissionRequested: record("permissionRequested"),
         permissionResolved: record("permissionResolved"),
         sessionEnded: () => {},
-        sessionOpened: (...args) => {
-            calls.push(["sessionOpened", ...args.slice(1)]);
+        sessionOpened: (_sessionId, info, threadId) => {
+            calls.push(threadId === undefined ? ["sessionOpened", info] : ["sessionOpened", info, threadId]);
         },
         text: record("text"),
         thought: record("thought"),
         tool: record("tool"),
         turnEnded: record("turnEnded"),
+        turnReceived: record("turnReceived"),
         turnStarted: record("turnStarted"),
     };
 
     return { calls, observer };
 };
 
-const start = async (gate: PermissionGate, observer: SessionObserver, secret?: { scrub: (text: string) => string; secretLength: number }) => {
+const start = async (
+    gate: PermissionGate,
+    observer: SessionObserver,
+    secret?: { scrub: (text: string) => string; secretLength: number },
+    remote?: { sessionId: string; threadId: string },
+) => {
     const agent = memoryAgent();
     const session = new AgentSession({
+        ...remote,
         agentKey: "example",
         agentLabel: "Example",
         appVersion: "9.9.9",
@@ -74,7 +92,7 @@ describe("a session's observer", () => {
         await expect.poll(() => session.snapshot().status).toBe("idle");
 
         expect(calls).toEqual([
-            ["sessionOpened", HOST_INFO],
+            ["sessionOpened", OPENED],
             ["turnStarted", expect.any(String), "say hi"],
             ["thought", expect.any(String), "thinking"],
             ["text", expect.any(String), "Hi"],
@@ -178,5 +196,85 @@ describe("a session's observer", () => {
 
         expect(ended[2]).toBe("failed");
         expect(typeof ended[3]).toBe("string");
+    });
+});
+
+describe("a session and turns the backend sent", () => {
+    it("goes by the id the backend made, and says which thread it is", async () => {
+        const { calls, observer } = recorder();
+        const { session } = await start(refuse, observer, undefined, { sessionId: "backend-session", threadId: "thread-1" });
+
+        expect(session.id).toBe("backend-session");
+        expect(calls).toEqual([["sessionOpened", OPENED, "thread-1"]]);
+    });
+
+    it("runs a prompt under the turn id it was sent with, received before it starts", async () => {
+        const { calls, observer } = recorder();
+        const { player, session, steps } = await start(refuse, observer);
+
+        session.send("say hi", "turn-1");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(calls.filter(([name]) => ["turnEnded", "turnReceived", "turnStarted"].includes(name as string))).toEqual([
+            ["turnReceived", "turn-1", "say hi"],
+            ["turnStarted", "turn-1", "say hi"],
+            ["turnEnded", "turn-1", "end_turn", undefined],
+        ]);
+        expect(session.snapshot().turns[0]?.id).toBe("turn-1");
+    });
+
+    it("tells the backend a queued prompt was received at once, and ends it when it is withdrawn", async () => {
+        const { calls, observer } = recorder();
+        const { player, session, steps } = await start(refuse, observer);
+
+        session.send("say hi");
+        await player.play(steps.slice(4, 5));
+        expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
+        expect(calls.filter(([name]) => name === "turnReceived")).toEqual([["turnReceived", "turn-2", "second"]]);
+
+        expect(session.cancelTurn("turn-2")).toBe(true);
+        expect(session.summary().queued).toBe(0);
+        expect(calls.at(-1)).toEqual(["turnEnded", "turn-2", "cancelled"]);
+        // A turn that is not waiting and not running is not this session's to cancel.
+        expect(session.cancelTurn("turn-2")).toBe(false);
+
+        await player.play(steps.slice(5));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+    });
+
+    it("ends every prompt the backend queued when the turn is stopped, so no stream waits on one", async () => {
+        const { calls, observer } = recorder();
+        const { player, session, steps } = await start(refuse, observer);
+
+        session.send("say hi");
+        await player.play(steps.slice(4, 5));
+        session.send("second", "turn-2");
+        session.send("third", "turn-3");
+        session.cancel();
+
+        const ended = calls.filter(([name]) => name === "turnEnded").map((call) => [call[1], call[2]]);
+
+        expect(ended).toEqual([
+            ["turn-2", "cancelled"],
+            ["turn-3", "cancelled"],
+        ]);
+        expect(session.summary().queued).toBe(0);
+    });
+
+    it("ends them as failed, with why, when the agent goes away", async () => {
+        const { calls, observer } = recorder();
+        const { agent, player, session, steps } = await start(refuse, observer);
+
+        session.send("say hi");
+        await player.play(steps.slice(4, 5));
+        session.send("second", "turn-2");
+        agent.end();
+        await expect.poll(() => session.snapshot().status).toBe("ended");
+
+        const waiting = calls.find(([name, turnId]) => name === "turnEnded" && turnId === "turn-2") ?? [];
+
+        expect(waiting[2]).toBe("failed");
+        expect(typeof waiting[3]).toBe("string");
     });
 });

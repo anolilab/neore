@@ -12,10 +12,17 @@
 
 #[cfg(feature = "keychain")]
 pub mod acp;
+#[cfg(feature = "keychain")]
+pub mod acp_call;
+#[cfg(feature = "keychain")]
+pub mod acp_install;
 pub mod acp_permission;
 pub mod actions;
+pub mod agent_env;
+pub mod agent_host;
 #[cfg(feature = "keychain")]
 pub mod approval;
+pub mod archive;
 pub mod egress;
 #[cfg(feature = "keychain")]
 pub mod engine;
@@ -32,6 +39,8 @@ pub mod launch;
 #[cfg(feature = "keychain")]
 pub mod lifecycle;
 pub mod mcp;
+pub mod media;
+pub mod outbox;
 pub mod sandbox;
 pub mod shell;
 #[cfg(feature = "keychain")]

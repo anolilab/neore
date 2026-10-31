@@ -19,6 +19,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
+import { syncActiveAgent } from "../agent/agent-switch";
 import { getThreadRow } from "../agent/branch-rows";
 import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
@@ -27,11 +28,12 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
-import type { StoredCustomProvider } from "./lib/custom-providers";
+import { endActiveGoals, hasLiveStream } from "./goals/rows";
 import {
     buildLocalPromptMessage,
     buildLocalReplyMessage,
     deriveLocalThreadTitle,
+    loadCustomProviders,
     type LocalTurnOutcome,
     MAX_LOCAL_ERROR_CHARS,
     MAX_LOCAL_PROMPT_CHARS,
@@ -70,24 +72,13 @@ export interface SaveLocalTurnResult {
     userMessageId: string;
 }
 
-/** The caller's custom endpoints — `customAIProviders` is `v.any()` at rest. */
-const loadProviders = async (ctx: MutationContext, userId: string): Promise<Record<string, StoredCustomProvider>> => {
-    const prefs = await ctx.db
-        .query("aiUserPreferences")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .unique();
-    const raw = prefs?.customAIProviders;
-
-    return raw && typeof raw === "object" ? (raw as Record<string, StoredCustomProvider>) : {};
-};
-
 /** Exported for the harness test; the procedure below adds auth and the rate limit. */
 export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string, args: SaveLocalTurnArgs): Promise<SaveLocalTurnResult> => {
     if (!args.prompt.trim()) {
         throw new LunoraError("BAD_REQUEST", "The prompt is empty");
     }
 
-    const resolved = resolveLocalModel(args.model, await loadProviders(ctx, userId));
+    const resolved = resolveLocalModel(args.model, await loadCustomProviders(ctx, userId));
 
     if ("error" in resolved) {
         throw new LunoraError("BAD_REQUEST", resolved.error);
@@ -120,11 +111,25 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         }
 
         threadId = args.threadId;
-        await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });
+        // A turn the browser ran ends a goal like a sent message does: no review follows a local reply.
+        const endedGoal = await endActiveGoals(ctx, threadId, "superseded");
+        // A goal between rounds holds the thread `running` for its review, which this turn just cancelled; unless another run has it, give it back.
+        const giveBack = endedGoal && !(await hasLiveStream(ctx, threadId));
+
+        // A switched thread keeps its stored model: it is where the paths before the first switch recover their agent,
+        // and a local model there would stop the send from taking its path's model (`MODEL_LOOKUP`). `lastReplyAt` also
+        // ends any pause the thread was waiting on (`patchThread`).
+        await patchThread(ctx.db, threadId, {
+            lastReplyAt: now,
+            ...(!thread.activeAgent && { model: args.model }),
+            ...(giveBack && { status: "active" as const }),
+            updatedAt: now,
+        });
     } else {
         threadId = (await insertThread(ctx.db, {
             createdBy: userId,
             ...(args.language && { language: args.language }),
+            lastReplyAt: now,
             mode: "text",
             model: args.model,
             status: "active",
@@ -170,6 +175,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             // As the gateway's regenerate: the new reply is then the prompt's latest
             // child, and `addMessagesHandler` advances the leaf onto it.
             await patchThread(ctx.db, threadId, { activeLeafMessageId: promptId });
+            await syncActiveAgent(ctx, threadId, promptId);
         }
 
         // `failPendingSteps` marks a fresh reply to an existing prompt — what makes

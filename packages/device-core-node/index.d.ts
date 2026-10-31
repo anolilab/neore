@@ -28,6 +28,17 @@ export declare class DeviceCore {
    */
   signTurn(payload: string): string
   /**
+   * Signs one request to the backend's device upload route (hex HMAC under the `upload` domain). Refuses a
+   * payload that is not an upload request for this paired computer.
+   */
+  signUpload(payload: string): string
+  /**
+   * Reads a file that an agent's reply refers to, if it is inside the folder the agent was approved for and an
+   * allowed type. The pair must be an approved one; the path is checked and opened in Rust, never in the page.
+   * Runs on the blocking pool: the file can be large.
+   */
+  acpReadMedia(agentKey: string, folder: string, reference: string): Promise<AcpMedia>
+  /**
    * Verifies, asks about (through `onEvent`), runs and signs one relayed call.
    * Resolves the signed result (`{ payload, signature }`, JSON).
    */
@@ -60,6 +71,18 @@ export declare class DeviceCore {
    * is open to it. Resolves `{ alreadyCurrent, version }` (JSON).
    */
   hostUpgrade(deviceId: string): Promise<string>
+  /**
+   * One page of a folder on a connected server (`{ entries, next, host, … }`, JSON), for the file tree of the
+   * local window. `after` is the `next` of the page before.
+   */
+  hostFilesList(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** A file of a connected server as text (`{ text, truncated, host, path }`, JSON). */
+  hostFileRead(deviceId: string, path: string): Promise<string>
+  /**
+   * Downloads a folder of a connected server as one tar archive into `destination`, a file path the person chose.
+   * Resolves what the archive holds (`{ files, folders, bytes, skipped, unreadable, host }`, JSON).
+   */
+  hostDownload(deviceId: string, path: string, destination: string): Promise<string>
   hostDisconnect(deviceId: string): void
   /** Forgets a server on this computer: its secret, folders and connection. */
   hostRemove(deviceId: string): void
@@ -84,11 +107,42 @@ export declare class DeviceCore {
   acpView(): string
   /** Applies an `AcpUpdate` (JSON): save or remove an agent, set or remove a variable. Validation is in Rust. */
   acpUpdate(update: string): string
+  /** A fresh folder for one registry download (its path). Only a file inside it can be installed. */
+  acpInstallStage(): string
+  /**
+   * Verifies a downloaded registry archive against its published SHA-256, unpacks it, and registers the agent
+   * with its pinned version (`InstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+   */
+  acpInstall(request: string): string
+  /**
+   * Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
+   * the install took the approval from.
+   */
+  acpInstallPrune(agentKey: string): void
   /**
    * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
    * version probe. The environment holds secrets: it goes to the main process and nowhere else.
    */
   acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
+  /**
+   * Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
+   * (an `acpUpdate` operation, JSON; JSON back: `{ agents, consents }` of that server). Local window only.
+   */
+  hostAcpUpdate(deviceId: string, update: string): string
+  /**
+   * What to start for an approved agent on a server (JSON, like `acpSpawnPlan`): the person's variables only, since
+   * the server builds the rest of the environment from its own. Refuses a pair the person did not approve for it.
+   */
+  acpHostSpawnPlan(deviceId: string, agentKey: string, folder: string): string
+  /**
+   * Starts an approved agent on a connected server under `handle`, a number the caller chose and has not used. Its
+   * output and end arrive as `hostAgent` and `hostAgentEnded` events. Returns the plan (JSON).
+   */
+  hostAgentStart(deviceId: string, handle: number, agentKey: string, folder: string): string
+  /** Bytes for the agent's stdin; an empty buffer closes it. */
+  hostAgentWrite(handle: number, bytes: Buffer): void
+  /** Stops the agent's whole process group on its server. Its end arrives as an event. */
+  hostAgentStop(handle: number): void
   /**
    * Registers a permission request from a coding agent and resolves with the outcome the agent receives
    * (JSON `{"outcome":"selected","optionId":…}` or `{"outcome":"cancelled"}`) once the user has answered it
@@ -105,6 +159,22 @@ export declare class DeviceCore {
   acpPermissionAnswerBatch(ids: Array<number>): number
   /** Answers every waiting request of one session cancelled. Call when the session is cancelled or ends. */
   acpPermissionCancelSession(sessionId: string): void
+  /**
+   * Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+   * without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
+   * writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
+   */
+  acpPrepare(envelope: string, signature: string): string
+  /**
+   * The signed result of a coding-agent command: `accepted`, or the reason it was not carried out
+   * (`{ payload, signature }`, JSON).
+   */
+  acpSign(envelope: string, signature: string, outcome: string): string
+  /**
+   * Answers the coding-agent request the backend named, under the device window's rules. Throws
+   * `already_answered` when it is no longer waiting.
+   */
+  acpPermissionAnswerRemote(sessionId: string, requestId: string, optionId: string): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /**
@@ -114,4 +184,18 @@ export declare class DeviceCore {
   reapIdleServers(): Promise<boolean>
   /** Stops every local MCP server. Call on quit. */
   stop(): void
+}
+
+/**
+ * A file an agent's reply refers to (`acpReadMedia`). `status` is `read`, `too_large` or `refused`; `bytes` is set
+ * only for `read`, and nothing else is filled for `refused`.
+ */
+export interface AcpMedia {
+  bytes?: Buffer
+  /** `image` (shown in the message) or `file` (offered for download). */
+  kind: string
+  mime: string
+  name: string
+  size: number
+  status: string
 }

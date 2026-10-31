@@ -3,7 +3,13 @@
  * a session in a folder, talk to it, stop it. Everything an agent wrote is rendered with `textContent`.
  * Variable values are typed here and never read back: the core returns names only.
  */
-import type { AcpView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import type { CapabilityReport } from "@neore/ai/capabilities";
+
+import type { HooksView } from "../../acp/hooks/types";
+import type { RegistryListing } from "../../acp/registry";
+import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
+import { HooksPanelModel } from "./hooks-panel";
+import { canImportSessions } from "./import-control";
 import { approveAllIds, barSignature, groupBySession } from "./permission-bar";
 
 const TOOL_LABELS: Record<ToolStatus, string> = {
@@ -35,12 +41,19 @@ const CLICK_THROUGH_GUARD_MS = 800;
 
 const state: {
     guard?: ReturnType<typeof setTimeout>;
+    /** The saved sessions being offered for import, and where they are from. */
+    importing?: { agentKey: string; folder: string; sessions: NativeSessionView[] };
+    listings: RegistryListing[];
+    /** What each agent reported at its last start, by key. */
+    reports: Record<string, CapabilityReport>;
     requests: PermissionView[];
+    /** Counts registry searches: only the answer to the latest one is shown. */
+    searchSerial: number;
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
     view: AcpView;
-} = { requests: [], sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -146,7 +159,75 @@ const probe = (key: string) =>
     guarded(async () => {
         const result = await globalThis.neoreDevice.acpProbe(key);
 
-        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.`;
+        await refreshReports();
+        $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
+    });
+
+// ─── Importing saved sessions ───────────────────────────────────────────────
+
+const refreshReports = async (): Promise<void> => {
+    state.reports = await globalThis.neoreDevice.acpReports();
+
+    // An agent that was changed reports nothing until it starts again: its open list goes with the control.
+    if (state.importing !== undefined && !canImportSessions(state.reports[state.importing.agentKey])) {
+        state.importing = undefined;
+        renderImport();
+    }
+
+    renderAgents();
+};
+
+const importedText = (summary: ImportSummary): string => {
+    if (summary.status === "already") {
+        return "That session is already in Neore; nothing was added.";
+    }
+
+    const notes = [
+        summary.droppedTurns > 0 ? `${String(summary.droppedTurns)} later turns were not kept` : "",
+        summary.shortenedTurns > 0 ? `${String(summary.shortenedTurns)} turns have a message cut to the size Neore stores` : "",
+    ].filter(Boolean);
+
+    return `Imported ${String(summary.turns)} turns as a thread in Neore.${notes.length === 0 ? "" : ` ${notes.join("; ")}.`}`;
+};
+
+const renderImport = (): void => {
+    const { importing } = state;
+
+    $("acp-import").hidden = importing === undefined;
+
+    if (importing === undefined) {
+        return;
+    }
+
+    const { agentKey, folder, sessions } = importing;
+
+    $("acp-import-heading").textContent = `Saved sessions of ${agentLabel(agentKey)} in ${folder}`;
+    $("acp-import-list").replaceChildren(
+        ...sessions.length === 0
+            ? [item("None.")]
+            : sessions.map((session) => {
+                const when = session.updatedAt === "" ? "" : ` · ${new Date(session.updatedAt).toLocaleString()}`;
+                const name = session.title === "" ? "Untitled session" : session.title;
+
+                return item(
+                    `${name}${when}`,
+                    button("Import", `Import the session ${name}`, () => {
+                        guarded(async () => {
+                            $("acp-notice").textContent = "Importing…";
+                            $("acp-notice").textContent = importedText(await globalThis.neoreDevice.acpImport(agentKey, folder, session.sessionId, session.title === "" ? undefined : session.title));
+                        });
+                    }),
+                );
+            }),
+    );
+};
+
+const openImport = (agentKey: string, folder: string) =>
+    guarded(async () => {
+        $("acp-notice").textContent = "Asking the agent for its saved sessions…";
+        state.importing = { agentKey, folder, sessions: await globalThis.neoreDevice.acpImportList(agentKey, folder) };
+        $("acp-notice").textContent = "";
+        renderImport();
     });
 
 const renderAgents = (): void => {
@@ -157,12 +238,14 @@ const renderAgents = (): void => {
             ? [item("No agents yet.")]
             : view.agents.flatMap((agent) => [
                 item(
-                    `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`,
+                    agent.install === null
+                        ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
+                        : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
-                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}” and its variables?`)) {
+                            if (!await globalThis.neoreDevice.confirm(`Remove “${agent.label}”, its variables${agent.install === null ? "" : " and its installed files"}?`)) {
                                 return;
                             }
 
@@ -177,6 +260,10 @@ const renderAgents = (): void => {
                         item(
                             `↳ ${consent.folderPath}`,
                             button("Start", `Start ${agent.label} in ${consent.folderPath}`, () => startIn(agent.key, consent.folderPath)),
+                            // Only for an agent that said it can; a missing, unknown or not-offered answer shows nothing.
+                            ...canImportSessions(state.reports[agent.key])
+                                ? [button("Import sessions…", `Import saved sessions of ${agent.label} in ${consent.folderPath}`, () => openImport(agent.key, consent.folderPath))]
+                                : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
                                     state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
@@ -217,6 +304,48 @@ const renderAgents = (): void => {
                         });
                     }),
                 );
+            }),
+    );
+};
+
+// ─── Registry ───────────────────────────────────────────────────────────────
+
+const installFromRegistry = (listing: RegistryListing) =>
+    guarded(async () => {
+        // The main process words and shows the confirmation (publisher, version, source); this only asks.
+        const view = await globalThis.neoreDevice.acpRegistryInstall(listing.id, listing.version);
+
+        if (view === null) {
+            return;
+        }
+
+        state.view = view;
+        renderAgents();
+        renderRegistry(state.listings);
+        $("acp-notice").textContent = `${listing.name} ${listing.version} is installed. Approve a folder for it to use it.`;
+    });
+
+const renderRegistry = (listings: RegistryListing[]): void => {
+    state.listings = listings;
+
+    $("acp-registry-results").replaceChildren(
+        ...listings.length === 0
+            ? [item("No agents found.")]
+            : listings.map((listing) => {
+                const installed = state.view.agents.find((agent) => agent.key === listing.id)?.install;
+                const li = item(
+                    `${listing.name} ${listing.version} · by ${listing.publisher} · ${listing.license}`,
+                    ...listing.installable
+                        ? [button(installed === null || installed === undefined ? "Install…" : "Reinstall…", `Install ${listing.name} ${listing.version}`, () => installFromRegistry(listing))]
+                        : [],
+                );
+                const note = document.createElement("small");
+
+                note.className = "muted";
+                note.textContent = listing.installable ? listing.description : `Not installable here: ${listing.reason ?? "unknown"}`;
+                li.append(note);
+
+                return li;
             }),
     );
 };
@@ -405,6 +534,189 @@ const renderSession = (snapshot: SessionSnapshot | undefined): void => {
     $<HTMLButtonElement>("acp-end").textContent = ended ? "Remove session" : "End session";
 };
 
+/** An approval is for one agent in one folder: it covers every session of that agent there, and no other agent's. */
+const hookStateText = (phase: HooksView["state"], agent: string): string => {
+    const scope = `any session of ${agent} in this folder`;
+    const text: Record<HooksView["state"], string> = {
+        approved: `Approved for ${scope}. File events and the manual hooks below can prompt it.`,
+        changed: `This file changed since you approved it for ${scope}. Nothing fires until you approve it again.`,
+        invalid: "This file is not a valid hooks file, so nothing fires.",
+        none: "",
+        unapproved: `Not approved. Nothing fires until you approve this file for ${scope}.`,
+    };
+
+    return text[phase];
+};
+
+const hookWhen = (hook: HooksView["hooks"][number]): string => hook.event === "manual" ? "Run by a button" : `When a file matching ${hook.glob ?? ""} is ${hook.event}`;
+
+const hookLine = (view: HooksView, sessionId: string, hook: HooksView["hooks"][number]): HTMLLIElement => {
+    const li = document.createElement("li");
+    const title = document.createElement("strong");
+    const when = document.createElement("span");
+    const prompt = document.createElement("pre");
+
+    title.textContent = hook.name;
+    when.className = "muted";
+    when.textContent = ` — ${hookWhen(hook)}. Sends:`;
+    prompt.textContent = hook.prompt;
+    li.append(title, when, prompt);
+
+    if (hook.event === "manual" && view.state === "approved" && view.hash !== undefined) {
+        const { hash } = view;
+
+        li.append(button("Run", `Run the hook ${hook.name}`, () => guarded(async () => {
+            // A button drawn for another session than the one on show never sends anything.
+            if (!hooksPanel.model.canAct(sessionId, state.selected)) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHookRun(sessionId, hook.id, hash);
+            $("acp-notice").textContent = `${hook.name} sent to the agent.`;
+        })));
+    }
+
+    return li;
+};
+
+/** Streamed text re-renders the session many times a second; the file is read again at most this often unless the session or its status changed. */
+const HOOKS_REFRESH_MS = 1500;
+const hooksPanel: { drawn: number; model: HooksPanelModel; read?: { at: number; id: string; status: string }; serial: number; sessionId?: string; trailing?: ReturnType<typeof setTimeout> } = {
+    drawn: 0,
+    model: new HooksPanelModel(),
+    serial: 0,
+};
+
+/** Empties the panel at once: nothing drawn for another session (or none) may stay on screen, with a button that still works. */
+const clearHooks = (): void => {
+    hooksPanel.model.clear();
+    hooksPanel.sessionId = undefined;
+    hooksPanel.serial += 1;
+    hooksPanel.drawn += 1;
+    hooksPanel.read = undefined;
+    clearTimeout(hooksPanel.trailing);
+    hooksPanel.trailing = undefined;
+    $("acp-hooks").hidden = true;
+    $("acp-hooks-list").replaceChildren();
+    $("acp-hooks-actions").replaceChildren();
+    $("acp-hooks-state").textContent = "";
+};
+
+const readHooks = async (snapshot: SessionSnapshot): Promise<HooksView> => {
+    try {
+        return snapshot.status === "ended" ? { hooks: [], state: "none", watching: false } : await globalThis.neoreDevice.acpHooks(snapshot.id);
+    } catch {
+        return { hooks: [], state: "none", watching: false };
+    }
+};
+
+const drawHooks = (snapshot: SessionSnapshot, view: HooksView, approveDelayMs: number): void => {
+    hooksPanel.drawn += 1;
+
+    const mine = hooksPanel.drawn;
+    const panel = $("acp-hooks");
+
+    panel.hidden = view.state === "none";
+    const unwatched = view.state !== "invalid" && !view.watching ? " The folder is not being watched, so file hooks cannot fire; manual hooks still work." : "";
+
+    $("acp-hooks-state").textContent = `${view.state === "invalid" ? `${hookStateText("invalid", snapshot.agentLabel)} ${view.error ?? ""}` : hookStateText(view.state, snapshot.agentLabel)}${unwatched}`;
+    $("acp-hooks-list").replaceChildren(...view.hooks.map((hook) => hookLine(view, snapshot.id, hook)));
+
+    const actions: HTMLElement[] = [];
+    const { hash } = view;
+
+    if (hash !== undefined && (view.state === "unapproved" || view.state === "changed")) {
+        const approve = button(`Approve for ${snapshot.agentLabel} in this folder`, "Approve the hooks file shown above for this agent in this folder", () => guarded(async () => {
+            if (!hooksPanel.model.canAct(snapshot.id, state.selected) || approve.disabled) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHooksApprove(snapshot.id, hash);
+            await renderHooks(snapshot, true, true);
+        }));
+
+        // The button is held back for a moment after it is drawn, so a click aimed at something else cannot land on it.
+        approve.disabled = approveDelayMs > 0;
+
+        if (approveDelayMs > 0) {
+            setTimeout(() => {
+                if (hooksPanel.drawn === mine) {
+                    approve.disabled = false;
+                }
+            }, approveDelayMs);
+        }
+
+        actions.push(approve);
+    }
+
+    if (view.state === "approved" || view.state === "changed") {
+        actions.push(button("Revoke approval", "Revoke the approval of this hooks file", () => guarded(async () => {
+            if (!hooksPanel.model.canAct(snapshot.id, state.selected)) {
+                return;
+            }
+
+            await globalThis.neoreDevice.acpHooksRevoke(snapshot.id);
+            await renderHooks(snapshot, true, true);
+        })));
+    }
+
+    $("acp-hooks-actions").replaceChildren(...actions);
+};
+
+/** The file changed while an Approve button for the old one was on screen: nothing is swapped in under the person's pointer. */
+const drawHooksChanged = (snapshot: SessionSnapshot): void => {
+    hooksPanel.drawn += 1;
+    $("acp-hooks").hidden = false;
+    $("acp-hooks-state").textContent = "The hooks file changed — review again. Nothing was approved.";
+    $("acp-hooks-list").replaceChildren();
+    $("acp-hooks-actions").replaceChildren(button("Review the hooks again", "Read the changed hooks file and show it in full", () => guarded(async () => {
+        await renderHooks(snapshot, true, true);
+    })));
+};
+
+/** `review`: the person asked for this read (after approving, revoking or "review again"), so it replaces what is on screen. */
+const renderHooks = async (snapshot: SessionSnapshot, force = false, review = false): Promise<void> => {
+    const now = Date.now();
+
+    // Another session than the panel was last drawn for: its buttons go before anything of this one is read.
+    if (hooksPanel.sessionId !== snapshot.id) {
+        clearHooks();
+        hooksPanel.sessionId = snapshot.id;
+    }
+
+    if (!force && hooksPanel.read?.id === snapshot.id && hooksPanel.read.status === snapshot.status && now - hooksPanel.read.at < HOOKS_REFRESH_MS) {
+        // A change that arrives inside the window (the file itself being edited, say) is still read once the window is over.
+        hooksPanel.trailing ??= setTimeout(() => {
+            hooksPanel.trailing = undefined;
+
+            if (state.selected === snapshot.id) {
+                renderHooks(snapshot, true);
+            }
+        }, HOOKS_REFRESH_MS);
+
+        return;
+    }
+
+    hooksPanel.read = { at: now, id: snapshot.id, status: snapshot.status };
+    hooksPanel.serial += 1;
+
+    const mine = hooksPanel.serial;
+    const view = await readHooks(snapshot);
+
+    // Another session was opened, or the panel was emptied, while the file was read.
+    if (mine !== hooksPanel.serial) {
+        return;
+    }
+
+    const step = review ? hooksPanel.model.review(snapshot.id, state.selected, view) : hooksPanel.model.receive(snapshot.id, state.selected, view);
+
+    if (step.kind === "show") {
+        drawHooks(snapshot, step.view, step.approveDelayMs);
+    } else if (step.kind === "notice") {
+        drawHooksChanged(snapshot);
+    }
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
@@ -428,7 +740,21 @@ const refreshSessions = async (): Promise<void> => {
             }),
     );
 
-    renderSession(state.selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(state.selected));
+    const { selected } = state;
+    const snapshot = selected === undefined ? undefined : await globalThis.neoreDevice.acpSession(selected);
+
+    // Another session was opened while this one loaded: its own refresh draws it.
+    if (state.selected !== selected) {
+        return;
+    }
+
+    renderSession(snapshot);
+
+    if (snapshot === undefined) {
+        clearHooks();
+    } else {
+        await renderHooks(snapshot);
+    }
 };
 
 const selectedId = (): string => {
@@ -475,6 +801,25 @@ export const initAcp = async (): Promise<void> => {
         });
     });
 
+    $("acp-registry-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        guarded(async () => {
+            state.searchSerial += 1;
+
+            const mine = state.searchSerial;
+            const found = await globalThis.neoreDevice.acpRegistrySearch(field("acp-registry-query"));
+
+            // A newer search was submitted meanwhile: its answer is the one to show.
+            if (mine !== state.searchSerial) {
+                return;
+            }
+
+            renderRegistry(found);
+            // The notice is the page's live region: a list that changes silently is invisible to a screen reader.
+            $("acp-notice").textContent = `${String(found.length)} ${found.length === 1 ? "agent" : "agents"} found.`;
+        });
+    });
+
     $("acp-env-form").addEventListener("submit", (event) => {
         event.preventDefault();
         guarded(async () => {
@@ -511,9 +856,14 @@ export const initAcp = async (): Promise<void> => {
         });
     });
 
+    $("acp-import-close").addEventListener("click", () => {
+        state.importing = undefined;
+        renderImport();
+    });
+
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {
-            await Promise.all([refreshRequests(), refreshSessions()]);
+            await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
         } catch (error) {
             showError(error);
         }
@@ -522,6 +872,6 @@ export const initAcp = async (): Promise<void> => {
     await guarded(async () => {
         state.view = await globalThis.neoreDevice.acpView();
         renderAgents();
-        await Promise.all([refreshRequests(), refreshSessions()]);
+        await Promise.all([refreshRequests(), refreshSessions(), refreshReports()]);
     });
 };

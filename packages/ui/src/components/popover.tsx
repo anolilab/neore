@@ -61,10 +61,13 @@ const PopoverAnchor = ({ children, nativeButton = true, render, ...props }: Popo
 };
 
 export interface PopoverContentProps
-    extends Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">, PopoverPrimitive.Popup.Props {}
+    extends Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">, PopoverPrimitive.Popup.Props {
+    /** Keep the content mounted while closed. */
+    keepMounted?: boolean;
+}
 
-const PopoverContent = ({ align = "center", alignOffset = 0, className, side = "bottom", sideOffset = 4, ...props }: PopoverContentProps) => (
-    <PopoverPrimitive.Portal>
+const PopoverContent = ({ align = "center", alignOffset = 0, className, keepMounted, side = "bottom", sideOffset = 4, ...props }: PopoverContentProps) => (
+    <PopoverPrimitive.Portal keepMounted={keepMounted}>
         <PopoverPrimitive.Positioner align={align} alignOffset={alignOffset} className="isolate z-50" side={side} sideOffset={sideOffset}>
             <PopoverPrimitive.Popup
                 className={cn(

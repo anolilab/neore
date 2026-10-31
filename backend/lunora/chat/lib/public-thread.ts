@@ -27,6 +27,7 @@ import type { Infer } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx as QueryContext } from "../../_generated/server";
+import { GOAL_CONTINUATION_AGENT } from "../goals/shared";
 
 /**
  * Upper bound on raw message rows read for one share page. Rows, not rendered
@@ -65,7 +66,7 @@ export type PublicThreadMessage = Infer<typeof vPublicThreadMessage>;
 /** The subset of a `UIMessage` this projection reads. */
 export interface PublicThreadSourceMessage {
     _creationTime: number;
-    /** Only read for a group-chat reply (`speakerSkillId` set) — otherwise it is the model id. */
+    /** Read for a group-chat reply (`speakerSkillId` set), and to drop a goal's instruction row. */
     agentName?: string;
     metadata?: unknown;
     parts: ReadonlyArray<unknown>;
@@ -173,6 +174,11 @@ const projectMessageParts = (
     nsfwStatusByFileId: ReadonlyMap<string, string | undefined>,
 ): { index: number; part: PublicThreadPart }[] | undefined => {
     if (message.role !== "user" && message.role !== "assistant") {
+        return undefined;
+    }
+
+    // A goal's instruction row holds the reviewer's note, worded from tool results the projection hides: not part of what was published.
+    if (message.role === "user" && message.agentName === GOAL_CONTINUATION_AGENT) {
         return undefined;
     }
 
