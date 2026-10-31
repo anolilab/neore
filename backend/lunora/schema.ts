@@ -14,12 +14,21 @@ import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
-import { vDeviceCallPhase, vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource, vDeviceTransport } from "./devices/validators";
+import {
+    vAcpOffer,
+    vDeviceCallPhase,
+    vDeviceCallStatus,
+    vDeviceManifestTool,
+    vDevicePlatform,
+    vDeviceTaintSource,
+    vDeviceTransport,
+} from "./devices/validators";
 import { embed } from "./embed";
 import {
     vEvalCheck,
@@ -35,6 +44,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
+import { vDraftComment, vReviewVerdict } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
@@ -141,6 +151,10 @@ export const schema = defineSchema({
         folderId: v.string(),
         folderLabel: v.string(),
         hostSessionId: v.string(),
+        // An imported session (S6) takes its transcript from the host a turn at a time: `importedTurns` is how many the backend
+        // holds, `importState` whether the host has sent the end. Unset on a session that ran here.
+        importedTurns: v.optional(v.number()),
+        importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
         lastEventAt: v.optional(v.number()),
         nativeSessionId: v.optional(v.string()),
         status: vAcpSessionStatus,
@@ -152,7 +166,9 @@ export const schema = defineSchema({
         .index("by_threadId", ["threadId"])
         .index("by_userId_status", ["userId", "status"])
         // Also serves "every session of a device" (a revoke reads the prefix).
-        .index("by_deviceId_hostSessionId", ["deviceId", "hostSessionId"]),
+        .index("by_deviceId_hostSessionId", ["deviceId", "hostSessionId"])
+        // One thread per agent session (S6): an import finds a session that already exists, imported or run here.
+        .index("by_userId_agentKey_nativeSessionId", ["userId", "agentKey", "nativeSessionId"]),
 
     actionCache: defineTable({
         expiresAt: v.number(),
@@ -590,6 +606,9 @@ export const schema = defineSchema({
     // `output` are capped copies for the activity list. Pruned after 30 days.
     deviceCalls: defineTable({
         claimedAt: v.optional(v.number()),
+        // Who holds the claim: the relay window that took it names itself, so its own retry (the answer was lost)
+        // is told it still holds it, and another window is not.
+        claimId: v.optional(v.string()),
         completedAt: v.optional(v.number()),
         createdAt: v.number(),
         deadline: v.number(),
@@ -629,6 +648,9 @@ export const schema = defineSchema({
     // A server reached over SSH is a row of its own (`transport: "ssh"`) held by
     // the desktop in `viaDeviceId`; only that desktop knows its secret.
     devices: defineTable({
+        // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
+        // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
+        acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
         lastSeenAt: v.optional(v.number()),
@@ -1784,6 +1806,9 @@ export const schema = defineSchema({
                 }),
             ),
         ),
+        // Set by the sidebar's stop, cleared once the run has saved the text it still owed (`finishStoppedReply`).
+        // While set the stream is `done` but its reply is not in the thread yet, so an agent switch waits (`hasUnsettledStop`).
+        stoppedAt: v.optional(v.number()),
         streamingConfig: v.object({
             contentType: v.string(),
             customSystemPrompt: v.optional(v.string()),
@@ -1803,6 +1828,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId_status", ["userId", "status"])
         .index("by_threadId", ["threadId"])
+        .index("by_threadId_messageId", ["threadId", "messageId"])
         .index("by_threadId_status", ["threadId", "status"])
         .index("by_hostTurnId", ["hostTurnId"])
         .relations((r) => {
@@ -2020,6 +2046,29 @@ export const schema = defineSchema({
     })
         .externallyManaged()
         .index("by_key", ["key"]),
+
+    // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
+    // server so it follows them across devices. One row per (user, host origin, repository, number);
+    // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
+    // a lease) and the row goes only once the host has confirmed the review.
+    reviewDrafts: defineTable({
+        body: v.string(),
+        comments: v.array(vDraftComment),
+        commitId: v.string(),
+        createdAt: v.number(),
+        hostOrigin: v.string(),
+        number: v.number(),
+        repository: v.string(),
+        // Moves on every edit: a finished submit tells an edited draft from the one it sent.
+        revision: v.number(),
+        // When a submit claimed the draft; 0 when none is running.
+        submittingAt: v.number(),
+        updatedAt: v.number(),
+        userId: v.string(),
+        verdict: v.union(vReviewVerdict, v.null()),
+    })
+        .shardBy("userId")
+        .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"]),
 
     sandboxActions: defineTable({
         action: v.string(),
@@ -2700,10 +2749,18 @@ export const schema = defineSchema({
         }),
 
     threads: defineTable({
+        // Cache of the agent the active path runs on, for the thread list and the composer's
+        // first paint; the path's last `agentSwitch` row decides (`agent/agent-switch.ts`).
+        // Unset = the thread was never switched, and every send keeps its own model.
+        activeAgent: v.optional(vAgentRef),
         // The message the user last pointed the in-thread branch switcher at.
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // The last run paused for the owner (a tool approval, or an askUser question). Set in the
+        // same patch that ends the run (`chat/lib/agent-run.ts#setThreadStatus`); removed by any
+        // write that puts the thread back to `running` (`agent/table-writes.ts#patchThread`).
+        awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
         // The bot this chat was started with. Set once at creation; its
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
@@ -2721,13 +2778,20 @@ export const schema = defineSchema({
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),
+        // Set once a switch on this thread stores a handoff (`chat/agent-switch.ts`): unset, a reply never
+        // walks the path looking for one (`agent/agent-switch.ts#handoffAboveOf`).
+        hasHandoff: v.optional(v.boolean()),
         isPublic: v.optional(v.boolean()),
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),
         lastCompressionStartedAt: v.optional(v.number()),
+        // When the last run finished successfully; written with the status write that ends it.
+        lastReplyAt: v.optional(v.number()),
         // When the user last saved a reply in the thread (not the prompt a routine run opens it with).
         // Written by `agent/messages.ts#addMessagesHandler`; the routines' quiet check reads it.
         lastUserMessageAt: v.optional(v.number()),
+        // When the OWNER last viewed the latest reply; written only by `chat/thread-state.ts#markThreadViewed`.
+        lastViewedAt: v.optional(v.number()),
         // Set while the thread has a passcode (locked). Content is refused
         // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
         lockedAt: v.optional(v.number()),
@@ -2745,6 +2809,8 @@ export const schema = defineSchema({
         // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
+        // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
+        snoozedUntil: v.optional(v.number()),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),
         status: v.string(),

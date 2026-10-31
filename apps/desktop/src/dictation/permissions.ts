@@ -63,3 +63,50 @@ export const isDictationAsset = (folder: string, rawUrl: string): boolean => {
 
     return url !== null && url.protocol === "file:" && url.href.startsWith(folder) && !url.pathname.includes("..");
 };
+
+/** What the OS says about this app's microphone access (`systemPreferences.getMediaAccessStatus`), and how to ask for it. */
+export interface MicrophoneAccess {
+    /** macOS only: shows the system prompt and resolves with the answer. */
+    ask: () => Promise<boolean>;
+    platform: NodeJS.Platform;
+    status: () => string;
+}
+
+/**
+ * Whether the app may open the microphone, per OS. macOS asks once, and a refusal is final until the person changes it in System
+ * Settings; `"prompted"` says the system prompt was just shown and accepted, which held the press while the key may have come up. Windows has no prompt for a desktop app: access is one switch in Settings, so only an explicit refusal is believed
+ * (any other answer, or none, is left to the capture itself, which fails with `denied` if it really is blocked). Linux has no
+ * OS-level gate to ask: the page's own failure (no device, denied by the sound server) is the answer.
+ */
+export const microphoneAllowed = async ({ ask, platform, status }: MicrophoneAccess): Promise<boolean | "prompted"> => {
+    if (platform === "darwin") {
+        const current = status();
+
+        if (current === "not-determined") {
+            return await ask() ? "prompted" : false;
+        }
+
+        return current === "granted";
+    }
+
+    if (platform === "win32") {
+        const current = status();
+
+        return current !== "denied" && current !== "restricted";
+    }
+
+    return true;
+};
+
+/** Where the person turns the microphone back on, worded for the notification that says it is off. */
+export const microphoneSettingsPath = (platform: NodeJS.Platform): string => {
+    if (platform === "darwin") {
+        return "System Settings → Privacy & Security → Microphone";
+    }
+
+    if (platform === "win32") {
+        return "Settings → Privacy & security → Microphone";
+    }
+
+    return "your system's sound or privacy settings";
+};

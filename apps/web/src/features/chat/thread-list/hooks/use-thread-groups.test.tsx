@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupType } from "../types";
 import useThreadGroups from "./use-thread-groups";
@@ -91,8 +91,11 @@ vi.mock("./use-thread-list-cache", () => {
     return { usePersistThreadList: () => {}, useThreadListPlaceholder: () => undefined };
 });
 
-const groupsFor = () =>
-    renderHook(() => useThreadGroups(new Set<GroupType>(), new Set<string>(), "", "threads", undefined, [], undefined, undefined)).result.current.threadGroups;
+const groupsFor = (collapsed: GroupType[] = []) => {
+    const { result } = renderHook(() => useThreadGroups(new Set<GroupType>(collapsed), new Set<string>(), "", "threads", undefined, [], undefined, undefined));
+
+    return result.current.threadGroups;
+};
 
 const titles = (groups: ReturnType<typeof groupsFor>, title: string) => groups.find((group) => group.title === title)?.threads.map((thread) => thread.title);
 
@@ -133,5 +136,53 @@ describe("project chats while the project list is unavailable", () => {
 
         expect(titles(view, "Projects")).toBeUndefined();
         expect(titles(view, "Today")?.toSorted((x, y) => x.localeCompare(y))).toEqual(["In project", "Loose"]);
+    });
+});
+
+describe("derived sections", () => {
+    const original = composite.threads.page;
+
+    beforeEach(() => {
+        state.isPlaceholderData = false;
+        state.projects = [{ _id: "p1", createdAt: 1, title: "Work" }];
+        state.projectsAnswered = true;
+    });
+
+    afterEach(() => {
+        composite.threads.page = original;
+    });
+
+    it("lists Needs you and Working first and Snoozed last, taking those threads out of the groups between", () => {
+        composite.threads.page = [
+            { _id: "a", _creationTime: NOW, createdAt: NOW, awaitingInput: "question", status: "active", title: "Waiting" },
+            { _id: "b", _creationTime: NOW, createdAt: NOW, projectId: "p1", status: "running", title: "Busy project chat" },
+            { _id: "c", _creationTime: NOW, createdAt: NOW, snoozedUntil: Date.now() + 3_600_000, status: "active", title: "Later" },
+            { _id: "d", _creationTime: NOW, createdAt: NOW, status: "active", title: "Plain" },
+        ] as never;
+        const view = groupsFor();
+
+        expect(view.map((group) => group.title)).toEqual(["Needs you", "Working", "Work", "Today", "Snoozed"]);
+        expect(titles(view, "Needs you")).toEqual(["Waiting"]);
+        expect(titles(view, "Working")).toEqual(["Busy project chat"]);
+        expect(titles(view, "Work")).toEqual([]);
+        expect(titles(view, "Today")).toEqual(["Plain"]);
+        expect(view.filter((group) => group.isPlaceholder).map((group) => group.title)).toEqual(["Needs you", "Working", "Snoozed"]);
+    });
+
+    it("opens Snoozed collapsed and expands it once the stored state says so", () => {
+        composite.threads.page = [
+            { _id: "c", _creationTime: NOW, createdAt: NOW, snoozedUntil: Date.now() + 3_600_000, status: "active", title: "Later" },
+        ] as never;
+
+        expect(groupsFor().find((group) => group.title === "Snoozed")?.isCollapsed).toBe(true);
+        expect(groupsFor(["snoozed"]).find((group) => group.title === "Snoozed")?.isCollapsed).toBe(false);
+    });
+
+    it("hides the sections while empty and returns an elapsed snooze to its group", () => {
+        composite.threads.page = [{ _id: "c", _creationTime: NOW, createdAt: NOW, snoozedUntil: Date.now() - 1, status: "active", title: "Back" }] as never;
+        const view = groupsFor();
+
+        expect(view.map((group) => group.title)).toEqual(["Work", "Today"]);
+        expect(titles(view, "Today")).toEqual(["Back"]);
     });
 });

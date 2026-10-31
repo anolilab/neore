@@ -6,6 +6,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { syncActiveAgent } from "../../../agent/agent-switch";
 import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
 import { parentOf } from "../../../agent/branch-rows";
 import { patchThread } from "../../../agent/table-writes";
@@ -247,7 +248,9 @@ export const stopActiveForThread = internalMutation
 
             const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-            await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
+            // Only a claimed run is still to settle the stop (`finishStoppedReply`); a queued one that has not started
+            // never will (`claimStreamRun` refuses a `done` stream), so it leaves nothing for a switch to wait on.
+            await ctx.db.patch(stream._id, { status: "done", ...(stream.runClaimedAt !== undefined && { stoppedAt: ctx.now }), ...(steers && { steers }) });
         }
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
@@ -276,6 +279,10 @@ const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pen
 
     if (thread?.activeLeafMessageId === pending._id) {
         await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+
+        if (parent) {
+            await syncActiveAgent(ctx, threadId, parent._id);
+        }
     }
 };
 
@@ -312,6 +319,11 @@ export const finishStoppedReply = internalMutation
 
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
+
+        // The owed text is saved below, in this transaction, so the stop is settled when it commits.
+        if (stream.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
 
         // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
         // row and the text it owes belong in that message's order, with that message as their prompt.
@@ -370,6 +382,23 @@ export const finishStoppedReply = internalMutation
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
 
         return { stopped: true, ...(messageId !== undefined && { messageId }) };
+    });
+
+/**
+ * A stopped run that ended without saving its owed text (`failRun`: setup or the finish threw) will never
+ * save it, so the stop is as settled as it will get and a model switch need not wait for it (`hasUnsettledStop`).
+ */
+export const settleStoppedRun = internalMutation
+    .input({ streamId: v.id("persistentStreams") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (stream?.stoppedAt !== undefined) {
+            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+        }
+
+        return null;
     });
 
 export const getStreamStatus = internalQuery
@@ -527,6 +556,13 @@ export const getChunksAfter = internalQuery
         checkLock: v.optional(v.boolean()),
         streamId: v.id("persistentStreams"),
         /**
+         * The thread and user the caller says the stream belongs to. A stream of anyone else answers as a
+         * missing one. Passed by `/chat/chunks`, which crosses shards as the system and so cannot lean on
+         * the shard's own caller checks.
+         */
+        threadId: v.optional(v.string().max(MAX_LENGTH.id)),
+        userId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /**
          * Say what a run that ended `done` is waiting for: the public API's blocking read and relay
          * ask, because their caller has no composer to show a pending question in.
          */
@@ -576,12 +612,13 @@ export const getChunksAfter = internalQuery
             totalChunks: v.number(),
         }),
     )
-    .query(async ({ args: { afterIndex, checkLock = true, streamId, withPendingRequest }, ctx }) => {
+    .query(async ({ args: { afterIndex, checkLock = true, streamId, threadId, userId, withPendingRequest }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
         // A missing stream is an error, not a lock: an expired one must not read as "This chat is locked."
-        if (!stream) {
+        // Someone else's stream is the same answer, so it cannot be told from a missing one.
+        if (!stream || (userId !== undefined && stream.userId !== userId) || (threadId !== undefined && stream.threadId !== threadId)) {
             return { chunks: [], locked: false, status: "error", totalChunks: afterIndex };
         }
 

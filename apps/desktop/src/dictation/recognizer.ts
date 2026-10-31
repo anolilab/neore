@@ -63,15 +63,26 @@ export interface RecognizerOptions {
     timeoutMs?: number;
 }
 
-/** A segment that is only an annotation (`[BLANK_AUDIO]`, `(music)`, `*applause*`): the model's note about silence, not speech. */
+/** The timestamps the helper prints before each segment. */
+const TIMESTAMP = /^\[\d+:\d{2}:\d{2}\.\d{3} --> \d+:\d{2}:\d{2}\.\d{3}\]\s*/u;
 const LINE_BREAK = /\r?\n/u;
+/** A segment that is only an annotation (`[BLANK_AUDIO]`, `(music)`, `*applause*`): the model's note about silence, not speech. */
 const ANNOTATION = /^(?:\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)$/u;
 
-/** One segment per line of the recogniser's output; empty lines and annotations are dropped. */
+/**
+ * How the helper is told to put its text on stdout. With `-f -` it has no file name to derive an output from, and upstream's stdin
+ * mode (`-otxt`) opens `/dev/stdout` (the console, `CON`, on Windows). Neither is our pipe: a pipe is a socket here, which cannot be
+ * opened by path, so the helper exits cleanly with no text. An output name that is not `-` makes it print each segment to
+ * stdout itself, one line per segment behind a timestamp (`parseTranscript` strips it), and with no `-o*` format flag no file is
+ * opened under that name. The CI run of the real helper on every OS is what shows this.
+ */
+const OUTPUT_ARGUMENTS = ["-of", "unused"];
+
+/** One segment per line of the recogniser's output, timestamps removed; empty lines and annotations are dropped. */
 export const parseTranscript = (output: string): Transcript => {
     const segments = output
         .split(LINE_BREAK)
-        .map((line) => line.trim())
+        .map((line) => line.replace(TIMESTAMP, "").trim())
         .filter((line) => line !== "" && !ANNOTATION.test(line));
 
     return { segments, text: segments.join(" ") };
@@ -101,9 +112,8 @@ export const startRecognizer = (options: RecognizerOptions): Recognizer => {
 
     const spawn = options.spawn ?? nodeSpawn;
     const timeoutMs = options.timeoutMs ?? TRANSCRIBE_TIMEOUT_MS;
-    // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects). With `-f -` the recogniser has no file
-    // name to derive an output from, so `-otxt` writes the text to stdout (upstream's stdin mode; Windows uses the console there, S4).
-    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", "-otxt", "-nt", "-np", "-l", options.language];
+    // `-l`: the default is English, which would turn other languages into English, so it is always given (`auto` detects).
+    const args = [...options.helper.args, "-m", options.modelPath, "-f", "-", ...OUTPUT_ARGUMENTS, "-np", "-l", options.language];
     const child = spawn(options.helper.command, args, {
         cwd: options.cwd,
         env: helperEnvironment(),

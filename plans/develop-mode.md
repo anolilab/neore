@@ -186,6 +186,11 @@ submit with a verdict, native viewed marks.
 - Acceptance: a draft survives a reload and a second device; a submit that the host refuses keeps
   the draft; a review submitted from Neore shows as one review on github.com; a file marked viewed
   in Neore is viewed on github.com and the reverse.
+- Built as: drafts are one `reviewDrafts` row per user and pull request, claimed by a submit
+  (lease) so two devices post one review. A reply cannot ride in the host's review call, so it
+  is posted at once and the capability report says so (`review.replies` is `divergent`). Viewed
+  marks live on the host only; Neore stores none. A submit whose answer never came is
+  `unconfirmed`: the draft is kept and the person is told to check the host first.
 
 **S3 — Checks and merge.** Required-aware checks state, re-run of the narrowest scope, merge and
 auto-merge where declared, each behind a confirmation.

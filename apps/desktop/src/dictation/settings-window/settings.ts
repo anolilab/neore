@@ -126,6 +126,7 @@ const buildRow = (model: ModelView): void => {
 const render = (view: SettingsView): void => {
     $("shortcut").textContent = view.shortcut;
     $("unavailable").hidden = view.available;
+    $("unavailable").textContent = view.unavailableReason;
     $("shortcut-unavailable").hidden = !view.shortcutUnavailable;
     enabled.checked = view.enabled;
     enabled.disabled = !view.available;

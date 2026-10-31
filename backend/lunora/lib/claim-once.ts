@@ -15,8 +15,12 @@
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
+ * | `switch`           | `<userId>:<threadId>:<clientId>` | 10 min (`AGENT_SWITCH_CLAIM_TTL_MS`) | `chat/agent-switch.ts` |
  * | `worker-dispatch`  | `tool:<userId>:<toolCallId>` or `client:<threadId>:<clientId>` | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
+ * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
+ * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
+ * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
@@ -129,7 +133,7 @@ const findClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) 
  * checks, or `null` when the key is held. A claim can only be taken again after
  * the previous one expired, so each acquisition has a `claimedAt` of its own.
  */
-const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<number | null> => {
+export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLapse, ttlMs, userId }: ClaimOptions): Promise<number | null> => {
     const now = Date.now();
     const existing = await findClaim(ctx, scope, key);
 
@@ -162,6 +166,13 @@ export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: st
     const existing = await findClaim(ctx, scope, key);
 
     return existing !== null && existing.expiresAt > Date.now();
+};
+
+/** When the unexpired claim for `(scope, key)` was taken, or `null` when there is none: lets a retry find what the first try made. */
+export const claimedAtOf = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<number | null> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now() ? existing.claimedAt : null;
 };
 
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */

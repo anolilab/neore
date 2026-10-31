@@ -13,6 +13,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { extendHostStream } from "../../chat/streaming/persistent/host";
 import { HOST_TURN_MAX_MS } from "./constants";
+import { withdrawSend } from "./withdraw";
 import { endHostTurn, sendHostCancel } from "./finish";
 import { sessionOfThread, touchSession } from "./sessions";
 
@@ -29,6 +30,21 @@ export const expireHostStream = async (ctx: MutationCtx, stream: Stream, now: nu
 
     if (waitingOnPerson) {
         await extendHostStream(ctx, stream, now);
+
+        return;
+    }
+
+    // The host never acknowledged the prompt (`accepted`): it did not answer, and the prompt must not run later.
+    if (stream.hostState === "accepted") {
+        await withdrawSend(ctx, stream, now);
+
+        if (await endHostTurn(ctx, stream, { error: "The host did not answer.", reason: "failed" }, now)) {
+            const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
+
+            if (session) {
+                await touchSession(ctx, session, "idle", now);
+            }
+        }
 
         return;
     }

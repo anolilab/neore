@@ -8,8 +8,9 @@ const mockKeyboardShortcuts = {
     audioRecord: "ctrl+shift+r",
     commandPalette: "ctrl+k",
     escape: "escape",
+    findInThread: "ctrl+f",
     firstItem: "home",
-    focusSearch: "ctrl+f",
+    focusSearch: "ctrl+shift+f",
     help: "ctrl+/",
     lastItem: "end",
     newChat: "ctrl+n",
@@ -19,6 +20,11 @@ const mockKeyboardShortcuts = {
     sidebarLeft: "ctrl+b",
     sidebarRight: "ctrl+shift+b",
 };
+
+// The sheet uses the lingui macro, which these tests do not compile; it has its own coverage.
+vi.mock("./keyboard-shortcuts-sheet", () => {
+    return { default: () => null };
+});
 
 vi.mock("@/features/layout/hooks/use-ui-state", () => {
     return {

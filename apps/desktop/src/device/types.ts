@@ -3,6 +3,8 @@
  * as JSON strings; these are their parsed forms (`device-core/src/engine.rs`).
  */
 
+import type { MediaRead } from "../acp/media";
+
 /** A payload and its HMAC, exactly as the device or the backend signed it. */
 export interface Signed {
     payload: string;
@@ -63,6 +65,45 @@ export interface HostUpgrade {
     /** The server already had this exact binary: nothing was uploaded. */
     alreadyCurrent: boolean;
     version: string;
+}
+
+/** One entry of a folder on a server. What it says is the server's word: show it as text, never as markup. */
+export interface FileEntry {
+    name: string;
+    size: number;
+    type: "dir" | "file" | "other" | "symlink" | "unknown";
+}
+
+/** One page of a folder on a connected server (`host_files_list`). */
+export interface FilesPage {
+    entries: FileEntry[];
+    /** The server the page came from. */
+    host: string;
+    /** Pass as `after` for the page that follows; `null` on the last. */
+    next: string | null;
+    path: string;
+    /** The folder had more entries than the server reads at all. */
+    truncated: boolean;
+}
+
+/** A file of a server as text (`host_file_read`). */
+export interface FileRead {
+    host: string;
+    path: string;
+    text: string;
+    truncated: boolean;
+}
+
+/** What a downloaded folder holds (`archive::Summary`). Symlinks and special files are not in the archive. */
+export interface Download {
+    bytes: number;
+    files: number;
+    folders: number;
+    host: string;
+    /** Links and special files, left out on purpose. */
+    skipped: number;
+    /** Files and folders that should be in the archive and are not: unreadable, or too deep. */
+    unreadable: number;
 }
 
 /** A server as the local window lists it (`HostView`). */
@@ -158,18 +199,27 @@ export type CoreEvent
     = | { agent: string; tool: string; type: "acpPermission" }
         | { callId: string; deviceId: string; payload: string; signature: string; type: "progress" }
         | { prompt: Prompt; type: "prompt" }
-        | { sessionId: string; turnId: string; type: "acpCancel" }
+        | { type: "acpPermissionsChanged" }
         | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
+    acpInstall: (request: string) => string;
+    acpInstallPrune: (agentKey: string) => void;
+    acpInstallStage: () => string;
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
     acpPermissionAnswer: (id: number, optionId: string) => void;
     acpPermissionAnswerBatch: (ids: number[]) => number;
+    acpPermissionAnswerRemote: (sessionId: string, requestId: string, optionId: string) => void;
     acpPermissionAsk: (request: string) => Promise<string>;
     acpPermissionCancelSession: (sessionId: string) => void;
     acpPermissionDecline: (id: number) => void;
     acpPermissions: () => string;
+    /** A relayed coding-agent command, checked but not acted on (`acp/commands.ts`). */
+    acpPrepare: (envelope: string, signature: string) => string;
+    /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
+    acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
+    acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     acpUpdate: (update: string) => string;
     acpView: () => string;
@@ -178,6 +228,9 @@ export interface DeviceCore {
     execute: (envelope: string, signature: string) => Promise<string>;
     hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
+    hostDownload: (deviceId: string, path: string, destination: string) => Promise<string>;
+    hostFileRead: (deviceId: string, path: string) => Promise<string>;
+    hostFilesList: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostForgetKey: (deviceId: string) => void;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;
     hostProbe: (spec: string) => Promise<string>;
@@ -195,6 +248,8 @@ export interface DeviceCore {
     settingsUpdate: (update: string) => string;
     /** Signs one turn post for the backend's ingest route; refuses anything that is not a turn post for this computer. */
     signTurn: (payload: string) => string;
+    /** Signs one request to the backend's device upload route; refuses anything that is not an upload request for this computer. */
+    signUpload: (payload: string) => string;
     status: () => string;
     stop: () => void;
 }

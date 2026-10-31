@@ -152,10 +152,11 @@ says what it costs.
 - `threads.activeAgent`: optional cache of the active path's agent. Shape `{ kind: "model", model }` or
   `{ kind: "host", hostId, agentKey, folderId }`.
 - Message part `agentSwitch`: `{ from, to, mode, startMessageId, fallbackReason? }`.
-  The `parts` column is `v.array(v.any())` (`backend/lunora/schema.ts`), so the
-  database takes the new part with no schema change. S1 adds a checked shape for it in
-  `agent/table-writes.ts`, the only writer, and a test that a reader skips unknown
-  part kinds.
+  Stored as one `system` row with no text in `messages`, its payload in
+  `providerMetadata.neoreAgentSwitch` (the `messages` table has no `parts` column; `parts` is
+  `streamDeltas`). S1 adds a checked shape for it in `agent/table-writes.ts`, the only writer, and
+  tests that readers skip it (the model context) or fall back to a plain row (a marker that does not
+  check). S1 writes `mode: "full"`: the new model sees the whole path, as before.
 - No new table. A cloud-to-host or host-to-cloud switch that forks is recorded as a
   `threadRelationships` row with the existing `continuation` branch type; S3 checks
   that this value fits the fork, and adds a value only if it does not.
@@ -198,6 +199,19 @@ verbatim tail, and delta on switching back.
   bytes in the context are identical on the first and the third turn after a
   switch (test), and on a provider that caches, the second turn's usage reports
   cache reads; above the threshold a cloud-to-cloud switch defaults to `portable`.
+- Built in S2: above the threshold the confirm step shows the credit estimate for the handoff and for the full
+  history before the divider is written (`previewAgentSwitch`, priced client-side with the target's catalog price).
+  `delta` keeps what the agent saw before it left, adds the stored handoff of what happened since, and then the turns
+  after; when the model's earlier divider lies outside the 100-row context window the switch is `portable` instead,
+  since the context could not give the model what a delta says it already has. Once the divider the model left
+  through has slid out of the window, the handoff of that divider stands in for what it saw (`deltaOrphans`,
+  `getHandoffBeforeDelta`), and a switch back with nothing missed stores no handoff and restores what the model saw.
+  Each summary call is one metered gateway call, fenced before it is paid for: the plan refuses a user whose daily
+  allowance is spent, `beginSwitchSummary` admits one summary per thread at a time (claim `switch-summary:<threadId>`,
+  2 minutes) and counts it against `chat/agentSwitchSummary`, and a summary longer than its room is cut at a line
+  (`capSummary`). A retry after a failed write summarises again, but is charged (`chargeRound`) once. Only the last
+  handoff block carries the Anthropic cache hint, since the provider allows four breakpoints and the gateway sets two.
+  The cache hint and the provider's cache reads need a real provider to check.
 
 **S3 — Host handoff.** Host to host, in the same thread, using the `portable` mode.
 Cloud to host, and host to cloud, create a new thread linked to the source through
@@ -244,7 +258,7 @@ report says it can load a saved session, and only when agent, folder and host al
 
 1. **Summary model.** Recommendation: the cloud utility model, cheapest tier that
    passes the S2 quality check.
-2. **Budget size.** Measure on real threads in S2; no value is fixed here.
+2. **Budget size.** Decided in S2: 12,000 estimated tokens (`HANDOFF_BUDGET_TOKENS`), measured on a 300-turn fixture; the reason is on the constant. The attachments of the next message are not reserved for in S2: the handoff is its own message ahead of the turns, and the user's next message is appended unchanged. A host handoff (S3), where the handoff and the first prompt are one message, reserves room then.
 3. **Switching mid-stream.** Recommendation: refuse, as stated in §3.
 4. **Stored summary.** Decided: stored on the `agentSwitch` part (§3, prompt
    caching), so the handoff is byte-stable; a repeat switch reuses it and

@@ -5,8 +5,9 @@
  *
  *   { v: 1, kind: "turn", deviceId, issuedAt, sessionId, threadId?, turnId?, firstSeq?, events: [...] }
  *
- * No `threadId` = a session-level post (`session_open`, which makes the host thread; or `close: true` with no events,
- * which ends the session). Otherwise a turn post: the event at index `i` takes `seq = firstSeq + i`.
+ * No `threadId` = a session-level post (`session_open`, which makes the host thread; `import_open`, which makes or finds the
+ * thread of an agent's saved session; or `close: true` with no events, which ends the session). Otherwise a turn post: the
+ * event at index `i` takes `seq = firstSeq + i`.
  *
  * The checks, in the order that keeps a forged post from costing anything:
  * 1. an in-isolate per-address counter and a body cap, before anything is parsed or any database is touched;
@@ -18,14 +19,17 @@
  *
  * Every authentication failure is the same 401. The action never touches `ctx.db`.
  */
+import { unknownCapabilityReport } from "@neore/ai/capabilities";
 import type { HttpActionCtx, Infer } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { isDeviceSignature } from "../devices/lib/signing";
-import { inShard } from "../lib/http-shard";
+import { vCapabilityReport } from "../lib/capability-report";
+import { isUploadId } from "../lib/chat-upload-staging";
+import { inSystemShard, systemRunners } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
-import { MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, INGEST_FLOOD_LIMIT_PER_MINUTE } from "./lib/constants";
+import { INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, MAX_MEDIA_PER_TURN } from "./lib/constants";
 import { vHostEvent } from "./validators";
 
 const json = (body: unknown, status: number): Response => Response.json(body, { status });
@@ -59,8 +63,8 @@ export const floodAllowed = (address: string, now: number): boolean => {
 
 export const resetFloodGuard = (): void => floodWindows.clear();
 
-/** The body as text, or null past `maxBytes`. Counted while reading: `Content-Length` is only the sender's word. */
-export const readCappedBody = async (request: Request, maxBytes: number): Promise<string | null> => {
+/** The body's bytes, or null past `maxBytes`. Counted while reading: `Content-Length` is only the sender's word. */
+export const readCappedBytes = async (request: Request, maxBytes: number): Promise<Uint8Array | null> => {
     const declared = Number(request.headers.get("content-length"));
 
     if (Number.isFinite(declared) && declared > maxBytes) {
@@ -72,7 +76,7 @@ export const readCappedBody = async (request: Request, maxBytes: number): Promis
     const reader = request.body?.getReader();
 
     if (!reader) {
-        return "";
+        return new Uint8Array();
     }
 
     const parts: Uint8Array[] = [];
@@ -104,7 +108,14 @@ export const readCappedBody = async (request: Request, maxBytes: number): Promis
         offset += part.byteLength;
     }
 
-    return new TextDecoder().decode(bytes);
+    return bytes;
+};
+
+/** The body as text, or null past `maxBytes`. */
+export const readCappedBody = async (request: Request, maxBytes: number): Promise<string | null> => {
+    const bytes = await readCappedBytes(request, maxBytes);
+
+    return bytes === null ? null : new TextDecoder().decode(bytes);
 };
 
 // ─── 2. the device's owner ─────────────────────────────────────────────────────
@@ -115,7 +126,7 @@ const ownerCache = new Map<string, { expiresAt: number; ownerId: string }>();
 
 export const resetOwnerCache = (): void => ownerCache.clear();
 
-const deviceOwner = async (context: HttpActionCtx, deviceId: string, now: number): Promise<string | null> => {
+export const deviceOwner = async (context: HttpActionCtx, deviceId: string, now: number): Promise<string | null> => {
     const hit = ownerCache.get(deviceId);
 
     if (hit !== undefined && hit.expiresAt > now) {
@@ -158,6 +169,39 @@ const optionalString = (value: unknown): string | undefined | null => {
     return typeof value === "string" ? value : null;
 };
 
+/**
+ * A `session_open` whose capability report does not validate keeps the session: the report is stored as "all
+ * unknown" (every control hidden) and the failure is logged, instead of the whole post being refused. Its
+ * `reportedAt` is 0, so it never outranks a real report: the next valid one replaces it.
+ */
+const withValidReport = (raw: unknown, deviceId: string, logged: { done: boolean }): unknown => {
+    if (!isRecord(raw) || raw.kind !== "session_open" || raw.capabilities === undefined) {
+        return raw;
+    }
+
+    const parsed = vCapabilityReport.safeParse(raw.capabilities);
+
+    if (parsed.ok) {
+        return raw;
+    }
+
+    // One line per post: a post may carry hundreds of events, and this runs before the per-device limit does.
+    if (!logged.done) {
+        logged.done = true;
+        console.warn(
+            `[acp] device ${deviceId} sent a capability report that does not validate at ${parsed.error.path.join(".") || "<root>"}; stored as all unknown`,
+        );
+    }
+
+    return { ...raw, capabilities: unknownCapabilityReport(0) };
+};
+
+type MediaEvent = Extract<Infer<typeof vHostEvent>, { kind: "media" }>;
+
+const withoutStorage = ({ contentType, kind, name, reference, size, uploadId }: MediaEvent): MediaEvent => {
+    return { kind, name, reference, size, ...(contentType !== undefined && { contentType }), ...(uploadId !== undefined && { uploadId }) };
+};
+
 interface Post {
     close: boolean;
     events: Infer<typeof vHostEvent>[];
@@ -168,7 +212,7 @@ interface Post {
 }
 
 /** The signed payload's fields, or null when they are not the shape of a post. */
-const readPost = (payload: Record<string, unknown>): Post | null => {
+const readPost = (payload: Record<string, unknown>, deviceId: string): Post | null => {
     const threadId = optionalString(payload.threadId);
     const turnId = optionalString(payload.turnId);
     const { firstSeq } = payload;
@@ -189,42 +233,107 @@ const readPost = (payload: Record<string, unknown>): Post | null => {
     }
 
     const events: Post["events"] = [];
+    const logged = { done: false };
 
     for (const raw of payload.events) {
-        const parsed = vHostEvent.safeParse(raw);
+        const parsed = vHostEvent.safeParse(withValidReport(raw, deviceId, logged));
 
         if (!parsed.ok) {
             return null;
         }
 
-        events.push(parsed.value);
+        // `fileId` and `storageKey` name stored bytes: only the backend sets them (`resolveMedia`), never a device.
+        events.push(parsed.value.kind === "media" ? withoutStorage(parsed.value) : parsed.value);
+    }
+
+    if (events.filter((event) => event.kind === "media").length > MAX_MEDIA_PER_TURN) {
+        return null;
     }
 
     return { close: payload.close === true, events, firstSeq, sessionId: payload.sessionId, threadId, turnId };
 };
 
-const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string, signature: string): Promise<Response> => {
-    // The route said whose device this is; the shard's own device row must agree.
-    const verified = await context.runQuery(internal.acp.ingest.verifyHostPost, { deviceId, now: Date.now(), payload, signature });
+/**
+ * Finalizes the uploads the post's `media` events name, for the device's owner, and returns the events as they are
+ * stored: an upload that finalized is attached (`fileId`, `storageKey`); anything else stays a name and a size.
+ * Only events the stream does not have yet are finalized: a redelivered post, or one the backend answers `gap` to,
+ * must not spend an upload that is meant for the resend. A finalize that fails never fails the post (the desktop
+ * would stop posting the whole turn): the file is shown as not attached.
+ */
+const resolveMedia = async (context: HttpActionCtx, ownerId: string, post: Post): Promise<Post["events"]> => {
+    const wanted = post.events.some((event) => event.kind === "media" && event.uploadId !== undefined);
 
-    if (verified?.userId !== ownerId) {
-        return unauthorized();
+    if (!wanted || post.turnId === undefined || post.firstSeq === undefined) {
+        return post.events.map((event) => (event.kind === "media" ? withoutUpload(event) : event));
     }
 
-    const post = readPost(parseJson(payload) as Record<string, unknown>);
+    const next = await context.runQuery(internal.acp.upload.hostStreamNext, { turnId: post.turnId, userId: ownerId });
+    const firstFresh = next === null ? 0 : next - post.firstSeq;
+    const gap = next !== null && post.firstSeq > next;
+    const resolved: Post["events"] = [];
+
+    // One at a time: a finalize holds the whole file in memory (`FINALIZE_MAX_BYTES`), and the host posts one file per
+    // request for the same reason.
+    for (const [index, event] of post.events.entries()) {
+        if (event.kind !== "media") {
+            resolved.push(event);
+        } else if (event.uploadId === undefined || index < firstFresh || gap || !isUploadId(event.uploadId)) {
+            resolved.push(withoutUpload(event));
+        } else {
+            resolved.push(await finalizeMedia(context, ownerId, event, event.uploadId));
+        }
+    }
+
+    return resolved;
+};
+
+/** The event as it is stored once its upload is finalized, or without a file when that fails for any reason. */
+const finalizeMedia = async (context: HttpActionCtx, ownerId: string, event: MediaEvent, uploadId: string): Promise<MediaEvent> => {
+    try {
+        const stored = await context.runAction(internal.acp.upload.finalizeHostUpload, {
+            filename: event.name.slice(0, MAX_LENGTH.short),
+            uploadId,
+            userId: ownerId,
+        });
+
+        return stored === null
+            ? withoutUpload(event)
+            : { ...withoutUpload(event), contentType: stored.mediaType, fileId: stored.fileId, storageKey: stored.storageKey };
+    } catch {
+        // A thrown finalize must not become a 5xx: the host retries those for ever.
+        return withoutUpload(event);
+    }
+};
+
+const withoutUpload = ({ contentType, kind, name, reference, size }: MediaEvent): MediaEvent => {
+    return { kind, name, reference, size, ...(contentType !== undefined && { contentType }) };
+};
+
+/** The post, applied on the owner's shard. The caller has verified the device's signature. */
+const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: string, payload: string): Promise<Response> => {
+    const post = readPost(parseJson(payload) as Record<string, unknown>, deviceId);
 
     if (!post) {
         return json({ error: "malformed" }, 400);
     }
 
     // A host-run thread is never shared, so it lives on its owner's shard: anything else is refused.
-    if (post.threadId !== undefined && (await threadShardFor(context, ownerId, post.threadId)) !== ownerId) {
+    if (post.threadId !== undefined && (await threadShardFor(context, ownerId, post.threadId, systemRunners(ownerId))) !== ownerId) {
         return json({ error: "refused" }, 403);
     }
 
+    // Finalizing a file deletes its staged upload, so the device's budget is spent first: a post that would be
+    // answered 429 must not have used the upload up.
+    const hasUploads = post.events.some((event) => event.kind === "media" && event.uploadId !== undefined);
+
+    if (hasUploads && !(await context.runMutation(internal.acp.ingest.spendHostBudget, { deviceId }))) {
+        return json({ error: "rate_limited" }, 429);
+    }
+
     const result = await context.runMutation(internal.acp.ingest.applyHostEvents, {
+        ...(hasUploads && { budgetSpent: true }),
         deviceId,
-        events: post.events,
+        events: await resolveMedia(context, ownerId, post),
         sessionId: post.sessionId,
         ...(post.close && { close: true }),
         ...(post.firstSeq !== undefined && { firstSeq: post.firstSeq }),
@@ -234,7 +343,15 @@ const handleOnShard = async (context: HttpActionCtx, ownerId: string, deviceId: 
 
     switch (result.outcome) {
         case "applied": {
-            return json({ ended: result.ended, next: result.next, ...(result.threadId !== undefined && { threadId: result.threadId }) }, 200);
+            return json(
+                {
+                    ended: result.ended,
+                    next: result.next,
+                    ...(result.existing !== undefined && { existing: result.existing }),
+                    ...(result.threadId !== undefined && { threadId: result.threadId }),
+                },
+                200,
+            );
         }
         case "busy": {
             // A conflict with no `next`: the host reads it as "try again", not as a gap to fill.
@@ -288,5 +405,14 @@ export const hostIngestHttpAction = async (context: HttpActionCtx, request: Requ
         return unauthorized();
     }
 
-    return await inShard(context, ownerId, async (shardContext) => await handleOnShard(shardContext, ownerId, deviceId, payload, signature));
+    // The route said whose device this is; the shard's own device row must agree. This is the only call made
+    // before the signature is known good: a fixed query that returns the owner or null, never data.
+    const verified = await systemRunners(ownerId).runQuery(internal.acp.ingest.verifyHostPost, { deviceId, now: Date.now(), payload, signature });
+
+    if (verified?.userId !== ownerId) {
+        return unauthorized();
+    }
+
+    // Verified: the host has no session, so the crossing is as the system.
+    return await inSystemShard(context, ownerId, async (shardContext) => await handleOnShard(shardContext, ownerId, deviceId, payload));
 };

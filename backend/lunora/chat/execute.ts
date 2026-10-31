@@ -441,10 +441,10 @@ export const runStreamingAgent = internalAction
             // goal plus a reviewer's note drawn from tool output, not something the user said.
             const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread) && sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
 
-            let paused: boolean;
+            let finished: Awaited<ReturnType<typeof finishRun>>;
 
             try {
-                ({ paused } = await finishRun(ctx, {
+                finished = await finishRun(ctx, {
                     mcpLabels: toolResult.mcpLabels,
                     pending,
                     savedMessages: result.savedMessages,
@@ -468,7 +468,7 @@ export const runStreamingAgent = internalAction
                     threadId,
                     unsaved,
                     userId,
-                }));
+                });
             } catch (error) {
                 // A stop landed after the pipe ended: the final write is refused, the owed text is saved.
                 await stoppedAt(error);
@@ -486,7 +486,7 @@ export const runStreamingAgent = internalAction
 
             // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running
             // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
-            if (paused) {
+            if (finished.paused) {
                 await noteGoalPaused(ctx, threadId);
             } else if ((await handOffToGoalReview(ctx, threadId, { messageId })) || (await otherGoalHoldsThread(ctx, threadId, { messageId }))) {
                 // Its goal reviews it next; or its goal was replaced while it ran and the new goal owns the thread now.
@@ -498,7 +498,7 @@ export const runStreamingAgent = internalAction
                 userId,
             });
 
-            await setThreadStatus(ctx, threadId, "active");
+            await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
 
             streamLogger.debug(`[BgAgent] Execution complete`, {
                 elapsedMs: Date.now() - startTime,
@@ -603,7 +603,11 @@ export const continueAfterToolApproval = internalAction
                 return;
             }
 
-            await setThreadStatus(ctx, threadId, "active");
+            await setThreadStatus(ctx, threadId, "active", { awaitingInput: resumed.awaitingInput, replied: !resumed.paused && !resumed.stopped });
+
+            if (resumed.stopped) {
+                await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
+            }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
 

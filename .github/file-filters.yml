@@ -40,6 +40,7 @@ e2e:
 # What the desktop package check exercises: the Electron shell and the Rust addon it loads.
 desktop:
     - "apps/desktop/**"
+    - "packages/ai/src/capabilities/**"
     - "packages/device-core/**"
     - "packages/device-core-node/**"
     - "**/tsconfig*.json"

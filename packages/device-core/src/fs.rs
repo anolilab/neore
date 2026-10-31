@@ -18,10 +18,16 @@ use std::path::{Component, Path, PathBuf};
 
 use serde_json::{json, Value};
 
+use crate::media::{self, Kind};
+
 /// Largest file `fs_read` opens and `fs_write` writes.
 pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 /// Directory entries `fs_list` returns.
 pub const MAX_LIST_ENTRIES: usize = 1000;
+/// Entries one page of [`list_page`] returns at most.
+pub const MAX_PAGE_ENTRIES: usize = 2000;
+/// Entries of one folder [`list_page`] reads before it says the folder was cut.
+const MAX_FOLDER_ENTRIES: usize = 1_000_000;
 
 /// The roots that still exist, canonicalised. Missing folders are skipped.
 pub fn canonical_roots(roots: &[String]) -> Vec<PathBuf> {
@@ -130,6 +136,13 @@ enum Open {
 /// `(name, kind, size)` per entry, and whether the listing was cut.
 type Listing = (Vec<(String, &'static str, u64)>, bool);
 
+/// One page of a folder in name order: its entries, whether more follow, and whether the folder was cut short.
+struct Page {
+    cut: bool,
+    entries: Vec<(String, &'static str, u64)>,
+    more: bool,
+}
+
 fn outside_roots() -> io::Error {
     io::Error::new(
         io::ErrorKind::PermissionDenied,
@@ -139,13 +152,36 @@ fn outside_roots() -> io::Error {
 
 #[cfg(unix)]
 mod confined {
-    use super::{outside_roots, Listing, Open};
+    use super::{outside_roots, Listing, Open, Page};
+    use std::collections::BinaryHeap;
     use std::ffi::{CString, OsStr};
     use std::fs::File;
     use std::io;
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
     use std::os::unix::ffi::OsStrExt;
     use std::path::{Component, Path, PathBuf};
+
+    /// The thread's `errno`, which `readdir` leaves alone at the end of a folder and sets on an error.
+    pub(crate) fn errno() -> *mut libc::c_int {
+        // SAFETY: each of these returns the address of the calling thread's `errno`.
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+        unsafe {
+            libc::__errno_location()
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "dragonfly"
+        ))]
+        unsafe {
+            libc::__error()
+        }
+        #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
+        unsafe {
+            libc::__errno()
+        }
+    }
 
     fn openat(dir: libc::c_int, name: &OsStr, flags: libc::c_int) -> io::Result<OwnedFd> {
         let name = CString::new(name.as_bytes())
@@ -239,63 +275,171 @@ mod confined {
         openat(dir.as_raw_fd(), name, flags).map(File::from)
     }
 
-    /// `(name, kind, size)` of up to `max` entries of a directory, read through the descriptor that
-    /// `open_dir` confined. The `bool` says whether there were more.
-    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
-        let dir = open_dir(roots, path, true)?;
-        let fd = dir.as_raw_fd();
-        // SAFETY: `fdopendir` takes over `fd`, so the owner is forgotten and `closedir` closes it below.
-        let stream = unsafe { libc::fdopendir(fd) };
+    /// A folder opened by [`open_dir`] and read through that descriptor.
+    struct Stream {
+        fd: libc::c_int,
+        stream: *mut libc::DIR,
+    }
 
-        if stream.is_null() {
-            return Err(io::Error::last_os_error());
+    impl Stream {
+        fn open(roots: &[PathBuf], path: &Path) -> io::Result<Stream> {
+            let dir = open_dir(roots, path, true)?;
+            let fd = dir.as_raw_fd();
+            // SAFETY: `fdopendir` takes over `fd`, so the owner is forgotten and `closedir` (in `Drop`) closes it.
+            let stream = unsafe { libc::fdopendir(fd) };
+
+            if stream.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+
+            std::mem::forget(dir);
+
+            Ok(Stream { fd, stream })
         }
 
-        std::mem::forget(dir);
+        /// Calls `visit` with each name but `.` and `..` until it answers `false`. A read that fails partway is an
+        /// error, not the end of the folder: a short listing would pass for a complete one.
+        fn names(&mut self, mut visit: impl FnMut(&std::ffi::CStr) -> bool) -> io::Result<()> {
+            loop {
+                // SAFETY: `errno` is the calling thread's own; `stream` is a live DIR* until `closedir`, and the
+                // entry is only read before the next call.
+                let entry = unsafe {
+                    *errno() = 0;
 
-        let mut listed = Vec::new();
-        let mut truncated = false;
+                    libc::readdir(self.stream)
+                };
 
-        loop {
-            // SAFETY: `stream` is a live DIR* until `closedir`; the entry is only read before the next call.
-            let entry = unsafe { libc::readdir(stream) };
+                if entry.is_null() {
+                    // The end of the folder leaves `errno` alone; a failed read sets it.
+                    let error = io::Error::last_os_error();
 
-            if entry.is_null() {
-                break;
+                    return match error.raw_os_error() {
+                        Some(0) | None => Ok(()),
+                        Some(_) => Err(error),
+                    };
+                }
+
+                // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
+                let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
+
+                if !matches!(name.to_bytes(), b"." | b"..") && !visit(name) {
+                    return Ok(());
+                }
             }
+        }
 
-            // SAFETY: `d_name` is a NUL-terminated string inside the entry returned above.
-            let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
-
-            if matches!(name.to_bytes(), b"." | b"..") {
-                continue;
-            }
-
-            if listed.len() >= max {
-                truncated = true;
-                break;
-            }
-
+        /// What an entry is and its size, without following it.
+        fn kind(fd: libc::c_int, name: &std::ffi::CStr) -> (&'static str, u64) {
             // SAFETY: an all-zero `stat` is a valid out-parameter; `fstatat` fills it.
             let mut stat: libc::stat = unsafe { std::mem::zeroed() };
             // SAFETY: `fd` is still open (owned by `stream`) and `name` is NUL-terminated.
             let found =
                 unsafe { libc::fstatat(fd, name.as_ptr(), &mut stat, libc::AT_SYMLINK_NOFOLLOW) }
                     == 0;
-            let (kind, size) = match (found, stat.st_mode & libc::S_IFMT) {
+
+            match (found, stat.st_mode & libc::S_IFMT) {
                 (false, _) => ("unknown", 0),
                 (true, libc::S_IFLNK) => ("symlink", stat.st_size as u64),
                 (true, libc::S_IFDIR) => ("dir", stat.st_size as u64),
-                (true, _) => ("file", stat.st_size as u64),
-            };
+                (true, libc::S_IFREG) => ("file", stat.st_size as u64),
+                (true, _) => ("other", 0),
+            }
+        }
+    }
+
+    impl Drop for Stream {
+        fn drop(&mut self) {
+            // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
+            unsafe { libc::closedir(self.stream) };
+        }
+    }
+
+    /// `(name, kind, size)` of up to `max` entries of a directory, read through the descriptor that
+    /// `open_dir` confined. The `bool` says whether there were more.
+    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+        let mut stream = Stream::open(roots, path)?;
+        let fd = stream.fd;
+        let mut listed = Vec::new();
+        let mut truncated = false;
+
+        stream.names(|name| {
+            if listed.len() >= max {
+                truncated = true;
+
+                return false;
+            }
+
+            let (kind, size) = Stream::kind(fd, name);
 
             listed.push((name.to_string_lossy().into_owned(), kind, size));
-        }
 
-        // SAFETY: `stream` came from `fdopendir` and is closed exactly once.
-        unsafe { libc::closedir(stream) };
+            true
+        })?;
 
         Ok((listed, truncated))
+    }
+
+    /// The `limit` smallest names greater than `after`, with their kinds, and whether more follow. Every name is
+    /// read but only `limit + 1` are kept, and only those are looked at with `fstatat`, so a page costs one pass
+    /// over the folder's names and memory for one page, however large the folder is. At most `scan` names are
+    /// read; `cut` says the folder had more.
+    pub fn page(
+        roots: &[PathBuf],
+        path: &Path,
+        after: Option<&str>,
+        limit: usize,
+        scan: usize,
+    ) -> io::Result<Page> {
+        let mut stream = Stream::open(roots, path)?;
+        // Largest on top, so the one to give up is always at hand. Compared as text, like the sorted listing.
+        let mut kept: BinaryHeap<(String, Vec<u8>)> = BinaryHeap::new();
+        let (mut scanned, mut cut) = (0usize, false);
+
+        stream.names(|name| {
+            if scanned >= scan {
+                cut = true;
+
+                return false;
+            }
+
+            scanned += 1;
+
+            let text = String::from_utf8_lossy(name.to_bytes());
+
+            if after.is_some_and(|after| text.as_ref() <= after) {
+                return true;
+            }
+
+            if kept.len() <= limit {
+                kept.push((text.into_owned(), name.to_bytes().to_vec()));
+            } else if kept
+                .peek()
+                .is_some_and(|largest| text.as_ref() < largest.0.as_str())
+            {
+                kept.pop();
+                kept.push((text.into_owned(), name.to_bytes().to_vec()));
+            }
+
+            true
+        })?;
+
+        let fd = stream.fd;
+        let mut names = kept.into_sorted_vec();
+        let more = names.len() > limit;
+
+        names.truncate(limit);
+
+        let entries = names
+            .into_iter()
+            .map(|(text, raw)| {
+                let (kind, size) = std::ffi::CString::new(raw)
+                    .map_or(("unknown", 0), |raw| Stream::kind(fd, &raw));
+
+                (text, kind, size)
+            })
+            .collect();
+
+        Ok(Page { cut, entries, more })
     }
 }
 
@@ -306,7 +450,8 @@ mod confined {
 /// file can still create it at a swapped-in place before the check; the file is then removed again.
 #[cfg(windows)]
 mod confined {
-    use super::{outside_roots, within_roots, Listing, Open};
+    use super::{outside_roots, within_roots, Listing, Open, Page};
+    use std::collections::BinaryHeap;
     use std::ffi::OsString;
     use std::fs::{File, OpenOptions};
     use std::io;
@@ -522,8 +667,13 @@ mod confined {
     }
 
     /// Lists the folder through the handle that was checked, so there is no second path to resolve. The directory
-    /// info classes report attributes without following anything: a reparse point is listed as a link.
-    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+    /// info classes report attributes without following anything: a reparse point is listed as a link. `visit` is
+    /// given each entry and says whether to go on; `false` stops the walk.
+    fn walk(
+        roots: &[PathBuf],
+        path: &Path,
+        mut visit: impl FnMut(String, &'static str, u64) -> bool,
+    ) -> io::Result<()> {
         let dir = options(false).open(path)?;
 
         confirm(&dir, roots)?;
@@ -533,10 +683,8 @@ mod confined {
         // 8-byte aligned, as the entries are.
         let mut buffer = vec![0u64; 8192];
         let mut class = FileIdBothDirectoryRestartInfo;
-        let mut listed = Vec::new();
-        let mut truncated = false;
 
-        'read: loop {
+        loop {
             // SAFETY: the handle is open and the buffer is writable for the length passed.
             let read = unsafe {
                 GetFileInformationByHandleEx(
@@ -552,7 +700,7 @@ mod confined {
 
                 // ERROR_NO_MORE_FILES: the end of the folder.
                 return if error.raw_os_error() == Some(18) {
-                    Ok((listed, truncated))
+                    Ok(())
                 } else {
                     Err(error)
                 };
@@ -581,11 +729,6 @@ mod confined {
                 let name = String::from_utf16_lossy(name);
 
                 if name != "." && name != ".." {
-                    if listed.len() >= max {
-                        truncated = true;
-                        break 'read;
-                    }
-
                     // With a reparse point set, `EaSize` carries its tag. Only a name surrogate is a link.
                     let link = entry.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
                         && super::is_name_surrogate(entry.EaSize);
@@ -597,7 +740,9 @@ mod confined {
                         "file"
                     };
 
-                    listed.push((name, kind, entry.EndOfFile.max(0) as u64));
+                    if !visit(name, kind, entry.EndOfFile.max(0) as u64) {
+                        return Ok(());
+                    }
                 }
 
                 if entry.NextEntryOffset == 0 {
@@ -607,9 +752,85 @@ mod confined {
                 offset += entry.NextEntryOffset as usize;
             }
         }
+    }
+
+    /// The folder's entries, at most `max` of them; the flag says it had more.
+    pub fn entries(roots: &[PathBuf], path: &Path, max: usize) -> io::Result<Listing> {
+        let mut listed = Vec::new();
+        let mut truncated = false;
+
+        walk(roots, path, |name, kind, size| {
+            if listed.len() >= max {
+                truncated = true;
+
+                return false;
+            }
+
+            listed.push((name, kind, size));
+
+            true
+        })?;
 
         Ok((listed, truncated))
     }
+
+    /// A page of the folder in name order. Windows lists a folder in one call that already carries every
+    /// entry's attributes, so no second look is needed; only the `limit + 1` smallest names after `after` are kept
+    /// (a heap, as on Unix), so memory is one page however large the folder is. At most `scan` names are read.
+    pub fn page(
+        roots: &[PathBuf],
+        path: &Path,
+        after: Option<&str>,
+        limit: usize,
+        scan: usize,
+    ) -> io::Result<Page> {
+        // Largest on top, so the one to give up is always at hand.
+        let mut kept: BinaryHeap<(String, &'static str, u64)> = BinaryHeap::new();
+        let (mut scanned, mut cut) = (0usize, false);
+
+        walk(roots, path, |name, kind, size| {
+            if scanned >= scan {
+                cut = true;
+
+                return false;
+            }
+
+            scanned += 1;
+
+            if after.is_some_and(|after| name.as_str() <= after) {
+                return true;
+            }
+
+            if kept.len() <= limit {
+                kept.push((name, kind, size));
+            } else if kept.peek().is_some_and(|largest| name < largest.0) {
+                kept.pop();
+                kept.push((name, kind, size));
+            }
+
+            true
+        })?;
+
+        let mut listed = kept.into_sorted_vec();
+        let more = listed.len() > limit;
+
+        listed.truncate(limit);
+
+        Ok(Page {
+            cut,
+            entries: listed,
+            more,
+        })
+    }
+}
+
+#[cfg(unix)]
+pub(crate) use confined::errno;
+
+/// A folder opened for reading through the same walk as [`list`], for a caller that goes on by descriptor.
+#[cfg(unix)]
+pub(crate) fn open_folder(roots: &[PathBuf], path: &Path) -> io::Result<std::os::fd::OwnedFd> {
+    confined::open_dir(roots, path, true)
 }
 
 pub fn list(roots: &[PathBuf], path: &Path) -> Result<Value, String> {
@@ -624,6 +845,32 @@ pub fn list(roots: &[PathBuf], path: &Path) -> Result<Value, String> {
         .collect();
 
     Ok(json!({ "path": path.to_string_lossy(), "entries": entries, "truncated": truncated }))
+}
+
+/// One page of a folder, name-sorted: the entries after `after` (a name from the previous page's `next`), at most
+/// `limit` of them. A page reads the folder's names but keeps and looks at only the page, so it costs a pass over
+/// the folder and memory for the page; `fs_list` keeps its 1000-entry cut for the agent.
+pub fn list_page(
+    roots: &[PathBuf],
+    path: &Path,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<Value, String> {
+    let page = confined::page(roots, path, after, limit, MAX_FOLDER_ENTRIES)
+        .map_err(|error| error.to_string())?;
+    let next = page
+        .more
+        .then(|| page.entries.last().map(|(name, _, _)| name.as_str()))
+        .flatten();
+    let entries: Vec<Value> = page
+        .entries
+        .iter()
+        .map(|(name, kind, size)| json!({ "name": name, "type": kind, "size": size }))
+        .collect();
+
+    Ok(
+        json!({ "path": path.to_string_lossy(), "entries": entries, "next": next, "truncated": page.cut }),
+    )
 }
 
 /// Up to [`MAX_FILE_BYTES`] of a file as text. Binary files are described, not dumped.
@@ -659,6 +906,145 @@ pub fn read(roots: &[PathBuf], path: &Path) -> Result<String, String> {
     }
 
     Ok(text)
+}
+
+/// `raw` as a path inside `root`, decided on the text alone: `.` and `..` are folded without touching the disk, a
+/// relative path is taken from the root, and the result must still start with it. Nothing is resolved, so a path
+/// that names another machine (`/net/host/..`, an automounted or network path) is refused before the system could
+/// connect to it, which `canonicalize` would do.
+fn lexically_inside(root: &Path, raw: &str) -> Option<PathBuf> {
+    let path = Path::new(raw.trim());
+    let mut folded = PathBuf::new();
+
+    for component in root.join(path).components() {
+        match component {
+            Component::ParentDir => {
+                folded.pop();
+            }
+            Component::CurDir => {}
+            other => folded.push(other.as_os_str()),
+        }
+    }
+
+    folded.starts_with(root).then_some(folded)
+}
+
+/// A file the agent wrote, read for attaching to its reply.
+#[derive(Debug)]
+pub struct MediaFile {
+    pub bytes: Vec<u8>,
+    pub kind: Kind,
+    pub mime: &'static str,
+    pub name: String,
+    pub size: u64,
+}
+
+/// What reading one reference came to. Only `Read` carries bytes.
+#[derive(Debug)]
+pub enum MediaRead {
+    Read(MediaFile),
+    /// Over the upload cap: named, never read past its first bytes.
+    TooLarge {
+        mime: &'static str,
+        name: String,
+        size: u64,
+    },
+    /// Outside the folder, not a plain file, not an allowed type, or not there. Says nothing about which.
+    Refused,
+}
+
+/// A file the agent's reply refers to, if it is inside `roots` and an allowed type (`media`). `reference` is the
+/// path as the reply wrote it: relative to the first root, or absolute.
+///
+/// A path that resolves outside the roots is refused by the canonicalisation, which opens nothing: `..`, an
+/// absolute path elsewhere and a link that leaves the folder are all caught before any file is touched. What
+/// passes is then opened through the same confined walk as `fs_read` (no link followed below the root, so a link
+/// swapped in since the check fails), and its size is taken from the OPEN file, not from an earlier look.
+pub fn read_media(roots: &[PathBuf], reference: &str) -> MediaRead {
+    if !media::is_plain_path(reference) {
+        return MediaRead::Refused;
+    }
+
+    // The text first: a reference that leaves the folder is refused before anything resolves it.
+    let Some(inside) = roots
+        .iter()
+        .find_map(|root| lexically_inside(root, reference))
+    else {
+        return MediaRead::Refused;
+    };
+    let Ok(path) = resolve_existing(&inside.to_string_lossy(), roots) else {
+        return MediaRead::Refused;
+    };
+    let Some(name) = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+    else {
+        return MediaRead::Refused;
+    };
+    let Ok(mut file) = confined::open_file(roots, &path, Open::Read) else {
+        return MediaRead::Refused;
+    };
+    let Ok(meta) = file.metadata() else {
+        return MediaRead::Refused;
+    };
+
+    if !meta.is_file() {
+        return MediaRead::Refused;
+    }
+
+    let mut head = Vec::new();
+
+    if (&mut file)
+        .take(media::SNIFF_BYTES as u64)
+        .read_to_end(&mut head)
+        .is_err()
+    {
+        return MediaRead::Refused;
+    }
+
+    let Some((mime, kind)) = media::classify(&name, &head) else {
+        return MediaRead::Refused;
+    };
+    let size = meta.len();
+
+    if size > media::MAX_UPLOAD_BYTES {
+        return MediaRead::TooLarge { mime, name, size };
+    }
+
+    // The rest, one byte past the cap so a file that grew since `fstat` is caught instead of truncated.
+    let mut bytes = head;
+
+    if file
+        .take(media::MAX_UPLOAD_BYTES + 1 - bytes.len() as u64)
+        .read_to_end(&mut bytes)
+        .is_err()
+    {
+        return MediaRead::Refused;
+    }
+
+    if bytes.len() as u64 > media::MAX_UPLOAD_BYTES {
+        return MediaRead::TooLarge {
+            mime,
+            name,
+            size: bytes.len() as u64,
+        };
+    }
+
+    let size = bytes.len() as u64;
+    // An image above the inline cap is offered as a file, with its size.
+    let kind = if kind == Kind::Image && size > media::MAX_INLINE_IMAGE_BYTES {
+        Kind::File
+    } else {
+        kind
+    };
+
+    MediaRead::Read(MediaFile {
+        bytes,
+        kind,
+        mime,
+        name,
+        size,
+    })
 }
 
 pub fn write(
@@ -812,6 +1198,35 @@ mod tests {
         assert!(read(&roots, &roots[0]).is_err());
     }
 
+    /// A FIFO is listed as `other`, not `file`, so a page cannot ask to preview (and block on) it.
+    #[cfg(unix)]
+    #[test]
+    fn lists_a_fifo_as_other() {
+        let dir = scratch("fifo");
+        let fifo =
+            std::ffi::CString::new(dir.join("root/pipe").to_string_lossy().as_bytes()).unwrap();
+        // SAFETY: `fifo` is a NUL-terminated path inside the scratch folder.
+        assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+        let listing = list(&roots, &roots[0]).unwrap();
+        let kinds: Vec<(&str, &str)> = listing["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                (
+                    entry["name"].as_str().unwrap(),
+                    entry["type"].as_str().unwrap(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            kinds,
+            [("a.txt", "file"), ("pipe", "other"), ("sub", "dir")]
+        );
+    }
+
     /// An ancestor of the root replaced by a link after the roots were read must not be followed.
     #[cfg(unix)]
     #[test]
@@ -892,6 +1307,198 @@ mod tests {
         assert_eq!(fs::read_to_string(dir.join("root/a.txt")).unwrap(), "x");
     }
 
+    const PNG_HEAD: [u8; 10] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
+
+    fn media_scratch(name: &str) -> (PathBuf, Vec<PathBuf>) {
+        let dir = scratch(name);
+
+        fs::write(dir.join("root/chart.png"), PNG_HEAD).unwrap();
+        fs::write(dir.join("secret.png"), PNG_HEAD).unwrap();
+
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        (dir, roots)
+    }
+
+    #[test]
+    fn an_image_in_the_folder_is_read_with_its_type() {
+        let (_dir, roots) = media_scratch("media-ok");
+
+        match read_media(&roots, "chart.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.bytes, PNG_HEAD);
+                assert_eq!(file.mime, "image/png");
+                assert_eq!(file.kind, Kind::Image);
+                assert_eq!(file.name, "chart.png");
+                assert_eq!(file.size, PNG_HEAD.len() as u64);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// The outside files are made unreadable: a refusal that is an "outside the folder" answer, not a permission
+    /// error from an open, proves the file was never opened.
+    #[cfg(unix)]
+    #[test]
+    fn a_reference_that_leaves_the_folder_is_refused_without_opening_anything() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, roots) = media_scratch("media-outside");
+        let secret = dir.join("secret.png");
+
+        std::os::unix::fs::symlink(&secret, dir.join("root/link.png")).unwrap();
+        std::os::unix::fs::symlink(&dir, dir.join("root/up")).unwrap();
+        fs::set_permissions(&secret, fs::Permissions::from_mode(0o000)).unwrap();
+
+        for reference in [
+            "../secret.png",
+            &secret.to_string_lossy(),
+            "link.png",
+            "up/secret.png",
+            "sub/../../secret.png",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+            assert!(
+                resolve_existing(reference, &roots)
+                    .unwrap_err()
+                    .ends_with("outside the shared folders"),
+                "{reference} must be refused by the path check, before any open"
+            );
+        }
+
+        fs::set_permissions(&secret, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+
+    #[test]
+    fn a_path_is_judged_on_its_text_before_anything_resolves_it() {
+        let root = Path::new("/work/project");
+
+        assert_eq!(
+            lexically_inside(root, "out/a.png"),
+            Some(PathBuf::from("/work/project/out/a.png"))
+        );
+        assert_eq!(
+            lexically_inside(root, "./out/../a.png"),
+            Some(PathBuf::from("/work/project/a.png"))
+        );
+        assert_eq!(
+            lexically_inside(root, "/work/project/out/a.png"),
+            Some(PathBuf::from("/work/project/out/a.png"))
+        );
+
+        for outside in [
+            "../a.png",
+            "out/../../a.png",
+            "/net/host/a.png",
+            "/Volumes/share/a.png",
+            "/work/project/../other/a.png",
+            "/work/projectile/a.png",
+            "/etc/passwd",
+        ] {
+            assert_eq!(lexically_inside(root, outside), None, "{outside}");
+        }
+    }
+
+    #[test]
+    fn a_network_path_is_refused_without_resolution_being_attempted() {
+        let (_dir, roots) = media_scratch("media-network");
+
+        // None of these exist, so a refusal by the file system and one by the text could not be told apart by the
+        // result alone; the text check is pinned by `a_path_is_judged_on_its_text_before_anything_resolves_it`.
+        for reference in [
+            r"\\host\share\a.png",
+            "/net/host/a.png",
+            "//host/share/a.png",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_url_a_missing_file_a_folder_and_a_page_are_refused() {
+        let (dir, roots) = media_scratch("media-refused");
+
+        fs::write(dir.join("root/page.html"), "<script>1</script>").unwrap();
+        fs::write(dir.join("root/fake.png"), "<script>1</script>").unwrap();
+        fs::write(dir.join("root/page.png.html"), PNG_HEAD).unwrap();
+
+        for reference in [
+            "https://example.com/chart.png",
+            "file:///etc/passwd",
+            "missing.png",
+            "sub",
+            "page.html",
+            "fake.png",
+            "page.png.html",
+            "",
+        ] {
+            assert!(
+                matches!(read_media(&roots, reference), MediaRead::Refused),
+                "{reference}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_file_over_the_upload_cap_is_named_with_its_size_and_not_read() {
+        let (dir, roots) = media_scratch("media-large");
+        let big = fs::File::create(dir.join("root/big.png")).unwrap();
+        let size = media::MAX_UPLOAD_BYTES + 5;
+
+        (&big).write_all(&PNG_HEAD).unwrap();
+        big.set_len(size).unwrap();
+
+        match read_media(&roots, "big.png") {
+            MediaRead::TooLarge {
+                name, size: seen, ..
+            } => {
+                assert_eq!(name, "big.png");
+                assert_eq!(seen, size);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_image_over_the_inline_cap_is_offered_as_a_file() {
+        let (dir, roots) = media_scratch("media-inline");
+        let large = fs::File::create(dir.join("root/large.png")).unwrap();
+
+        (&large).write_all(&PNG_HEAD).unwrap();
+        large.set_len(media::MAX_INLINE_IMAGE_BYTES + 1).unwrap();
+
+        match read_media(&roots, "large.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.kind, Kind::File);
+                assert_eq!(file.mime, "image/png");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_size_comes_from_the_bytes_read() {
+        let (dir, roots) = media_scratch("media-size");
+        let exact = fs::File::create(dir.join("root/exact.png")).unwrap();
+
+        (&exact).write_all(&PNG_HEAD).unwrap();
+        exact.set_len(media::MAX_INLINE_IMAGE_BYTES).unwrap();
+
+        match read_media(&roots, "exact.png") {
+            MediaRead::Read(file) => {
+                assert_eq!(file.kind, Kind::Image);
+                assert_eq!(file.bytes.len() as u64, media::MAX_INLINE_IMAGE_BYTES);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
     #[test]
     fn only_a_name_surrogate_reparse_tag_is_a_link() {
         assert!(is_name_surrogate(0xA000_000C), "symlink");
@@ -899,5 +1506,105 @@ mod tests {
         assert!(!is_name_surrogate(0x9000_001A), "cloud files placeholder");
         assert!(!is_name_surrogate(0x8000_0013), "deduplicated file");
         assert!(!is_name_surrogate(0));
+    }
+
+    #[test]
+    fn a_folder_pages_in_name_order_without_repeating_or_skipping() {
+        let dir = scratch("pages");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for name in ["d", "b", "c", "e"] {
+            fs::write(dir.join("root").join(name), name).unwrap();
+        }
+
+        let names = |page: &Value| -> Vec<String> {
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let first = list_page(&roots, &roots[0], None, 3).unwrap();
+        let second = list_page(&roots, &roots[0], first["next"].as_str(), 3).unwrap();
+        let past_the_end = list_page(&roots, &roots[0], Some("sub"), 3).unwrap();
+
+        assert_eq!(names(&first), ["a.txt", "b", "c"]);
+        assert_eq!(first["next"], "c");
+        assert_eq!(names(&second), ["d", "e", "sub"]);
+        // Exactly the last page: nothing follows it, so there is no cursor.
+        assert!(second["next"].is_null());
+        assert!(names(&past_the_end).is_empty());
+        assert!(list_page(&roots, &roots[0].join("a.txt"), None, 3).is_err());
+    }
+
+    #[test]
+    fn a_large_folder_pages_completely_in_name_order() {
+        let dir = scratch("many");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for index in 0..2500 {
+            fs::write(dir.join(format!("root/f{index:05}")), "x").unwrap();
+        }
+
+        let mut seen = Vec::new();
+        let mut after: Option<String> = None;
+        let mut pages = 0;
+
+        loop {
+            let page = list_page(&roots, &roots[0], after.as_deref(), 1000).unwrap();
+
+            pages += 1;
+            seen.extend(page["entries"].as_array().unwrap().iter().map(|entry| {
+                (
+                    entry["name"].as_str().unwrap().to_owned(),
+                    entry["size"].as_u64().unwrap(),
+                )
+            }));
+
+            match page["next"].as_str() {
+                Some(next) => after = Some(next.to_owned()),
+                None => break,
+            }
+        }
+
+        // The file and folder `scratch` made, and the 2,500 more, once each and in order.
+        assert_eq!(pages, 3);
+        assert_eq!(seen.len(), 2502);
+        assert!(seen.windows(2).all(|pair| pair[0].0 < pair[1].0));
+        assert!(seen
+            .iter()
+            .any(|(name, size)| name == "f02499" && *size == 1));
+    }
+
+    #[test]
+    fn a_page_keeps_the_smallest_names_after_the_cursor_whatever_order_the_folder_lists_them_in() {
+        let dir = scratch("smallest");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+
+        for name in ["m", "z", "b", "k", "a", "y"] {
+            fs::write(dir.join("root").join(name), name).unwrap();
+        }
+
+        let page = confined::page(&roots, &roots[0], Some("a.txt"), 2, 100).unwrap();
+        let names: Vec<&str> = page
+            .entries
+            .iter()
+            .map(|(name, _, _)| name.as_str())
+            .collect();
+
+        assert_eq!(names, ["b", "k"]);
+        assert!(page.more);
+        assert!(!page.cut);
+    }
+
+    #[test]
+    fn a_folder_larger_than_the_scan_cap_says_so() {
+        let dir = scratch("scan");
+        let roots = canonical_roots(&[dir.join("root").to_string_lossy().into_owned()]);
+        let page = confined::page(&roots, &roots[0], None, 10, 1).unwrap();
+
+        assert!(page.cut);
+        assert_eq!(page.entries.len(), 1);
     }
 }

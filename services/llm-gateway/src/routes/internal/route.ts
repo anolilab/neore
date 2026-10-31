@@ -6,6 +6,7 @@
  * selects the most cost-effective model that meets quality requirements.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { estimateTokensFromCharacters } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 
@@ -75,8 +76,8 @@ const extractLastUserMessage = (messages: ModelMessage[]): string => {
  *
  * Only the magnitude matters here — it feeds a threshold that decides whether
  * a downgrade is worth the prompt-cache rebuild it forces, and the answer does
- * not change between 180k and 200k. The 4-chars-per-token approximation is the
- * same one the scorer uses.
+ * not change between 180k and 200k. The characters-per-token approximation is
+ * the one the scorer and the thread's agent switch use.
  */
 const estimateContextTokens = (messages: ModelMessage[]): number => {
     let characters = 0;
@@ -93,7 +94,7 @@ const estimateContextTokens = (messages: ModelMessage[]): number => {
         }
     }
 
-    return characters / 4;
+    return estimateTokensFromCharacters(characters);
 };
 
 const requestSchema = z.object({

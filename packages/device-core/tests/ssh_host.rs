@@ -1831,3 +1831,218 @@ fn a_host_that_refuses_its_command_line_needs_a_reinstall_and_is_not_retried() {
     assert!(error.to_string().contains("Reinstall"));
     end_master(&target, &paths);
 }
+
+const BIG_FOLDER_FILES: usize = 10_000;
+
+/// A folder of `BIG_FOLDER_FILES` small files, a link out of it and a file outside that the link points at.
+/// Returns the folder and the bytes its files hold.
+fn big_folder(label: &str) -> (PathBuf, u64) {
+    let dir = std::env::temp_dir().join(format!("neore-big-{label}-{}", std::process::id()));
+
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("big")).unwrap();
+    fs::write(dir.join("secret.txt"), "outside-the-shared-folder").unwrap();
+    std::os::unix::fs::symlink(dir.join("secret.txt"), dir.join("big/escape.txt")).unwrap();
+
+    let mut bytes = 0;
+
+    for index in 0..BIG_FOLDER_FILES {
+        let content = format!("file {index}\n").repeat(40);
+
+        bytes += content.len() as u64;
+        fs::write(dir.join(format!("big/file-{index:05}.txt")), content).unwrap();
+    }
+
+    (fs::canonicalize(dir.join("big")).unwrap(), bytes)
+}
+
+/// How long a 10,000-file folder may take to list and to download, each, over a real ssh session.
+///
+/// MEASURED over six runs of this test (debug build, a sshd on 127.0.0.1, Apple silicon macOS 26, 2026-10-28):
+/// listing the 10,001 entries in six pages took 0.46 to 0.78 s, the download of the 10.2 MB tar 0.69 to 1.29 s (the
+/// listing took 0.28 to 0.42 s over three runs once a page kept only its own names).
+/// TODO(S6): add the first green CI run's Ubuntu and macOS numbers (the job summary has them) and re-pin if they
+/// leave less than three times headroom.
+/// The budgets are about six times the worst run: CI runners are slower and noisier than a laptop, and what this
+/// guards is a regression to something that costs a round trip per file (minutes), not a few percent.
+const LIST_BUDGET: Duration = Duration::from_secs(5);
+const DOWNLOAD_BUDGET: Duration = Duration::from_secs(8);
+
+#[test]
+fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "files");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = connect(&server, &target, &paths, &trusting()).unwrap();
+    let (folder, bytes) = big_folder("ssh");
+    let params = json!({ "roots": [folder], "path": "" });
+
+    let started = Instant::now();
+    let mut names = Vec::new();
+    let mut after = serde_json::Value::Null;
+    let mut pages = 0;
+
+    loop {
+        let mut page_params = params.clone();
+
+        page_params["after"] = after.clone();
+
+        let page = connection
+            .list_files(&page_params, Duration::from_secs(30))
+            .unwrap();
+
+        pages += 1;
+        names.extend(
+            page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["name"].as_str().unwrap().to_owned()),
+        );
+
+        if page["next"].is_null() {
+            break;
+        }
+
+        after = page["next"].clone();
+    }
+
+    let listed = started.elapsed();
+
+    // The 10,000 files and the link, once each and in order.
+    assert_eq!(names.len(), BIG_FOLDER_FILES + 1);
+    assert!(names.windows(2).all(|pair| pair[0] < pair[1]));
+    assert_eq!(pages, 6);
+
+    let archive_path = server.dir.join("big.tar");
+    let mut archive = fs::File::create(&archive_path).unwrap();
+    let started = Instant::now();
+    let summary = connection
+        .download(&params, &mut archive, Duration::from_secs(30))
+        .unwrap();
+    let downloaded = started.elapsed();
+
+    // The numbers the budgets were set from; a passing test prints nothing, so CI gets them in the job summary.
+    let line = format!(
+        "ten-thousand-file folder: listed {} entries in {pages} pages in {listed:?}, downloaded {} bytes in {downloaded:?} (budgets {LIST_BUDGET:?} and {DOWNLOAD_BUDGET:?})",
+        names.len(),
+        fs::metadata(&archive_path).unwrap().len()
+    );
+
+    eprintln!("{line}");
+
+    if let Some(summary) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+        let mut summary = fs::OpenOptions::new().append(true).open(summary).unwrap();
+
+        writeln!(summary, "{line}\n").unwrap();
+    }
+
+    assert!(listed < LIST_BUDGET, "listing took {listed:?}");
+    assert!(
+        downloaded < DOWNLOAD_BUDGET,
+        "the download took {downloaded:?}"
+    );
+
+    // What came down is a complete archive of the folder without the link, and nothing of what the link names.
+    assert_eq!(
+        summary,
+        json!({ "bytes": bytes, "files": BIG_FOLDER_FILES, "folders": 1, "skipped": 1, "unreadable": 0 })
+    );
+
+    let entries = Command::new("tar")
+        .arg("-tf")
+        .arg(&archive_path)
+        .output()
+        .unwrap();
+
+    assert!(entries.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&entries.stdout).lines().count(),
+        BIG_FOLDER_FILES + 1
+    );
+    assert!(!fs::read(&archive_path)
+        .unwrap()
+        .windows(25)
+        .any(|window| window == b"outside-the-shared-folder"));
+
+    // A folder the person did not share is refused by the server, not trusted to the caller.
+    let outside = json!({ "roots": [folder], "path": ".." });
+
+    assert!(connection
+        .download(&outside, &mut std::io::sink(), Duration::from_secs(30))
+        .unwrap_err()
+        .contains("outside the shared folders"));
+
+    finish(&connection, &target, &paths);
+}
+
+/// A writer that takes its time, like a slow disk.
+struct Slow(Duration);
+
+impl std::io::Write for Slow {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        thread::sleep(self.0);
+
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
+    let Some(sshd) = sshd_binary() else { return };
+    let server = Server::start(&sshd, "slow");
+    let (target, paths) = (server.target("client"), server.paths("a"));
+    let connection = Arc::new(connect(&server, &target, &paths, &trusting()).unwrap());
+    let dir = std::env::temp_dir().join(format!("neore-slow-{}", std::process::id()));
+
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("big")).unwrap();
+    fs::write(dir.join("big/blob"), vec![7u8; 16 * 1024 * 1024]).unwrap();
+
+    let folder = fs::canonicalize(dir.join("big")).unwrap();
+    let params = json!({ "roots": [folder], "path": "" });
+    let download = {
+        let (connection, params) = (Arc::clone(&connection), params.clone());
+
+        thread::spawn(move || {
+            let started = Instant::now();
+            let result = connection.download(
+                &params,
+                &mut Slow(Duration::from_millis(100)),
+                Duration::from_secs(30),
+            );
+
+            (result, started.elapsed())
+        })
+    };
+
+    // The disk takes about six seconds for the 16 MiB; the connection must not wait for it.
+    thread::sleep(Duration::from_secs(1));
+
+    let started = Instant::now();
+    let page = connection
+        .list_files(&params, Duration::from_secs(30))
+        .unwrap();
+    let answered = started.elapsed();
+
+    assert_eq!(page["entries"].as_array().unwrap().len(), 1);
+    assert!(
+        answered < Duration::from_secs(2),
+        "the page took {answered:?}"
+    );
+
+    let (result, took) = download.join().unwrap();
+
+    assert!(result.is_ok(), "{result:?}");
+    assert!(
+        took > Duration::from_secs(3),
+        "the disk was not slow: {took:?}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+    finish(&connection, &target, &paths);
+}

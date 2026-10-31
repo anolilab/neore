@@ -2,26 +2,25 @@
  * Develop mode, read side: the signed-in user's pull requests on their Git host.
  *
  * Every procedure is an ACTION: it calls the host with the user's own connector
- * token, and an external call never belongs in a query or mutation. Nothing is
- * stored, so there is no table, policy or erasure step here; the page caches
- * what it reads. The token is decrypted inside the action, used for the call and
- * never returned. A failure a person can act on is a `status`, not a throw.
+ * token, and an external call never belongs in a query or mutation. Nothing here
+ * is stored; the page caches what it reads. The review half (drafts, threads,
+ * viewed marks) is in `review-*.ts`. The token is decrypted inside the action,
+ * used for the call and never returned. A failure a person can act on is a
+ * `status`, not a throw.
  *
- * S1 serves GitHub only. The driver is picked in one place (`DEVELOP_DRIVER`),
- * and the page reads what the host can do from the capability report.
+ * The driver is picked in one place (`DEVELOP_DRIVER`), and the page reads what
+ * the host can do from the capability report.
  */
 import { v } from "lunorash/server";
 
 import { hasGithubGrant, resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
+import { rollupOf } from "./checks-logic";
 import { leftOutPast } from "./coverage";
-import type { HostDriver } from "./driver";
-import { githubDriver } from "./drivers/github";
+import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
-
-/** The one host Develop reads in S1. */
-const DEVELOP_DRIVER: HostDriver = githubDriver;
+import { vFailed } from "./validators";
 
 const vCapability = v.union(
     v.object({ degradation: v.literal("none"), supported: v.literal(true) }),
@@ -32,17 +31,6 @@ const vCapability = v.union(
     }),
     v.object({ reason: v.union(v.literal("not_offered"), v.literal("not_enforced"), v.literal("unknown")), supported: v.literal(false) }),
 );
-
-const vFailed = v.object({
-    status: v.union(
-        v.literal("forbidden"),
-        v.literal("host_error"),
-        v.literal("needs_reconnect"),
-        v.literal("not_connected"),
-        v.literal("not_found"),
-        v.literal("rate_limited"),
-    ),
-});
 
 const vSummary = v.object({
     authorLogin: v.string(),
@@ -99,9 +87,20 @@ const vFile = v.object({
 });
 
 const vCheck = v.object({
+    id: v.union(v.string(), v.null()),
     name: v.string(),
+    required: v.union(v.boolean(), v.null()),
     state: v.union(v.literal("cancelled"), v.literal("failure"), v.literal("neutral"), v.literal("pending"), v.literal("skipped"), v.literal("success")),
     url: v.union(v.string(), v.null()),
+});
+
+const vRollup = v.object({
+    complete: v.boolean(),
+    failing: v.number(),
+    optionalFailing: v.number(),
+    pending: v.number(),
+    state: v.union(v.literal("failing"), v.literal("none"), v.literal("passing"), v.literal("pending")),
+    waiting: v.array(v.string().max(MAX_LENGTH.short)),
 });
 
 const vRef = {
@@ -208,10 +207,14 @@ export const getPullRequestFiles = authAction
 export const getPullRequestChecks = authAction
     .use(rateLimit("sourceControl/read"))
     .input({ ...vRef, headSha: v.string().max(MAX_LENGTH.short) })
-    .output(v.union(v.object({ checks: v.array(vCheck), status: v.literal("ok"), total: v.number() }), vFailed))
+    .output(v.union(v.object({ checks: v.array(vCheck), rollup: vRollup, status: v.literal("ok"), total: v.number() }), vFailed))
     .action(async ({ args, ctx }) => {
         const token = await resolveGithubToken(ctx, ctx.user.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, (request) => DEVELOP_DRIVER.listChecks(request, args, args.headSha));
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            const summary = await DEVELOP_DRIVER.listChecks(request, args, args.headSha);
+
+            return { checks: summary.checks, rollup: rollupOf(summary.checks, summary.total, summary.required), total: summary.total };
+        });
 
         ctx.log.event("source_control.get_checks", { status: outcome.status });
 
