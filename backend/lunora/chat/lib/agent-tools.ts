@@ -119,9 +119,11 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, connectorServers] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, connectorServers] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
+        // A run nobody is at inherits no time-boxed allow, so it does not even read them.
+        headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
         // A broken connector must never take the run down with it.
         getConnectorMcpServers(ctx, userId).catch((error: unknown) => {
             toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
@@ -199,6 +201,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        timedGrants,
     });
 
     if (removed.length > 0 || requiresApproval.length > 0) {
