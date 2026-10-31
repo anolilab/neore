@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHAT_MODEL } from "../lib/defaults";
 import { MAX_PROJECT_TITLE_LENGTH } from "./project-title";
 import type { ProjectRow } from "./projects-api";
-import { createProject, ProjectInputError, startProjectThread, watchProjects, watchProjectThreads } from "./projects-api";
+import { createProject, isWriteBlocked, ProjectInputError, startProjectThread, watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
 type Callback = (data: unknown) => void;
 
@@ -214,5 +214,56 @@ describe("mutation arguments", () => {
     it("the byte walker does catch bytes", () => {
         expect(isHoldingBytes({ nested: { file: new Uint8Array(2) } })).toBe(true);
         expect(isHoldingBytes({ file: new ArrayBuffer(2) })).toBe(true);
+    });
+});
+
+describe("watchProject", () => {
+    it("subscribes to getProject and hands over the one row, with its model", () => {
+        const fake = fakeClient();
+        const rows: ProjectRow[][] = [];
+
+        watchProject(
+            fake.client,
+            "p1",
+            (next) => {
+                rows.push(next);
+            },
+            vi.fn(),
+        );
+
+        expect(fake.subscribe.mock.calls[0]?.[0]).toBe(api.projects.functions.getProject);
+        expect(fake.subscribe.mock.calls[0]?.[1]).toEqual({ projectId: "p1" });
+
+        fake.push(projectDocument("p1", "Roadmap", { defaultModel: "proj-model" }));
+
+        expect(rows).toEqual([[{ defaultModel: "proj-model", description: undefined, id: "p1", title: "Roadmap" }]]);
+    });
+
+    it("answers an empty list for a project that is gone or not shared", () => {
+        const fake = fakeClient();
+        const rows: ProjectRow[][] = [];
+
+        watchProject(
+            fake.client,
+            "p1",
+            (next) => {
+                rows.push(next);
+            },
+            vi.fn(),
+        );
+        fake.push(null);
+
+        expect(rows).toEqual([[]]);
+    });
+});
+
+describe("isWriteBlocked", () => {
+    it.each([
+        [{ busy: false, offline: false }, false],
+        [{ busy: true, offline: false }, true],
+        [{ busy: false, offline: true }, true],
+        [{ busy: true, offline: true }, true],
+    ])("%j -> %s", (state, expected) => {
+        expect(isWriteBlocked(state)).toBe(expected);
     });
 });

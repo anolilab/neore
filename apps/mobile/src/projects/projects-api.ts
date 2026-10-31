@@ -48,6 +48,23 @@ export const watchProjects = (client: ProjectsClient, onRows: (rows: ProjectRow[
         { onError: (error) => onError(error.message) },
     );
 
+/** One project by id. The row list holds the project, or is empty when it is gone or not shared with this user. */
+export const watchProject = (
+    client: ProjectsClient,
+    projectId: string,
+    onRows: (rows: ProjectRow[]) => void,
+    onError: (message: string) => void,
+): Unsubscribe =>
+    client.subscribe(
+        api.projects.functions.getProject,
+        { projectId: projectId as Id<"projects"> },
+        (project) => {
+            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
+            onRows(project ? [{ defaultModel: project.defaultModel, description: project.description, id: project._id, title: project.title }] : []);
+        },
+        { onError: (error) => onError(error.message) },
+    );
+
 export const watchProjectThreads = (
     client: ProjectsClient,
     projectId: string,
@@ -91,6 +108,9 @@ export const startProjectThread = async (client: ProjectsClient, project: { defa
         { model: project.defaultModel ?? DEFAULT_CHAT_MODEL, projectId: project.id as Id<"projects"> },
         { onlineOnly: true },
     );
+
+/** A write is refused while another one is running or the connection is down. Screens check it in the handler too, since a keyboard's return key bypasses a disabled button. */
+export const isWriteBlocked = ({ busy, offline }: { busy: boolean; offline: boolean }): boolean => busy || offline;
 
 /** What to tell the person when a project write failed. */
 export const writeErrorMessage = (error: unknown): string => {

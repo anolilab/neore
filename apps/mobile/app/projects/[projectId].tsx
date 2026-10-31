@@ -3,21 +3,22 @@ import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text } from "react-native";
 
 import { getClient } from "@/lib/lunora";
-import { startProjectThread, writeErrorMessage } from "@/projects/projects-api";
-import { useIsOffline, useProjects, useProjectThreads } from "@/projects/use-projects";
+import { isWriteBlocked, startProjectThread, writeErrorMessage } from "@/projects/projects-api";
+import { useIsOffline, useProject, useProjectThreads } from "@/projects/use-projects";
 
 const ProjectScreen = () => {
     const { projectId } = useLocalSearchParams<{ projectId: string }>();
     const router = useRouter();
-    const { rows: projects } = useProjects();
+    const { error: projectError, rows: projectRows } = useProject(projectId);
     const { error: loadError, rows: threads } = useProjectThreads(projectId);
     const isOffline = useIsOffline();
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const project = projects?.find((candidate) => candidate.id === projectId);
+    // Read by id: the list is capped at 100 and empty until it answers, and the server prefers the model sent here over the project's own.
+    const project = projectRows?.[0];
 
     const startThread = async () => {
-        if (starting) {
+        if (!project || isWriteBlocked({ busy: starting, offline: isOffline })) {
             return;
         }
 
@@ -25,7 +26,7 @@ const ProjectScreen = () => {
         setError(null);
 
         try {
-            const threadId = await startProjectThread(getClient(), { defaultModel: project?.defaultModel, id: projectId });
+            const threadId = await startProjectThread(getClient(), { defaultModel: project.defaultModel, id: projectId });
 
             router.push(`/chat/${threadId}`);
         } catch (error_: unknown) {
@@ -38,8 +39,8 @@ const ProjectScreen = () => {
         }
     };
 
-    const blocked = starting || isOffline;
-    const shownError = error ?? loadError;
+    const blocked = isWriteBlocked({ busy: starting, offline: isOffline }) || !project;
+    const shownError = error ?? projectError ?? (projectRows?.length === 0 ? "This project is not available." : undefined) ?? loadError;
 
     return (
         <>
@@ -47,7 +48,12 @@ const ProjectScreen = () => {
             <FlatList
                 data={threads ?? []}
                 keyExtractor={(thread) => thread.id}
-                ListEmptyComponent={threads === undefined ? <Text accessibilityRole="progressbar" style={{ padding: 16 }}>Loading chats...</Text> : <Text style={{ padding: 16 }}>No chats in this project yet.</Text>}
+                ListEmptyComponent={(
+<>
+{threads === undefined && !shownError ? <Text accessibilityRole="progressbar" style={{ padding: 16 }}>Loading chats...</Text> : null}
+{threads === undefined ? null : <Text style={{ padding: 16 }}>No chats in this project yet.</Text>}
+</>
+)}
                 ListHeaderComponent={(
                     <>
                         <Pressable

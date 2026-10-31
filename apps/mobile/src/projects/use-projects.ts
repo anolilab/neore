@@ -3,39 +3,36 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
 
+import type { Live, Scoped } from "./live-follow";
+import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
 import type { ProjectRow, ProjectThreadRow } from "./projects-api";
-import { watchProjects, watchProjectThreads } from "./projects-api";
-
-interface Live<T> {
-    error: string | undefined;
-    /** `undefined` until the first answer. */
-    rows: T[] | undefined;
-}
+import { watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
 /** Follows one live query while the user is signed in; the subscription ends with the screen. */
 const useLive = <T>(watch: ((onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void) | undefined, key: string): Live<T> => {
-    const { status } = useAuth();
-    const [live, setLive] = useState<Live<T>>({ error: undefined, rows: undefined });
+    const { status, user } = useAuth();
+    const scope = status === "signed-in" && watch && user ? `${user.id}:${key}` : undefined;
+    const [live, setLive] = useState<Scoped<T>>({ ...EMPTY_LIVE, scope: "" });
 
     useEffect(() => {
-        if (status !== "signed-in" || !watch) {
+        if (scope === undefined || !watch) {
+            setLive({ ...EMPTY_LIVE, scope: "" });
+
             return undefined;
         }
 
-        return watch(
-            (rows) => setLive({ error: undefined, rows }),
-            (message) =>
-                setLive((current) => {
-                    return { ...current, error: message };
-                }),
-        );
-        // `key` stands for everything `watch` closes over.
-    }, [key, status]);
+        return followLive(scope, watch, setLive);
+        // `scope` stands for the user and everything `watch` closes over.
+    }, [scope]);
 
-    return live;
+    return liveFor(live, scope);
 };
 
 export const useProjects = (): Live<ProjectRow> => useLive((onRows, onError) => watchProjects(getClient(), onRows, onError), "projects");
+
+/** One project by id, so its model is known even past the first page of the list. `rows` is `[]` once it is known to be missing. */
+export const useProject = (projectId: string): Live<ProjectRow> =>
+    useLive((onRows, onError) => watchProject(getClient(), projectId, onRows, onError), `project:${projectId}`);
 
 export const useProjectThreads = (projectId: string): Live<ProjectThreadRow> =>
     useLive((onRows, onError) => watchProjectThreads(getClient(), projectId, onRows, onError), `threads:${projectId}`);

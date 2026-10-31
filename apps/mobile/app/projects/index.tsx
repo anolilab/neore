@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text, TextInput, View } from "react-native";
 
 import { getClient } from "@/lib/lunora";
-import { createProject, writeErrorMessage } from "@/projects/projects-api";
+import { createProject, isWriteBlocked, writeErrorMessage } from "@/projects/projects-api";
 import { useIsOffline, useProjects } from "@/projects/use-projects";
 
 const ProjectsScreen = () => {
@@ -14,7 +14,7 @@ const ProjectsScreen = () => {
     const [error, setError] = useState<string | null>(null);
 
     const create = async () => {
-        if (creating) {
+        if (isWriteBlocked({ busy: creating, offline: isOffline })) {
             return;
         }
 
@@ -37,20 +37,25 @@ const ProjectsScreen = () => {
         }
     };
 
-    const blocked = creating || isOffline;
+    const blocked = isWriteBlocked({ busy: creating, offline: isOffline });
     const shownError = error ?? loadError;
 
     return (
         <FlatList
             data={rows ?? []}
             keyExtractor={(project) => project.id}
-            ListEmptyComponent={rows === undefined ? <Text accessibilityRole="progressbar" style={{ padding: 16 }}>Loading projects...</Text> : <Text style={{ padding: 16 }}>No projects yet.</Text>}
+            ListEmptyComponent={(
+<>
+{rows === undefined && !shownError ? <Text accessibilityRole="progressbar" style={{ padding: 16 }}>Loading projects...</Text> : null}
+{rows === undefined ? null : <Text style={{ padding: 16 }}>No projects yet.</Text>}
+</>
+)}
             ListHeaderComponent={(
                 <View style={{ gap: 8, padding: 16 }}>
                     <Text style={{ fontWeight: "600" }}>New project</Text>
                     <TextInput
                         accessibilityLabel="Project name"
-                        editable={!creating}
+                        editable={!blocked}
                         onChangeText={setName}
                         onSubmitEditing={create}
                         placeholder="Project name"
