@@ -52,6 +52,7 @@ import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
+import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 
@@ -127,6 +128,17 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
     // An imported conversation's rows come from an outside export file, and an agent switch hands the earlier
     // conversation over as one quoted message: no taint signal can see inside either.
     if (thread?.createdBy?.startsWith("import:") || thread?.hasHandoff === true) {
+        return false;
+    }
+
+    // The agent reads only the last `DEFAULT_RECENT_MESSAGES` rows. Past that, a web or tool result can leave the
+    // window while the reply that passed it on stays, and nothing in the window marks it: never judge such a thread.
+    const rows = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+        .take(DEFAULT_RECENT_MESSAGES + 1);
+
+    if (rows.length > DEFAULT_RECENT_MESSAGES) {
         return false;
     }
 
