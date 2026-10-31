@@ -2,6 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
+import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { Input } from "@neore/ui/components/input";
@@ -23,23 +24,23 @@ interface BundleExportDialogProps {
     open: boolean;
 }
 
-interface PickerItem {
+interface PickerItem<T extends string> {
     description?: string;
     disabledReason?: string;
-    id: string;
+    id: T;
     label: string;
 }
 
-interface PickerProps {
+interface PickerProps<T extends string> {
     emptyLabel: string;
-    items: PickerItem[];
+    items: PickerItem<T>[];
     legend: string;
-    onToggle: (id: string) => void;
-    selected: ReadonlySet<string>;
+    onToggle: (id: T) => void;
+    selected: ReadonlySet<T>;
 }
 
 /** A group of checkboxes under a legend. An item that cannot be exported stays listed, unticked, with its reason. */
-const Picker: FC<PickerProps> = ({ emptyLabel, items, legend, onToggle, selected }) => {
+const Picker = <T extends string>({ emptyLabel, items, legend, onToggle, selected }: PickerProps<T>) => {
     const { t } = useLingui();
     const baseId = useId();
 
@@ -80,7 +81,7 @@ const Picker: FC<PickerProps> = ({ emptyLabel, items, legend, onToggle, selected
     );
 };
 
-const toggled = (set: ReadonlySet<string>, id: string): Set<string> => {
+const toggled = <T extends string>(set: ReadonlySet<T>, id: T): Set<T> => {
     const next = new Set(set);
 
     if (!next.delete(id)) {
@@ -106,9 +107,9 @@ const BundleExportDialogBody: FC<Omit<BundleExportDialogProps, "open">> = ({ onC
     const { isPending: isExporting, mutateAsync: exportBundle } = useMutation(useLunoraActionOptions(api.skills.bundle.exportBundle));
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [skills, setSkills] = useState<ReadonlySet<string>>(new Set());
-    const [triggers, setTriggers] = useState<ReadonlySet<string>>(new Set());
-    const [groups, setGroups] = useState<ReadonlySet<string>>(new Set());
+    const [skills, setSkills] = useState<ReadonlySet<Id<"skills">>>(new Set());
+    const [triggers, setTriggers] = useState<ReadonlySet<Id<"triggers">>>(new Set());
+    const [groups, setGroups] = useState<ReadonlySet<Id<"threads">>>(new Set());
 
     const limits = candidates?.limits;
     const skillCount = candidates
@@ -127,10 +128,10 @@ const BundleExportDialogBody: FC<Omit<BundleExportDialogProps, "open">> = ({ onC
         try {
             const result = await exportBundle({
                 description: description.trim() || undefined,
-                groupChatIds: [...groups] as never,
+                groupChatIds: [...groups],
                 name: name.trim() || t`Team bundle`,
-                skillIds: [...skills] as never,
-                triggerIds: [...triggers] as never,
+                skillIds: [...skills],
+                triggerIds: [...triggers],
             });
 
             saveBlob(new Blob([result.markdown], { type: "text/markdown;charset=utf-8" }), result.filename);

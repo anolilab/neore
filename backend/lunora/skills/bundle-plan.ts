@@ -441,6 +441,16 @@ const removeCreated = async (item: ImportedItem, ops: BundleOps): Promise<unknow
     return item.kind === "group" ? await ops.deleteGroupChat(item.id) : await ops.deleteTrigger(item.id);
 };
 
+const createdId = (idByKey: ReadonlyMap<string, string>, key: string): string => {
+    const id = idByKey.get(key);
+
+    if (id === undefined) {
+        throw new Error(`${key} was not created before the item that needs it`);
+    }
+
+    return id;
+};
+
 /** Creates one planned entry; a group chat finds its participants among the skills created before it. */
 const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<string, string>): Promise<ImportedItem> => {
     const { plan } = entry;
@@ -458,7 +468,7 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
         const synthesizerSkillId = synthesizerKey === undefined ? undefined : idByKey.get(synthesizerKey);
         const id = await ops.createGroupChat({
             ...rest,
-            skillIds: participantKeys.map((key) => idByKey.get(key) ?? ""),
+            skillIds: participantKeys.map((key) => createdId(idByKey, key)),
             ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
         });
 

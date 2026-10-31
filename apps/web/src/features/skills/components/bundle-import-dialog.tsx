@@ -242,7 +242,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
 
         try {
             const text = await file.text();
-            const next = (await previewBundle({ markdown: text })) as Review;
+            const next = await previewBundle({ markdown: text });
 
             setMarkdown(text);
             setFilename(file.name);
@@ -255,7 +255,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onC
 
     const handleImport = async () => {
         try {
-            const result = (await importBundle({ markdown, selected: [...selected] })) as Imported;
+            const result = await importBundle({ markdown, selected: [...selected] });
 
             setDone(result);
             onImported();

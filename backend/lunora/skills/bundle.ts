@@ -379,8 +379,8 @@ export const exportBundle = authAction
         }
 
         const sources = await ctx.runQuery(internal.skills.bundle.loadBundleSources, { groupChatIds, skillIds, triggerIds, userId });
-        const isKnownTool = (name: string): boolean => knownTools.has(name);
         const knownTools = knownToolNames();
+        const isKnownTool = (name: string): boolean => knownTools.has(name);
 
         // The skills the file carries: the picked ones, then the participants of the group chats.
         const skillSources = new Map<string, SkillSource>(sources.skills.map((skill) => [skill.id, skill]));
