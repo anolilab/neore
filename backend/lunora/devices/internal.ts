@@ -12,6 +12,7 @@ import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
@@ -42,8 +43,8 @@ const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"thre
 /**
  * The devices an interactive run in this thread may call, with their verified
  * manifests — or `null` when the thread is not eligible. Offline devices,
- * unpaired rows and empty manifests are left out, so the model never sees a
- * tool it cannot reach.
+ * unpaired rows, empty manifests and devices whose project scope leaves this
+ * thread out are left out, so the model never sees a tool it cannot reach.
  */
 export const getDeviceToolContext = internalQuery
     // `now` from the caller (an action), so the query stays deterministic.
@@ -57,16 +58,25 @@ export const getDeviceToolContext = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        if (!(await loadEligibleThread(ctx, args.threadId, args.userId))) {
+        const thread = await loadEligibleThread(ctx, args.threadId, args.userId);
+
+        if (!thread) {
             return null;
         }
 
         const { now } = args;
         const { page } = await ctx.db.devices.findMany({ orderBy: [{ createdAt: "asc" }], where: { userId: args.userId } });
+        const projectId = await resolveThreadProject(ctx, thread, args.userId, page);
 
         return {
             devices: page
-                .filter((device) => device.encryptedSecret !== undefined && (device.manifest?.length ?? 0) > 0 && isDeviceOnline(device, now))
+                .filter(
+                    (device) =>
+                        device.encryptedSecret !== undefined &&
+                        (device.manifest?.length ?? 0) > 0 &&
+                        isDeviceOnline(device, now) &&
+                        isDeviceInScope(device, projectId),
+                )
                 .map((device) => {
                     return { deviceId: device._id as string, name: device.name, tools: device.manifest ?? [] };
                 }),
@@ -81,7 +91,8 @@ const vCreateResult = v.union(
 /**
  * Creates and signs one call. Every gate the tool set was built under is
  * re-checked here, at call time: the thread is still eligible, the device is
- * still paired, online and advertising the tool, it holds fewer than
+ * still paired, online, advertising the tool and in scope for the thread's
+ * project as it is now, it holds fewer than
  * {@link MAX_OPEN_CALLS_PER_DEVICE} open calls, and the user is under the
  * `devices/call` rate limit.
  */
@@ -107,6 +118,10 @@ export const createDeviceCall = internalMutation
         const device = await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } });
 
         if (!thread || !device?.encryptedSecret || !device.manifest?.some((tool) => tool.name === toolName)) {
+            return { error: "ineligible" as const };
+        }
+
+        if (!isDeviceInScope(device, await resolveThreadProject(ctx, thread, userId, [device]))) {
             return { error: "ineligible" as const };
         }
 

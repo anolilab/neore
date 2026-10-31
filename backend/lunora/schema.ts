@@ -643,6 +643,9 @@ export const schema = defineSchema({
         manifestIssuedAt: v.optional(v.number()),
         name: v.string(),
         platform: vDevicePlatform,
+        // Where the device's tools are offered (`devices/lib/scope.ts`): unset = any of the
+        // owner's chats, a list = only threads of those projects (empty = nowhere).
+        projectIds: v.optional(v.array(v.id("projects"))),
         revokedAt: v.optional(v.number()),
         transport: v.optional(vDeviceTransport),
         userId: v.string(),
