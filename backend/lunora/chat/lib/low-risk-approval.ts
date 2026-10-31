@@ -261,7 +261,7 @@ export interface LowRiskApproverDependencies {
     model: string;
     now: () => number;
     /** Called for every decision, for logs. */
-    onOutcome?: (outcome: LowRiskOutcome) => void;
+    onOutcome?: (outcome: LowRiskOutcome, call: LowRiskCall) => void;
     /** Called once per approval, before the call runs. */
     record: (toolCallId: string, record: AutoApprovalRecord) => void;
 }
@@ -270,14 +270,13 @@ export interface LowRiskApproverDependencies {
  * The check for ONE run: `true` means the call may run unasked. Never throws — whatever goes
  * wrong means "ask the person".
  */
-export const createLowRiskApprover = (dependencies: LowRiskApproverDependencies): LowRiskCheck => {
-    const done = (outcome: LowRiskOutcome, approved = false): boolean => {
-        dependencies.onOutcome?.(outcome);
+export const createLowRiskApprover = (dependencies: LowRiskApproverDependencies): LowRiskCheck => async (call) => {
+        const done = (outcome: LowRiskOutcome, approved = false): boolean => {
+            dependencies.onOutcome?.(outcome, call);
 
-        return approved;
-    };
+            return approved;
+        };
 
-    return async (call) => {
         try {
             // Unknown history is untrusted history.
             if (call.messages === undefined || computeTaint(call.messages as Parameters<typeof computeTaint>[0]).length > 0) {
@@ -311,4 +310,3 @@ export const createLowRiskApprover = (dependencies: LowRiskApproverDependencies)
             return done("failed");
         }
     };
-};

@@ -67,7 +67,13 @@ export const createRunLowRiskCheck = (ctx: ActionCtx, args: { threadId: string; 
         },
         model: LOW_RISK_MODEL,
         now: () => Date.now(),
-        onOutcome: (outcome) => ctx.log.event("chat.low_risk_check", { outcome, threadId }),
+        // An approval is also stamped on the saved call at `finishRun`; this is the trace a run that never gets there leaves.
+        onOutcome: (outcome, call) =>
+            ctx.log.event("chat.low_risk_check", {
+                outcome,
+                threadId,
+                ...(outcome === "approved" && { permissionKey: call.key, toolCallId: call.toolCallId }),
+            }),
         record: (toolCallId, record) => {
             approvals[toolCallId] = record;
         },
