@@ -1376,7 +1376,7 @@ sleep 1"#
         let root = temp_root("dead-group");
         let pidfile = root.join("orphan.pid");
         let script = format!(
-            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; sleep 30 & echo $! > '{}'; exit 0"#,
+            r#"read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; read l; sleep 30 & echo $! > '{}'; exit 0"#,
             pidfile.display()
         );
 

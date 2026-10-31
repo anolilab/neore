@@ -281,7 +281,7 @@ const balancedObjectAt = (text: string, start: number): string | undefined => {
  * brace before it is skipped, which is how models actually answer "respond with
  * only JSON".
  */
-const findJsonObject = (text: string): Record<string, unknown> | undefined => {
+export const findJsonObject = (text: string): Record<string, unknown> | undefined => {
     let start = text.indexOf("{");
 
     for (let attempt = 0; start !== -1 && attempt < MAX_OBJECT_CANDIDATES; attempt += 1) {

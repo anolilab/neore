@@ -1198,9 +1198,27 @@ export const failRun = async (
         }
     }
 
+    // A goal that replaced this run's own owns the thread: its status is not this run's to set.
+    const replaced = await ctx
+        .runQuery(internal.chat.goals.internal.otherGoalHoldsThread, { streamId: streamId as Id<"persistentStreams">, threadId: threadId as Id<"threads"> })
+        .catch(() => false);
+
+    if (!replaced) {
+        try {
+            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
+
+    // A failed run ends the goal it belonged to, and only that one: no review follows a run that never finished.
     try {
-        await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+        await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, {
+            reason: "error",
+            streamId: streamId as Id<"persistentStreams">,
+            threadId: threadId as Id<"threads">,
+        });
     } catch {
-        // Ignore cleanup errors
+        // The goal's own stall sweep ends it (`reapStalledGoals`).
     }
 };
