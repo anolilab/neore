@@ -32,7 +32,7 @@ for (const model of MODEL_REGISTRY) {
     }
 }
 
-/** A provider key (`anthropic`) as people know it (`Anthropic`); the key itself, capitalised, for one the registry does not name. */
+/** A provider key (`acme`) as people know it (`Acme`); the key itself, capitalised, for one the registry does not name. */
 export const providerLabel = (provider: string | undefined): string | undefined => {
     if (!provider) {
         return undefined;
