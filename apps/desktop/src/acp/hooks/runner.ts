@@ -179,6 +179,7 @@ export class HookRunner {
                 this.options.log?.(`[acp-hooks] the watcher stopped: ${error.message}`);
                 this.stop();
             },
+            { limit: MAX_KNOWN, skip: ignored },
         );
     }
 

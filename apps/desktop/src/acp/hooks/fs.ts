@@ -4,6 +4,9 @@ import { constants } from "node:fs";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
+import type { TreeDeps } from "./watch-tree";
+import { watchTree } from "./watch-tree";
+
 export interface FileInfo {
     directory: boolean;
     file: boolean;
@@ -24,8 +27,17 @@ export interface HookFs {
     realpath: (target: string) => Promise<string | undefined>;
     /** Regular files under `root` (relative, `/`-separated), skipping what `skip` says and every symlink, at most `limit`. */
     scan: (root: string, limit: number, skip: (relative: string) => boolean) => Promise<string[]>;
-    /** Calls `listener` for every change under `root`. `filename` is relative to it. */
-    watch: (root: string, listener: (eventType: string, filename: string | null) => void, onError: (error: Error) => void) => { close: () => void };
+    /**
+     * Calls `listener` for every change under `root`. `filename` is relative to it. `skip` names directories that are not
+     * worth a watch (they may still report events), and `limit` caps the directories a platform without a native
+     * recursive watch watches one by one.
+     */
+    watch: (
+        root: string,
+        listener: (eventType: string, filename: string | null) => void,
+        onError: (error: Error) => void,
+        options: { limit: number; skip: (relative: string) => boolean },
+    ) => { close: () => void };
 }
 
 const missing = (error: unknown): boolean => ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "");
@@ -136,6 +148,22 @@ const readInside = async (root: string, relative: string, maxBytes: number): Pro
     }
 };
 
+/** {@link watchTree} over the real file system: Node's own `fs.watch` on one directory at a time. */
+export const nodeTreeDeps = (root: string, skip: (relative: string) => boolean, limit: number): TreeDeps => {
+    return {
+        limit,
+        list: (relative) => listFolder(root, relative, skip),
+        skip,
+        watchDirectory: (relative, onEvent, onError) => {
+            const watcher = watch(path.join(root, relative), { persistent: false }, (eventType, filename) => onEvent(eventType, filename === null ? null : String(filename)));
+
+            watcher.on("error", onError);
+
+            return { close: () => watcher.close() };
+        },
+    };
+};
+
 export const nodeHookFs: HookFs = {
     lstat: async (target) => {
         const info = await orMissing(() => lstat(target));
@@ -158,7 +186,12 @@ export const nodeHookFs: HookFs = {
 
         return found;
     },
-    watch: (root, listener, onError) => {
+    watch: (root, listener, onError, options) => {
+        // Linux has no native recursive watch: Node would put one inotify watch on every directory, node_modules included.
+        if (process.platform === "linux") {
+            return watchTree(nodeTreeDeps(root, options.skip, options.limit), listener, onError);
+        }
+
         const watcher = watch(root, { persistent: false, recursive: true }, (eventType, filename) => listener(eventType, filename === null ? null : String(filename)));
 
         watcher.on("error", onError);
