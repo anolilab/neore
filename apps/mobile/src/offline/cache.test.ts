@@ -183,6 +183,51 @@ describe("messages", () => {
     });
 });
 
+describe("messages of a chat the list has not stored yet", () => {
+    it("keeps the messages of a new chat, up to the same 20 threads", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("fresh", [message("m1", "fresh", 1)]);
+
+        expect(await scoped.loadMessages("fresh")).toHaveLength(1);
+
+        for (let index = 0; index < MAX_THREADS_WITH_MESSAGES; index += 1) {
+            // eslint-disable-next-line no-await-in-loop -- one thread after the other
+            await scoped.saveMessages(`other-${index}`, [message(`o${index}`, `other-${index}`, 1)]);
+        }
+
+        expect(await scoped.loadMessages("other-0")).toHaveLength(1);
+        expect(await scoped.loadMessages(`other-${MAX_THREADS_WITH_MESSAGES - 1}`)).toHaveLength(0);
+        expect(await scoped.loadMessages("fresh")).toHaveLength(1);
+    });
+
+    it("refuses a thread the list stored but ranks outside the newest 20", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads(Array.from({ length: MAX_THREADS_WITH_MESSAGES + 1 }, (_, index) => thread(`t${index}`, 100 - index)));
+        await scoped.saveMessages(`t${MAX_THREADS_WITH_MESSAGES}`, [message("m1", `t${MAX_THREADS_WITH_MESSAGES}`, 1)]);
+
+        expect(await scoped.loadMessages(`t${MAX_THREADS_WITH_MESSAGES}`)).toEqual([]);
+    });
+});
+
+describe("read-start stamps", () => {
+    it("never lets a save stamped by an older read replace the rows of a newer one", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("t1", 10)]);
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { text: "new" })], { syncedAt: 2000 });
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { text: "old" })], { syncedAt: 1000 });
+
+        const [saved] = await scoped.loadMessages("t1");
+
+        expect(saved).toMatchObject({ syncedAt: 2000, text: "new" });
+    });
+});
+
 describe("locked threads", () => {
     it("forgets a thread and its messages once the server says it is locked", async () => {
         const { cache } = makeCache();
@@ -198,6 +243,19 @@ describe("locked threads", () => {
         expect(threads.map((row) => row.id)).toEqual(["b"]);
         expect(await scoped.loadMessages("a")).toEqual([]);
         expect(await scoped.loadMessages("b")).toHaveLength(1);
+    });
+
+    it("forgets the statuses of a locked thread too", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveThreads([thread("a", 10), thread("b", 20)]);
+        await scoped.saveStatuses([status("h1", 10, { threadId: "a" }), status("h2", 11, { threadId: "b" })]);
+        await scoped.forgetThreads(["a"]);
+
+        const remaining = await scoped.loadStatuses();
+
+        expect(remaining.map((row) => row.id)).toEqual(["h2"]);
     });
 });
 

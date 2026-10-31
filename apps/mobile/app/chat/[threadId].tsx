@@ -14,11 +14,10 @@ import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
-import { isNetworkFailure } from "@/offline/connectivity";
 import { mergeRows } from "@/offline/merge";
+import { createMessageReadGate, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
-import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
 
@@ -26,7 +25,16 @@ type Row = MessageRow;
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
-const MAX_CACHED_MESSAGES = 50;
+const REFUSED_MESSAGE = "This chat is locked or no longer available.";
+
+/** A chat that reads again is no longer refused; any other message on screen is not this read's to clear. */
+const withoutRefusal = (current: string | null): string | null => {
+    if (current === REFUSED_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
 
 /** What one stored message part shows: its text, or a label for an attachment (the preview is not in this slice yet). */
 const partText = (part: unknown): string => {
@@ -40,13 +48,13 @@ const partText = (part: unknown): string => {
 };
 
 /* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
-const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; role: string; status: string }, threadId: string): Row => {
+const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; role: string; status: string }, threadId: string, syncedAt: number): Row => {
     return {
         createdAt: message._creationTime,
         id: message.id,
         role: message.role,
         status: message.status,
-        syncedAt: Date.now(),
+        syncedAt,
         text: message.parts.map((part) => partText(part)).join(""),
         threadId,
         updatedAt: message._creationTime,
@@ -88,6 +96,9 @@ const ChatScreen = () => {
     const sendControl = useWriteControl("send");
     // Once live rows are in, a late read of the cache must not touch the thread.
     const hasLiveRows = useRef(false);
+    // Set when the server refused this chat (locked, gone): a late read of the cache must not paint it again.
+    const isRefused = useRef(false);
+    const readGate = useRef(createMessageReadGate());
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
     // Where the next older page starts; null once the whole history is loaded.
@@ -103,37 +114,62 @@ const ChatScreen = () => {
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(async (id: string) => {
-        try {
-            const pages: Row[][] = [];
-            let cursor: string | null = null;
-            let isDone = false;
+        const result = await readThreadMessages({
+            cache,
+            fetchRows: async (startedAt) => {
+                const pages: Row[][] = [];
+                let cursor: string | null = null;
+                let isDone = false;
 
-            for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
-                // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-                const page = await fetchMessagePage(id, cursor);
+                for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
+                    // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+                    const page = await fetchMessagePage(id, cursor);
 
-                // The server returns each page newest first; the rows are shown oldest first.
-                pages.unshift(page.page.map((message) => toRow(message, id)).toReversed());
-                isDone = page.isDone;
-                cursor = page.continueCursor;
+                    // The server returns each page newest first; the rows are shown oldest first.
+                    pages.unshift(page.page.map((message) => toRow(message, id, startedAt)).toReversed());
+                    isDone = page.isDone;
+                    cursor = page.continueCursor;
+                }
+
+                return { olderCursor: isDone ? null : cursor, rows: pages.flat() };
+            },
+            gate: readGate.current,
+            threadId: id,
+        });
+
+        switch (result.kind) {
+            case "failed": {
+                setError(result.message);
+                break;
             }
-
-            const loaded = pages.flat();
-
-            hasLiveRows.current = true;
-            setRows(loaded);
-            setOlderCursor(isDone ? null : cursor);
-            reportRead("succeeded");
-            settleQuietly(cache?.saveMessages(id, loaded.slice(-MAX_CACHED_MESSAGES)));
-        } catch (error_: unknown) {
-            if (isNetworkFailure(error_)) {
+            case "refused": {
+                // Locked or gone: the saved copy is dropped, and nothing of it stays on screen.
+                isRefused.current = true;
+                hasLiveRows.current = false;
+                setRows([]);
+                setOlderCursor(null);
+                setError(REFUSED_MESSAGE);
+                reportRead("succeeded");
+                break;
+            }
+            case "rows": {
+                isRefused.current = false;
+                hasLiveRows.current = true;
+                setRows(result.rows);
+                setOlderCursor(result.olderCursor);
+                setError(withoutRefusal);
+                reportRead("succeeded");
+                break;
+            }
+            case "unreachable": {
                 // No answer is not an error to show: the saved messages stay, under the offline banner.
                 reportRead("failed");
-
-                return;
+                break;
             }
-
-            setError(error_ instanceof Error ? error_.message : "Could not load messages.");
+            default: {
+                // Superseded by a newer read, which reports for itself.
+                break;
+            }
         }
     }, [cache, reportRead]);
 
@@ -147,7 +183,9 @@ const ChatScreen = () => {
         try {
             const page = await fetchMessagePage(threadId, olderCursor);
 
-            setRows((current) => [...page.page.map((message) => toRow(message, threadId)).toReversed(), ...current]);
+            const syncedAt = Date.now();
+
+            setRows((current) => [...page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed(), ...current]);
             setOlderCursor(page.isDone ? null : page.continueCursor);
         } catch (error_: unknown) {
             setError(error_ instanceof Error ? error_.message : "Could not load messages.");
@@ -168,7 +206,7 @@ const ChatScreen = () => {
             try {
                 const cached = await cache.loadMessages(threadId);
 
-                if (!isCancelled && !hasLiveRows.current && cached.length > 0) {
+                if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
                     setRows((current) => byCreation(mergeRows(current, cached)));
                 }
             } catch {
@@ -182,6 +220,13 @@ const ChatScreen = () => {
             isCancelled = true;
         };
     }, [cache, status, threadId]);
+
+    useEffect(() => {
+        const gate = readGate.current;
+
+        // A read begun for another chat must not land on this one.
+        return () => gate.invalidate();
+    }, [threadId]);
 
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.

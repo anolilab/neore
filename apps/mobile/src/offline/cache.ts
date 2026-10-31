@@ -83,19 +83,24 @@ interface StatusSql {
     updated_at: number;
 }
 
+export interface SaveOptions {
+    /** When the read that produced these rows STARTED. A later save of an older read then loses to a newer one; defaults to the save time. */
+    syncedAt?: number;
+}
+
 /** One signed-in account's view of the cache. Once the account signs out or another binds, every call does nothing. */
 export interface ScopedCache {
     /**
-     * Removes threads and their messages. For a thread the server reports as locked after it was saved: that is a
-     * positive signal, unlike a thread merely missing from a page.
+     * Removes threads, their messages and their statuses. For a thread the server reports as locked after it was saved:
+     * that is a positive signal, unlike a thread merely missing from a page.
      */
     forgetThreads: (threadIds: ReadonlyArray<string>) => Promise<void>;
     loadMessages: (threadId: string) => Promise<MessageRow[]>;
     loadStatuses: () => Promise<StatusRow[]>;
     loadThreads: () => Promise<ThreadRow[]>;
-    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage>) => Promise<void>;
-    saveStatuses: (statuses: ReadonlyArray<CachedStatus>) => Promise<void>;
-    saveThreads: (threads: ReadonlyArray<CachedThread>) => Promise<void>;
+    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage>, options?: SaveOptions) => Promise<void>;
+    saveStatuses: (statuses: ReadonlyArray<CachedStatus>, options?: SaveOptions) => Promise<void>;
+    saveThreads: (threads: ReadonlyArray<CachedThread>, options?: SaveOptions) => Promise<void>;
 }
 
 export interface OfflineCache {
@@ -150,6 +155,30 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
         });
     };
 
+    /**
+     * Messages are kept for the most recent threads only. A thread the list has not stored yet (a chat started on this
+     * phone) is kept too, within the same count, until the list save either lists it or evicts it.
+     */
+    const keepsMessagesOf = async (threadId: string): Promise<boolean> => {
+        const recent = await database.getAllAsync<{ id: string }>(RECENT_THREAD_IDS);
+
+        if (recent.some((row) => row.id === threadId)) {
+            return true;
+        }
+
+        const [listed] = await database.getAllAsync<{ id: string }>("SELECT id FROM cached_threads WHERE id = ?", [threadId]);
+
+        if (listed !== undefined) {
+            return false;
+        }
+
+        const unlisted = await database.getAllAsync<{ thread_id: string }>(
+            "SELECT DISTINCT thread_id FROM cached_messages WHERE thread_id NOT IN (SELECT id FROM cached_threads)",
+        );
+
+        return unlisted.some((row) => row.thread_id === threadId) || unlisted.length < MAX_THREADS_WITH_MESSAGES;
+    };
+
     const forOwner = (userId: string): ScopedCache => {
         const scoped = async <T>(fallback: T, task: () => Promise<T>): Promise<T> =>
             enqueue(async () => {
@@ -169,6 +198,8 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         for (const threadId of threadIds) {
                             // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
                             await database.runAsync("DELETE FROM cached_messages WHERE thread_id = ?", [threadId]);
+                            // eslint-disable-next-line no-await-in-loop -- as above
+                            await database.runAsync("DELETE FROM cached_statuses WHERE thread_id = ?", [threadId]);
                             // eslint-disable-next-line no-await-in-loop -- as above
                             await database.runAsync("DELETE FROM cached_threads WHERE id = ?", [threadId]);
                         }
@@ -225,16 +256,13 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         };
                     });
                 }),
-            saveMessages: (threadId, messages) =>
+            saveMessages: (threadId, messages, options) =>
                 scoped<undefined>(undefined, async () => {
-                    // Messages are kept for the most recent threads only; a thread outside them is not cached.
-                    const recent = await database.getAllAsync<{ id: string }>(RECENT_THREAD_IDS);
-
-                    if (recent.every((row) => row.id !== threadId)) {
+                    if (!await keepsMessagesOf(threadId)) {
                         return;
                     }
 
-                    const syncedAt = now();
+                    const syncedAt = options?.syncedAt ?? now();
 
                     await database.withTransactionAsync(async () => {
                         for (const message of messages) {
@@ -266,9 +294,9 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         );
                     });
                 }),
-            saveStatuses: (statuses) =>
+            saveStatuses: (statuses, options) =>
                 scoped<undefined>(undefined, async () => {
-                    const syncedAt = now();
+                    const syncedAt = options?.syncedAt ?? now();
 
                     await database.withTransactionAsync(async () => {
                         for (const row of statuses) {
@@ -288,9 +316,9 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         );
                     });
                 }),
-            saveThreads: (threads) =>
+            saveThreads: (threads, options) =>
                 scoped<undefined>(undefined, async () => {
-                    const syncedAt = now();
+                    const syncedAt = options?.syncedAt ?? now();
 
                     await database.withTransactionAsync(async () => {
                         for (const thread of threads) {
