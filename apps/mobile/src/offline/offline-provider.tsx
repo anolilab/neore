@@ -31,12 +31,11 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
     const isChecking = !isOffline && !canWrite(connectivity);
     const wasOffline = useRef(false);
     // Coming back online reads again, and mints a token first if the one held may have lapsed or was never fetched.
-    const retryTokenRef = useRef(retryToken);
     const refresher = useRef(
         createReconnectRefresher(
             renewTokenThenRefresh({
                 refresh: () => setRefreshTick(nextTick),
-                renewToken: () => retryTokenRef.current(),
+                renewToken: retryToken,
             }),
         ),
     );
