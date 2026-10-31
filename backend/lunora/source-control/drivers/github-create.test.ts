@@ -87,6 +87,38 @@ describe("github driver createPullRequest", () => {
         expect(result).toEqual({ url: `https://github.com/${REPO}/pull/4` });
     });
 
+    it("sends branch names as written, not percent-encoded", async () => {
+        const { request, sent } = host({
+            "/repos/octo/hello/pulls": () => {
+                return { html_url: `https://github.com/${REPO}/pull/9`, number: 9 };
+            },
+        });
+
+        await createPullRequest(request, { base: BASE, body: BODY, head: "feature+fix/a b", repository: REPO, title: TITLE });
+
+        expect(sent[0]?.json).toMatchObject({ head: "feature+fix/a b" });
+    });
+
+    it("does not report a pull request number that is not a positive whole number as opened", async () => {
+        const { request } = host({
+            "/repos/octo/hello/pulls": () => {
+                return { html_url: null, number: 0 };
+            },
+        });
+
+        await expect(createPullRequest(request, { base: BASE, body: BODY, head: HEAD, repository: REPO, title: TITLE })).rejects.toMatchObject({
+            unconfirmed: true,
+        });
+    });
+
+    it("finds the open pull request of a branch, or none", async () => {
+        const open = host({ "/repos/octo/hello/pulls": [{ html_url: `https://github.com/${REPO}/pull/3`, number: 3 }] });
+        const none = host({ "/repos/octo/hello/pulls": [] });
+
+        expect(await githubDriver.findOpenPullRequest?.(open.request, { head: HEAD, repository: REPO })).toEqual({ url: `https://github.com/${REPO}/pull/3` });
+        expect(await githubDriver.findOpenPullRequest?.(none.request, { head: HEAD, repository: REPO })).toBeUndefined();
+    });
+
     it("refuses an address that is not owner/name", async () => {
         const { request, sent } = host({});
 

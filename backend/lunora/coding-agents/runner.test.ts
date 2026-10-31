@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HostDriver } from "../source-control/driver";
 import type { HostRequest } from "../source-control/origin-fetch";
+import { HostApiError } from "../source-control/origin-fetch";
 import {
     BASE_INFO_PATH,
     CODEX_LAST_MESSAGE_PATH,
@@ -18,6 +19,7 @@ import { expandSecrets } from "./redact";
 import type { CommandOutcome, RunCommandOptions, RunSpec, SandboxHandle, SandboxProvider } from "./runner";
 import {
     checkPullRequest,
+    describePullRequestFailure,
     finalizeRun,
     openPullRequestForBranch,
     pollRun,
@@ -407,6 +409,55 @@ describe("pull requests (async: start, poll, then the API)", () => {
     });
 });
 
+describe("a pull request that may already exist", () => {
+    const repo = parseRepoUrl("anolilab/neore");
+    const input = { baseBranch: "main", body: "b", branch: "neore/agent-run123", repo, title: "t" };
+
+    it("records the open pull request for the branch instead of creating another", async () => {
+        const createPullRequest = vi.fn(async () => {
+            return { url: "https://github.com/anolilab/neore/pull/2" };
+        });
+        const findOpenPullRequest = vi.fn(async () => {
+            return { url: "https://github.com/anolilab/neore/pull/1" };
+        });
+
+        await expect(openPullRequestForBranch(input, { createPullRequest, findOpenPullRequest })).resolves.toEqual({
+            url: "https://github.com/anolilab/neore/pull/1",
+        });
+        expect(findOpenPullRequest).toHaveBeenCalledWith({ head: "neore/agent-run123", repository: "anolilab/neore" });
+        expect(createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it("creates when there is none, or the lookup fails", async () => {
+        const createPullRequest = vi.fn(async () => {
+            return { url: "https://github.com/anolilab/neore/pull/2" };
+        });
+
+        await openPullRequestForBranch(input, { createPullRequest, findOpenPullRequest: async () => undefined });
+        await openPullRequestForBranch(input, {
+            createPullRequest,
+            findOpenPullRequest: async () => {
+                throw new Error("down");
+            },
+        });
+
+        expect(createPullRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it("puts the host's reason in the log, redacted, and says an unreadable answer may have opened one", () => {
+        const refused = new HostApiError("Host API error: 422", 422, false, { detail: "A pull request already exists for o:b token-abc" });
+        const lost = new HostApiError("The host's answer could not be read", 0, false, { unconfirmed: true });
+        const secrets = expandSecrets(["token-abc"]);
+
+        const text = describePullRequestFailure(refused, secrets);
+
+        expect(text).toContain("A pull request already exists");
+        expect(text).not.toContain("token-abc");
+        expect(describePullRequestFailure(lost, secrets)).toContain("may have opened it anyway");
+        expect(describePullRequestFailure(new Error("boom"), secrets)).toBe("Could not open the pull request: boom");
+    });
+});
+
 describe("pullRequestProblem", () => {
     it("needs a GitHub repo, a token, a base branch and a complete diff", () => {
         const repo = parseRepoUrl("anolilab/neore");
@@ -498,5 +549,13 @@ describe("the pull request goes through the host adapter", () => {
         expect(source).not.toContain("githubPullRequestCreator");
         expect(source).toContain("pullRequestApiFromDriver");
         expect(source).toContain("pullRequest.create");
+    });
+
+    it("links a pull request opened from the button to its thread, and logs a link that fails", async () => {
+        const source = await readFile(decodeURIComponent(new URL("execute.ts", import.meta.url).pathname), "utf8");
+
+        expect(source).toContain("linkOpenedPullRequest(ctx, run)");
+        expect(source).toContain("else if (prUrl !== undefined)");
+        expect(source).toContain("could not link the opened pull request");
     });
 });

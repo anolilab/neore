@@ -71,6 +71,8 @@ const HOSTILE = [
     "unicode ✓ ünïcødé",
 ];
 
+const QUOTED = /^'.*'$/u;
+
 describe("shellQuote", () => {
     it.skipIf(NO_BASH).each(HOSTILE)("round-trips %j through bash unchanged", (value) => {
         expect(bashArgv(shellQuote(value))).toEqual([value]);
@@ -302,6 +304,22 @@ describe("origin-scoped credentials", () => {
         expect(prOffGithub).toContain(extraheaderKey("https://git.example.com"));
         expect(offGithub).not.toContain(GITHUB_CREDENTIAL_ORIGIN);
         expect(prOffGithub).not.toContain(GITHUB_CREDENTIAL_ORIGIN);
+    });
+
+    it("quotes the credential key in both scripts, so an origin cannot add shell words", () => {
+        const origin = "https://git.example.com";
+        const key = `GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(origin))}`;
+        const run = buildRunScript({ agent: "claude_code", repo: parseRepoUrl("https://git.example.com/octo/hello.git"), timeoutSeconds: 600 });
+        const pr = buildPullRequestScript({
+            baseBranch: "main",
+            branch: "neore/agent-run1",
+            message: "m",
+            repo: parseRepoUrl("https://git.example.com/octo/hello.git"),
+        });
+
+        expect(shellQuote("http.https://a b;x/.extraheader")).toMatch(QUOTED);
+        expect(run).toContain(key);
+        expect(pr).toContain(key);
     });
 });
 

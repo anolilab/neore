@@ -340,7 +340,7 @@ export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; r
         `finish() { echo "$1" > ${RUN_STATUS_PATH}; exit 0; }`,
         "cd /home/user",
         `echo ${shellQuote(`$ git clone ${input.repo.cloneUrl}${input.branch ? ` (branch ${input.branch})` : ""}`)}`,
-        `( if [ -s ${GIT_AUTH_PATH} ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${extraheaderKey(input.repo.origin)} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; fi; rm -f ${GIT_AUTH_PATH}; timeout ${String(CLONE_TIMEOUT_S)} ${buildCloneCommand(input.repo, input.branch)} ) || { rm -f ${GIT_AUTH_PATH}; finish setup-failed:clone; }`,
+        `( if [ -s ${GIT_AUTH_PATH} ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(input.repo.origin))} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; fi; rm -f ${GIT_AUTH_PATH}; timeout ${String(CLONE_TIMEOUT_S)} ${buildCloneCommand(input.repo, input.branch)} ) || { rm -f ${GIT_AUTH_PATH}; finish setup-failed:clone; }`,
         `rm -f ${GIT_AUTH_PATH}`,
         `cd ${REPO_DIR} || finish setup-failed:clone`,
         `{ git rev-parse HEAD && git rev-parse --abbrev-ref HEAD; } > ${BASE_INFO_PATH} || finish setup-failed:rev-parse`,
@@ -457,7 +457,7 @@ export const PR_STATUS_PATH = "/tmp/neore-pr.status";
  */
 export const buildPullRequestScript = (input: { baseBranch: string; branch: string; message: string; repo: ParsedRepo }): string => {
     const withAuth = (command: string): string =>
-        `( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${extraheaderKey(input.repo.origin)} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; timeout ${String(CLONE_TIMEOUT_S)} ${command} )`;
+        `( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(input.repo.origin))} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; timeout ${String(CLONE_TIMEOUT_S)} ${command} )`;
 
     return [
         "#!/bin/bash",

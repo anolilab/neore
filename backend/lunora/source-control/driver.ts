@@ -54,6 +54,11 @@ export interface HostDriver {
      * `pullRequest.create` reads as unsupported.
      */
     createPullRequest?: (request: HostRequest, input: CreatePullRequestInput) => Promise<CreatedPullRequest>;
+    /**
+     * The open pull request already made from `head` (a branch of `repository`), if any. Asked before a create, so a
+     * create whose answer was lost and is retried records the pull request the host holds instead of opening another.
+     */
+    findOpenPullRequest?: (request: HostRequest, input: { head: string; repository: string }) => Promise<CreatedPullRequest | undefined>;
     getMergeStatus: (request: HostRequest, ref: PullRequestRef) => Promise<MergeStatus>;
     getPullRequest: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestDetail>;
     /** The request headers the host's API wants, besides the token. */

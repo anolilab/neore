@@ -51,7 +51,7 @@ import {
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
 import type { HostDriver } from "../source-control/driver";
-import { createBoundRequester } from "../source-control/origin-fetch";
+import { createBoundRequester, HostApiError } from "../source-control/origin-fetch";
 
 export interface CommandOutcome {
     exitCode: number;
@@ -439,13 +439,18 @@ export const checkPullRequest = async (sandbox: SandboxHandle, input: { runId: s
 export interface PullRequestApi {
     /** The host's call that opens the PR, made from the backend — never from the sandbox. */
     createPullRequest: (input: { base: string; body: string; head: string; repository: string; title: string }) => Promise<{ url: string }>;
+    /** The open pull request already made from this branch, if the host can say. */
+    findOpenPullRequest?: (input: { head: string; repository: string }) => Promise<{ url: string } | undefined>;
 }
 
 /**
  * The host adapter's pull-request call, bound to the driver's own origin: the token is sent there and nowhere else. A
  * driver that does not declare `createPullRequest` cannot open one, and says so rather than reaching GitHub itself.
  */
-export const pullRequestApiFromDriver = (driver: Pick<HostDriver, "apiOrigin" | "createPullRequest" | "headers">, token: string): PullRequestApi => {
+export const pullRequestApiFromDriver = (
+    driver: Pick<HostDriver, "apiOrigin" | "createPullRequest" | "findOpenPullRequest" | "headers">,
+    token: string,
+): PullRequestApi => {
     const create = driver.createPullRequest;
 
     if (!create) {
@@ -454,7 +459,12 @@ export const pullRequestApiFromDriver = (driver: Pick<HostDriver, "apiOrigin" | 
 
     const request = createBoundRequester({ headers: driver.headers, origin: driver.apiOrigin, token });
 
-    return { createPullRequest: async (input) => await create(request, input) };
+    const find = driver.findOpenPullRequest;
+
+    return {
+        createPullRequest: async (input) => await create(request, input),
+        ...(find && { findOpenPullRequest: async (input: { head: string; repository: string }) => await find(request, input) }),
+    };
 };
 
 /** The final, short step: open the PR for a pushed branch. */
@@ -466,11 +476,32 @@ export const openPullRequestForBranch = async (
         throw new Error("Pull requests are only supported for github.com repositories");
     }
 
+    const address = `${input.repo.github.owner}/${input.repo.github.repo}`;
+
+    // A retry after a create whose answer was lost must find the pull request the host may hold, not open a second.
+    // The lookup is an aid: when it fails, the create is still the honest next step.
+    const existing = await dependencies.findOpenPullRequest?.({ head: input.branch, repository: address }).catch(() => undefined);
+
+    if (existing) {
+        return existing;
+    }
+
     return await dependencies.createPullRequest({
         base: input.baseBranch,
         body: input.body,
         head: input.branch,
-        repository: `${input.repo.github.owner}/${input.repo.github.repo}`,
+        repository: address,
         title: input.title,
     });
+};
+
+/** The log line for a failed create: the host's own reason (untrusted, redacted), and a warning when it may have opened it anyway. */
+export const describePullRequestFailure = (error: unknown, secrets: string[]): string => {
+    const host = error instanceof HostApiError ? error : undefined;
+    const reason = [error instanceof Error ? error.message : String(error), host?.detail].filter(Boolean).join(": ");
+    const text = `Could not open the pull request: ${redactSecrets(reason, secrets).slice(0, 1000)}`;
+
+    return host?.unconfirmed
+        ? `${text}\nThe host may have opened it anyway: check the repository's pull requests before trying again. A retry looks for an open one first.`
+        : text;
 };

@@ -857,7 +857,7 @@ const branchPath = (branch: string): string | undefined => {
     }
 };
 
-const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.number() });
+const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() });
 
 /**
  * Opens a pull request for a branch that is already pushed, and answers its web page. The branch names become JSON
@@ -873,15 +873,13 @@ const createPullRequest = async (request: HostRequest, input: CreatePullRequestI
         throw new HostApiError("Not a GitHub pull request address", 404);
     }
 
-    const base = branchPath(input.base);
-    const head = branchPath(input.head);
-
-    if (base === undefined || head === undefined) {
+    // The names are JSON values, not path parts: `branchPath` only vets them (an encoded `+` would name another branch).
+    if (branchPath(input.base) === undefined || branchPath(input.head) === undefined) {
         throw new HostApiError("Not a branch this can open a pull request from", 404);
     }
 
     const response = await request(`/repos/${parts.owner}/${parts.name}/pulls`, {
-        json: { base, body: input.body, head, title: input.title },
+        json: { base: input.base, body: input.body, head: input.head, title: input.title },
         method: "POST",
     });
     let created: z.infer<typeof createdPullRequestSchema>;
@@ -894,6 +892,26 @@ const createPullRequest = async (request: HostRequest, input: CreatePullRequestI
     }
 
     return { url: webUrl(created.html_url) ?? `${GITHUB_WEB_ORIGIN}/${parts.owner}/${parts.name}/pull/${String(created.number)}` };
+};
+
+const openPullRequestsSchema = z.array(z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() }));
+
+/** The open pull request from a branch of the repository itself, or `undefined`. The head is `owner:branch`, as the host wants it. */
+const findOpenPullRequest = async (request: HostRequest, input: { head: string; repository: string }): Promise<CreatedPullRequest | undefined> => {
+    const parts = splitGithubRepo(input.repository);
+
+    if (!parts || branchPath(input.head) === undefined) {
+        return undefined;
+    }
+
+    const response = await request(`/repos/${parts.owner}/${parts.name}/pulls`, {
+        query: { head: `${parts.owner}:${input.head}`, per_page: 1, state: "open" },
+    });
+    const [found] = parse(openPullRequestsSchema, await readJson(response));
+
+    return found === undefined
+        ? undefined
+        : { url: webUrl(found.html_url) ?? `${GITHUB_WEB_ORIGIN}/${parts.owner}/${parts.name}/pull/${String(found.number)}` };
 };
 
 /** Reads a source of required-check rules, which may be withheld: only a sign-in or rate-limit problem is the caller's. */
@@ -1242,6 +1260,7 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
     createPullRequest,
+    findOpenPullRequest,
     getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },

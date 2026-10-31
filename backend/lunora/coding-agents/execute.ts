@@ -22,7 +22,7 @@ import { CODING_AGENTS, missingKeyMessage, parseRepoUrl, RUN_TIMEOUT_MS } from "
 import { buildRunResultMessage } from "./result-message";
 import { createE2BSandboxProvider, killE2BSandbox } from "./sandbox-provider";
 import { enqueueJob } from "../lib/job-queue";
-import { expandSecrets, redactSecrets } from "./redact";
+import { expandSecrets } from "./redact";
 import type { SandboxHandle } from "./runner";
 import {
     checkPullRequest,
@@ -30,6 +30,7 @@ import {
     openPullRequestForBranch,
     pollRun,
     PR_BUDGET_MS,
+    describePullRequestFailure,
     pullRequestApiFromDriver,
     pullRequestProblem,
     startPullRequest,
@@ -240,6 +241,27 @@ export const pollCodingAgentRun = internalAction
     });
 
 /**
+ * Both ways: the thread that opened the PR names it, so the pull request lists the thread that worked on it. Best
+ * effort, so a link that cannot be recorded never fails the result the user is waiting for, but a failure is logged:
+ * nothing retries it. Idempotent, so a run reaching it from two paths records one link.
+ */
+const linkOpenedPullRequest = async (ctx: RunnerCtx, run: { prUrl?: string; threadId?: string; userId: string }): Promise<void> => {
+    if (run.prUrl === undefined || run.threadId === undefined) {
+        return;
+    }
+
+    try {
+        await ctx.runMutation(internal.source_control.pr_threads.recordOpenedPullRequest, {
+            prUrl: run.prUrl,
+            threadId: run.threadId,
+            userId: run.userId,
+        });
+    } catch (error) {
+        console.error(`[coding-agents] could not link the opened pull request to its thread ${run.threadId}:`, error);
+    }
+};
+
+/**
  * The follow-ups of a finished run: the result message in its thread and a
  * waiting task round's answer. Runs once — after the PR, when one was asked for.
  */
@@ -260,17 +282,7 @@ const postFollowUps = async (ctx: RunnerCtx, runId: Id<"codingAgentRuns">): Prom
         });
     }
 
-    // Both ways: the thread that opened the PR names it, so the pull request lists the thread that worked on it. Best
-    // effort — a link that cannot be recorded must never fail the result the user is waiting for.
-    if (run.prUrl !== undefined && run.threadId !== undefined) {
-        await ctx
-            .runMutation(internal.source_control.pr_threads.recordOpenedPullRequest, {
-                prUrl: run.prUrl,
-                threadId: run.threadId,
-                userId: run.userId,
-            })
-            .catch(() => undefined);
-    }
+    await linkOpenedPullRequest(ctx, run);
 
     if (run.taskRunId) {
         // A verifier call: on the jobs queue; it skips a round that is already complete.
@@ -418,6 +430,13 @@ export const pollPullRequest = internalAction
 
             if (followUp) {
                 await postFollowUps(ctx, runId);
+            } else if (prUrl !== undefined) {
+                // The button-made PR has no follow-ups to post, but it is still the thread's pull request.
+                const run = await ctx.runQuery(internal.coding_agents.functions.getRunForFollowUp, { runId });
+
+                if (run) {
+                    await linkOpenedPullRequest(ctx, run);
+                }
             }
         };
 
@@ -485,9 +504,7 @@ export const pollPullRequest = internalAction
 
             await complete(`${check.log}\nOpened pull request ${url}\n`, url);
         } catch (error) {
-            const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets).slice(0, 1000);
-
-            await complete(`${check.log}\nCould not open the pull request: ${message}\n`);
+            await complete(`${check.log}\n${describePullRequestFailure(error, secrets)}\n`);
         }
 
         return null;
