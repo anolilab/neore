@@ -1583,6 +1583,11 @@
     {
       "from": "function:chat_execute:continueAfterToolApproval",
       "kind": "call",
+      "to": "function:agent_threads:endStoppedPause"
+    },
+    {
+      "from": "function:chat_execute:continueAfterToolApproval",
+      "kind": "call",
       "to": "function:chat_streaming_persistent_library:claimStreamRun"
     },
     {
@@ -8529,6 +8534,13 @@
       "id": "function:agent_threads:deleteThreadRelationship",
       "kind": "function",
       "name": "agent.threads.deleteThreadRelationship",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_threads:endStoppedPause",
+      "kind": "function",
+      "name": "agent.threads.endStoppedPause",
       "module": "agent"
     },
     {
@@ -18225,13 +18237,13 @@
     {
       "file": "agent/threads",
       "kind": "write",
-      "line": 314,
+      "line": 329,
       "reason": "\"markThreadArchived\" is not a registered function"
     },
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1501,
+      "line": 1516,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18844,6 +18856,12 @@
       "file": "chat/group/run",
       "kind": "call",
       "line": 771,
+      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 800,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {

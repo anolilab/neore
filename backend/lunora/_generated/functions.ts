@@ -435,6 +435,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "agent_threads:deleteAllForThreadIdSync": lunora_agent_threads_27.deleteAllForThreadIdSync as unknown as RegisteredLunoraFunction,
     "agent_threads:deleteExpiredTemporaryThreads": lunora_agent_threads_27.deleteExpiredTemporaryThreads as unknown as RegisteredLunoraFunction,
     "agent_threads:deleteThreadRelationship": lunora_agent_threads_27.deleteThreadRelationship as unknown as RegisteredLunoraFunction,
+    "agent_threads:endStoppedPause": lunora_agent_threads_27.endStoppedPause as unknown as RegisteredLunoraFunction,
     "agent_threads:getChildThreads": lunora_agent_threads_27.getChildThreads as unknown as RegisteredLunoraFunction,
     "agent_threads:getExpiredTemporaryThreadIds": lunora_agent_threads_27.getExpiredTemporaryThreadIds as unknown as RegisteredLunoraFunction,
     "agent_threads:getTemporaryThread": lunora_agent_threads_27.getTemporaryThread as unknown as RegisteredLunoraFunction,
@@ -2508,6 +2509,12 @@ __arr1[__i1] = __e1;
 return { "threadIds": __arr1 };
 });
 installCompiledValidatorMap(lunora_agent_threads_27.deleteThreadRelationship.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
+});
+installCompiledValidatorMap(lunora_agent_threads_27.endStoppedPause.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
@@ -8292,6 +8299,7 @@ export interface Caller {
             deleteAllForThreadIdSync: (args: { limit?: number; threadId: Id<"threads"> }) => Promise<null>;
             deleteExpiredTemporaryThreads: (args: { threadIds: Array<Id<"threads">> }) => Promise<{ deletedCount: number }>;
             deleteThreadRelationship: (args: { threadId: Id<"threads"> }) => Promise<null>;
+            endStoppedPause: (args: { threadId: Id<"threads"> }) => Promise<null>;
             getChildThreads: (args: { parentThreadId: Id<"threads"> }) => Promise<Array<{ _creationTime: number; _id: Id<"threadRelationships">; branchPoint?: number; branchType?: "branch" | "continuation" | "comparison" | "subagent"; createdAt: number; parentThreadId: Id<"threads">; threadId: Id<"threads">; userId?: string }>>;
             getExpiredTemporaryThreadIds: (args: { now: number }) => Promise<Array<Id<"threads">>>;
             getTemporaryThread: (args: { threadId: Id<"threads"> }) => Promise<{ _creationTime: number; _id: Id<"temporaryThreads">; expiresAt: number; retentionHours?: number; threadId: Id<"threads"> } | null>;
@@ -10083,6 +10091,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             deleteAllForThreadIdSync: (args) => callRegistered(context, "agent_threads:deleteAllForThreadIdSync", args),
             deleteExpiredTemporaryThreads: (args) => callRegistered(context, "agent_threads:deleteExpiredTemporaryThreads", args),
             deleteThreadRelationship: (args) => callRegistered(context, "agent_threads:deleteThreadRelationship", args),
+            endStoppedPause: (args) => callRegistered(context, "agent_threads:endStoppedPause", args),
             getChildThreads: (args) => callRegistered(context, "agent_threads:getChildThreads", args),
             getExpiredTemporaryThreadIds: (args) => callRegistered(context, "agent_threads:getExpiredTemporaryThreadIds", args),
             getTemporaryThread: (args) => callRegistered(context, "agent_threads:getTemporaryThread", args),
