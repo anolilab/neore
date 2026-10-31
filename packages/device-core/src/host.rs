@@ -368,11 +368,9 @@ impl Write for Chunks<'_> {
                 match self.outbox.offer(&self.buffer) {
                     Ok(()) => break,
                     Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        // Dropped, not failed: the archive's own check of the flag words how it ended.
                         if self.stop.load(Ordering::SeqCst) {
-                            return Err(io::Error::new(
-                                io::ErrorKind::Interrupted,
-                                "the archive was cancelled",
-                            ));
+                            break;
                         }
 
                         thread::sleep(Duration::from_millis(10));

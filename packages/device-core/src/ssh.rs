@@ -18,7 +18,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
@@ -29,9 +29,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::frame::{chunk_of, read_frame, stream_chunk_of, write_frame, CHUNK_TAG, STDERR_TAG};
+use crate::frame::{chunk_of, read_frame, stream_chunk_of, CHUNK_TAG, STDERR_TAG};
 use crate::host::PROTOCOL_VERSION;
 use crate::launch::Reaped;
+use crate::outbox::Outbox;
 
 /// The `neore-host` version the desktop expects to find in `~/.neore/host/<version>/` (S4 uploads it).
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -1038,6 +1039,8 @@ struct Chunks {
 
 /// Bytes of a download that may wait for the disk at once.
 const MAX_BACKLOG: usize = 64 * 1024 * 1024;
+/// Bytes of an agent's input waiting for ssh's stdin before a write is refused; requests and cancels have more room.
+const OUTBOX_BYTES: usize = 8 * 1024 * 1024;
 /// How long a download may go without a byte before it is given up.
 pub const DOWNLOAD_IDLE: Duration = Duration::from_secs(60);
 
@@ -1105,8 +1108,10 @@ pub struct HostConnection {
     /// The ssh child's exit code, read once when the session is closed: `i64::MIN` while unknown.
     exit_code: AtomicI64,
     next_id: AtomicU64,
+    /// Everything this side writes to ssh's stdin goes through here, in order. Nothing waits on the pipe: a server that
+    /// stops reading must not freeze the Electron main process (which calls in synchronously) or its quit.
+    outbox: Outbox,
     pending: Pending,
-    stdin: Mutex<ChildStdin>,
     stderr: Arc<Mutex<String>>,
     target: Target,
 }
@@ -1165,6 +1170,7 @@ impl HostConnection {
             .spawn()
             .map_err(|error| SshError::Other(format!("ssh could not run: {error}")))?;
         let stdin = child.stdin.take().expect("piped stdin");
+        let (outbox, _writer) = Outbox::new(stdin, OUTBOX_BYTES);
         let mut stdout = child.stdout.take().expect("piped stdout");
         let mut stderr_pipe = child.stderr.take().expect("piped stderr");
         let stderr = Arc::new(Mutex::new(String::new()));
@@ -1297,9 +1303,9 @@ impl HostConnection {
             launch_id,
             exit_code: AtomicI64::new(i64::MIN),
             next_id: AtomicU64::new(1),
+            outbox,
             pending,
             stderr,
-            stdin: Mutex::new(stdin),
             target: target.clone(),
         })
     }
@@ -1349,10 +1355,7 @@ impl HostConnection {
 
         let sent = serde_json::to_vec(&frame)
             .map_err(|error| error.to_string())
-            .and_then(|bytes| {
-                write_frame(&mut *self.stdin.lock().unwrap(), &bytes)
-                    .map_err(|error| error.to_string())
-            });
+            .and_then(|bytes| self.queue(&bytes, true));
 
         if let Err(error) = sent {
             self.pending.lock().unwrap().remove(&id);
@@ -1361,6 +1364,33 @@ impl HostConnection {
         }
 
         Ok((id, receiver))
+    }
+
+    /// Queues a frame for the server without waiting. A pipe that has not drained for [`OUTBOX_BYTES`] more than the
+    /// data allowance is a connection that stalled: it is closed (the host stops every agent when its pipe ends), so a
+    /// stop never waits on it and nothing is left half-sent. `urgent` frames (requests, cancels) have room beyond
+    /// what an agent's input may use.
+    fn queue(&self, frame: &[u8], urgent: bool) -> Result<(), String> {
+        let queued = if urgent {
+            self.outbox.offer_urgent(frame)
+        } else {
+            self.outbox.offer(frame)
+        };
+
+        queued.map_err(|error| {
+            if urgent && error.kind() == io::ErrorKind::WouldBlock {
+                self.close();
+
+                return "the connection to the server stopped taking data and was closed"
+                    .to_owned();
+            }
+
+            if error.kind() == io::ErrorKind::WouldBlock {
+                return "the server is not keeping up with what is sent to it".to_owned();
+            }
+
+            error.to_string()
+        })
     }
 
     /// Waits at most `wait` for the response to request `id`.
@@ -1484,17 +1514,14 @@ impl HostLink for HostConnection {
             return Err("the connection to the server was lost".into());
         }
 
-        // A frame is capped well under the stream: a long prompt goes in several.
-        let mut stdin = self.stdin.lock().unwrap();
-
+        // A frame is capped well under the stream: a long prompt goes in several. The end of the input is tiny and
+        // urgent like a cancel; the bytes are what a stalled server must refuse.
         if bytes.is_empty() {
-            return write_frame(&mut *stdin, &stream_frame(handle, &[]))
-                .map_err(|error| error.to_string());
+            return self.queue(&stream_frame(handle, &[]), true);
         }
 
         for piece in bytes.chunks(256 * 1024) {
-            write_frame(&mut *stdin, &stream_frame(handle, piece))
-                .map_err(|error| error.to_string())?;
+            self.queue(&stream_frame(handle, piece), false)?;
         }
 
         Ok(())
@@ -1523,6 +1550,7 @@ impl HostLink for HostConnection {
 
     fn close(&self) {
         self.alive.store(false, Ordering::SeqCst);
+        self.outbox.close();
 
         let mut child = self.child.lock().unwrap();
 
@@ -2385,5 +2413,114 @@ mod tests {
 
         assert!(chunks.overflowed.load(Ordering::SeqCst));
         assert!(chunks.backlog.load(Ordering::SeqCst) <= MAX_BACKLOG);
+    }
+
+    /// A stdin the far side never reads.
+    struct Stalled(std::sync::mpsc::Receiver<()>);
+
+    impl Write for Stalled {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let _ = self.0.recv();
+
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[cfg(unix)]
+    fn over_a_stalled_pipe() -> (HostConnection, std::sync::mpsc::Sender<()>) {
+        let (release, stalled) = channel();
+        let (outbox, _writer) = Outbox::new(Stalled(stalled), OUTBOX_BYTES);
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let connection = HostConnection {
+            alive: Arc::new(AtomicBool::new(true)),
+            child: Mutex::new(child),
+            exit_master: Vec::new(),
+            hello: Hello {
+                agents: true,
+                platform: "linux".into(),
+                protocol: PROTOCOL_VERSION,
+                sandbox: RemoteSandbox {
+                    available: true,
+                    detail: String::new(),
+                },
+                version: "test".into(),
+            },
+            launch_id: "test".into(),
+            exit_code: AtomicI64::new(i64::MIN),
+            next_id: AtomicU64::new(1),
+            outbox,
+            pending: Arc::default(),
+            stderr: Arc::default(),
+            target: target(),
+        };
+
+        (connection, release)
+    }
+
+    /// The Electron main process calls in synchronously: a server that stopped reading must not hold the call.
+    #[cfg(unix)]
+    #[test]
+    fn stopping_an_agent_never_waits_on_a_pipe_the_server_stopped_reading() {
+        let (connection, release) = over_a_stalled_pipe();
+        let started = Instant::now();
+
+        // Fill what the input may use; the writer thread is stuck on the first frame.
+        let mut refused = false;
+
+        for _ in 0..64 {
+            if connection.agent_write(9, &vec![0u8; 1024 * 1024]).is_err() {
+                refused = true;
+
+                break;
+            }
+        }
+
+        assert!(refused, "the input is bounded and refuses past it");
+        // A stop still queues behind the full buffer, and returns at once.
+        connection.agent_stop(9);
+        assert!(
+            connection.is_alive(),
+            "room beyond the data allowance remains"
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+
+        drop(release);
+        connection.close();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_connection_whose_pipe_is_stalled_past_even_a_cancel_is_closed() {
+        let (connection, release) = over_a_stalled_pipe();
+        let started = Instant::now();
+
+        for _ in 0..64 {
+            if connection.agent_write(9, &vec![0u8; 1024 * 1024]).is_err() {
+                break;
+            }
+        }
+
+        // Cancels fill the headroom; the one that does not fit ends the connection.
+        for target in 0..1_000_000u64 {
+            if !connection.is_alive() {
+                break;
+            }
+
+            connection.cancel(target);
+        }
+
+        assert!(!connection.is_alive());
+        assert!(started.elapsed() < Duration::from_secs(5));
+        drop(release);
     }
 }
