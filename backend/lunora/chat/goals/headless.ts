@@ -68,6 +68,7 @@ export const runHeadlessGoalRounds = async (input: {
         const finish = (ended: HeadlessGoalOutcome["ended"]): HeadlessGoalOutcome => {
             return { costMicrodollars, ended, reason, result, rounds: round, totalTokens };
         };
+
         // A run stopped while its round generated is not reviewed: no reviewer call, and no win reported for it.
         if (await input.stopped?.()) {
             return finish("user");
