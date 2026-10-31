@@ -228,7 +228,7 @@ describe("making a summary", () => {
     it("moves the cover on when the model answers with nothing, instead of paying for the same rows again", async () => {
         expect.assertions(3);
 
-        generateText.mockResolvedValueOnce({ text: "   ", usage: {} });
+        generateText.mockResolvedValueOnce({ text: " ".repeat(3), usage: {} });
         await seedThread(ROWS);
         await runJob(rowIds.at(-1)!);
 
