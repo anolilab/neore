@@ -1,7 +1,7 @@
 /**
  * The globs a hooks file may carry. The file is repository content, so the dialect is small and checked before
  * anything is compiled: relative paths, `*`, `**` (a whole segment), `?` and one level of `{a,b}`. Matching is by
- * segment, never one big regular expression, so a hostile pattern cannot take the main process's time.
+ * segment with a linear wildcard walk, never a regular expression, so a hostile pattern cannot take the main process's time.
  */
 
 const MAX_GLOB = 200;
@@ -12,7 +12,6 @@ const MAX_EXPANSIONS = 32;
 // eslint-disable-next-line no-control-regex -- control characters are what is being refused
 const CONTROL = /[\u{0}-\u{1F}\u{7F}]/u;
 const ALLOWED = /^[\w\-./*?{},@+= ]+$/u;
-const REGEXP_SPECIAL = /[$()+.[\\\]^{|}]/gu;
 
 /** Expands the single brace group, if any. `null` when the braces are nested, unbalanced or too many. */
 const expandBraces = (glob: string): string[] | null => {
@@ -85,18 +84,52 @@ export const globProblem = (glob: string): string | null => {
     return null;
 };
 
+/**
+ * One segment against one candidate: `*` is any run of characters, `?` one. The classic two-pointer walk that, on a
+ * mismatch, retries from the last `*` one character further on. It never backtracks further than that star, so the
+ * work is at most pattern length times candidate length, whatever the pattern.
+ */
+const wildcardMatch = (pattern: string[], candidate: string[]): boolean => {
+    let patternIndex = 0;
+    let candidateIndex = 0;
+    let star = -1;
+    let resume = 0;
+
+    while (candidateIndex < candidate.length) {
+        const part = pattern[patternIndex];
+
+        if (part === "*") {
+            star = patternIndex;
+            resume = candidateIndex;
+            patternIndex += 1;
+        } else if (part !== undefined && (part === "?" || part === candidate[candidateIndex])) {
+            patternIndex += 1;
+            candidateIndex += 1;
+        } else if (star === -1) {
+            return false;
+        } else {
+            resume += 1;
+            candidateIndex = resume;
+            patternIndex = star + 1;
+        }
+    }
+
+    while (pattern[patternIndex] === "*") {
+        patternIndex += 1;
+    }
+
+    return patternIndex === pattern.length;
+};
+
 const segmentMatcher = (segment: string): (candidate: string) => boolean => {
     if (segment === "**") {
         return () => true;
     }
 
-    const source = segment
-        .replaceAll(REGEXP_SPECIAL, String.raw`\$&`)
-        .replaceAll("*", "[^/]*")
-        .replaceAll("?", "[^/]");
-    const expression = new RegExp(`^${source}$`, "u");
+    // By code point, so `?` is one character as a person counts it and not half of a surrogate pair.
+    const pattern = [...segment];
 
-    return (candidate) => expression.test(candidate);
+    return (candidate) => wildcardMatch(pattern, [...candidate]);
 };
 
 const matchSegments = (pattern: { globstar: boolean; test: (candidate: string) => boolean }[], candidate: string[]): boolean => {

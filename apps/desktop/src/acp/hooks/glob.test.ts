@@ -38,10 +38,33 @@ describe("compileGlob", () => {
     });
 
     it("stays fast on a hostile pattern", () => {
-        const started = Date.now();
+        const hostile = [
+            ["*a*a*a*a", "a".repeat(255)],
+            ["*-*-*-*.ts", `${"-".repeat(250)}x`],
+            ["*-*-*-*.ts", "-".repeat(250)],
+            ["{*-*-*-*,*a*a*a*}.ts", `${"-a".repeat(120)}x`],
+            ["**/*-*-*-*.ts", `${"d/".repeat(40)}${"-".repeat(250)}`],
+        ] as const;
+        const started = performance.now();
 
-        matches("*a*a*a*a", "a".repeat(255));
-        expect(Date.now() - started).toBeLessThan(500);
+        for (const [glob, candidate] of hostile) {
+            matches(glob, candidate);
+        }
+
+        expect(performance.now() - started).toBeLessThan(50);
+    });
+
+    it("matches the way a backtracking matcher would", () => {
+        expect(matches("*-*-*.ts", "a-b-c.ts")).toBe(true);
+        expect(matches("*-*-*.ts", "a-b.ts")).toBe(false);
+        expect(matches("*a*b", "aab")).toBe(true);
+        expect(matches("*a*b", "abx")).toBe(false);
+        expect(matches("a*", "a")).toBe(true);
+        expect(matches("*", "")).toBe(false);
+        expect(matches("a?c*", "abcd")).toBe(true);
+        expect(matches("??", "é")).toBe(false);
+        expect(matches("?", "😀")).toBe(true);
+        expect(matches("*.{ts,tsx}", "a.tsx")).toBe(true);
     });
 });
 
