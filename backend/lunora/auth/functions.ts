@@ -1109,7 +1109,7 @@ export const getUserPreferencesQuery = internalQuery
  * of that server. Bound to its name AND url, like a run's view in {@link getMCPServersQuery}.
  */
 export const getMcpSecretHeadersQuery = internalQuery
-    .input({ name: v.string().max(MAX_LENGTH.short), url: v.string().max(MAX_LENGTH.url), userId: v.string() })
+    .input({ name: v.string().max(MAX_LENGTH.short), url: v.string().max(MAX_LENGTH.url), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.object({ key: v.string(), value: v.string() })))
     .query(async ({ args: { name, url, userId }, ctx: context }) => {
         try {
