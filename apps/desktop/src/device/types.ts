@@ -110,17 +110,47 @@ export interface Prompt {
     id: number;
 }
 
+/** How far a sandboxed program may reach into the network (`NetworkTier` in `sandbox.rs`). */
+export type NetworkTier = "dependencies" | "off" | "on";
+
+/** A local MCP server as stored (`McpServerConfig` in `mcp.rs`). */
+export interface McpServer {
+    args: string[];
+    command: string;
+    env: Record<string, string>;
+    name: string;
+    network: NetworkTier;
+}
+
+/** Whether a configured server will run sandboxed here (`McpServerStatus` in `engine.rs`). */
+export interface McpServerStatus {
+    name: string;
+    /** Why its network tier is not fully enforced although it is sandboxed (Off, on a computer that cannot block sockets); `null` when it is. */
+    networkGap: string | null;
+    /** What its approval prompt says about the sandbox and the network tier; empty when it cannot start. */
+    note: string;
+    /** Why it cannot start; `null` when it can. */
+    problem: string | null;
+    sandboxed: boolean;
+}
+
 export interface SettingsView {
     accountLabel: string | null;
     allowRules: string[];
+    /** `shellNetwork === "on"`; kept for the Rust view's older readers. */
     allowShellNetwork: boolean;
     auditPath: string;
+    /** Why "Common dependencies only" cannot be enforced on this computer; `null` when it can. */
+    dependenciesUnavailable: string | null;
     hosts: HostView[];
-    mcpServers: { args: string[]; command: string; env: Record<string, string>; name: string }[];
+    mcpServers: McpServer[];
+    /** One per entry of `mcpServers`, in order. */
+    mcpStatus: McpServerStatus[];
     paired: boolean;
     requireShellSandbox: boolean;
     roots: string[];
     sandboxUnavailable: string | null;
+    shellNetwork: NetworkTier;
 }
 
 /** What the engine emits, parsed from the addon's JSON event strings. */

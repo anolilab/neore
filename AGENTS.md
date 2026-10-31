@@ -591,13 +591,26 @@ written here is what is not.
   it always prompts and never offers "Always allow"; `shell_run`/`fs_write`
   never do either. `shell_run` runs in an OS sandbox (`packages/device-core/src/sandbox.rs`:
   Landlock / `sandbox-exec`; Windows has none) that writes only the shared
-  folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network is blocked
-  on macOS and Linux unless the user turns on "Allow network for shell commands" (default
-  off); on Linux that is a seccomp filter making `socket(2)` fail with `EPERM` for
+  folders + a per-run `$TMPDIR` and hides the rest of `$HOME`. Network has three tiers
+  (`NetworkTier`: Off default / "Common dependencies only" / On; the settings key
+  `shellNetwork`, with `allowShellNetwork` its legacy bool). The middle tier lets a program
+  connect to ONE loopback port, a per-run CONNECT-only proxy (`egress.rs`) that dials a fixed
+  list of registries and source hosts, and the proxy requires the TLS ClientHello's server name to
+  equal the CONNECT host (no SNI, Encrypted ClientHello or non-TLS bytes end the tunnel); macOS enforces it, **Linux refuses it** (Landlock filters
+  by port, not address, so the proxy's port would open on every host) rather than downgrading,
+  and Windows has no sandbox. Off is blocked
+  on macOS and Linux; on Linux that is a seccomp filter making `socket(2)` fail with `EPERM` for
   every family except `AF_UNIX` and `AF_NETLINK` (and `io_uring_setup`), on little-endian
   x86_64 and aarch64 only (elsewhere the call is refused unless unsandboxed shells are allowed, and then it keeps
-  Landlock and the prompt says the network is NOT blocked); Windows does not restrict it. MCP servers are NOT sandboxed. Where there is no sandbox the call
-  is REFUSED unless the user turned off "Require sandbox for shell commands"
+  Landlock and the prompt says the network is NOT blocked); Windows does not restrict it. **Local MCP servers run in the same sandbox**
+  (`mcp.rs`): listing their tools for the manifest starts one too, so both paths go through
+  `actions::plan_mcp_launch`; each has its own tier (default "Common dependencies only" where enforceable, else Off) and a private
+  folder `<app data>/mcp/<name>/` holding its `$TMPDIR` and package caches (the user's own `~/.npm`
+  etc. stay unreachable: a writable one would let a server plant a package the user later runs outside
+  the sandbox). The running process is keyed on its planned policy, so changed shared folders, tier or
+  sandbox setting restart it. Allowed paths and the host list are in `packages/device-core/README.md`.
+  Where there is no sandbox the call
+  is REFUSED unless the user turned off "Require sandbox for shell commands and local MCP servers"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow
   rules, shared folders, that setting and local MCP servers live only in Rust. **The pairing secret crosses the page exactly once**
   (`registerDevice` → `device_pair`), accepted because pairing needs a local
