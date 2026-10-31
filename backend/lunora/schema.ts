@@ -45,7 +45,7 @@ import {
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
-import { vDraftComment, vReviewVerdict } from "./source-control/validators";
+import { vDraftComment, vGuideFailure, vGuideProposal, vGuideSource, vGuideStatus, vGuideStop, vReviewVerdict } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
 import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
@@ -2037,6 +2037,40 @@ export const schema = defineSchema({
             };
         })
         .triggers((t) => auditTriggersFor(t, "prompts", AUDIT_TABLES["prompts"]!)),
+
+    // Develop mode (`source-control/`): the AI guide of a pull request, one row per (user, host origin,
+    // repository, number, head commit). A guide is about the head it was built for; a pull request that has
+    // moved on reads it as stale. Written by the generation job and the host turn's finalizer only; the page
+    // changes nothing but a proposal's status.
+    pullRequestGuides: defineTable({
+        createdAt: v.number(),
+        // Why it did not finish, when `status` is `failed`.
+        failure: v.optional(vGuideFailure),
+        // 0 until the guide is ready.
+        generatedAt: v.number(),
+        headSha: v.string(),
+        hostOrigin: v.string(),
+        // The user's review instructions this guide was written under; a regenerate starts from them.
+        instructions: v.string(),
+        // The queue job's claim key (cloud); ties a dead delivery to this row.
+        jobId: v.optional(v.string()),
+        // Changed files the host would not list, so the guide cannot name them.
+        leftOut: v.number(),
+        number: v.number(),
+        proposals: v.array(vGuideProposal),
+        repository: v.string(),
+        source: vGuideSource,
+        status: vGuideStatus,
+        stops: v.array(vGuideStop),
+        summary: v.string(),
+        // The coding-agent thread that writes a host guide.
+        threadId: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
+        .index("by_threadId", ["threadId"]),
 
     /**
      * better-auth's own rate-limit store.

@@ -31,6 +31,8 @@ export type HostCapabilityGroups = {
         description?: Capability;
         diff?: Capability;
         files?: Capability;
+        /** An AI guide that walks the change in reading order. */
+        guide?: Capability;
     };
     review?: {
         batchedSubmit?: Capability;

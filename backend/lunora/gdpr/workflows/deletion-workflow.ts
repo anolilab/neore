@@ -244,6 +244,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain("delete-user-devices", async () => await context.run(internal.devices.gdpr.deleteUserDevices, { userId: args.userId }));
         await drain("delete-user-acp-sessions", async () => await context.run(internal.acp.gdpr.deleteUserAcpSessions, { userId: args.userId }));
         await drain("delete-user-review-drafts", async () => await context.run(internal.source_control.gdpr.deleteUserReviewDrafts, { userId: args.userId }));
+        await drain("delete-user-pull-request-guides", async () => await context.run(internal.source_control.gdpr.deleteUserGuides, { userId: args.userId }));
         await drain("anonymise-gateway-usage-deductions", async () => await context.run(steps.anonymiseGatewayUsageDeductions, { userId: args.userId }));
         await context.step.do(
             "delete-user-browser-data",

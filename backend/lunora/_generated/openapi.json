@@ -45796,6 +45796,970 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#source_control_guide_functions:applyGuideProposal": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_guide_functions:applyGuideProposal` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_guide_functions:applyGuideProposal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "guideId": {
+                        "description": "Id<\"pullRequestGuides\">",
+                        "type": "string",
+                        "x-lunora-table": "pullRequestGuides"
+                      },
+                      "proposalId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "guideId",
+                      "proposalId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_guide_functions:applyGuideProposal",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "commentId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "const": "applied",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "commentId",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "head_moved",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_ready",
+                              "type": "string"
+                            },
+                            {
+                              "const": "submitting",
+                              "type": "string"
+                            },
+                            {
+                              "const": "too_many",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_guide_functions:applyGuideProposal",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_guide_functions:dismissGuideProposal": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_guide_functions:dismissGuideProposal` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_guide_functions:dismissGuideProposal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "guideId": {
+                        "description": "Id<\"pullRequestGuides\">",
+                        "type": "string",
+                        "x-lunora-table": "pullRequestGuides"
+                      },
+                      "proposalId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "guideId",
+                      "proposalId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_guide_functions:dismissGuideProposal",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "const": "dismissed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "not_found",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_guide_functions:dismissGuideProposal",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#source_control_guide_functions:generateGuide": {
+      "post": {
+        "description": "Invoke the `action` `source_control_guide_functions:generateGuide` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_guide_functions:generateGuide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "instructions": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "instructions"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_guide_functions:generateGuide",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "status": {
+                          "const": "started",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "guest",
+                              "type": "string"
+                            },
+                            {
+                              "const": "running",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "retryAfter": {
+                          "type": "number"
+                        },
+                        "status": {
+                          "const": "quota",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_guide_functions:generateGuide",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_guide_functions:getGuide": {
+      "post": {
+        "description": "Invoke the `query` `source_control_guide_functions:getGuide` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_guide_functions:getGuide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository",
+                      "headSha"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_guide_functions:getGuide",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "properties": {
+                        "freshness": {
+                          "anyOf": [
+                            {
+                              "const": "current",
+                              "type": "string"
+                            },
+                            {
+                              "const": "stale",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "guide": {
+                          "properties": {
+                            "failure": {
+                              "anyOf": [
+                                {
+                                  "const": "abandoned",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "head_moved",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "host_error",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "model_error",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "no_answer",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_connected",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "quota",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "too_large",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "generatedAt": {
+                              "type": "number"
+                            },
+                            "headSha": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "instructions": {
+                              "type": "string"
+                            },
+                            "leftOut": {
+                              "type": "number"
+                            },
+                            "proposals": {
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "const": "comment",
+                                        "type": "string"
+                                      },
+                                      "line": {
+                                        "type": "number"
+                                      },
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "side": {
+                                        "anyOf": [
+                                          {
+                                            "const": "new",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "old",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "startLine": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "status": {
+                                        "anyOf": [
+                                          {
+                                            "const": "applied",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "dismissed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "proposed",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "id",
+                                      "kind",
+                                      "line",
+                                      "path",
+                                      "side",
+                                      "startLine",
+                                      "status"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "const": "label",
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "reason": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "anyOf": [
+                                          {
+                                            "const": "applied",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "dismissed",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "proposed",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "kind",
+                                      "name",
+                                      "reason",
+                                      "status"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "type": "array"
+                            },
+                            "source": {
+                              "anyOf": [
+                                {
+                                  "const": "cloud",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "host",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "failed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "generating",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ready",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "stops": {
+                              "items": {
+                                "properties": {
+                                  "explanation": {
+                                    "type": "string"
+                                  },
+                                  "files": {
+                                    "items": {
+                                      "properties": {
+                                        "path": {
+                                          "type": "string"
+                                        },
+                                        "ranges": {
+                                          "items": {
+                                            "properties": {
+                                              "end": {
+                                                "type": "number"
+                                              },
+                                              "side": {
+                                                "anyOf": [
+                                                  {
+                                                    "const": "new",
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "const": "old",
+                                                    "type": "string"
+                                                  }
+                                                ]
+                                              },
+                                              "start": {
+                                                "type": "number"
+                                              }
+                                            },
+                                            "required": [
+                                              "end",
+                                              "side",
+                                              "start"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          "type": "array"
+                                        }
+                                      },
+                                      "required": [
+                                        "path",
+                                        "ranges"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "core",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "dependent",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "mechanical",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "uncovered",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "explanation",
+                                  "files",
+                                  "id",
+                                  "kind",
+                                  "title"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "threadId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "generatedAt",
+                            "headSha",
+                            "id",
+                            "instructions",
+                            "leftOut",
+                            "proposals",
+                            "source",
+                            "status",
+                            "stops",
+                            "summary"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "freshness",
+                        "guide"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_guide_functions:getGuide",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#source_control_guide_host:startHostGuide": {
+      "post": {
+        "description": "Invoke the `action` `source_control_guide_host:startHostGuide` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_guide_host:startHostGuide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "agentKey": {
+                        "type": "string"
+                      },
+                      "deviceId": {
+                        "description": "Id<\"devices\">",
+                        "type": "string",
+                        "x-lunora-table": "devices"
+                      },
+                      "folderId": {
+                        "type": "string"
+                      },
+                      "instructions": {
+                        "type": "string"
+                      },
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "agentKey",
+                      "deviceId",
+                      "folderId",
+                      "instructions",
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_guide_host:startHostGuide",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "status": {
+                          "const": "started",
+                          "type": "string"
+                        },
+                        "threadId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "threadId"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "folder_mismatch",
+                              "type": "string"
+                            },
+                            {
+                              "const": "guest",
+                              "type": "string"
+                            },
+                            {
+                              "const": "running",
+                              "type": "string"
+                            },
+                            {
+                              "const": "too_large",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "reason": {
+                          "anyOf": [
+                            {
+                              "const": "busy",
+                              "type": "string"
+                            },
+                            {
+                              "const": "offline",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            },
+                            {
+                              "const": "session_ended",
+                              "type": "string"
+                            },
+                            {
+                              "const": "too_large",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "const": "unavailable",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "reason",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "forbidden",
+                              "type": "string"
+                            },
+                            {
+                              "const": "host_error",
+                              "type": "string"
+                            },
+                            {
+                              "const": "needs_reconnect",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_connected",
+                              "type": "string"
+                            },
+                            {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            {
+                              "const": "rate_limited",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_guide_host:startHostGuide",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#source_control_merge_functions:getMergeStatus": {
       "post": {
         "description": "Invoke the `action` `source_control_merge_functions:getMergeStatus` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -55449,7 +56413,7 @@
       "name": "skills"
     },
     {
-      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts; the client caches what it reads.",
+      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts and the AI guides; the client caches what it reads.",
       "name": "source-control"
     },
     {

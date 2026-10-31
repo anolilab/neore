@@ -10,8 +10,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllReviewDrafts } from "./export-pages";
-import { collectReviewDraftsForExport, deleteUserReviewDrafts } from "./gdpr";
+import { collectAllGuides, collectAllReviewDrafts } from "./export-pages";
+import { collectGuidesForExport, collectReviewDraftsForExport, deleteUserGuides, deleteUserReviewDrafts } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
@@ -136,5 +136,73 @@ describe("review drafts in the account workflows", () => {
 
         expect(source).toContain('"delete-user-review-drafts"');
         expect(source).toContain("internal.source_control.gdpr.deleteUserReviewDrafts");
+    });
+});
+
+const seedGuides = async (userId: string, count: number): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        for (let index = 0; index < count; index += 1) {
+            await ctx.db.insert("pullRequestGuides", {
+                createdAt: 1,
+                generatedAt: 1,
+                headSha: "a".repeat(40),
+                hostOrigin: "https://github.com",
+                instructions: "Look at errors",
+                leftOut: 0,
+                number: index + 1,
+                proposals: [],
+                repository: "o/r",
+                source: "cloud",
+                status: "ready",
+                stops: [],
+                summary: "Adds a thing.",
+                updatedAt: 1,
+                userId,
+            });
+        }
+    });
+};
+
+const guidesFor = async (userId: string): Promise<number> =>
+    await harness.run(async (ctx: any) => {
+        const found: { userId: string }[] = await ctx.db.query("pullRequestGuides").collect();
+
+        return found.filter((row) => row.userId === userId).length;
+    });
+
+describe("guides in GDPR flows", () => {
+    it("deletes every guide of the user and nobody else's, past one batch", async () => {
+        await seedGuides(A, MANY);
+        await seedGuides(B, 1);
+
+        let rounds = 0;
+
+        for (; rounds < 100; rounds += 1) {
+            const { hasMore } = await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserGuides, { userId: A }));
+
+            if (!hasMore) {
+                break;
+            }
+        }
+
+        expect(rounds).toBeGreaterThan(0);
+        expect(await guidesFor(A)).toBe(0);
+        expect(await guidesFor(B)).toBe(1);
+    });
+
+    it("exports every guide of the user page by page, and nobody else's", async () => {
+        await seedGuides(A, 7);
+        await seedGuides(B, 1);
+
+        let pages = 0;
+        const { guides } = await collectAllGuides(async (cursor) => {
+            pages += 1;
+
+            return await harness.run(async (ctx: any) => await ctx.runQuery(collectGuidesForExport, { cursor, userId: A }));
+        });
+
+        expect(pages).toBeGreaterThan(1);
+        expect(guides).toHaveLength(7);
+        expect(JSON.stringify(guides)).not.toContain(B);
     });
 });

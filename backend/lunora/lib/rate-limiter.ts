@@ -498,6 +498,9 @@ export const RATE_LIMIT_CONFIGS = {
     // Edits to a review draft: no host call, but a person typing saves often.
     "sourceControl/draft:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/draft:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // Asking for a guide: a paid model call over the diff, on top of the daily text quota it is charged to.
+    "sourceControl/guide:free": Ratelimit.fixedWindow(10, HOUR),
+    "sourceControl/guide:premium": Ratelimit.fixedWindow(40, HOUR),
     "sourceControl/read:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/read:premium": Ratelimit.fixedWindow(600, MINUTE),
     // A write to the Git host (a reply, a resolve, a viewed mark, a submitted review) is a user action

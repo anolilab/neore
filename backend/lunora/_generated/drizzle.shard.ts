@@ -1129,6 +1129,32 @@ export const projectKnowledge = sqliteTable("projectKnowledge", {
     by_projectId: index("by_projectId").on(t.projectId),
 }));
 
+export const pullRequestGuides = sqliteTable("pullRequestGuides", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    failure: text("failure", { mode: "json" }).$type<"abandoned" | "head_moved" | "host_error" | "model_error" | "no_answer" | "not_connected" | "quota" | "too_large">(),
+    generatedAt: real("generatedAt").notNull(),
+    headSha: text("headSha").notNull(),
+    hostOrigin: text("hostOrigin").notNull(),
+    instructions: text("instructions").notNull(),
+    jobId: text("jobId"),
+    leftOut: real("leftOut").notNull(),
+    number: real("number").notNull(),
+    proposals: text("proposals", { mode: "json" }).$type<Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>>().notNull(),
+    repository: text("repository").notNull(),
+    source: text("source", { mode: "json" }).$type<"cloud" | "host">().notNull(),
+    status: text("status", { mode: "json" }).$type<"failed" | "generating" | "ready">().notNull(),
+    stops: text("stops", { mode: "json" }).$type<Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>>().notNull(),
+    summary: text("summary").notNull(),
+    threadId: text("threadId"),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_user_and_pull: index("by_user_and_pull").on(t.userId, t.hostOrigin, t.repository, t.number),
+}));
+
 export const rateLimits = sqliteTable("rateLimits", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
