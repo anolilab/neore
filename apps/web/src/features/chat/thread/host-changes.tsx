@@ -9,7 +9,7 @@ import { useState } from "react";
 
 import DiffCommentForm from "@/features/chat/host/diff-comment-form";
 import DiffCommentsDraft from "@/features/chat/host/diff-comments-draft";
-import { useDiffCommentStore } from "@/features/chat/host/diff-comments-store";
+import { useDiffCommentStore, useDiffDraftFull } from "@/features/chat/host/diff-comments-store";
 import type { UIMessage } from "@/lib/agent";
 
 import HostDiffViewer from "./host-diff-viewer";
@@ -37,6 +37,7 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
     const added = files.reduce((sum, file) => sum + file.added, 0);
     const removed = files.reduce((sum, file) => sum + file.removed, 0);
     const commentable = threadId !== undefined && messageId !== undefined;
+    const full = useDiffDraftFull(threadId ?? "");
 
     return (
         <section aria-label={t`Files changed by this turn`} className="border-border my-2 rounded-md border text-sm" data-testid="host-changes">
@@ -78,11 +79,17 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
                         </div>
                         {commentable && commenting === file.path && (
                             <DiffCommentForm
+                                full={full}
                                 label={t`Comment on the whole file ${file.path}`}
                                 onCancel={() => setCommenting(undefined)}
                                 onSubmit={(text) => {
-                                    useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
-                                    setCommenting(undefined);
+                                    const stored = useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
+
+                                    if (stored) {
+                                        setCommenting(undefined);
+                                    }
+
+                                    return stored;
                                 }}
                             />
                         )}

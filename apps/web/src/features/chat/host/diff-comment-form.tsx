@@ -8,16 +8,20 @@ import { useEffect, useRef, useState } from "react";
 import { MAX_COMMENT_CHARS } from "./diff-comments";
 
 interface DiffCommentFormProps {
+    /** The thread's draft holds as many comments as it may: nothing more can be added until some are sent or removed. */
+    full: boolean;
     /** Names the box for assistive technology: the file and lines the comment is on. */
     label: string;
     onCancel: () => void;
-    onSubmit: (text: string) => void;
+    /** Returns whether the comment was stored; the caller closes the box only then. */
+    onSubmit: (text: string) => boolean;
 }
 
 /** A comment box for one place in a diff. Takes focus when it opens; Escape closes it, Ctrl or Cmd with Enter adds. */
-const DiffCommentForm: FC<DiffCommentFormProps> = ({ label, onCancel, onSubmit }) => {
+const DiffCommentForm: FC<DiffCommentFormProps> = ({ full, label, onCancel, onSubmit }) => {
     const { t } = useLingui();
     const [text, setText] = useState("");
+    const [refused, setRefused] = useState(false);
     const field = useRef<HTMLTextAreaElement>(null);
     const trimmed = text.trim();
 
@@ -26,8 +30,8 @@ const DiffCommentForm: FC<DiffCommentFormProps> = ({ label, onCancel, onSubmit }
     }, []);
 
     const submit = () => {
-        if (trimmed !== "") {
-            onSubmit(trimmed);
+        if (trimmed !== "" && !full) {
+            setRefused(!onSubmit(trimmed));
         }
     };
 
@@ -60,8 +64,13 @@ const DiffCommentForm: FC<DiffCommentFormProps> = ({ label, onCancel, onSubmit }
                 ref={field}
                 value={text}
             />
+            {(full || refused) && (
+                <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
+                    <Trans>The draft is full. Send or remove some comments before adding more.</Trans>
+                </p>
+            )}
             <div className="flex gap-2">
-                <Button disabled={trimmed === ""} size="sm" type="submit">
+                <Button disabled={trimmed === "" || full} size="sm" type="submit">
                     <Trans>Add comment</Trans>
                 </Button>
                 <Button onClick={onCancel} size="sm" type="button" variant="outline">

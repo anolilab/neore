@@ -59,7 +59,7 @@ import AgentSwitchDivider from "./agent-switch-divider";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
-import HostChanges from "./host-changes";
+import HostChangesOfThread from "./host-changes-of-thread";
 import MemoryUsageAction from "./memory-usage-action";
 import MessageBranchSwitcher from "./message-branch-switcher";
 import MessageContent from "./message-content";
@@ -466,13 +466,6 @@ DefaultActionBar.displayName = "DefaultActionBar";
 /**
  * Main MessageItem component
  */
-/** The changes of a host turn, commentable in the thread they belong to; read here so only these rows follow the thread context. */
-const HostChangesOfThread: FC<{ changes: NonNullable<UIMessage["hostChanges"]>; messageId: string }> = ({ changes, messageId }) => {
-    const { threadId } = useChatThread();
-
-    return <HostChanges changes={changes} messageId={messageId} threadId={threadId} />;
-};
-
 const EMPTY_COMPONENTS: NonNullable<MessageItemProps["components"]> = {};
 
 /** A finished reply with visible text; the server edits that text in place (`agent_branches.editAssistantReply`). */

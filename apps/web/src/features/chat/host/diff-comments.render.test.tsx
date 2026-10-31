@@ -15,6 +15,8 @@ const harness = vi.hoisted(() => {
         calls: [] as [string, unknown][],
         data: {} as Record<string, unknown>,
         sendResults: [] as ({ error: string; ok: false } | { ok: true })[],
+        /** Words a test wants translated: `t` answers a message that is exactly one of these keys with its value. */
+        translations: {} as Record<string, string>,
     };
 });
 
@@ -23,7 +25,13 @@ vi.mock("@lingui/react/macro", () => {
         Plural: ({ one, other, value }: { one: string; other: string; value: number }) => (value === 1 ? one : other).split("#").join(String(value)),
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return {
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => {
+                    const message = String.raw({ raw: strings }, ...values);
+
+                    return harness.translations[message] ?? message;
+                },
+            };
         },
     };
 });
@@ -86,7 +94,7 @@ class InertResizeObserver {
 }
 /* eslint-enable class-methods-use-this */
 
-const { useDiffCommentStore } = await import("@/features/chat/host/diff-comments-store");
+const { MAX_DRAFT_COMMENTS, useDiffCommentStore } = await import("@/features/chat/host/diff-comments-store");
 const { default: HostChanges } = await import("@/features/chat/thread/host-changes");
 const { default: DiffCommentsDraft } = await import("@/features/chat/host/diff-comments-draft");
 
@@ -105,6 +113,12 @@ const mount = (patch: string | { tooLarge: true }) =>
         </QueryClientProvider>,
     );
 
+const TWO_HUNKS = ["--- a/src/a.ts", "+++ b/src/a.ts", "@@ -1,1 +1,2 @@", " one", "+two", "@@ -20,2 +21,1 @@", "-gone", " twenty", ""].join("\n");
+const TWO = /\+two$/u;
+const GONE = /-gone$/u;
+const TWENTY = / twenty$/u;
+const ONE = / one$/u;
+const REMOVED_WORD = /\(removed\)/u;
 const NEW_LINE = /\+new line$/u;
 const ANOTHER_LINE = /\+another new line$/u;
 
@@ -130,6 +144,7 @@ beforeEach(() => {
     Element.prototype.getAnimations = () => [];
     harness.calls = [];
     harness.sendResults = [];
+    harness.translations = {};
     harness.data = { "acp.functions.getHostSession": { status: "idle" } };
     useDiffCommentStore.setState({ drafts: {} });
 });
@@ -237,5 +252,131 @@ describe("commenting on a turn's diff", () => {
         const send = await screen.findByRole("button", { name: "Send to agent" });
 
         await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(true));
+    });
+
+    it("keeps the comment box open, says the draft is full and will not add a 31st comment", async () => {
+        mount({ tooLarge: true });
+
+        const { add } = useDiffCommentStore.getState();
+
+        act(() => {
+            for (let index = 0; index < MAX_DRAFT_COMMENTS - 1; index += 1) {
+                add("thread-1", { messageId: "m1", path: "b.md", text: `comment ${String(index)}` });
+            }
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Comment on src/a.ts" }));
+
+        const box = await screen.findByLabelText("Comment on the whole file src/a.ts");
+
+        fireEvent.change(box, { target: { value: "the last one" } });
+        expect(screen.queryByRole("alert")?.textContent ?? "").not.toContain("full");
+        fireEvent.click(screen.getByRole("button", { name: "Add comment" }));
+        expect(useDiffCommentStore.getState().drafts["thread-1"]).toHaveLength(MAX_DRAFT_COMMENTS);
+
+        // The draft is full now: a 31st comment is neither stored nor lost from the box, which stays with its text.
+        fireEvent.click(screen.getByRole("button", { name: "Comment on src/a.ts" }));
+        fireEvent.change(await screen.findByLabelText("Comment on the whole file src/a.ts"), { target: { value: "one too many" } });
+
+        const alert = screen.getAllByRole("alert").find((node) => node.textContent?.includes("full"));
+
+        expect(alert?.textContent).toContain("full");
+        expect((screen.getByRole("button", { name: "Add comment" }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.keyDown(screen.getByLabelText("Comment on the whole file src/a.ts"), { ctrlKey: true, key: "Enter" });
+        expect(useDiffCommentStore.getState().drafts["thread-1"]).toHaveLength(MAX_DRAFT_COMMENTS);
+        expect((screen.getByLabelText("Comment on the whole file src/a.ts") as HTMLTextAreaElement).value).toBe("one too many");
+    });
+
+    describe("a diff with two hunks", () => {
+        const open = async () => {
+            mount(TWO_HUNKS);
+            fireEvent.click(screen.getByRole("button", { name: "Open diff" }));
+            await screen.findAllByRole("option");
+        };
+
+        const selected = (name: RegExp) => screen.getByRole("option", { name }).getAttribute("aria-selected") === "true";
+
+        it("does not extend a selection from one hunk into the next with the keyboard", async () => {
+            await open();
+
+            const two = screen.getByRole("option", { name: TWO });
+
+            act(() => two.focus());
+            fireEvent.keyDown(two, { key: " " });
+            fireEvent.keyDown(two, { key: "ArrowDown", shiftKey: true });
+
+            expect(selected(TWO)).toBe(true);
+            expect(selected(GONE)).toBe(false);
+
+            fireEvent.keyDown(two, { key: "Enter" });
+            expect(await screen.findByLabelText("Comment on src/a.ts, lines 2")).toBeTruthy();
+        });
+
+        it("starts a new selection when shift-click lands in another hunk, and moves focus freely without shift", async () => {
+            await open();
+            fireEvent.click(screen.getByRole("option", { name: TWO }));
+            fireEvent.click(screen.getByRole("option", { name: TWENTY }), { shiftKey: true });
+
+            expect(selected(TWO)).toBe(false);
+            expect(selected(GONE)).toBe(false);
+            expect(selected(TWENTY)).toBe(true);
+
+            const two = screen.getByRole("option", { name: TWO });
+
+            act(() => two.focus());
+            fireEvent.keyDown(two, { key: "ArrowDown" });
+            // eslint-disable-next-line testing-library/no-node-access -- focus is a property of the document, not of a queried node
+            expect(document.activeElement).toBe(screen.getByRole("option", { name: GONE }));
+        });
+
+        it("still extends a selection within one hunk", async () => {
+            await open();
+
+            const first = screen.getByRole("option", { name: ONE });
+
+            act(() => first.focus());
+            fireEvent.keyDown(first, { key: " " });
+            fireEvent.keyDown(first, { key: "ArrowDown", shiftKey: true });
+
+            expect(selected(TWO)).toBe(true);
+        });
+
+        it("words a removed line in the person's language in the box label and the draft, not in English", async () => {
+            harness.translations = { removed: "entfernt" };
+            await open();
+            fireEvent.click(screen.getByRole("option", { name: GONE }));
+            fireEvent.keyDown(screen.getByRole("option", { name: GONE }), { key: "Enter" });
+
+            const box = await screen.findByLabelText("Comment on src/a.ts, lines 20 (entfernt)");
+
+            fireEvent.change(box, { target: { value: "why" } });
+            fireEvent.click(screen.getByRole("button", { name: "Add comment" }));
+
+            expect(await screen.findByRole("button", { name: "Remove the comment on src/a.ts:20 (entfernt)" })).toBeTruthy();
+            expect(screen.queryByText(REMOVED_WORD)).toBeNull();
+        });
+    });
+
+    it("sends comments recreated after a failed send under a new request id, so they are not mistaken for its retry", async () => {
+        mount({ tooLarge: true });
+
+        const { add, clear } = useDiffCommentStore.getState();
+
+        act(() => add("thread-1", { messageId: "m1", path: "b.md", text: "same words" }));
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        fireEvent.click(screen.getByRole("button", { name: "Send to agent" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        await waitFor(() => expect((screen.getByRole("button", { name: "Send to agent" }) as HTMLButtonElement).disabled).toBe(false));
+
+        // The person discards the comments and writes the same ones again: a new message.
+        act(() => clear("thread-1"));
+        act(() => add("thread-1", { messageId: "m1", path: "b.md", text: "same words" }));
+        fireEvent.click(screen.getByRole("button", { name: "Send to agent" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(2));
+
+        const [first, second] = harness.calls.map(([, input]) => input as { requestId: string; text: string });
+
+        expect(second?.text).toBe(first?.text);
+        expect(second?.requestId).not.toBe(first?.requestId);
     });
 });

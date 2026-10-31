@@ -15,23 +15,28 @@ export const MAX_DRAFT_COMMENTS = 30;
 const NONE: ReadonlyArray<DiffComment> = [];
 
 interface DiffCommentStore {
-    add: (threadId: string, comment: Omit<DiffComment, "id">) => void;
+    /** Stores the comment and says so; false when the thread's draft is full and nothing was stored. */
+    add: (threadId: string, comment: Omit<DiffComment, "id">) => boolean;
     /** Drops the named comments (those that were sent), or the whole draft when none are named. */
     clear: (threadId: string, ids?: ReadonlyArray<string>) => void;
     drafts: Record<string, ReadonlyArray<DiffComment>>;
     remove: (threadId: string, id: string) => void;
 }
 
-export const useDiffCommentStore = create<DiffCommentStore>((set) => {
+export const useDiffCommentStore = create<DiffCommentStore>((set, get) => {
     return {
         add: (threadId, comment) => {
-            set((state) => {
-                const current = state.drafts[threadId] ?? NONE;
+            const current = get().drafts[threadId] ?? NONE;
 
-                return current.length >= MAX_DRAFT_COMMENTS
-                    ? state
-                    : { drafts: { ...state.drafts, [threadId]: [...current, { ...comment, id: crypto.randomUUID() }] } };
+            if (current.length >= MAX_DRAFT_COMMENTS) {
+                return false;
+            }
+
+            set((state) => {
+                return { drafts: { ...state.drafts, [threadId]: [...(state.drafts[threadId] ?? NONE), { ...comment, id: crypto.randomUUID() }] } };
             });
+
+            return true;
         },
         clear: (threadId, ids) => {
             set((state) => {
@@ -55,3 +60,6 @@ export const useDiffCommentStore = create<DiffCommentStore>((set) => {
 
 /** A thread's draft; the same array until it changes. */
 export const useDiffDraft = (threadId: string): ReadonlyArray<DiffComment> => useDiffCommentStore((state) => state.drafts[threadId] ?? NONE);
+
+/** True while a thread's draft holds as many comments as it may. */
+export const useDiffDraftFull = (threadId: string): boolean => useDiffCommentStore((state) => (state.drafts[threadId]?.length ?? 0) >= MAX_DRAFT_COMMENTS);

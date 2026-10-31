@@ -4,7 +4,8 @@
  * A host turn's frozen patch as text, one list of lines per file, where lines can be selected and commented on
  * (plans/acp-agent-host.md §4.9). The patch is the agent's text, so every line is plain text, never Markdown. Each file's
  * lines are a multi-select list with a roving tab stop: Arrow keys move, Shift with an arrow extends the selection,
- * Space selects the line, Enter (or the button) opens the comment box, Escape clears. A selection stays in one file.
+ * Space selects the line, Enter (or the button) opens the comment box, Escape clears. A selection stays in one file
+ * and in one hunk: the comment quotes a single hunk header, so extending past the hunk's edge does nothing.
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -16,8 +17,8 @@ import { useMemo, useRef, useState } from "react";
 
 import DiffCommentForm from "@/features/chat/host/diff-comment-form";
 import type { DiffFile, DiffLine } from "@/features/chat/host/diff-comments";
-import { describeRange, parsePatchFiles, rangeOf } from "@/features/chat/host/diff-comments";
-import { useDiffCommentStore, useDiffDraft } from "@/features/chat/host/diff-comments-store";
+import { describeRange, parsePatchFiles, rangeOf, sameHunk } from "@/features/chat/host/diff-comments";
+import { useDiffCommentStore, useDiffDraft, useDiffDraftFull } from "@/features/chat/host/diff-comments-store";
 
 import type { PatchLineKind } from "./host-changes-lines";
 import { classifyPatch } from "./host-changes-lines";
@@ -43,9 +44,11 @@ interface HostDiffViewerProps {
     patch: string;
 }
 
-/** The selectable lines between two positions of a file's lines, in order. */
+/** The selectable lines between two positions of a file's lines, in order, and only those under the anchor's hunk. */
 const linesBetween = (file: DiffFile, selection: Pick<Selection, "anchor" | "head">): DiffLine[] =>
-    file.lines.slice(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head) + 1).filter((line) => line.selectable);
+    file.lines
+        .slice(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head) + 1)
+        .filter((line) => line.selectable && line.hunk === file.lines[selection.anchor]?.hunk);
 
 const selectableAt = (file: DiffFile, from: number, step: 1 | -1): number | undefined => {
     for (let index = from; index >= 0 && index < file.lines.length; index += step) {
@@ -75,17 +78,25 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
     const [fileForm, setFileForm] = useState(false);
     const selected = mine ? linesBetween(file, mine) : [];
     const range = rangeOf(selected);
-    const rangeLabel = range ? describeRange(range) : "";
+    const kindWord: Record<PatchLineKind, string> = { add: t`added`, context: t`unchanged`, header: "", hunk: "", remove: t`removed` };
+    const rangeLabel = range ? describeRange(range, kindWord.remove) : "";
+    const full = useDiffDraftFull(threadId);
     const lo = mine ? Math.min(mine.anchor, mine.head) : -1;
     const hi = mine ? Math.max(mine.anchor, mine.head) : -1;
-    const kindWord: Record<PatchLineKind, string> = { add: t`added`, context: t`unchanged`, header: "", hunk: "", remove: t`removed` };
 
     const move = (index: number, extend: boolean) => {
+        const anchor = mine?.anchor ?? stop;
+
+        // The edge of the anchor's hunk: the selection, and the focus with it, stay put.
+        if (extend && !sameHunk(file, anchor, index)) {
+            return;
+        }
+
         setStop(index);
         elements.current.get(index)?.focus();
 
         if (extend) {
-            setSelection({ anchor: mine?.anchor ?? stop, composing: false, file: fileIndex, head: index });
+            setSelection({ anchor, composing: false, file: fileIndex, head: index });
         }
     };
 
@@ -153,16 +164,25 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
 
     const onClick = (event: MouseEvent<HTMLLIElement>, index: number) => {
         setStop(index);
-        setSelection({ anchor: event.shiftKey && mine ? mine.anchor : index, composing: false, file: fileIndex, head: index });
+        // Shift-click extends the selection within its hunk; in another hunk it starts a new one.
+        setSelection({
+            anchor: event.shiftKey && mine && sameHunk(file, mine.anchor, index) ? mine.anchor : index,
+            composing: false,
+            file: fileIndex,
+            head: index,
+        });
     };
 
-    const addLineComment = (text: string) => {
-        if (range) {
-            useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, range, text });
+    const addLineComment = (text: string): boolean => {
+        // A full draft keeps the box open with the text in it.
+        if (range && !useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, range, text })) {
+            return false;
         }
 
         setSelection(undefined);
         elements.current.get(stop)?.focus();
+
+        return true;
     };
 
     return (
@@ -228,6 +248,7 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
             {mine?.composing && range && (
                 <div className="border-border border-t">
                     <DiffCommentForm
+                        full={full}
                         label={t`Comment on ${file.path}, lines ${rangeLabel}`}
                         onCancel={() => {
                             setSelection(undefined);
@@ -240,11 +261,17 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
             {fileForm && (
                 <div className="border-border border-t">
                     <DiffCommentForm
+                        full={full}
                         label={t`Comment on the whole file ${file.path}`}
                         onCancel={() => setFileForm(false)}
                         onSubmit={(text) => {
-                            useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
-                            setFileForm(false);
+                            const stored = useDiffCommentStore.getState().add(threadId, { messageId, path: file.path, text });
+
+                            if (stored) {
+                                setFileForm(false);
+                            }
+
+                            return stored;
                         }}
                     />
                 </div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DiffComment } from "./diff-comments";
-import { composeDiffComments, describeRange, MAX_COMMENT_MESSAGE_BYTES, MAX_COMMENT_MESSAGE_CHARS, parsePatchFiles, rangeOf } from "./diff-comments";
+import { composeDiffComments, describeRange, MAX_COMMENT_MESSAGE_BYTES, MAX_COMMENT_MESSAGE_CHARS, parsePatchFiles, rangeOf, sameHunk } from "./diff-comments";
 
 const PATCH = [
     "--- a/src/a.ts",
@@ -62,10 +62,8 @@ describe("parsePatchFiles", () => {
 
 describe("rangeOf", () => {
     it("takes the lines, their hunk and the numbers of the first and last", () => {
-        const lines =
-            parsePatchFiles(PATCH)[0]
-                ?.lines.filter((line) => line.selectable)
-                .slice(2, 4) ?? [];
+        const selectable = parsePatchFiles(PATCH)[0]?.lines.filter((line) => line.selectable) ?? [];
+        const lines = selectable.slice(2, 4);
 
         expect(rangeOf(lines)).toEqual({
             from: 4,
@@ -99,8 +97,31 @@ describe("rangeOf", () => {
         const range = rangeOf(removed);
 
         expect(range).toMatchObject({ from: 1, side: "old", to: 1 });
-        expect(describeRange(range as never)).toBe("1 (removed)");
-        expect(describeRange({ from: 4, side: "new", to: 6 })).toBe("4-6");
+        expect(describeRange(range as never, "removed")).toBe("1 (removed)");
+        expect(describeRange({ from: 4, side: "new", to: 6 }, "removed")).toBe("4-6");
+    });
+
+    it("says a removed line in the word it is given, so a label can be translated", () => {
+        expect(describeRange({ from: 1, side: "old", to: 3 }, "entfernt")).toBe("1-3 (entfernt)");
+    });
+});
+
+describe("sameHunk", () => {
+    const TWO_HUNKS = ["--- a/src/a.ts", "+++ b/src/a.ts", "@@ -1,1 +1,2 @@", " one", "+two", "@@ -20,1 +20,2 @@", " twenty", "+twenty-one", ""].join("\n");
+
+    it("holds for lines under one hunk header and fails across two", () => {
+        const [file] = parsePatchFiles(TWO_HUNKS);
+        const selectable =
+            file?.lines
+                .map((line, index) => {
+                    return { index, line };
+                })
+                .filter(({ line }) => line.selectable) ?? [];
+        const [one, two, twenty] = selectable.map(({ index }) => index) as [number, number, number];
+
+        expect(sameHunk(file as never, one, two)).toBe(true);
+        expect(sameHunk(file as never, two, twenty)).toBe(false);
+        expect(sameHunk(file as never, twenty, one)).toBe(false);
     });
 });
 

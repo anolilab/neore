@@ -20,7 +20,7 @@ import { describeRange } from "./diff-comments";
 import { useDiffCommentStore } from "./diff-comments-store";
 import useSendDiffComments from "./use-send-diff-comments";
 
-const placeOf = (comment: DiffComment): string => (comment.range ? `${comment.path}:${describeRange(comment.range)}` : comment.path);
+const placeOf = (comment: DiffComment, removed: string): string => (comment.range ? `${comment.path}:${describeRange(comment.range, removed)}` : comment.path);
 
 const DiffCommentsDraft: FC<{ threadId: string }> = ({ threadId }) => {
     const { t } = useLingui();
@@ -31,6 +31,7 @@ const DiffCommentsDraft: FC<{ threadId: string }> = ({ threadId }) => {
     const running = live !== null && live !== undefined;
     const ended = session?.status === "ended";
     const count = comments.length;
+    const removed = t`removed`;
 
     return (
         <section aria-label={t`Comments for the agent`} className={count === 0 ? "sr-only" : "bg-muted flex flex-col gap-2 rounded-lg border p-3 text-sm"}>
@@ -43,11 +44,11 @@ const DiffCommentsDraft: FC<{ threadId: string }> = ({ threadId }) => {
                         {comments.map((comment) => (
                             <li className="flex items-start justify-between gap-2" key={comment.id}>
                                 <span className="min-w-0">
-                                    <span className="block truncate font-mono text-xs">{placeOf(comment)}</span>
+                                    <span className="block truncate font-mono text-xs">{placeOf(comment, removed)}</span>
                                     <span className="line-clamp-2 break-words">{comment.text}</span>
                                 </span>
                                 <Button
-                                    aria-label={t`Remove the comment on ${placeOf(comment)}`}
+                                    aria-label={t`Remove the comment on ${placeOf(comment, removed)}`}
                                     onClick={() => useDiffCommentStore.getState().remove(threadId, comment.id)}
                                     size="icon-sm"
                                     type="button"

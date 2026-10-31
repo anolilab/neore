@@ -171,11 +171,22 @@ export const rangeOf = (lines: ReadonlyArray<DiffLine>): DiffLineRange | undefin
     };
 };
 
-/** A range as it is written: `12`, `12-15`, with the side said for removed lines. */
-export const describeRange = (range: Pick<DiffLineRange, "from" | "side" | "to">): string => {
+/** True when two positions of a file's lines sit under the same hunk header: a selection never spans two hunks. */
+export const sameHunk = (file: DiffFile, a: number, b: number): boolean => {
+    const first = file.lines[a];
+    const second = file.lines[b];
+
+    return first !== undefined && second !== undefined && first.hunk === second.hunk;
+};
+
+/**
+ * A range as it is written: `12`, `12-15`, with the side said for removed lines. The word for "removed" comes from
+ * the caller, so a label shown to a person is translated and the message to the agent says it in English.
+ */
+export const describeRange = (range: Pick<DiffLineRange, "from" | "side" | "to">, removed: string): string => {
     const numbers = range.from === range.to ? String(range.from) : `${String(range.from)}-${String(range.to)}`;
 
-    return range.side === "old" ? `${numbers} (removed)` : numbers;
+    return range.side === "old" ? `${numbers} (${removed})` : numbers;
 };
 
 /** The longest message `/hosts/send` takes, in characters (`MAX_SEND_CHARS` in `backend/lunora/acp/send.ts`). */
@@ -220,7 +231,7 @@ const quoteOf = (comment: DiffComment): string[] => (comment.range ? [comment.ra
 const place = (comment: DiffComment): string => {
     const { range } = comment;
 
-    return range ? `${comment.path}, lines ${describeRange(range)}` : `${comment.path} (the whole file)`;
+    return range ? `${comment.path}, lines ${describeRange(range, "removed")}` : `${comment.path} (the whole file)`;
 };
 
 /** The fence is chosen from the whole quote, so a cut quote never needs a longer one than the budget counted. */
