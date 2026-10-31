@@ -401,6 +401,7 @@ export const runStreamingAgent = internalAction
                     savedMessages: [...priorRows, ...(result.savedMessages ?? [])],
                     ...(skill && { skill }),
                     steeredTexts: steering.steeredTexts(),
+                    summarizeThread: runContext.prefs.threadSummariesEnabled,
                     threadId,
                     ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                     timingStart,

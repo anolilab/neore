@@ -198,6 +198,8 @@ See [Messenger Integration](/docs/messenger).
 
 **Auto-archive:** pinned chats, chats in a pinned project, chats with a reply still being generated and temporary chats are never archived. Archived chats stay searchable.
 
+**Summarise long chats (off by default):** the assistant reads the most recent part of a chat. With this on, once a long chat has sat idle for a few minutes, its older messages are condensed into short notes the assistant keeps in mind, so early decisions are not forgotten. It uses a small amount of credits, is never done for temporary, locked or no-history chats, and turning it off deletes the summaries already made. The notes are reference material for the assistant, never instructions, and they are part of your data export.
+
 **Blocked websites for web search:** enter one domain per line (for example `example.com`). The assistant's web search never returns results from those sites or their subdomains, even when it asks for them. This covers web search only; it does not stop the browser tool from visiting a site.
 
 ### Devices

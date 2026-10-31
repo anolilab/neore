@@ -74,7 +74,7 @@ impl SandboxReport {
 
         match (
             &support,
-            sandbox::policy_for_call(&support, false, false, &[], None),
+            sandbox::policy_for_call(&support, false, sandbox::NetworkTier::Off, &[], None),
         ) {
             (Support::Available(detail), Ok(_)) => SandboxReport {
                 available: true,
@@ -151,7 +151,11 @@ fn run_request_from(params: RunParams, received: Instant) -> Outcome {
     let roots = shareable_roots(&params.roots);
     let shell = ShellSettings {
         allow_unsandboxed: params.allow_unsandboxed_shell,
-        allow_network: params.allow_shell_network,
+        network: if params.allow_shell_network {
+            sandbox::NetworkTier::On
+        } else {
+            sandbox::NetworkTier::Off
+        },
     };
 
     match plan_builtin(&params.tool, &params.input, &roots, shell) {

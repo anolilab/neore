@@ -7,6 +7,7 @@ import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
 import type { Message } from "../validators";
+import { summaryNotesBlock, SUMMARY_RECENT_ROWS } from "../thread-summary-logic";
 import { validateVectorDimension, type VectorDimension } from "../vector/tables";
 import { issuedStorageOrigins } from "../../lib/storage-ref";
 import { signedReadUrl } from "../../lib/storage-read";
@@ -567,6 +568,8 @@ export const fetchContextWithPrompt = async (
     messages: ModelMessage[];
     order: number | undefined;
     stepOrder: number | undefined;
+    /** Reference notes on the thread's older turns, for the system prompt (not a message: see `summaryNotesBlock`); absent for none. */
+    threadNotes?: string;
 }> => {
     const { embeddingModel, statelessMode, threadId, userId } = args;
 
@@ -597,29 +600,33 @@ export const fetchContextWithPrompt = async (
     }
 
     // If only a messageId is provided, this will add that message to the end.
-    const { recentMessages, searchMessages } = await fetchRecentAndSearchMessages(context, component, {
-        admittedRun: args.admittedRun,
-        contextOptions: args.contextOptions ?? {},
-        getEmbedding: async (text) => {
-            assert(embeddingModel, "An embeddingModel is required to be set on the Agent that you're doing vector search with");
-            const result = await embedMany(context, {
-                ...args,
-                userId,
-                values: [text],
-            });
-            const embedding = result.embeddings[0];
+    const [{ recentMessages, searchMessages }, olderSummary] = await Promise.all([
+        fetchRecentAndSearchMessages(context, component, {
+            admittedRun: args.admittedRun,
+            contextOptions: args.contextOptions ?? {},
+            getEmbedding: async (text) => {
+                assert(embeddingModel, "An embeddingModel is required to be set on the Agent that you're doing vector search with");
+                const result = await embedMany(context, {
+                    ...args,
+                    userId,
+                    values: [text],
+                });
+                const embedding = result.embeddings[0];
 
-            if (!embedding) {
-                throw new Error("Failed to generate embedding for text");
-            }
+                if (!embedding) {
+                    throw new Error("Failed to generate embedding for text");
+                }
 
-            return { embedding, embeddingModel };
-        },
-        searchText,
-        targetMessageId: args.promptMessageId,
-        threadId,
-        userId,
-    });
+                return { embedding, embeddingModel };
+            },
+            searchText,
+            targetMessageId: args.promptMessageId,
+            threadId,
+            userId,
+        }),
+        // A context handler decides what the model reads (the group chats build their own history), so it gets no notes.
+        args.contextHandler ? null : readOlderSummary(context, args),
+    ]);
 
     const promptMessageIndex = args.promptMessageId ? recentMessages.findIndex((m) => m._id === args.promptMessageId) : -1;
     const promptMessage = promptMessageIndex === -1 ? undefined : recentMessages[promptMessageIndex];
@@ -710,7 +717,34 @@ export const fetchContextWithPrompt = async (
         messages: processedMessages,
         order: promptMessage?.order,
         stepOrder: promptMessage?.stepOrder,
+        ...(olderSummary && { threadNotes: summaryNotesBlock(olderSummary) }),
     };
+};
+
+/**
+ * The stored summary of this thread's older turns (`agent/thread-summaries.ts`) when the recent window is the
+ * one it was made for and the summary belongs to the path being answered; otherwise `null`, today's behaviour.
+ * A failed read is not a failed run.
+ */
+const readOlderSummary = async (
+    context: ActionContext,
+    args: { contextOptions?: ContextOptions; promptMessageId: string | undefined; statelessMode?: boolean; threadId: string | undefined },
+): Promise<string | null> => {
+    // A smaller window would leave rows uncovered between the summary and itself.
+    if (!args.threadId || args.statelessMode || (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS) {
+        return null;
+    }
+
+    try {
+        return await context.runQuery(internal.agent.thread_summaries.getThreadSummaryForContext, {
+            ...(args.promptMessageId && { promptMessageId: args.promptMessageId as Id<"messages"> }),
+            threadId: args.threadId as Id<"threads">,
+        });
+    } catch (error) {
+        console.warn("[agent/search] Reading the thread summary failed; continuing without it:", error);
+
+        return null;
+    }
 };
 
 export const getPromptArray = (prompt: string | (ModelMessage | Message)[] | undefined): (ModelMessage | Message)[] => {

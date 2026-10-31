@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeTaint, taintOfTool } from "./taint";
+import { computeTaint, mergeTaint, taintOfTool } from "./taint";
 
 describe("taintOfTool", () => {
     it("classifies tools by where their output comes from", () => {
@@ -51,5 +51,15 @@ describe("computeTaint", () => {
 
     it("treats a missing message list as clean", () => {
         expect(computeTaint(undefined)).toEqual([]);
+    });
+});
+
+describe("mergeTaint", () => {
+    it("unions lists into the stable order, once each", () => {
+        expect(mergeTaint(["files", "web"], ["mcp", "web"], undefined)).toEqual(["web", "mcp", "files"]);
+    });
+
+    it("is empty for nothing", () => {
+        expect(mergeTaint()).toEqual([]);
     });
 });

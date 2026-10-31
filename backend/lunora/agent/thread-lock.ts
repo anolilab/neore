@@ -20,6 +20,7 @@ import { hashPasscode, isAcceptablePasscode, isThreadLocked, mintUnlockProof, ne
 import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
+import { deleteThreadSummaries } from "./thread-summaries";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -120,6 +121,8 @@ export const enableThreadLock = authMutation
             userId,
         });
         await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        // Condensed copies of its content made before the lock are not kept (`thread-summaries.ts`).
+        await deleteThreadSummaries(context, threadId);
         // Index the chat's attachments; until the walk stamps the row, the file gate scans its messages.
         await scheduleFileLinkBackfill(context, threadId, userId);
         // Former collaborators' notifications for this chat stop showing its title (`notifications/locked-redact.ts`).
