@@ -390,6 +390,34 @@ the folder and refers to it in its reply. Rules:
   are cut, fairly, and the message says so; comments are never cut, and a draft whose comments alone do not fit is
   not sent. The draft clears only when the send is accepted, and only the comments that were in it.
 
+### 4.10 File-event hooks
+
+A folder may carry `.neore/hooks.json` (`apps/desktop/src/acp/hooks/`): `{ "version": 1, "hooks": [...] }`, at most 8
+hooks, each a file hook (`on`: `created` | `saved` | `deleted`, a `glob`) or a manual one (`on: "manual"`), with an `id`,
+a `name` (60 characters) and a `prompt` (4,000 characters). The schema is strict: an unknown field refuses the whole file.
+
+The file is repository content, so it is untrusted:
+
+- **A hook only sends its prompt to the folder's open session**, through `AgentSession.send`. The agent's own permission
+  requests and approvals apply. A hook never runs a command, starts a session or changes the folder or its approval.
+- **Inert until approved in the local device window**, which shows every hook in full. The approval is a SHA-256 of the
+  file's bytes per folder (`acp-hook-approvals.json` in the app's data folder, written only by the window's channels).
+  Approving names the hash the person was shown and is refused if the file has changed since. A changed file has no
+  approval and there is no "always allow". The file is read and hashed again at the moment a hook fires.
+- **The watcher stays in the folder**: paths are checked by real path, a symlink is never followed, `.git/`,
+  `node_modules/` and `.neore/` are ignored. Globs are relative, without `..`, and matched by segment.
+- **No feedback loop.** Events are dropped while any turn runs and for 2 s after it; they are debounced (500 ms), one
+  hook fires at most once per 30 s, and the session at most 20 hooks an hour. Only an idle session is prompted, and
+  only the first matching hook of a batch fires.
+- **In the thread** the prompt is a normal user message that starts with `[Hook "<name>"]`, so it is visible there; as
+  any turn of a host session it writes no usage and charges nothing.
+- The watcher belongs to the session (`AgentSession`'s `lifecycle`) and stops when it ends, by any path. Agents run on
+  this computer only, so the watcher runs in the main process beside `AcpManager`.
+- **Linux.** `fs.watch` with `recursive: true` is native on macOS and Windows. On Linux Node would put an inotify watch on
+  every directory, `node_modules` included, so there the watcher walks the tree itself (`hooks/watch-tree.ts`): folders
+  the skip list names get no watch, symlinked folders are not followed, and the number of watches is capped. If the system
+  still runs out of watches, the watcher stops and the window says file hooks cannot fire (manual hooks still work).
+
 ## 5. Data changes
 
 ### 5.1 Tables and fields

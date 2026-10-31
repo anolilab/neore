@@ -579,6 +579,10 @@ describe("coding-agent channels", () => {
         LOCAL_CHANNEL.acpCancel,
         LOCAL_CHANNEL.acpClose,
         LOCAL_CHANNEL.acpForget,
+        LOCAL_CHANNEL.acpHookRun,
+        LOCAL_CHANNEL.acpHooks,
+        LOCAL_CHANNEL.acpHooksApprove,
+        LOCAL_CHANNEL.acpHooksRevoke,
         LOCAL_CHANNEL.acpImport,
         LOCAL_CHANNEL.acpImportList,
         LOCAL_CHANNEL.acpPermissionAnswer,
@@ -613,6 +617,16 @@ describe("coding-agent channels", () => {
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
+    it("take a hooks approval only as the sha-256 of a file, before anything is read", async () => {
+        for (const hash of ["", "abc", "Z".repeat(64), 7, undefined]) {
+            expect(() => invoke(LOCAL_CHANNEL.acpHooksApprove, localEvent(), "session-1", hash)).toThrow("hooks file hash is invalid");
+            expect(() => invoke(LOCAL_CHANNEL.acpHookRun, localEvent(), "session-1", "summary", hash)).toThrow("hooks file hash is invalid");
+        }
+
+        // A valid hash for a session that does not exist reaches the manager and is refused there.
+        await expect(invoke(LOCAL_CHANNEL.acpHooksApprove, localEvent(), "session-1", "a".repeat(64))).rejects.toThrow("no longer exists");
     });
 
     it("pass a permission answer to the core as the request id and the agent's option id, and nothing else", () => {

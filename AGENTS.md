@@ -261,6 +261,22 @@ written here is what is not.
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
 
+- **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
+  a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
+  headers/body (`services/llm-gateway/src/lib/retry-after.ts`) and sends `rateLimit: { status, retryAt }` beside
+  `fallbackReason` — on the 502 body, an in-band error part and a mid-read throw — only while the step has produced nothing
+  visible; the backend decides on that field alone, never on message text, and a bare 429 with no field still fails. The
+  stream stays `pending|streaming` with `persistentStreams.pause` set (so stop, the live query and the expiry sweep need no
+  new status; `expiresAt` moves past `retryAt`), the rejected step's empty placeholder row is deleted, and the resume is the
+  SAME `runStreamingAgent` job re-enqueued with `resume: <pause id>` at `retryAt` (the pause stores the job's input).
+  `claimRunResume` claims by pause id, so a redelivery, "Retry now" (`chat/rate-limit-retry.ts`, which queues the same
+  resume for now) and a stale delayed job all no-op after the first; the resume streams from the last row the run saved
+  (`pause.from`), not from the user message — `failPendingSteps` plus a user-message prompt would make a mid-run resume a
+  sibling reply. Caps: a pause ≤ 10 min, one per step (keyed on `from`), 3 per run; past them, or with a delivered steer, or
+  stateless, or in a group turn / approval continuation, the run fails as before. Nothing waits in an action or a queue
+  invocation. The AI SDK never retries these (`GatewayLanguageModel` throws a plain `Error`, not an `APICallError`), so the
+  pause is the only retry. The countdown in the chat is `aria-hidden`; a polite status region speaks every 30 s.
+
 - **Video render queue** — `POST /v1/videos` enqueues and returns 202; the
   Worker's `queue()` handler consumes it. **Cross-config invariant:**
   `VIDEO_RENDER_MAX_ATTEMPTS = 3` in the consumer MUST equal `maxRetries: 2`
@@ -908,7 +924,12 @@ written here is what is not.
   The size caps and the type list are PROVISIONAL (not measured) — one pair of
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
-  Host turns write no usage row and charge no credit. `acp_*` device calls have
+  Host turns write no usage row and charge no credit.
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+  and a hook can only send a prompt to the already-open session. The watcher drops events
+  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.

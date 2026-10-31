@@ -188,6 +188,19 @@ export const readSearchQuery = (value: unknown): string => value === "" ? "" : t
 
 export const readAgentVersion = (value: unknown): string => text(value, "version", 40);
 
+const SHA256_HEX = /^[0-9a-f]{64}$/u;
+
+/** A hook id from the approved file, and the sha-256 hex of the file the person was shown. */
+export const readHookId = (value: unknown): string => text(value, "hook", 40);
+
+export const readHooksHash = (value: unknown): string => {
+    if (typeof value !== "string" || !SHA256_HEX.test(value)) {
+        throw new Error("device: hooks file hash is invalid");
+    }
+
+    return value;
+};
+
 export const readFolder = (value: unknown): string => text(value, "folder", MAX_PATH_CHARS);
 
 export const readPrompt = (value: unknown): string => text(value, "prompt", MAX_PROMPT_CHARS);

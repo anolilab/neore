@@ -41,7 +41,7 @@ import { mapNavigatorLanguage } from "../utils/language-utilities";
 import { createReadinessGate } from "../utils/readiness-gate";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
-import { toAppError } from "./chat-action-shared";
+import { stopTarget, toAppError } from "./chat-action-shared";
 import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "./chat-context-hooks";
 import type {
     ChatActionsContextValue,
@@ -564,6 +564,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         crpc.chat.streaming.getActiveStreamForThread.queryOptions(threadId && threadId !== "default" ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
     const activeStreamId = activeStream?.streamId ?? null;
+    const pause = activeStream?.pause ?? null;
 
     // In a shared thread the stream is on the owner's shard; `getStreamBody`
     // names only the stream, so it inherits the thread's route.
@@ -641,6 +642,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const isStreaming = (Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating)) || isLocalStreaming;
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
+    const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
     const streamingMessageRef = useRef<StreamingMessage | null>(null);
 
     // Posts the media kick-off for a reply `/v1/chat` created. A refusal (the daily limit, a 401, a 404) or a
@@ -739,7 +741,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             streamingMessageRef.current = threadId && streamingId ? { messageId: streamingId, threadId } : null;
         }
 
-        if (streamingMessageRef.current) {
+        const target = stopTarget({ activeStreamId, streamingMessage: streamingMessageRef.current });
+
+        if (target === "message" && streamingMessageRef.current) {
             trackEvent("stream_cancelled", { model });
 
             try {
@@ -752,8 +756,16 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             }
 
             streamingMessageRef.current = null;
+        } else if (target === "thread" && threadId) {
+            trackEvent("stream_cancelled", { model });
+
+            try {
+                await abortThreadStreamMutation({ threadId: threadId as Id<"threads"> });
+            } catch (abortError) {
+                providerLogger.error("[ChatProvider] Failed to abort", { error: abortError });
+            }
         }
-    }, [abortStreamMutation, setIsRegenerating, model, cancelLocalTurn, threadId]);
+    }, [abortStreamMutation, abortThreadStreamMutation, activeStreamId, setIsRegenerating, model, cancelLocalTurn, threadId]);
 
     const reloadMessage = useCallback(
         (messageId: string) =>
@@ -881,11 +893,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             isLocalModel: localTarget !== undefined,
             isLocalStreaming,
             isStreaming,
+            pause,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo]);
+    }, [isStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {

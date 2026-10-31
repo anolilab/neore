@@ -192,7 +192,7 @@ msgid "{0, plural, one {# check is still running} other {# checks are still runn
 msgstr ""
 
 #. placeholder {0}: files.length
-#: src/features/chat/thread/host-changes.tsx:46
+#: src/features/chat/thread/host-changes.tsx:53
 msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr ""
 
@@ -2234,7 +2234,7 @@ msgstr ""
 msgid "Add/Replace Object"
 msgstr "Añadir/reemplazar objeto"
 
-#: src/features/chat/thread/host-diff-viewer.tsx:81
+#: src/features/chat/thread/host-diff-viewer.tsx:87
 msgid "added"
 msgstr ""
 
@@ -5324,12 +5324,12 @@ msgstr ""
 msgid "Changes from the last refinement"
 msgstr "Cambios del último refinamiento"
 
-#: src/features/chat/thread/host-changes.tsx:109
+#: src/features/chat/thread/host-changes.tsx:123
 msgid "Changes in this turn"
 msgstr ""
 
 #. placeholder {0}: file.path
-#: src/features/chat/thread/host-diff-viewer.tsx:189
+#: src/features/chat/thread/host-diff-viewer.tsx:198
 msgid "Changes to {0}"
 msgstr ""
 
@@ -6327,16 +6327,16 @@ msgid "Comment color"
 msgstr "Color del comentario"
 
 #. placeholder {0}: file.path
-#: src/features/chat/thread/host-changes.tsx:69
+#: src/features/chat/thread/host-changes.tsx:76
 msgid "Comment on {0}"
 msgstr ""
 
 #. placeholder {0}: file.path
-#: src/features/chat/thread/host-diff-viewer.tsx:252
+#: src/features/chat/thread/host-diff-viewer.tsx:268
 msgid "Comment on {0}, lines {rangeLabel}"
 msgstr ""
 
-#: src/features/chat/thread/host-diff-viewer.tsx:194
+#: src/features/chat/thread/host-diff-viewer.tsx:210
 msgid "Comment on file"
 msgstr ""
 
@@ -6346,14 +6346,14 @@ msgstr ""
 msgid "Comment on line {0}"
 msgstr ""
 
-#: src/features/chat/thread/host-diff-viewer.tsx:244
+#: src/features/chat/thread/host-diff-viewer.tsx:260
 msgid "Comment on lines {rangeLabel}"
 msgstr ""
 
 #. placeholder {0}: file.path
-#: src/features/chat/thread/host-changes.tsx:83
-#: src/features/chat/thread/host-diff-viewer.tsx:192
-#: src/features/chat/thread/host-diff-viewer.tsx:265
+#: src/features/chat/thread/host-changes.tsx:97
+#: src/features/chat/thread/host-diff-viewer.tsx:202
+#: src/features/chat/thread/host-diff-viewer.tsx:281
 msgid "Comment on the whole file {0}"
 msgstr ""
 
@@ -7713,7 +7713,7 @@ msgstr "No se pudo previsualizar · Haz clic para descargar"
 msgid "Could not pull {0}: {1}"
 msgstr "No se pudo descargar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:653
+#: src/features/chat/core/context/chat-context.tsx:655
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7752,6 +7752,10 @@ msgstr "No se pudo cambiar el nombre de la página"
 #: src/features/pages/components/page-view.tsx:283
 msgid "Could not restore this version"
 msgstr "No se pudo restaurar esta versión"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:143
+msgid "Could not retry. Please try again."
+msgstr ""
 
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
@@ -7822,6 +7826,7 @@ msgid "Could not stop the conversation"
 msgstr "No se pudo detener la conversación"
 
 #: src/features/chat/thread-list/thread-node.tsx:565
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:148
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -13046,7 +13051,7 @@ msgstr "El nombre del archivo no puede estar vacío"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:43
+#: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr ""
 
@@ -17094,7 +17099,7 @@ msgstr "La línea {number} de esta transcripción no es JSON válido, así que l
 
 #. placeholder {0}: kindWord[line.kind]
 #. placeholder {1}: line.text
-#: src/features/chat/thread/host-diff-viewer.tsx:212
+#: src/features/chat/thread/host-diff-viewer.tsx:228
 msgid "Line {number}, {0}: {1}"
 msgstr ""
 
@@ -17128,7 +17133,7 @@ msgid "Linear multistep"
 msgstr "Multipaso lineal"
 
 #. placeholder {0}: file.path
-#: src/features/chat/thread/host-diff-viewer.tsx:197
+#: src/features/chat/thread/host-diff-viewer.tsx:213
 msgid "Lines of {0}"
 msgstr ""
 
@@ -17511,7 +17516,7 @@ msgstr "Cargando…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:689
+#: src/features/chat/core/context/chat-context.tsx:691
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Los modelos locales solo admiten texto. Quita los adjuntos para enviar."
 
@@ -21155,7 +21160,7 @@ msgstr "Abrir la URL actual"
 msgid "Open Develop"
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:52
+#: src/features/chat/thread/host-changes.tsx:59
 msgid "Open diff"
 msgstr ""
 
@@ -24001,6 +24006,22 @@ msgstr "Has alcanzado el límite de uso. Podrás mejorar {minutes, plural, one {
 msgid "Rate limited"
 msgstr ""
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:90
+msgid "Rate limited by {provider}, retrying in {countdown}"
+msgstr ""
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:89
+msgid "Rate limited by {provider}. Retrying in about {announced}"
+msgstr ""
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:93
+msgid "Rate limited, retrying in {countdown}"
+msgstr ""
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:92
+msgid "Rate limited. Retrying in about {announced}"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:80
 msgid "Rate limiting"
 msgstr "Limitación de tasa"
@@ -24893,7 +24914,7 @@ msgid "Remove variable {0}"
 msgstr ""
 
 #: src/features/chat/host/diff-comments-draft.tsx:34
-#: src/features/chat/thread/host-diff-viewer.tsx:81
+#: src/features/chat/thread/host-diff-viewer.tsx:87
 msgid "removed"
 msgstr ""
 
@@ -25012,7 +25033,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:621
+#: src/features/chat/core/context/chat-context.tsx:622
 msgid "Reply ready"
 msgstr "Respuesta lista"
 
@@ -25348,6 +25369,10 @@ msgstr "Reintentar exportación"
 msgid "Retry in {retryAfterMinutes}m"
 msgstr "Reintentar en {retryAfterMinutes} min"
 
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:108
+msgid "Retry now"
+msgstr ""
+
 #: src/features/chat/thread/composer-input.tsx:410
 msgid "Retry upload"
 msgstr ""
@@ -25359,6 +25384,10 @@ msgstr ""
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 msgid "Retry with note"
 msgstr "Reintentar con nota"
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:86
+msgid "Retrying now"
+msgstr ""
 
 #: src/features/home/components/home-page.tsx:144
 msgid "Retrying…"
@@ -28369,6 +28398,7 @@ msgstr "Bolsa"
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:203
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
@@ -29745,7 +29775,7 @@ msgstr ""
 msgid "That link could not be read."
 msgstr ""
 
-#: src/features/chat/thread/message-list.tsx:319
+#: src/features/chat/thread/message-list.tsx:320
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
@@ -29878,11 +29908,11 @@ msgstr ""
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "La aplicación de escritorio funciona en macOS, Windows y Linux. Los instaladores se adjuntan a una versión de escritorio en GitHub y aparecen allí cuando esa versión se publica."
 
-#: src/features/chat/thread/host-changes.tsx:112
+#: src/features/chat/thread/host-changes.tsx:126
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
 msgstr ""
 
-#: src/features/chat/thread/host-changes.tsx:101
+#: src/features/chat/thread/host-changes.tsx:115
 msgid "The diff is too large to keep. The files and their line counts are shown."
 msgstr ""
 
@@ -30160,6 +30190,10 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:528
 msgid "The resource endpoint from Keys and Endpoint — *.openai.azure.com or *.cognitiveservices.azure.com."
 msgstr "El punto de conexión del recurso, de Claves y punto de conexión: *.openai.azure.com o *.cognitiveservices.azure.com."
+
+#: src/features/chat/thread/rate-limit-pause-notice.tsx:83
+msgid "The retry is taking longer than expected"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:51
 msgid "The right model, every time."
@@ -31818,7 +31852,7 @@ msgstr "Sin categoría ({0})"
 msgid "Uncategorized"
 msgstr "Sin categoría"
 
-#: src/features/chat/thread/host-diff-viewer.tsx:81
+#: src/features/chat/thread/host-diff-viewer.tsx:87
 msgid "unchanged"
 msgstr ""
 
@@ -33457,7 +33491,7 @@ msgstr "¿Quieres continuar desde aquí?"
 msgid "Watch only this part (optional)"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:691
+#: src/features/chat/core/context/chat-context.tsx:693
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "No pudimos confirmar tu sesión a tiempo. Tu mensaje sigue en el editor. Intenta enviarlo de nuevo."
 
@@ -34290,7 +34324,7 @@ msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 msgid "Your answer"
 msgstr "Tu respuesta"
 
-#: src/features/chat/core/context/chat-context.tsx:621
+#: src/features/chat/core/context/chat-context.tsx:622
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
@@ -34414,7 +34448,7 @@ msgstr "Tu servidor local respondió, pero rechazó este sitio (CORS). Permite e
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Tu ubicación (p. ej., \"Nueva York, EE. UU.\", \"Berlín, Alemania\")."
 
-#: src/features/chat/core/context/chat-context.tsx:688
+#: src/features/chat/core/context/chat-context.tsx:690
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Tu mensaje contiene contenido inapropiado y no se puede enviar."
 
