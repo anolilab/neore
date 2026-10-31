@@ -80,6 +80,7 @@ const OWNER = "owner-1";
 
 let harness: Harness;
 let threadId: string;
+let promptId: string;
 let goalId: string;
 
 beforeAll(async () => {
@@ -105,7 +106,7 @@ beforeEach(async () => {
 
     const { internal } = await import("../../_generated/internal");
 
-    ({ goalId, threadId } = await harness.run(async (ctx: any) => {
+    ({ goalId, promptId, threadId } = await harness.run(async (ctx: any) => {
         const thread = await ctx.db.insert("threads", { status: "running", title: "Chat", userId: OWNER });
         const message = await ctx.db.insert("messages", {
             message: { content: "Make the report", role: "user" },
@@ -136,7 +137,7 @@ beforeEach(async () => {
             userId: OWNER,
         });
 
-        return { goalId: String(started.goalId), threadId: String(thread) };
+        return { goalId: String(started.goalId), promptId: String(message), threadId: String(thread) };
     }));
 });
 
@@ -296,7 +297,7 @@ describe("reviewGoalRound", () => {
 
 describe("handOffToGoalReview", () => {
     it("queues the next review for a thread with an active goal, once per round", async () => {
-        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId))).toBe(true);
+        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId, { messageId: promptId }))).toBe(true);
 
         const jobs = jobsQueueMessages.filter((message) => message.body.functionPath.includes("reviewGoalRound"));
 
@@ -309,7 +310,44 @@ describe("handOffToGoalReview", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "user", threadId }));
 
-        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId))).toBe(false);
+        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId, { messageId: promptId }))).toBe(false);
+        expect(jobsQueueMessages).toHaveLength(0);
+    });
+
+    it("hands an approval continuation to its own goal only, found through its stream", async () => {
+        const streamFor = async (messageId: string): Promise<string> =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("persistentStreams", {
+                        createdAt: Date.now(),
+                        messageId,
+                        status: "streaming",
+                        streamingConfig: { contentType: "text", model: "test-model" },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+        // A continuation of this goal's round is handed to it.
+        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId, { streamId: await streamFor(promptId) }))).toBe(true);
+
+        // One that answered an earlier prompt, before this goal replaced the one it belonged to, is not.
+        jobsQueueMessages.length = 0;
+        const earlier = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "An older request", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "An older request",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await harness.action(async (ctx: any) => await handOffToGoalReview(ctx, threadId, { streamId: await streamFor(String(earlier)) }))).toBe(false);
         expect(jobsQueueMessages).toHaveLength(0);
     });
 });

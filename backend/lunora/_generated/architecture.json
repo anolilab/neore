@@ -17749,13 +17749,13 @@
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 29,
+      "line": 35,
       "reason": "\"handOffToGoalReview\" is not a registered function"
     },
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 48,
+      "line": 54,
       "reason": "\"noteGoalPaused\" is not a registered function"
     },
     {
@@ -17923,133 +17923,133 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 136,
+      "line": 137,
       "reason": "\"improvePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 239,
+      "line": 240,
       "reason": "\"optimizeSystemPromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 287,
+      "line": 288,
       "reason": "\"iteratePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 513,
+      "line": 514,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 548,
+      "line": 549,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 617,
+      "line": 618,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 637,
+      "line": 638,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 649,
+      "line": 650,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 735,
+      "line": 760,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 747,
+      "line": 772,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 752,
+      "line": 777,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 761,
+      "line": 786,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 799,
+      "line": 824,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 835,
+      "line": 857,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 864,
+      "line": 874,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 985,
+      "line": 995,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1000,
+      "line": 1010,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1009,
+      "line": 1019,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1130,
+      "line": 1140,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1138,
+      "line": 1148,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1279,
+      "line": 1289,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1305,
+      "line": 1315,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {

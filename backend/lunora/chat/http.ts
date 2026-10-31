@@ -22,6 +22,7 @@ import { threadShardFor } from "../lib/thread-shard";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { parseSkillCommand } from "../skills/slash-command";
 import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
+import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
@@ -690,6 +691,30 @@ const runChatStartOnShard = async (
         style: body.style,
     };
 
+    // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
+    // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
+    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    const goalConfig =
+        body.goal === undefined
+            ? undefined
+            : vGoalRunConfig.safeParse({
+                  ...(streamingConfig.customSystemPrompt !== undefined && { customSystemPrompt: streamingConfig.customSystemPrompt }),
+                  ...(streamingConfig.enabledFeatures !== undefined && { enabledFeatures: streamingConfig.enabledFeatures }),
+                  ...(streamingConfig.mcpServerNames !== undefined && { mcpServerNames: streamingConfig.mcpServerNames }),
+                  model: streamingConfig.model,
+                  ...(streamingConfig.reasoningEffort !== undefined && { reasoningEffort: clampGoalEffort(streamingConfig.reasoningEffort) }),
+                  ...(streamingConfig.researchDepth !== undefined && { researchDepth: streamingConfig.researchDepth }),
+                  ...(streamingConfig.searchMode !== undefined && { searchMode: streamingConfig.searchMode }),
+                  ...(streamingConfig.statelessMode !== undefined && { statelessMode: streamingConfig.statelessMode }),
+                  // Every round runs as this one does: an API key's tool limits and the invoked skill carry through.
+                  ...(origin && { origin }),
+                  ...(goalSkill && { skill: goalSkill }),
+              });
+
+    if (goalConfig && !goalConfig.ok) {
+        return Response.json({ error: "These chat settings cannot be used with a goal." }, { status: 400 });
+    }
+
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
     // because that route can be called again for the same prompt; a charge here
@@ -828,24 +853,9 @@ const runChatStartOnShard = async (
         const activeOrganizationId = await activeOrganizationPromise;
         let goalId: Id<"threadGoals"> | undefined;
 
-        // The skill the goal's message invokes, as the first run reads it (`runStreamingAgent`).
-        const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
-
-        if (body.goal !== undefined) {
+        if (body.goal !== undefined && goalConfig?.ok) {
             const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
-                config: {
-                    ...(streamingConfig.customSystemPrompt !== undefined && { customSystemPrompt: streamingConfig.customSystemPrompt }),
-                    ...(streamingConfig.enabledFeatures !== undefined && { enabledFeatures: streamingConfig.enabledFeatures }),
-                    ...(streamingConfig.mcpServerNames !== undefined && { mcpServerNames: streamingConfig.mcpServerNames }),
-                    model: streamingConfig.model,
-                    ...(streamingConfig.reasoningEffort !== undefined && { reasoningEffort: clampGoalEffort(streamingConfig.reasoningEffort) }),
-                    ...(streamingConfig.researchDepth !== undefined && { researchDepth: streamingConfig.researchDepth }),
-                    ...(streamingConfig.searchMode !== undefined && { searchMode: streamingConfig.searchMode }),
-                    ...(streamingConfig.statelessMode !== undefined && { statelessMode: streamingConfig.statelessMode }),
-                    // Every round runs as this one does: an API key's tool limits and the invoked skill carry through.
-                    ...(origin && { origin }),
-                    ...(goalSkill && { skill: goalSkill }),
-                },
+                config: goalConfig.value,
                 ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
                 ...(activeOrganizationId && { organizationId: activeOrganizationId }),
                 promptMessageId: messageId,

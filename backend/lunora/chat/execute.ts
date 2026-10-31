@@ -479,7 +479,7 @@ export const runStreamingAgent = internalAction
             // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
             if (paused) {
                 await noteGoalPaused(ctx, threadId);
-            } else if (await handOffToGoalReview(ctx, threadId, messageId)) {
+            } else if (await handOffToGoalReview(ctx, threadId, { messageId })) {
                 return;
             }
 
@@ -586,7 +586,7 @@ export const continueAfterToolApproval = internalAction
             // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
             if (resumed.paused) {
                 await noteGoalPaused(ctx, threadId);
-            } else if (!resumed.stopped && (await handOffToGoalReview(ctx, threadId))) {
+            } else if (!resumed.stopped && (await handOffToGoalReview(ctx, threadId, { streamId }))) {
                 return;
             }
 

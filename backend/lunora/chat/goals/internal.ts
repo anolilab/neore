@@ -122,11 +122,23 @@ export const startGoal = internalMutation
  * run of a superseded goal never reviews, or ends, the goal that replaced it.
  */
 export const getActiveGoalForRun = internalQuery
-    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.id("threads") })
+    .input({
+        messageId: v.optional(v.string().max(MAX_LENGTH.id)),
+        streamId: v.optional(v.id("persistentStreams")),
+        threadId: v.id("threads"),
+    })
     .output(v.union(v.object({ goalId: v.id("threadGoals"), round: v.number() }), v.null()))
     .query(async ({ args, ctx }) => {
+        // A continuation names its run by stream; the stream's `messageId` is the prompt row the run answers.
+        const stream = args.streamId === undefined ? null : await ctx.db.get(args.streamId);
+        const messageId = args.messageId ?? stream?.messageId;
+
+        if (messageId === undefined) {
+            return null;
+        }
+
         const goals = await activeGoalsOf(ctx, args.threadId);
-        const goal = goals.find((row) => args.messageId === undefined || row.promptMessageId === args.messageId);
+        const goal = goals.find((row) => row.promptMessageId === messageId);
 
         return goal ? { goalId: goal._id, round: goal.round } : null;
     });
@@ -297,6 +309,19 @@ export const recordGoalVerdict = internalMutation
             return { outcome: "ended" as const };
         };
 
+        const thread = await ctx.db.get(goal.threadId);
+
+        // The user switched branch, or edited, while the review ran: the verdict is about a reply nobody is looking at, so it
+        // neither counts as a win nor opens a round on a branch that is not shown.
+        if (thread?.activeLeafMessageId && args.lastMessage) {
+            const { id, order } = args.lastMessage;
+            const onPath = await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, [{ _id: id, order }]);
+
+            if (!onPath.has(id)) {
+                return await end("stopped", "superseded");
+            }
+        }
+
         if (decision === "met") {
             return await end("met");
         }
@@ -305,21 +330,9 @@ export const recordGoalVerdict = internalMutation
             return await end("stopped", decision);
         }
 
-        const thread = await ctx.db.get(goal.threadId);
-
         // A chat in the trash is as good as gone: nothing is run into it.
         if (!thread || thread.deleted) {
             return await end("stopped", "error");
-        }
-
-        // The user switched branch, or edited, while the review ran: the next round would answer a branch nobody is looking at.
-        if (thread.activeLeafMessageId && args.lastMessage) {
-            const { id, order } = args.lastMessage;
-            const onPath = await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, [{ _id: id, order }]);
-
-            if (!onPath.has(id)) {
-                return await end("stopped", "superseded");
-            }
         }
 
         const account = await loadTaskAccount(ctx, goal.userId);

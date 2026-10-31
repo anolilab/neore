@@ -383,6 +383,18 @@ describe("a round whose branch was left", () => {
         expect(await count("persistentStreams")).toBe(0);
         expect((await read(threadId)).status).toBe("active");
     });
+
+    it("does not record a win for a reply the thread no longer shows", async () => {
+        const { other, reply } = await branch();
+        const goalId = await start();
+
+        await setLeaf(other);
+
+        const outcome = await review(goalId, 1, { lastMessage: { id: reply, order: 0 }, met: true });
+
+        expect(outcome).toEqual({ outcome: "ended" });
+        expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "superseded" });
+    });
 });
 
 describe("a goal whose thread is gone", () => {

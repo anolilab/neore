@@ -22,12 +22,18 @@ import { reviewRound } from "./review";
 /**
  * Called when a run that may belong to a goal has ended. Returns whether a goal
  * review was queued — then the goal owns the thread's status and the follow-up
- * suggestions until it ends, and the caller leaves both alone. `messageId` is the
- * prompt row the run answered: only the goal whose current round it opened is handed the run.
+ * suggestions until it ends, and the caller leaves both alone. `run` names the
+ * prompt row the run answered (a continuation names its stream, which records it): only
+ * the goal whose current round that row opened is handed the run, so a run that ends
+ * after its goal was replaced never reviews the new one.
  */
-export const handOffToGoalReview = async (ctx: Pick<ActionCtx, "runQuery">, threadId: string, messageId?: string): Promise<boolean> => {
+export const handOffToGoalReview = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    threadId: string,
+    run: { messageId: string } | { streamId: string },
+): Promise<boolean> => {
     const goal = await ctx.runQuery(internal.chat.goals.internal.getActiveGoalForRun, {
-        ...(messageId !== undefined && { messageId }),
+        ...("messageId" in run ? { messageId: run.messageId } : { streamId: run.streamId as never }),
         threadId: threadId as never,
     });
 
