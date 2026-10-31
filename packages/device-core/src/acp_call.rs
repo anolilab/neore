@@ -54,6 +54,9 @@ pub fn is_acp_tool(tool: &str) -> bool {
 )]
 pub enum AcpCommand {
     Cancel {
+        /// Keep the prompts queued behind the turn (a worker's stop, whose later messages are other runs). Absent or
+        /// anything but `true` drops them, as a person's Stop does.
+        keep_queue: bool,
         session_id: String,
         turn_id: String,
     },
@@ -221,6 +224,7 @@ impl DeviceState {
         match call.tool.as_str() {
             "acp_cancel" => match (id_of(input, "sessionId"), id_of(input, "turnId")) {
                 (Some(session_id), Some(turn_id)) => Ok(AcpCommand::Cancel {
+                    keep_queue: input.get("keepQueue").and_then(Value::as_bool) == Some(true),
                     session_id,
                     turn_id,
                 }),
@@ -539,6 +543,40 @@ mod tests {
 
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_cancel_keeps_the_queue_only_when_it_says_so() {
+        let (state, dir, _) = state("keep-queue");
+
+        for (input, keep) in [
+            (json!({ "sessionId": "s1", "turnId": "u1" }), false),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": false }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": "yes" }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": true }),
+                true,
+            ),
+        ] {
+            let prepared = state.acp_prepare(&call("acp_cancel", input)).unwrap();
+
+            assert_eq!(
+                prepared.command,
+                Some(AcpCommand::Cancel {
+                    keep_queue: keep,
+                    session_id: "s1".into(),
+                    turn_id: "u1".into()
+                })
+            );
         }
 
         let _ = std::fs::remove_dir_all(&dir);

@@ -457,7 +457,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         switch (command.kind) {
             case "cancel": {
                 // The turn may have ended already; that is not a refusal.
-                (server?.acp ?? requireAcp()).cancelTurn(command.sessionId, command.turnId);
+                (server?.acp ?? requireAcp()).cancelTurn(command.sessionId, command.turnId, { keepQueue: command.keepQueue === true });
                 (server?.early ?? requireEarly()).cancel(command.sessionId, command.turnId);
 
                 return "accepted";

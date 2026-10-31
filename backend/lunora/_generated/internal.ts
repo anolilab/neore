@@ -26,7 +26,7 @@ export interface InternalApiTypes {
             verifyHostPost: FunctionReference<"query", { deviceId: string; now: number; payload: string; signature: string }, null | { userId: string }>;
         };
         send: {
-            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" }>;
+            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" | "worker_thread" }>;
         };
         upload: {
             finalizeHostUpload: FunctionReference<"action", { filename: string; uploadId: string; userId: string }, null | { fileId: string; mediaType: string; storageKey: string }>;
@@ -1078,10 +1078,12 @@ export interface InternalApiTypes {
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { childThreadId?: string; clientId?: string; depth: number; dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
-            createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
-            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
+            createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
+            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
-            reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
+            reapRun: FunctionReference<"mutation", { claimedAt?: number; runId: Id<"subAgentRuns"> }, null>;
+            retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
         };
     };
@@ -2253,9 +2255,11 @@ export const internal: InternalApiTypes = {
             claimRun: { __lunoraRef: "sub_agents_functions:claimRun" },
             completeRun: { __lunoraRef: "sub_agents_functions:completeRun" },
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
+            isHostWorker: { __lunoraRef: "sub_agents_functions:isHostWorker" },
             messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapRun: { __lunoraRef: "sub_agents_functions:reapRun" },
+            retryHostRunStart: { __lunoraRef: "sub_agents_functions:retryHostRunStart" },
             shouldRunStop: { __lunoraRef: "sub_agents_functions:shouldRunStop" },
         },
     },

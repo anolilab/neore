@@ -23,6 +23,7 @@ import { countOpenCalls, isDeviceOnline } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
+import { openHostSession } from "./lib/start-session";
 import { vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
@@ -127,31 +128,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         userId,
     });
 
-    await ctx.db.insert("acpSessions", {
-        agentKey: offer.agentKey,
-        agentLabel: offer.agentLabel,
-        createdAt: ctx.now,
-        deviceId: device._id,
-        folderId: offer.folderId,
-        folderLabel: offer.folderLabel,
-        hostSessionId,
-        status: "starting",
-        threadId,
-        updatedAt: ctx.now,
-        userId,
-    });
-
-    const call = await createAcpCall(
-        ctx,
-        {
-            deviceId: device._id,
-            input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
-            kind: "acp_start",
-            threadId,
-            userId,
-        },
-        ctx.now,
-    );
+    const call = await openHostSession(ctx, { device, hostSessionId, offer, threadId, userId }, ctx.now);
 
     if ("error" in call) {
         // Throwing rolls the thread and the session back with the claim.

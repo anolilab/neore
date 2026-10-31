@@ -29,6 +29,15 @@ describe("computeTaint", () => {
         ).toEqual([]);
     });
 
+    it("counts a coding agent's posted result as device taint, whichever key its mark rides under", () => {
+        const mark = { neore: { runner: "host" } };
+
+        expect(computeTaint([{ content: [{ providerMetadata: mark, text: "Done.", type: "text" }], role: "assistant" }])).toEqual(["device"]);
+        expect(computeTaint([{ content: [{ providerOptions: mark, text: "Done.", type: "text" }], role: "assistant" }])).toEqual(["device"]);
+        // The person's own words never carry it.
+        expect(computeTaint([{ content: [{ providerMetadata: mark, text: "hi", type: "text" }], role: "user" }])).toEqual([]);
+    });
+
     it("collects every untrusted source the model read, once, in a stable order", () => {
         expect(
             computeTaint([
