@@ -376,13 +376,14 @@ export interface ApiTypes {
             getDeviceCallByToolCall: FunctionReference<"query", { toolCallId: string }, null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }, { paired: boolean }>;
             listDeviceCalls: FunctionReference<"query", { deviceId?: Id<"devices">; limit?: number }, Array<{ _id: string; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: FunctionReference<"query", {}, Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listDevices: FunctionReference<"query", {}, Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; projectIds?: Array<string>; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
             listPendingDeviceCalls: FunctionReference<"query", { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }, Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
             registerDevice: FunctionReference<"mutation", { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }, { deviceId: string; secret: string }>;
             releaseDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }, null>;
             renameDevice: FunctionReference<"mutation", { deviceId: Id<"devices">; name: string }, null>;
             reportDeviceCallProgress: FunctionReference<"mutation", { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { accepted: boolean }>;
             revokeDevice: FunctionReference<"mutation", { deviceId: Id<"devices"> }, null>;
+            setDeviceProjectScope: FunctionReference<"mutation", { deviceId: Id<"devices">; scope: { kind: "any" } | { kind: "projects"; projectIds: Array<Id<"projects">> } }, null>;
             updateDeviceManifest: FunctionReference<"mutation", { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }, { toolCount: number }>;
         };
     };
@@ -769,7 +770,7 @@ export interface ApiTypes {
             updateGalleryMeta: FunctionReference<"mutation", { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }, { success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "upscale" | "inpaint" | "outpaint" | "transcription" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         presence: {
             checkNodeLock: FunctionReference<"query", { nodeId: string; projectId: Id<"projects"> }, { locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -1160,6 +1161,7 @@ export const api: ApiTypes = {
             renameDevice: { __lunoraRef: "devices_functions:renameDevice" },
             reportDeviceCallProgress: { __lunoraRef: "devices_functions:reportDeviceCallProgress" },
             revokeDevice: { __lunoraRef: "devices_functions:revokeDevice" },
+            setDeviceProjectScope: { __lunoraRef: "devices_functions:setDeviceProjectScope" },
             updateDeviceManifest: { __lunoraRef: "devices_functions:updateDeviceManifest" },
         },
     },

@@ -2761,6 +2761,11 @@
       "to": "table:persistentStreams"
     },
     {
+      "from": "function:chat_streaming_persistent_library:claimRunResume",
+      "kind": "read",
+      "to": "table:streamingMessages"
+    },
+    {
       "from": "function:chat_streaming_persistent_library:claimStreamRun",
       "kind": "write",
       "to": "table:persistentStreams"
@@ -11171,6 +11176,13 @@
       "id": "function:devices_functions:revokeDevice",
       "kind": "function",
       "name": "devices.functions.revokeDevice",
+      "module": "devices"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:devices_functions:setDeviceProjectScope",
+      "kind": "function",
+      "name": "devices.functions.setDeviceProjectScope",
       "module": "devices"
     },
     {
