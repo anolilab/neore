@@ -25,7 +25,7 @@ use crate::store::Host;
 /// A server's folder for an agent: an absolute path on the server inside one of the folders shared for it. Checked
 /// by text here, because this computer cannot canonicalise a path on another machine; the host resolves it on its own
 /// filesystem and refuses what leaves the shared folders when it starts the agent.
-fn approved_folder(folder: &str, roots: &[String]) -> Result<String, String> {
+pub(super) fn approved_folder(folder: &str, roots: &[String]) -> Result<String, String> {
     let trimmed = if folder.len() > 1 {
         folder.trim_end_matches('/')
     } else {
@@ -948,6 +948,52 @@ mod tests {
         assert!(state
             .acp_host_spawn_plan(host, "claude", "/srv/app")
             .is_err());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn narrowing_a_servers_shared_folders_takes_the_approvals_outside_them_away() {
+        let (state, dir, _) = engine("unshare", None);
+        let host = "ha-unshare-host";
+        let share = |roots: &[&str]| -> crate::engine::SettingsUpdate {
+            serde_json::from_value(json!({ "host": { "deviceId": host, "roots": roots } })).unwrap()
+        };
+
+        state
+            .host_acp_update(
+                host,
+                AcpUpdate::Grant {
+                    agent_key: "claude".into(),
+                    folder: "/srv/app/sub".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(state.settings().hosts[0].acp_consents.len(), 2);
+
+        // Still shared: both approvals stand.
+        state
+            .settings_update(share(&["/srv/app", "/data"]))
+            .unwrap();
+        assert_eq!(state.settings().hosts[0].acp_consents.len(), 2);
+
+        // Only the subfolder stays shared: the approval for its parent goes, the one inside stays.
+        state.settings_update(share(&["/srv/app/sub"])).unwrap();
+
+        let kept: Vec<_> = state.settings().hosts[0]
+            .acp_consents
+            .iter()
+            .map(|consent| consent.folder_path.clone())
+            .collect();
+
+        assert_eq!(kept, ["/srv/app/sub"]);
+        assert!(state
+            .acp_host_spawn_plan(host, "claude", "/srv/app")
+            .is_err());
+
+        // A folder that only shares a name prefix with a shared one is not inside it.
+        state.settings_update(share(&["/srv/ap"])).unwrap();
+        assert!(state.settings().hosts[0].acp_consents.is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

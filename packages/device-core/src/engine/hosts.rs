@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 use std::thread;
 
+use super::host_agents::approved_folder;
 use super::reconnect::{Attempt, AttemptGuard, ConnectError, ReconnectView};
 use super::*;
 use crate::install::{self, Installed, Remote};
@@ -204,6 +205,9 @@ pub(super) fn apply_update(settings: &mut Settings, update: &HostUpdate) -> Resu
 
     if let Some(roots) = roots {
         host.roots = roots;
+        // An approval is for a folder the server shares. One that no longer is must not start an agent there.
+        host.acp_consents
+            .retain(|consent| approved_folder(&consent.folder_path, &host.roots).is_ok());
     }
 
     if let Some(required) = update.require_shell_sandbox {
