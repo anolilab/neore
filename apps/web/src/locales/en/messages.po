@@ -7791,7 +7791,7 @@ msgstr "Could not stop the sub-agent."
 msgid "Could not stop the worker."
 msgstr "Could not stop the worker."
 
-#: src/features/chat/model-settings/use-model-combobox.ts:138
+#: src/features/chat/model-settings/use-model-combobox.ts:148
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
