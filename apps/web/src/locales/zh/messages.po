@@ -7706,7 +7706,7 @@ msgstr "无法重命名页面"
 msgid "Could not restore this version"
 msgstr "无法恢复此版本"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:18
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr ""
 
@@ -14681,7 +14681,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr ""
 
@@ -16192,7 +16192,7 @@ msgstr "它可能已被删除，或者你已无权访问。"
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "它可能已过期、被撤销或已被使用。请索取新的链接。"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:22
+#: src/features/chat/thread/agent-switch-divider.tsx:21
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr ""
 
@@ -20804,7 +20804,7 @@ msgstr "一致性更高的上一代电影感模型"
 msgid "Older"
 msgstr "更早"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -25243,7 +25243,7 @@ msgstr "继续导入"
 msgid "Resume your latest chat"
 msgstr "继续最近的对话"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:27
+#: src/features/chat/thread/agent-switch-divider.tsx:26
 msgid "Resumed its own session"
 msgstr ""
 
@@ -30357,7 +30357,7 @@ msgstr "此操作无法撤销。所有团队成员都将被移除。"
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据。"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:20
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr ""
 
@@ -30403,7 +30403,7 @@ msgstr "此命令名称已被保留"
 msgid "This computer"
 msgstr "此电脑"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:21
+#: src/features/chat/thread/agent-switch-divider.tsx:20
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 

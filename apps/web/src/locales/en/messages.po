@@ -7705,7 +7705,7 @@ msgstr "Could not rename the page"
 msgid "Could not restore this version"
 msgstr "Could not restore this version"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:18
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr "Could not resume its own session, so the conversation was handed over"
 
@@ -14680,7 +14680,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -16191,7 +16191,7 @@ msgstr "It may have been deleted, or you no longer have access."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "It may have expired, been revoked, or already been used. Ask for a new link."
 
-#: src/features/chat/thread/agent-switch-divider.tsx:22
+#: src/features/chat/thread/agent-switch-divider.tsx:21
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr "It opened a different session than its own, so the conversation was handed over"
 
@@ -20803,7 +20803,7 @@ msgstr "Old generation cinematic model with higher consistency"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -25242,7 +25242,7 @@ msgstr "Resume import"
 msgid "Resume your latest chat"
 msgstr "Resume your latest chat"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:27
+#: src/features/chat/thread/agent-switch-divider.tsx:26
 msgid "Resumed its own session"
 msgstr "Resumed its own session"
 
@@ -30356,7 +30356,7 @@ msgstr "This action cannot be undone. All team members will be removed."
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "This action cannot be undone. This will permanently delete the organization and all associated data."
 
-#: src/features/chat/thread/agent-switch-divider.tsx:20
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "This agent cannot resume its own session, so the conversation was handed over"
 
@@ -30402,7 +30402,7 @@ msgstr "This command name is reserved"
 msgid "This computer"
 msgstr "This computer"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:21
+#: src/features/chat/thread/agent-switch-divider.tsx:20
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr "This computer did not resume its own session, so the conversation was handed over"
 

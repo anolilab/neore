@@ -4,8 +4,8 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
 import { agentSwitchOf } from "../../agent/agent-switch-logic";
-import { walkPath } from "../../agent/branch-rows";
 import type { ReattachFallbackReason } from "../../agent/agent-switch-validators";
+import { walkPath } from "../../agent/branch-rows";
 import { patchAgentSwitchRow } from "../../agent/table-writes";
 import { omit } from "../../lib/collections";
 

@@ -7706,7 +7706,7 @@ msgstr "No se pudo cambiar el nombre de la página"
 msgid "Could not restore this version"
 msgstr "No se pudo restaurar esta versión"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:18
 msgid "Could not resume its own session, so the conversation was handed over"
 msgstr ""
 
@@ -14681,7 +14681,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr ""
 
@@ -16192,7 +16192,7 @@ msgstr "Puede que se haya eliminado o que ya no tengas acceso."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Puede que haya caducado, se haya revocado o ya se haya usado. Pide un enlace nuevo."
 
-#: src/features/chat/thread/agent-switch-divider.tsx:22
+#: src/features/chat/thread/agent-switch-divider.tsx:21
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr ""
 
@@ -20804,7 +20804,7 @@ msgstr "Modelo cinematográfico de generación anterior con mayor consistencia"
 msgid "Older"
 msgstr "Anteriores"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:31
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -25243,7 +25243,7 @@ msgstr "Reanudar importación"
 msgid "Resume your latest chat"
 msgstr "Retomar tu último chat"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:27
+#: src/features/chat/thread/agent-switch-divider.tsx:26
 msgid "Resumed its own session"
 msgstr ""
 
@@ -30357,7 +30357,7 @@ msgstr "Esta acción no se puede deshacer. Se quitarán todos los miembros del e
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "Esta acción no se puede deshacer. Se eliminarán de forma permanente la organización y todos sus datos asociados."
 
-#: src/features/chat/thread/agent-switch-divider.tsx:20
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr ""
 
@@ -30403,7 +30403,7 @@ msgstr "Este nombre de comando está reservado"
 msgid "This computer"
 msgstr "Este ordenador"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:21
+#: src/features/chat/thread/agent-switch-divider.tsx:20
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 

@@ -13,8 +13,7 @@ const AgentSwitchDivider: FC<{ part: AgentSwitchPart }> = ({ part }) => {
     const models = useFeatureFlaggedModels();
     const nameOf = (model: string): string => models.find((candidate) => candidate.id === model)?.name ?? model;
     const label = t`Switched from ${switchAgentName(part.from, nameOf)} to ${switchAgentName(part.to, nameOf)}`;
-    // Why the agent's own session was not resumed, worded here (not in a helper handed `t`, which the extractor cannot see)
-    // because the backend sends a code, never the computer's text.
+    // Worded here rather than in a helper handed `t`: the extractor only reads `t` from this scope.
     const reattachFailureNotes = {
         load_failed: t`Could not resume its own session, so the conversation was handed over`,
         load_unsupported: t`This agent cannot resume its own session, so the conversation was handed over`,
