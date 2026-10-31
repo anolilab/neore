@@ -44,8 +44,11 @@ import {
     peopleSearchTool,
     redditSearchTool,
     renderUITool,
+    requestSecretTool,
     retrieveTool,
+    saveSecretAsProviderKeyTool,
     searchMemoryTool,
+    setMcpServerSecretTool,
     shellExecutionTool,
     spotifySearchTool,
     stockChartTool,
@@ -129,9 +132,10 @@ const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
 export const SANDBOX_TOOLS = [ToolName.ShellExecution, ToolName.FileOperations];
 // Delegation to an external coding agent (Claude Code / Codex); asks before every run by default
 const CODING_AGENT_TOOLS = [ToolName.DelegateToCodingAgent];
-// Asking the user mid-run: every mode, since any conversation can hit an ambiguity.
-// Headless runs lose it (`tool-permissions.ts`), as nobody is there to answer.
-const INTERACTION_TOOLS = [ToolName.AskUser];
+// Asking the user mid-run: every mode, since any conversation can hit an ambiguity, and asking for a
+// secret on a card instead of in the chat, with the tools that spend it. Headless runs lose the two
+// that wait for a person (`tool-permissions.ts`), as nobody is there to answer.
+const INTERACTION_TOOLS = [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret];
 // Delegating a self-contained piece of work to a headless sub-agent (`sub-agents/`)
 const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent, ToolName.MessageWorker];
 
@@ -385,11 +389,15 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     // Generative UI Tools
     [ToolName.RenderUI]: renderUITool,
 
+    // Asking the user for a secret, and spending it
+    [ToolName.RequestSecret]: requestSecretTool,
     // Content Tools
     [ToolName.Retrieve]: retrieveTool,
+    [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
 
     // Memory Tools
     [ToolName.SearchMemory]: searchMemoryTool,
+    [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
 
@@ -448,7 +456,7 @@ const TOOLS_BY_CATEGORY = {
     entertainment: [ToolName.MovieTvSearch, ToolName.TrendingMovies, ToolName.TrendingTv],
     finance: [ToolName.CoinData, ToolName.CoinDataByContract, ToolName.CoinOhlc, ToolName.CurrencyConverter, ToolName.ListCurrencies, ToolName.StockChart],
     generation: [ToolName.ImageGeneration, ToolName.VideoGeneration, ToolName.MusicGeneration, ToolName.ImageEditing],
-    interaction: [ToolName.AskUser],
+    interaction: [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret],
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
     memory: [ToolName.SearchMemory],

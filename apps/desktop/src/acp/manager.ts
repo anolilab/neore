@@ -48,6 +48,8 @@ const removeQuietly = async (folder: string): Promise<void> => {
 export interface ManagerOptions {
     appVersion: string;
     cancelGraceMs?: number;
+    /** The agents run on another machine (a server): their folder is not one of this computer's, so none of its files are read for them. */
+    folderIsRemote?: boolean;
     gate?: PermissionGate;
     /** File-event hooks (`hooks/runner.ts`). Without it, a folder's `.neore/hooks.json` is not looked at. */
     hooks?: { approvals: HookApprovals; fs?: HookFs };
@@ -107,7 +109,7 @@ export class AcpManager {
         let child: AgentProcess;
 
         try {
-            child = this.spawn(plan);
+            child = this.spawn(plan, agentKey);
         } catch (error) {
             // The folder exists before anything starts; a start that fails must not leave it behind.
             if (plan.scratch) {
@@ -178,7 +180,7 @@ export class AcpManager {
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
-        const child = this.spawn(plan);
+        const child = this.spawn(plan, agentKey);
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const { hooks } = this.options;
         // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
@@ -189,6 +191,7 @@ export class AcpManager {
             appVersion: this.options.appVersion,
             cancelGraceMs: this.options.cancelGraceMs,
             folder: plan.cwd,
+            folderIsRemote: this.options.folderIsRemote,
             gate: this.options.gate ?? declineGate,
             lifecycle: hooks === undefined ? undefined : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
             log: this.options.log,
@@ -251,8 +254,8 @@ export class AcpManager {
     }
 
     /** Stops the turn the backend named, if that session still runs it. A turn that already ended is not an error. */
-    public cancelTurn(sessionId: string, turnId: string): boolean {
-        return this.sessions.get(sessionId)?.cancelTurn(turnId) ?? false;
+    public cancelTurn(sessionId: string, turnId: string, options: { keepQueue?: boolean } = {}): boolean {
+        return this.sessions.get(sessionId)?.cancelTurn(turnId, options) ?? false;
     }
 
     public async close(sessionId: string): Promise<void> {
@@ -375,8 +378,8 @@ export class AcpManager {
         }, CHANGE_INTERVAL_MS);
     }
 
-    private spawn(plan: SpawnPlan): AgentProcess {
-        const child = this.options.spawn(plan);
+    private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {
+        const child = this.options.spawn(plan, agentKey);
 
         this.processes.add(child);
         this.forgetWhenExited(child);

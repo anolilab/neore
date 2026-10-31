@@ -7,6 +7,7 @@
  * comes from the driver, never from the client, so a draft cannot be filed under an
  * origin the user was not reviewing on.
  */
+import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
@@ -87,6 +88,103 @@ export const getReviewDraft = authQuery
         return draft === null ? null : toDraft(draft, ctx.now);
     });
 
+export interface DraftCommentInput {
+    body: string;
+    commentId?: string;
+    commitId: string;
+    line: number;
+    number: number;
+    path: string;
+    repository: string;
+    side: "new" | "old";
+    startLine: number | null;
+}
+
+/**
+ * Adds a line comment to the user's draft, or replaces one when `commentId` names it. The one write path
+ * into a draft: the Files tab and an applied guide proposal both end here, so both obey the same checks.
+ */
+export const saveDraftCommentFor = async (ctx: MutationCtx, userId: string, args: DraftCommentInput): Promise<Infer<typeof vEdit>> => {
+    requireAddress(args.number);
+    requireCommit(args.commitId);
+    requireLines(args.line, args.startLine);
+
+    if (args.body.trim() === "" || args.path === "") {
+        throw new LunoraError("BAD_REQUEST", "A comment needs a file and some text");
+    }
+
+    const { now } = ctx;
+    const draft = await draftFor(ctx, userId, args.repository, args.number);
+
+    if (draft !== null && isSubmitting(draft, now)) {
+        return { status: "submitting" as const };
+    }
+
+    const commitId = commitFor(draft, args.commitId);
+
+    if (commitId === "head_moved") {
+        return { status: "head_moved" as const };
+    }
+
+    const existing = args.commentId === undefined ? undefined : draft?.comments.find((comment) => comment.id === args.commentId);
+
+    if (args.commentId !== undefined && existing === undefined) {
+        return { status: "not_found" as const };
+    }
+
+    if (existing === undefined && (draft?.comments.length ?? 0) >= MAX_DRAFT_COMMENTS) {
+        return { status: "too_many" as const };
+    }
+
+    const comment: DraftComment = {
+        body: args.body,
+        createdAt: existing?.createdAt ?? now,
+        id: existing?.id ?? crypto.randomUUID(),
+        line: args.line,
+        path: args.path,
+        side: args.side,
+        startLine: args.startLine,
+    };
+    const comments =
+        existing === undefined
+            ? [...(draft?.comments ?? []), comment]
+            : (draft?.comments ?? []).map((candidate) => (candidate.id === comment.id ? comment : candidate));
+
+    if (draftBytes({ body: draft?.body ?? "", comments }) > MAX_DRAFT_BYTES) {
+        return { status: "too_many" as const };
+    }
+
+    if (draft === null) {
+        await ctx.db.insert("reviewDrafts", {
+            body: "",
+            comments,
+            commitId,
+            createdAt: now,
+            hostOrigin: DEVELOP_DRIVER.webOrigin,
+            number: args.number,
+            repository: args.repository,
+            revision: 1,
+            submittingAt: 0,
+            updatedAt: now,
+            userId,
+            verdict: null,
+        });
+
+        return { commentId: comment.id, revision: 1, status: "ok" as const };
+    }
+
+    const revision = draft.revision + 1;
+
+    await ctx.db.patch(draft._id, {
+        comments,
+        commitId,
+        revision,
+        updatedAt: now,
+    });
+
+    return { commentId: comment.id, revision, status: "ok" as const };
+};
+
 /** Adds a line comment, or replaces one when `commentId` names it. */
 export const saveDraftComment = authMutation
     .use(rateLimit("sourceControl/draft"))
@@ -102,86 +200,7 @@ export const saveDraftComment = authMutation
         startLine: v.union(v.number(), v.null()),
     })
     .output(v.from(vEdit))
-    .mutation(async ({ args, ctx }) => {
-        requireAddress(args.number);
-        requireCommit(args.commitId);
-        requireLines(args.line, args.startLine);
-
-        if (args.body.trim() === "" || args.path === "") {
-            throw new LunoraError("BAD_REQUEST", "A comment needs a file and some text");
-        }
-
-        const { now } = ctx;
-        const draft = await draftFor(ctx, ctx.user.userId, args.repository, args.number);
-
-        if (draft !== null && isSubmitting(draft, now)) {
-            return { status: "submitting" as const };
-        }
-
-        const commitId = commitFor(draft, args.commitId);
-
-        if (commitId === "head_moved") {
-            return { status: "head_moved" as const };
-        }
-
-        const existing = args.commentId === undefined ? undefined : draft?.comments.find((comment) => comment.id === args.commentId);
-
-        if (args.commentId !== undefined && existing === undefined) {
-            return { status: "not_found" as const };
-        }
-
-        if (existing === undefined && (draft?.comments.length ?? 0) >= MAX_DRAFT_COMMENTS) {
-            return { status: "too_many" as const };
-        }
-
-        const comment: DraftComment = {
-            body: args.body,
-            createdAt: existing?.createdAt ?? now,
-            id: existing?.id ?? crypto.randomUUID(),
-            line: args.line,
-            path: args.path,
-            side: args.side,
-            startLine: args.startLine,
-        };
-        const comments =
-            existing === undefined
-                ? [...(draft?.comments ?? []), comment]
-                : (draft?.comments ?? []).map((candidate) => (candidate.id === comment.id ? comment : candidate));
-
-        if (draftBytes({ body: draft?.body ?? "", comments }) > MAX_DRAFT_BYTES) {
-            return { status: "too_many" as const };
-        }
-
-        if (draft === null) {
-            await ctx.db.insert("reviewDrafts", {
-                body: "",
-                comments,
-                commitId,
-                createdAt: now,
-                hostOrigin: DEVELOP_DRIVER.webOrigin,
-                number: args.number,
-                repository: args.repository,
-                revision: 1,
-                submittingAt: 0,
-                updatedAt: now,
-                userId: ctx.user.userId,
-                verdict: null,
-            });
-
-            return { commentId: comment.id, revision: 1, status: "ok" as const };
-        }
-
-        const revision = draft.revision + 1;
-
-        await ctx.db.patch(draft._id, {
-            comments,
-            commitId,
-            revision,
-            updatedAt: now,
-        });
-
-        return { commentId: comment.id, revision, status: "ok" as const };
-    });
+    .mutation(async ({ args, ctx }) => await saveDraftCommentFor(ctx, ctx.user.userId, args));
 
 export const deleteDraftComment = authMutation
     .use(rateLimit("sourceControl/draft"))

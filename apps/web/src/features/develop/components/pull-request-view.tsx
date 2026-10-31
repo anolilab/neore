@@ -8,6 +8,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { ExternalLink } from "lucide-react";
+import { useState } from "react";
 
 import { safeExternalUrl } from "../lib/format";
 import type { DevelopTab } from "../lib/search";
@@ -18,6 +19,7 @@ import ChecksTab from "./checks-tab";
 import CommitsTab from "./commits-tab";
 import FailureNotice from "./failure-notice";
 import FilesTab from "./files-tab";
+import GuideTab from "./guide-tab";
 import type { HostInfo } from "./host-info";
 import MergePanel from "./merge-panel";
 import ReviewPanel from "./review-panel";
@@ -28,6 +30,7 @@ const TAB_CAPABILITY: Record<DevelopTab, HostCapabilityKey> = {
     commits: "pullRequest.commits",
     description: "pullRequest.description",
     files: "pullRequest.files",
+    guide: "pullRequest.guide",
 };
 
 const PullRequestView = ({
@@ -47,6 +50,8 @@ const PullRequestView = ({
     const requestNoun = useRequestNoun(host.requestNoun);
     const address = { number, repository };
     const pull = usePullRequest(address);
+    // A file the guide pointed at: the Files tab opens it. The token makes a second click on the same file act again.
+    const [focus, setFocus] = useState<{ path: string; token: number } | null>(null);
 
     if (pull.isPending) {
         return <Skeleton aria-label={t`Loading`} className="h-40 w-full" role="status" />;
@@ -64,7 +69,7 @@ const PullRequestView = ({
     // In the declared order, so a pull request opens on its description.
     const tabs = DEVELOP_TABS.filter((candidate) => isHostCapabilityAvailable(host.capabilities, TAB_CAPABILITY[candidate]));
     const current = tab !== undefined && tabs.includes(tab) ? tab : tabs[0];
-    const tabLabels: Record<DevelopTab, string> = { checks: t`Checks`, commits: t`Commits`, description: t`Description`, files: t`Files` };
+    const tabLabels: Record<DevelopTab, string> = { checks: t`Checks`, commits: t`Commits`, description: t`Description`, files: t`Files`, guide: t`Guide` };
     const stateLabels = { closed: t`Closed`, merged: t`Merged`, open: t`Open` };
     const href = safeExternalUrl(detail.url);
 
@@ -137,10 +142,25 @@ const PullRequestView = ({
                                 capabilities={host.capabilities}
                                 fileCount={detail.changedFiles}
                                 fileLimit={host.limits.files}
+                                focus={focus}
                                 headSha={detail.headSha}
                                 hostLabel={host.label}
                                 leftOut={leftOut.files}
                                 showDiff={isHostCapabilityAvailable(host.capabilities, "pullRequest.diff")}
+                            />
+                        )}
+                    </TabsContent>
+                    <TabsContent className="pt-3" value="guide">
+                        {current === "guide" && (
+                            <GuideTab
+                                address={address}
+                                headSha={detail.headSha}
+                                hostLabel={host.label}
+                                onOpenFile={(path) => {
+                                    setFocus({ path, token: Date.now() });
+                                    onTabChange("files");
+                                }}
+                                requestNoun={requestNoun}
                             />
                         )}
                     </TabsContent>

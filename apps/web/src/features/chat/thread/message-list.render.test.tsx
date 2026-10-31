@@ -56,6 +56,11 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
     };
 });
 
+// A host turn's changes (and the comment draft under them) are not under test here and reach for the backend.
+vi.mock("./host-changes-of-thread", () => {
+    return { default: () => null };
+});
+
 vi.mock("./message-content", () => {
     return {
         default: ({ message }: { message: UIMessage }) => {

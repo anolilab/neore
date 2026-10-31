@@ -16,7 +16,15 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_TOOLS, SUB_AGENT_SKILL_SLUG_MAX, SUB_AGENT_TASK_MAX, WORKER_NAME_MAX } from "../../sub-agents/logic";
 
+/** A computer, and the (agent, folder) pair it offered, to run a worker on. */
+export interface DelegateHostInput {
+    agentKey: string;
+    deviceId: string;
+    folderId: string;
+}
+
 export interface DelegateToSubAgentInput {
+    host?: DelegateHostInput;
     name?: string;
     persistent?: boolean;
     skill?: string;
@@ -46,6 +54,7 @@ Use it for work that splits cleanly off the conversation — researching one sid
 - task: everything the sub-agent needs to know; it cannot see this conversation and cannot ask questions.
 - skill: optional slug of one of the user's enabled skills for the sub-agent to run as.
 - tools: optional list of tool names to restrict the sub-agent to; omit it for its normal tool set. A sub-agent never gets a tool you do not have.
+- host: with persistent, run the worker on a coding agent on one of the user's computers: the computer's id and the agent and folder it offered (they must all be approved on that computer; every start asks the user). Omit it for a worker in the cloud.
 - persistent: set true to start a worker — a sub-agent whose thread the user can open and message, and that keeps its context. You can send it more work later with messageWorker, using the workerId this tool returns. Give it a short name.
 This tool returns as soon as the sub-agent has started. Its result is posted to this conversation as a separate message when it finishes; do not wait for it or claim what it found — tell the user it is working.`,
     execute: async (context, input, options) => {
@@ -55,6 +64,10 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
 
         if (!context.dispatchOrigin) {
             return { error: "Sub-agents are unavailable in this run.", status: "failed" };
+        }
+
+        if (input.host && !input.persistent) {
+            return { error: "A computer is only for a worker: set persistent as well.", status: "failed" };
         }
 
         // A worker is bounded by its lead's tools, so a lead whose tools are unknown starts none.
@@ -67,6 +80,9 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
         const parentModel = parentModelOf(context);
         const created = await context.runMutation(internal.sub_agents.functions.createRun, {
             dispatchedBy: context.dispatchOrigin,
+            // A headless run cannot be asked to approve: a worker on a computer is out of its reach (checked at admission).
+            ...(context.headless && { headless: true }),
+            ...(input.host && { host: input.host }),
             ...(parentModel !== undefined && { parentModel }),
             parentThreadId: context.threadId,
             ...(input.persistent && { leadTools, name: input.name, persistent: true }),
@@ -92,6 +108,15 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
     },
     inputSchema: z
         .object({
+            host: z
+                .object({
+                    agentKey: z.string().min(1).max(128).meta({ description: "The agent the computer offered" }),
+                    deviceId: z.string().min(1).max(128).meta({ description: "The computer's id" }),
+                    folderId: z.string().min(1).max(128).meta({ description: "The folder the computer offered for that agent" }),
+                })
+                .strict()
+                .optional()
+                .meta({ description: "Run the worker on a coding agent on one of the user's computers (persistent only; asks the user)" }),
             name: z.string().min(1).max(WORKER_NAME_MAX).optional().meta({ description: "A short name for the worker (persistent only)" }),
             persistent: z.boolean().optional().meta({ description: "Start a worker the user can open and message, which keeps its context between messages" }),
             skill: z.string().min(1).max(SUB_AGENT_SKILL_SLUG_MAX).optional().meta({ description: "Slug of an enabled skill for the sub-agent to use" }),
@@ -103,6 +128,9 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
                 .meta({ description: "Restrict the sub-agent to these tool names; omit for its normal tool set" }),
         })
         .strict(),
+    // Starting a worker on a computer needs a click whatever the tool's mode, a timed allow included. A headless run has
+    // nobody to click: it is not asked, and the mutation refuses instead.
+    needsApproval: (context, input) => context.headless !== true && input.host !== undefined,
     title: "Delegate to Sub-Agent",
 });
 

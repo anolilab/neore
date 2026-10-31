@@ -20,8 +20,9 @@ import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import type { HostSendError } from "./host-send";
+import DiffCommentsDraft from "./diff-comments-draft";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
+import useHostSendErrorMessages from "./host-send-errors";
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
@@ -87,17 +88,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const cancel = useMutation(crpc.acp.remote.cancelHostTurn.mutationOptions());
     const answer = useMutation(crpc.acp.remote.answerHostPermission.mutationOptions());
 
-    const messages: Record<HostSendError, string> = {
-        busy: t`Your computer is busy. Try again in a moment.`,
-        not_authenticated: t`Sign in again to send.`,
-        not_found: t`This chat could not be found.`,
-        offline: t`Your computer is offline. Open Neore on it and try again.`,
-        rate_limited: t`You are sending too fast. Wait a moment.`,
-        session_ended: t`This session has ended. Start a new one from the desktop app.`,
-        too_large: t`That message is too long to send from here.`,
-        turn_running: t`The agent is still working on the last message.`,
-        unreachable: t`Could not reach the server. Try again.`,
-    };
+    const messages = useHostSendErrorMessages();
 
     const send = async (prompt: string) => {
         // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
@@ -168,6 +159,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     ))}
                 </ul>
             )}
+            <DiffCommentsDraft threadId={threadId} />
             {status === "starting" && (
                 <p aria-live="polite" className="text-muted-foreground flex items-center gap-2 text-sm" role="status">
                     <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />

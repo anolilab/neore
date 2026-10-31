@@ -30,11 +30,14 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
+import { isDeviceEligibleThread } from "../devices/internal";
 import { getConnectorMcpServers, withMcpServerGrants } from "../connectors/lib/grant-runtime";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { checkRateLimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import type { MCPServerConfig } from "./lib/mcp-tools";
 import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
@@ -49,6 +52,9 @@ import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
+import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
+import { threadSummaryTaint } from "../agent/thread-summary-taint";
+import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -79,7 +85,7 @@ export const getToolPermissionsQuery = internalQuery
 
 /** The user's time-boxed allows, lapsed ones included — the resolver judges them against the clock. */
 export const getToolPermissionGrantsQuery = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(vToolPermissionGrants)
     .query(async ({ args: { userId }, ctx }) => {
         const prefs = await ctx.db
@@ -90,6 +96,91 @@ export const getToolPermissionGrantsQuery = internalQuery
         return prefs?.toolPermissionGrants ?? {};
     });
 
+type QuickCheckCtx = Pick<QueryCtx, "db">;
+
+/**
+ * The user's opt-in is on, the thread is one only they write to (`isDeviceEligibleThread`), and none of its context
+ * summaries folded in untrusted content: a summary reaches the model as notes in its system prompt, so a web page or
+ * tool result that scrolled out of the window still shapes the call (`agent/thread-summary-taint.ts`).
+ */
+const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string, permissionKey?: string): Promise<boolean> => {
+    const prefs = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    if (prefs?.autoApproveLowRisk !== true) {
+        return false;
+    }
+
+    // A mode the user set for this tool themselves is theirs to answer, also when they set it while the run was going.
+    if (permissionKey !== undefined && prefs.toolPermissions?.[permissionKey] !== undefined) {
+        return false;
+    }
+
+    const thread = await ctx.db.get(threadId);
+    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
+
+    if (!isDeviceEligibleThread(thread, userId, grant !== null)) {
+        return false;
+    }
+
+    // An imported conversation's rows come from an outside export file, and an agent switch hands the earlier
+    // conversation over as one quoted message: no taint signal can see inside either.
+    if (thread?.createdBy?.startsWith("import:") || thread?.hasHandoff === true) {
+        return false;
+    }
+
+    // The agent reads only the last `DEFAULT_RECENT_MESSAGES` rows. Past that, a web or tool result can leave the
+    // window while the reply that passed it on stays, and nothing in the window marks it: never judge such a thread.
+    const rows = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+        .take(DEFAULT_RECENT_MESSAGES + 1);
+
+    if (rows.length > DEFAULT_RECENT_MESSAGES) {
+        return false;
+    }
+
+    // A row someone else wrote (a collaborator before the sharing ended) is text the person did not write.
+    if (rows.some((row) => row.userId !== undefined && row.userId !== userId)) {
+        return false;
+    }
+
+    const summaryTaint = await threadSummaryTaint(ctx, threadId);
+
+    return summaryTaint.length === 0;
+};
+
+/**
+ * Whether the quick check may judge this run's `ask` calls: the user turned it on AND the thread is one only they
+ * can write to (`isDeviceEligibleThread`: not shared, public, a group chat or a messenger conversation). In anyone
+ * else's thread the tool would run with the owner's servers and keys on a collaborator's turn, which only the owner
+ * may approve. Read once at run start; each call re-reads it in {@link consumeLowRiskCheck}.
+ */
+export const getLowRiskApprovalContext = internalQuery
+    .input({ permissionKey: v.optional(v.string().max(MAX_KEY_LENGTH)), threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { permissionKey, threadId, userId }, ctx }) => await quickCheckAllowed(ctx, threadId, userId, permissionKey));
+
+/**
+ * Spends one unit of the user's quick-check budget for ONE call, after re-reading the setting and the thread's
+ * sharing in the same write — so switching the setting off, or sharing the thread, takes effect on the next call of a
+ * run already under way. `false` (nothing spent) when either no longer holds, or the budget is spent.
+ */
+export const consumeLowRiskCheck = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+        if (!(await quickCheckAllowed(ctx, threadId, userId))) {
+            return false;
+        }
+
+        const budget = await checkRateLimit(ctx, "chat/toolAutoApprove", { count: 1, key: userId });
+
+        return budget.ok;
+    });
+
 /**
  * Built-in tools plus the caller's stored overrides. MCP tools need a live
  * connection to enumerate, so they come from {@link listMcpToolPermissions}.
@@ -98,6 +189,8 @@ export const getToolPermissionSettings = authQuery
     .input({})
     .output(
         v.object({
+            // The opt-in quick check for low-risk calls (`chat/lib/low-risk-approval.ts`). Off unless the user turned it on.
+            autoApproveLowRisk: v.boolean(),
             builtIn: v.array(
                 v.object({
                     available: v.boolean(),
@@ -119,6 +212,7 @@ export const getToolPermissionSettings = authQuery
             .unique();
 
         return {
+            autoApproveLowRisk: prefs?.autoApproveLowRisk === true,
             builtIn: listBuiltInTools().map(({ available, category, name }) => {
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
@@ -262,6 +356,24 @@ export const setToolPermission = authMutation
         return null;
     });
 
+/** Turn the opt-in quick check for low-risk `ask` calls on or off. Off is the default. */
+export const setAutoApproveLowRisk = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ enabled: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args: { enabled }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { autoApproveLowRisk: enabled });
+
+        ctx.log.event("chat.set_auto_approve_low_risk", { enabled });
+
+        return null;
+    });
+
 /** Records (or, with `expiresAt: null`, drops) ONE time-boxed allow, pruning lapsed ones in the same write. */
 const writeToolGrant = async (ctx: PreferenceCtx, key: string, expiresAt: number | null): Promise<void> => {
     const { userId } = ctx.user;
@@ -341,11 +453,13 @@ export const recordPendingToolApprovals = internalMutation
         // tool calls — they notify as "a question is waiting", not "approve".
         askUserApprovalIds: v.optional(v.array(v.string())),
         config: vToolRunConfig,
+        // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
+        secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         threadId: v.string(),
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, secretApprovalIds, threadId, userId }, ctx }) => {
         const createdAt = ctx.now;
         const thread = await ctx.db.get(threadId as Id<"threads">);
         // The row belongs to the thread OWNER, whoever's turn paused: only the
@@ -364,19 +478,30 @@ export const recordPendingToolApprovals = internalMutation
         }
 
         // One notification per pause, to the thread OWNER — only they can answer
-        // (`respondToToolApproval`). A question takes precedence over approvals.
+        // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
+        // answered with something, and nothing offers to "approve" them.
         const askUserIds = new Set(askUserApprovalIds);
+        const secretIds = new Set(secretApprovalIds);
         const [first] = uniqueIds;
+        const secret = [...uniqueIds].find((id) => secretIds.has(id));
         const question = [...uniqueIds].find((id) => askUserIds.has(id));
 
         if (first !== undefined) {
-            const key = question ?? first;
+            let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
+
+            if (secret !== undefined) {
+                type = "secret_request";
+            } else if (question !== undefined) {
+                type = "ask_user";
+            }
+
+            const key = secret ?? question ?? first;
 
             await notifyQuietly(ctx, {
-                dedupeKey: `${question === undefined ? "tool_approval" : "ask_user"}:${key}`,
+                dedupeKey: `${type}:${key}`,
                 link: `/chat/${threadId}`,
                 title: thread?.title ?? "Chat",
-                type: question === undefined ? "tool_approval" : "ask_user",
+                type,
                 userId: ownerId,
             });
         }
@@ -455,6 +580,11 @@ export const respondToToolApproval = authMutation
         // the claim back.
         if (toolName === ASK_USER_TOOL_NAME) {
             throw new LunoraError("BAD_REQUEST", "Answer this question instead of approving it");
+        }
+
+        // Likewise a secret request is answered with the value (`chat/request-secret.ts`), or declined there.
+        if (toolName === REQUEST_SECRET_TOOL_NAME) {
+            throw new LunoraError("BAD_REQUEST", "Answer this secret request instead of approving it");
         }
 
         // The key recorded when the tool was built. A snapshot without one

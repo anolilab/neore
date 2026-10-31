@@ -30,6 +30,9 @@ const OWN_OUTPUT_TOOLS: ReadonlySet<string> = new Set([
     "listLanguages",
     "musicGeneration",
     "renderUI",
+    "requestSecret",
+    "saveSecretAsProviderKey",
+    "setMcpServerSecret",
     "taskList",
     "updateDesign",
     "updateDocument",
@@ -86,10 +89,14 @@ const goalNoteTaint = (content: unknown): DeviceTaintSource[] => {
         .filter((source): source is DeviceTaintSource => TAINT_ORDER.includes(source as DeviceTaintSource));
 };
 
+/** A text part a coding agent on a paired computer wrote (`HOST_TEXT_MARK`); the mark rides as metadata or, once mapped, as options. */
+const isHostText = (part: { providerMetadata?: unknown; providerOptions?: unknown }): boolean =>
+    [part.providerMetadata, part.providerOptions].some((meta) => (meta as { neore?: { runner?: unknown } } | undefined)?.neore?.runner === "host");
+
 /**
  * The sorted, de-duplicated taint of a message list. Reads only `role`,
- * `content[].type` and `content[].toolName` (and a goal's review note in a
- * user message), so it takes any model-message shape.
+ * `content[].type`, `content[].toolName`, a host-text mark on an assistant text part
+ * and a goal's review note in a user message, so it takes any model-message shape.
  */
 export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): DeviceTaintSource[] => {
     const found = new Set<DeviceTaintSource>();
@@ -107,10 +114,13 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
             continue;
         }
 
-        const parts = message.content as ReadonlyArray<{ toolName?: unknown; type?: unknown }>;
+        const parts = message.content as ReadonlyArray<{ providerMetadata?: unknown; providerOptions?: unknown; toolName?: unknown; type?: unknown }>;
 
         for (const part of parts) {
-            if (part.type === "tool-result" && typeof part.toolName === "string") {
+            if (message.role === "assistant" && part.type === "text" && isHostText(part)) {
+                // A coding agent's own text, posted from a paired computer: it read files and command output there.
+                found.add("device");
+            } else if (part.type === "tool-result" && typeof part.toolName === "string") {
                 const taint = taintOfTool(part.toolName);
 
                 if (taint) {

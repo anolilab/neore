@@ -27,6 +27,8 @@
  */
 import type { ToolSet } from "ai";
 
+import type { LowRiskCheck } from "./low-risk-approval";
+import { lowRiskIneligibleReason } from "./low-risk-approval";
 import type { ToolPermissionGrants } from "./tool-permission-grants";
 import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 import { grantExpiryFor } from "./tool-permission-grants";
@@ -38,6 +40,7 @@ export type ToolSource = "builtin" | "connector" | "device" | "mcp";
 /** The subset of MCP `ToolAnnotations` the defaults read. Untrusted hints. */
 export interface ToolAnnotationHints {
     destructiveHint?: boolean;
+    openWorldHint?: boolean;
     readOnlyHint?: boolean;
 }
 
@@ -80,7 +83,13 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
  */
-export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set(["askUser", "delegateToCodingAgent", "delegateToSubAgent", "messageWorker"]);
+export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
+    "askUser",
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "messageWorker",
+    "requestSecret",
+]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
 
@@ -126,6 +135,12 @@ export interface ToolPermissionOptions {
      * check. `off` stays off, and a tool that needs a person is still removed.
      */
     headlessApproved?: ReadonlySet<string>;
+    /**
+     * The user's opt-in quick check (`low-risk-approval.ts`). Given, an `ask` tool that is eligible for it asks the check
+     * before pausing: `true` runs the call unasked, anything else pauses as before. Omitted (the setting is off, or the
+     * run is not one a person is in), every `ask` tool pauses exactly as it always did.
+     */
+    lowRiskCheck?: LowRiskCheck;
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
@@ -205,13 +220,58 @@ export const resolveToolPermissionWithGrant = (
 export const readMcpAnnotations = (tool: unknown): ToolAnnotationHints | undefined =>
     (tool as { metadata?: { annotations?: ToolAnnotationHints } } | undefined)?.metadata?.annotations;
 
+type OwnApproval = ToolSet[string]["needsApproval"];
+
+interface NeedsApprovalOptions {
+    messages?: ReadonlyArray<unknown>;
+    toolCallId: string;
+}
+
+type AfterLapse = (input: unknown, options: NeedsApprovalOptions) => boolean | Promise<boolean>;
+
+/** A `needsApproval` that asks, unless the quick check clears the call. It never throws: a check that fails asks. */
+const needsApprovalUnless =
+    (check: LowRiskCheck, key: string) =>
+    async (input: unknown, { messages, toolCallId }: NeedsApprovalOptions): Promise<boolean> => {
+        try {
+            return !(await check({ input, key, messages, toolCallId }));
+        } catch {
+            return true;
+        }
+    };
+
+/**
+ * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
+ * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
+ * computer), and neither a grant nor the quick check lifts that.
+ */
+const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse): OwnApproval => {
+    if (own === true) {
+        return true;
+    }
+
+    const lapsed = (input: unknown, options: NeedsApprovalOptions): boolean | Promise<boolean> => Date.now() >= expiresAt && afterLapse(input, options);
+
+    if (typeof own !== "function") {
+        return lapsed as OwnApproval;
+    }
+
+    return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
+        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+
+        return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
+    } as OwnApproval;
+};
+
 /**
  * Apply permissions to a tool set.
  *
  * `describe` maps a runtime tool name to its descriptor; a tool it returns
  * `undefined` for is treated as a built-in keyed by its runtime name.
  *
- * `ask` tools are shallow-copied with `needsApproval: true`. Copying (rather than
+ * `ask` tools are shallow-copied with `needsApproval: true` — or, when the user's opt-in quick check is on and the tool
+ * is eligible for it (`low-risk-approval.ts`), with a `needsApproval` that asks the check first. Copying (rather than
  * mutating) matters: built-in tools are module-level singletons shared by every
  * request, and `createTool`'s own `needsApproval` is an own property the spread
  * overrides.
@@ -235,14 +295,27 @@ export const applyToolPermissions = (
             continue;
         }
 
+        // Only a tool the user left at its default `ask` can be put to the quick check; the rules are in `low-risk-approval.ts`.
+        const check =
+            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, name, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
+                ? options.lowRiskCheck
+                : undefined;
+
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: true } as ToolSet[string];
+            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor.key) : true } as ToolSet[string];
             continue;
         }
 
         // Tools are built once per run and a run can outlast the grant, so the lapse is checked at every call.
-        result[name] = timedUntil === undefined ? tool : ({ ...tool, needsApproval: () => Date.now() >= timedUntil } as ToolSet[string]);
+        if (timedUntil !== undefined) {
+            const afterLapse: AfterLapse = check ? needsApprovalUnless(check, descriptor.key) : () => true;
+
+            result[name] = { ...tool, needsApproval: withLapse(tool.needsApproval, timedUntil, afterLapse) } as ToolSet[string];
+            continue;
+        }
+
+        result[name] = tool;
     }
 
     return { removed, requiresApproval, tools: result };

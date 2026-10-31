@@ -23,6 +23,7 @@ import type {
     MergeStatus,
     PullRequestDetail,
     PullRequestRef,
+    RepoPoll,
     ReviewSubmission,
     ReviewThread,
     SubmittedReview,
@@ -68,6 +69,17 @@ export interface HostDriver {
     listViewed: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ViewedFile>>;
     /** Merges now, in ONE host call that names the head the person saw; the host's rules may refuse it. */
     mergePullRequest: (request: HostRequest, ref: PullRequestRef, merge: MergeRequest) => Promise<MergedPullRequest>;
+    /**
+     * The repository address in the form the host's API takes (`owner/name`), or `null` when it is not one. Nothing
+     * is checked against the host: whether the user can see the repository is the first poll's answer.
+     */
+    normalizeRepository: (input: string) => string | null;
+    /**
+     * One conditional read of a repository's open pull requests for the review requests addressed to the signed-in
+     * user. With the `etag` of the last read an unchanged list is ONE request the host does not count, and `login`
+     * spares the call that finds out who is signed in.
+     */
+    pollReviewRequests: (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }) => Promise<RepoPoll>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
@@ -80,6 +92,8 @@ export interface HostDriver {
     submitReview: (request: HostRequest, ref: PullRequestRef, submission: ReviewSubmission) => Promise<SubmittedReview>;
     /** What a UI needs to word and gate this host, without naming it. */
     readonly view: HostView;
+    /** How this host signs a webhook delivery (the names the trigger webhooks use), or `null` when it has none we can verify. */
+    readonly webhookScheme: "native" | null;
     /** The web origin: a link a host returns is kept only when it starts here. */
     readonly webOrigin: string;
 }

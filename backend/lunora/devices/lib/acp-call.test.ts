@@ -13,7 +13,7 @@ vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...keyBytes)));
 
 const { default: schema } = await import("../../schema");
 const { encryptKey } = await import("../../lib/encryption");
-const { createAcpCancelCall } = await import("./acp-call");
+const { createAcpCall, createAcpCancelCall } = await import("./acp-call");
 const { ACP_CLAIM_WINDOW_MS, MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("./constants");
 
 const OWNER = "owner";
@@ -93,5 +93,49 @@ describe("createAcpCancelCall", () => {
         }
 
         await expect(cancel()).resolves.toEqual({ error: "busy" });
+    });
+});
+
+describe("createAcpCall taint", () => {
+    const send = async (taintedBy?: string[]) =>
+        await harness.run(
+            async (ctx: any) =>
+                await createAcpCall(
+                    ctx,
+                    {
+                        deviceId: deviceId as never,
+                        input: { sessionId: "s", text: "hi", turnId: "t" },
+                        kind: "acp_send",
+                        taintedBy: taintedBy as never,
+                        threadId: threadId as never,
+                        userId: OWNER,
+                    },
+                    Date.now(),
+                ),
+        );
+
+    const lastCall = async (): Promise<{ envelope: string; taintedBy: string[] }> => {
+        const { page } = (await harness.run(async (ctx: any) => await ctx.db.deviceCalls.findMany({ where: {} }))) as { page: any[] };
+
+        return page.at(-1);
+    };
+
+    it("signs the taint it is given into the row and the envelope, in the stable order", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(deviceId, { lastSeenAt: Date.now() }));
+        expect(await send(["mcp", "web"])).toHaveProperty("callId");
+
+        const call = await lastCall();
+
+        expect(call.taintedBy).toEqual(["web", "mcp"]);
+        expect(JSON.parse(call.envelope)).toMatchObject({ taintedBy: ["web", "mcp"] });
+    });
+
+    it("is untainted when nothing says otherwise", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(deviceId, { lastSeenAt: Date.now() }));
+        await send();
+
+        const call = await lastCall();
+
+        expect(call.taintedBy).toEqual([]);
     });
 });

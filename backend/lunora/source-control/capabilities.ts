@@ -14,6 +14,12 @@ export type HostCapabilityGroups = {
         /** Re-run one check or job on its own, not the whole workflow. */
         rerun?: Capability;
     };
+    freshness?: {
+        /** A list read again with the validator of the last read costs nothing when nothing changed. */
+        conditionalPolling?: Capability;
+        /** The host can tell us a repository changed (a webhook the user installs); it only ever marks it dirty. */
+        webhooks?: Capability;
+    };
     inbox?: {
         drafts?: Capability;
         mine?: Capability;
@@ -33,6 +39,8 @@ export type HostCapabilityGroups = {
         description?: Capability;
         diff?: Capability;
         files?: Capability;
+        /** An AI guide that walks the change in reading order. */
+        guide?: Capability;
     };
     review?: {
         batchedSubmit?: Capability;

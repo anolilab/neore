@@ -12,6 +12,7 @@
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
  * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` (`gitlab-token`) |
+ * | `watch-webhook`    | `<watchId>:<sig hex>`    | {@link TRIGGER_CLAIM_TTL_MS}   | `source-control/freshness-internal.ts` (a repository webhook: marks it dirty, nothing more) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
@@ -21,6 +22,7 @@
  * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
+ * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |

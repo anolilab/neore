@@ -34,6 +34,7 @@ export const acpSessions = sqliteTable("acpSessions", {
 export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    autoApproveLowRisk: integer("autoApproveLowRisk", { mode: "boolean" }),
     autoDetectComplexity: integer("autoDetectComplexity", { mode: "boolean" }),
     autoMediaEnrichment: integer("autoMediaEnrichment", { mode: "boolean" }),
     browserSettings: text("browserSettings", { mode: "json" }).$type<{ domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean }>(),
@@ -45,6 +46,7 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     enableKnowledge: integer("enableKnowledge", { mode: "boolean" }),
     enablePlanner: integer("enablePlanner", { mode: "boolean" }),
     generalProviders: text("generalProviders"),
+    mcpSecretHeaders: text("mcpSecretHeaders", { mode: "json" }).$type<Array<{ encryptedValue: string; header: string; server: string; url: string }>>(),
     mcpServers: text("mcpServers", { mode: "json" }).$type<Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>(),
     messengerKeys: text("messengerKeys"),
     modelFilterRules: text("modelFilterRules", { mode: "json" }).$type<{ allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }>(),
@@ -897,7 +899,7 @@ export const notifications = sqliteTable("notifications", {
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1049,6 +1051,7 @@ export const persistentChunks = sqliteTable("persistentChunks", {
 export const persistentStreams = sqliteTable("persistentStreams", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    earlySteps: text("earlySteps", { mode: "json" }).$type<Array<string>>(),
     expiresAt: real("expiresAt").notNull(),
     hostEndReason: text("hostEndReason", { mode: "json" }).$type<"finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped">(),
     hostPendingPermissions: text("hostPendingPermissions", { mode: "json" }).$type<Array<string>>(),
@@ -1056,6 +1059,9 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     hostState: text("hostState", { mode: "json" }).$type<"accepted" | "received" | "running" | "ended">(),
     hostTurnId: text("hostTurnId"),
     messageId: text("messageId").notNull(),
+    pause: text("pause", { mode: "json" }).$type<{ from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number }>(),
+    pausedRun: text("pausedRun", { mode: "json" }).$type<{ replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string }>(),
+    pausedSteps: text("pausedSteps", { mode: "json" }).$type<Array<string>>(),
     producer: text("producer"),
     runClaimedAt: real("runClaimedAt"),
     status: text("status").notNull(),
@@ -1125,22 +1131,30 @@ export const projectKnowledge = sqliteTable("projectKnowledge", {
     by_projectId: index("by_projectId").on(t.projectId),
 }));
 
-export const pullRequestThreads = sqliteTable("pullRequestThreads", {
+export const pullRequestGuides = sqliteTable("pullRequestGuides", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
-    baseBranch: text("baseBranch"),
     createdAt: real("createdAt").notNull(),
-    headBranch: text("headBranch"),
-    kind: text("kind", { mode: "json" }).$type<"attached" | "opened">().notNull(),
+    failure: text("failure", { mode: "json" }).$type<"abandoned" | "head_moved" | "host_error" | "model_error" | "no_answer" | "not_connected" | "quota" | "too_large">(),
+    generatedAt: real("generatedAt").notNull(),
+    headSha: text("headSha").notNull(),
+    hostOrigin: text("hostOrigin").notNull(),
+    instructions: text("instructions").notNull(),
+    jobId: text("jobId"),
+    leftOut: real("leftOut").notNull(),
     number: real("number").notNull(),
+    proposals: text("proposals", { mode: "json" }).$type<Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>>().notNull(),
     repository: text("repository").notNull(),
-    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
-    title: text("title").notNull(),
-    url: text("url").notNull(),
+    source: text("source", { mode: "json" }).$type<"cloud" | "host">().notNull(),
+    status: text("status", { mode: "json" }).$type<"failed" | "generating" | "ready">().notNull(),
+    stops: text("stops", { mode: "json" }).$type<Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>>().notNull(),
+    summary: text("summary").notNull(),
+    threadId: text("threadId"),
+    updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user_and_threadId: index("by_user_and_threadId").on(t.userId, t.threadId),
-    by_user_and_repository_number: index("by_user_and_repository_number").on(t.userId, t.repository, t.number),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_user_and_pull: index("by_user_and_pull").on(t.userId, t.hostOrigin, t.repository, t.number),
 }));
 
 export const rateLimits = sqliteTable("rateLimits", {
@@ -1152,6 +1166,27 @@ export const rateLimits = sqliteTable("rateLimits", {
     value: real("value").notNull(),
 }, (t) => ({
     by_key: index("by_key").on(t.key),
+}));
+
+export const requestedSecrets = sqliteTable("requestedSecrets", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId").notNull(),
+    createdAt: real("createdAt").notNull(),
+    encryptedValue: text("encryptedValue"),
+    expiresAt: real("expiresAt").notNull(),
+    label: text("label").notNull(),
+    ref: text("ref").notNull(),
+    replyKey: text("replyKey"),
+    status: text("status", { mode: "json" }).$type<"saved" | "used">().notNull(),
+    threadId: text("threadId").notNull(),
+    use: text("use", { mode: "json" }).$type<{ header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string }>().notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_ref: index("by_ref").on(t.ref),
 }));
 
 export const reviewDrafts = sqliteTable("reviewDrafts", {
@@ -1285,6 +1320,8 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     depth: real("depth").notNull(),
     dispatchedBy: text("dispatchedBy", { mode: "json" }).$type<"lead" | "user" | "trigger" | "messenger" | "outside_agent">(),
     error: text("error"),
+    hostStartAttempts: real("hostStartAttempts"),
+    hostTurnId: text("hostTurnId"),
     loopExitedAt: real("loopExitedAt"),
     mode: text("mode", { mode: "json" }).$type<"run" | "worker">(),
     organizationId: text("organizationId"),
@@ -1597,7 +1634,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
     createdAt: real("createdAt").notNull(),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
@@ -1808,6 +1845,29 @@ export const userSkills = sqliteTable("userSkills", {
     by_skillId: index("by_skillId").on(t.skillId),
     by_user_and_enabled: index("by_user_and_enabled").on(t.userId, t.enabled),
     by_user_and_skill: index("by_user_and_skill").on(t.userId, t.skillId),
+}));
+
+export const watchedRepositories = sqliteTable("watchedRepositories", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    checkedAt: real("checkedAt").notNull(),
+    createdAt: real("createdAt").notNull(),
+    dirtyAt: real("dirtyAt").notNull(),
+    etag: text("etag", { mode: "json" }).$type<string | null>().notNull(),
+    hostOrigin: text("hostOrigin").notNull(),
+    lastStatus: text("lastStatus", { mode: "json" }).$type<"ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited">().notNull(),
+    leasedAt: real("leasedAt").notNull(),
+    login: text("login", { mode: "json" }).$type<string | null>().notNull(),
+    nextPollAt: real("nextPollAt").notNull(),
+    repository: text("repository").notNull(),
+    requested: text("requested", { mode: "json" }).$type<Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>>().notNull(),
+    seeded: integer("seeded", { mode: "boolean" }).notNull(),
+    userId: text("userId").notNull(),
+    webhookSecret: text("webhookSecret"),
+    webhookSeenAt: real("webhookSeenAt").notNull(),
+}, (t) => ({
+    by_user_and_repository: index("by_user_and_repository").on(t.userId, t.hostOrigin, t.repository),
+    by_nextPollAt: index("by_nextPollAt").on(t.nextPollAt),
 }));
 
 export const workflowExecutions = sqliteTable("workflowExecutions", {

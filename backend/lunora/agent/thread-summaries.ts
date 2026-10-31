@@ -49,7 +49,8 @@ import { v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { computeTaint, mergeTaint } from "../devices/lib/taint";
+import { computeTaint, type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
+import { messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { vDeviceTaintSource } from "../devices/validators";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -72,6 +73,10 @@ import {
     THREAD_SUMMARY_CLAIM_SCOPE,
     THREAD_SUMMARY_CLAIM_TTL_MS,
 } from "./thread-summary-logic";
+
+/** Attached document or page text is a plain user text part `computeTaint` cannot see, and the summary no longer shows it. */
+const foldedTaint = (rows: ReadonlyArray<{ content?: unknown; role?: unknown }>): DeviceTaintSource[] =>
+    mergeTaint(computeTaint(rows), messagesCarryAttachedText(rows) ? ["files"] : []);
 
 type Reader = Pick<QueryCtx, "db">;
 type Row = Doc<"messages">;
@@ -283,7 +288,7 @@ export const prepareThreadSummary = internalMutation
             ...(base && { previousSummary: base.summary.summary, previousSummaryId: base.summary._id }),
             // Whatever untrusted content the folded rows held, and the previous summary already carried.
             taintedBy: mergeTaint(
-                computeTaint(slice.slice(0, consumed).map((row) => row.message as { content?: unknown; role?: unknown })),
+                foldedTaint(slice.slice(0, consumed).map((row) => row.message as { content?: unknown; role?: unknown })),
                 base?.summary.taintedBy,
             ),
             transcript: text,

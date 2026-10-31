@@ -18,6 +18,8 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
+import { Label } from "@neore/ui/components/label";
+import { Switch } from "@neore/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
@@ -204,7 +206,7 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
                                 <p className="text-muted-foreground truncate text-xs">{server ? t`${server} · until ${until}` : t`Until ${until}`}</p>
                             </div>
                             <Button
-                                aria-label={t`Revoke the allow for ${tool}`}
+                                aria-label={server ? t`Revoke the allow for ${tool} on ${server}` : t`Revoke the allow for ${tool}`}
                                 disabled={isRevoking}
                                 onClick={() => onRevoke(key)}
                                 size="sm"
@@ -217,6 +219,46 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
                 })}
             </ul>
         </section>
+    );
+};
+
+interface QuickCheckProps {
+    checked: boolean;
+    isSaving: boolean;
+    onChange: (enabled: boolean) => void;
+}
+
+/** The opt-in quick check for low-risk calls. Says what it covers and what it never does, since it replaces a click. */
+const QuickCheckSetting: FC<QuickCheckProps> = ({ checked, isSaving, onChange }) => {
+    const { t } = useLingui();
+    const switchId = useId();
+    const detailsId = useId();
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                        <CardTitle>
+                            <Label htmlFor={switchId}>{t`Let a quick check approve low-risk calls`}</Label>
+                        </CardTitle>
+                        <CardDescription id={detailsId}>
+                            {t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}
+                        </CardDescription>
+                    </div>
+                    <Switch aria-describedby={detailsId} checked={checked} disabled={isSaving} id={switchId} onCheckedChange={onChange} />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
+                    <li>{t`Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to.`}</li>
+                    <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
+                    <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
+                    <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>
+                    <li>{t`Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual.`}</li>
+                </ul>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -237,6 +279,8 @@ const ToolPermissionsSettings: FC = () => {
 
     const { isPending: isSaving, mutate: setToolPermission } = useMutation(crpc.chat.tool_permissions.setToolPermission.mutationOptions());
 
+    const { isPending: isSavingQuickCheck, mutate: setQuickCheck } = useMutation(crpc.chat.tool_permissions.setAutoApproveLowRisk.mutationOptions());
+
     const { isPending: isRevoking, mutate: revokeGrant } = useMutation(crpc.chat.tool_permissions.revokeToolPermissionGrant.mutationOptions());
 
     if (isLoading) {
@@ -252,6 +296,18 @@ const ToolPermissionsSettings: FC = () => {
             { key, mode },
             {
                 onError: (error) => showError(error instanceof Error ? error : t`Failed to update tool permission`),
+                onSettled: () => {
+                    void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
+                },
+            },
+        );
+    };
+
+    const handleQuickCheck = (enabled: boolean) => {
+        setQuickCheck(
+            { enabled },
+            {
+                onError: (error) => showError(error instanceof Error ? error : t`Failed to update the quick check`),
                 onSettled: () => {
                     void queryClient.invalidateQueries({ queryKey: settingsOptions.queryKey });
                 },
@@ -305,6 +361,8 @@ const ToolPermissionsSettings: FC = () => {
                     {t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}
                 </AlertDescription>
             </Alert>
+
+            <QuickCheckSetting checked={settings?.autoApproveLowRisk === true} isSaving={isSavingQuickCheck} onChange={handleQuickCheck} />
 
             <TimedAllows grants={settings?.grants ?? {}} isRevoking={isRevoking} onRevoke={handleRevoke} />
 

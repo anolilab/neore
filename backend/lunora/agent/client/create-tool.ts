@@ -14,9 +14,13 @@ export type ToolCtx = ActionContext & {
     agent?: Agent;
     /** What started this run, for a dispatch to a worker to carry as `dispatchedBy`; unset when the run never said, which refuses one. */
     dispatchOrigin?: DispatchOrigin;
+    /** Set when the run is headless (a sub-agent, trigger, task or messenger reply): nobody is there to approve a call. */
+    headless?: boolean;
     messageId?: string;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
+    /** Who started the turn this run belongs to; a continuation runs as the thread's owner whoever that was. Unset when the run never said. */
+    startedBy?: string;
     threadId?: string;
     userId?: string;
     /** Caller-supplied user tier ("free" | "premium" | "ultra" | "public" | "anonymous"). Tools fall back to "free" when absent. */

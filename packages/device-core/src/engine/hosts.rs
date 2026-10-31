@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 use std::thread;
 
+use super::host_agents::approved_folder;
 use super::reconnect::{Attempt, AttemptGuard, ConnectError, ReconnectView};
 use super::*;
 use crate::install::{self, Installed, Remote};
@@ -126,7 +127,12 @@ pub struct HostStatus {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostView {
+    /// The coding agents registered for this server and the folders each is approved for.
+    pub acp_agents: Vec<crate::acp::AcpAgentView>,
+    pub acp_consents: Vec<crate::acp::AcpConsent>,
     pub address: String,
+    /// Whether the host software on the server runs coding agents; unknown (`None`) while not connected.
+    pub agents_supported: Option<bool>,
     pub allow_shell_network: bool,
     pub connected: bool,
     pub device_id: String,
@@ -199,6 +205,9 @@ pub(super) fn apply_update(settings: &mut Settings, update: &HostUpdate) -> Resu
 
     if let Some(roots) = roots {
         host.roots = roots;
+        // An approval is for a folder the server shares. One that no longer is must not start an agent there.
+        host.acp_consents
+            .retain(|consent| approved_folder(&consent.folder_path, &host.roots).is_ok());
     }
 
     if let Some(required) = update.require_shell_sandbox {
@@ -496,7 +505,10 @@ impl DeviceState {
                     .filter(|link| link.is_alive());
 
                 HostView {
+                    acp_agents: super::host_agents::host_agent_views(host),
+                    acp_consents: host.acp_consents.clone(),
                     address: host.address.clone(),
+                    agents_supported: link.as_ref().map(|link| link.hello().agents),
                     allow_shell_network: host.allow_shell_network,
                     connected: link.is_some(),
                     device_id: host.device_id.clone(),
@@ -947,6 +959,8 @@ impl DeviceState {
             }
 
             settings.hosts.push(Host {
+                acp_agents: Vec::new(),
+                acp_consents: Vec::new(),
                 address: target.address.clone(),
                 allow_shell_network: false,
                 allow_unsandboxed_shell: false,
@@ -1515,7 +1529,11 @@ impl DeviceState {
         Ok(envelope::sign_value(
             &host.secret,
             Domain::Manifest,
-            &json!({ "v": 1, "kind": "manifest", "deviceId": host.device_id, "issuedAt": self.next_manifest_time(), "tools": tools }),
+            &json!({
+                "v": 1, "kind": "manifest", "deviceId": host.device_id, "issuedAt": self.next_manifest_time(), "tools": tools,
+                // The pairs approved for this server, so the web and the phone can start an agent on it.
+                "acpOffers": super::host_agents::host_offers(host),
+            }),
         ))
     }
 
@@ -1713,6 +1731,7 @@ mod tests {
                 suspect: AtomicBool::new(false),
                 target: Some(target_of(&server("host-1"))),
                 hello: Hello {
+                    agents: false,
                     platform: "linux".into(),
                     protocol: 1,
                     sandbox: RemoteSandbox {
@@ -1814,6 +1833,8 @@ mod tests {
 
     fn server(device_id: &str) -> Host {
         Host {
+            acp_agents: Vec::new(),
+            acp_consents: Vec::new(),
             address: "build.example.com".into(),
             allow_shell_network: false,
             allow_unsandboxed_shell: false,
@@ -2783,6 +2804,8 @@ mod tests {
         state
             .change_settings(|settings| {
                 settings.hosts.push(Host {
+                    acp_agents: Vec::new(),
+                    acp_consents: Vec::new(),
                     device_id: other_id("forget").as_str().into(),
                     name: "twin".into(),
                     ..server(other_id("forget").as_str())

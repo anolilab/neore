@@ -21,6 +21,8 @@ import {
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
+import type { DeviceTaintSource } from "./taint";
+import { mergeTaint } from "./taint";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
@@ -31,10 +33,19 @@ const CHECK_SLACK_MS = 1000;
 
 export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
-    args: { deviceId: Id<"devices">; input: Record<string, string>; kind: AcpCallKind; threadId: Id<"threads">; userId: string },
+    args: {
+        deviceId: Id<"devices">;
+        input: Record<string, boolean | string>;
+        kind: AcpCallKind;
+        /** Untrusted content the call's text carries (`lib/taint.ts`); signed into the envelope. Absent = the user's own words. */
+        taintedBy?: ReadonlyArray<DeviceTaintSource>;
+        threadId: Id<"threads">;
+        userId: string;
+    },
     now: number,
 ): Promise<AcpCallResult> => {
     const { deviceId, kind, threadId, userId } = args;
+    const taintedBy = mergeTaint(args.taintedBy);
     const device = await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } });
 
     if (!device?.encryptedSecret) {
@@ -79,7 +90,7 @@ export const createAcpCall = async (
         input,
         signature: "",
         status: "pending",
-        taintedBy: [],
+        taintedBy,
         threadId,
         toolName: kind,
         userId,
@@ -92,7 +103,7 @@ export const createAcpCall = async (
         issuedAt: now,
         kind: "call",
         nonce: crypto.randomUUID(),
-        taintedBy: [],
+        taintedBy,
         threadId,
         threadTitle: (thread?.title ?? "").slice(0, 200),
         tool: kind,
@@ -111,14 +122,16 @@ export type AcpCancelResult = { callId: string } | { error: "busy" | "ineligible
 
 export const createAcpCancelCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
-    args: { deviceId: Id<"devices">; hostSessionId: string; threadId: Id<"threads">; turnId: string; userId: string },
+    args: { deviceId: Id<"devices">; hostSessionId: string; keepQueue?: boolean; threadId: Id<"threads">; turnId: string; userId: string },
     now: number,
 ): Promise<AcpCancelResult> => {
     const result = await createAcpCall(
         ctx,
         {
             deviceId: args.deviceId,
-            input: { sessionId: args.hostSessionId, turnId: args.turnId },
+            // `keepQueue` rides inside the signed envelope: only a worker run's stop sets it, so the prompts the person
+            // typed in the desktop window are still dropped by every other Stop.
+            input: { sessionId: args.hostSessionId, turnId: args.turnId, ...(args.keepQueue === true && { keepQueue: true }) },
             kind: "acp_cancel",
             threadId: args.threadId,
             userId: args.userId,
