@@ -22858,85 +22858,85 @@
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 457,
+      "line": 458,
       "reason": "\"dispatchWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 457,
+      "line": 458,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 457,
+      "line": 458,
       "reason": "\"finishRunFromLoop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 478,
+      "line": 479,
       "reason": "\"admitSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 478,
+      "line": 479,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 491,
+      "line": 492,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 505,
+      "line": 506,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 572,
+      "line": 573,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "write",
-      "line": 839,
+      "line": 840,
       "reason": "\"admitWorkerRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 992,
+      "line": 993,
       "reason": "\"claimQueuedRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1203,
+      "line": 1204,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1233,
+      "line": 1234,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1384,
+      "line": 1385,
       "reason": "\"reapSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1446,
+      "line": 1447,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
@@ -22960,13 +22960,13 @@
     {
       "file": "sub-agents/host-runs",
       "kind": "write",
-      "line": 73,
+      "line": 80,
       "reason": "\"sendHostRunTurn\" is not a registered function"
     },
     {
       "file": "sub-agents/host-runs",
       "kind": "read",
-      "line": 87,
+      "line": 94,
       "reason": "\"findRunningHostRun\" is not a registered function"
     },
     {
