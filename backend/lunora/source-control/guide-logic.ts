@@ -89,13 +89,16 @@ const MAX_LABEL = 50;
 const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/u;
 
 export interface PatchLines {
+    /** The hunk each shown line belongs to, per side: a multi-line comment must stay inside one hunk. */
+    newHunks: Map<number, number>;
     newLines: Set<number>;
+    oldHunks: Map<number, number>;
     oldLines: Set<number>;
 }
 
 /** The line numbers a patch shows on each side: the only lines a range or a comment may name. */
 export const parsePatchLines = (patch: string | null): PatchLines => {
-    const lines: PatchLines = { newLines: new Set(), oldLines: new Set() };
+    const lines: PatchLines = { newHunks: new Map(), newLines: new Set(), oldHunks: new Map(), oldLines: new Set() };
 
     if (patch === null) {
         return lines;
@@ -104,6 +107,7 @@ export const parsePatchLines = (patch: string | null): PatchLines => {
     let oldLine = 0;
     let newLine = 0;
     let inHunk = false;
+    let hunk = -1;
 
     for (const row of patch.split("\n")) {
         const header = HUNK.exec(row);
@@ -112,6 +116,7 @@ export const parsePatchLines = (patch: string | null): PatchLines => {
             oldLine = Number(header[1]);
             newLine = Number(header[2]);
             inHunk = true;
+            hunk += 1;
             continue;
         }
 
@@ -121,13 +126,17 @@ export const parsePatchLines = (patch: string | null): PatchLines => {
 
         if (row.startsWith("+")) {
             lines.newLines.add(newLine);
+            lines.newHunks.set(newLine, hunk);
             newLine += 1;
         } else if (row.startsWith("-")) {
             lines.oldLines.add(oldLine);
+            lines.oldHunks.set(oldLine, hunk);
             oldLine += 1;
         } else {
             lines.newLines.add(newLine);
+            lines.newHunks.set(newLine, hunk);
             lines.oldLines.add(oldLine);
+            lines.oldHunks.set(oldLine, hunk);
             newLine += 1;
             oldLine += 1;
         }
@@ -292,9 +301,10 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
 
             const startLine = wholeLine(candidate.startLine);
             const shown = linesOf(lines, path, side);
+            const hunks = side === "new" ? lines.get(path)?.newHunks : lines.get(path)?.oldHunks;
 
-            // A comment the host would refuse (a line outside the diff) is not worth proposing.
-            if (!shown.has(line) || (startLine !== null && (startLine >= line || !shown.has(startLine)))) {
+            // A comment the host would refuse (a line outside the diff, or a range across two hunks) is not worth proposing.
+            if (!shown.has(line) || (startLine !== null && (startLine >= line || !shown.has(startLine) || hunks?.get(startLine) !== hunks?.get(line)))) {
                 continue;
             }
 

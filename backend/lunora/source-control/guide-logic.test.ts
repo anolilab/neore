@@ -149,6 +149,23 @@ describe("assembleGuide", () => {
         expect(guide.proposals.every((proposal) => proposal.status === "proposed")).toBe(true);
     });
 
+    it("drops a comment whose lines span two hunks, which the host would refuse", () => {
+        const twoHunks = ["@@ -1,2 +1,2 @@", " a", "+b", "@@ -40,2 +40,2 @@", " c", "+d"].join("\n");
+        const guide = assembleGuide(
+            [file("src/core.ts", { patch: twoHunks })],
+            {
+                ...output,
+                proposals: [
+                    { body: "Across hunks", kind: "comment", line: 41, path: "src/core.ts", side: "new", startLine: 2 },
+                    { body: "Inside one hunk", kind: "comment", line: 41, path: "src/core.ts", side: "new", startLine: 40 },
+                ],
+            },
+            0,
+        );
+
+        expect(guide.proposals.map((proposal) => (proposal.kind === "comment" ? proposal.body : ""))).toEqual(["Inside one hunk"]);
+    });
+
     it("promotes the first stop to core when the model named none", () => {
         const guide = assembleGuide(
             files,
