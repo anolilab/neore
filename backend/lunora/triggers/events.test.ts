@@ -580,7 +580,7 @@ describe("an occurrence that fires while an earlier one is still waiting for the
         expect(scheduledRuns().filter((args) => args.firing === NOW + 61 * MINUTE)).toHaveLength(0);
 
         // The retry of the earlier firing still matches, and the queue takes it once.
-        await harness.run(async (ctx: any) => await performEventRun(ctx, retry!.args));
+        await harness.run(async (ctx: any) => await performEventRun(ctx, retry!.args as unknown as Parameters<typeof performEventRun>[1]));
 
         expect(enqueueJob).toHaveBeenCalledTimes(2);
         expect(enqueueJob.mock.calls[1]?.[2]).toMatchObject({ once: { jobId: `event:${id}:${NOW}` } });
