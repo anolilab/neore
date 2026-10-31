@@ -21,6 +21,8 @@ export interface BundleReviewEntry {
         instructions: string;
         model?: string;
         name: string;
+        reasoningEffort?: number;
+        searchMode?: string;
         slug: string;
         tools: string[];
     };

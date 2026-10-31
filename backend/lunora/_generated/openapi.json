@@ -39783,6 +39783,12 @@
                               "name": {
                                 "type": "string"
                               },
+                              "reasoningEffort": {
+                                "type": "number"
+                              },
+                              "searchMode": {
+                                "type": "string"
+                              },
                               "slug": {
                                 "type": "string"
                               },

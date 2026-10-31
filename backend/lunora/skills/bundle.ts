@@ -39,7 +39,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import type { BundleItem, SkillSource } from "./bundle-format";
 import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
-import { assertSelectionImportable, BundleImportError, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
+import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
 import { isSelectableTextModel } from "./builder-logic";
 import { getToolRegistry } from "./jit-tool-loader";
 import { deleteTriggerRows } from "../triggers/functions";
@@ -644,6 +644,8 @@ export const previewBundle = authAction
                             instructions: v.string(),
                             model: v.optional(v.string()),
                             name: v.string(),
+                            reasoningEffort: v.optional(v.number()),
+                            searchMode: v.optional(v.string()),
                             slug: v.string(),
                             tools: v.array(v.string()),
                         }),
@@ -790,8 +792,10 @@ export const importBundle = authAction
                 warnings: entries.filter((entry) => selected.has(entry.key)).flatMap((entry) => entry.warnings.map((warning) => `${entry.title}: ${warning}`)),
             };
         } catch (error) {
-            // The import is over and rolled back (or reported what it could not remove): a retry of the same id is a new attempt.
-            await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimId, scope: IMPORT_CLAIM_SCOPE }).catch(() => undefined);
+            // A clean rollback makes a retry of the same id a new attempt; leftovers keep the id taken (`mayRetryImport`).
+            if (mayRetryImport(error)) {
+                await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimId, scope: IMPORT_CLAIM_SCOPE }).catch(() => undefined);
+            }
 
             throw error instanceof BundleImportError ? new LunoraError("BAD_REQUEST", error.message) : error;
         }

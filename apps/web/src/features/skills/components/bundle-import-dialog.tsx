@@ -121,6 +121,10 @@ const EntryDetails: FC<{ entry: BundleReviewEntry; problemsId: string }> = ({ en
                     {skill.disabledTools.length > 0 && <List items={skill.disabledTools} label={t`Turns these tools off:`} />}
                     {skill.droppedTools.length > 0 && <List items={skill.droppedTools} label={t`Ignored, not available here:`} tone="warning" />}
                     {skill.model && <p className="text-muted-foreground text-xs">{t`Prefers the model ${skill.model}.`}</p>}
+                    {skill.searchMode && <p className="text-muted-foreground text-xs">{t`Search mode: ${skill.searchMode}.`}</p>}
+                    {skill.reasoningEffort !== undefined && (
+                        <p className="text-muted-foreground text-xs">{t`Reasoning effort: ${String(skill.reasoningEffort)} of 4.`}</p>
+                    )}
                     <p className="text-muted-foreground text-xs">{t`Imported as /${skill.slug}.`}</p>
                 </>
             )}
@@ -148,6 +152,10 @@ const EntryDetails: FC<{ entry: BundleReviewEntry; problemsId: string }> = ({ en
                 <>
                     <p className="text-muted-foreground text-xs">{t`Mode ${group.mode}, on ${group.model}. Nothing starts when it is created.`}</p>
                     <List items={group.participants} label={t`Participants:`} />
+                    {group.synthesizer && <p className="text-muted-foreground text-xs">{t`Summed up by /${group.synthesizer}.`}</p>}
+                    {group.debateRounds !== undefined && (
+                        <p className="text-muted-foreground text-xs">{t`Debates for ${String(group.debateRounds)} rounds.`}</p>
+                    )}
                 </>
             )}
             {entry.problems.length > 0 && (

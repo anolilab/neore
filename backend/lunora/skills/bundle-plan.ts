@@ -100,6 +100,8 @@ export interface PlanView {
         instructions: string;
         model?: string;
         name: string;
+        reasoningEffort?: number;
+        searchMode?: string;
         slug: string;
         tools: string[];
     };
@@ -282,6 +284,8 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
                 instructions: planned.instructions,
                 ...(planned.config?.preferredModel && { model: planned.config.preferredModel }),
                 name: planned.name,
+                ...(planned.config?.reasoningEffort !== undefined && { reasoningEffort: planned.config.reasoningEffort }),
+                ...(planned.config?.searchMode && { searchMode: planned.config.searchMode }),
                 slug,
                 tools: planned.config?.additionalTools ?? [],
             };
@@ -363,6 +367,9 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
                 problems.push(optionsError.error);
             }
 
+            // What the group chat is stored with: the debate rounds clamped, and options its mode does not use dropped.
+            const stored = "options" in optionsError ? optionsError.options : {};
+
             const distinct = [...new Set(group.participants)];
 
             for (const slug of distinct) {
@@ -384,21 +391,21 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
             const view: PlanView = {
                 group: {
-                    ...(group.debateRounds !== undefined && { debateRounds: group.debateRounds }),
+                    ...(stored.debateRounds !== undefined && { debateRounds: stored.debateRounds }),
                     mode: group.mode,
                     model: group.model,
                     participants: names,
-                    ...(group.synthesizer !== undefined && { synthesizer: group.synthesizer }),
+                    ...(stored.synthesizerSkillId !== undefined && { synthesizer: stored.synthesizerSkillId }),
                 },
             };
-            const synthesizerKey = group.synthesizer === undefined ? undefined : skillKeyBySlug.get(group.synthesizer);
+            const synthesizerKey = stored.synthesizerSkillId === undefined ? undefined : skillKeyBySlug.get(stored.synthesizerSkillId);
 
             entries.push({
                 ...base,
                 ...(problems.length === 0 && {
                     plan: {
                         create: {
-                            ...(group.debateRounds !== undefined && { debateRounds: group.debateRounds }),
+                            ...(stored.debateRounds !== undefined && { debateRounds: stored.debateRounds }),
                             mode: group.mode,
                             model: group.model,
                             participantKeys: group.participants.map((slug) => skillKeyBySlug.get(slug)!),
@@ -453,6 +460,12 @@ export class BundleImportError extends Error {
         this.leftBehind = leftBehind;
     }
 }
+
+/**
+ * Whether a failed import frees its id for a retry. Not while rollback left created items behind: a retry of the
+ * same id would create them a second time beside the ones the user still has to delete.
+ */
+export const mayRetryImport = (error: unknown): boolean => !(error instanceof BundleImportError && error.leftBehind.length > 0);
 
 const removeCreated = async (item: ImportedItem, ops: BundleOps): Promise<unknown> => {
     if (item.kind === "skill") {

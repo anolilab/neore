@@ -5,7 +5,7 @@ import { getRateLimitKey, RATE_LIMIT_CONFIGS } from "../lib/rate-limiter";
 import type { Bundle, BundleGroup, BundleItem, BundleTrigger } from "./bundle-format";
 import { BUNDLE_GROUP_MODES, BUNDLE_LIMITS, buildBundleMarkdown, parseBundleMarkdown } from "./bundle-format";
 import type { BundleOps, PlanEnv, PlanEntry } from "./bundle-plan";
-import { assertSelectionImportable, BundleImportError, planBundle, runBundleImport } from "./bundle-plan";
+import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport } from "./bundle-plan";
 import type { SkillMarkdownData } from "./markdown";
 
 const RE_1 = /imported as "alpha-2"/;
@@ -93,6 +93,29 @@ describe("the dry run", () => {
         expect(entry?.view.skill).toMatchObject({ disabledTools: ["webSearch"], droppedTools: ["shellRun"], tools: ["webSearch"] });
         expect(entry?.problems).toStrictEqual([]);
         expect(entry?.plan?.kind).toBe("skill");
+    });
+
+    it("shows every setting a skill would run with, not only its tools", () => {
+        const [entry] = plan([skill("alpha", { reasoningEffort: 4, searchMode: "web" })]);
+
+        expect(entry?.view.skill).toMatchObject({ reasoningEffort: 4, searchMode: "web" });
+    });
+
+    it("shows and creates a group chat with the options it will be stored with", () => {
+        const debate: BundleItem = { group: { ...GROUP, debateRounds: 99, mode: "debate", synthesizer: "alpha" }, kind: "group" };
+        const roundRobin: BundleItem = { group: { ...GROUP, debateRounds: 7, synthesizer: "alpha", title: "Plain" }, kind: "group" };
+        const entries = plan([skill("alpha"), skill("beta"), debate, roundRobin], ["skill:0", "skill:1", "group:2", "group:3"]);
+        const clamped = entryOf(entries, "group:2");
+
+        expect(clamped.view.group?.debateRounds).toBe(3);
+        expect(clamped.view.group?.synthesizer).toBe("alpha");
+        expect(clamped.plan).toMatchObject({ create: { debateRounds: 3 }, kind: "group" });
+
+        const plain = entryOf(entries, "group:3");
+
+        expect(plain.view.group).not.toHaveProperty("debateRounds");
+        expect(plain.view.group).not.toHaveProperty("synthesizer");
+        expect(plain.plan?.kind === "group" && plain.plan.create).not.toHaveProperty("debateRounds");
     });
 
     it("holds a free account to its limit only for the skills actually picked", () => {
@@ -356,6 +379,17 @@ describe("the import", () => {
         expect(error.message).toMatch(RE_16);
         expect(error.message).not.toContain("They are disabled");
         expect(ops.deleteSkill).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("mayRetryImport", () => {
+    it("frees the import id after a clean rollback or an unrelated failure", () => {
+        expect(mayRetryImport(new BundleImportError("failed", []))).toBe(true);
+        expect(mayRetryImport(new Error("network"))).toBe(true);
+    });
+
+    it("keeps the import id while rollback left created items behind, so a retry cannot copy them", () => {
+        expect(mayRetryImport(new BundleImportError("failed", ["alpha"]))).toBe(false);
     });
 });
 
