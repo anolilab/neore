@@ -46,6 +46,9 @@ export interface AutoApprovalRecord {
     reason: string;
 }
 
+/** Saved tool call id -> why it ran unasked. Filled as the run goes; read when it finishes. */
+export type AutoApprovals = Record<string, AutoApprovalRecord>;
+
 export interface LowRiskVerdict {
     lowRisk: boolean;
     reason: string;
@@ -270,7 +273,9 @@ export interface LowRiskApproverDependencies {
  * The check for ONE run: `true` means the call may run unasked. Never throws — whatever goes
  * wrong means "ask the person".
  */
-export const createLowRiskApprover = (dependencies: LowRiskApproverDependencies): LowRiskCheck => async (call) => {
+export const createLowRiskApprover =
+    (dependencies: LowRiskApproverDependencies): LowRiskCheck =>
+    async (call) => {
         const done = (outcome: LowRiskOutcome, approved = false): boolean => {
             dependencies.onOutcome?.(outcome, call);
 

@@ -17,7 +17,7 @@ import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/li
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
 import { buildDeviceTools } from "./device-tools";
-import type { AutoApprovals } from "./low-risk-check";
+import type { AutoApprovals } from "./low-risk-approval";
 import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";

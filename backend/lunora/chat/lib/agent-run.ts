@@ -32,7 +32,8 @@ import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
-import type { AutoApprovalStamps, McpToolLabels } from "./mcp-tool-labels";
+import type { AutoApprovals } from "./low-risk-approval";
+import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
 import {
@@ -772,7 +773,7 @@ export const finishRun = async (
     ctx: Pick<ActionCtx, "runMutation">,
     args: {
         /** Calls the quick check let run unasked (`BuildAgentToolsResult.autoApprovals`), stamped onto the saved calls. */
-        autoApprovals?: AutoApprovalStamps;
+        autoApprovals?: AutoApprovals;
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
         pending: { reasoning: string; text: string };

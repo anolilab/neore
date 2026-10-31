@@ -14,7 +14,7 @@
  * where no provider reads it — each reads only its own namespace.
  */
 
-import type { AutoApprovalRecord } from "./low-risk-approval";
+import type { AutoApprovalRecord, AutoApprovals } from "./low-risk-approval";
 
 export type McpToolLabels = Record<string, { serverName: string; toolName: string }>;
 
@@ -34,15 +34,12 @@ interface ToolCallLike {
     type?: unknown;
 }
 
-/** Calls the quick check approved, by tool call id. */
-export type AutoApprovalStamps = Record<string, AutoApprovalRecord>;
-
 /**
  * The content with every labelled MCP tool call and every auto-approved call
  * stamped, or `undefined` when nothing needed stamping (not an array, nothing to
  * stamp, already stamped).
  */
-export const labelMcpToolCalls = (content: unknown, labels: McpToolLabels, autoApprovals: AutoApprovalStamps = {}): unknown[] | undefined => {
+export const labelMcpToolCalls = (content: unknown, labels: McpToolLabels, autoApprovals: AutoApprovals = {}): unknown[] | undefined => {
     if (!Array.isArray(content)) {
         return undefined;
     }

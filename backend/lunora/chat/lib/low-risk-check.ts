@@ -12,11 +12,8 @@ import type { ActionCtx } from "../../_generated/server";
 import { checkRateLimit } from "../../lib/rate-limiter";
 import { gatewayFetch } from "../../lib/services";
 import { getUtilityModel } from "../../lib/utility-model";
-import type { AutoApprovalRecord, LowRiskCheck } from "./low-risk-approval";
+import type { AutoApprovals, LowRiskCheck } from "./low-risk-approval";
 import { createLowRiskApprover, LOW_RISK_DEADLINE_MS, LOW_RISK_SYSTEM_PROMPT } from "./low-risk-approval";
-
-/** Saved tool call id -> why it ran unasked. Filled as the run goes; read when it finishes. */
-export type AutoApprovals = Record<string, AutoApprovalRecord>;
 
 const LOW_RISK_MODEL = DEFAULT_MEMORY_EXTRACTION_MODEL;
 
