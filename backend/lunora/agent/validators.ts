@@ -687,6 +687,9 @@ export const vThreadDocFields = {
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
     status: vThreadStatus,
+    // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).
+    summaryEpoch: v.optional(v.number()),
+    summaryPathTooLongAt: v.optional(v.number()),
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),

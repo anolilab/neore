@@ -20,13 +20,38 @@
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
 //!   (`shell.rs`) and are reported as unsandboxed.
 //!
-//! Network access is blocked on macOS and Linux unless the user allows it
-//! ([`Policy::network`]); on Linux that means no sockets except local Unix and
-//! netlink ones. Windows does not restrict it. The user's
-//! "Require sandbox for shell commands" setting (default on) refuses `shell_run`
-//! where [`support`] says unavailable.
+//! Network access has three tiers ([`NetworkTier`]). `Off` (the default for shell
+//! commands) blocks it on macOS and Linux; on Linux that means no sockets except
+//! local Unix and netlink ones. `On` leaves it alone. `Dependencies` ("common
+//! dependencies only") lets a program reach the hosts in [`crate::egress`] and
+//! nothing else: the program may connect only to a filtering proxy on the loopback
+//! (`egress.rs`) that this process runs, and the proxy dials listed hosts. That is
+//! enforced where the OS can name the one allowed destination, which today is macOS
+//! (`sandbox-exec` allows `localhost:<port>`). Linux cannot: Landlock filters TCP
+//! by port, not by address, so a rule for the proxy's port would also admit that
+//! port on every other host, and seccomp cannot read the address. The tier is
+//! therefore refused there ([`dependencies_support`]), never downgraded to `On`.
+//! Windows has no sandbox. The user's "Require sandbox for shell commands and
+//! local MCP servers" setting (default on) refuses `shell_run` and local MCP
+//! servers where [`support`] says unavailable.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use serde::{Deserialize, Serialize};
+
+/// How far a sandboxed program may reach into the network.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkTier {
+    /// No network (macOS and Linux; Windows has no sandbox to enforce it).
+    #[default]
+    Off,
+    /// Only the package registries and source hosts of [`crate::egress::DEPENDENCY_HOSTS`].
+    Dependencies,
+    /// Everything.
+    On,
+}
 
 /// Whether this computer can confine a shell command, probed per call.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,10 +73,15 @@ pub struct Policy {
     /// Hidden except for `writable`/`readable` entries under it (macOS; on
     /// Linux everything not listed is hidden anyway).
     pub home: Option<PathBuf>,
-    /// Whether the command may reach the network. macOS denies it when false;
-    /// Linux refuses every socket family but Unix and netlink (seccomp). Windows
-    /// does not enforce it.
-    pub network: bool,
+    /// How far the command may reach into the network. `Off` is denied on macOS
+    /// and, on Linux, by refusing every socket family but Unix and netlink
+    /// (seccomp); `Dependencies` only on macOS. Windows does not enforce it.
+    pub network: NetworkTier,
+    /// The loopback port of the filtering proxy a `Dependencies` program may
+    /// connect to. Not part of the planned policy: the caller starts the proxy
+    /// when it spawns the program and sets this on its own copy. Unset, the
+    /// profile of a `Dependencies` policy is the one for `Off`.
+    pub proxy_port: Option<u16>,
     /// Why `network: false` cannot be enforced (Linux on a CPU the seccomp
     /// filter does not cover). The command keeps its Landlock confinement and
     /// the prompt says the network is open.
@@ -149,7 +179,8 @@ impl Policy {
             writable: roots.to_vec(),
             readable,
             home: home.map(Path::to_path_buf),
-            network: false,
+            network: NetworkTier::Off,
+            proxy_port: None,
             network_gap: None,
         }
     }
@@ -214,8 +245,22 @@ pub fn seatbelt_profile(policy: &Policy) -> (String, Vec<(String, String)>) {
          (deny mach-lookup (global-name \"com.apple.coreservices.launchservicesd\"))\n",
     );
 
-    if !policy.network {
-        profile.push_str("(deny network*)\n");
+    // `Dependencies` starts from the same denial as `Off` and re-allows exactly one destination, the loopback
+    // port of this run's proxy (SBPL's `remote ip` takes only `*` or `localhost` as a host). Without a port it
+    // stays denied.
+    match policy.network {
+        NetworkTier::On => {}
+        NetworkTier::Off => profile.push_str("(deny network*)\n"),
+        NetworkTier::Dependencies => {
+            profile.push_str("(deny network*)\n");
+
+            if let Some(port) = policy.proxy_port {
+                params.push(("PROXY_PORT".to_owned(), port.to_string()));
+                profile.push_str(
+                    "(allow network-outbound (remote ip (string-append \"localhost:\" (param \"PROXY_PORT\"))))\n",
+                );
+            }
+        }
     }
 
     profile.push_str(
@@ -272,7 +317,7 @@ mod linux {
         RulesetCreatedAttr, Scope, ABI,
     };
 
-    use super::{landlock_rules, Guard, Policy};
+    use super::{landlock_rules, Guard, NetworkTier, Policy, DEPENDENCIES_UNSUPPORTED_LINUX};
 
     // The classic BPF opcodes the filter uses (`linux/bpf_common.h`).
     const BPF_LD_W_ABS: u16 = 0x20;
@@ -591,10 +636,12 @@ mod linux {
     pub fn confine(command: &mut Command, policy: &Policy) -> Result<Guard, String> {
         let ruleset = ruleset(policy)?;
         let fd = ruleset.as_raw_fd();
-        let filter = if policy.network || policy.network_gap.is_some() {
-            None
-        } else {
-            Some(network_filter()?)
+        let filter = match policy.network {
+            NetworkTier::On => None,
+            NetworkTier::Off if policy.network_gap.is_some() => None,
+            NetworkTier::Off => Some(network_filter()?),
+            // Never planned on Linux (`dependencies_support`); refused here too so no path can run it unfiltered.
+            NetworkTier::Dependencies => return Err(DEPENDENCIES_UNSUPPORTED_LINUX.to_owned()),
         };
 
         // SAFETY: only async-signal-safe syscalls between fork and exec (the
@@ -677,17 +724,66 @@ pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 /// Why a command without network cannot get its seccomp filter on this
 /// architecture, which leaves it Landlock only.
 #[cfg(target_os = "linux")]
-fn network_gap(network: bool) -> Option<String> {
-    if network {
-        return None;
+fn network_gap(network: NetworkTier) -> Option<String> {
+    match network {
+        NetworkTier::Off => linux::network_filter().err(),
+        NetworkTier::Dependencies | NetworkTier::On => None,
     }
-
-    linux::network_filter().err()
 }
 
 #[cfg(not(target_os = "linux"))]
-fn network_gap(_network: bool) -> Option<String> {
+fn network_gap(_network: NetworkTier) -> Option<String> {
     None
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const DEPENDENCIES_UNSUPPORTED_LINUX: &str =
+    "Linux cannot limit a program's network to chosen hosts (Landlock filters TCP by port only, \
+     so the filter's port would be open to every host, and seccomp cannot read the destination)";
+
+/// Whether the "common dependencies only" tier can be enforced on this computer: `Err` says why not.
+pub fn dependencies_support() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        match support() {
+            Support::Available(_) => Ok(()),
+            Support::Unavailable(reason) => Err(reason),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Err(DEPENDENCIES_UNSUPPORTED_LINUX.to_owned())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        Err("there is no sandbox on this operating system".to_owned())
+    }
+}
+
+/// What a sandboxed program is, for the words around a refusal and the prompt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Subject {
+    Shell,
+    Mcp,
+}
+
+impl Subject {
+    fn plural(self) -> &'static str {
+        match self {
+            Subject::Shell => "shell commands",
+            Subject::Mcp => "local MCP servers",
+        }
+    }
+
+    /// Where the user changes the network tier.
+    fn network_setting(self) -> &'static str {
+        match self {
+            Subject::Shell => "\"Network for shell commands\" in this computer's device settings",
+            Subject::Mcp => "the server's network setting in this computer's device settings",
+        }
+    }
 }
 
 /// Decides how a `shell_run` call runs: `Ok(Some)` sandboxed, `Ok(None)`
@@ -695,44 +791,80 @@ fn network_gap(_network: bool) -> Option<String> {
 pub fn policy_for_call(
     support: &Support,
     allow_unsandboxed: bool,
-    allow_network: bool,
+    network: NetworkTier,
     roots: &[PathBuf],
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
     plan_call(
+        Subject::Shell,
         support,
         allow_unsandboxed,
-        allow_network,
-        network_gap(allow_network),
+        network,
+        (network_gap(network), dependencies_support()),
         roots,
         home,
     )
 }
 
-fn plan_call(
+/// [`policy_for_call`] for a local MCP server: the same sandbox, the same refusal where there is none.
+pub fn policy_for_mcp(
     support: &Support,
     allow_unsandboxed: bool,
-    allow_network: bool,
-    network_gap: Option<String>,
+    network: NetworkTier,
     roots: &[PathBuf],
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
+    plan_call(
+        Subject::Mcp,
+        support,
+        allow_unsandboxed,
+        network,
+        (network_gap(network), dependencies_support()),
+        roots,
+        home,
+    )
+}
+
+/// `gaps` are what this computer cannot enforce, passed in so a test can pose a computer it is not:
+/// why `Off` cannot be fully enforced, and whether `Dependencies` can.
+fn plan_call(
+    subject: Subject,
+    support: &Support,
+    allow_unsandboxed: bool,
+    network: NetworkTier,
+    (network_gap, dependencies): (Option<String>, Result<(), String>),
+    roots: &[PathBuf],
+    home: Option<&Path>,
+) -> Result<Option<Policy>, String> {
+    let what = subject.plural();
+    let setting = "Require sandbox for shell commands and local MCP servers";
+
     match support {
-        Support::Available(_) => match network_gap {
-            Some(reason) if !allow_unsandboxed => Err(format!(
-                "shell commands must run sandboxed, and {reason}. To run them anyway, turn off \
-                 \"Require sandbox for shell commands\" in this computer's device settings."
+        Support::Available(_) => match (network_gap, dependencies) {
+            (Some(reason), _) if !allow_unsandboxed => Err(format!(
+                "{what} must run sandboxed, and {reason}. To run them anyway, turn off \"{setting}\" in this \
+                 computer's device settings."
             )),
-            network_gap => Ok(Some(Policy {
-                network: allow_network,
+            // Refused, never downgraded: "dependencies only" must not quietly become "everything".
+            (_, Err(reason)) if network == NetworkTier::Dependencies => Err(format!(
+                "\"Common dependencies only\" is not available on this computer: {reason}. Choose Off or On in {}.",
+                subject.network_setting()
+            )),
+            (network_gap, _) => Ok(Some(Policy {
+                network,
                 network_gap,
                 ..Policy::for_roots(roots, home)
             })),
         },
+        // No sandbox means no proxy: "dependencies only" is refused rather than run with the whole network.
+        Support::Unavailable(reason) if allow_unsandboxed && network == NetworkTier::Dependencies => Err(format!(
+            "\"Common dependencies only\" needs the sandbox, and {reason}. Choose Off or On in {}.",
+            subject.network_setting()
+        )),
         Support::Unavailable(_) if allow_unsandboxed => Ok(None),
         Support::Unavailable(reason) => Err(format!(
-            "shell commands must run sandboxed, and {reason}. To run them without a sandbox, \
-             turn off \"Require sandbox for shell commands\" in this computer's device settings."
+            "{what} must run sandboxed, and {reason}. To run them without a sandbox, \
+             turn off \"{setting}\" in this computer's device settings."
         )),
     }
 }
@@ -761,40 +893,70 @@ const SANDBOX_LIMITS: &str =
 /// The network clause of the sandbox line. Empty where the mechanism does not
 /// enforce it: [`SANDBOX_LIMITS`] already says so.
 #[cfg(target_os = "macos")]
-fn network_sentence(policy: &Policy) -> &'static str {
-    if policy.network {
-        " Network access is allowed by this computer's device settings."
-    } else {
-        " Network access is blocked. Turn on \"Allow network for shell commands\" in this computer's device settings to allow it."
+fn network_sentence(policy: &Policy, subject: Subject) -> String {
+    match policy.network {
+        NetworkTier::On => " Network access is allowed by this computer's device settings.".to_owned(),
+        NetworkTier::Dependencies => DEPENDENCIES_SENTENCE.to_owned(),
+        NetworkTier::Off => format!(
+            " Network access is blocked. Allow \"Common dependencies only\" or everything in {} to change that.",
+            subject.network_setting()
+        ),
     }
 }
 
 #[cfg(target_os = "linux")]
-fn network_sentence(policy: &Policy) -> &'static str {
-    if policy.network {
-        " Network access is allowed by this computer's device settings."
-    } else {
-        " Network sockets are blocked; local Unix and netlink sockets are not. Turn on \"Allow network for shell commands\" in this computer's device settings to allow them."
+fn network_sentence(policy: &Policy, subject: Subject) -> String {
+    match policy.network {
+        NetworkTier::On => " Network access is allowed by this computer's device settings.".to_owned(),
+        // Unreachable from a planned policy (`dependencies_support` refuses it); worded in case one is described anyway.
+        NetworkTier::Dependencies => DEPENDENCIES_SENTENCE.to_owned(),
+        NetworkTier::Off => format!(
+            " Network sockets are blocked; local Unix and netlink sockets are not. Allow everything in {} to change that.",
+            subject.network_setting()
+        ),
     }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-fn network_sentence(_policy: &Policy) -> &'static str {
-    ""
+fn network_sentence(_policy: &Policy, _subject: Subject) -> String {
+    String::new()
 }
 
-/// The line the approval prompt shows about the sandbox.
+/// The prompt's words for the "common dependencies only" tier.
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "linux", test)),
+    allow(dead_code)
+)]
+const DEPENDENCIES_SENTENCE: &str = " Network access is limited to common package registries and source hosts \
+    (npm, PyPI, crates.io, Go modules, RubyGems, GitHub), over HTTPS only, through a local filter that checks \
+    that each connection's TLS server name is the listed host it was opened for. The filter cannot read the \
+    encrypted traffic: those hosts can still receive any data the program sends them, for example a push to a \
+    repository or a package publish, and a host that also serves other sites could be asked for them. A program \
+    that does not use HTTPS through the filter, or that hides the server name, has no network.";
+
+/// The line the approval prompt shows about a sandboxed shell command.
 pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
+    describe_for(Subject::Shell, support, policy)
+}
+
+/// [`describe`] for either kind of program.
+pub fn describe_for(subject: Subject, support: &Support, policy: Option<&Policy>) -> String {
     match (support, policy) {
         (Support::Available(mechanism), Some(policy)) => {
             let network = match &policy.network_gap {
                 Some(reason) => format!(
                     " Network access is NOT blocked, although it is off in this computer's device settings: {reason}."
                 ),
-                None => network_sentence(policy).to_owned(),
+                None => network_sentence(policy, subject),
+            };
+            let private = match subject {
+                Subject::Shell => "",
+                Subject::Mcp => {
+                    " Its package caches live in a private folder of its own, which it may also write."
+                }
             };
 
-            format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}{network}")
+            format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}{private}{network}")
         }
         (Support::Unavailable(reason), _) => {
             format!("NOT sandboxed ({reason}): it runs with your full access to this computer.")
@@ -802,6 +964,49 @@ pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
         (Support::Available(_), None) => {
             "NOT sandboxed: it runs with your full access to this computer.".to_owned()
         }
+    }
+}
+
+/// A command for `program` and `args` confined by `policy`: `sandbox-exec` around it on macOS, Landlock (and the
+/// network filter) in the child on Linux. The caller sets environment, directory and pipes. Fails where there is
+/// no sandbox; a policy is never run unconfined.
+pub fn sandboxed_command(
+    policy: &Policy,
+    program: &str,
+    args: &[&str],
+) -> Result<(Command, Guard), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let (profile, params) = seatbelt_profile(policy);
+        let mut command = Command::new(SANDBOX_EXEC);
+
+        command.arg("-p").arg(profile);
+
+        for (name, value) in params {
+            command.arg("-D").arg(format!("{name}={value}"));
+        }
+
+        command.arg(program).args(args);
+
+        Ok((command, Guard::default()))
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let mut command = Command::new(program);
+
+        command.args(args);
+
+        let guard = linux::confine(&mut command, policy)?;
+
+        Ok((command, guard))
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (policy, program, args);
+
+        Err("there is no shell sandbox on this operating system".to_owned())
     }
 }
 
@@ -828,7 +1033,8 @@ mod tests {
             writable: vec![PathBuf::from("/home/me/project")],
             readable: vec![PathBuf::from("/usr"), PathBuf::from("/home/me/.rustup")],
             home: Some(PathBuf::from("/home/me")),
-            network: false,
+            network: NetworkTier::Off,
+            proxy_port: None,
             network_gap: None,
         }
     }
@@ -926,18 +1132,26 @@ mod tests {
         let roots = vec![PathBuf::from("/srv/p")];
         let missing = Support::Unavailable("no Landlock".into());
 
-        assert!(policy_for_call(&missing, false, false, &roots, None)
-            .unwrap_err()
-            .contains("no Landlock"));
+        assert!(
+            policy_for_call(&missing, false, NetworkTier::Off, &roots, None)
+                .unwrap_err()
+                .contains("no Landlock")
+        );
         assert_eq!(
-            policy_for_call(&missing, true, false, &roots, None),
+            policy_for_call(&missing, true, NetworkTier::Off, &roots, None),
             Ok(None)
         );
         assert_eq!(
-            policy_for_call(&Support::Available("x".into()), false, false, &roots, None)
-                .unwrap()
-                .unwrap()
-                .writable,
+            policy_for_call(
+                &Support::Available("x".into()),
+                false,
+                NetworkTier::Off,
+                &roots,
+                None
+            )
+            .unwrap()
+            .unwrap()
+            .writable,
             roots
         );
     }
@@ -946,15 +1160,15 @@ mod tests {
     fn network_is_blocked_unless_the_user_allows_it() {
         let roots = vec![PathBuf::from("/srv/p")];
         let available = Support::Available("x".into());
-        let blocked = policy_for_call(&available, false, false, &roots, None)
+        let blocked = policy_for_call(&available, false, NetworkTier::Off, &roots, None)
             .unwrap()
             .unwrap();
-        let allowed = policy_for_call(&available, false, true, &roots, None)
+        let allowed = policy_for_call(&available, false, NetworkTier::On, &roots, None)
             .unwrap()
             .unwrap();
 
-        assert!(!blocked.network);
-        assert!(allowed.network);
+        assert_eq!(blocked.network, NetworkTier::Off);
+        assert_eq!(allowed.network, NetworkTier::On);
     }
 
     #[test]
@@ -962,23 +1176,32 @@ mod tests {
         let roots = vec![PathBuf::from("/srv/p")];
         let available = Support::Available("Landlock ABI 5".into());
         let gap = Some("no filter for riscv64".to_owned());
-        let policy = plan_call(&available, true, false, gap.clone(), &roots, None)
-            .unwrap()
-            .unwrap();
+        let plan = |allow_unsandboxed, network, gap: Option<String>| {
+            plan_call(
+                Subject::Shell,
+                &available,
+                allow_unsandboxed,
+                network,
+                (gap, Ok(())),
+                &roots,
+                None,
+            )
+        };
+        let policy = plan(true, NetworkTier::Off, gap.clone()).unwrap().unwrap();
         let note = describe(&available, Some(&policy));
 
         assert_eq!(policy.writable, roots);
-        assert!(!policy.network);
+        assert_eq!(policy.network, NetworkTier::Off);
         assert_eq!(policy.network_gap, gap);
         assert!(note.starts_with("Sandboxed (Landlock ABI 5)"));
         assert!(note.contains("Network access is NOT blocked"));
         assert!(note.contains("no filter for riscv64"));
-        assert!(plan_call(&available, false, false, gap, &roots, None)
+        assert!(plan(false, NetworkTier::Off, gap)
             .unwrap_err()
             .contains("no filter for riscv64"));
-        assert!(plan_call(&available, false, true, None, &roots, None).is_ok());
+        assert!(plan(false, NetworkTier::On, None).is_ok());
         assert_eq!(
-            plan_call(&available, false, false, None, &roots, None)
+            plan(false, NetworkTier::Off, None)
                 .unwrap()
                 .unwrap()
                 .network_gap,
@@ -987,16 +1210,121 @@ mod tests {
     }
 
     #[test]
+    fn the_dependencies_tier_is_refused_where_it_cannot_be_enforced_never_downgraded() {
+        let roots = vec![PathBuf::from("/srv/p")];
+        let available = Support::Available("x".into());
+        let plan = |subject, allow_unsandboxed, dependencies: Result<(), String>| {
+            plan_call(
+                subject,
+                &available,
+                allow_unsandboxed,
+                NetworkTier::Dependencies,
+                (None, dependencies),
+                &roots,
+                None,
+            )
+        };
+        let no = || Err("no per-host filter here".to_owned());
+
+        for allow_unsandboxed in [false, true] {
+            let error = plan(Subject::Mcp, allow_unsandboxed, no()).unwrap_err();
+
+            assert!(error.contains("no per-host filter here"));
+            assert!(error.contains("Choose Off or On"));
+            assert!(error.contains("the server's network setting"));
+        }
+
+        assert!(plan(Subject::Shell, false, no())
+            .unwrap_err()
+            .contains("Network for shell commands"));
+        assert_eq!(
+            plan(Subject::Mcp, false, Ok(())).unwrap().unwrap().network,
+            NetworkTier::Dependencies
+        );
+        // The other tiers do not care whether the third is available.
+        assert!(plan_call(
+            Subject::Mcp,
+            &available,
+            false,
+            NetworkTier::On,
+            (None, no()),
+            &roots,
+            None
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn the_refusal_for_a_missing_sandbox_names_the_subject_and_the_setting() {
+        let roots = vec![PathBuf::from("/srv/p")];
+        let missing = Support::Unavailable("no Landlock".into());
+        let error = policy_for_mcp(&missing, false, NetworkTier::Off, &roots, None).unwrap_err();
+
+        assert!(error.starts_with("local MCP servers must run sandboxed"));
+        assert!(error.contains("no Landlock"));
+        assert!(error.contains("Require sandbox for shell commands and local MCP servers"));
+        // Without a sandbox there is no proxy, so "dependencies only" is refused even where unsandboxed runs are
+        // allowed: it must never quietly become "everything".
+        assert!(
+            policy_for_mcp(&missing, true, NetworkTier::Dependencies, &roots, None)
+                .unwrap_err()
+                .contains("Common dependencies only")
+        );
+        assert!(
+            policy_for_call(&missing, true, NetworkTier::Dependencies, &roots, None)
+                .unwrap_err()
+                .contains("Common dependencies only")
+        );
+        assert_eq!(
+            policy_for_mcp(&missing, true, NetworkTier::Off, &roots, None),
+            Ok(None)
+        );
+        assert!(
+            policy_for_call(&missing, false, NetworkTier::Off, &roots, None)
+                .unwrap_err()
+                .starts_with("shell commands must run sandboxed")
+        );
+    }
+
+    #[test]
     fn the_seatbelt_profile_denies_the_network_unless_allowed() {
         let (blocked, _) = seatbelt_profile(&policy());
         let (allowed, _) = seatbelt_profile(&Policy {
-            network: true,
+            network: NetworkTier::On,
             ..policy()
         });
 
         assert!(blocked.contains("(deny network*)"));
         assert!(!allowed.contains("network"));
         assert_eq!(blocked.matches('(').count(), blocked.matches(')').count());
+    }
+
+    #[test]
+    fn the_dependencies_profile_allows_only_the_proxy_port_on_the_loopback() {
+        let tier = |proxy_port| Policy {
+            network: NetworkTier::Dependencies,
+            proxy_port,
+            ..policy()
+        };
+        let (profile, params) = seatbelt_profile(&tier(Some(4242)));
+        let deny = profile.find("(deny network*)").unwrap();
+        let allow = profile.find("(allow network-outbound").unwrap();
+
+        assert!(deny < allow);
+        assert!(
+            profile.contains("(remote ip (string-append \"localhost:\" (param \"PROXY_PORT\")))")
+        );
+        assert!(params.contains(&("PROXY_PORT".to_owned(), "4242".to_owned())));
+        // The port is a parameter, never spliced into the profile text.
+        assert!(!profile.contains("4242"));
+        assert_eq!(profile.matches('(').count(), profile.matches(')').count());
+
+        // No proxy yet: as closed as Off.
+        let (closed, params) = seatbelt_profile(&tier(None));
+        let (off, _) = seatbelt_profile(&policy());
+
+        assert_eq!(closed, off);
+        assert!(!params.iter().any(|(name, _)| name == "PROXY_PORT"));
     }
 
     #[test]
@@ -1021,12 +1349,37 @@ mod tests {
         assert!(describe(
             &available,
             Some(&Policy {
-                network: true,
+                network: NetworkTier::On,
                 ..policy()
             })
         )
         .contains("Network access is allowed"));
+        #[cfg(target_os = "macos")]
+        assert!(describe(
+            &available,
+            Some(&Policy {
+                network: NetworkTier::Dependencies,
+                ..policy()
+            })
+        )
+        .contains("limited to common package registries and source hosts"));
+        assert!(describe_for(Subject::Mcp, &available, Some(&policy())).contains("private folder"));
         assert!(describe(&missing, None).starts_with("NOT sandboxed (no Landlock)"));
+    }
+
+    #[test]
+    fn the_dependencies_sentence_says_what_the_filter_checks_and_what_it_cannot() {
+        for said in [
+            "TLS server name",
+            "HTTPS only",
+            "can still receive any data",
+            "hides the server name",
+        ] {
+            assert!(DEPENDENCIES_SENTENCE.contains(said), "{said}");
+        }
+
+        // It must not promise more than the filter does.
+        assert!(!DEPENDENCIES_SENTENCE.contains("nothing else"));
     }
 
     /// What a forked child sees from `socket(2)` after `filter` (if any) is

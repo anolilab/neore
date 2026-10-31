@@ -363,6 +363,8 @@ const RULES: Record<string, TableRules> = {
         },
         update: (scope, row) => threadLevelAtLeast(scope, row.threadId, "admin"),
     },
+    // A condensed copy of the thread's content: readable by whoever reads the thread. Written only by internal functions.
+    threadContextSummaries: threadScoped({ hasUserId: true }),
     // No `userId`: the pending tokens are the owner's and admin grantees' alone.
     threadInvites: {
         delete: (scope, row) => threadLevelAtLeast(scope, row.threadId, "admin"),

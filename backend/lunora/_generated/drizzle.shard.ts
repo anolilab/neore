@@ -1380,6 +1380,21 @@ export const threadGoals = sqliteTable("threadGoals", {
     by_thread: index("by_thread").on(t.threadId),
 }));
 
+export const threadContextSummaries = sqliteTable("threadContextSummaries", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    coveredCount: real("coveredCount").notNull(),
+    coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
+    createdAt: real("createdAt").notNull(),
+    summary: text("summary").notNull(),
+    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>().notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+}));
+
 export const threadKnowledge = sqliteTable("threadKnowledge", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -1478,6 +1493,8 @@ export const threads = sqliteTable("threads", {
     statelessMode: integer("statelessMode", { mode: "boolean" }),
     status: text("status").notNull(),
     summary: text("summary"),
+    summaryEpoch: real("summaryEpoch"),
+    summaryPathTooLongAt: real("summaryPathTooLongAt"),
     tagIds: text("tagIds", { mode: "json" }).$type<Array<string>>(),
     tags: text("tags", { mode: "json" }).$type<Array<string>>(),
     teamId: text("teamId"),
@@ -1715,6 +1732,7 @@ export const userSettings = sqliteTable("userSettings", {
     sendBehavior: text("sendBehavior"),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
+    threadSummariesEnabled: integer("threadSummariesEnabled", { mode: "boolean" }),
     threadTitleInstructions: text("threadTitleInstructions"),
     timezone: text("timezone"),
     userId: text("userId").notNull(),

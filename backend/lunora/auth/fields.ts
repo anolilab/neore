@@ -118,6 +118,7 @@ export const userSettingsFieldsWithoutUserId = {
     sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
+    threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.
     threadTitleInstructions: v.optional(v.string().max(MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH)), // How the user wants thread titles worded; appended to the title prompt. "" or absent = none.
     timezone: v.optional(v.string().max(MAX_LENGTH.short)), // IANA timezone identifier (e.g., "America/New_York", "Europe/Berlin")
     voiceModeVoice: v.optional(v.string().max(100)), // Default voice for spoken replies — a preset of the speech model; a skill's own voice wins

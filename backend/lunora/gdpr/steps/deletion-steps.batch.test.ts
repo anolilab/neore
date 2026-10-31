@@ -178,9 +178,26 @@ describe("batched account-deletion steps", () => {
 
             for (let index = 0; index < threadCount; index += 1) {
                 const threadId = await ctx.db.insert("threads", { status: "active", title: `t${String(index)}`, userId: A });
+                const messageId = await ctx.db.insert("messages", {
+                    message: { content: "m", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId,
+                    tool: false,
+                    userId: A,
+                });
 
                 ids.push(threadId);
                 await ctx.db.insert("followupSuggestions", { createdAt: 0, lastMessageId: "m", suggestions: ["next?"], threadId, updatedAt: 0 });
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: messageId,
+                    createdAt: 0,
+                    summary: "s",
+                    threadId,
+                    userId: A,
+                });
                 await ctx.db.insert("threadInvites", {
                     expiresAt: 0,
                     invitedBy: A,
@@ -232,6 +249,7 @@ describe("batched account-deletion steps", () => {
 
         expect(remaining).toStrictEqual({ invites: 0, suggestionThreads: [others] });
         expect(await count("followupSuggestions", { threadId: crowded })).toBe(0);
+        expect(await count("threadContextSummaries", { userId: A })).toBe(0);
         // The threads themselves stay for the later step, which deletes them with their messages.
         expect(await count("threads", { userId: A })).toBe(threadCount);
     });

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::acp::{AcpAgent, AcpConsent, EnvVars};
 use super::mcp::McpServerConfig;
+use super::sandbox::NetworkTier;
 
 const KEYCHAIN_SERVICE: &str = "dev.neore.device";
 
@@ -79,10 +80,15 @@ pub struct Settings {
     /// so a missing field (and `Settings::default()`) means "required".
     #[serde(default)]
     pub allow_unsandboxed_shell: bool,
-    /// The user turned ON "Allow network for shell commands". Absent means
-    /// restricted, where the OS sandbox can enforce it.
+    /// Read-only legacy form of `shell_network`: "Allow network for shell commands" turned ON. A file written
+    /// before the tiers existed has this and not `shell_network`; saving writes both, so an older build still
+    /// reads the restriction it knows (the middle tier is `false` there).
     #[serde(default)]
     pub allow_shell_network: bool,
+    /// How far shell commands may reach into the network. Absent (a file from before the tiers) is read from
+    /// `allow_shell_network`; use [`Settings::shell_network_tier`], not the field.
+    #[serde(default)]
+    pub shell_network: Option<NetworkTier>,
     /// The servers this desktop speaks for (`transport: ssh` on the backend).
     #[serde(default)]
     pub hosts: Vec<Host>,
@@ -93,6 +99,23 @@ pub struct Settings {
     /// Folders the file and shell tools may reach.
     #[serde(default)]
     pub roots: Vec<String>,
+}
+
+impl Settings {
+    /// The network tier of `shell_run`: the stored one, else what the legacy switch said.
+    pub fn shell_network_tier(&self) -> NetworkTier {
+        self.shell_network.unwrap_or(if self.allow_shell_network {
+            NetworkTier::On
+        } else {
+            NetworkTier::Off
+        })
+    }
+
+    /// Sets the tier, keeping the legacy switch in step (`On` is the only tier it can say).
+    pub fn set_shell_network(&mut self, tier: NetworkTier) {
+        self.shell_network = Some(tier);
+        self.allow_shell_network = tier == NetworkTier::On;
+    }
 }
 
 /// Reads the settings file. A missing file is the first run and gives the defaults. A file that cannot be read or
@@ -657,6 +680,46 @@ mod tests {
                 .unwrap()
                 .allow_unsandboxed_shell
         );
+    }
+
+    #[test]
+    fn the_shell_network_tier_reads_a_file_from_before_the_tiers() {
+        let tier = |json: &str| {
+            serde_json::from_str::<Settings>(json)
+                .unwrap()
+                .shell_network_tier()
+        };
+
+        assert_eq!(tier(r#"{}"#), NetworkTier::Off);
+        assert_eq!(tier(r#"{"allowShellNetwork":false}"#), NetworkTier::Off);
+        assert_eq!(tier(r#"{"allowShellNetwork":true}"#), NetworkTier::On);
+        // The stored tier wins over the legacy switch.
+        assert_eq!(
+            tier(r#"{"allowShellNetwork":true,"shellNetwork":"dependencies"}"#),
+            NetworkTier::Dependencies
+        );
+    }
+
+    #[test]
+    fn setting_the_tier_keeps_the_legacy_switch_in_step_for_an_older_build() {
+        let mut settings = Settings::default();
+
+        for (tier, legacy) in [
+            (NetworkTier::On, true),
+            (NetworkTier::Dependencies, false),
+            (NetworkTier::Off, false),
+        ] {
+            settings.set_shell_network(tier);
+
+            assert_eq!(settings.shell_network_tier(), tier);
+            // An older build reads only the switch; "dependencies" must read as restricted there, never as on.
+            assert_eq!(settings.allow_shell_network, legacy);
+
+            let again: Settings =
+                serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+
+            assert_eq!(again.shell_network_tier(), tier);
+        }
     }
 
     #[test]

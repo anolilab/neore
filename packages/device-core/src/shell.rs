@@ -14,7 +14,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use super::sandbox::{Guard, Policy};
+use super::egress;
+use super::sandbox::{Guard, NetworkTier, Policy};
 
 pub struct ShellOutput {
     pub exit_code: Option<i32>,
@@ -149,12 +150,15 @@ impl Drop for TempDir {
 /// Cache variables pointed into the run's temp folder, so tools that cache in
 /// the (hidden, read-only) home folder still work sandboxed. `CARGO_HOME` and
 /// `RUSTUP_HOME` are deliberately absent: they name the real toolchain.
-const CACHE_VARS: &[(&str, &str)] = &[
+pub(crate) const CACHE_VARS: &[(&str, &str)] = &[
     ("BUN_INSTALL_CACHE_DIR", "bun"),
+    ("COREPACK_HOME", "corepack"),
+    ("DENO_DIR", "deno"),
     ("GOCACHE", "go-build"),
     ("GOMODCACHE", "go-mod"),
     ("PIP_CACHE_DIR", "pip"),
     ("UV_CACHE_DIR", "uv"),
+    ("UV_TOOL_DIR", "uv-tools"),
     ("XDG_CACHE_HOME", "xdg"),
     ("YARN_CACHE_FOLDER", "yarn"),
     ("npm_config_cache", "npm"),
@@ -163,7 +167,7 @@ const CACHE_VARS: &[(&str, &str)] = &[
 /// The cache variables to set for a sandboxed run: each one under
 /// `<temp>/cache/`, unless the user's own value already points inside a
 /// shared folder (`roots`), which the sandbox lets it write.
-fn cache_env(
+pub(crate) fn cache_env(
     temp: &Path,
     roots: &[PathBuf],
     current: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -191,49 +195,29 @@ fn command(line: &str, policy: Option<&Policy>) -> Result<(Command, Guard), Stri
         Ok((command, Guard::default()))
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
 
-        let mut command = match policy {
-            None => Command::new("sh"),
-            Some(policy) => {
-                let (profile, params) = super::sandbox::seatbelt_profile(policy);
-                let mut command = Command::new(super::sandbox::SANDBOX_EXEC);
+        // `sh` is looked up on PATH; the sandboxed macOS shell is `sandbox-exec`'s, by absolute path.
+        let program = if cfg!(target_os = "macos") {
+            "/bin/sh"
+        } else {
+            "sh"
+        };
+        let (mut command, guard) = match policy {
+            Some(policy) => super::sandbox::sandboxed_command(policy, program, &["-c", line])?,
+            None => {
+                let mut command = Command::new("sh");
 
-                command.arg("-p").arg(profile);
+                command.args(["-c", line]);
 
-                for (name, value) in params {
-                    command.arg("-D").arg(format!("{name}={value}"));
-                }
-
-                command.arg("/bin/sh");
-                command
+                (command, Guard::default())
             }
         };
 
-        command.args(["-c", line]);
         // Its own process group, so a timeout kills everything it started.
         command.process_group(0);
-        Ok((command, Guard::default()))
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        use std::os::unix::process::CommandExt;
-
-        let mut command = Command::new("sh");
-        command.args(["-c", line]);
-        // Its own process group, so a timeout kills everything it started.
-        command.process_group(0);
-
-        let guard = match policy {
-            #[cfg(target_os = "linux")]
-            Some(policy) => super::sandbox::confine(&mut command, policy)?,
-            #[cfg(not(target_os = "linux"))]
-            Some(_) => return Err("there is no shell sandbox on this operating system".into()),
-            None => Guard::default(),
-        };
 
         Ok((command, guard))
     }
@@ -396,10 +380,20 @@ pub fn run(
     sandbox: Option<&Policy>,
 ) -> Result<ShellOutput, String> {
     let temp = sandbox.map(|_| TempDir::new()).transpose()?;
+    // Lives until the run ends. Only a sandboxed `Dependencies` run has one: it is the single place such a
+    // program may connect to.
+    let proxy = match sandbox {
+        Some(policy) if policy.network == NetworkTier::Dependencies => Some(
+            egress::Proxy::start()
+                .map_err(|error| format!("could not start the network filter: {error}"))?,
+        ),
+        _ => None,
+    };
     let policy = sandbox.zip(temp.as_ref()).map(|(policy, temp)| {
         let mut policy = policy.clone();
 
         policy.writable.push(temp.0.clone());
+        policy.proxy_port = proxy.as_ref().map(egress::Proxy::port);
         policy
     });
     // Holds the Landlock ruleset open until the child has it; closed with the run.
@@ -425,6 +419,10 @@ pub fn run(
             .envs(cache_env(&temp.0, &sandbox.writable, |name| {
                 std::env::var_os(name)
             }));
+    }
+
+    if let Some(proxy) = &proxy {
+        command.envs(egress::proxy_env(proxy.port()));
     }
 
     let spawned = command
@@ -503,10 +501,17 @@ pub fn run(
     stop.store(true, Ordering::Relaxed);
 
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
+    let exit_code = status.and_then(|status| status.code());
+    let mut output = String::from_utf8_lossy(&bytes).into_owned();
+
+    // A failed run that asked the filter for a host it does not list: say so, or the failure reads as a broken network.
+    if let Some(proxy) = proxy.as_ref().filter(|_| exit_code != Some(0)) {
+        output.push_str(&proxy.refused_note());
+    }
 
     Ok(ShellOutput {
-        exit_code: status.and_then(|status| status.code()),
-        output: String::from_utf8_lossy(&bytes).into_owned(),
+        exit_code,
+        output,
         timed_out,
         truncated,
     })
@@ -515,6 +520,15 @@ pub fn run(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[allow(dead_code)]
+    fn tier(network: bool) -> NetworkTier {
+        if network {
+            NetworkTier::On
+        } else {
+            NetworkTier::Off
+        }
+    }
 
     #[test]
     fn a_reader_returns_once_stopped_even_while_its_pipe_stays_open() {
@@ -736,7 +750,7 @@ mod tests {
         let (shared, _outside) = folders("seccomp");
         let filters = |network: bool| {
             let policy = Policy {
-                network,
+                network: tier(network),
                 ..Policy::for_roots(std::slice::from_ref(&shared), None)
             };
             let result = run(
@@ -782,7 +796,7 @@ mod tests {
         );
         let outcome = |network: bool| {
             let policy = Policy {
-                network,
+                network: tier(network),
                 ..Policy::for_roots(std::slice::from_ref(&shared), None)
             };
 
@@ -829,7 +843,7 @@ mod tests {
 
         for network in [false, true] {
             let policy = Policy {
-                network,
+                network: tier(network),
                 ..Policy::for_roots(std::slice::from_ref(&shared), None)
             };
 
@@ -934,7 +948,7 @@ mod tests {
         let (shared, _) = folders("network");
         let blocked = Policy::for_roots(std::slice::from_ref(&shared), None);
         let allowed = Policy {
-            network: true,
+            network: NetworkTier::On,
             ..blocked.clone()
         };
         let run_with = |policy: &Policy| {
