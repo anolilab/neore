@@ -211,6 +211,20 @@ describe("scanThreadRows", () => {
         expect(scanThreadRows([row("a", 1), row("b", 2)], undefined, "me")).toEqual({ baseline: { order: 2, stepOrder: 0 } });
     });
 
+    it("takes the newest settled row as the baseline of a first look, even behind a pending one, so what existed never fires", () => {
+        const rows = [row("writing", 5, { status: "pending", stepOrder: 2 }), row("later", 6)];
+
+        expect(scanThreadRows(rows, undefined, "me")).toEqual({ baseline: { order: 6, stepOrder: 0 } });
+    });
+
+    it("points just before the oldest row when a first look finds nothing settled", () => {
+        expect(scanThreadRows([row("writing", 5, { status: "pending", stepOrder: 2 })], undefined, "me")).toEqual({ baseline: { order: 5, stepOrder: 1 } });
+    });
+
+    it("keeps the baseline of a first look at the newest settled row when a pending row follows it", () => {
+        expect(scanThreadRows([row("a", 1), row("writing", 2, { status: "pending" })], undefined, "me")).toEqual({ baseline: { order: 1, stepOrder: 0 } });
+    });
+
     it("does not let a row stuck in pending past the stream timeout block the rows after it", () => {
         const stuckBefore = 10_000;
         const rows = [row("a", 1), row("stuck", 2, { createdAt: 1000, status: "pending" }), row("later", 3, { createdAt: 20_000 })];

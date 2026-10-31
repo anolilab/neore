@@ -52,6 +52,10 @@ export const EVENT_FIRE_CLAIM_TTL_MS = 4 * MINUTE_MS;
 /** A dispatched check that never reports back is retried after this long. */
 export const EVENT_CHECK_LEASE_MS = 5 * MINUTE_MS;
 const EVENT_DISPATCH_BATCH = 25;
+/** A send the jobs queue refused is tried again after this long, doubling each time, up to {@link EVENT_RUN_MAX_ATTEMPTS} tries. */
+const EVENT_RUN_RETRY_MS = 2 * MINUTE_MS;
+
+export const EVENT_RUN_MAX_ATTEMPTS = 6;
 /** Rows read per scan of a thread. A longer stretch is read over several checks: the baseline moves to the last row read. */
 const THREAD_SCAN_ROWS = 60;
 /** The longest a transient failure delays the next check. */
@@ -81,12 +85,12 @@ export const armEventTrigger = (trigger: Doc<"triggers">, now: number): { eventS
 
 /** A user keeps at most {@link MAX_ACTIVE_EVENT_WATCHERS} watchers switched on: each is checked every few minutes. */
 export const assertWatcherCapacity = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
-    const mine = await ctx.db
+    const switchedOn = await ctx.db
         .query("triggers")
-        .withIndex("by_userId_organizationId", (q) => q.eq("userId", userId))
-        .collect();
+        .withIndex("by_userId_type_enabled", (q) => q.eq("userId", userId).eq("type", "event").eq("enabled", true))
+        .take(MAX_ACTIVE_EVENT_WATCHERS);
 
-    if (mine.filter((row) => row.type === "event" && row.enabled === true).length >= MAX_ACTIVE_EVENT_WATCHERS) {
+    if (switchedOn.length >= MAX_ACTIVE_EVENT_WATCHERS) {
         throw new LunoraError("BAD_REQUEST", `You can have ${String(MAX_ACTIVE_EVENT_WATCHERS)} event triggers switched on at a time. Turn one off first.`);
     }
 };
@@ -104,6 +108,15 @@ export const assertThreadWatchable = async (ctx: Pick<MutationCtx, "db">, thread
     }
 
     throw new LunoraError("NOT_FOUND", "Thread not found");
+};
+
+/** The baseline without the run waiting for the queue, which {@link settleEventRun} alone ends. */
+const withoutPendingRun = (state: EventState | undefined): EventState => {
+    const kept = { ...state };
+
+    delete kept.pendingRun;
+
+    return kept;
 };
 
 /** The baseline without the counters of failed checks. */
@@ -140,11 +153,12 @@ export const dispatchDueEventTriggers = internalMutation
     .output(v.object({ dispatched: v.number() }))
     .mutation(async ({ ctx }) => {
         const { now } = ctx;
-        const armed = await ctx.db
+        // One more than a batch says whether a batch is left over. `gt(0)` leaves out a watcher with no next check — a
+        // moment that has fired and waits for its run — which sorts before every number and would be dispatched again.
+        const due = await ctx.db
             .query("triggers")
-            .withIndex("by_enabled_nextTriggerAt", (q) => q.eq("enabled", true).lte("nextTriggerAt", now))
-            .collect();
-        const due = armed.filter((row) => row.type === "event");
+            .withIndex("by_type_enabled_nextTriggerAt", (q) => q.eq("type", "event").eq("enabled", true).gt("nextTriggerAt", 0).lte("nextTriggerAt", now))
+            .take(EVENT_DISPATCH_BATCH + 1);
         let dispatched = 0;
 
         for (const trigger of due.slice(0, EVENT_DISPATCH_BATCH)) {
@@ -352,12 +366,8 @@ export const runEventCheck = internalAction
     });
 
 /**
- * Puts the run of one firing on the jobs queue. It is scheduled by the mutation that claimed the firing
- * ({@link recordEventCheck}), so it exists only if that mutation committed: a queue send made inside the
- * mutation is not undone when the mutation fails, and would start a run for a firing that was never recorded.
- * The job id is taken from the firing, so a repeat of this send — the scheduler re-runs an action that throws,
- * with backoff — is the same run, claimed once (`lib/job-once.ts`). A send that keeps failing past the scheduler's
- * retries loses that firing: the claim and the baseline are already recorded.
+ * Puts the run of one firing on the jobs queue. The job id is taken from the firing, so a repeat of this send
+ * is the same run, claimed once (`lib/job-once.ts`).
  */
 export const queueEventRun = async ({
     firing,
@@ -377,16 +387,119 @@ export const queueEventRun = async ({
     );
 };
 
+interface EventRunArgs {
+    attempt?: number;
+    firing: number;
+    payload: string;
+    triggerId: Id<"triggers">;
+    userId: string;
+}
+
+/**
+ * Sends the run of a firing that {@link recordEventCheck} claimed. It is scheduled by that mutation, so it exists
+ * only if the mutation committed: a queue send made inside the mutation is not undone when the mutation fails, and
+ * would start a run for a firing that was never recorded. The firing stays `pendingRun` on the watcher until the
+ * queue has accepted it; a refused send is scheduled again with a longer wait ({@link settleEventRun}), so a queue
+ * outage costs time, not the occurrence. A firing that is no longer pending (sent, or the watcher was re-armed since) sends nothing.
+ */
+export const performEventRun = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, args: EventRunArgs): Promise<void> => {
+    const { attempt = 0, firing, triggerId } = args;
+
+    if (!(await ctx.runQuery(internal.triggers.events.isEventRunPending, { firing, triggerId }))) {
+        return;
+    }
+
+    try {
+        await queueEventRun(args);
+    } catch (error) {
+        console.error(`[Triggers] Could not queue the run of trigger ${triggerId} (attempt ${String(attempt + 1)})`, error);
+        await ctx.runMutation(internal.triggers.events.settleEventRun, { attempt, firing, sent: false, triggerId });
+
+        return;
+    }
+
+    await ctx.runMutation(internal.triggers.events.settleEventRun, { attempt, firing, sent: true, triggerId });
+};
+
 export const startEventRun = internalAction
     .input({
+        attempt: v.optional(v.number()),
         firing: v.number(),
         payload: v.string().max(MAX_LENGTH.text),
         triggerId: v.id("triggers"),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.null())
-    .action(async ({ args }) => {
-        await queueEventRun(args);
+    .action(async ({ args, ctx }) => {
+        await performEventRun(ctx, args);
+
+        return null;
+    });
+
+/** Whether `firing` is still waiting for the queue to take it. */
+export const isEventRunPending = internalQuery
+    .input({ firing: v.number(), triggerId: v.id("triggers") })
+    .output(v.boolean())
+    .query(async ({ args: { firing, triggerId }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        return trigger?.eventState?.pendingRun?.firing === firing;
+    });
+
+/**
+ * What came of one send of a firing. Accepted: the firing is no longer pending. Refused: the same send is scheduled
+ * again with a doubled wait; after {@link EVENT_RUN_MAX_ATTEMPTS} the firing is given up — a moment is switched off, so it
+ * does not hold one of its owner's watcher slots with nothing left to do — and the owner is told.
+ */
+export const settleEventRun = internalMutation
+    .input({ attempt: v.number(), firing: v.number(), sent: v.boolean(), triggerId: v.id("triggers") })
+    .output(v.null())
+    .mutation(async ({ args: { attempt, firing, sent, triggerId }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+        const pending = trigger?.eventState?.pendingRun;
+
+        if (!trigger || pending?.firing !== firing) {
+            return null;
+        }
+
+        const { now } = ctx;
+        const rest = withoutPendingRun(trigger.eventState);
+
+        if (sent) {
+            await patchRow(ctx.db, trigger, { eventState: rest });
+
+            return null;
+        }
+
+        if (attempt + 1 < EVENT_RUN_MAX_ATTEMPTS) {
+            await ctx.scheduler.runAfter(EVENT_RUN_RETRY_MS * 2 ** attempt, internal.triggers.events.startEventRun, {
+                attempt: attempt + 1,
+                firing,
+                payload: pending.payload,
+                triggerId,
+                userId: trigger.userId,
+            });
+
+            return null;
+        }
+
+        const error = "A run of this trigger could not be queued and was dropped.";
+
+        await patchRow(ctx.db, trigger, {
+            eventState: rest,
+            lastError: error,
+            updatedAt: now,
+            ...(trigger.eventSource?.kind === "time" && { enabled: false }),
+        });
+        await notifyQuietly(ctx, {
+            body: error,
+            dedupeKey: `trigger-run-dropped:${trigger._id}:${firing}`,
+            link: "/dashboard/settings/chat/triggers",
+            outcome: "failure",
+            title: trigger.name,
+            type: "trigger",
+            userId: trigger.userId,
+        });
 
         return null;
     });
@@ -425,7 +538,9 @@ export const recordEventCheck = internalMutation
             !trigger.eventSource ||
             watchesSomethingElse(trigger.eventSource, read.source) ||
             trigger.eventState?.armedAt !== read.armedAt ||
-            trigger.eventState?.checkedAt !== read.checkedAt
+            trigger.eventState?.checkedAt !== read.checkedAt ||
+            // A moment fires once. Its claim lapses after a few minutes and its run can take longer: a check that reaches it then is moot.
+            (trigger.eventSource.kind === "time" && trigger.eventState?.firedAt !== undefined)
         ) {
             return { fired: false };
         }
@@ -471,13 +586,23 @@ export const recordEventCheck = internalMutation
         const fireKey = fire ? `${trigger._id}:${fire.key}` : undefined;
         const claimed = fireKey !== undefined && (await claimOnce(ctx, EVENT_FIRE_SCOPE, fireKey, EVENT_FIRE_CLAIM_TTL_MS, trigger.userId));
         const { checkFailures, checkRetries } = state ?? trigger.eventState ?? {};
-        const kept = withoutCounters(state ?? trigger.eventState);
+        // The pending run is the watcher's own record, settled by `settleEventRun`: a check that read it earlier must not bring it back.
+        const kept = withoutPendingRun(withoutCounters(state ?? trigger.eventState));
+        const pendingRun = trigger.eventState?.pendingRun;
         // A moment in time fires once and is done; the others keep watching, after a cooldown.
         const nextTriggerAt = nextCheckAfterSuccess(config, { fired: fire !== undefined, interval, now, started: claimed });
         const recovered = (checkFailures ?? 0) > 0 || (checkRetries ?? 0) > 0;
 
+        // A newer firing replaces an older one still pending: only a queue outage longer than the cooldown could leave two.
+        const payload = claimed && fire ? buildEventPayload(fire.summary, fire.excerpt) : undefined;
+
         await patchRow(ctx.db, trigger, {
-            eventState: { ...kept, checkedAt: now, ...(claimed && { firedAt: now }) },
+            eventState: {
+                ...kept,
+                checkedAt: now,
+                ...(claimed && { firedAt: now }),
+                ...(payload === undefined ? pendingRun && { pendingRun } : { pendingRun: { firing: now, payload } }),
+            },
             nextTriggerAt,
             updatedAt: now,
             ...(recovered && { lastError: undefined }),
@@ -487,11 +612,11 @@ export const recordEventCheck = internalMutation
             await noteShardDue(ctx, nextTriggerAt, trigger.userId);
         }
 
-        if (claimed && fire) {
+        if (payload !== undefined) {
             // Scheduled, not sent: a job scheduled by a mutation is dropped with it if it fails, a queue send is not.
             await ctx.scheduler.runAfter(0, internal.triggers.events.startEventRun, {
                 firing: now,
-                payload: buildEventPayload(fire.summary, fire.excerpt),
+                payload,
                 triggerId,
                 userId: trigger.userId,
             });

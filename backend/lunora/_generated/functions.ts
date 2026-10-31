@@ -1336,9 +1336,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "tasks_internal:isRoundRunning": lunora_tasks_internal_173.isRoundRunning as unknown as RegisteredLunoraFunction,
     "tasks_internal:resolveTaskSkill": lunora_tasks_internal_173.resolveTaskSkill as unknown as RegisteredLunoraFunction,
     "triggers_events:dispatchDueEventTriggers": lunora_triggers_events_174.dispatchDueEventTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_events:isEventRunPending": lunora_triggers_events_174.isEventRunPending as unknown as RegisteredLunoraFunction,
     "triggers_events:latestThreadReply": lunora_triggers_events_174.latestThreadReply as unknown as RegisteredLunoraFunction,
     "triggers_events:recordEventCheck": lunora_triggers_events_174.recordEventCheck as unknown as RegisteredLunoraFunction,
     "triggers_events:runEventCheck": lunora_triggers_events_174.runEventCheck as unknown as RegisteredLunoraFunction,
+    "triggers_events:settleEventRun": lunora_triggers_events_174.settleEventRun as unknown as RegisteredLunoraFunction,
     "triggers_events:startEventRun": lunora_triggers_events_174.startEventRun as unknown as RegisteredLunoraFunction,
     "triggers_execute:default": lunora_triggers_execute_175.default as unknown as RegisteredLunoraFunction,
     "triggers_execute:executeTrigger": lunora_triggers_execute_175.executeTrigger as unknown as RegisteredLunoraFunction,
@@ -7479,11 +7481,27 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "skillId": source["skillId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_triggers_events_174.isEventRunPending.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { "firing": source["firing"], "triggerId": source["triggerId"] };
+});
 installCompiledValidatorMap(lunora_triggers_events_174.runEventCheck.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
+});
+installCompiledValidatorMap(lunora_triggers_events_174.settleEventRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
+if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
+if (typeof source["sent"] !== "boolean") return DEFER;
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { "attempt": source["attempt"], "firing": source["firing"], "sent": source["sent"], "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_176.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9391,10 +9409,12 @@ export interface Caller {
     triggers: {
         events: {
             dispatchDueEventTriggers: (args?: {}) => Promise<{ dispatched: number }>;
+            isEventRunPending: (args: { firing: number; triggerId: Id<"triggers"> }) => Promise<boolean>;
             latestThreadReply: (args: { after?: { order: number; stepOrder: number }; now: number; threadId: string; userId: string }) => Promise<{ accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; transient?: boolean; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
+            recordEventCheck: (args: { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } }; transient?: boolean; triggerId: Id<"triggers"> }) => Promise<{ fired: boolean }>;
             runEventCheck: (args: { triggerId: Id<"triggers"> }) => Promise<null>;
-            startEventRun: (args: { firing: number; payload: string; triggerId: Id<"triggers">; userId: string }) => Promise<null>;
+            settleEventRun: (args: { attempt: number; firing: number; sent: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
+            startEventRun: (args: { attempt?: number; firing: number; payload: string; triggerId: Id<"triggers">; userId: string }) => Promise<null>;
         };
         execute: {
             default: (args: { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
@@ -11076,9 +11096,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
     triggers: {
         events: {
             dispatchDueEventTriggers: (args) => callRegistered(context, "triggers_events:dispatchDueEventTriggers", args),
+            isEventRunPending: (args) => callRegistered(context, "triggers_events:isEventRunPending", args),
             latestThreadReply: (args) => callRegistered(context, "triggers_events:latestThreadReply", args),
             recordEventCheck: (args) => callRegistered(context, "triggers_events:recordEventCheck", args),
             runEventCheck: (args) => callRegistered(context, "triggers_events:runEventCheck", args),
+            settleEventRun: (args) => callRegistered(context, "triggers_events:settleEventRun", args),
             startEventRun: (args) => callRegistered(context, "triggers_events:startEventRun", args),
         },
         execute: {

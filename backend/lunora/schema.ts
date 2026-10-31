@@ -2858,7 +2858,10 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId_organizationId", ["userId", "organizationId"])
         .index("by_type_enabled", ["type", "enabled"])
-        .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"]),
+        .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"])
+        // The active-watcher cap counts one user's switched-on event triggers; the dispatcher reads the due ones in order. Both stop at a bound.
+        .index("by_userId_type_enabled", ["userId", "type", "enabled"])
+        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"]),
 
     twoFactor: defineTable({
         backupCodes: v.string(),

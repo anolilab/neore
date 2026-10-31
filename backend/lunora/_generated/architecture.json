@@ -6461,6 +6461,11 @@
       "to": "function:triggers_functions:getTriggerInternal"
     },
     {
+      "from": "function:triggers_events:settleEventRun",
+      "kind": "schedule",
+      "to": "function:triggers_events:startEventRun"
+    },
+    {
       "from": "function:triggers_execute:default",
       "kind": "call",
       "to": "function:bots_functions:getBotForRun"
@@ -14646,6 +14651,13 @@
     },
     {
       "detail": "query",
+      "id": "function:triggers_events:isEventRunPending",
+      "kind": "function",
+      "name": "triggers.events.isEventRunPending",
+      "module": "triggers"
+    },
+    {
+      "detail": "query",
       "id": "function:triggers_events:latestThreadReply",
       "kind": "function",
       "name": "triggers.events.latestThreadReply",
@@ -14663,6 +14675,13 @@
       "id": "function:triggers_events:runEventCheck",
       "kind": "function",
       "name": "triggers.events.runEventCheck",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:triggers_events:settleEventRun",
+      "kind": "function",
+      "name": "triggers.events.settleEventRun",
       "module": "triggers"
     },
     {
@@ -20840,20 +20859,38 @@
     {
       "file": "triggers/events",
       "kind": "read",
-      "line": 84,
+      "line": 88,
       "reason": "\"assertWatcherCapacity\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 298,
+      "line": 312,
       "reason": "\"performEventCheck\" is not a registered function"
     },
     {
       "file": "triggers/events",
       "kind": "call",
-      "line": 306,
+      "line": 320,
       "reason": "\"performEventCheck\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "call",
+      "line": 408,
+      "reason": "\"performEventRun\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "call",
+      "line": 416,
+      "reason": "\"performEventRun\" is not a registered function"
+    },
+    {
+      "file": "triggers/events",
+      "kind": "call",
+      "line": 421,
+      "reason": "\"performEventRun\" is not a registered function"
     },
     {
       "file": "triggers/gdpr",

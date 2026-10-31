@@ -13,9 +13,11 @@ import { createExecution, recordFilteredExecution, setTriggerEnabledInternal, sw
 import {
     EVENT_CHECK_LEASE_MS,
     EVENT_FIRE_CLAIM_TTL_MS,
+    EVENT_RUN_MAX_ATTEMPTS,
     dispatchDueEventTriggers,
     latestThreadReply,
     performEventCheck,
+    performEventRun,
     recordEventCheck,
     queueEventRun,
 } from "./events";
@@ -373,6 +375,26 @@ describe("a time watcher", () => {
     });
 });
 
+describe("a time watcher that has already fired", () => {
+    it("claims no second firing when a stray check reaches it after the claim expired", async () => {
+        const AT = NOW + 1000;
+        const id = await insertWatcher({ eventSource: { at: AT, kind: "time" }, nextTriggerAt: AT });
+
+        vi.setSystemTime(AT);
+        await check(id, "", AT);
+
+        const later = AT + EVENT_FIRE_CLAIM_TTL_MS + 1;
+
+        vi.setSystemTime(later);
+        await check(id, "", later);
+
+        expect(scheduledRuns()).toHaveLength(1);
+        const row = await readTrigger(id);
+
+        expect(row.eventState.firedAt).toBe(AT);
+    });
+});
+
 describe("handing a firing to the queue", () => {
     it("schedules the send from the claiming mutation, so a mutation that does not commit sends nothing", async () => {
         const id = await insertWatcher();
@@ -408,22 +430,93 @@ describe("handing a firing to the queue", () => {
 });
 
 describe("a send that fails", () => {
-    it("is thrown to the scheduler to run again, and leaves the firing recorded", async () => {
+    const fireMoment = async (): Promise<{ args: any; id: string }> => {
         const id = await insertWatcher({ eventSource: { at: NOW + 1000, kind: "time" }, nextTriggerAt: NOW + 1000 });
 
         vi.setSystemTime(NOW + 1000);
         await check(id, "", NOW + 1000);
+
+        return { args: scheduledRuns()[0], id };
+    };
+    const send = async (args: unknown): Promise<void> => await harness.run(async (ctx: any) => await performEventRun(ctx, args as never));
+
+    it("is repeated under the same job id, so a second send is one run", async () => {
+        const { args, id } = await fireMoment();
+
         enqueueJob.mockRejectedValueOnce(new Error("queue unavailable"));
-
-        const [args] = scheduledRuns();
-
         await expect(queueEventRun(args)).rejects.toThrow("queue unavailable");
         await queueEventRun(args);
 
-        const row = await readTrigger(id);
+        expect(enqueueJob).toHaveBeenCalledTimes(2);
+        expect(await readTrigger(id)).toMatchObject({ enabled: true, eventState: { firedAt: NOW + 1000 } });
+    });
+
+    it("keeps the firing pending until the queue has accepted it, then forgets it", async () => {
+        const { args, id } = await fireMoment();
+
+        const pending = await readTrigger(id);
+
+        expect(pending.eventState.pendingRun).toEqual({ firing: NOW + 1000, payload: args.payload });
+
+        await send(args);
+
+        const sent = await readTrigger(id);
+
+        expect(enqueueJob).toHaveBeenCalledTimes(1);
+        expect(Object.hasOwn(sent.eventState, "pendingRun")).toBe(false);
+    });
+
+    it("schedules another attempt instead of losing the firing when the queue refuses", async () => {
+        const { args, id } = await fireMoment();
+        const before = harness.scheduler.list().length;
+
+        enqueueJob.mockRejectedValueOnce(new Error("queue unavailable"));
+        await send(args);
+
+        const retries = harness.scheduler.list().slice(before);
+
+        expect(retries).toHaveLength(1);
+        expect(retries[0]!.args).toMatchObject({ attempt: 1, firing: NOW + 1000, triggerId: id });
+        expect(await readTrigger(id)).toMatchObject({ enabled: true, eventState: { pendingRun: { firing: NOW + 1000 } } });
+
+        await send(retries[0]!.args);
+
+        const settled = await readTrigger(id);
 
         expect(enqueueJob).toHaveBeenCalledTimes(2);
-        expect(row).toMatchObject({ enabled: true, eventState: { firedAt: NOW + 1000 } });
+        expect(settled.eventState.pendingRun).toBeUndefined();
+    });
+
+    it("gives up after the last attempt: the moment is switched off and the owner told", async () => {
+        const { args, id } = await fireMoment();
+
+        enqueueJob.mockRejectedValue(new Error("queue unavailable"));
+        await send({ ...args, attempt: EVENT_RUN_MAX_ATTEMPTS - 1 });
+        enqueueJob.mockReset();
+
+        const row = await readTrigger(id);
+
+        expect(row.enabled).toBe(false);
+        expect(row.lastError).toContain("could not be queued");
+        expect(row.eventState.pendingRun).toBeUndefined();
+    });
+
+    it("sends nothing for a firing that is no longer pending (already sent, or the watcher was re-armed)", async () => {
+        const { args, id } = await fireMoment();
+
+        await send(args);
+        await send(args);
+
+        expect(enqueueJob).toHaveBeenCalledTimes(1);
+
+        const again = await fireMoment();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(again.id, { eventState: { armedAt: NOW } }));
+        enqueueJob.mockClear();
+        await send(again.args);
+
+        expect(enqueueJob).not.toHaveBeenCalled();
+        expect(id).not.toBe(again.id);
     });
 });
 
@@ -627,6 +720,41 @@ describe("dispatching due watchers", () => {
         expect(harness.scheduler.list()).toEqual([]);
     });
 
+    it("does not dispatch a moment that has fired and is waiting for its run, however long that takes", async () => {
+        const id = await insertWatcher({
+            eventSource: { at: NOW - 600_000, kind: "time" },
+            eventState: { checkedAt: NOW - 600_000, firedAt: NOW - 600_000 },
+            nextTriggerAt: undefined,
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueEventTriggers, {}));
+
+        const row = await readTrigger(id);
+
+        expect(harness.scheduler.list()).toEqual([]);
+        expect(row.nextTriggerAt).toBeUndefined();
+    });
+
+    it("is not starved by due schedules, and starts at most one batch of checks", async () => {
+        for (let index = 0; index < 30; index += 1) {
+            await insertWatcher({ cronExpression: "0 9 * * *", eventSource: undefined, nextTriggerAt: NOW - 10_000 - index, type: "schedule" });
+        }
+
+        const wanted = await insertWatcher({ nextTriggerAt: NOW - 5000 });
+
+        for (let index = 0; index < 30; index += 1) {
+            await insertWatcher({ nextTriggerAt: NOW - 1 });
+        }
+
+        const result = await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueEventTriggers, {}));
+        const checked = harness.scheduler.list().map((job) => job.args.triggerId);
+
+        expect(result.dispatched).toBe(25);
+        expect(checked).toHaveLength(25);
+        expect(checked).toContain(wanted);
+        expect(noteShardDue).toHaveBeenCalledWith(expect.anything(), NOW, USER);
+    });
+
     it("switches off a legacy event row that has no condition", async () => {
         const id = await insertWatcher({ eventSource: undefined });
 
@@ -692,6 +820,34 @@ describe("the thread scan", () => {
         const later = await scan(threadId, second.baseline);
 
         expect(later.reply).toBeUndefined();
+    });
+
+    it("takes the newest settled row as the baseline even behind a reply still being written, so older replies never fire", async () => {
+        const threadId = await insertThread();
+        const rowIds: string[] = [];
+
+        for (let order = 0; order < 25; order += 1) {
+            const extra = order % 2 === 0 ? { userId: USER } : {};
+
+            rowIds.push(await insertRow(threadId, order, order % 2 === 0 ? "user" : "assistant", order === 5 ? { status: "pending" } : extra));
+        }
+
+        const first = await scan(threadId);
+
+        expect(first).toEqual({ accessible: true, baseline: { order: 24, stepOrder: 0 } });
+
+        // The reply that was being written settles: it, and every reply before the newest row, was there when the watch began.
+        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[5], { status: "success" }));
+
+        const later = await scan(threadId, first.baseline);
+
+        expect(later.reply).toBeUndefined();
+
+        await insertRow(threadId, 25, "assistant");
+
+        const fresh = await scan(threadId, first.baseline);
+
+        expect(fresh.reply).toMatchObject({ text: "assistant 25" });
     });
 
     it("sees a reply past the sixtieth row of the order the baseline is in, then the later orders", async () => {

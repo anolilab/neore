@@ -57,6 +57,8 @@ export const vEventState = v.object({
     lastOrder: v.optional(v.number()),
     lastStepOrder: v.optional(v.number()),
     matched: v.optional(v.boolean()),
+    // A firing whose run the jobs queue has not accepted yet; kept so a send that fails is tried again (`startEventRun`) and never lost.
+    pendingRun: v.optional(v.object({ firing: v.number(), payload: v.string() })),
 });
 
 export type EventState = Infer<typeof vEventState>;

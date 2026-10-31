@@ -1786,7 +1786,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
@@ -2346,7 +2346,7 @@ export interface IndexNamesByTable {
     threadVariables: "by_user" | "by_thread";
     toolApprovalRuns: "by_userId_status_createdAt" | "by_status_resolvedAt" | "by_status_createdAt" | "by_threadId" | "by_approvalId";
     triggerExecutions: "by_triggerId_status" | "by_triggerId_startedAt";
-    triggers: "by_enabled_nextTriggerAt" | "by_type_enabled" | "by_userId_organizationId";
+    triggers: "by_type_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_enabled_nextTriggerAt" | "by_type_enabled" | "by_userId_organizationId";
     twoFactor: "userId";
     usageBackfill: "by_userId";
     usageDaily: "by_date" | "by_user_date" | "by_user_skill_date";
@@ -4568,7 +4568,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string };
-    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean };
+    eventState?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } };
     eventType?: string;
     failureStreak?: number;
     filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;

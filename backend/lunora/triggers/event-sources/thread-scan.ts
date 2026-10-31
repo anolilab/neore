@@ -49,11 +49,16 @@ export const scanThreadRows = (
     const barrier = live.findIndex((row) => row.status === "pending");
     const settled = barrier === -1 ? live : live.slice(0, barrier);
     const fresh = after === undefined ? settled : settled.filter((row) => isAfter(row, after));
-    const last = fresh.at(-1);
+    // A first look has no replies to wait for: everything there now is history, so the baseline is the newest settled
+    // row even when a reply still being written sits before it (else that reply, once settled, would let older ones fire).
+    // With nothing settled at all it points just before the oldest row, never at "nothing".
+    const last = after === undefined ? live.findLast((row) => row.status !== "pending") : fresh.at(-1);
+    const oldest = after === undefined && last === undefined ? live[0] : undefined;
     const reply = after === undefined ? undefined : fresh.findLast((row) => isReply(row, watcherId));
 
     return {
         ...(last && { baseline: { order: last.order, stepOrder: last.stepOrder } }),
+        ...(oldest && { baseline: { order: oldest.order, stepOrder: oldest.stepOrder - 1 } }),
         ...(reply && { reply: { id: reply._id, text: (reply.text ?? "").slice(0, REPLY_EXCERPT_CHARS) } }),
     };
 };

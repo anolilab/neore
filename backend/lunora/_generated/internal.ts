@@ -986,10 +986,12 @@ export interface InternalApiTypes {
     triggers: {
         events: {
             dispatchDueEventTriggers: FunctionReference<"mutation", {}, { dispatched: number }>;
+            isEventRunPending: FunctionReference<"query", { firing: number; triggerId: Id<"triggers"> }, boolean>;
             latestThreadReply: FunctionReference<"query", { after?: { order: number; stepOrder: number }; now: number; threadId: string; userId: string }, { accessible: boolean; baseline?: { order: number; stepOrder: number }; reply?: { id: string; text: string } }>;
-            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean }; transient?: boolean; triggerId: Id<"triggers"> }, { fired: boolean }>;
+            recordEventCheck: FunctionReference<"mutation", { error?: string; fire?: { excerpt?: string; key: string; summary: string }; read: { armedAt?: number; checkedAt?: number; source: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string } }; state?: { armedAt?: number; checkedAt?: number; checkFailures?: number; checkRetries?: number; firedAt?: number; hash?: string; lastOrder?: number; lastStepOrder?: number; matched?: boolean; pendingRun?: { firing: number; payload: string } }; transient?: boolean; triggerId: Id<"triggers"> }, { fired: boolean }>;
             runEventCheck: FunctionReference<"action", { triggerId: Id<"triggers"> }, null>;
-            startEventRun: FunctionReference<"action", { firing: number; payload: string; triggerId: Id<"triggers">; userId: string }, null>;
+            settleEventRun: FunctionReference<"mutation", { attempt: number; firing: number; sent: boolean; triggerId: Id<"triggers"> }, null>;
+            startEventRun: FunctionReference<"action", { attempt?: number; firing: number; payload: string; triggerId: Id<"triggers">; userId: string }, null>;
         };
         execute: {
             default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
@@ -2037,9 +2039,11 @@ export const internal: InternalApiTypes = {
     triggers: {
         events: {
             dispatchDueEventTriggers: { __lunoraRef: "triggers_events:dispatchDueEventTriggers" },
+            isEventRunPending: { __lunoraRef: "triggers_events:isEventRunPending" },
             latestThreadReply: { __lunoraRef: "triggers_events:latestThreadReply" },
             recordEventCheck: { __lunoraRef: "triggers_events:recordEventCheck" },
             runEventCheck: { __lunoraRef: "triggers_events:runEventCheck" },
+            settleEventRun: { __lunoraRef: "triggers_events:settleEventRun" },
             startEventRun: { __lunoraRef: "triggers_events:startEventRun" },
         },
         execute: {

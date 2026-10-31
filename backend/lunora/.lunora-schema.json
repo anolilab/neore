@@ -21456,6 +21456,26 @@
               "nullable": false,
               "optional": true,
               "unique": false
+            },
+            "pendingRun": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "firing": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "payload": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              }
             }
           }
         },
@@ -21723,10 +21743,26 @@
           ],
           "unique": false
         },
+        "by_type_enabled_nextTriggerAt": {
+          "fields": [
+            "type",
+            "enabled",
+            "nextTriggerAt"
+          ],
+          "unique": false
+        },
         "by_userId_organizationId": {
           "fields": [
             "userId",
             "organizationId"
+          ],
+          "unique": false
+        },
+        "by_userId_type_enabled": {
+          "fields": [
+            "userId",
+            "type",
+            "enabled"
           ],
           "unique": false
         }
