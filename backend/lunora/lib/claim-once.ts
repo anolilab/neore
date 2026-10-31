@@ -22,6 +22,7 @@
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
+ * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
@@ -91,6 +92,12 @@ export const TRIGGER_DELIVERY_SCOPE = "trigger-delivery";
 
 /** Queue jobs: well past the queue's retry window (seconds to minutes); a day is plenty. */
 export const JOB_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** A side question's "Add to thread" (`chat/aside.ts`): a double click or a retry within a day writes the row once. */
+export const ASIDE_ADD_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** The scope of those claims. */
+export const ASIDE_ADD_SCOPE = "aside-add";
 
 /** A worker dispatch (`sub-agents/functions.ts`): the lead's tool call or the user's `clientId`, redelivered or retried within a day. */
 export const WORKER_DISPATCH_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;

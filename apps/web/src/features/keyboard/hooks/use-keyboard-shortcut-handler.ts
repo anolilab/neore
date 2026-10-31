@@ -26,6 +26,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
             }
 
             switch (action) {
+                case "askAside": {
+                    // The thread's listener opens the panel (`ask-aside-shortcut-listener.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("askAside"));
+                    break;
+                }
                 case "audioRecord": {
                     // Dispatch custom event for audio recording
                     // The audio recording hook listens for this event
