@@ -49,6 +49,7 @@ import {
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -236,6 +237,23 @@ export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): voi
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
 export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
+};
+
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
+export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
+    (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * A reply ended for good — drop the ciphertext of that reply's saved secret references (`requestSecret`). Best
+ * effort: it must never fail or delay the end of a run, and what it misses waits for the housekeeping sweep.
+ */
+export const discardRunSecrets = async (ctx: Pick<ActionCtx, "runMutation">, run: { streamId: string; threadId: string }): Promise<void> => {
+    try {
+        await ctx.runMutation(internal.chat.request_secret.discardSecretsOfThread, { streamId: run.streamId, threadId: run.threadId as Id<"threads"> });
+    } catch {
+        // Swept later.
+    }
 };
 
 /** Personalization only when the user set any of it; `undefined` otherwise, so the prompt carries no empty block. */
@@ -814,10 +832,13 @@ export const finishRun = async (
     const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
 
     if (approvalIds.length > 0) {
+        const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
+
         await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
+            ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
             threadId,
             userId,
         });
@@ -837,11 +858,20 @@ export const finishRun = async (
         throw asRefusedWrite(error, { reasoning: unsaved.reasoning + pending.reasoning, text: unsaved.text + pending.text });
     }
 
-    // A question only when every pending call is the askUser tool; any other tool in the set is an approval.
+    // A pause keeps the references (a consumer set to ask resumes the run); only a final end drops them. A group turn that
+    // goes on with the next speaker (`keepOpenUnlessPaused`) is not over either.
+    if (!paused && keepOpenUnlessPaused !== true) {
+        await discardRunSecrets(ctx, { streamId, threadId });
+    }
+
+    // A question when every pending call waits on the person's own input (askUser, or a secret card); any other tool
+    // in the set is an approval.
     let awaitingInput: AwaitingInput | undefined;
 
     if (paused) {
-        awaitingInput = askUserApprovalIds.length === approvalIds.length ? "question" : "approval";
+        const secretPending = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME).length;
+
+        awaitingInput = askUserApprovalIds.length + secretPending === approvalIds.length ? "question" : "approval";
     }
 
     return { awaitingInput, paused };
@@ -867,6 +897,7 @@ export const endStoppedRun = async (
         result: { consumeStream: () => PromiseLike<unknown> };
         stop: AbortController;
         streamId: string;
+        threadId: string;
     },
 ): Promise<string[]> => {
     if (!isStreamWriteRefused(error)) {
@@ -903,6 +934,7 @@ export const endStoppedRun = async (
     args.stop.abort();
     // Errors are reported on the result, not thrown; the abort ends the stream, so this returns once the save is done.
     await args.result.consumeStream();
+    await discardRunSecrets(ctx, { streamId: args.streamId, threadId: args.threadId });
 
     return stopped.messageId === undefined ? [] : [stopped.messageId];
 };
@@ -931,7 +963,7 @@ export const endStoppedRun = async (
 export const resumeApprovedRun = async (
     ctx: ActionCtx,
     args: {
-        /** An approved `askUser` call's answer: the resumed tool returns it as its result. */
+        /** An approved `askUser` call's answer, or a saved `requestSecret`'s reference: the resumed tool returns it as its result. */
         answer?: string;
         approvalId: string;
         approved: boolean;
@@ -1002,6 +1034,17 @@ export const resumeApprovedRun = async (
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
         }
 
+        // An answered secret request: the call's result is the stored value's reference, never the value.
+        if (approved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
+            if (answer === undefined) {
+                throw new AgentRunError("stale-approval", "A secret request can only be resumed with a reference");
+            }
+
+            const { createAnsweredRequestSecretTool } = await import("../tools/request-secret");
+
+            toolResult.tools[REQUEST_SECRET_TOOL_NAME] = createAnsweredRequestSecretTool(answer) as (typeof toolResult.tools)[string];
+        }
+
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
         const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
         const agent = await getAgent(config.model, {
@@ -1032,6 +1075,8 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
+        setRunStartedBy(ctx, config.startedBy);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1101,6 +1146,7 @@ export const resumeApprovedRun = async (
                 result,
                 stop: stopping,
                 streamId,
+                threadId,
             });
 
             // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -1259,4 +1305,6 @@ export const failRun = async (
     } catch {
         // The goal's own stall sweep ends it (`reapStalledGoals`).
     }
+
+    await discardRunSecrets(ctx, { streamId, threadId });
 };

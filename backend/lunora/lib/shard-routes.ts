@@ -16,9 +16,11 @@ import { internalQuery } from "../_generated/server";
  * `thread-public` routes a share TOKEN (the anonymous share page);
  * `thread-share` routes the id of a PUBLIC thread, so `/chat/<id>` opened by a
  * signed-in stranger can still find its share page. `device` routes a paired
- * device's id to its owner, for the host ingest (`acp/http.ts`).
+ * device's id to its owner, for the host ingest (`acp/http.ts`). `watch` routes a
+ * watched repository's id to its owner, for the repository webhook
+ * (`source-control/webhook.ts`).
  */
-export type ShardRouteKind = "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger";
+export type ShardRouteKind = "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch";
 
 /** The `shardRoutes.key` for `value` of `kind`. */
 export const shardRouteKey = (kind: ShardRouteKind, value: string): string => `${kind}:${value}`;
@@ -103,6 +105,7 @@ export const getRouteOwner = internalQuery
             v.literal("thread-public"),
             v.literal("thread-share"),
             v.literal("trigger"),
+            v.literal("watch"),
         ),
         value: v.string(),
     })

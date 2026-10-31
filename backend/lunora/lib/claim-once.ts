@@ -12,6 +12,7 @@
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
  * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` (`gitlab-token`) |
+ * | `watch-webhook`    | `<watchId>:<sig hex>`    | {@link TRIGGER_CLAIM_TTL_MS}   | `source-control/freshness-internal.ts` (a repository webhook: marks it dirty, nothing more) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |

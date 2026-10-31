@@ -15,7 +15,7 @@ import { accountDeletionWorkflowConfig } from "./deletion-workflow";
 const USER = "user-1";
 const PARAMS = { requestId: "request-1", userEmail: "user@example.com", userId: USER };
 
-type Entry = { args: Record<string, unknown>; kind: "run"; ref: string; shardKey?: string } | { kind: "step"; name: string };
+type Entry = { args: Record<string, unknown>; dedupId?: string; kind: "run"; ref: string; shardKey?: string } | { kind: "step"; name: string };
 
 let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
@@ -25,8 +25,8 @@ const rounds = new Map<string, number>();
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
 
 const workflowContext = () => {
-    const run = async (reference: unknown, args: Record<string, unknown>, options?: { shardKey?: string }) => {
-        const entry: Entry = { args, kind: "run", ref: refOf(reference), shardKey: options?.shardKey };
+    const run = async (reference: unknown, args: Record<string, unknown>, options?: { dedupId?: string; shardKey?: string }) => {
+        const entry: Entry = { args, dedupId: options?.dedupId, kind: "run", ref: refOf(reference), shardKey: options?.shardKey };
 
         trace.push(entry);
 
@@ -337,5 +337,37 @@ describe("account deletion workflow: batched steps", () => {
         await expect(execute()).rejects.toThrow("still had rows after 10000 batches");
 
         expect(completionIndex()).toBe(-1);
+    });
+});
+
+describe("account deletion workflow: watched repositories", () => {
+    const WATCHED = "source_control_gdpr:deleteUserWatchedRepositories";
+
+    // A raw `step.do` callback is skipped on a replay, so the body's positional dedup counter does not advance and a
+    // later call can be answered with an earlier call's cached result: the erasure would be reported done unrun.
+    // An id of its own, stable across replays and different per batch, cannot collide.
+    it("dispatches each batch under an id of its own that a replay reproduces", async () => {
+        answer = (ref, round) => {
+            return { cursor: null, hasMore: ref === WATCHED && round < 3 };
+        };
+        await execute();
+
+        const first = runs()
+            .filter((entry) => entry.ref === WATCHED)
+            .map((entry) => entry.dedupId);
+
+        expect(first).toHaveLength(3);
+        expect(new Set(first).size).toBe(3);
+        expect(first.every((id) => typeof id === "string" && id.includes(PARAMS.requestId))).toBe(true);
+
+        trace = [];
+        rounds.clear();
+        await execute();
+
+        expect(
+            runs()
+                .filter((entry) => entry.ref === WATCHED)
+                .map((entry) => entry.dedupId),
+        ).toEqual(first);
     });
 });

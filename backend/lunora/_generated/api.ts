@@ -299,6 +299,9 @@ export interface ApiTypes {
         rate_limit_retry: {
             retryRateLimitedRun: FunctionReference<"mutation", { threadId: Id<"threads">; unlockProof?: string }, { resumed: boolean }>;
         };
+        request_secret: {
+            answerSecretRequest: FunctionReference<"mutation", { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }, { alreadyResolved: boolean; streamId: string | null }> & { readonly sensitive: true };
+        };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
@@ -453,7 +456,7 @@ export interface ApiTypes {
     };
     home: {
         overview: {
-            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
+            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
         };
     };
     knowledge: {
@@ -527,7 +530,7 @@ export interface ApiTypes {
             setDailyBriefEnabled: FunctionReference<"mutation", { enabled: boolean }, null>;
         };
         functions: {
-            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
+            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; unreadCount: number }>;
             markAllNotificationsRead: FunctionReference<"mutation", {}, { hasMore: boolean }>;
             markNotificationRead: FunctionReference<"mutation", { notificationId: Id<"notifications"> }, null>;
         };
@@ -682,6 +685,14 @@ export interface ApiTypes {
         };
     };
     source_control: {
+        freshness: {
+            disableWatchWebhook: FunctionReference<"mutation", { repository: string }, { disabled: boolean }>;
+            enableWatchWebhook: FunctionReference<"mutation", { repository: string }, { id: string; secret: string; status: "ok" } | { status: "not_found" | "unsupported" }>;
+            listWatchedRepositories: FunctionReference<"query", {}, { limit: number; watched: Array<{ checkedAt: number; dirty: boolean; id: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhook: { enabled: boolean; seenAt: number } }> }>;
+            refreshWatchedRepositories: FunctionReference<"action", {}, { polled: number; status: "ok" }>;
+            unwatchRepo: FunctionReference<"mutation", { repository: string }, { removed: boolean }>;
+            watchRepo: FunctionReference<"mutation", { repository: string }, { status: "invalid" | "limit" | "ok" }>;
+        };
         functions: {
             getDevelopHost: FunctionReference<"action", {}, { connected: boolean; host: { capabilities: { groups: Record<string, Record<string, { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }>>; reportedAt: number; version: 1 }; connectorSlug: string; label: string; limits: { commits: number; files: number }; requestNoun: "merge request" | "pull request" } }>;
             getInbox: FunctionReference<"action", { page?: number; section: "needsMyReview" | "mine" | "readyToMerge" | "drafts" }, { hasMore: boolean; items: Array<{ authorLogin: string; commentCount: number; createdAt: number; draft: boolean; labels: Array<string>; number: number; repository: string; title: string; updatedAt: number; url: string }>; page: number; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
@@ -690,6 +701,15 @@ export interface ApiTypes {
             getPullRequestCommits: FunctionReference<"action", { number: number; repository: string; page?: number }, { commits: Array<{ authorName: string; committedAt: number; message: string; sha: string }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
             getPullRequestFiles: FunctionReference<"action", { number: number; repository: string; page?: number }, { files: Array<{ additions: number; deletions: number; patch: string | null; patchState: "full" | "host_omitted" | "over_budget" | "truncated"; path: string; previousPath: string | null; status: "added" | "changed" | "copied" | "modified" | "removed" | "renamed" | "unchanged" }>; hasMore: boolean; page: number; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
         };
+        guide_functions: {
+            applyGuideProposal: FunctionReference<"mutation", { guideId: Id<"pullRequestGuides">; headSha: string; proposalId: string }, { commentId: string | null; status: "applied" } | { status: "head_moved" | "not_found" | "not_ready" | "submitting" | "too_many" }>;
+            dismissGuideProposal: FunctionReference<"mutation", { guideId: Id<"pullRequestGuides">; proposalId: string }, { status: "dismissed" | "not_found" }>;
+            generateGuide: FunctionReference<"action", { number: number; repository: string; instructions: string }, { status: "started" } | { status: "guest" | "running" } | { retryAfter?: number; status: "quota" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+            getGuide: FunctionReference<"query", { number: number; repository: string; headSha: string }, null | { freshness: "current" | "stale"; guide: { failure?: "abandoned" | "head_moved" | "host_error" | "model_error" | "no_answer" | "not_connected" | "quota" | "too_large"; generatedAt: number; headSha: string; id: string; instructions: string; leftOut: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string; threadId?: string } }>;
+        };
+        guide_host: {
+            startHostGuide: FunctionReference<"action", { agentKey: string; deviceId: Id<"devices">; folderId: string; instructions: string; number: number; repository: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "guest" | "running" | "too_large" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
+        };
         merge_functions: {
             getMergeStatus: FunctionReference<"action", { number: number; repository: string }, { autoMergeAllowed: boolean; autoMergeEnabled: boolean; methods: Array<"merge" | "rebase" | "squash">; state: "behind" | "blocked" | "clean" | "conflicting" | "draft" | "unknown" | "unstable"; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
             mergePullRequest: FunctionReference<"action", { number: number; repository: string; headSha: string; method: "merge" | "rebase" | "squash" }, { sha: string | null; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
@@ -697,11 +717,11 @@ export interface ApiTypes {
             setAutoMerge: FunctionReference<"action", { number: number; repository: string; enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
         review_drafts: {
-            deleteDraftComment: FunctionReference<"mutation", { commentId: string; number: number; repository: string }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
+            deleteDraftComment: FunctionReference<"mutation", { commentId: string; number: number; repository: string }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
             discardReviewDraft: FunctionReference<"mutation", { number: number; repository: string }, { status: "ok" } | { status: "submitting" }>;
             getReviewDraft: FunctionReference<"query", { number: number; repository: string }, {} & { body: string; comments: ({} & { body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null; })[]; commitId: string; revision: number; submitting: boolean; updatedAt: number; verdict: "comment" | "approve" | "request_changes" | null; } | null>;
-            saveDraftComment: FunctionReference<"mutation", { body: string; commentId?: string; commitId: string; line: number; number: number; path: string; repository: string; side: "new" | "old"; startLine: number | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
-            setDraftReview: FunctionReference<"mutation", { body: string; commitId: string; number: number; repository: string; verdict: "approve" | "comment" | "request_changes" | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "submitting" | "head_moved" | "too_many"; })>;
+            saveDraftComment: FunctionReference<"mutation", { body: string; commentId?: string; commitId: string; line: number; number: number; path: string; repository: string; side: "new" | "old"; startLine: number | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
+            setDraftReview: FunctionReference<"mutation", { body: string; commitId: string; number: number; repository: string; verdict: "approve" | "comment" | "request_changes" | null }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
         };
         review_functions: {
             getReviewThreads: FunctionReference<"action", { number: number; repository: string; after?: string }, { endCursor: string | null; hasMore: boolean; status: "ok"; threads: Array<{ canResolve: boolean; canUnresolve: boolean; comments: Array<{ authorLogin: string; body: string; createdAt: number; id: string }>; id: string; isOutdated: boolean; isResolved: boolean; line: number | null; path: string; side: "new" | "old"; startLine: number | null }> } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
@@ -822,7 +842,7 @@ export interface ApiTypes {
             updateGalleryMeta: FunctionReference<"mutation", { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }, { success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "image" | "file" | "output" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         presence: {
             checkNodeLock: FunctionReference<"query", { nodeId: string; projectId: Id<"projects"> }, { locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -1128,6 +1148,9 @@ export const api: ApiTypes = {
         },
         rate_limit_retry: {
             retryRateLimitedRun: { __lunoraRef: "chat_rate_limit_retry:retryRateLimitedRun" },
+        },
+        request_secret: {
+            answerSecretRequest: { __lunoraRef: "chat_request_secret:answerSecretRequest", sensitive: true },
         },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },
@@ -1512,6 +1535,14 @@ export const api: ApiTypes = {
         },
     },
     source_control: {
+        freshness: {
+            disableWatchWebhook: { __lunoraRef: "source_control_freshness:disableWatchWebhook" },
+            enableWatchWebhook: { __lunoraRef: "source_control_freshness:enableWatchWebhook" },
+            listWatchedRepositories: { __lunoraRef: "source_control_freshness:listWatchedRepositories" },
+            refreshWatchedRepositories: { __lunoraRef: "source_control_freshness:refreshWatchedRepositories" },
+            unwatchRepo: { __lunoraRef: "source_control_freshness:unwatchRepo" },
+            watchRepo: { __lunoraRef: "source_control_freshness:watchRepo" },
+        },
         functions: {
             getDevelopHost: { __lunoraRef: "source_control_functions:getDevelopHost" },
             getInbox: { __lunoraRef: "source_control_functions:getInbox" },
@@ -1519,6 +1550,15 @@ export const api: ApiTypes = {
             getPullRequestChecks: { __lunoraRef: "source_control_functions:getPullRequestChecks" },
             getPullRequestCommits: { __lunoraRef: "source_control_functions:getPullRequestCommits" },
             getPullRequestFiles: { __lunoraRef: "source_control_functions:getPullRequestFiles" },
+        },
+        guide_functions: {
+            applyGuideProposal: { __lunoraRef: "source_control_guide_functions:applyGuideProposal" },
+            dismissGuideProposal: { __lunoraRef: "source_control_guide_functions:dismissGuideProposal" },
+            generateGuide: { __lunoraRef: "source_control_guide_functions:generateGuide" },
+            getGuide: { __lunoraRef: "source_control_guide_functions:getGuide" },
+        },
+        guide_host: {
+            startHostGuide: { __lunoraRef: "source_control_guide_host:startHostGuide" },
         },
         merge_functions: {
             getMergeStatus: { __lunoraRef: "source_control_merge_functions:getMergeStatus" },
