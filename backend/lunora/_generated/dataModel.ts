@@ -391,6 +391,7 @@ export interface Doc_devices {
     manifestIssuedAt?: number;
     name: string;
     platform: "macos" | "windows" | "linux";
+    projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
     transport?: "ssh";
     userId: string;
@@ -3192,6 +3193,7 @@ export interface Insert_devices {
     manifestIssuedAt?: number;
     name: string;
     platform: "macos" | "windows" | "linux";
+    projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
     transport?: "ssh";
     userId: string;

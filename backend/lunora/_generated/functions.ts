@@ -843,6 +843,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "devices_functions:renameDevice": lunora_devices_functions_88.renameDevice as unknown as RegisteredLunoraFunction,
     "devices_functions:reportDeviceCallProgress": lunora_devices_functions_88.reportDeviceCallProgress as unknown as RegisteredLunoraFunction,
     "devices_functions:revokeDevice": lunora_devices_functions_88.revokeDevice as unknown as RegisteredLunoraFunction,
+    "devices_functions:setDeviceProjectScope": lunora_devices_functions_88.setDeviceProjectScope as unknown as RegisteredLunoraFunction,
     "devices_functions:updateDeviceManifest": lunora_devices_functions_88.updateDeviceManifest as unknown as RegisteredLunoraFunction,
     "devices_gdpr:collectDevicesForExport": lunora_devices_gdpr_89.collectDevicesForExport as unknown as RegisteredLunoraFunction,
     "devices_gdpr:deleteUserDevices": lunora_devices_gdpr_89.deleteUserDevices as unknown as RegisteredLunoraFunction,
@@ -8660,13 +8661,14 @@ export interface Caller {
             getDeviceCallByToolCall: (args: { toolCallId: string }) => Promise<null | { _id: string; deviceName: string; phase?: "prompting" | "running"; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; toolName: string }>;
             heartbeatDevice: (args: { deviceId: Id<"devices">; viaDeviceId?: Id<"devices"> }) => Promise<{ paired: boolean }>;
             listDeviceCalls: (args: { deviceId?: Id<"devices">; limit?: number }) => Promise<Array<{ _id: string; completedAt?: number; createdAt: number; decision?: string; deviceId: string; deviceName: string; error?: string; exitCode?: number; input: string; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: string; toolName: string; truncated?: boolean }>>;
-            listDevices: (args?: {}) => Promise<Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
+            listDevices: (args?: {}) => Promise<Array<{ _id: string; createdAt: number; lastSeenAt?: number; name: string; platform: "macos" | "windows" | "linux"; projectIds?: Array<string>; toolNames: Array<string>; transport?: "ssh"; viaDeviceId?: string }>>;
             listPendingDeviceCalls: (args: { deviceId: Id<"devices">; hostDeviceIds?: Array<Id<"devices">> }) => Promise<Array<{ callId: string; deviceId: string; envelope: string; signature: string }>>;
             registerDevice: (args: { name: string; platform: "macos" | "windows" | "linux"; viaDeviceId?: Id<"devices"> }) => Promise<{ deviceId: string; secret: string }>;
             releaseDeviceCall: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; reason: string; viaDeviceId?: Id<"devices"> }) => Promise<null>;
             renameDevice: (args: { deviceId: Id<"devices">; name: string }) => Promise<null>;
             reportDeviceCallProgress: (args: { callId: Id<"deviceCalls">; deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ accepted: boolean }>;
             revokeDevice: (args: { deviceId: Id<"devices"> }) => Promise<null>;
+            setDeviceProjectScope: (args: { deviceId: Id<"devices">; scope: { kind: "any" } | { kind: "projects"; projectIds: Array<Id<"projects">> } }) => Promise<null>;
             updateDeviceManifest: (args: { deviceId: Id<"devices">; payload: string; signature: string; viaDeviceId?: Id<"devices"> }) => Promise<{ toolCount: number }>;
         };
         gdpr: {
@@ -10355,6 +10357,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             renameDevice: (args) => callRegistered(context, "devices_functions:renameDevice", args),
             reportDeviceCallProgress: (args) => callRegistered(context, "devices_functions:reportDeviceCallProgress", args),
             revokeDevice: (args) => callRegistered(context, "devices_functions:revokeDevice", args),
+            setDeviceProjectScope: (args) => callRegistered(context, "devices_functions:setDeviceProjectScope", args),
             updateDeviceManifest: (args) => callRegistered(context, "devices_functions:updateDeviceManifest", args),
         },
         gdpr: {

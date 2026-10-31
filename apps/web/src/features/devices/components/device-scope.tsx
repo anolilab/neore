@@ -1,0 +1,134 @@
+import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
+import { Checkbox } from "@neore/ui/components/checkbox";
+import { Label } from "@neore/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
+import { useMutation } from "@tanstack/react-query";
+import type { FC } from "react";
+import { useId, useState } from "react";
+import { toast } from "sonner";
+
+import { useProjectList } from "@/features/projects/hooks/use-projects";
+import { useCRPC } from "@/lib/lunora/crpc";
+
+/**
+ * Where one device's tools are offered: any chat, or only threads of the chosen projects. The server decides
+ * (and re-checks at call time); this only edits the setting, which applies from the next turn.
+ */
+/** Same set of ids, in any order; `undefined` is "any chat". */
+const sameScope = (a: string[] | undefined, b: string[] | undefined): boolean =>
+    a === undefined || b === undefined ? a === b : a.length === b.length && a.every((id) => b.includes(id));
+
+const DeviceScope: FC<{ deviceId: string; projectIds?: string[] }> = ({ deviceId, projectIds: stored }) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const baseId = useId();
+    // What the last successful save sent, and the stored value it replaced. Until the live device list moves past
+    // that stored value, edits build on the saved one, so a second quick edit cannot undo the first.
+    const [saved, setSaved] = useState<{ from: string[] | undefined; to: string[] | undefined } | undefined>(undefined);
+    const projectIds = saved && sameScope(saved.from, stored) ? saved.to : stored;
+    const scoped = projectIds !== undefined;
+    // The project list is only needed to draw the picker, so a device offered in any chat starts no query.
+    const { isAnswered, projects } = useProjectList(scoped);
+    const setScope = useMutation(crpc.devices.functions.setDeviceProjectScope.mutationOptions());
+    const chosen = new Set(projectIds);
+    // Chat projects are offered; a workflow project shows only when it is already in the scope, so it can be cleared.
+    const chat = projects.filter((project) => project.projectType !== "workflow" || chosen.has(project._id));
+    const listed = new Set(projects.map((project) => project._id as string));
+    // A chosen project outside the loaded page can still be taken out of the scope; until the list has answered,
+    // nothing is known to be outside it.
+    const unlisted = isAnswered ? [...chosen].filter((id) => !listed.has(id)) : [];
+
+    const save = (scope: { kind: "any" } | { kind: "projects"; projectIds: Id<"projects">[] }): void => {
+        setScope.mutate(
+            { deviceId: deviceId as Id<"devices">, scope },
+            {
+                onError: () => toast.error(t`Could not change where this device is offered.`),
+                onSuccess: () => setSaved({ from: stored, to: scope.kind === "any" ? undefined : scope.projectIds }),
+            },
+        );
+    };
+
+    return (
+        <div aria-labelledby={`${baseId}-label`} className="basis-full space-y-2" role="group">
+            <Label id={`${baseId}-label`}>{t`Where this device is offered`}</Label>
+            <RadioGroup
+                aria-labelledby={`${baseId}-label`}
+                disabled={setScope.isPending}
+                onValueChange={(value) => {
+                    if (value === "any") {
+                        save({ kind: "any" });
+                    } else if (!scoped) {
+                        save({ kind: "projects", projectIds: [] });
+                    }
+                }}
+                value={scoped ? "projects" : "any"}
+            >
+                <div className="flex items-center gap-2">
+                    <RadioGroupItem id={`${baseId}-any`} value="any" />
+                    <Label className="font-normal" htmlFor={`${baseId}-any`}>{t`Any of my chats`}</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                    <RadioGroupItem id={`${baseId}-projects`} value="projects" />
+                    <Label className="font-normal" htmlFor={`${baseId}-projects`}>{t`Only these projects`}</Label>
+                </div>
+            </RadioGroup>
+            {scoped && (
+                <div className="space-y-2 pl-6">
+                    {chat.length > 0 || unlisted.length > 0 ? (
+                        <ul aria-label={t`Projects this device is offered in`} className="space-y-1">
+                            {chat.map((project) => (
+                                <li className="flex items-center gap-2" key={project._id}>
+                                    <Checkbox
+                                        checked={chosen.has(project._id)}
+                                        disabled={setScope.isPending}
+                                        id={`${baseId}-${project._id}`}
+                                        onCheckedChange={(checked) => {
+                                            const next = new Set(chosen);
+
+                                            if (checked) {
+                                                next.add(project._id);
+                                            } else {
+                                                next.delete(project._id);
+                                            }
+
+                                            save({ kind: "projects", projectIds: [...next] as Id<"projects">[] });
+                                        }}
+                                    />
+                                    <Label className="text-xs font-normal" htmlFor={`${baseId}-${project._id}`}>
+                                        {project.title}
+                                    </Label>
+                                </li>
+                            ))}
+                            {unlisted.map((id) => (
+                                <li className="flex items-center gap-2" key={id}>
+                                    <Checkbox
+                                        checked
+                                        disabled={setScope.isPending}
+                                        id={`${baseId}-${id}`}
+                                        onCheckedChange={() => {
+                                            save({ kind: "projects", projectIds: [...chosen].filter((other) => other !== id) as Id<"projects">[] });
+                                        }}
+                                    />
+                                    <Label className="text-xs font-normal" htmlFor={`${baseId}-${id}`}>
+                                        {t`An older project not listed here`}
+                                    </Label>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-muted-foreground text-xs">{isAnswered ? t`You have no projects yet.` : t`Loading your projects…`}</p>
+                    )}
+                    {projects.length >= 100 && <p className="text-muted-foreground text-xs">{t`Only your 100 most recent projects are listed.`}</p>}
+                    <p className="text-muted-foreground text-xs" role="status">
+                        {chosen.size === 0
+                            ? t`Not offered in any chat until you choose a project.`
+                            : t`Offered only in chats that belong to the projects above. It applies from the next message.`}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default DeviceScope;
