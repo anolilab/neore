@@ -28,8 +28,11 @@ auditConfig:
     - GHSA-gcqx-w48m-w2h4
     # minimatch <11.0.1 and glob >=9 <=14.0.1 are fixed only in new majors (minimatch
     # 11, glob 14). Their consumers ask for minimatch 3/9/10 (3 kept CJS on purpose,
-    # see the overrides) and glob 10–13 through rimraf, workbox-build and commitizen,
-    # all build or dev time. Drop these once those dependencies move up.
+    # see the overrides) and glob 10–13: rimraf, workbox-build, commitizen and eslint at
+    # build or dev time, and the backend's e2b, which loads glob only by a dynamic import
+    # inside its template builder (`Template.build`). The backend creates sandboxes and
+    # never builds a template, and no pattern comes from user input. Drop these once
+    # those dependencies move up.
     - GHSA-g3hv-75wg-m249
     - GHSA-3g3m-2fjr-6pw4
 
