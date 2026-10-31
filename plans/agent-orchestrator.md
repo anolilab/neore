@@ -335,12 +335,17 @@ capability-gated steer.
   transaction that claims it: the same `acp_send` as `/hosts/send`, no charge, and a host that cannot take it
   (offline, ineligible, no session or an ended one, input too large) fails the run at once through `finishRun`, so the lead gets the per-run failure
   post. A busy one (its open-call budget spent, or another turn holding the session) puts the run back at the head of its
-  line and retries it, waits doubling from 5 s to 2 min, up to `HOST_START_MAX_ATTEMPTS` (8) tries. The
+  line and retries it. A spent budget waits doubling from 5 s to 2 min and fails the run after
+  `HOST_START_MAX_ATTEMPTS` (8) tries; a turn holding the session (`holdsSession`) is not counted, the run keeps
+  polling every 30 s until that turn ends (a host stream is bounded by its reaper), so a long desktop turn does not
+  fail a queued worker message. The
   turn's end (`turn_end`, the reaper, a revoke, Stop, a deleted thread) finishes the run that sent it (`hostTurnId`).
   A stop or a stale-run failure on this side cancels the turn on the computer and releases the line at once.
   Releasing the line before the computer confirms is safe: the desktop session keeps one turn at a time and queues an
-  `acp_send` that arrives while it is still cancelling, and a cancel by turn id leaves the prompts behind that turn
-  queued (`session.test.ts`). The cancel is still signed before the next send (`stopHostTurn`, the reaper).
+  `acp_send` that arrives while it is still cancelling, and a cancel that carries `keepQueue` (set only by a
+  worker run's stop, inside the signed envelope; `cancelHostTurnNow`) leaves the prompts behind that turn queued
+  (`session.test.ts`). Every other Stop, a person's from the web included, drops what waits behind the turn, which is
+  prompts typed in the desktop window. The cancel is still signed before the next send (`stopHostTurn`, the reaper).
   A dispatch needs the same lead as the device tools (`loadEligibleThread`: the user's own conversation, not shared,
   public, group or messenger), for a new worker and for every message to one. Creating a worker spends `hosts/start` too.
   `messageWorker` and `delegateToSubAgent` carry a `needsApproval` function that asks for a host target whatever the

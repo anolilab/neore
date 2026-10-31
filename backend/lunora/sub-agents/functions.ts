@@ -57,7 +57,7 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/acco
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { MAX_LENGTH } from "../lib/validators";
-import { HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
+import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
@@ -426,7 +426,8 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
         return;
     }
 
-    const attempts = (claimed.hostStartAttempts ?? 0) + 1;
+    // A turn that holds the session ends by itself, so a run waiting behind a long one is not failed for the wait.
+    const attempts = (claimed.hostStartAttempts ?? 0) + (sent.holdsSession === true ? 0 : 1);
 
     if (!sent.retry || attempts >= HOST_START_MAX_ATTEMPTS) {
         await finishRun(ctx, runId, { error: sent.error, kind: "failed" });
@@ -434,7 +435,7 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
         return;
     }
 
-    await putHostRunBack(ctx, claimed, attempts);
+    await putHostRunBack(ctx, claimed, attempts, sent.holdsSession === true ? HOST_SESSION_BUSY_RETRY_MS : hostStartRetryDelayMs(attempts));
 };
 
 /**
@@ -442,7 +443,7 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
  * line, so a later message is never started ahead of it (`claimQueuedRun` starts the head only). A retry that finds
  * the run started, cancelled or ended is a no-op: the claim decides, so a duplicate retry is harmless.
  */
-const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number): Promise<void> => {
+const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number, delayMs: number): Promise<void> => {
     const now = Date.now();
 
     await patchById(ctx.db, run._id, { hostStartAttempts: attempts, startedAt: undefined, status: "queued", updatedAt: now });
@@ -454,7 +455,7 @@ const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number): 
         await patchThread(ctx.db, worker._id, { status: "active", updatedAt: now });
     }
 
-    await ctx.scheduler.runAfter(hostStartRetryDelayMs(attempts), internal.sub_agents.functions.retryHostRunStart, { runId: run._id });
+    await ctx.scheduler.runAfter(delayMs, internal.sub_agents.functions.retryHostRunStart, { runId: run._id });
 };
 
 /** Tries again to start a host run that met a busy computer (a no-op unless it is still the queued head of its line). */

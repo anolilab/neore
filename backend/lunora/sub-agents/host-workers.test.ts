@@ -749,7 +749,11 @@ describe("stopping a host run", () => {
 
         expect(await runRow(receipt.runId)).toMatchObject({ status: "cancelled" });
         expect((await table("persistentStreams", { threadId: receipt.workerId }))[0]).toMatchObject({ hostState: "ended" });
-        expect(await table("deviceCalls", { toolName: "acp_cancel" })).toHaveLength(1);
+        const cancels = await table("deviceCalls", { toolName: "acp_cancel" });
+
+        expect(cancels).toHaveLength(1);
+        // A worker's stop leaves what waits behind the turn on the computer; the flag is inside the signed envelope.
+        expect(JSON.parse(cancels[0]!.envelope as string).input).toMatchObject({ keepQueue: true });
         // The loop is gone, so the queue is not held for it.
         expect(await runRow(queued.runId)).toMatchObject({ status: "running" });
     });
@@ -952,6 +956,33 @@ describe("a queued message that meets a busy computer", () => {
 
         expect((await leadMessages()).filter((message) => BUSY.test(message))).toHaveLength(1);
         expect(await sentCalls()).toHaveLength(1);
+    });
+
+    it("keeps waiting, past the attempt cap, while a turn from the desktop window holds the session, and starts once it ends", async () => {
+        const { filler, receipt, runId } = await queuedBehindBusyComputer();
+        const ended: Row = { ...(await table("persistentStreams", { threadId: receipt.workerId }))[0] };
+
+        delete ended._creationTime;
+        delete ended._id;
+
+        await freeOpenCalls(filler);
+
+        const holder = await run(async (context) => await context.db.insert("persistentStreams", { ...ended, hostState: "running", status: "streaming" }));
+
+        for (let attempt = 0; attempt < HOST_START_MAX_ATTEMPTS + 3; attempt += 1) {
+            await retryStart(runId);
+        }
+
+        // The wait for the person's turn is not counted: only the one budget refusal before it is.
+        expect(await runRow(runId)).toMatchObject({ hostStartAttempts: 1, status: "queued" });
+        expect((await runRow(runId)).error).toBeUndefined();
+        expect(await sentCalls()).toHaveLength(1);
+
+        await run(async (context) => await context.db.patch(holder, { hostState: "ended", status: "done" }));
+        await retryStart(runId);
+
+        expect(await runRow(runId)).toMatchObject({ status: "running" });
+        expect(await sentCalls()).toHaveLength(2);
     });
 
     it("fails at once when the refusal is final: the agent's session has ended", async () => {

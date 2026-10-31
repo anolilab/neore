@@ -26,8 +26,11 @@ const REFUSALS = {
     offline: "The host did not answer: that computer is offline.",
 } as const;
 
-/** How often a message that met a busy computer is tried again before it fails. */
+/** How often a message that met a computer with no room for another call is tried again before it fails. A turn holding the session does not count ({@link HostSendRefusal}). */
 export const HOST_START_MAX_ATTEMPTS = 8;
+
+/** The wait between tries while a turn holds the session: its length is not ours to know, so a steady poll rather than a growing wait. */
+export const HOST_SESSION_BUSY_RETRY_MS = 30_000;
 
 const HOST_START_RETRY_BASE_MS = 5000;
 const HOST_START_RETRY_CAP_MS = 120_000;
@@ -35,14 +38,18 @@ const HOST_START_RETRY_CAP_MS = 120_000;
 /** The wait before the next try after `attempts` busy answers: 5 s, doubling, at most 2 min. */
 export const hostStartRetryDelayMs = (attempts: number): number => Math.min(HOST_START_RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), HOST_START_RETRY_CAP_MS);
 
-/** Why a host run's message was not sent: `retry` means the computer is only busy right now, so the run waits; otherwise it is final. */
-export type HostSendRefusal = { error: string; retry: boolean };
+/**
+ * Why a host run's message was not sent: `retry` means the computer is only busy right now, so the run waits; otherwise it is final.
+ * `holdsSession` is the busy that is another turn running in the session: it ends when that turn does (a host stream
+ * is bounded by its own reaper), so the wait is not counted toward {@link HOST_START_MAX_ATTEMPTS}.
+ */
+export type HostSendRefusal = { error: string; holdsSession?: boolean; retry: boolean };
 
 /**
  * Sends a claimed run's message to the worker's agent: the same signed `acp_send` as a message from the web
  * (`queueHostTurn`), under a turn id the run keeps, so that turn's end finishes this run and no other. Answers why
  * nothing was sent: a refusal that is `retry` is a busy computer (its open-call budget is spent, or a turn holds the
- * session) and the caller holds the run for another try; any other fails the run, the turn is not held back for a
+ * session: `holdsSession`) and the caller holds the run for another try; any other fails the run, the turn is not held back for a
  * host that is not answering.
  */
 export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number): Promise<HostSendRefusal | { turnId: string }> => {
@@ -58,7 +65,7 @@ export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number
     });
 
     if (busy) {
-        return { error: "The agent is busy with another turn on that computer.", retry: true };
+        return { error: "The agent is busy with another turn on that computer.", holdsSession: true, retry: true };
     }
 
     // A task the lead wrote is model output, shaped by whatever the lead's run read: mark it untrusted on every count,
