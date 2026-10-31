@@ -91,7 +91,13 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
     // The mutation cache holds a mutation's variables for five minutes after it settles; `gcTime: 0` drops them (the value) at once.
-    const { isPending, mutate, reset } = useMutation({ ...crpc.chat.request_secret.answerSecretRequest.mutationOptions(), gcTime: 0 });
+    // Offline, the default network mode would PAUSE the call with the value in its variables; `always` sends it now, so it fails and is dropped.
+    const { isPending, mutate, reset } = useMutation({
+        ...crpc.chat.request_secret.answerSecretRequest.mutationOptions(),
+        gcTime: 0,
+        networkMode: "always",
+        retry: 0,
+    });
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as RequestSecretInput;
     const label = input.label ?? "";
