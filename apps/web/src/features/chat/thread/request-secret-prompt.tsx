@@ -30,6 +30,8 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import { providerLabel } from "./rate-limit-pause";
+
 /** Mirror `SECRET_HEADER_VALUE_MAX` and `SECRET_PROVIDER_KEY_MAX` on the server (`chat/tools/request-secret-constants.ts`). */
 const HEADER_VALUE_MAX = 10_000;
 const PROVIDER_KEY_MAX = 500;
@@ -45,15 +47,6 @@ interface RequestSecretInput {
 }
 
 type Submitted = "decline" | "save";
-
-const PROVIDER_NAMES: Record<string, string> = {
-    anthropic: "Anthropic",
-    groq: "Groq",
-    openai: "OpenAI",
-    openrouter: "OpenRouter",
-    requesty: "Requesty",
-    xai: "xAI",
-};
 
 /** Where the header will be sent, without a query or fragment (a saved URL can carry a token there). */
 const addressOf = (url: string): string => {
@@ -122,7 +115,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     let destination = "";
 
     if (input.use?.kind === "provider_key") {
-        const provider = PROVIDER_NAMES[input.use.provider] ?? input.use.provider;
+        const provider = providerLabel(input.use.provider) ?? input.use.provider;
 
         destination = t`Will be saved as your ${provider} API key`;
     } else if (input.use?.kind === "mcp_header") {

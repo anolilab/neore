@@ -210,7 +210,10 @@ describe(finishRun, () => {
     it("a normal finish writes its final chunk and reports no pause", async () => {
         const ctx = { runMutation: vi.fn(async () => null) };
 
-        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ awaitingInput: undefined, paused: false });
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
+            paused: false,
+        });
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
     });
 
@@ -225,7 +228,10 @@ describe(finishRun, () => {
             }),
         };
 
-        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({ awaitingInput: undefined, paused: false });
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
+            paused: false,
+        });
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, { streamId: "stream-1", threadId: "thread-1" });
     });
 
