@@ -2168,8 +2168,10 @@ fn a_coding_agent_runs_on_the_server_without_the_clients_agent_socket_and_dies_w
 
     assert!(process_alive(leader) && process_alive(child));
 
-    // The desktop quit: its ssh is gone, and the host with it.
-    finish(&connection, &target, &paths);
+    // The desktop quit: its ssh session is gone (that is what quitting does; the master may live on for its
+    // ControlPersist), and the host with it. Only the session is closed here, so a master left up cannot be what
+    // ended the agent.
+    connection.close();
     eventually("the agent outlived the connection", || {
         !process_alive(leader)
     });
@@ -2180,4 +2182,9 @@ fn a_coding_agent_runs_on_the_server_without_the_clients_agent_socket_and_dies_w
         live.ended.lock().unwrap().is_some(),
         "the sink should be told the connection ended"
     );
+    assert!(
+        master_is_running(&target, &paths),
+        "the master should still be up, so it is not what ended the agent"
+    );
+    finish(&connection, &target, &paths);
 }

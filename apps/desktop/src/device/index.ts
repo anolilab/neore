@@ -521,8 +521,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
      */
     const recoverFromRestart = async (core: DeviceCore): Promise<void> => {
         const host = requireHost(core);
-        // Read first: the replay opens channels, and the first of them rewrites the file of running turns.
+        // Read first: the replay opens channels, and the first of them rewrites the file of running turns. The same goes
+        // for each server's file: a held message that fails for a server opens a channel through that server's poster.
         const read = host.readLeftovers();
+        const serversRead = requireServers().readLeftovers();
         // The gate goes up now, not once the read is done: a start delivered meanwhile would be replayed as well.
         const recovered = requireCommands().recover(
             (async () => {
@@ -544,7 +546,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         await host.recover(leftovers);
         // The same for the turns a previous run left on a server, each ended through that server's own poster.
-        await requireServers().recover();
+        await requireServers().recover(await serversRead);
     };
 
     if (state.core !== undefined) {
@@ -733,6 +735,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         // A running agent was started under an approval this update may have taken away.
         await state.acp?.closeUnapproved(view);
+        // The variables for every agent reach a server's agents as well, and the core drops their approvals the same way.
+        await state.servers?.reviewApprovals();
 
         return view;
     };

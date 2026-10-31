@@ -330,6 +330,14 @@ fn drop_path_consents(settings: &mut crate::store::Settings, agent_key: Option<&
     settings
         .acp_consents
         .retain(|consent| agent_key.is_some_and(|key| consent.agent_key != key));
+
+    // The variables for every agent reach the agents of the servers too (`acp_host_spawn_plan`), so what the person
+    // approved there was approved for a different program.
+    if agent_key.is_none() {
+        for host in &mut settings.hosts {
+            host.acp_consents.clear();
+        }
+    }
 }
 
 impl DeviceState {

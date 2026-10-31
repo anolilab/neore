@@ -927,4 +927,28 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn a_global_variable_that_changes_which_program_runs_takes_the_servers_approvals_with_it() {
+        let (state, dir, _) = engine("global-env", None);
+        let host = "ha-global-env-host";
+        let set = |name: &str| AcpUpdate::SetEnv {
+            agent_key: None,
+            name: name.into(),
+            value: "v".into(),
+        };
+
+        // A proxy variable changes no program: the approvals stay.
+        state.acp_update(set("HTTPS_PROXY")).unwrap();
+        assert_eq!(state.settings().hosts[0].acp_consents.len(), 1);
+
+        // `PATH` decides which program a bare command starts: they are approvals for another program now.
+        state.acp_update(set("PATH")).unwrap();
+        assert!(state.settings().hosts[0].acp_consents.is_empty());
+        assert!(state
+            .acp_host_spawn_plan(host, "claude", "/srv/app")
+            .is_err());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

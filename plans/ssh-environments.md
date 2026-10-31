@@ -353,11 +353,15 @@ Where S7 departs from the text above:
   server and the server's does not sign for the desktop), and `sign_turn` signs a turn post only for the device it names.
   The ingest needs no change: the server is a device of its own, its `shardRoutes` row exists, and the backend test pins
   that a post signed with the desktop's secret naming the server is a 401. Each server has its own poster, running-turns
-  file (`acp-host-turns-<deviceId>.json`) and 401 streak.
+  file (`acp-host-turns-<deviceId>.json`) and 401 streak. The files are read before the held commands are replayed, as the
+  computer's own is, so a turn a restart cut off still ends as `interrupted`.
 - **The environment is built on the server**, from the host's own (`agent_env.rs`, shared with the desktop's list), plus
   `SSH_AUTH_SOCK` only when forwarding put one there, then the variables the person set (this computer's global ones, then
   the agent's), validated again on the host. The launch starts from `PATH=/usr/bin:/bin`, so an agent installed elsewhere
   needs an absolute command or its own `PATH` variable.
+- **Approvals follow the program.** A variable for every agent that changes which program runs (`PATH`, `NODE_*`, …) takes the
+  approvals of the servers' agents with it, as it does the computer's own, and ends their running sessions; so does
+  registering a different command for an agent of a server.
 - **The prompts name the server.** The agent's label is `<agent> on <server>`, in the permission prompt, the thread and
   the audit log; there is still no "Always allow".
 - **The computer's disk is never read for a server's folder.** A turn's changes (S9) and the images a reply names (S8) are

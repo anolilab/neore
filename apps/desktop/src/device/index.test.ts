@@ -266,7 +266,7 @@ const makeCore = () => {
         promptCurrent: vi.fn(() => null),
         promptSecret: vi.fn(),
         reapIdleServers: vi.fn(),
-        settingsGet: vi.fn(() => JSON.stringify({ paired: false, roots: [] })),
+        settingsGet: vi.fn(() => JSON.stringify({ hosts: [], paired: false, roots: [] })),
         settingsUpdate: vi.fn(() => JSON.stringify({ paired: false, roots: ["/x"] })),
         signTurn: vi.fn((payload: string) => `sig:${String(payload.length)}`),
         status: vi.fn(() => JSON.stringify({ accountLabel: null, deviceId: null, platform: "macos" })),

@@ -20,6 +20,7 @@ interface Post {
     firstSeq?: number;
     sessionId: string;
     threadId?: string;
+    turnId?: string;
 }
 
 let scratch: Scratch;
@@ -28,6 +29,7 @@ let stopped: number[];
 let posts: { post: Post; signature: string; url: string }[];
 let signed: string[];
 let children: Map<number, AgentProcess>;
+let records: ServerRecord[] | undefined;
 
 const SERVER = "srv-1";
 
@@ -114,7 +116,7 @@ const setup = (): { remote: RemoteAgents; servers: ServerAgents } => {
         gate: declineGate,
         onChange: () => {},
         remote,
-        servers: () => [record()],
+        servers: () => records ?? [record()],
         userData: scratch.dir,
     });
 
@@ -128,6 +130,7 @@ beforeEach(() => {
     posts = [];
     signed = [];
     children = new Map();
+    records = undefined;
 });
 
 afterEach(() => {
@@ -197,12 +200,52 @@ describe("coding agents on a server", () => {
         const path = await import("node:path");
 
         await writeFile(path.join(scratch.dir, `acp-host-turns-${SERVER}.json`), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "turn-9" }] }));
-        await servers.recover();
+        await servers.recover(await servers.readLeftovers());
 
         await expect.poll(() => posts.length, { timeout: 8000 }).toBeGreaterThan(0);
 
         for (const { post } of posts) {
             expect(post.deviceId).toBe(SERVER);
         }
+    });
+
+    it("still ends a turn a restart cut off when a held message for the same server opened its channel first", async () => {
+        const { servers } = setup();
+        const { writeFile } = await import("node:fs/promises");
+        const path = await import("node:path");
+
+        await writeFile(path.join(scratch.dir, `acp-host-turns-${SERVER}.json`), JSON.stringify({ turns: [{ sessionId: "old", threadId: "thread-9", turnId: "turn-9" }] }));
+
+        // Read before the replay, as the app does; the replay then opens a channel, which rewrites the file.
+        const read = await servers.readLeftovers();
+
+        servers.get(SERVER).poster.turnHeld("held", "turn-held", "hello", "thread-8");
+        await servers.recover(read);
+
+        // The turn the last run left is ended as interrupted, through this server's poster, though a channel opened first.
+        await expect
+            .poll(() => posts.some(({ post }) => post.turnId === "turn-9" && post.events.some((event) => event.kind === "turn_end" && (event as { reason?: string }).reason === "interrupted")), { timeout: 8000 })
+            .toBe(true);
+
+        for (const { post } of posts) {
+            expect(post.deviceId).toBe(SERVER);
+        }
+    });
+
+    it("ends the sessions a changed approval no longer covers, for each server", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+
+        await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-3", threadId: "thread-3" });
+        expect(runtime.acp.summaries()[0]?.status).not.toBe("ended");
+
+        // The server's record still covers the pair: nothing is closed.
+        await servers.reviewApprovals();
+        expect(runtime.acp.summaries()[0]?.status).not.toBe("ended");
+
+        // The core dropped the approvals (a variable that changes which program runs): the session ends.
+        records = [{ ...record(), acpConsents: [] }];
+        await servers.reviewApprovals();
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
     });
 });

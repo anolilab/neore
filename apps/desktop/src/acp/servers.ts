@@ -13,6 +13,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { EarlySends } from "./early-sends";
+import type { RunningTurn } from "./ingest";
 import { HostPoster } from "./ingest";
 import { AcpManager } from "./manager";
 import type { PermissionGate } from "./permission";
@@ -47,6 +48,12 @@ export interface ServerAgentsOptions {
 
 /** The file one server's poster keeps its running turns in; undefined for any other file name. */
 const STATE_FILE = /^acp-host-turns-(.{1,64})\.json$/;
+
+/** The turns a server's previous run left running, and the poster that ends them. */
+export interface Leftovers {
+    poster: HostPoster;
+    turns: RunningTurn[];
+}
 
 export interface ServerRuntime {
     acp: AcpManager;
@@ -88,14 +95,17 @@ export class ServerAgents {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);
     }
 
-    /** What a previous run left running on any server ends as `interrupted`, whether or not anything is started this time. */
-    public async recover(): Promise<void> {
+    /**
+     * Reads, from disk, the turns a previous run left running on each server. Read BEFORE anything that opens a channel (the
+     * replay of held commands does): the first channel rewrites the server's file, and the turns it held would be lost.
+     */
+    public async readLeftovers(): Promise<Leftovers[]> {
         let names: string[];
 
         try {
             names = await readdir(this.options.userData);
         } catch {
-            return;
+            return [];
         }
 
         const ids = names.flatMap((name) => {
@@ -104,14 +114,45 @@ export class ServerAgents {
             return deviceId !== undefined && this.isServer(deviceId) ? [deviceId] : [];
         });
 
-        await Promise.all(ids.map(async (deviceId) => {
+        return await Promise.all(ids.map(async (deviceId) => {
             const { poster } = this.get(deviceId);
 
             try {
-                await poster.recover(await poster.readLeftovers());
+                return { poster, turns: await poster.readLeftovers() };
+            } catch (error) {
+                this.options.log?.(`[acp-host] a server's unfinished turns could not be read: ${(error as Error).message}`);
+
+                return { poster, turns: [] };
+            }
+        }));
+    }
+
+    /** Ends what a previous run left running on a server as `interrupted`, whether or not an agent is started this time. */
+    public async recover(read: Leftovers[]): Promise<void> {
+        await Promise.all(read.map(async ({ poster, turns }) => {
+            try {
+                await poster.recover(turns);
             } catch (error) {
                 this.options.log?.(`[acp-host] a server's unfinished turns could not be ended: ${(error as Error).message}`);
             }
+        }));
+    }
+
+    /**
+     * Ends the sessions the person's approvals no longer cover, for every server with a runtime. The variables for all agents
+     * reach a server's agents too, so a change of those can take approvals away from servers as well.
+     */
+    public async reviewApprovals(): Promise<void> {
+        if (this.runtimes.size === 0) {
+            return;
+        }
+
+        const servers = this.options.servers();
+
+        await Promise.all(Array.from(this.runtimes, async ([deviceId, runtime]) => {
+            const record = servers.find((candidate) => candidate.deviceId === deviceId);
+
+            await runtime.acp.closeUnapproved({ agents: record?.acpAgents ?? [], consents: record?.acpConsents ?? [] });
         }));
     }
 
