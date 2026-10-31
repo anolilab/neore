@@ -1,4 +1,3 @@
-import type { NetworkState } from "expo-network";
 import { addNetworkStateListener, getNetworkStateAsync } from "expo-network";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -7,7 +6,7 @@ import { AccessibilityInfo, Platform } from "react-native";
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
 import type { ScopedCache } from "./cache";
-import { INITIAL_CONNECTIVITY, isOffline as isOfflineState, reduceConnectivity } from "./connectivity";
+import { canWrite, INITIAL_CONNECTIVITY, isOffline as isOfflineState, isReachable, reduceConnectivity } from "./connectivity";
 import { getOfflineCache } from "./database";
 import { OfflineContext } from "./offline-context";
 import { createReconnectRefresher } from "./reconnect";
@@ -17,20 +16,19 @@ const RETRY_MS = 15_000;
 
 const nextTick = (tick: number): number => tick + 1;
 
-const isReachable = (state: NetworkState): boolean => state.isConnected !== false && state.isInternetReachable !== false;
-
 /**
  * Tracks whether the app is offline (no network, the live socket down, or the last read failing on the network),
  * binds the cache to the signed-in account and empties it on sign-out. Everything it exposes is for reading:
  * coming back online moves `refreshTick` and nothing else.
  */
 export const OfflineProvider = ({ children }: { children: ReactNode }) => {
-    const { retryToken, status, user } = useAuth();
+    const { hasToken, retryToken, status, user } = useAuth();
     const [connectivity, dispatch] = useReducer(reduceConnectivity, INITIAL_CONNECTIVITY);
     const [refreshTick, setRefreshTick] = useState(0);
     const [bound, setBound] = useState<{ cache: ScopedCache; userId: string } | undefined>();
     const userId = user?.id;
     const isOffline = isOfflineState(connectivity);
+    const isChecking = !isOffline && !canWrite(connectivity);
     const wasOffline = useRef(false);
     // Coming back online reads again, and mints a token first if the one held may have lapsed or was never fetched.
     const refresher = useRef(
@@ -59,6 +57,13 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
             unsubscribe();
         };
     }, []);
+
+    // Signed in with no token: the server could not be reached to mint one, which is offline whatever the device says.
+    const isTokenMissing = status === "signed-in" && !hasToken;
+
+    useEffect(() => {
+        dispatch({ missing: isTokenMissing, type: "token" });
+    }, [isTokenMissing]);
 
     useEffect(() => {
         refresher.current.update(isOffline);
@@ -118,8 +123,8 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
 
     const cache = status === "signed-in" && bound !== undefined && bound.userId === userId ? bound.cache : undefined;
     const value = useMemo(() => {
-        return { cache, isOffline, refreshTick, reportRead };
-    }, [cache, isOffline, refreshTick, reportRead]);
+        return { cache, isChecking, isOffline, refreshTick, reportRead };
+    }, [cache, isChecking, isOffline, refreshTick, reportRead]);
 
     return <OfflineContext value={value}>{children}</OfflineContext>;
 };

@@ -35,3 +35,5 @@ export interface CachedStatus {
 export type ThreadRow = Synced<CachedThread>;
 export type MessageRow = Synced<CachedMessage> & { updatedAt: number };
 export type StatusRow = Synced<CachedStatus>;
+/** A status as a screen shows it: `fromCache` is true until a live read has replaced the saved copy. */
+export type ShownStatus = StatusRow & { fromCache: boolean };

@@ -91,7 +91,7 @@ const ChatScreen = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
     const { hasToken, status } = useAuth();
-    const { cache, isOffline, refreshTick, reportRead } = useOffline();
+    const { cache, refreshTick, reportRead } = useOffline();
     const composer = useWriteControl("composer");
     const sendControl = useWriteControl("send");
     // Once live rows are in, a late read of the cache must not touch the thread.
@@ -266,7 +266,7 @@ const ChatScreen = () => {
             getClient().setAuthToken(jwt);
 
             // Nothing is held back for later: a send that finds the app offline is refused, not queued.
-            const started = await requireOnline({ isOffline }, () =>
+            const started = await requireOnline({ isOffline: sendControl.disabled }, () =>
                 startChat({
                     body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
                     fetch,

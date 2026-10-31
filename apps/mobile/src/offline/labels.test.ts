@@ -37,6 +37,11 @@ describe("displayStatus", () => {
 
         expect(label).toBe("Last seen Oct 31, 12:00 PM");
     });
+
+    it("never calls a cached in-flight session Running, even when the app is online", () => {
+        expect(displayStatus("running", { fromCache: true, isOffline: false, lastSeenAt: undefined })).toBe("Last seen");
+        expect(displayStatus("running", { fromCache: false, isOffline: false, lastSeenAt: undefined })).toBe("Running");
+    });
 });
 
 describe("lastSyncedLabel", () => {

@@ -12,7 +12,7 @@ import { mergeRows } from "@/offline/merge";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
-import type { StatusRow, ThreadRow } from "@/offline/types";
+import type { ShownStatus, ThreadRow } from "@/offline/types";
 import { useHostStatuses } from "@/offline/use-host-statuses";
 
 /** Threads per request. The list asks for the next page when its end comes into view. */
@@ -49,13 +49,13 @@ const saveThreadPage = (cache: ScopedCache | undefined, page: Awaited<ReturnType
 };
 
 /** A host or worker status line for a row; any other thread shows one only while it is running. */
-const statusLine = (thread: ThreadRow, tracked: StatusRow | undefined, isOffline: boolean) => {
+const statusLine = (thread: ThreadRow, tracked: ShownStatus | undefined, isOffline: boolean, isLive: boolean) => {
     if (tracked) {
-        return <Text style={{ fontSize: 12 }}>{displayStatus(tracked.status, { isOffline, lastSeenAt: tracked.lastSeenAt })}</Text>;
+        return <Text style={{ fontSize: 12 }}>{displayStatus(tracked.status, { fromCache: tracked.fromCache, isOffline, lastSeenAt: tracked.lastSeenAt })}</Text>;
     }
 
     if (thread.status === "running") {
-        return <Text style={{ fontSize: 12 }}>{displayStatus(thread.status, { isOffline, lastSeenAt: thread.syncedAt })}</Text>;
+        return <Text style={{ fontSize: 12 }}>{displayStatus(thread.status, { fromCache: !isLive, isOffline, lastSeenAt: thread.syncedAt })}</Text>;
     }
 
     return null;
@@ -69,6 +69,8 @@ const ThreadListScreen = () => {
     const [threads, setThreads] = useState<ThreadRow[]>([]);
     // Once live data is in, a late read of the cache must not touch the list.
     const hasLiveData = useRef(false);
+    // The same fact for the render: until live data is in, every row is a saved copy and a running one reads "Last seen".
+    const [isLive, setIsLive] = useState(false);
     const [cursor, setCursor] = useState<string | null>(null);
     const [isDone, setIsDone] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -113,6 +115,7 @@ const ThreadListScreen = () => {
 
                 if (!isCancelled) {
                     hasLiveData.current = true;
+                    setIsLive(true);
                     setThreads(page.rows);
                     setCursor(page.continueCursor);
                     setIsDone(page.isDone);
@@ -217,7 +220,7 @@ const ThreadListScreen = () => {
                 <Link asChild href={`/chat/${item.id}`}>
                     <Pressable accessibilityRole="link" style={{ padding: 16 }}>
                         <Text numberOfLines={1}>{item.title}</Text>
-                        {statusLine(item, statuses.get(item.id), isOffline)}
+                        {statusLine(item, statuses.get(item.id), isOffline, isLive)}
                     </Pressable>
                 </Link>
             )}

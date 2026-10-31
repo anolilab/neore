@@ -7,6 +7,8 @@ import { writeControlState } from "./write-gate";
 export interface OfflineValue {
     /** The signed-in account's cache, or undefined while nobody is signed in. */
     cache: ScopedCache | undefined;
+    /** The network just came back and no request has answered yet: reads run, writes wait. */
+    isChecking: boolean;
     isOffline: boolean;
     /** Moves when a read should run again: the app came back online, or a retry is due while offline. Reads only. */
     refreshTick: number;
@@ -29,7 +31,7 @@ export const useOffline = (): OfflineValue => {
 
 /** The enabled state of one write control, with the reason it is off. */
 export const useWriteControl = (control: WriteControl): WriteControlState => {
-    const { isOffline } = useOffline();
+    const { isChecking, isOffline } = useOffline();
 
-    return writeControlState(control, { isOffline });
+    return writeControlState(control, { isChecking, isOffline });
 };

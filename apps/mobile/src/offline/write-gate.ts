@@ -5,6 +5,8 @@ export type WriteControl = (typeof WRITE_CONTROLS)[number];
 
 export const OFFLINE_REASON = "Unavailable offline. Reconnect to send.";
 
+export const CHECKING_REASON = "Checking the connection. Try again in a moment.";
+
 export interface WriteControlState {
     disabled: boolean;
     /** Why the control is disabled; read out with it. */
@@ -13,9 +15,14 @@ export interface WriteControlState {
 
 // `control` is unused today: every control follows the same rule, but a caller names the one it renders so a
 // later per-control rule (a capability gate, say) changes this function and not its callers.
-export const writeControlState = (_control: WriteControl, { isOffline }: { isOffline: boolean }): WriteControlState => {
+export const writeControlState = (_control: WriteControl, { isChecking = false, isOffline }: { isChecking?: boolean; isOffline: boolean }): WriteControlState => {
     if (isOffline) {
         return { disabled: true, reason: OFFLINE_REASON };
+    }
+
+    // The network reports back before anything has been heard from the server: not yet a connection to write over.
+    if (isChecking) {
+        return { disabled: true, reason: CHECKING_REASON };
     }
 
     return { disabled: false, reason: undefined };

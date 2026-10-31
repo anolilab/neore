@@ -40,12 +40,12 @@ export const lastSyncedLabel = (syncedAt: number | undefined, options: FormatOpt
 };
 
 /**
- * The status to show for a row. Online it is the live status. Offline an in-flight status becomes "Last seen":
- * the cache knows the session was running when it was read, not that it is running now.
+ * The status to show for a row. Online and live it is the live status. Offline, or read from the cache, an in-flight
+ * status becomes "Last seen": the cache knows the session was running when it was read, not that it is running now.
  */
 export const displayStatus = (
     status: string,
-    { isOffline, lastSeenAt, ...format }: FormatOptions & { isOffline: boolean; lastSeenAt: number | undefined },
+    { fromCache = false, isOffline, lastSeenAt, ...format }: FormatOptions & { fromCache?: boolean; isOffline: boolean; lastSeenAt: number | undefined },
 ): string => {
     // A host that stopped answering is "last seen" whether or not this phone is online: the phone never hears from a host itself.
     if (status === "offline") {
@@ -56,7 +56,7 @@ export const displayStatus = (
         return SETTLED[status] ?? status;
     }
 
-    if (!isOffline) {
+    if (!isOffline && !fromCache) {
         return "Running";
     }
 

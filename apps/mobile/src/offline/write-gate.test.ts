@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { OFFLINE_REASON, OfflineWriteError, requireOnline, WRITE_CONTROLS, writeControlState } from "./write-gate";
+import { CHECKING_REASON, OFFLINE_REASON, OfflineWriteError, requireOnline, WRITE_CONTROLS, writeControlState } from "./write-gate";
 
 describe("writeControlState", () => {
     it("disables every write control while offline and says why", () => {
@@ -14,6 +14,12 @@ describe("writeControlState", () => {
 
     it("covers the composer, send, approve, cancel and start controls", () => {
         expect([...WRITE_CONTROLS].toSorted((a, b) => a.localeCompare(b))).toEqual(["approve", "cancel", "composer", "send", "start"]);
+    });
+
+    it("keeps them disabled while a returning connection is being confirmed, with its own reason", () => {
+        for (const control of WRITE_CONTROLS) {
+            expect(writeControlState(control, { isChecking: true, isOffline: false }), control).toEqual({ disabled: true, reason: CHECKING_REASON });
+        }
     });
 
     it("enables them online with no reason", () => {
