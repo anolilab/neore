@@ -12068,6 +12068,9 @@
                           "archiveThread": {
                             "type": "string"
                           },
+                          "askAside": {
+                            "type": "string"
+                          },
                           "audioRecord": {
                             "type": "string"
                           },
@@ -15039,6 +15042,186 @@
           }
         },
         "summary": "action: chat_agent_switch:switchThreadAgent",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#chat_aside:addAsideToThread": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_aside:addAsideToThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_aside:addAsideToThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "answer": {
+                        "type": "string"
+                      },
+                      "entryId": {
+                        "type": "string"
+                      },
+                      "question": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "answer",
+                      "entryId",
+                      "question",
+                      "threadId",
+                      "token"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_aside:addAsideToThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "messageId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "messageId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_aside:addAsideToThread",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_aside:askAside": {
+      "post": {
+        "description": "Invoke the `action` `chat_aside:askAside` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_aside:askAside",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "entryId": {
+                        "type": "string"
+                      },
+                      "question": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "entryId",
+                      "question",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_aside:askAside",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "answer": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "withThread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "answer",
+                    "token",
+                    "withThread"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_aside:askAside",
         "tags": [
           "chat"
         ],

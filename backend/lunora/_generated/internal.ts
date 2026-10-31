@@ -323,6 +323,9 @@ export interface InternalApiTypes {
             commitAgentSwitch: FunctionReference<"mutation", { clientId: string; expectedLeafId: string; handoff?: { mode: "delta" | "portable"; summarized: boolean; text: string }; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; coldStartCostly: boolean; messageId: string | null; switched: boolean }>;
             planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
         };
+        aside: {
+            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
+        };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;
         };
@@ -1447,6 +1450,9 @@ export const internal: InternalApiTypes = {
             beginSwitchSummary: { __lunoraRef: "chat_agent_switch:beginSwitchSummary" },
             commitAgentSwitch: { __lunoraRef: "chat_agent_switch:commitAgentSwitch" },
             planAgentSwitch: { __lunoraRef: "chat_agent_switch:planAgentSwitch" },
+        },
+        aside: {
+            readAsideSnapshot: { __lunoraRef: "chat_aside:readAsideSnapshot" },
         },
         autocomplete: {
             isComposerAutocompleteEnabled: { __lunoraRef: "chat_autocomplete:isComposerAutocompleteEnabled" },
