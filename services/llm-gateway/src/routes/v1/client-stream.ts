@@ -232,7 +232,13 @@ clientStreamRouter.post("/v1/stream", async (c) => {
                     }
 
                     const data = (await response.json()) as {
-                        chunks: { reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }[];
+                        chunks: {
+                            reasoning?: string;
+                            restart?: boolean;
+                            speaker?: { name: string; skillId: string };
+                            text: string;
+                            toolProgress?: unknown;
+                        }[];
                         /** The backend held the poll until it had something (or its wait ran out). */
                         longPoll?: boolean;
                         status: string;
@@ -242,10 +248,17 @@ clientStreamRouter.post("/v1/stream", async (c) => {
                     // Write new chunks as NDJSON lines
                     for (const chunk of data.chunks) {
                         // `speaker` marks a group-chat participant starting to speak;
-                        // `restart`, the reply continuing below a steered message.
+                        // `restart`, the reply continuing below a steered message; `toolProgress`, a running
+                        // MCP tool call's latest report (no text).
                         controller.enqueue(
                             encoder.encode(
-                                `${JSON.stringify({ reasoning: chunk.reasoning, ...(chunk.restart && { restart: true }), speaker: chunk.speaker, text: chunk.text })}\n`,
+                                `${JSON.stringify({
+                                    reasoning: chunk.reasoning,
+                                    ...(chunk.restart && { restart: true }),
+                                    speaker: chunk.speaker,
+                                    text: chunk.text,
+                                    ...(chunk.toolProgress !== undefined && { toolProgress: chunk.toolProgress }),
+                                })}\n`,
                             ),
                         );
                     }

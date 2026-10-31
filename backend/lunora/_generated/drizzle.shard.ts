@@ -1035,6 +1035,7 @@ export const persistentChunks = sqliteTable("persistentChunks", {
     speaker: text("speaker", { mode: "json" }).$type<{ name: string; skillId: string }>(),
     streamId: text("streamId").references((): AnySQLiteColumn => persistentStreams._id).notNull(),
     text: text("text").notNull(),
+    toolProgress: text("toolProgress", { mode: "json" }).$type<{ ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number }>(),
 }, (t) => ({
     by_streamId_seq: index("by_streamId_seq").on(t.streamId, t.seq),
 }));

@@ -59,6 +59,19 @@ const vStreamBody = v.object({
     // drift from the one the table and the writer use.
     status: streamStatusValidator,
     text: v.string(),
+    /** The MCP tool calls running now, each with its latest report: what a viewer without the live stream still shows. */
+    toolProgress: v.optional(
+        v.array(
+            v.object({
+                message: v.optional(v.string().max(MAX_LENGTH.short)),
+                progress: v.number(),
+                serverName: v.string().max(MAX_LENGTH.short),
+                toolCallId: v.string().max(MAX_LENGTH.id),
+                toolName: v.string().max(MAX_LENGTH.short),
+                total: v.optional(v.number()),
+            }),
+        ),
+    ),
 });
 
 // `.output()` is declared, not merely annotated on the handler.
@@ -103,7 +116,16 @@ export const getStreamBody = optionalAuthQuery
 
         const body = await persistentTextStreaming.getStreamBody(ctx, input.streamId as StreamId);
 
-        return access.kind === "full" ? body : { ...body, reasoning: "" };
+        if (access.kind === "full") {
+            return body;
+        }
+
+        // Like the reasoning, which tool is running (and what it says) is not part of what a public thread shows.
+        const visible = { ...body, reasoning: "" };
+
+        delete visible.toolProgress;
+
+        return visible;
     });
 
 export const createStreamWithMessage = internalMutation
