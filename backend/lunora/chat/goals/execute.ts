@@ -22,10 +22,14 @@ import { reviewRound } from "./review";
 /**
  * Called when a run that may belong to a goal has ended. Returns whether a goal
  * review was queued — then the goal owns the thread's status and the follow-up
- * suggestions until it ends, and the caller leaves both alone.
+ * suggestions until it ends, and the caller leaves both alone. `messageId` is the
+ * prompt row the run answered: only the goal whose current round it opened is handed the run.
  */
-export const handOffToGoalReview = async (ctx: Pick<ActionCtx, "runQuery">, threadId: string): Promise<boolean> => {
-    const goal = await ctx.runQuery(internal.chat.goals.internal.getActiveGoalForRun, { threadId: threadId as never });
+export const handOffToGoalReview = async (ctx: Pick<ActionCtx, "runQuery">, threadId: string, messageId?: string): Promise<boolean> => {
+    const goal = await ctx.runQuery(internal.chat.goals.internal.getActiveGoalForRun, {
+        ...(messageId !== undefined && { messageId }),
+        threadId: threadId as never,
+    });
 
     if (!goal) {
         return false;

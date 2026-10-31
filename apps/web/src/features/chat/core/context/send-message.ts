@@ -138,6 +138,9 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
     const isCreatingNewThread = !threadId;
 
     if (localTarget) {
+        // A local turn never carries a goal: clear one that is armed, so it cannot ride the next gateway send.
+        useGoalComposer.getState().setEnabled(false);
+
         const restoreComposer = (message: string | undefined) => {
             setOptimisticMessages(withoutMessage(optimisticId));
             useChatUIStore.getState().setComposerText(text);
@@ -370,10 +373,8 @@ export const runSendMessage = async (env: SendMessageEnv, text: string, attachme
 
             const composerMode = useModelStore.getState().getComposerMode(threadId || undefined);
 
-            // A goal is spent by the message that carried it.
-            if (goal) {
-                useGoalComposer.getState().setEnabled(false);
-            }
+            // A goal is spent by the message that carried it; one armed in text mode does not wait out an image or video send.
+            useGoalComposer.getState().setEnabled(false);
 
             trackEvent("stream_started", { model });
             trackEvent("message_sent", {

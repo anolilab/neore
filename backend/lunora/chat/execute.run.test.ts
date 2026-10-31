@@ -292,6 +292,21 @@ describe("runStreamingAgent: a redelivered job", () => {
     });
 });
 
+describe("runStreamingAgent: a goal's queued round", () => {
+    it("does not run when its goal ended after the round was queued, and gives the thread back", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch(ids.messageId as never, { agentName: "neore:goal" }));
+
+        await run();
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(0);
+        expect(state.replies).toHaveLength(0);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+});
+
 describe("runStreamingAgent: a failed run", () => {
     it("finishes the stream with the error and resets the thread to `error` when the model call fails", async () => {
         modelState.model = new MockLanguageModelV3({

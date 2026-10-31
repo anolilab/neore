@@ -21,20 +21,35 @@ export const stopGoalRow = async (ctx: GoalCtx, goal: Doc<"threadGoals">, reason
 };
 
 /**
- * Ends every active goal of the thread but `except` (the one a message is starting). Returns whether one was ended. Plain function:
+ * Ends every active goal of the thread. Returns whether one was ended. Plain function:
  * the stop mutation, `startGoal` and the run-failure path call it inside their own
  * transaction. A goal ended here never reviews or continues: the review job and
  * `recordGoalVerdict` both check the status.
  */
-export const endActiveGoals = async (ctx: GoalCtx, threadId: Id<"threads">, reason: GoalStopReason, except?: Id<"threadGoals">): Promise<boolean> => {
-    const active = await activeGoalsOf(ctx, threadId);
-    const goals = active.filter((goal) => goal._id !== except);
+export const endActiveGoals = async (ctx: GoalCtx, threadId: Id<"threads">, reason: GoalStopReason): Promise<boolean> => {
+    const goals = await activeGoalsOf(ctx, threadId);
 
     for (const goal of goals) {
         await stopGoalRow(ctx, goal, reason);
     }
 
     return goals.length > 0;
+};
+
+/** Whether a run is queued (`pending`) or running (`streaming`) on the thread. */
+export const hasLiveStream = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
+    for (const status of ["pending", "streaming"] as const) {
+        const live = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", status))
+            .first();
+
+        if (live) {
+            return true;
+        }
+    }
+
+    return false;
 };
 
 /**

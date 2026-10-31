@@ -3,8 +3,10 @@
  * it are all here, each idempotent, because the review runs on the jobs queue
  * (at least once):
  *
- * - `startGoal` opens a goal; the message that starts it ends the thread's previous one
- *   (`createStreamWithMessage`).
+ * - `startGoal` opens a goal and, in the same transaction, ends the thread's previous one: a later
+ *   start can never be ended by an earlier one's stream, which is created afterwards.
+ * - `closeStaleGoalRound` is the check a goal's next round makes before it runs: a round whose goal
+ *   ended in between (a new message, Stop) closes its stream instead of running beside the user's turn.
  * - `claimGoalRound` is the claim a review takes before it spends a model call,
  *   like `claimStreamRun` for a stream: round N is claimed by one delivery only.
  * - `recordGoalVerdict` applies the verdict. When the goal goes on, the next
@@ -16,7 +18,7 @@
  */
 import { v } from "lunorash/server";
 
-import type { Doc } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { candidatesOnActivePath } from "../../agent/branch-rows";
@@ -38,7 +40,7 @@ import {
     GOAL_TEXT_MAX,
     type GoalStopReason,
 } from "./logic";
-import { activeGoalsOf, endActiveGoals, giveThreadBack, stopGoalRow } from "./rows";
+import { activeGoalsOf, endActiveGoals, giveThreadBack, hasLiveStream, stopGoalRow } from "./rows";
 import { GOAL_CONTINUATION_AGENT } from "./shared";
 import { vGoalRunConfig, vGoalStopReason } from "./validators";
 
@@ -89,6 +91,9 @@ export const startGoal = internalMutation
             return { error: "A goal can only be set in your own chat.", ok: false as const };
         }
 
+        // A goal replaces the thread's previous one here, with the insert: the later of two concurrent starts is the one left active.
+        await endActiveGoals(ctx, args.threadId, "superseded");
+
         const { now } = ctx;
         const goalId = await ctx.db.insert("threadGoals", {
             config: args.config,
@@ -111,14 +116,52 @@ export const startGoal = internalMutation
         return { goalId, ok: true as const };
     });
 
-/** The thread's goal, when one is still running. The run that just ended asks, to learn whether a review owes it a hand-off. */
+/**
+ * The thread's goal, when one is still running. The run that just ended asks, to learn whether a review owes it a hand-off.
+ * A run that knows its prompt row (`messageId`) is handed off only to the goal whose current round that row opened, so a
+ * run of a superseded goal never reviews, or ends, the goal that replaced it.
+ */
 export const getActiveGoalForRun = internalQuery
-    .input({ threadId: v.id("threads") })
+    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.id("threads") })
     .output(v.union(v.object({ goalId: v.id("threadGoals"), round: v.number() }), v.null()))
     .query(async ({ args, ctx }) => {
-        const [goal] = await activeGoalsOf(ctx, args.threadId);
+        const goals = await activeGoalsOf(ctx, args.threadId);
+        const goal = goals.find((row) => args.messageId === undefined || row.promptMessageId === args.messageId);
 
         return goal ? { goalId: goal._id, round: goal.round } : null;
+    });
+
+/**
+ * Whether the run that claimed `streamId` for the goal instruction row `messageId` is still wanted. The next round's
+ * stream is written with the verdict and its job queued after; a new message, a regenerate, an edit or a Stop in
+ * between ends the goal and leaves that stream `pending`. Such a run is refused here: its stream is closed and the
+ * thread given back unless another run holds it.
+ */
+export const closeStaleGoalRound = internalMutation
+    .input({ messageId: v.string().max(MAX_LENGTH.id), streamId: v.id("persistentStreams") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.get(args.streamId);
+
+        if (!stream) {
+            return false;
+        }
+
+        const threadId = stream.threadId as Id<"threads">;
+
+        const goals = await activeGoalsOf(ctx, threadId);
+
+        if (goals.some((goal) => goal.promptMessageId === args.messageId)) {
+            return true;
+        }
+
+        await ctx.db.patch(stream._id, { status: "done" });
+
+        if (!(await hasLiveStream(ctx, threadId))) {
+            await giveThreadBack(ctx, threadId);
+        }
+
+        return false;
     });
 
 /**
@@ -175,6 +218,8 @@ export const roundTranscript = internalQuery
         // Newest first; the round is everything newer than its prompt (all of it, if the scan did not reach the prompt).
         const round = prompt === -1 ? recent : recent.slice(0, prompt);
         const rows = round.toReversed().filter((row) => (row.message as { role?: string } | undefined)?.role !== "user");
+        // The round's prompt row carries the taint of every round before it (the reviewer's note), which nothing in this round may drop.
+        const taintRows = prompt === -1 ? round : recent.slice(0, prompt + 1);
         const last = round[0];
         const cost = sumMessageCosts(rows.map((row) => row.providerMetadata));
         const lastReply = rows.findLast((row) => !row.tool);
@@ -183,7 +228,7 @@ export const roundTranscript = internalQuery
             costMicrodollars: Math.round(cost?.microdollars ?? 0),
             ...(last && { lastMessage: { id: last._id as string, order: last.order } }),
             ...(lastReply && { lastOrder: lastReply.order }),
-            taintedBy: computeTaint(rows.map((row) => row.message as { content?: unknown; role?: unknown })),
+            taintedBy: computeTaint(taintRows.toReversed().map((row) => row.message as { content?: unknown; role?: unknown })),
             transcript: buildGoalTranscript(rows),
         };
     });
@@ -355,15 +400,8 @@ export const GOAL_STALL_MS = 60 * 60 * 1000;
  * has lost its hand-off.
  */
 const isGoalWaiting = async (ctx: Pick<MutationCtx, "db">, goal: Doc<"threadGoals">): Promise<boolean> => {
-    for (const status of ["pending", "streaming"] as const) {
-        const live = await ctx.db
-            .query("persistentStreams")
-            .withIndex("by_threadId_status", (q) => q.eq("threadId", goal.threadId).eq("status", status))
-            .first();
-
-        if (live) {
-            return true;
-        }
+    if (await hasLiveStream(ctx, goal.threadId)) {
+        return true;
     }
 
     // The user's unanswered approvals are few; the thread's answered ones are not, and would hide a new pending one.

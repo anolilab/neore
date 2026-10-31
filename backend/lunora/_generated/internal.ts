@@ -347,9 +347,10 @@ export interface InternalApiTypes {
             internal: {
                 chargeGoalRound: FunctionReference<"mutation", { userId: string }, boolean>;
                 claimGoalRound: FunctionReference<"mutation", { goalId: Id<"threadGoals">; round: number }, { text: string; threadId: Id<"threads">; userId: string } | null>;
+                closeStaleGoalRound: FunctionReference<"mutation", { messageId: string; streamId: Id<"persistentStreams"> }, boolean>;
                 endGoalsForThread: FunctionReference<"mutation", { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; threadId: Id<"threads"> }, boolean>;
                 failGoalReview: FunctionReference<"mutation", { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }, boolean>;
-                getActiveGoalForRun: FunctionReference<"query", { threadId: Id<"threads"> }, { goalId: Id<"threadGoals">; round: number } | null>;
+                getActiveGoalForRun: FunctionReference<"query", { messageId?: string; threadId: Id<"threads"> }, { goalId: Id<"threadGoals">; round: number } | null>;
                 reapStalledGoals: FunctionReference<"mutation", {}, number>;
                 recordGoalVerdict: FunctionReference<"mutation", { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }, { next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
                 roundTranscript: FunctionReference<"query", { goalId: Id<"threadGoals"> }, { costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
@@ -1407,6 +1408,7 @@ export const internal: InternalApiTypes = {
             internal: {
                 chargeGoalRound: { __lunoraRef: "chat_goals_internal:chargeGoalRound" },
                 claimGoalRound: { __lunoraRef: "chat_goals_internal:claimGoalRound" },
+                closeStaleGoalRound: { __lunoraRef: "chat_goals_internal:closeStaleGoalRound" },
                 endGoalsForThread: { __lunoraRef: "chat_goals_internal:endGoalsForThread" },
                 failGoalReview: { __lunoraRef: "chat_goals_internal:failGoalReview" },
                 getActiveGoalForRun: { __lunoraRef: "chat_goals_internal:getActiveGoalForRun" },

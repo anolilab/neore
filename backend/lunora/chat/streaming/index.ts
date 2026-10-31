@@ -109,7 +109,7 @@ export const getStreamBody = optionalAuthQuery
 
 export const createStreamWithMessage = internalMutation
     .input({
-        /** The goal this message starts, which stays; every other active goal of the thread ends with the new message. */
+        /** The goal this message started: `startGoal` already ended the thread's others, so nothing ends here. */
         goalId: v.optional(v.id("threadGoals")),
         messageId: v.string(),
         streamingConfig: vStreamingConfig,
@@ -122,7 +122,10 @@ export const createStreamWithMessage = internalMutation
     .output(v.string())
     .mutation(async ({ args: { goalId, messageId, streamingConfig, threadId, userId }, ctx: context }) => {
         // A new message in a thread ends the goal it was working toward (a goal's own rounds never come through here).
-        await endActiveGoals(context, threadId as Id<"threads">, "superseded", goalId);
+        // A goal-starting message skips it: `startGoal` ended the others with its insert, and a late stream must not end a later goal.
+        if (!goalId) {
+            await endActiveGoals(context, threadId as Id<"threads">, "superseded");
+        }
 
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,

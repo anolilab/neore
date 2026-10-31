@@ -78,13 +78,30 @@ describe("goalReviewNotes", () => {
 });
 
 describe("withoutNotedVerdicts", () => {
-    it("drops an unmet verdict a note already says, and keeps the others", () => {
+    const list = [message("u1", "user", 0), message("a1", "assistant", 0), message("a2", "assistant", 1), message("a3", "assistant", 2)];
+
+    it("drops the unmet verdict whose round a note follows, and keeps the others", () => {
         const verdicts = [
-            { met: false, reason: "Add the charts.", round: 1 },
-            { met: false, reason: "Out of rounds.", round: 2 },
-            { met: true, reason: "Add the charts.", round: 3 },
+            { met: false, order: 0, reason: "Add the charts.", round: 1 },
+            { met: false, order: 1, reason: "Out of rounds.", round: 2 },
+            { met: true, order: 2, reason: "Add the charts.", round: 3 },
         ];
 
-        expect(withoutNotedVerdicts(verdicts, new Map([["a1", ["Add the charts."]]])).map((v) => v.round)).toEqual([2, 3]);
+        expect(withoutNotedVerdicts(list, verdicts, new Map([["a1", ["Add the charts."]]])).map((v) => v.round)).toEqual([2, 3]);
+    });
+
+    it("keeps a final verdict that repeats the wording of an earlier, noted one", () => {
+        const verdicts = [
+            { met: false, order: 0, reason: "Still missing the charts.", round: 1 },
+            { met: false, order: 2, reason: "Still missing the charts.", round: 2 },
+        ];
+
+        expect(withoutNotedVerdicts(list, verdicts, new Map([["a1", ["Still missing the charts."]]])).map((v) => v.round)).toEqual([2]);
+    });
+
+    it("keeps a verdict whose turn is not loaded", () => {
+        expect(withoutNotedVerdicts(list, [{ met: false, order: 9, reason: "More.", round: 1 }], new Map([["a3", ["More."]]])).map((v) => v.round)).toEqual([
+            1,
+        ]);
     });
 });

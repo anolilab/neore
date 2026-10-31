@@ -1,11 +1,18 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { isCustomModelId } from "@neore/ai/models";
 import { Button } from "@neore/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Target } from "lucide-react";
 import type { FC } from "react";
+import { useEffect } from "react";
+
+import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
+import { findLocalModelTarget } from "@/features/settings/lib/custom-models";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { GOAL_ROUND_CHOICES, useGoalComposer } from "./goal-store";
 
@@ -19,10 +26,26 @@ interface ComposerGoalProps {
  */
 const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
     const { t } = useLingui();
+    const crpc = useCRPC();
+    const currentModel: string = useCurrentModel();
+    // A local model runs in the browser and never reaches the goal loop, so the control is not offered there.
+    const { data: providers } = useQuery(crpc.chat.custom_providers.listCustomProviders.queryOptions(isCustomModelId(currentModel) ? {} : skipToken));
+    const isLocalModel = findLocalModelTarget(providers, currentModel) !== undefined;
     const enabled = useGoalComposer((state) => state.enabled);
     const maxRounds = useGoalComposer((state) => state.maxRounds);
     const setEnabled = useGoalComposer((state) => state.setEnabled);
     const setMaxRounds = useGoalComposer((state) => state.setMaxRounds);
+
+    // A goal armed before switching to a local model must not wait for the next gateway send.
+    useEffect(() => {
+        if (isLocalModel) {
+            setEnabled(false);
+        }
+    }, [isLocalModel, setEnabled]);
+
+    if (isLocalModel) {
+        return null;
+    }
 
     const cycleRounds = () => {
         const index = GOAL_ROUND_CHOICES.indexOf(maxRounds as (typeof GOAL_ROUND_CHOICES)[number]);

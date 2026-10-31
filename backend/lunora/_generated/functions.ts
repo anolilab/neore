@@ -673,6 +673,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_goals_functions:getThreadGoal": lunora_chat_goals_functions_55.getThreadGoal as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:chargeGoalRound": lunora_chat_goals_internal_56.chargeGoalRound as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:claimGoalRound": lunora_chat_goals_internal_56.claimGoalRound as unknown as RegisteredLunoraFunction,
+    "chat_goals_internal:closeStaleGoalRound": lunora_chat_goals_internal_56.closeStaleGoalRound as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:endGoalsForThread": lunora_chat_goals_internal_56.endGoalsForThread as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:failGoalReview": lunora_chat_goals_internal_56.failGoalReview as unknown as RegisteredLunoraFunction,
     "chat_goals_internal:getActiveGoalForRun": lunora_chat_goals_internal_56.getActiveGoalForRun as unknown as RegisteredLunoraFunction,
@@ -3781,12 +3782,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["goalId"] !== "string") return DEFER;
 if (typeof source["round"] !== "number" || !Number.isFinite(source["round"])) return DEFER;
 return { "goalId": source["goalId"], "round": source["round"] };
-});
-installCompiledValidatorMap(lunora_chat_goals_internal_56.getActiveGoalForRun.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_chat_goals_internal_56.roundTranscript.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8428,9 +8423,10 @@ export interface Caller {
             internal: {
                 chargeGoalRound: (args: { userId: string }) => Promise<boolean>;
                 claimGoalRound: (args: { goalId: Id<"threadGoals">; round: number }) => Promise<{ text: string; threadId: Id<"threads">; userId: string } | null>;
+                closeStaleGoalRound: (args: { messageId: string; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                 endGoalsForThread: (args: { reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; threadId: Id<"threads"> }) => Promise<boolean>;
                 failGoalReview: (args: { goalId: Id<"threadGoals">; reason: "cost_limit" | "daily_limit" | "error" | "review_failed" | "round_limit" | "superseded" | "unsupported" | "user"; round: number }) => Promise<boolean>;
-                getActiveGoalForRun: (args: { threadId: Id<"threads"> }) => Promise<{ goalId: Id<"threadGoals">; round: number } | null>;
+                getActiveGoalForRun: (args: { messageId?: string; threadId: Id<"threads"> }) => Promise<{ goalId: Id<"threadGoals">; round: number } | null>;
                 reapStalledGoals: (args?: {}) => Promise<number>;
                 recordGoalVerdict: (args: { anchorOrder?: number; costMicrodollars: number; goalId: Id<"threadGoals">; lastMessage?: { id: string; order: number }; met: boolean; reason: string; round: number; taintedBy?: Array<string> }) => Promise<{ next?: { config: { customSystemPrompt?: string; enabledFeatures?: Array<string>; mcpServerNames?: Array<string>; model: string; origin?: "outside_agent"; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; skill?: { rawArgs: string; slug: string }; statelessMode?: boolean }; messageId: string; organizationId?: string; streamId: string }; outcome: "continue" | "ended" | "ignored" }>;
                 roundTranscript: (args: { goalId: Id<"threadGoals"> }) => Promise<{ costMicrodollars: number; lastMessage?: { id: string; order: number }; lastOrder?: number; taintedBy?: Array<string>; transcript: string }>;
@@ -10125,6 +10121,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             internal: {
                 chargeGoalRound: (args) => callRegistered(context, "chat_goals_internal:chargeGoalRound", args),
                 claimGoalRound: (args) => callRegistered(context, "chat_goals_internal:claimGoalRound", args),
+                closeStaleGoalRound: (args) => callRegistered(context, "chat_goals_internal:closeStaleGoalRound", args),
                 endGoalsForThread: (args) => callRegistered(context, "chat_goals_internal:endGoalsForThread", args),
                 failGoalReview: (args) => callRegistered(context, "chat_goals_internal:failGoalReview", args),
                 getActiveGoalForRun: (args) => callRegistered(context, "chat_goals_internal:getActiveGoalForRun", args),

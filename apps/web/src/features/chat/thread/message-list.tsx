@@ -236,7 +236,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const goal = useThreadGoal(threadId);
     const messages = withoutGoalInstructions(threadMessages);
     const reviewNotes = goalReviewNotes(threadMessages);
-    const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(goal.verdicts, reviewNotes)) : null;
+    const verdictAnchors = goal ? anchorVerdicts(messages, withoutNotedVerdicts(messages, goal.verdicts, reviewNotes)) : null;
     const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
@@ -435,35 +435,26 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         const isEntering =
             initialIds !== null && shouldAnimateEntrance({ index, initialIds, messageId: message.id, role: message.role, total: messages.length });
 
+        // One list item per message: the goal's banner and notes belong to it, so the list's count and positions stay the messages'.
         return (
-            <>
-                {goal && threadId && goal.startMessageId === message.id && (
-                    <div role="listitem">
-                        <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />
-                    </div>
-                )}
-                <div
-                    aria-posinset={index + 1}
-                    aria-setsize={setSize}
-                    className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
-                    data-list-message-id={message.id}
-                    role="listitem"
-                    tabIndex={-1}
-                >
-                    {renderMessage(message, index)}
-                </div>
+            <div
+                aria-posinset={index + 1}
+                aria-setsize={setSize}
+                className={cn("outline-none", isEntering && "animate-in fade-in slide-in-from-bottom-2 duration-200")}
+                data-list-message-id={message.id}
+                role="listitem"
+                tabIndex={-1}
+            >
+                {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
+                {renderMessage(message, index)}
                 {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
-                    <div key={`${message.id}-review-${String(noteIndex)}`} role="listitem">
-                        <GoalReviewNote maxWidth={maxWidth} reason={reason} />
-                    </div>
+                    <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
                 ))}
                 {goal &&
-                    verdictAnchors?.get(message.id)?.map((verdict) => (
-                        <div key={verdict.round} role="listitem">
-                            <GoalVerdictNote goal={goal} maxWidth={maxWidth} verdict={verdict} />
-                        </div>
-                    ))}
-            </>
+                    verdictAnchors
+                        ?.get(message.id)
+                        ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
+            </div>
         );
     };
 

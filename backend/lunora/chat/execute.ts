@@ -25,6 +25,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused } from "./goals/execute";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
     afterRun,
@@ -136,6 +137,16 @@ export const runStreamingAgent = internalAction
                 // Through `failRun`, not a bare chunk: the thread was set to `running` when the run started,
                 // and only `failRun` takes it back out.
                 await failRun(ctx, { safeMessage: "Thread not found", streamId, threadId, threadStatus: "active" });
+
+                return;
+            }
+
+            // A goal's later round was queued with the verdict; one that ended since (a new message, Stop) closes its stream and never runs.
+            if (
+                sseMessages?.[0]?.agentName === GOAL_CONTINUATION_AGENT &&
+                !(await ctx.runMutation(internal.chat.goals.internal.closeStaleGoalRound, { messageId, streamId: streamId as Id<"persistentStreams"> }))
+            ) {
+                streamLogger.warn(`[BgAgent] Stream ${streamId} belongs to a goal that ended — not run`);
 
                 return;
             }
@@ -468,7 +479,7 @@ export const runStreamingAgent = internalAction
             // and holds the follow-ups back until it ends. A run paused on an approval is not finished yet.
             if (paused) {
                 await noteGoalPaused(ctx, threadId);
-            } else if (await handOffToGoalReview(ctx, threadId)) {
+            } else if (await handOffToGoalReview(ctx, threadId, messageId)) {
                 return;
             }
 

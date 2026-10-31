@@ -13,8 +13,10 @@ import { chargeRound } from "../../tasks/account";
 import { deleteAllForThreadIdAsync, softDeleteThread } from "../../agent/threads";
 import {
     claimGoalRound,
+    closeStaleGoalRound,
     endGoalsForThread,
     failGoalReview,
+    getActiveGoalForRun,
     GOAL_STALL_MS,
     reapStalledGoals,
     recordGoalVerdict,
@@ -610,5 +612,88 @@ describe("roundTranscript", () => {
         expect(result.transcript).toBe("assistant: Searching.\n\ntool result (search): 3 hits\n\nassistant: Done.");
         expect(result.transcript).not.toContain("SECRET");
         expect(result.lastOrder).toBe(0);
+    });
+});
+
+describe("a goal's taint across rounds", () => {
+    it("roundTranscript keeps the taint the round's instruction row carries when the round used no new tool", async () => {
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { met: false, reason: "Check the page again.", taintedBy: ["web"] });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("messages", {
+                message: { content: "Nothing new.", role: "assistant" },
+                order: 5,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+
+        const result = await harness.run(async (ctx: any) => await ctx.runQuery(roundTranscript, { goalId }));
+
+        expect(outcome.outcome).toBe("continue");
+        expect(result.taintedBy).toEqual(["web"]);
+    });
+});
+
+describe("starting a goal while another is active", () => {
+    it("ends the previous goal in the same transaction, so a later start is never ended by an earlier one", async () => {
+        const first = await start();
+        const second = await start();
+
+        expect(await read(first)).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(await read(second)).toMatchObject({ status: "active" });
+    });
+});
+
+describe("a goal's queued round", () => {
+    it("runs while its goal is still active at that round", async () => {
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { met: false });
+
+        expect(await run(closeStaleGoalRound, { messageId: outcome.next.messageId, streamId: outcome.next.streamId })).toBe(true);
+        expect((await read(outcome.next.streamId)).status).toBe("pending");
+    });
+
+    it("does not run once a new message ended the goal, closes its stream and gives the thread back", async () => {
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { met: false });
+
+        await run(endGoalsForThread, { reason: "superseded", threadId });
+
+        expect(await run(closeStaleGoalRound, { messageId: outcome.next.messageId, streamId: outcome.next.streamId })).toBe(false);
+        expect((await read(outcome.next.streamId)).status).toBe("done");
+        expect((await read(threadId)).status).toBe("active");
+    });
+
+    it("leaves the thread to a run that holds it", async () => {
+        const goalId = await start();
+        const outcome = await review(goalId, 1, { met: false });
+
+        await run(endGoalsForThread, { reason: "superseded", threadId });
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: promptId,
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await run(closeStaleGoalRound, { messageId: outcome.next.messageId, streamId: outcome.next.streamId })).toBe(false);
+        expect((await read(threadId)).status).toBe("running");
+    });
+
+    it("hands a run off only to the goal whose current round it is", async () => {
+        const goalId = await start();
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getActiveGoalForRun, { messageId: promptId, threadId }))).toEqual({ goalId, round: 0 });
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getActiveGoalForRun, { messageId: "another-run", threadId }))).toBeNull();
     });
 });

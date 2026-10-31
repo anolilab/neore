@@ -67,9 +67,22 @@ export const goalReviewNotes = (messages: ReadonlyArray<Pick<UIMessage, "agentNa
     return notes;
 };
 
-/** The verdicts that no instruction row already shows: an unmet verdict whose reason is a "Review: …" note is not said twice. */
-export const withoutNotedVerdicts = (verdicts: ReadonlyArray<GoalVerdictView>, notes: ReadonlyMap<string, string[]>): GoalVerdictView[] => {
-    const shown = new Set([...notes.values()].flat());
+/**
+ * The verdicts that no instruction row already shows. A "Review: …" note follows the reply of the round it judged,
+ * so an unmet verdict is dropped only when a note follows the reply it is anchored to (matched by round, never by
+ * wording: a final verdict may repeat an earlier reason and still has no note of its own).
+ */
+export const withoutNotedVerdicts = (
+    messages: ReadonlyArray<Pick<UIMessage, "id" | "order" | "role">>,
+    verdicts: ReadonlyArray<GoalVerdictView>,
+    notes: ReadonlyMap<string, string[]>,
+): GoalVerdictView[] =>
+    verdicts.filter((verdict) => {
+        if (verdict.met) {
+            return true;
+        }
 
-    return verdicts.filter((verdict) => verdict.met || !shown.has(verdict.reason));
-};
+        const reply = messages.findLast((message) => message.role === "assistant" && message.order === verdict.order);
+
+        return reply === undefined || !notes.has(reply.id);
+    });

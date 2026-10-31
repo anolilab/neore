@@ -1533,6 +1533,11 @@
     {
       "from": "function:chat_execute:runStreamingAgent",
       "kind": "call",
+      "to": "function:chat_goals_internal:closeStaleGoalRound"
+    },
+    {
+      "from": "function:chat_execute:runStreamingAgent",
+      "kind": "call",
       "to": "function:chat_goals_internal:endGoalsForThread"
     },
     {
@@ -2396,8 +2401,8 @@
       "to": "table:threadGoals"
     },
     {
-      "from": "function:chat_goals_internal:reapStalledGoals",
-      "kind": "read",
+      "from": "function:chat_goals_internal:closeStaleGoalRound",
+      "kind": "write",
       "to": "table:persistentStreams"
     },
     {
@@ -9936,6 +9941,13 @@
       "id": "function:chat_goals_internal:claimGoalRound",
       "kind": "function",
       "name": "chat.goals.internal.claimGoalRound",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_goals_internal:closeStaleGoalRound",
+      "kind": "function",
+      "name": "chat.goals.internal.closeStaleGoalRound",
       "module": "chat"
     },
     {
@@ -17737,13 +17749,13 @@
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 28,
+      "line": 29,
       "reason": "\"handOffToGoalReview\" is not a registered function"
     },
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 44,
+      "line": 48,
       "reason": "\"noteGoalPaused\" is not a registered function"
     },
     {
@@ -17761,13 +17773,19 @@
     {
       "file": "chat/goals/rows",
       "kind": "read",
-      "line": 53,
+      "line": 42,
+      "reason": "\"hasLiveStream\" is not a registered function"
+    },
+    {
+      "file": "chat/goals/rows",
+      "kind": "read",
+      "line": 68,
       "reason": "\"deleteGoalsForThread\" is not a registered function"
     },
     {
       "file": "chat/goals/rows",
       "kind": "write",
-      "line": 59,
+      "line": 74,
       "reason": "\"deleteGoalsForThread\" is not a registered function"
     },
     {
@@ -18427,13 +18445,13 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 141,
+      "line": 144,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
       "file": "chat/local-models",
       "kind": "call",
-      "line": 147,
+      "line": 150,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
