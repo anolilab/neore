@@ -21,6 +21,7 @@ const KEYS: Record<HostCapabilityKey, true> = {
     "pullRequest.description": true,
     "pullRequest.diff": true,
     "pullRequest.files": true,
+    "pullRequest.guide": true,
     "review.batchedSubmit": true,
     "review.lineComments": true,
     "review.replies": true,

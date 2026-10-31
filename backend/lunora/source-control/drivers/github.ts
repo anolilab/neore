@@ -95,7 +95,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE },
+        pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,

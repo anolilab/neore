@@ -655,7 +655,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -754,7 +754,7 @@ export interface InternalApiTypes {
             searchSharedCollections: FunctionReference<"action", { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
         summarize: {
-            resummarizeFile: FunctionReference<"action", { knowledgeFileId: Id<"knowledgeFiles"> }, { error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "reference" | "other" | "data" | "code" | "technical_doc" | "article" | "report" | "guide" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;
+            resummarizeFile: FunctionReference<"action", { knowledgeFileId: Id<"knowledgeFiles"> }, { error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "reference" | "data" | "code" | "other" | "technical_doc" | "article" | "report" | "guide" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;
             summarizeCollection: FunctionReference<"action", { userId: string }, { fileCount: number; summary: string; topics?: undefined; } | { fileCount: number; summary: string; topics: string[]; }>;
         };
     };
@@ -1033,10 +1033,28 @@ export interface InternalApiTypes {
             pollWatchedRepo: FunctionReference<"action", { lease: number; watchId: Id<"watchedRepositories"> }, { fetched: boolean }>;
         };
         gdpr: {
+            collectGuidesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; guides: Array<{ createdAt: number; generatedAt: number; headSha: string; hostOrigin: string; instructions: string; number: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; repository: string; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string }> }>;
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             collectWatchedRepositoriesForExport: FunctionReference<"query", { userId: string }, { watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
+            deleteUserGuides: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
             deleteUserReviewDrafts: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
             deleteUserWatchedRepositories: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+        };
+        guide_host: {
+            beginHostGuide: FunctionReference<"mutation", { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
+            finalizeHostGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
+            queueHostGuideFinalize: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
+            readHostGuideAnswer: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null | { answer: string | null; headSha: string; number: number; repository: string }>;
+        };
+        guide_internal: {
+            beginGuide: FunctionReference<"mutation", { number: number; repository: string; userId: string; headSha: string; instructions: string; jobId?: string; source: "cloud" | "host" }, { guideId: Id<"pullRequestGuides">; status: "started" } | { status: "running" }>;
+            failAbandonedGuide: FunctionReference<"mutation", { claimKey: string; guideId: Id<"pullRequestGuides">; userId: string }, boolean>;
+            failGuide: FunctionReference<"mutation", { failure: "abandoned" | "head_moved" | "host_error" | "model_error" | "no_answer" | "not_connected" | "quota" | "too_large"; guideId: Id<"pullRequestGuides">; userId: string }, boolean>;
+            readGuideForJob: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; userId: string }, null | { headSha: string; instructions: string; number: number; repository: string }>;
+            saveGuide: FunctionReference<"mutation", { guideId: Id<"pullRequestGuides">; headSha: string; leftOut: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string; userId: string }, boolean>;
+        };
+        guide_job: {
+            runCloudGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; jobId?: string; userId: string }, null>;
         };
         review_internal: {
             claimDraftForSubmit: FunctionReference<"mutation", { number: number; repository: string; userId: string }, { draft: { body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; revision: number; verdict: "approve" | "comment" | "request_changes" | null }; lease: number; status: "claimed" } | { status: "in_progress" | "no_draft" }>;
@@ -2181,10 +2199,28 @@ export const internal: InternalApiTypes = {
             pollWatchedRepo: { __lunoraRef: "source_control_freshness_poll:pollWatchedRepo" },
         },
         gdpr: {
+            collectGuidesForExport: { __lunoraRef: "source_control_gdpr:collectGuidesForExport" },
             collectReviewDraftsForExport: { __lunoraRef: "source_control_gdpr:collectReviewDraftsForExport" },
             collectWatchedRepositoriesForExport: { __lunoraRef: "source_control_gdpr:collectWatchedRepositoriesForExport" },
+            deleteUserGuides: { __lunoraRef: "source_control_gdpr:deleteUserGuides" },
             deleteUserReviewDrafts: { __lunoraRef: "source_control_gdpr:deleteUserReviewDrafts" },
             deleteUserWatchedRepositories: { __lunoraRef: "source_control_gdpr:deleteUserWatchedRepositories" },
+        },
+        guide_host: {
+            beginHostGuide: { __lunoraRef: "source_control_guide_host:beginHostGuide" },
+            finalizeHostGuide: { __lunoraRef: "source_control_guide_host:finalizeHostGuide" },
+            queueHostGuideFinalize: { __lunoraRef: "source_control_guide_host:queueHostGuideFinalize" },
+            readHostGuideAnswer: { __lunoraRef: "source_control_guide_host:readHostGuideAnswer" },
+        },
+        guide_internal: {
+            beginGuide: { __lunoraRef: "source_control_guide_internal:beginGuide" },
+            failAbandonedGuide: { __lunoraRef: "source_control_guide_internal:failAbandonedGuide" },
+            failGuide: { __lunoraRef: "source_control_guide_internal:failGuide" },
+            readGuideForJob: { __lunoraRef: "source_control_guide_internal:readGuideForJob" },
+            saveGuide: { __lunoraRef: "source_control_guide_internal:saveGuide" },
+        },
+        guide_job: {
+            runCloudGuide: { __lunoraRef: "source_control_guide_job:runCloudGuide" },
         },
         review_internal: {
             claimDraftForSubmit: { __lunoraRef: "source_control_review_internal:claimDraftForSubmit" },

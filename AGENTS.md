@@ -428,6 +428,17 @@ written here is what is not.
   refuses edits on a newer head (`head_moved`). A reply and a resolve are written at once (the
   review call has no place for a reply). Viewed marks are the host's, read and written through
   GraphQL; a write is never redirected or replayed by the requester.
+  **Guides** (`guide-*.ts`, table `pullRequestGuides`): a model's or an agent's answer is INPUT, never
+  structure. `assembleGuide` (pure) decides the order (core, dependents, mechanical, not covered), which files are
+  mechanical (by name, not the model's say-so), that every changed file lands somewhere, which line ranges exist in
+  the diff, and which proposals survive (a comment on a diff line, a label). Applying a comment only writes the
+  review DRAFT (`saveDraftCommentFor`); a label has no write. Prompts quote host text with the optimizer's `toJson`
+  inside one JSON evidence block. The cloud job runs on the jobs queue under `runJobOnce` (charged to the daily text
+  quota); a host guide is a coding-agent turn in the user's checkout, started by ONE transaction (`beginHostGuide`:
+  guide row, session, prompt; a refusal throws so none of it stays) and finished by `endHostTurn` →
+  `settleHostGuide` → `finalizeHostGuide`, which re-reads the diff and refuses an answer for another head
+  (`head_moved`). The host prompt is capped in BYTES of the signed call's JSON (`hostPromptBytes`), not characters.
+
 - **Develop freshness** (`backend/lunora/source-control/freshness*.ts`, `webhook.ts`) — the user
   CHOOSES the repositories (`watchedRepositories`, max 20); only those are polled, through the shard tick
   (`dispatchDueRepoPolls` in `runShardTick`, plus `shardSweeps()` as backstop), never a global loop.

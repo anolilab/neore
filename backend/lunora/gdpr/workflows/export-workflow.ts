@@ -21,7 +21,7 @@ import { LunoraError } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
-import { collectAllReviewDrafts } from "../../source-control/export-pages";
+import { collectAllGuides, collectAllReviewDrafts } from "../../source-control/export-pages";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -81,6 +81,19 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             const name = page === 0 ? "collect-review-drafts" : `collect-review-drafts-${String(page)}`;
 
             return await context.step.do(name, async () => await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }));
+        });
+        const pullRequestGuides = await collectAllGuides(async (cursor, page) => {
+            const name = `collect-pull-request-guides-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () =>
+                    await context.run(
+                        internal.source_control.gdpr.collectGuidesForExport,
+                        { cursor, userId },
+                        { dedupId: `collect-pull-request-guides:${requestId}:${String(page)}` },
+                    ),
+            );
         });
         const watchedRepositories = await context.step.do(
             "collect-watched-repositories",
@@ -148,6 +161,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         pages,
                         profile,
                         prompts,
+                        pullRequestGuides,
                         requestId,
                         reviewDrafts,
                         settings,

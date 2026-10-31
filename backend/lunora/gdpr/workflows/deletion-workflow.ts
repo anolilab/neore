@@ -244,6 +244,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain("delete-user-devices", async () => await context.run(internal.devices.gdpr.deleteUserDevices, { userId: args.userId }));
         await drain("delete-user-acp-sessions", async () => await context.run(internal.acp.gdpr.deleteUserAcpSessions, { userId: args.userId }));
         await drain("delete-user-review-drafts", async () => await context.run(internal.source_control.gdpr.deleteUserReviewDrafts, { userId: args.userId }));
+        await drain(
+            "delete-user-pull-request-guides",
+            async (round) =>
+                await context.run(
+                    internal.source_control.gdpr.deleteUserGuides,
+                    { userId: args.userId },
+                    { dedupId: `delete-pull-request-guides:${args.requestId}:${String(round)}` },
+                ),
+        );
         // Its own dispatch id per batch: a replay skips the finished steps' callbacks, so the body's positional ids
         // drift and a call could be answered with an earlier call's cached result, leaving the rows in place.
         await drain(

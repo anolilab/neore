@@ -4,12 +4,13 @@
  * and ends the stream through `endHostStream` (status and `hostState: ended` in one write).
  */
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { addMessagesHandler } from "../../agent/messages";
 import { patchThread } from "../../agent/table-writes";
 import { endHostStream, isLiveStream } from "../../chat/streaming/persistent/host";
 import { createAcpCancelCall } from "../../devices/lib/acp-call";
 import { streamLogger } from "../../lib/logger";
+import { settleHostGuide } from "../../source-control/guide-host-end";
 import type { HostChanges } from "./changes";
 import {
     addMediaToTranscript,
@@ -75,7 +76,7 @@ const appendChunks = (transcript: ReturnType<typeof emptyTranscript>, chunks: Ch
  * only children and files are still collected (reasoning after that point is not kept), within the same page budget. When the page budget is spent first, the last pages are read
  * too and joined on after a marker, so the answer that follows a long run of tool events is not lost.
  */
-export const readHostTranscript = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">) => {
+export const readHostTranscript = async (ctx: Pick<QueryCtx, "db">, streamId: Id<"persistentStreams">) => {
     const transcript = emptyTranscript();
     let cursor: string | undefined;
     let pages = 0;
@@ -201,7 +202,14 @@ export const endHostTurn = async (
     await saveHostReply(ctx, stream, end.reason, end.error, end.changes);
     await withdrawPermissionAnswers(ctx, stream, now);
 
-    return await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
+    const ended = await endHostStream(ctx, stream, { reason: end.reason, status: STATUS_OF[end.reason] }, now);
+
+    if (ended) {
+        // A pull request's guide written by this turn is finished, or failed, by how the turn ended.
+        await settleHostGuide(ctx, stream, end.reason);
+    }
+
+    return ended;
 };
 
 /** The host's `turn_end` or Stop: {@link endHostTurn}, then the session is free again. */
