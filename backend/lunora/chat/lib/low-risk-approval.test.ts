@@ -176,6 +176,14 @@ describe("lowRiskIneligibleReason", () => {
         expect(lowRiskIneligibleReason(mcpDescriptor("assign_issue", "get_things"), "mcp_get_things__assign_issue", false, interactive)).toBe("not-read-verb");
     });
 
+    it.each(["get_sms_code", "list_pushes", "get_replies", "find_patches"])("refuses %s, whose outward word is plural or ends in s", (tool) => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("outward");
+    });
+
+    it("refuses a key whose server name holds a colon, so no part of it is read as the verb", () => {
+        expect(lowRiskIneligibleReason(mcpDescriptor("drain_account", "x:get"), "mcp_x_get__drain_account", false, interactive)).toBe("ambiguous-key");
+    });
+
     it("reads words, not substrings", () => {
         expect(lowRiskIneligibleReason(mcpDescriptor("query_postgres", "Postgres"), "mcp_Postgres__query_postgres", false, interactive)).toBeNull();
     });

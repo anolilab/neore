@@ -170,13 +170,20 @@ const OUTWARD_WORDS: ReadonlySet<string> = new Set([
 const CAMEL_BOUNDARY_RE = /(?<=[a-z0-9])(?=[A-Z])/g;
 const NON_WORD_RE = /[^a-z0-9]+/i;
 const TRAILING_S_RE = /s$/;
+const TRAILING_ES_RE = /es$/;
+const TRAILING_IES_RE = /ies$/;
 
+/** Each word as written and without a plural ending, so `sms`, `pushes` and `replies` all meet their listed form. */
 const wordsOf = (name: string): string[] =>
     name
         .replaceAll(CAMEL_BOUNDARY_RE, " ")
         .split(NON_WORD_RE)
         .filter(Boolean)
-        .map((word) => word.toLowerCase().replace(TRAILING_S_RE, ""));
+        .flatMap((word) => {
+            const lower = word.toLowerCase();
+
+            return [lower, lower.replace(TRAILING_S_RE, ""), lower.replace(TRAILING_ES_RE, ""), lower.replace(TRAILING_IES_RE, "y")];
+        });
 
 /** The tool's own name inside a permission key (`mcp:<server>:<tool>`, `connector:<slug>:<tool>`): what follows the second colon. */
 const toolNameOf = (key: string): string => {
@@ -223,6 +230,11 @@ export const lowRiskIneligibleReason = (
 
     if ([...wordsOf(runtimeName), ...wordsOf(descriptor.key)].some((word) => OUTWARD_WORDS.has(word))) {
         return "outward";
+    }
+
+    // A server name or slug with a colon in it makes the key's tool name ambiguous: never guess which part is the verb.
+    if (descriptor.key.split(":").length !== 3) {
+        return "ambiguous-key";
     }
 
     // An allowlist, taken off the key's tool name so the server's name (and `mcp_<server>__`) never counts as the verb.
