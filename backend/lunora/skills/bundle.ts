@@ -404,10 +404,11 @@ export const exportBundle = authAction
     .use(rateLimit("skills/bundle"))
     .input({
         description: v.optional(v.string().max(MAX_LENGTH.long)),
-        groupChatIds: v.array(v.id("threads")),
+        // Bounded before anything reads them: the distinct-count checks below run only after a dedupe.
+        groupChatIds: v.array(v.id("threads")).max(BUNDLE_LIMITS.groupChats),
         name: v.string().max(MAX_LENGTH.short),
-        skillIds: v.array(v.id("skills")),
-        triggerIds: v.array(v.id("triggers")),
+        skillIds: v.array(v.id("skills")).max(BUNDLE_LIMITS.skills),
+        triggerIds: v.array(v.id("triggers")).max(BUNDLE_LIMITS.triggers),
     })
     .output(v.object({ filename: v.string(), itemCount: v.number(), markdown: v.string() }))
     .action(async ({ args, ctx }) => {
@@ -709,7 +710,7 @@ export const importBundle = authAction
         /** Minted by the client per attempt (and kept across a retry of it): an id that was imported already is refused. */
         importId: v.string().max(MAX_LENGTH.id),
         markdown: v.string().max(MAX_LENGTH.document),
-        selected: v.array(v.string().max(MAX_LENGTH.short)),
+        selected: v.array(v.string().max(MAX_LENGTH.short)).max(BUNDLE_LIMITS.skills + BUNDLE_LIMITS.triggers + BUNDLE_LIMITS.groupChats),
     })
     .output(
         v.object({
