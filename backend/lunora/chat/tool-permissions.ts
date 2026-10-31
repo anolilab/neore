@@ -49,6 +49,7 @@ import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -455,6 +456,11 @@ export const respondToToolApproval = authMutation
         // the claim back.
         if (toolName === ASK_USER_TOOL_NAME) {
             throw new LunoraError("BAD_REQUEST", "Answer this question instead of approving it");
+        }
+
+        // Likewise a secret request is answered with the value (`chat/request-secret.ts`), or declined there.
+        if (toolName === REQUEST_SECRET_TOOL_NAME) {
+            throw new LunoraError("BAD_REQUEST", "Answer this secret request instead of approving it");
         }
 
         // The key recorded when the tool was built. A snapshot without one

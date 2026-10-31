@@ -668,6 +668,7 @@ class AppBuilder<Env extends object> {
             ["prompts", { mode: { kind: "global" } }],
             ["rateLimit", { mode: { kind: "global" } }],
             ["rateLimits", { mode: { kind: "root" } }],
+            ["requestedSecrets", { mode: { field: "userId", kind: "shardBy" } }],
             ["sandboxActions", { mode: { kind: "root" } }],
             ["sandboxSessions", { mode: { field: "userId", kind: "shardBy" } }],
             ["session", { mode: { kind: "global" } }],

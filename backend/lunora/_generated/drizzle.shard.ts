@@ -1127,6 +1127,25 @@ export const rateLimits = sqliteTable("rateLimits", {
     by_key: index("by_key").on(t.key),
 }));
 
+export const requestedSecrets = sqliteTable("requestedSecrets", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId").notNull(),
+    createdAt: real("createdAt").notNull(),
+    encryptedValue: text("encryptedValue"),
+    expiresAt: real("expiresAt").notNull(),
+    label: text("label").notNull(),
+    ref: text("ref").notNull(),
+    status: text("status", { mode: "json" }).$type<"saved" | "used">().notNull(),
+    threadId: text("threadId").notNull(),
+    use: text("use", { mode: "json" }).$type<{ header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string }>().notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_ref: index("by_ref").on(t.ref),
+}));
+
 export const sandboxActions = sqliteTable("sandboxActions", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

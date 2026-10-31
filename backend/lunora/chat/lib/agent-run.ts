@@ -46,6 +46,7 @@ import {
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -904,7 +905,7 @@ export const endStoppedRun = async (
 export const resumeApprovedRun = async (
     ctx: ActionCtx,
     args: {
-        /** An approved `askUser` call's answer: the resumed tool returns it as its result. */
+        /** An approved `askUser` call's answer, or a saved `requestSecret`'s reference: the resumed tool returns it as its result. */
         answer?: string;
         approvalId: string;
         approved: boolean;
@@ -972,6 +973,17 @@ export const resumeApprovedRun = async (
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
+        }
+
+        // An answered secret request: the call's result is the stored value's reference, never the value.
+        if (approved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
+            if (answer === undefined) {
+                throw new AgentRunError("stale-approval", "A secret request can only be resumed with a reference");
+            }
+
+            const { createAnsweredRequestSecretTool } = await import("../tools/request-secret");
+
+            toolResult.tools[REQUEST_SECRET_TOOL_NAME] = createAnsweredRequestSecretTool(answer) as (typeof toolResult.tools)[string];
         }
 
         const modelFilterRules = await loadModelFilterRules(ctx, userId);

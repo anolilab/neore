@@ -15,7 +15,7 @@ import { persistentTextStreaming } from "../streaming";
 import type { ToolRunConfig } from "./tool-run-config";
 
 export interface ResumeClaimedRunArgs {
-    /** The user's answer, for an approved `askUser` call — becomes the tool result. */
+    /** The user's answer for an approved `askUser` call, or the reference of a saved `requestSecret` — becomes the tool result. Never a secret value. */
     answer?: string;
     approvalId: string;
     approved: boolean;

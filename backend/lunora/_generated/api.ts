@@ -276,6 +276,9 @@ export interface ApiTypes {
         prompt_outline: {
             getThreadPromptOutline: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { items: Array<{ id: string; text: string }>; truncated: boolean }>;
         };
+        request_secret: {
+            answerSecretRequest: FunctionReference<"mutation", { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }, { alreadyResolved: boolean; streamId: string | null }>;
+        };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
@@ -1049,6 +1052,9 @@ export const api: ApiTypes = {
         },
         prompt_outline: {
             getThreadPromptOutline: { __lunoraRef: "chat_prompt_outline:getThreadPromptOutline" },
+        },
+        request_secret: {
+            answerSecretRequest: { __lunoraRef: "chat_request_secret:answerSecretRequest" },
         },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },

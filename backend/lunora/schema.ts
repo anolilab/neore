@@ -2004,6 +2004,35 @@ export const schema = defineSchema({
         .externallyManaged()
         .index("by_key", ["key"]),
 
+    /**
+     * A value the agent asked the user for with `requestSecret` (an API key, a token),
+     * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
+     * ciphertext (`lib/encryption.ts`, `provider-keys`); it exists only while the
+     * row is `saved` and is removed in the same write that marks it `used`
+     * (`chat/lib/secret-requests.ts`). `use` is the destination the user approved
+     * on the card, so a consumer cannot send the value anywhere else. The
+     * housekeeping sweep deletes a row once `expiresAt` has passed.
+     */
+    requestedSecrets: defineTable({
+        approvalId: v.string(),
+        createdAt: v.number(),
+        encryptedValue: v.optional(v.string()),
+        expiresAt: v.number(),
+        label: v.string(),
+        ref: v.string(),
+        status: v.union(v.literal("saved"), v.literal("used")),
+        threadId: v.string(),
+        use: v.union(
+            v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string() }),
+            v.object({ kind: v.literal("provider_key"), provider: v.string() }),
+        ),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_ref", ["ref"])
+        .index("by_expiresAt", ["expiresAt"])
+        .index("by_userId", ["userId"]),
+
     sandboxActions: defineTable({
         action: v.string(),
         command: v.optional(v.string()),

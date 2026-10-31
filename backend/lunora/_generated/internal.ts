@@ -360,6 +360,11 @@ export interface InternalApiTypes {
         media_stale: {
             failStaleMediaRows: FunctionReference<"mutation", { cursor?: string }, { failed: number }>;
         };
+        request_secret: {
+            consumeSecretAsMcpHeader: FunctionReference<"mutation", { ref: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            consumeSecretAsProviderKey: FunctionReference<"mutation", { ref: string; threadId: string; userId: string }, { message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
+            sweepRequestedSecrets: FunctionReference<"mutation", {}, null>;
+        };
         sharing: {
             checkThreadAccess: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, boolean>;
             checkThreadAccessWithData: FunctionReference<"query", { requiredPermission?: "read" | "write" | "admin"; threadId: string; userId: string }, { hasAccess: true; permission: "read" | "write" | "admin"; thread: { category?: string; createdBy?: string; customSystemPrompt?: string; deleted?: boolean; deletedAt?: number; dictationLanguage?: string; enabledFeatures?: Array<string>; externalThreadId?: string; isPublic?: boolean; isTemporary?: boolean; language?: string; lastCompressionStartedAt?: number; messengerConnectionId?: string; mode?: "text" | "image" | "video"; model?: string; multiChat?: boolean; organizationId?: string; parentThreadIds?: Array<string>; pinnedAt?: number; projectId?: string; publicAccessToken?: string; reasoningEffort?: number; source?: string; statelessMode?: boolean; summary?: string; tags?: Array<string>; teamId?: string; title?: string; updatedAt?: number; userId?: string; _creationTime: number; _id: string; activeLeafMessageId?: string; botId?: string; createdAt?: number; groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }; lastUserMessageAt?: number; lockedAt?: number; order?: number; runner?: "host"; status: "active" | "archived" | "running" | "abort" | "error" | "finish"; tagIds?: Array<string>; workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number } } } | { hasAccess: false; permission: null; thread: null }>;
@@ -1404,6 +1409,11 @@ export const internal: InternalApiTypes = {
         },
         media_stale: {
             failStaleMediaRows: { __lunoraRef: "chat_media_stale:failStaleMediaRows" },
+        },
+        request_secret: {
+            consumeSecretAsMcpHeader: { __lunoraRef: "chat_request_secret:consumeSecretAsMcpHeader" },
+            consumeSecretAsProviderKey: { __lunoraRef: "chat_request_secret:consumeSecretAsProviderKey" },
+            sweepRequestedSecrets: { __lunoraRef: "chat_request_secret:sweepRequestedSecrets" },
         },
         sharing: {
             checkThreadAccess: { __lunoraRef: "chat_sharing:checkThreadAccess" },

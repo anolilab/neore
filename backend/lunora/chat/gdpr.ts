@@ -35,12 +35,12 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
 };
 
 /**
- * Tool-approval snapshots, then a stream per reply and every chunk of it. The
- * approval snapshots carry the run's final system prompt, which can hold memory
- * and personalisation text.
+ * Tool-approval snapshots and requested secrets (ciphertext the user handed the
+ * agent), then a stream per reply and every chunk of it. The approval snapshots
+ * carry the run's final system prompt, which can hold memory and personalisation text.
  */
 export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [streams, approvalRuns] = await Promise.all([
+    const [streams, approvalRuns, secrets] = await Promise.all([
         ctx.db
             .query("persistentStreams")
             .withIndex("by_userId_status", (q) => q.eq("userId", userId))
@@ -49,9 +49,13 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .query("toolApprovalRuns")
             .withIndex("by_userId_status_createdAt", (q) => q.eq("userId", userId))
             .take(BATCH),
+        ctx.db
+            .query("requestedSecrets")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(BATCH),
     ]);
 
-    await Promise.all(approvalRuns.map(async (run) => await ctx.db.delete(run._id)));
+    await Promise.all([...approvalRuns.map(async (run) => await ctx.db.delete(run._id)), ...secrets.map(async (row) => await ctx.db.delete(row._id))]);
 
     const streamsLeft = await deleteParentsWithChildren(
         ctx,
@@ -63,7 +67,7 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
                 .take(BATCH),
     );
 
-    return { hasMore: streamsLeft || approvalRuns.length >= BATCH };
+    return { hasMore: streamsLeft || approvalRuns.length >= BATCH || secrets.length >= BATCH };
 };
 
 /** The user's presentations, each after its slides. */

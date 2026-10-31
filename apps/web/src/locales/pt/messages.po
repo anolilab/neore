@@ -440,7 +440,7 @@ msgstr "{0} com falha"
 
 #. placeholder {0}: modeLabels[mode]
 #. placeholder {1}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:89
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:93
 msgid "{0} for {1}"
 msgstr "{0} para {1}"
 
@@ -1077,7 +1077,7 @@ msgstr "{selectedCount, plural, one {# conversa selecionada} other {# conversas 
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} de {MAX_PARALLEL} selecionados"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
 msgid "{server} · until {until}"
 msgstr ""
 
@@ -2776,8 +2776,8 @@ msgstr "Permitir este site ({0})"
 msgid "Allowed AI Models"
 msgstr "Modelos de IA permitidos"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:180
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:181
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:193
 msgid "Allowed for a limited time"
 msgstr ""
 
@@ -3401,7 +3401,7 @@ msgstr "Cresc."
 msgid "ask"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:57
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Ask"
 msgstr "Perguntar"
 
@@ -3560,7 +3560,7 @@ msgstr ""
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:57
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Auto"
 msgstr "Automático"
 
@@ -3612,7 +3612,7 @@ msgstr "Ler respostas automaticamente"
 msgid "Auto-save"
 msgstr "Salvamento automático"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:293
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:305
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Automático: executa sem perguntar. Perguntar: pausa para você Aprovar / Negar. Desativado: o assistente nunca vê a ferramenta. Automações (gatilhos, bots de mensageiros, fluxos de trabalho) não podem perguntar, então ferramentas em \"Perguntar\" ficam indisponíveis nelas. Ferramentas MCP usam Perguntar por padrão, a menos que o servidor as marque como somente leitura."
 
@@ -4485,8 +4485,8 @@ msgstr "Editor de canvas integrado"
 msgid "Built-in reasoning before generating"
 msgstr "Raciocínio integrado antes de gerar"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:300
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:301
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:312
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:313
 #: src/features/settings/lib/settings-keywords.ts:101
 msgid "Built-in tools"
 msgstr "Ferramentas integradas"
@@ -5288,7 +5288,7 @@ msgstr "Escolha o modo de pesquisa"
 msgid "Choose the camera system for your shot"
 msgstr "Escolha o sistema de câmera para a sua cena"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:287
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:299
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Escolha quais ferramentas o assistente pode usar sozinho, quais precisam da sua aprovação e quais ficam desativadas."
 
@@ -6476,7 +6476,7 @@ msgstr "Conectado a {0}"
 msgid "Connected. You can close this window."
 msgstr "Conectado. Você pode fechar esta janela."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:314
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:334
 msgid "Connecting to your MCP servers..."
 msgstr "Conectando aos seus servidores MCP..."
 
@@ -7180,7 +7180,7 @@ msgstr "Não foi possível carregar o detalhamento por habilidade."
 msgid "Could not load this"
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:132
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:137
 msgid "Could not load tools: {error}"
 msgstr "Não foi possível carregar as ferramentas: {error}"
 
@@ -7275,6 +7275,10 @@ msgstr "Não foi possível guardar a nova ordem de {label}"
 #: src/features/pages/components/page-view.tsx:248
 msgid "Could not save the page"
 msgstr "Não foi possível salvar a página"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:106
+msgid "Could not save. Please try again."
+msgstr ""
 
 #: src/features/sub-agents/components/worker-composer.tsx:59
 msgid "Could not send the message."
@@ -7851,7 +7855,7 @@ msgid "Custom rate limits"
 msgstr "Limites de taxa personalizados"
 
 #. placeholder {0}: modeLabels[tool.defaultMode]
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Custom setting (default: {0})"
 msgstr "Configuração personalizada (padrão: {0})"
 
@@ -8085,6 +8089,14 @@ msgstr "Rodadas de debate"
 msgid "Debug an error or review my code..."
 msgstr "Depure um erro ou revise meu código..."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:183
+msgid "Decline"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:125
+msgid "Declined — continuing without it"
+msgstr ""
+
 #: src/features/chat/prompt-improvement/hooks/use-optimizer-style-labels.ts:50
 msgid "Decompose the goal into an actionable plan."
 msgstr "Divida o objetivo em um plano prático."
@@ -8177,7 +8189,7 @@ msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "O LLM de chat avançado experimental da DeepSeek, com raciocínio"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:71
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:73
 msgid "Default"
 msgstr "Padrão"
 
@@ -8838,7 +8850,7 @@ msgstr "Designers que criam logos, ícones e ativos de marca em que a precisão 
 msgid "Desktop"
 msgstr "Desktop"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:67
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:69
 msgid "destructive"
 msgstr "destrutiva"
 
@@ -11718,7 +11730,7 @@ msgstr "Falha ao revogar a sessão"
 msgid "Failed to revoke sessions"
 msgstr "Falha ao revogar as sessões"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:266
 msgid "Failed to revoke the allow"
 msgstr ""
 
@@ -11954,7 +11966,7 @@ msgstr "Falha ao atualizar o caso"
 msgid "Failed to update thread visibility"
 msgstr "Falha ao atualizar a visibilidade da conversa"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:242
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
 msgid "Failed to update tool permission"
 msgstr "Falha ao atualizar a permissão da ferramenta"
 
@@ -16777,7 +16789,7 @@ msgstr "Carregando sua visão geral…"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:233
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:245
 #: src/features/settings/components/chat/trigger-settings.tsx:903
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
@@ -17379,7 +17391,7 @@ msgstr "MCP"
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:320
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:340
 msgid "MCP server"
 msgstr "Servidor MCP"
 
@@ -17420,8 +17432,8 @@ msgstr "Servidores MCP"
 msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 msgstr "Servidores MCP oferecem ferramentas extras que a IA pode usar durante as conversas. As ferramentas dos servidores conectados ficam disponíveis automaticamente no chat."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:309
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:310
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:329
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:330
 #: src/features/settings/lib/settings-keywords.ts:102
 msgid "MCP tools"
 msgstr "Ferramentas MCP"
@@ -19239,7 +19251,7 @@ msgstr "Nenhum dispositivo emparelhado."
 msgid "No diff data available for this version"
 msgstr "Não há diferenças disponíveis para esta versão"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:317
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:337
 msgid "No enabled MCP servers."
 msgstr "Nenhum servidor MCP ativado."
 
@@ -19629,7 +19641,7 @@ msgstr "Ainda não há dados de plano. As informações de plano são registrada
 msgid "No tools shared yet"
 msgstr "Nenhuma ferramenta compartilhada ainda"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:135
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:140
 msgid "No tools."
 msgstr "Nenhuma ferramenta."
 
@@ -19776,7 +19788,7 @@ msgstr "Não aprovado"
 msgid "Not attached:"
 msgstr "Não anexado:"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:68
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "not configured"
 msgstr "não configurado"
 
@@ -19971,7 +19983,7 @@ msgstr ""
 
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:57
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:59
 msgid "Off"
 msgstr "Desativado"
 
@@ -21390,6 +21402,10 @@ msgstr "Colar URL da imagem"
 msgid "Paste image URL..."
 msgstr "Cole a URL da imagem..."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:170
+msgid "Paste it here — it is not shown in the chat"
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:123
 msgid "Paste only what fits in the existing rows"
 msgstr "Colar apenas o que cabe nas linhas existentes"
@@ -22041,6 +22057,10 @@ msgstr "Transparência de raciocínio de nível premium"
 #: src/features/chat/thread/ask-user-prompt.tsx:122
 msgid "Preparing a question…"
 msgstr "Preparando uma pergunta…"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:131
+msgid "Preparing a request…"
+msgstr ""
 
 #: src/features/knowledge/components/knowledge-import-actions.tsx:111
 msgid "Preparing the import…"
@@ -23066,7 +23086,7 @@ msgstr "Ler a documentação"
 msgid "Read what needs you: the description, commits, files, diff and checks of each change."
 msgstr ""
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:66
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:68
 msgid "read-only"
 msgstr "somente leitura"
 
@@ -24091,12 +24111,12 @@ msgstr "Reenviar e-mail de verificação"
 #: ../../packages/ui/src/components/image-editor.tsx:311
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:102
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:106
 msgid "Reset"
 msgstr "Redefinir"
 
 #. placeholder {0}: tool.name
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:96
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:100
 msgid "Reset {0} to default"
 msgstr "Redefinir {0} para o padrão"
 
@@ -24353,7 +24373,7 @@ msgstr "Observação do revisor"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/pages/components/page-share-dialog.tsx:209
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:201
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:213
 msgid "Revoke"
 msgstr "Revogar"
 
@@ -24365,7 +24385,7 @@ msgstr "Revogar todas as sessões"
 msgid "Revoke Session"
 msgstr "Revogar sessão"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:195
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:207
 msgid "Revoke the allow for {tool}"
 msgstr ""
 
@@ -24725,6 +24745,7 @@ msgstr "Arábia Saudita"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/chat/thread/request-secret-prompt.tsx:179
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:640
@@ -24830,9 +24851,21 @@ msgstr "Salvar fluxo de trabalho"
 msgid "Saved"
 msgstr "Salvo"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:129
+msgid "Saved — continuing"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:127
+msgid "Saved — the assistant can use it once"
+msgstr ""
+
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "Salvo como predefinição"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:83
+msgid "Saved as your {provider} API key"
+msgstr ""
 
 #. placeholder {0}: chosen.name
 #: src/features/evals/components/save-eval-case-action.tsx:70
@@ -25215,6 +25248,10 @@ msgstr "assento/mês"
 #: src/features/settings/lib/settings-keywords.ts:63
 #: src/features/settings/lib/settings-keywords.ts:64
 msgid "secret"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:160
+msgid "Secret"
 msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:341
@@ -25684,6 +25721,10 @@ msgstr "Sessões revogadas"
 #: src/features/auth/components/settings/security/change-password-card.tsx:224
 msgid "Set a password for your account"
 msgstr "Defina uma senha para sua conta"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:87
+msgid "Set as the {header} header on your {server} MCP server"
+msgstr ""
 
 #: ../../packages/ui/src/components/color-picker.tsx:194
 msgid "Set color to {color}"
@@ -26579,7 +26620,7 @@ msgid "Source"
 msgstr "Fonte"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1110
-#: src/features/chat/thread/message-content.tsx:125
+#: src/features/chat/thread/message-content.tsx:140
 msgid "Source {index}"
 msgstr "Fonte {index}"
 
@@ -28512,6 +28553,10 @@ msgstr "O arquivo compactado contém arquivos demais."
 msgid "The assistant has a question"
 msgstr "O assistente tem uma pergunta"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:142
+msgid "The assistant needs a secret"
+msgstr ""
+
 #: src/features/settings/components/chat/bots-settings.tsx:191
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
@@ -28952,7 +28997,7 @@ msgstr "Estas memórias foram adicionadas ao contexto da IA nesta resposta porqu
 msgid "These providers will never be used for your requests."
 msgstr "Esses provedores nunca serão usados nas suas solicitações."
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:182
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:194
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
 msgstr ""
 
@@ -29744,7 +29789,7 @@ msgstr "chamada de ferramentas"
 msgid "Tool Calling"
 msgstr "Chamada de ferramentas"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:286
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:298
 #: src/features/settings/lib/settings-navigation.ts:95
 msgid "Tool Permissions"
 msgstr "Permissões de ferramentas"
@@ -30535,7 +30580,7 @@ msgstr "tipo não suportado"
 msgid "until {0}"
 msgstr "até {0}"
 
-#: src/features/settings/components/chat/tool-permissions-settings.tsx:192
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:204
 msgid "Until {until}"
 msgstr ""
 
@@ -31897,6 +31942,10 @@ msgstr "Aguardando saída…"
 msgid "Waiting for the agent…"
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:133
+msgid "Waiting for the owner"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for the owner to answer"
 msgstr "Aguardando a resposta do proprietário"
@@ -31911,6 +31960,10 @@ msgstr "Aguardando a aprovação do proprietário"
 #: src/features/chat/thread/composer-input-area.tsx:380
 msgid "Waiting for uploads to complete…"
 msgstr "Aguardando os envios terminarem…"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:133
+msgid "Waiting for you"
+msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:124
 msgid "Waiting for your answer"
