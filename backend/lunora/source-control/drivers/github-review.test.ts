@@ -181,6 +181,34 @@ describe("review threads", () => {
         expect(sent[0]?.json.query).not.toContain("octo");
     });
 
+    it("reads on through a long thread past its first page of comments", async () => {
+        const comment = (id: number) => {
+            return { author: { login: "r" }, body: `c${id}`, createdAt: "2026-10-02T10:00:00Z", fullDatabaseId: String(id) };
+        };
+        const { request, sent } = host((call) => {
+            if (call.json.query.includes("node(id")) {
+                return { data: { node: { comments: { nodes: [comment(31)], pageInfo: { endCursor: null, hasNextPage: false } } } } };
+            }
+
+            return {
+                data: {
+                    repository: {
+                        pullRequest: {
+                            reviewThreads: {
+                                nodes: [threadNode({ comments: { nodes: [comment(30)], pageInfo: { endCursor: "c30", hasNextPage: true } } })],
+                                pageInfo: { endCursor: null, hasNextPage: false },
+                            },
+                        },
+                    },
+                },
+            };
+        });
+        const page = await githubDriver.listThreads(request, REF, null);
+
+        expect(page.items[0]?.comments.map((entry) => entry.id)).toEqual(["30", "31"]);
+        expect(sent[1]?.json.variables).toEqual({ after: "c30", id: "PRRT_kwDOA" });
+    });
+
     it("says a pull request that is not there is not found", async () => {
         const { request } = host(() => {
             return { data: { repository: { pullRequest: null } } };

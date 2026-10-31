@@ -38,6 +38,7 @@ import type {
     ReviewSubmission,
     ReviewThread,
     SubmittedReview,
+    ThreadComment,
     ViewedFile,
     ViewedState,
 } from "../types";
@@ -395,10 +396,12 @@ const listFiles = async (request: HostRequest, ref: PullRequestRef, page: number
 
 // ─── Review ─────────────────────────────────────────────────────────────────
 
-/** Cursor pages the review reads ask for: 100 files, 50 threads with their first 30 comments. */
+/** Cursor pages the review reads ask for: 100 files, 50 threads with their first 30 comments (the rest of a long thread is read on, up to {@link MAX_THREAD_COMMENT_PAGES} more pages). */
 const VIEWED_PAGE_SIZE = 100;
 const THREAD_PAGE_SIZE = 50;
 const THREAD_COMMENTS = 30;
+const MAX_THREAD_COMMENT_PAGES = 4;
+const COMMENT_PAGE_SIZE = 100;
 const COMMENT_MAX_CHARS = 20_000;
 const COMMENT_ID = /^\d{1,20}$/u;
 const NODE_ID = /^[\w=-]{1,200}$/u;
@@ -436,12 +439,25 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
-          comments(first: ${THREAD_COMMENTS}) { nodes { fullDatabaseId author { login } body createdAt } }
+          comments(first: ${THREAD_COMMENTS}) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
         }
       }
     }
   }
 }`;
+
+/** The comments of one thread after a cursor: the rest of a thread the first page did not hold. */
+const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequestReviewThread {
+      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+    }
+  }
+}`;
+
+const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional() });
+
+const commentsDataSchema = z.object({ node: z.object({ comments: commentsSchema }).nullable() });
 
 const threadCommentSchema = z.object({
     author: z.object({ login: z.string() }).nullable(),
@@ -451,7 +467,7 @@ const threadCommentSchema = z.object({
 });
 
 const threadSchema = z.object({
-    comments: z.object({ nodes: z.array(z.unknown()) }),
+    comments: commentsSchema,
     diffSide: z.string(),
     id: z.string(),
     isOutdated: z.boolean(),
@@ -469,14 +485,8 @@ const threadsDataSchema = z.object({
         .nullable(),
 });
 
-const toThread = (value: unknown): ReviewThread | undefined => {
-    const thread = threadSchema.safeParse(value);
-
-    if (!thread.success) {
-        return undefined;
-    }
-
-    const comments = thread.data.comments.nodes.flatMap((node) => {
+const commentsOf = (nodes: unknown[]): ThreadComment[] =>
+    nodes.flatMap((node) => {
         const comment = threadCommentSchema.safeParse(node);
         const id = comment.success ? String(comment.data.fullDatabaseId) : "";
 
@@ -491,6 +501,34 @@ const toThread = (value: unknown): ReviewThread | undefined => {
               ]
             : [];
     });
+
+/** A thread's comments past the first page, a page at a time up to {@link MAX_THREAD_COMMENT_PAGES}; a longer thread ends there. */
+const laterComments = async (request: HostRequest, threadId: string, first: z.infer<typeof commentsSchema>): Promise<unknown[]> => {
+    const nodes: unknown[] = [];
+    let { pageInfo } = first;
+
+    for (let page = 0; pageInfo?.hasNextPage && pageInfo.endCursor !== null && page < MAX_THREAD_COMMENT_PAGES; page += 1) {
+        const data = await graphqlRequest(request, COMMENTS_QUERY, { after: pageInfo.endCursor, id: threadId }, commentsDataSchema);
+
+        if (data.node === null) {
+            break;
+        }
+
+        nodes.push(...data.node.comments.nodes);
+        pageInfo = data.node.comments.pageInfo;
+    }
+
+    return nodes;
+};
+
+const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThread | undefined> => {
+    const thread = threadSchema.safeParse(value);
+
+    if (!thread.success) {
+        return undefined;
+    }
+
+    const comments = commentsOf([...thread.data.comments.nodes, ...(await laterComments(request, thread.data.id, thread.data.comments))]);
 
     return {
         canResolve: thread.data.viewerCanResolve,
@@ -509,11 +547,12 @@ const toThread = (value: unknown): ReviewThread | undefined => {
 const listThreads = async (request: HostRequest, ref: PullRequestRef, after: string | null): Promise<CursorPage<ReviewThread>> => {
     const data = await graphqlRequest(request, THREADS_QUERY, { ...repoParts(ref), after }, threadsDataSchema);
     const { reviewThreads } = pullRequestOf(data.repository);
+    const threads = await Promise.all(reviewThreads.nodes.map(async (node) => await toThread(request, node)));
 
     return {
         endCursor: reviewThreads.pageInfo.endCursor,
         hasMore: reviewThreads.pageInfo.hasNextPage,
-        items: reviewThreads.nodes.map((node) => toThread(node)).filter((thread): thread is ReviewThread => thread !== undefined),
+        items: threads.filter((thread): thread is ReviewThread => thread !== undefined),
     };
 };
 
