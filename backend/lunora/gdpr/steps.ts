@@ -175,6 +175,8 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     // `thread.summaryTYPO` an error; this annotation only has to describe the
     // wire shape.
     const conversations: {
+        /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
+        contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }[];
         messages: {
             _id: string;
             createdAt: number;
@@ -261,7 +263,11 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                     messageCursor = result.continueCursor;
                 }
 
-                conversations.push({ messages, thread: projectThread(thread, tagNames) });
+                const contextSummaries = await context.runQuery(internal.agent.thread_summaries.listThreadSummariesForExport, {
+                    threadId: thread._id as Id<"threads">,
+                });
+
+                conversations.push({ contextSummaries, messages, thread: projectThread(thread, tagNames) });
             } catch (error) {
                 gdprLogger.error(`Failed to collect messages for thread ${listed._id}:`, error);
             }

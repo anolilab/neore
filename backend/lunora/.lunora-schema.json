@@ -5555,6 +5555,19 @@
             }
           ]
         },
+        "projectIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "projects"
+          }
+        },
         "revokedAt": {
           "kind": "number",
           "nullable": false,
@@ -19510,6 +19523,115 @@
       },
       "shardMode": "global:d1"
     },
+    "threadContextSummaries": {
+      "commitOrdered": false,
+      "fields": {
+        "coveredCount": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "coveredUpToMessageId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "messages"
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "summary": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "taintedBy": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "union",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "members": [
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"device\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"files\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"knowledge\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"mcp\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"web\""
+              }
+            ]
+          }
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_threadId": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "threadInvites": {
       "commitOrdered": false,
       "fields": {
@@ -20483,6 +20605,18 @@
         },
         "summary": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "summaryEpoch": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "summaryPathTooLongAt": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -22792,6 +22926,12 @@
         },
         "temporaryChatRetentionHours": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "threadSummariesEnabled": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
