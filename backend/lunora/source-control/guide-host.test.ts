@@ -201,6 +201,13 @@ describe("the end of a host guide's turn", () => {
         await endTurn(stream, "finished");
 
         expect(await statusOf()).toMatchObject({ status: "generating" });
+        // Nothing is sent to the queue from the transaction that ends the turn: the scheduled step queues it after the commit.
+        expect(jobsQueueMessages).toEqual([]);
+
+        const { queueHostGuideFinalize } = await import("./guide-host");
+
+        await harness.action(async (ctx: any) => await ctx.runAction(queueHostGuideFinalize, { guideId: guide._id, streamId: stream._id, userId: ownerId }));
+
         expect(jobsQueueMessages.map((message) => message.body.functionPath)).toEqual([expect.stringContaining("finalizeHostGuide")]);
         expect(jobsQueueMessages[0]?.body.args).toEqual({ guideId: guide._id, streamId: stream._id, userId: ownerId });
     });

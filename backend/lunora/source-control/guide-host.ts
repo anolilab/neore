@@ -22,6 +22,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { isDeviceOnline } from "../devices/lib/state";
 import type { DeviceTaintSource } from "../devices/lib/taint";
+import { enqueueJob } from "../lib/job-queue";
 import { getUserTier } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
@@ -244,6 +245,16 @@ export const readHostGuideAnswer = internalQuery
         const answer = extractJsonObject(text);
 
         return { answer: answer === null ? null : JSON.stringify(answer), headSha: guide.headSha, number: guide.number, repository: guide.repository };
+    });
+
+/** Queues {@link finalizeHostGuide} once the turn-ending mutation has committed (`guide-host-end.ts#settleHostGuide`). */
+export const queueHostGuideFinalize = internalAction
+    .input({ guideId: v.id("pullRequestGuides"), streamId: v.id("persistentStreams"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .action(async ({ args }) => {
+        await enqueueJob(internal.source_control.guide_host.finalizeHostGuide, args, { shardKey: args.userId });
+
+        return null;
     });
 
 /**

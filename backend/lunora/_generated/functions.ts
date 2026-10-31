@@ -1380,6 +1380,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "source_control_guide_functions:getGuide": lunora_source_control_guide_functions_181.getGuide as unknown as RegisteredLunoraFunction,
     "source_control_guide_host:beginHostGuide": lunora_source_control_guide_host_182.beginHostGuide as unknown as RegisteredLunoraFunction,
     "source_control_guide_host:finalizeHostGuide": lunora_source_control_guide_host_182.finalizeHostGuide as unknown as RegisteredLunoraFunction,
+    "source_control_guide_host:queueHostGuideFinalize": lunora_source_control_guide_host_182.queueHostGuideFinalize as unknown as RegisteredLunoraFunction,
     "source_control_guide_host:readHostGuideAnswer": lunora_source_control_guide_host_182.readHostGuideAnswer as unknown as RegisteredLunoraFunction,
     "source_control_guide_host:startHostGuide": lunora_source_control_guide_host_182.startHostGuide as unknown as RegisteredLunoraFunction,
     "source_control_guide_internal:beginGuide": lunora_source_control_guide_internal_183.beginGuide as unknown as RegisteredLunoraFunction,
@@ -9651,6 +9652,7 @@ export interface Caller {
         guide_host: {
             beginHostGuide: (args: { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }) => Promise<{ status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
             finalizeHostGuide: (args: { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }) => Promise<null>;
+            queueHostGuideFinalize: (args: { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }) => Promise<null>;
             readHostGuideAnswer: (args: { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }) => Promise<null | { answer: string | null; headSha: string; number: number; repository: string }>;
             startHostGuide: (args: { agentKey: string; deviceId: Id<"devices">; folderId: string; instructions: string; number: number; repository: string }) => Promise<{ status: "started"; threadId: string } | { status: "folder_mismatch" | "guest" | "running" | "too_large" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
         };
@@ -11478,6 +11480,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         guide_host: {
             beginHostGuide: (args) => callRegistered(context, "source_control_guide_host:beginHostGuide", args),
             finalizeHostGuide: (args) => callRegistered(context, "source_control_guide_host:finalizeHostGuide", args),
+            queueHostGuideFinalize: (args) => callRegistered(context, "source_control_guide_host:queueHostGuideFinalize", args),
             readHostGuideAnswer: (args) => callRegistered(context, "source_control_guide_host:readHostGuideAnswer", args),
             startHostGuide: (args) => callRegistered(context, "source_control_guide_host:startHostGuide", args),
         },

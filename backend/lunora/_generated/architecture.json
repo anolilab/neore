@@ -15189,6 +15189,13 @@
       "module": "source-control"
     },
     {
+      "detail": "action",
+      "id": "function:source_control_guide_host:queueHostGuideFinalize",
+      "kind": "function",
+      "name": "source_control.guide_host.queueHostGuideFinalize",
+      "module": "source-control"
+    },
+    {
       "detail": "query",
       "id": "function:source_control_guide_host:readHostGuideAnswer",
       "kind": "function",
@@ -17683,7 +17690,7 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 238,
+      "line": 245,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {

@@ -1023,6 +1023,7 @@ export interface InternalApiTypes {
         guide_host: {
             beginHostGuide: FunctionReference<"mutation", { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
             finalizeHostGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
+            queueHostGuideFinalize: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
             readHostGuideAnswer: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null | { answer: string | null; headSha: string; number: number; repository: string }>;
         };
         guide_internal: {
@@ -2168,6 +2169,7 @@ export const internal: InternalApiTypes = {
         guide_host: {
             beginHostGuide: { __lunoraRef: "source_control_guide_host:beginHostGuide" },
             finalizeHostGuide: { __lunoraRef: "source_control_guide_host:finalizeHostGuide" },
+            queueHostGuideFinalize: { __lunoraRef: "source_control_guide_host:queueHostGuideFinalize" },
             readHostGuideAnswer: { __lunoraRef: "source_control_guide_host:readHostGuideAnswer" },
         },
         guide_internal: {
