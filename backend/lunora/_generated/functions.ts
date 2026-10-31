@@ -262,6 +262,12 @@ export interface RegisteredLunoraFunction {
      * paywalls it; the shard refuses to subscribe it (`isPaidFunction`).
      */
     x402?: { readonly price: number | string };
+    /**
+     * Names of the arguments whose validators carry a `v.sensitive` marker. Read by the
+     * shard before any validator is loaded, so a lazy function's secret args are
+     * masked even on a dispatch that fails before its module evaluates.
+     */
+    sensitiveArgs?: readonly string[];
 }
 
 /**

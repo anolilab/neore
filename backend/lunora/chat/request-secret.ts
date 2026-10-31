@@ -57,10 +57,15 @@ export const answerSecretRequest = authMutation
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-        /** `null` declines to provide the secret. The destination's own limit applies on top of this one. */
-        value: v.union(
-            v.string().check((value) => value.length <= SECRET_HEADER_VALUE_MAX * 2, { message: "Value too long" }),
-            v.null(),
+        /**
+         * `null` declines to provide the secret. The destination's own limit applies on top of this one. Sensitive: the
+         * runtime keeps it out of request logs and redacts it from validation errors.
+         */
+        value: v.sensitive(
+            v.union(
+                v.string().check((value) => value.length <= SECRET_HEADER_VALUE_MAX * 2, { message: "Value too long" }),
+                v.null(),
+            ),
         ),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))

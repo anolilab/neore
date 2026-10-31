@@ -28,7 +28,6 @@ import { useId, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { showError } from "@/lib/toast";
 
 import { providerLabel } from "./rate-limit-pause";
 
@@ -84,7 +83,10 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const valueId = useId();
     const destinationId = useId();
     const tooLongId = useId();
+    const saveErrorId = useId();
     const [draft, setDraft] = useState("");
+    // Shown in the card, tied to the field: the typed value is cleared on send, so the person must know to type it again.
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
@@ -158,14 +160,15 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         // Cleared before the call returns: the value lives in this component for no longer than the keystrokes.
         setDraft("");
+        setSaveError(null);
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
             { approvalId, threadId: threadId as Id<"threads">, value },
             {
-                onError: (error) => {
+                onError: () => {
                     setSubmitted(null);
-                    showError(error instanceof Error ? error : t`Could not save. Please try again.`);
+                    setSaveError(reply === "save" ? t`It was not saved. Paste it again and save.` : t`Could not answer. Please try again.`);
                 },
                 // The mutation's own copy of the arguments goes too.
                 onSettled: () => reset(),
@@ -222,8 +225,10 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         {label || t`Secret`}
                     </label>
                     <Input
-                        aria-describedby={[destination ? destinationId : "", tooLong ? tooLongId : ""].filter(Boolean).join(" ") || undefined}
-                        aria-invalid={tooLong || undefined}
+                        aria-describedby={
+                            [destination ? destinationId : "", tooLong ? tooLongId : "", saveError ? saveErrorId : ""].filter(Boolean).join(" ") || undefined
+                        }
+                        aria-invalid={tooLong || saveError !== null || undefined}
                         autoComplete="new-password"
                         autoCorrect="off"
                         id={valueId}
@@ -236,6 +241,11 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         type="password"
                         value={draft}
                     />
+                    {saveError && (
+                        <p className="text-destructive text-xs" id={saveErrorId} role="alert">
+                            {saveError}
+                        </p>
+                    )}
                     {tooLong && (
                         <p className="text-destructive text-xs" id={tooLongId} role="alert">
                             {t`This is too long: up to ${valueMax} characters.`}

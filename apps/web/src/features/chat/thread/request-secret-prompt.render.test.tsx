@@ -157,6 +157,23 @@ describe("the secret request card", () => {
         );
     });
 
+    it("says in the card, tied to the field, that a failed save was not saved", async () => {
+        answer.mockRejectedValueOnce(new Error("network"));
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const field = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        fireEvent.change(field, { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        const alert = await screen.findByText("It was not saved. Paste it again and save.");
+        const refreshed = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        expect(alert.getAttribute("role")).toBe("alert");
+        expect(refreshed.getAttribute("aria-describedby")).toContain(alert.id);
+        expect(refreshed.getAttribute("aria-invalid")).toBe("true");
+    });
+
     it("names the address of the server a header will be set on, scheme and path included, and nothing from the query", async () => {
         // eslint-disable-next-line unicorn/prefer-https -- the card has to show the scheme of a server saved over plain http
         servers.current = [{ name: "Files", url: "http://files.example.com/mcp?token=hidden" }];

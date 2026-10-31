@@ -22542,12 +22542,16 @@
                       "value": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "type": "string",
+                            "writeOnly": true,
+                            "format": "password"
                           },
                           {
-                            "type": "null"
+                            "type": "null",
+                            "writeOnly": true
                           }
-                        ]
+                        ],
+                        "writeOnly": true
                       }
                     },
                     "required": [

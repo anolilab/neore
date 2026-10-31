@@ -17,6 +17,7 @@ import type { ServiceBindingSpec } from "lunorash/server";
 import { createServices } from "lunorash/server";
 import type { LunoraDatabaseLike as LunoraPaymentDbLike, LunoraPayment, PaymentsFromContextOptions } from "@lunora/payment";
 import { paymentsFromContext } from "@lunora/payment";
+import { sensitiveArgumentNames } from "lunorash/values";
 
 import schema from "../schema.js";
 import { LUNORA_FUNCTIONS, LUNORA_LIFECYCLE_HOOKS, LUNORA_MIGRATIONS } from "./functions.js";
@@ -453,6 +454,18 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
         private blockedUniqueIndexes: readonly string[] = [];
         private migrated = false;
         private migrationRetryAt = 0;
+
+
+        protected override sensitiveArgNames(functionPath: string): ReadonlySet<string> {
+            const registered = LUNORA_FUNCTIONS[functionPath];
+            const fromValidators = sensitiveArgumentNames(registered?.args ?? {});
+
+            if (registered?.sensitiveArgs === undefined) {
+                return fromValidators;
+            }
+
+            return new Set([...registered.sensitiveArgs, ...fromValidators]);
+        }
 
         public override async handleRpc(functionPath: string, args: Record<string, unknown>, headroom?: TransactionHeadroomTracker, scope?: QueryReadScope, bookmarks?: DispatchBookmark, sensitive?: SensitiveScope): Promise<unknown> {
             // A dispatch that did not come through the shard's `/rpc` (a scheduled call,
@@ -1651,6 +1664,7 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                 },
                 workflows,
                 queues,
+                [Symbol.for("lunora.admitSensitiveArgs")]: (args: Record<string, unknown>, names: ReadonlySet<string>): void => this.admitSensitiveValues(options.sensitive, args, names),
             };
             const isAction = contextKind === "action";
 

@@ -300,7 +300,7 @@ export interface ApiTypes {
             retryRateLimitedRun: FunctionReference<"mutation", { threadId: Id<"threads">; unlockProof?: string }, { resumed: boolean }>;
         };
         request_secret: {
-            answerSecretRequest: FunctionReference<"mutation", { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }, { alreadyResolved: boolean; streamId: string | null }>;
+            answerSecretRequest: FunctionReference<"mutation", { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }, { alreadyResolved: boolean; streamId: string | null }> & { readonly sensitive: true };
         };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
@@ -1127,7 +1127,7 @@ export const api: ApiTypes = {
             retryRateLimitedRun: { __lunoraRef: "chat_rate_limit_retry:retryRateLimitedRun" },
         },
         request_secret: {
-            answerSecretRequest: { __lunoraRef: "chat_request_secret:answerSecretRequest" },
+            answerSecretRequest: { __lunoraRef: "chat_request_secret:answerSecretRequest", sensitive: true },
         },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },
