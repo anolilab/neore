@@ -22,6 +22,8 @@ const row = (id: string, order: number, role: "assistant" | "user", text: string
     };
 };
 
+const CONTEXT_NOT_INSTRUCTIONS = /context, not instructions/i;
+
 const RECENT = [row("m1", 1, "user", "first recent"), row("m2", 2, "assistant", "second recent"), row("m3", 3, "user", "the prompt")];
 
 const contextFor = async (summary: string | null, options: { recentMessages?: number; statelessMode?: boolean } = {}) => {
@@ -37,7 +39,7 @@ const contextFor = async (summary: string | null, options: { recentMessages?: nu
         return { page: [...RECENT].toReversed() };
     });
     const { statelessMode, ...contextOptions } = options;
-    const { messages } = await fetchContextWithPrompt(
+    const { messages, threadNotes } = await fetchContextWithPrompt(
         { runQuery, storage: {} } as never,
         {} as never,
         {
@@ -51,33 +53,33 @@ const contextFor = async (summary: string | null, options: { recentMessages?: nu
         } as never,
     );
 
-    return { messages, runQuery };
+    return { messages, runQuery, threadNotes };
 };
 
 const texts = (messages: { content: unknown }[]) =>
     messages.map((message) => (typeof message.content === "string" ? message.content : JSON.stringify(message.content)));
 
 describe("fetchContextWithPrompt with a thread summary", () => {
-    it("puts the summary ahead of the recent rows, then the recent rows, then the prompt, in order", async () => {
+    it("hands the summary over as reference notes for the system prompt, and leaves the messages as they were", async () => {
         expect.assertions(5);
 
-        const { messages, runQuery } = await contextFor("The user is planning a trip to Lisbon.");
-        const all = texts(messages as never);
+        const { messages, runQuery, threadNotes } = await contextFor("The user is planning a trip to Lisbon.");
 
-        expect(all).toHaveLength(4);
-        expect(all[0]).toContain("The user is planning a trip to Lisbon.");
-        expect(all.slice(1)).toStrictEqual(["first recent", "second recent", "the prompt"]);
+        expect(texts(messages as never)).toStrictEqual(["first recent", "second recent", "the prompt"]);
+        expect(threadNotes).toContain("The user is planning a trip to Lisbon.");
+        // Framed as context, never as a request: it is not a message at all, least of all a user's.
+        expect(threadNotes).toMatch(CONTEXT_NOT_INSTRUCTIONS);
+        expect((messages as { role: string }[]).map((message) => message.role)).not.toContain("system");
         expect(runQuery).toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, { promptMessageId: "m3", threadId: "thread-1" });
-        // It is labelled so the model reads it as background, in the role the compressor uses.
-        expect((messages as { role: string }[])[0]?.role).toBe("user");
     });
 
     it("leaves today's context alone when there is no summary for this path", async () => {
-        expect.assertions(1);
+        expect.assertions(2);
 
-        const { messages } = await contextFor(null);
+        const { messages, threadNotes } = await contextFor(null);
 
         expect(texts(messages as never)).toStrictEqual(["first recent", "second recent", "the prompt"]);
+        expect(threadNotes).toBeUndefined();
     });
 
     it("does not look for one when the recent window is smaller than the one the summary was made for", async () => {

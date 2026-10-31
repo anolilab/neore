@@ -69,8 +69,8 @@ const AccountSettings: FC = () => {
     const currentLocation = userSettings?.location;
     const currentTimezone = userSettings?.timezone;
     const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
-    // On unless explicitly turned off.
-    const isThreadSummariesEnabled = userSettings?.threadSummariesEnabled !== false;
+    // OPT-IN: absent means off, matching the backend gate (`agent/thread-summaries.ts`).
+    const isThreadSummariesEnabled = userSettings?.threadSummariesEnabled === true;
     // Opt-in: absent means off.
     const isAutoReadReplies = userSettings?.autoReadReplies === true;
     const currentSpeechVoice = userSettings?.voiceModeVoice ?? DEFAULT_SPEECH_VOICE ?? null;
@@ -336,7 +336,7 @@ const AccountSettings: FC = () => {
                                 {t`Summarise long chats`}
                             </Label>
                             <p className="text-muted-foreground text-sm">
-                                {t`While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits.`}
+                                {t`Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made.`}
                             </p>
                         </div>
                         <Switch

@@ -21,11 +21,26 @@
  * makes a redelivered job do nothing twice. It is released when the model call
  * fails, so the next reply's job can try the same cut.
  *
+ * ## What guards the result
+ *
+ * - **Opt-in** (`userSettings.threadSummariesEnabled === true`); switching it off
+ *   erases the user's summaries ({@link eraseUserThreadSummaries}).
+ * - **Taint.** Each row records the untrusted sources of the rows it folded plus
+ *   the previous summary's (`taintedBy`); `createDeviceCall` adds them to a call's
+ *   own, so a summary of web or tool content still makes a device call ask.
+ * - **Epoch.** An in-place edit moves `threads.summaryEpoch` and erases the
+ *   summaries covering the edited turns ({@link dropSummariesFromEdit}); a run
+ *   prepared before it refuses to store.
+ * - **Cost.** A path past `SUMMARY_MAX_PATH_ROWS` is never read from the top:
+ *   `threads.summaryPathTooLongAt` makes later jobs skip it, and an extending walk
+ *   stops at the previous cover.
+ *
  * ## Reading
  *
  * {@link getThreadSummaryForContext} answers the context builder
  * (`agent/client/search.ts`): the newest summary whose last covered row is an
- * ancestor of the prompt, or nothing. A summary of another branch is never
+ * ancestor of the prompt, or nothing. It reaches the model as notes in the
+ * system prompt, not as a message. A summary of another branch is never
  * used, and a locked thread has none (the lock paths erase them).
  */
 import { generateText } from "ai";
@@ -34,7 +49,10 @@ import { v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { computeTaint, mergeTaint } from "../devices/lib/taint";
+import { vDeviceTaintSource } from "../devices/validators";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { gatewayFetch } from "../lib/services";
 import { isThreadLocked } from "../lib/thread-lock";
 import { getUtilityModel } from "../lib/utility-model";
@@ -50,6 +68,7 @@ import {
     SUMMARY_MAX_PATH_ROWS,
     SUMMARY_READ_REACH_ROWS,
     SUMMARY_SYSTEM_PROMPT,
+    SUMMARY_TOO_LONG_RECHECK_MS,
     THREAD_SUMMARY_CLAIM_SCOPE,
     THREAD_SUMMARY_CLAIM_TTL_MS,
 } from "./thread-summary-logic";
@@ -60,6 +79,8 @@ type Thread = Doc<"threads">;
 type OwnedThread = Thread & { userId: string };
 
 const SUMMARY_EVENT = "chat.thread_summary";
+
+const ERASE_BATCH = 50;
 
 const STORAGE_ORDER_DESC = [{ order: "desc" }, { stepOrder: "desc" }, { _creationTime: "desc" }] as const;
 
@@ -93,8 +114,8 @@ const blockerOf = async (ctx: Reader, thread: OwnedThread): Promise<string | nul
         .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
         .first();
 
-    // Opt-OUT: absent means on.
-    return settings?.threadSummariesEnabled === false ? "disabled" : null;
+    // OPT-IN, like memory: absent means off.
+    return settings?.threadSummariesEnabled === true ? null : "disabled";
 };
 
 /** Of `candidates` (rows of a thread), the ids that are `tip` or among its `reach` nearest ancestors. */
@@ -153,11 +174,21 @@ const leafOf = async (ctx: Reader, thread: Thread, latest: Row | null): Promise<
 const preparedValidator = v.object({
     coveredCount: v.number(),
     coveredUpToMessageId: v.id("messages"),
+    /** `threads.summaryEpoch` as the run was prepared; storing the summary needs it unchanged. */
+    epoch: v.number(),
     previousSummary: v.optional(v.string()),
     previousSummaryId: v.optional(v.id("threadContextSummaries")),
+    taintedBy: v.array(vDeviceTaintSource),
     transcript: v.string(),
     userId: v.string(),
 });
+
+/** Marks the thread so later jobs skip reading its path from the top. */
+const markPathTooLong = async (ctx: MutationCtx, thread: Thread): Promise<null> => {
+    await ctx.db.patch(thread._id, { summaryPathTooLongAt: ctx.now });
+
+    return null;
+};
 
 /**
  * Everything one summarising run needs, or `null` when there is nothing to do
@@ -169,7 +200,12 @@ export const prepareThreadSummary = internalMutation
     .mutation(async ({ args, ctx }) => {
         const thread = ownedBy(await ctx.db.get(args.threadId));
 
-        if (!thread || (await blockerOf(ctx, thread)) !== null) {
+        // A thread found too long is not read again for a while: its jobs do not even look at its rows.
+        if (!thread || (thread.summaryPathTooLongAt !== undefined && ctx.now - thread.summaryPathTooLongAt < SUMMARY_TOO_LONG_RECHECK_MS)) {
+            return null;
+        }
+
+        if ((await blockerOf(ctx, thread)) !== null) {
             return null;
         }
 
@@ -190,14 +226,24 @@ export const prepareThreadSummary = internalMutation
             return null;
         }
 
+        // Every turn adds at least one row to the path, so this many turns is too long without reading a row.
+        if (leaf.order >= SUMMARY_MAX_PATH_ROWS) {
+            return await markPathTooLong(ctx, thread);
+        }
+
         const [base] = await summariesOnPath(ctx, thread._id, leaf, await summariesOf(ctx, thread._id), SUMMARY_MAX_PATH_ROWS);
         const { next, rows } = await walkPath(ctx, thread._id, leaf, {
             limit: SUMMARY_MAX_PATH_ROWS,
-            ...(base && { stopAtId: base.covered._id as string }),
+            ...(base && { stopAtId: base.covered._id as string, stopBelowOrder: base.covered.order }),
         });
 
-        // Too long to read from the top, or the walk did not reach the previous cover: keep today's behaviour.
-        if (rows.length >= SUMMARY_MAX_PATH_ROWS || (base && next?._id !== base.covered._id)) {
+        // Too long to read from the top: keep today's behaviour, and do not walk it again.
+        if (rows.length >= SUMMARY_MAX_PATH_ROWS) {
+            return await markPathTooLong(ctx, thread);
+        }
+
+        // The walk did not reach the previous cover.
+        if (base && next?._id !== base.covered._id) {
             return null;
         }
 
@@ -228,7 +274,13 @@ export const prepareThreadSummary = internalMutation
         return {
             coveredCount: (base?.summary.coveredCount ?? 0) + consumed,
             coveredUpToMessageId: covered._id,
+            epoch: thread.summaryEpoch ?? 0,
             ...(base && { previousSummary: base.summary.summary, previousSummaryId: base.summary._id }),
+            // Whatever untrusted content the folded rows held, and the previous summary already carried.
+            taintedBy: mergeTaint(
+                computeTaint(slice.slice(0, consumed).map((row) => row.message as { content?: unknown; role?: unknown })),
+                base?.summary.taintedBy,
+            ),
             transcript: text,
             userId: thread.userId,
         };
@@ -243,8 +295,10 @@ export const finishThreadSummary = internalMutation
     .input({
         coveredCount: v.number(),
         coveredUpToMessageId: v.id("messages"),
+        epoch: v.number(),
         previousSummaryId: v.optional(v.id("threadContextSummaries")),
         summary: v.optional(v.string().max(MAX_LENGTH.long)),
+        taintedBy: v.array(vDeviceTaintSource),
         threadId: v.id("threads"),
     })
     .output(v.boolean())
@@ -259,6 +313,13 @@ export const finishThreadSummary = internalMutation
         const thread = ownedBy(await ctx.db.get(args.threadId));
 
         if (!thread || (await blockerOf(ctx, thread)) !== null) {
+            return false;
+        }
+
+        // A reply was edited in place since the run was prepared: the rows it read are not the rows there now.
+        if ((thread.summaryEpoch ?? 0) !== args.epoch) {
+            await releaseClaim(ctx, THREAD_SUMMARY_CLAIM_SCOPE, claimKey(args.threadId, args.coveredUpToMessageId));
+
             return false;
         }
 
@@ -278,6 +339,7 @@ export const finishThreadSummary = internalMutation
             coveredUpToMessageId: args.coveredUpToMessageId,
             createdAt: ctx.now,
             summary: args.summary,
+            taintedBy: args.taintedBy,
             threadId: args.threadId,
             userId: thread.userId,
         });
@@ -304,7 +366,13 @@ export const runThreadSummary = internalAction
             return null;
         }
 
-        const done = { coveredCount: job.coveredCount, coveredUpToMessageId: job.coveredUpToMessageId, threadId: args.threadId };
+        const done = {
+            coveredCount: job.coveredCount,
+            coveredUpToMessageId: job.coveredUpToMessageId,
+            epoch: job.epoch,
+            taintedBy: job.taintedBy,
+            threadId: args.threadId,
+        };
 
         // Rows with no text of their own: the cover moves on, the summary stays.
         if (job.transcript === "") {
@@ -390,6 +458,82 @@ export const getThreadSummaryForContext = internalQuery
         const [best] = await summariesOnPath(ctx, args.threadId, tip, summaries, SUMMARY_READ_REACH_ROWS);
 
         return best && best.summary.summary !== "" ? best.summary.summary : null;
+    });
+
+/** One thread's stored summaries, for the owner's data export (`gdpr/steps.ts#collectConversations`). Lock does not apply: it is their data. */
+export const listThreadSummariesForExport = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.array(v.object({ coveredCount: v.number(), coveredUpToMessageId: v.string(), createdAt: v.number(), summary: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const stored = await summariesOf(ctx, args.threadId);
+
+        return stored
+            .toSorted((a, b) => a.coveredCount - b.coveredCount)
+            .map((row) => {
+                return {
+                    coveredCount: row.coveredCount,
+                    coveredUpToMessageId: row.coveredUpToMessageId as string,
+                    createdAt: row.createdAt,
+                    summary: row.summary,
+                };
+            });
+    });
+
+/**
+ * A reply was edited in place, from `editedOrder` on. Moves the epoch, so a run already under way refuses to
+ * store what it read, and erases the summaries that may quote the old text: those covering a row at or after
+ * the edit (a summary ending above it never saw it), and any whose covered row is gone.
+ */
+export const dropSummariesFromEdit = async (ctx: MutationCtx, threadId: Id<"threads">, editedOrder: number): Promise<void> => {
+    const thread = await ctx.db.get(threadId);
+
+    if (thread) {
+        await ctx.db.patch(threadId, { summaryEpoch: (thread.summaryEpoch ?? 0) + 1 });
+    }
+
+    const stored = await summariesOf(ctx, threadId);
+
+    for (const summary of stored) {
+        const covered = await getThreadRow(ctx, threadId, summary.coveredUpToMessageId);
+
+        if (!covered || covered.order >= editedOrder) {
+            await ctx.db.delete(summary._id);
+        }
+    }
+};
+
+/**
+ * Erases the summaries of every thread of `userId` (they live on the user's own shard): the user switched the
+ * setting off, which is a promise that what it made goes. One batch per call; a full batch schedules the next.
+ * Returns whether it did.
+ */
+export const eraseUserThreadSummaries = internalMutation
+    .input({ batch: v.optional(v.number()), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const batch = args.batch ?? ERASE_BATCH;
+        const rows = await ctx.db
+            .query("threadContextSummaries")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .take(batch);
+
+        for (const row of rows) {
+            await ctx.db.delete(row._id);
+        }
+
+        const more = rows.length === batch;
+
+        if (more) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.agent.thread_summaries.eraseUserThreadSummaries,
+                { batch: args.batch, userId: args.userId },
+                args.userId,
+            );
+        }
+
+        return more;
     });
 
 /** Erases a thread's summaries; the thread is deleted, locked or opted out. Returns whether a full batch went (call again). */

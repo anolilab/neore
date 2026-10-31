@@ -7,7 +7,7 @@ import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
 import type { Message } from "../validators";
-import { summaryContextText, SUMMARY_RECENT_ROWS } from "../thread-summary-logic";
+import { summaryNotesBlock, SUMMARY_RECENT_ROWS } from "../thread-summary-logic";
 import { validateVectorDimension, type VectorDimension } from "../vector/tables";
 import { issuedStorageOrigins } from "../../lib/storage-ref";
 import { signedReadUrl } from "../../lib/storage-read";
@@ -568,6 +568,8 @@ export const fetchContextWithPrompt = async (
     messages: ModelMessage[];
     order: number | undefined;
     stepOrder: number | undefined;
+    /** Reference notes on the thread's older turns, for the system prompt (not a message: see `summaryNotesBlock`); absent for none. */
+    threadNotes?: string;
 }> => {
     const { embeddingModel, statelessMode, threadId, userId } = args;
 
@@ -685,11 +687,7 @@ export const fetchContextWithPrompt = async (
     }
 
     const search = docsToModelMessages(signedSearch);
-    // The summary of the older turns leads the recent rows, in the role the context compressor uses for its own.
-    const recent = [
-        ...(olderSummary ? [{ content: summaryContextText(olderSummary), role: "user" } as ModelMessage] : []),
-        ...docsToModelMessages(signedPrePrompt),
-    ];
+    const recent = docsToModelMessages(signedPrePrompt);
     const inputMessages = messages.map((item) => toModelMessage(item));
     const inputPrompt = promptArray.map((item) => toModelMessage(item));
     const existingResponses = docsToModelMessages(signedExisting);
@@ -718,6 +716,7 @@ export const fetchContextWithPrompt = async (
         messages: processedMessages,
         order: promptMessage?.order,
         stepOrder: promptMessage?.stepOrder,
+        ...(olderSummary && { threadNotes: summaryNotesBlock(olderSummary) }),
     };
 };
 

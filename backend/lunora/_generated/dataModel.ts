@@ -1622,6 +1622,7 @@ export interface Doc_threadContextSummaries {
     coveredUpToMessageId: Id<"messages">;
     createdAt: number;
     summary: string;
+    taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     userId: string;
 }
@@ -1726,6 +1727,8 @@ export interface Doc_threads {
     statelessMode?: boolean;
     status: string;
     summary?: string;
+    summaryEpoch?: number;
+    summaryPathTooLongAt?: number;
     tagIds?: Array<string>;
     tags?: Array<string>;
     teamId?: string;
@@ -2346,7 +2349,7 @@ export interface IndexNamesByTable {
     teamSettings: "organizationId" | "teamId";
     temporaryThreads: "by_userId_expiresAt" | "by_expiresAt" | "by_thread";
     threadAccess: "by_user_and_owner" | "by_thread_and_user";
-    threadContextSummaries: "by_threadId";
+    threadContextSummaries: "by_userId" | "by_threadId";
     threadInvites: "by_invite_token" | "by_thread";
     threadKnowledge: "by_knowledgeFileId" | "by_threadId";
     threadPasscodes: "by_userId" | "by_thread";
@@ -4418,6 +4421,7 @@ export interface Insert_threadContextSummaries {
     coveredUpToMessageId: Id<"messages">;
     createdAt: number;
     summary: string;
+    taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     userId: string;
 }
@@ -4522,6 +4526,8 @@ export interface Insert_threads {
     statelessMode?: boolean;
     status: string;
     summary?: string;
+    summaryEpoch?: number;
+    summaryPathTooLongAt?: number;
     tagIds?: Array<string>;
     tags?: Array<string>;
     teamId?: string;

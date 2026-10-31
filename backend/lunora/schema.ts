@@ -2534,10 +2534,18 @@ export const schema = defineSchema({
         coveredUpToMessageId: v.id("messages"),
         createdAt: v.number(),
         summary: v.string(),
+        /**
+         * The untrusted sources (`devices/lib/taint.ts`) of the rows folded into the summary and of the one it
+         * extends. A device call made while the thread holds a summary carries them, so text the model read
+         * once, then lost to the window, still makes the call ask. Empty = clean.
+         */
+        taintedBy: v.array(vDeviceTaintSource),
         threadId: v.id("threads"),
         /** The thread's owner, whose shard this row lives on and whose account erases it. */
         userId: v.string(),
-    }).index("by_threadId", ["threadId"]),
+    })
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
 
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
@@ -2685,6 +2693,11 @@ export const schema = defineSchema({
         statelessMode: v.optional(v.boolean()),
         status: v.string(),
         summary: v.optional(v.string()),
+        // Moves each time a reply is edited in place; a context summary is stored only if it did not move since the
+        // run was prepared (`agent/thread-summaries.ts`). Unset = never edited.
+        summaryEpoch: v.optional(v.number()),
+        // When a summary run found the path too long to read from the top; later runs skip the walk.
+        summaryPathTooLongAt: v.optional(v.number()),
         // User-defined `threadTags` ids. NOT `tags` — that column holds
         // system-assigned source labels ("chat", "telegram", ...).
         tagIds: v.optional(v.array(v.string())),
@@ -3064,7 +3077,7 @@ export const schema = defineSchema({
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
-        // Summaries of a long thread's older turns, made while it sits idle (`agent/thread-summaries.ts`). Absent = ON; only `false` turns it off.
+        // Summaries of a long thread's older turns, made while it sits idle (`agent/thread-summaries.ts`). OPT-IN: absent means off.
         threadSummariesEnabled: v.optional(v.boolean()),
         // How the user wants thread titles worded; appended to the title prompt (`chat/functions.ts#createTitleChat`). Blank or absent = none.
         threadTitleInstructions: v.optional(v.string().max(MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH)),

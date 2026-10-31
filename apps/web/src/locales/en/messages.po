@@ -19953,6 +19953,10 @@ msgstr "off"
 msgid "Off"
 msgstr "Off"
 
+#: src/features/settings/components/account/account-settings.tsx:339
+msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
+msgstr "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
+
 #: src/features/skills/components/skill-item.tsx:82
 msgid "Official"
 msgstr "Official"
@@ -32216,8 +32220,8 @@ msgid "Which providers are supported?"
 msgstr "Which providers are supported?"
 
 #: src/features/settings/components/account/account-settings.tsx:339
-msgid "While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits."
-msgstr "While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits."
+#~ msgid "While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits."
+#~ msgstr "While a long chat sits idle, condense its older messages so the assistant keeps them in mind. Uses a small amount of credits."
 
 #: src/features/chat/group/create-group-chat-button.tsx:212
 #: src/features/chat/group/group-participant-bar.tsx:100

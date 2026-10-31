@@ -261,6 +261,47 @@ describe("the relay", () => {
         await expect(as(STRANGER).query(functions.listPendingDeviceCalls as never, { deviceId } as never)).resolves.toEqual([]);
     });
 
+    it("adds the taint of the thread's context summaries to a call, in the signed envelope and the stored row", async () => {
+        const { deviceId, secret } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+
+        // A web page the model read once, then lost to the window: only the summary of it remains.
+        await harness.run(async (ctx: any) => {
+            const messageId = await ctx.db.insert("messages", {
+                message: { content: "hi", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: ownerId,
+            });
+
+            await ctx.db.insert("threadContextSummaries", {
+                coveredCount: 1,
+                coveredUpToMessageId: messageId,
+                createdAt: 1,
+                summary: "notes",
+                taintedBy: ["mcp"],
+                threadId,
+                userId: ownerId,
+            });
+        });
+
+        const created = (await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(internals.createDeviceCall, { deviceId, input: "{}", taintedBy: [], threadId, toolName: "fs_read", userId: ownerId }),
+        )) as { callId: string };
+        const pending = (await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as {
+            envelope: string;
+            signature: string;
+        }[];
+
+        await expect(verifyDevicePayload(secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(true);
+        expect(JSON.parse(pending[0]!.envelope)).toMatchObject({ taintedBy: ["mcp"] });
+        expect(((await readCall(created.callId)) as { taintedBy: string[] }).taintedBy).toStrictEqual(["mcp"]);
+    });
+
     it("claims once and accepts only a result the device signed", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);

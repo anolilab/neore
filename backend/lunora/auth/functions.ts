@@ -6,6 +6,7 @@ import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../_generated/server";
 
+import { internal } from "../_generated/internal";
 import { action, internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mutation, query, rateLimit } from "../lib/crpc";
 import { getAuth, getSession } from "../auth";
@@ -25,6 +26,7 @@ import { getCurrentUserInternal } from "./lib/helper";
 import { resolveActiveMembership } from "./lib/organization-helpers";
 import { resolveUserPlan } from "./lib/plan";
 import roleGuard from "./lib/role-guard";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
@@ -271,6 +273,12 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             userId,
             ...toStore,
         });
+    }
+
+    // Context summaries are opt-in: switching them off erases the ones already made (`agent/thread-summaries.ts`),
+    // on the user's own shard, where they live.
+    if (tableName === "userSettings" && toStore.threadSummariesEnabled !== undefined && toStore.threadSummariesEnabled !== true) {
+        await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { userId }, userId);
     }
 };
 

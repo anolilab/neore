@@ -1356,9 +1356,11 @@ export const threadContextSummaries = sqliteTable("threadContextSummaries", {
     coveredUpToMessageId: text("coveredUpToMessageId").references((): AnySQLiteColumn => messages._id).notNull(),
     createdAt: real("createdAt").notNull(),
     summary: text("summary").notNull(),
+    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>().notNull(),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
     by_threadId: index("by_threadId").on(t.threadId),
 }));
 
@@ -1460,6 +1462,8 @@ export const threads = sqliteTable("threads", {
     statelessMode: integer("statelessMode", { mode: "boolean" }),
     status: text("status").notNull(),
     summary: text("summary"),
+    summaryEpoch: real("summaryEpoch"),
+    summaryPathTooLongAt: real("summaryPathTooLongAt"),
     tagIds: text("tagIds", { mode: "json" }).$type<Array<string>>(),
     tags: text("tags", { mode: "json" }).$type<Array<string>>(),
     teamId: text("teamId"),

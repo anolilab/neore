@@ -626,6 +626,16 @@
       "to": "table:threadPasscodes"
     },
     {
+      "from": "function:agent_thread_summaries:eraseUserThreadSummaries",
+      "kind": "read",
+      "to": "table:threadContextSummaries"
+    },
+    {
+      "from": "function:agent_thread_summaries:eraseUserThreadSummaries",
+      "kind": "write",
+      "to": "table:threadContextSummaries"
+    },
+    {
       "from": "function:agent_thread_summaries:finishThreadSummary",
       "kind": "read",
       "to": "table:threadContextSummaries"
@@ -651,6 +661,11 @@
       "to": "table:userSettings"
     },
     {
+      "from": "function:agent_thread_summaries:listThreadSummariesForExport",
+      "kind": "read",
+      "to": "table:threadContextSummaries"
+    },
+    {
       "from": "function:agent_thread_summaries:prepareThreadSummary",
       "kind": "read",
       "to": "table:threadContextSummaries"
@@ -659,6 +674,11 @@
       "from": "function:agent_thread_summaries:prepareThreadSummary",
       "kind": "read",
       "to": "table:userSettings"
+    },
+    {
+      "from": "function:agent_thread_summaries:prepareThreadSummary",
+      "kind": "write",
+      "to": "table:threads"
     },
     {
       "from": "function:agent_thread_summaries:runThreadSummary",
@@ -4134,6 +4154,11 @@
       "from": "function:gdpr_steps:collectConversations",
       "kind": "call",
       "to": "function:agent_messages:listMessagesByThreadIdAdmitted"
+    },
+    {
+      "from": "function:gdpr_steps:collectConversations",
+      "kind": "call",
+      "to": "function:agent_thread_summaries:listThreadSummariesForExport"
     },
     {
       "from": "function:gdpr_steps:collectConversations",
@@ -8015,6 +8040,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:agent_thread_summaries:eraseUserThreadSummaries",
+      "kind": "function",
+      "name": "agent.thread_summaries.eraseUserThreadSummaries",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
       "id": "function:agent_thread_summaries:finishThreadSummary",
       "kind": "function",
       "name": "agent.thread_summaries.finishThreadSummary",
@@ -8025,6 +8057,13 @@
       "id": "function:agent_thread_summaries:getThreadSummaryForContext",
       "kind": "function",
       "name": "agent.thread_summaries.getThreadSummaryForContext",
+      "module": "agent"
+    },
+    {
+      "detail": "query",
+      "id": "function:agent_thread_summaries:listThreadSummariesForExport",
+      "kind": "function",
+      "name": "agent.thread_summaries.listThreadSummariesForExport",
       "module": "agent"
     },
     {
@@ -16686,19 +16725,19 @@
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 666,
+      "line": 668,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 667,
+      "line": 669,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 739,
+      "line": 738,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
@@ -16722,7 +16761,7 @@
     {
       "file": "agent/client/start",
       "kind": "call",
-      "line": 290,
+      "line": 293,
       "reason": "the default export is not a registered function"
     },
     {
@@ -17244,14 +17283,38 @@
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 397,
+      "line": 134,
+      "reason": "\"dropSummariesFromEdit\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-summaries",
+      "kind": "write",
+      "line": 491,
+      "reason": "\"dropSummariesFromEdit\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-summaries",
+      "kind": "write",
+      "line": 500,
+      "reason": "\"dropSummariesFromEdit\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-summaries",
+      "kind": "read",
+      "line": 541,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 403,
+      "line": 547,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-summary-taint",
+      "kind": "read",
+      "line": 17,
+      "reason": "\"threadSummaryTaint\" is not a registered function"
     },
     {
       "file": "agent/threads",
@@ -17280,25 +17343,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 152,
+      "line": 154,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 270,
+      "line": 272,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 290,
+      "line": 298,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 786,
+      "line": 794,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {

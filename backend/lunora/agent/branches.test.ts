@@ -437,22 +437,31 @@ describe("editing an assistant reply in place", () => {
         expect(after.get(idOf("rA2"))?.parentMessageId).toBe(before.get(idOf("rA2"))?.parentMessageId);
     });
 
-    it("drops the thread's context summaries, which may quote the old reply", async () => {
-        await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("threadContextSummaries", {
-                    coveredCount: 1,
-                    coveredUpToMessageId: ids.u1,
-                    createdAt: 1,
-                    summary: "The old answer said A.",
-                    threadId,
-                    userId: OWNER,
-                }),
-        );
+    it("drops the context summaries that cover the edited reply, keeps the ones that end above it, and moves the epoch", async () => {
+        const summary = async (coveredUpToMessageId: string, text: string) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("threadContextSummaries", {
+                        coveredCount: 1,
+                        coveredUpToMessageId,
+                        createdAt: 1,
+                        summary: text,
+                        taintedBy: [],
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+        // u3 (turn 2) is above the edited reply (turn 3); rA2 is the reply itself.
+        await summary(ids.u3 as string, "Earlier turns.");
+        await summary(ids.rA2 as string, "The old answer said A.");
 
         await edit(ids.rA0 as string, "Revised answer.");
 
-        expect(await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect())).toHaveLength(0);
+        const left = (await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect())) as { summary: string }[];
+
+        expect(left.map((row) => row.summary)).toStrictEqual(["Earlier turns."]);
+        expect(((await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { summaryEpoch?: number }).summaryEpoch).toBe(1);
     });
 
     it("writes nothing when the same text is saved again", async () => {

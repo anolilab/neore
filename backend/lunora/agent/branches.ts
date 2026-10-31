@@ -16,7 +16,7 @@ import { extractText } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
 import { patchRow } from "../lib/patch";
-import { deleteThreadSummaries } from "./thread-summaries";
+import { dropSummariesFromEdit } from "./thread-summaries";
 import { MAX_LENGTH } from "../lib/validators";
 
 /**
@@ -379,8 +379,8 @@ export const editAssistantReplyHandler = async (
         await patchRow(ctx.db, row, patch);
     }
 
-    // A summary of the thread's older turns may quote the old text (`thread-summaries.ts`); the next idle period remakes it.
-    await deleteThreadSummaries(ctx, args.threadId);
+    // A summary covering the edited turns may quote the old text, and a run under way has read it (`thread-summaries.ts`).
+    await dropSummariesFromEdit(ctx, args.threadId, Math.min(...reply.map((row) => row.order)));
 
     return null;
 };

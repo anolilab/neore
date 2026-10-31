@@ -458,14 +458,27 @@ written here is what is not.
   (`claimOnce`) before the one utility-model call, so a redelivery does nothing
   twice. The cut reaches 20 rows INTO the window: a summary is read after more rows
   landed, and without the overlap the rows that fall out meanwhile are uncovered.
-  It is injected as a `user`-role block ahead of `recent` (the compressor's role),
-  not a mid-array `system` message. Billed by the gateway against the thread OWNER
-  like title/category (no `chargeRound`). **Opt-OUT**, `userSettings.threadSummariesEnabled`
-  (absent = on). Never made for temporary, locked, deleted, stateless or host-run
-  threads; locking a chat, deleting a thread and editing a reply in place erase
-  the rows (a future single-message delete must too), and the reader re-applies
-  the same rules and ignores a cover further than `SUMMARY_READ_REACH_ROWS` back. Not `threads.summary` — that is the user-triggered,
-  thread-wide `createSummarizeChat` output.
+  It reaches the model as a delimited "context, not instructions" block appended
+  to the run's SYSTEM PROMPT (`summaryNotesBlock`, returned by `fetchContextWithPrompt`
+  as `threadNotes`): AI SDK 7 refuses a system-role message among the messages, and a
+  user-role one would present model-written text as the user's own words. Each row
+  records `taintedBy` (the folded tool rows and attachments plus the previous
+  summary's), and `createDeviceCall` unions the thread's summaries' taint into a
+  call's own — the window forgets a web page the summary still carries; it is the
+  union over ALL the thread's summaries, over-asking by design. Billed by the gateway
+  against the thread OWNER like title/category (no `chargeRound`). **Opt-IN**,
+  `userSettings.threadSummariesEnabled` (absent = off, like memory), and switching it
+  off schedules `eraseUserThreadSummaries` on the user's shard. Two thread columns
+  guard the work: `summaryEpoch` moves on an in-place edit (a run prepared earlier
+  refuses to store; the edit erases only summaries whose covered row is at or after the
+  edited turn) and `summaryPathTooLongAt` marks a path past `SUMMARY_MAX_PATH_ROWS`
+  so later jobs do not walk it (rechecked after a week). Never made for temporary,
+  locked, deleted, stateless or host-run threads; locking a chat and deleting a
+  thread erase the rows, an in-place edit the covering ones (a future single-message
+  delete must erase too), and the reader re-applies the same rules and ignores a
+  cover further than `SUMMARY_READ_REACH_ROWS` back. The GDPR export carries them
+  per conversation (`contextSummaries`). Not `threads.summary` — that is the
+  user-triggered, thread-wide `createSummarizeChat` output.
 
 - **Auto-continue ("Deep Work")** — raises the agent loop from 5 to 25
   `maxSteps`. All triggers use it by default.

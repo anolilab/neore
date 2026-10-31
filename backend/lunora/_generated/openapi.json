@@ -15273,6 +15273,12 @@
                           }
                         ]
                       },
+                      "summaryEpoch": {
+                        "type": "number"
+                      },
+                      "summaryPathTooLongAt": {
+                        "type": "number"
+                      },
                       "tagIds": {
                         "items": {
                           "type": "string"

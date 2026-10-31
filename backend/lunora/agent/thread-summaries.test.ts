@@ -7,12 +7,25 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
+import { threadSummaryTaint } from "./thread-summary-taint";
 import { deleteAllForThreadIdAsync } from "./threads";
-import { getThreadSummaryForContext, runThreadSummary } from "./thread-summaries";
+import { eraseUserThreadSummaries, getThreadSummaryForContext, runThreadSummary } from "./thread-summaries";
 import { SUMMARIES_KEPT_PER_THREAD, SUMMARY_MAX_CHARS } from "./thread-summary-logic";
 
-const { generateText, registry } = vi.hoisted(() => {
-    return { generateText: vi.fn(), registry: new Map<string, unknown>() };
+const { generateText, limits, registry } = vi.hoisted(() => {
+    return { generateText: vi.fn(), limits: { maxPathRows: 5000 }, registry: new Map<string, unknown>() };
+});
+
+// A small cap lets a test cross it without thousands of rows.
+vi.mock("./thread-summary-logic", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./thread-summary-logic")>();
+
+    return {
+        ...original,
+        get SUMMARY_MAX_PATH_ROWS() {
+            return limits.maxPathRows;
+        },
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -39,6 +52,10 @@ const ROWS = 130;
 let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
 let rowIds: string[];
+/** Summaries are OPT-IN: a thread's owner has switched them on unless a test says otherwise. */
+let optedIn = true;
+
+const optIn = async () => await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { threadSummariesEnabled: true, userId: OWNER }));
 
 const insertRow = async (index: number, extra: Record<string, unknown> = {}): Promise<string> => {
     const role = index % 2 === 0 ? "user" : "assistant";
@@ -63,6 +80,10 @@ const seedThread = async (rows: number, thread: Record<string, unknown> = {}) =>
     threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "regular", title: "Long", userId: OWNER, ...thread }));
     rowIds = [];
 
+    if (optedIn) {
+        await optIn();
+    }
+
     for (let index = 0; index < rows; index += 1) {
         rowIds.push(await insertRow(index));
     }
@@ -70,13 +91,13 @@ const seedThread = async (rows: number, thread: Record<string, unknown> = {}) =>
 
 const runJob = async (afterMessageId: string) => await harness.action(async (ctx: any) => await ctx.runAction(runThreadSummary, { afterMessageId, threadId }));
 
-const summaries = async (): Promise<{ coveredUpToMessageId: string; summary: string }[]> =>
+const summaries = async (): Promise<{ coveredUpToMessageId: string; summary: string; taintedBy: string[] }[]> =>
     await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect());
 
 const contextSummary = async (promptMessageId?: string) =>
     await harness.run(async (ctx: any) => await ctx.runQuery(getThreadSummaryForContext, { promptMessageId, threadId }));
 
-const storeSummary = async (coveredIndex: number, summary: string, coveredCount = coveredIndex + 1) =>
+const storeSummary = async (coveredIndex: number, summary: string, coveredCount = coveredIndex + 1, taintedBy: string[] = []) =>
     await harness.run(
         async (ctx: any) =>
             await ctx.db.insert("threadContextSummaries", {
@@ -84,16 +105,21 @@ const storeSummary = async (coveredIndex: number, summary: string, coveredCount 
                 coveredUpToMessageId: rowIds[coveredIndex],
                 createdAt: Date.now(),
                 summary,
+                taintedBy,
                 threadId,
                 userId: OWNER,
             }),
     );
+
+const threadRow = async () => (await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { summaryEpoch?: number; summaryPathTooLongAt?: number };
 
 beforeAll(async () => {
     registerModule(registry, "agent_thread_summaries", await import("./thread-summaries"));
 });
 
 beforeEach(() => {
+    optedIn = true;
+    limits.maxPathRows = 5000;
     harness = lunoraTest(schema as never);
     generateText.mockResolvedValue({ text: "The user is planning a trip.", usage: { inputTokens: 10, outputTokens: 5 } });
 });
@@ -158,10 +184,15 @@ describe("making a summary", () => {
         expect(await summaries()).toHaveLength(0);
     });
 
-    it("makes none when the owner turned summaries off, and makes one when the setting is absent or on", async () => {
-        expect.assertions(3);
+    it("makes none until the owner switched summaries on: absent and off both mean off", async () => {
+        expect.assertions(4);
 
+        optedIn = false;
         await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).not.toHaveBeenCalled();
+
         await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { threadSummariesEnabled: false, userId: OWNER }));
         await runJob(rowIds.at(-1)!);
 
@@ -246,6 +277,7 @@ describe("making a summary", () => {
                         coveredUpToMessageId: stray,
                         createdAt: 1000 + index,
                         summary: `other ${index}`,
+                        taintedBy: [],
                         threadId,
                         userId: OWNER,
                     }),
@@ -410,16 +442,244 @@ describe("what the agent reads", () => {
         expect(await contextSummary(rowIds.at(-1))).toBeNull();
     });
 
-    it("answers nothing once the owner opted out", async () => {
-        expect.assertions(2);
+    it("answers nothing unless the owner opted in, and nothing again once they opt out", async () => {
+        expect.assertions(3);
 
+        optedIn = false;
         await seedThread(ROWS);
         await storeSummary(49, "Early turns: trip planning.");
 
+        expect(await contextSummary(rowIds.at(-1))).toBeNull();
+
+        await optIn();
+
         expect(await contextSummary(rowIds.at(-1))).toBe("Early turns: trip planning.");
 
-        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { threadSummariesEnabled: false, userId: OWNER }));
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.query("userSettings").first();
+
+            await ctx.db.patch(row._id, { threadSummariesEnabled: false });
+        });
 
         expect(await contextSummary(rowIds.at(-1))).toBeNull();
+    });
+});
+
+/** A tool row: what a web search left in the thread. */
+const toolRow = {
+    message: { content: [{ output: "x", toolCallId: "c", toolName: "webSearch", type: "tool-result" }], role: "tool" },
+    text: undefined,
+    tool: true,
+};
+
+describe("what a summary carries over from the rows it folds in", () => {
+    it("records the taint of the tool rows it folded, and the previous summary's with it", async () => {
+        expect.assertions(3);
+
+        await seedThread(0);
+
+        // Rows 0..49 are the first slice; one of them is a web search result.
+        for (let index = 0; index < ROWS; index += 1) {
+            rowIds.push(await insertRow(index, index === 10 ? toolRow : {}));
+        }
+
+        await runJob(rowIds.at(-1)!);
+
+        const [head] = await summaries();
+
+        expect(head?.taintedBy).toStrictEqual(["web"]);
+
+        // The next slice holds no tool row, but the summary it extends still did.
+        for (let index = ROWS; index < ROWS + 30; index += 1) {
+            rowIds.push(await insertRow(index));
+        }
+
+        await runJob(rowIds.at(-1)!);
+
+        const [stored] = await summaries();
+
+        expect(stored?.coveredUpToMessageId).toBe(rowIds[79]);
+        expect(stored?.taintedBy).toStrictEqual(["web"]);
+    });
+
+    it("keeps a clean summary clean", async () => {
+        expect.assertions(1);
+
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        const [head] = await summaries();
+
+        expect(head?.taintedBy).toStrictEqual([]);
+    });
+
+    it("keeps the taint when the folded rows have no text of their own, which re-stores the old summary", async () => {
+        expect.assertions(3);
+
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        // Rows 60..89 (the next slice) are all tool results: nothing to summarise, but the cover moves on.
+        for (let index = ROWS; index < ROWS + 30; index += 1) {
+            rowIds.push(await insertRow(index));
+        }
+
+        await harness.run(async (ctx: any) => {
+            for (const id of rowIds.slice(50, 80)) {
+                await ctx.db.patch(id, { message: toolRow.message, tool: true });
+            }
+        });
+        generateText.mockClear();
+        await runJob(rowIds.at(-1)!);
+
+        const [stored] = await summaries();
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(stored?.coveredUpToMessageId).toBe(rowIds[79]);
+        expect(stored?.taintedBy).toStrictEqual(["web"]);
+    });
+
+    it("reads the taint of the thread's summaries for a device call, whichever branch they belong to", async () => {
+        expect.assertions(3);
+
+        await seedThread(ROWS);
+
+        const read = async () => await harness.run(async (ctx: any) => await threadSummaryTaint(ctx, threadId as never));
+
+        expect(await read()).toStrictEqual([]);
+
+        await storeSummary(29, "a", 30, ["mcp"]);
+        await storeSummary(49, "b", 50, ["files", "web"]);
+
+        expect(await read()).toStrictEqual(["web", "mcp", "files"]);
+
+        const [first] = await summaries();
+
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("threadContextSummaries").collect();
+
+            await ctx.db.delete(rows.find((row: any) => row.summary === first?.summary)._id);
+        });
+
+        expect(await read()).not.toStrictEqual([]);
+    });
+});
+
+describe("the cost of a thread too long to read from the top", () => {
+    it("exits without walking when the path's turns alone pass the cap, and marks the thread", async () => {
+        expect.assertions(4);
+
+        limits.maxPathRows = 50;
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(await summaries()).toHaveLength(0);
+        const marked = await threadRow();
+
+        expect(marked.summaryPathTooLongAt).toBeTypeOf("number");
+
+        // The marker is what stops the next job: it makes no call even once the cap would let the path through.
+        limits.maxPathRows = 5000;
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("marks the thread when the walk itself reaches the cap", async () => {
+        expect.assertions(2);
+
+        // 130 rows over 65 turns: the turn count (65) is under the cap, the row count is not.
+        limits.maxPathRows = 100;
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).not.toHaveBeenCalled();
+        const marked = await threadRow();
+
+        expect(marked.summaryPathTooLongAt).toBeTypeOf("number");
+    });
+
+    it("walks only back to the previous cover when extending", async () => {
+        expect.assertions(1);
+
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+
+        for (let index = ROWS; index < ROWS + 30; index += 1) {
+            rowIds.push(await insertRow(index));
+        }
+
+        // 160 rows in all, 110 after the cover: a walk to the top would hit this cap, one that stops at the cover does not.
+        limits.maxPathRows = 130;
+        await runJob(rowIds.at(-1)!);
+
+        const [head] = await summaries();
+
+        expect(head?.coveredUpToMessageId).toBe(rowIds[79]);
+    });
+});
+
+describe("an edit that lands while a summary is being made", () => {
+    it("refuses to store a summary prepared before the edit, and lets the next job try again", async () => {
+        expect.assertions(4);
+
+        await seedThread(ROWS);
+        // The model call takes a while; a reply is edited in place meanwhile.
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { summaryEpoch: 1 }));
+
+            return { text: "Summary of the old text.", usage: {} };
+        });
+        await runJob(rowIds.at(-1)!);
+
+        expect(await summaries()).toHaveLength(0);
+
+        // The claim was released with the refusal: the same cut is made again, from the edited rows.
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).toHaveBeenCalledTimes(2);
+        expect(await summaries()).toHaveLength(1);
+        const [head] = await summaries();
+
+        expect(head?.summary).toBe("The user is planning a trip.");
+    });
+});
+
+describe("turning the setting off", () => {
+    it("erases every summary of the user's threads, in batches", async () => {
+        expect.assertions(4);
+
+        await seedThread(ROWS);
+
+        for (let index = 0; index < 4; index += 1) {
+            await storeSummary(index + 10, `s${index}`);
+        }
+
+        // Someone else's summary stays.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: rowIds[0],
+                    createdAt: 1,
+                    summary: "theirs",
+                    taintedBy: [],
+                    threadId,
+                    userId: "someone-else",
+                }),
+        );
+
+        const first = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, userId: OWNER }));
+
+        expect(first).toBe(true);
+        expect(await summaries()).toHaveLength(2);
+
+        const second = await harness.run(async (ctx: any) => await ctx.runMutation(eraseUserThreadSummaries, { batch: 3, userId: OWNER }));
+
+        expect(second).toBe(false);
+        const left = await summaries();
+
+        expect(left.map((row) => row.summary)).toStrictEqual(["theirs"]);
     });
 });
