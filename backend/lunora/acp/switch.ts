@@ -325,6 +325,12 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const toHost = args.target.kind === "host";
     const forks = fromHost !== toHost;
 
+    // A switch across the runner copies the newest turns into a new, permanent thread, which a temporary chat's expiry
+    // would never reach.
+    if (forks && thread.isTemporary === true) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "A temporary chat cannot be handed between a model and a computer");
+    }
+
     // A click already answered: the same answer, not a second thread. Before the target is looked up, which needs the
     // computer to be online and to still offer the pair.
     if (claimedAt !== null) {

@@ -72,6 +72,7 @@ const TOO_MANY = /Too many/u;
 const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
 const WORKER_CHAT = /takes its messages from its lead/u;
+const TEMPORARY_CHAT = /temporary chat cannot be handed/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -886,6 +887,19 @@ describe("what a chat must be to be handed to a computer", () => {
         expect(await rows("threadRelationships")).toHaveLength(0);
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("a temporary chat", () => {
+    it("is not handed to a computer: the continuation would outlive the chat's expiry", async () => {
+        const device = await pairedDevice(ownerId);
+        const temporary = await cloudThread();
+
+        await run(async (ctx) => await ctx.db.patch(temporary as never, { isTemporary: true }));
+
+        await expect(switchTo(temporary, hostTarget(device))).rejects.toThrow(TEMPORARY_CHAT);
+        expect(await rows("threads")).toHaveLength(1);
+        expect(await rows("acpSessions")).toHaveLength(0);
     });
 });
 
