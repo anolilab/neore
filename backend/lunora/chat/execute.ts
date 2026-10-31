@@ -153,7 +153,12 @@ export const runStreamingAgent = internalAction
 
             if (groupConfig) {
                 // A goal reviews one agent's turns; a group turn has several speakers.
-                await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "unsupported", threadId: threadId as Id<"threads"> });
+                // Only the goal this run's own message started: a newer goal (a skill in the same group chat) is not this run's.
+                await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, {
+                    reason: "unsupported",
+                    streamId: streamId as Id<"persistentStreams">,
+                    threadId: threadId as Id<"threads">,
+                });
                 await runGroupTurn(
                     ctx,
                     { isAnonymous: isAnonymous === true, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },

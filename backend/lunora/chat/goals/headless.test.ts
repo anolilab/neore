@@ -113,6 +113,13 @@ describe("stopped and stepsTranscript", () => {
         expect(runRound).not.toHaveBeenCalled();
     });
 
+    it("does not review, or report a win for, a round that was stopped while it ran", async () => {
+        const { review, run } = setup([{ met: true }]);
+
+        expect((await run({ stopped: async () => true })).ended).toBe("user");
+        expect(review).not.toHaveBeenCalled();
+    });
+
     it("reads a result's steps as text and tool results only", () => {
         const transcript = stepsTranscript([{ text: "Searching.", toolResults: [{ output: { hits: 3 }, toolName: "search" }] }, { text: "Found three." }]);
 

@@ -70,6 +70,11 @@ export const runHeadlessGoalRounds = async (input: {
         };
         let verdict: GoalVerdict & { costMicrodollars: number };
 
+        // A run stopped while its round generated is not reviewed: no reviewer call, and no win reported for it.
+        if (await input.stopped?.()) {
+            return finish("user");
+        }
+
         try {
             verdict = await input.review({ round, transcript: result.transcript });
         } catch {
