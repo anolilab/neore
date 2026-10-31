@@ -51,6 +51,7 @@ import {
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
 } from "./message-windowing";
+import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -228,7 +229,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const { t } = useLingui();
     const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
-    const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
+    const { activeStreamId, gatewayUrl, isStreaming, pause, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
@@ -475,6 +476,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                                 maxWidth={maxWidth}
                                 streamId={streamIdToShow}
                             />
+                        )}
+                        {/* The run is waiting out a provider's rate limit: when it resumes, and what a person can do meanwhile. */}
+                        {streamIdToShow && pause && threadId && (
+                            <RateLimitPauseNotice className="mx-auto w-full max-w-(--thread-max-width) pb-3" pause={pause} threadId={threadId} />
                         )}
                         {/* Simple "Thinking..." placeholder when regenerating but no stream yet */}
                         {!streamIdToShow && <ThinkingPlaceholder maxWidth={maxWidth} />}

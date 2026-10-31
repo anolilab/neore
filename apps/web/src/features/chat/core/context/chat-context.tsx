@@ -561,6 +561,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         crpc.chat.streaming.getActiveStreamForThread.queryOptions(threadId && threadId !== "default" ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
     const activeStreamId = activeStream?.streamId ?? null;
+    const pause = activeStream?.pause ?? null;
 
     // In a shared thread the stream is on the owner's shard; `getStreamBody`
     // names only the stream, so it inherits the thread's route.
@@ -876,11 +877,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             activeStreamId,
             gatewayUrl: gatewayInfo.gatewayUrl,
             isStreaming,
+            pause,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, streamingMessageId, activeStreamId, gatewayInfo]);
+    }, [isStreaming, streamingMessageId, activeStreamId, gatewayInfo, pause]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {

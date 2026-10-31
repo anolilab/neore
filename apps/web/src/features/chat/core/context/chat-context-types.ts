@@ -5,6 +5,7 @@ import type { UIMessage } from "@/lib/agent";
 import type { AppError } from "@/lib/errors";
 import type { useLunora } from "@/lib/lunora/crpc";
 
+import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 
 /**
@@ -71,6 +72,8 @@ export interface ChatStreamingContextValue {
     /** Gateway URL for edge streaming */
     gatewayUrl: string | null;
     isStreaming: boolean;
+    /** The run is waiting out a provider's rate limit and resumes by itself (`getActiveStreamForThread`). */
+    pause?: RateLimitPause | null;
 
     /**
      * The stream this client just started, from the `/v1/chat` response. The

@@ -52,37 +52,13 @@ import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { pauseOnRateLimit } from "./lib/pause-run";
+import { runStreamingAgentFields } from "./lib/streaming-run-args";
 import { toUserFacingError } from "./lib/user-facing-error";
 
 export const runStreamingAgent = internalAction
-    .input({
-        /** Anonymous callers are pinned to the free model; a skill must not lift that. */
-        isAnonymous: v.optional(v.boolean()),
-        messageId: v.string(),
-        /** The caller's active organization, verified by `/chat/start` — scopes organization-shared skills. */
-        organizationId: v.optional(v.string()),
-        /** What started the turn: the user's own chat, or the public API's key (an outside agent). Unset reads as the user's. */
-        origin: v.optional(v.union(v.literal("lead"), v.literal("outside_agent"))),
-        streamId: v.string(),
-        streamingConfig: v.object({
-            contentType: v.string(),
-            customSystemPrompt: v.optional(v.string()),
-            enabledFeatures: v.optional(v.array(v.string())),
-            imageSize: v.optional(v.string()),
-            mcpServerNames: v.optional(v.array(v.string())),
-            model: v.string(),
-            reasoningEffort: v.optional(v.number()),
-            researchDepth: v.optional(v.string()),
-            searchMode: v.optional(v.string()),
-            shouldAutoContinue: v.optional(v.boolean()),
-            statelessMode: v.optional(v.boolean()),
-        }),
-        threadId: v.string(),
-        userId: v.string(),
-        /** The raw composer text, when the start payload had it — where a `/<slug>` command is detected. */
-        userPrompt: v.optional(v.string()),
-    })
-    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
+    .input(runStreamingAgentFields)
+    .action(async ({ args: { isAnonymous, messageId, organizationId, origin, resume, streamId, streamingConfig, threadId, userId, userPrompt }, ctx }) => {
         // Everything before the first token is on the user's wait, so the reads
         // that need nothing but the job's own arguments start together, WITH
         // the claim. They are queries: a redelivery that loses the claim reads
@@ -104,11 +80,30 @@ export const runStreamingAgent = internalAction
         reads.catch(() => undefined);
 
         // Enqueued on the jobs queue, which delivers at least once: only the
-        // delivery that claims the stream may generate into it.
-        if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
-            streamLogger.warn(`[BgAgent] Stream ${streamId} already claimed — ignoring a redelivered run`);
+        // delivery that claims the stream may generate into it. The job that
+        // resumes a run paused on a rate limit (`resume`) claims that pause
+        // instead, and learns which row the run continues from.
+        let resumedFrom: string | undefined;
 
-            return;
+        if (resume === undefined) {
+            if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
+                streamLogger.warn(`[BgAgent] Stream ${streamId} already claimed — ignoring a redelivered run`);
+
+                return;
+            }
+        } else {
+            const claim = await ctx.runMutation(internal.chat.streaming.persistent.library.claimRunResume, {
+                pauseId: resume,
+                streamId: streamId as Id<"persistentStreams">,
+            });
+
+            if (!claim) {
+                streamLogger.warn(`[BgAgent] Pause ${resume} of stream ${streamId} is not open — ignoring a resume that lost the claim`);
+
+                return;
+            }
+
+            resumedFrom = claim.from;
         }
 
         const startTime = Date.now();
@@ -325,7 +320,8 @@ export const runStreamingAgent = internalAction
             if (threadStatelessMode) {
                 streamTextArgs.prompt = prompt;
             } else {
-                streamTextArgs.promptMessageId = messageId;
+                // A resumed run continues from the last row it saved before the pause, so its rows land under that row.
+                streamTextArgs.promptMessageId = resumedFrom ?? messageId;
             }
 
             // Memory, knowledge base, project context and the thread's own
@@ -397,6 +393,27 @@ export const runStreamingAgent = internalAction
             try {
                 piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering.steeredBefore });
             } catch (error) {
+                // A provider rate limit pauses the run and resumes it at the provider's retry time, as a queued job:
+                // nothing here waits. A stateless run keeps no rows to continue from, so it fails as before.
+                const paused =
+                    !threadStatelessMode &&
+                    (await pauseOnRateLimit(ctx, {
+                        error,
+                        from: result.savedMessages?.at(-1)?._id ?? resumedFrom ?? messageId,
+                        run: { isAnonymous, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
+                        settle: async () => await result.consumeStream(),
+                        streamId,
+                    }));
+
+                if (paused) {
+                    // The steps that finished before the pause are a reply like any other on the usage page.
+                    if ((result.savedMessages?.length ?? 0) > 0) {
+                        await recordRun({ extractMemory: false, firstTokenTime: undefined, prompt: "" });
+                    }
+
+                    return;
+                }
+
                 await stoppedAt(error);
 
                 return;

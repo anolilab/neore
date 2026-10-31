@@ -1048,6 +1048,8 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     hostState: text("hostState", { mode: "json" }).$type<"accepted" | "received" | "running" | "ended">(),
     hostTurnId: text("hostTurnId"),
     messageId: text("messageId").notNull(),
+    pause: text("pause", { mode: "json" }).$type<{ from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number }>(),
+    pausedSteps: text("pausedSteps", { mode: "json" }).$type<Array<string>>(),
     producer: text("producer"),
     runClaimedAt: real("runClaimedAt"),
     status: text("status").notNull(),

@@ -276,6 +276,9 @@ export interface ApiTypes {
         prompt_outline: {
             getThreadPromptOutline: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { items: Array<{ id: string; text: string }>; truncated: boolean }>;
         };
+        rate_limit_retry: {
+            retryRateLimitedRun: FunctionReference<"mutation", { threadId: Id<"threads">; unlockProof?: string }, { resumed: boolean }>;
+        };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
@@ -309,7 +312,7 @@ export interface ApiTypes {
             withdrawSteer: FunctionReference<"mutation", { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; unlockProof?: string }, { outcome: "withdrawn" | "delivered" | "unknown" }>;
         };
         streaming: {
-            getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; streamId: Id<"persistentStreams"> } | null>;
+            getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; pause?: { provider?: string; reason: "rate_limit"; retryAt: number; status: number }; streamId: Id<"persistentStreams"> } | null>;
             getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string }>;
         };
         tags: {
@@ -1048,6 +1051,9 @@ export const api: ApiTypes = {
         },
         prompt_outline: {
             getThreadPromptOutline: { __lunoraRef: "chat_prompt_outline:getThreadPromptOutline" },
+        },
+        rate_limit_retry: {
+            retryRateLimitedRun: { __lunoraRef: "chat_rate_limit_retry:retryRateLimitedRun" },
         },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },

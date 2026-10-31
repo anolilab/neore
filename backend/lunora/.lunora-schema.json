@@ -5543,11 +5543,25 @@
           "optional": true,
           "unique": false
         },
+        "transport": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"ssh\""
+        },
         "userId": {
           "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "viaDeviceId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "devices"
         }
       },
       "indexes": {
@@ -15400,6 +15414,227 @@
           "optional": false,
           "unique": false
         },
+        "pause": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "from": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "id": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "provider": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "reason": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"rate_limit\""
+            },
+            "retryAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "run": {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "isAnonymous": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "messageId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "organizationId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "origin": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"lead\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"outside_agent\""
+                    }
+                  ]
+                },
+                "resume": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "streamId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "streamingConfig": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "fields": {
+                    "contentType": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "customSystemPrompt": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "enabledFeatures": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "of": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false
+                      }
+                    },
+                    "imageSize": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "mcpServerNames": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "of": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false
+                      }
+                    },
+                    "model": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "reasoningEffort": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "researchDepth": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "searchMode": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "shouldAutoContinue": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    },
+                    "statelessMode": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false
+                    }
+                  }
+                },
+                "threadId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "userId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                },
+                "userPrompt": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "status": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "pausedSteps": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "producer": {
           "kind": "literal",
           "nullable": false,
@@ -18416,6 +18651,13 @@
         "by_childThreadId": {
           "fields": [
             "childThreadId"
+          ],
+          "unique": false
+        },
+        "by_childThreadId_and_status": {
+          "fields": [
+            "childThreadId",
+            "status"
           ],
           "unique": false
         },

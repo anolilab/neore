@@ -1538,6 +1538,11 @@
     {
       "from": "function:chat_execute:runStreamingAgent",
       "kind": "call",
+      "to": "function:chat_streaming_persistent_library:claimRunResume"
+    },
+    {
+      "from": "function:chat_execute:runStreamingAgent",
+      "kind": "call",
       "to": "function:chat_streaming_persistent_library:claimStreamRun"
     },
     {
@@ -2531,6 +2536,11 @@
       "to": "table:threadPins"
     },
     {
+      "from": "function:chat_rate_limit_retry:retryRateLimitedRun",
+      "kind": "call",
+      "to": "function:chat_streaming_persistent_library:retryPausedRunsNow"
+    },
+    {
       "from": "function:chat_sharing:acceptThreadInvite",
       "kind": "call",
       "to": "function:agent_sharing:createThreadAccess"
@@ -2769,6 +2779,16 @@
       "from": "function:chat_streaming_persistent_library:getChunksAfter",
       "kind": "read",
       "to": "table:toolApprovalRuns"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:pauseRunForRateLimit",
+      "kind": "write",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:retryPausedRunsNow",
+      "kind": "write",
+      "to": "table:persistentStreams"
     },
     {
       "from": "function:chat_streaming_persistent_library:setStreamStatus",
@@ -10104,6 +10124,13 @@
       "module": "chat"
     },
     {
+      "detail": "mutation",
+      "id": "function:chat_rate_limit_retry:retryRateLimitedRun",
+      "kind": "function",
+      "name": "chat.rate_limit_retry.retryRateLimitedRun",
+      "module": "chat"
+    },
+    {
       "detail": "query",
       "id": "function:chat_resume:latestResumableThread",
       "kind": "function",
@@ -10350,6 +10377,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:claimRunResume",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.claimRunResume",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
       "id": "function:chat_streaming_persistent_library:claimStreamRun",
       "kind": "function",
       "name": "chat.streaming.persistent.library.claimStreamRun",
@@ -10388,6 +10422,20 @@
       "id": "function:chat_streaming_persistent_library:getStreamText",
       "kind": "function",
       "name": "chat.streaming.persistent.library.getStreamText",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:pauseRunForRateLimit",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.pauseRunForRateLimit",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:retryPausedRunsNow",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.retryPausedRunsNow",
       "module": "chat"
     },
     {
@@ -18048,6 +18096,12 @@
       "kind": "call",
       "line": 303,
       "reason": "\"callMCPToolFromAppHttpAction\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/pause-run",
+      "kind": "call",
+      "line": 33,
+      "reason": "\"pauseOnRateLimit\" is not a registered function"
     },
     {
       "file": "chat/lib/persist-stream",

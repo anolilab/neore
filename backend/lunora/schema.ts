@@ -15,6 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vGroupChat } from "./chat/group/validators";
+import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
 import { vCodingAgentAssignment, vCodingAgentId, vCodingAgentRunStatus } from "./coding-agents/validators";
 import { vOAuthClientRecord, vOAuthFlow, vOAuthTarget } from "./connectors/lib/validators";
@@ -1741,6 +1742,25 @@ export const schema = defineSchema({
         hostState: v.optional(vHostState),
         hostTurnId: v.optional(v.string()),
         messageId: v.string(),
+        // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
+        // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
+        // names this pause, and exactly one resume claims it (`claimRunResume`). `run` is the job's own
+        // input, kept so "Retry now" can enqueue the resume from a mutation.
+        pause: v.optional(
+            v.object({
+                // The row the rejected step continues from: the last row this run saved, else the prompt.
+                // The resume streams from it as its prompt, so it lands under it and not beside it.
+                from: v.string(),
+                id: v.string(),
+                provider: v.optional(v.string()),
+                reason: v.literal("rate_limit"),
+                retryAt: v.number(),
+                run: v.object({ ...runStreamingAgentFields }),
+                status: v.number(),
+            }),
+        ),
+        // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
+        pausedSteps: v.optional(v.array(v.string())),
         producer: v.optional(v.literal("host")),
         // Set once, by the ONE run that may write this stream (`claimStreamRun`).
         // The run arrives on the jobs queue, which delivers at least once; a
