@@ -15,24 +15,21 @@ type Session = Doc<"acpSessions">;
 const SCAN_ROWS = 20;
 
 /**
- * The saved session of the SAME agent a switch may ask the computer to load again (harness switch S4): one of the thread's
- * own earlier sessions with the same agent, folder and computer, that recorded the agent's own session id and whose
- * report said the agent loads saved sessions. Anything else — another folder, another computer, an agent that never said
- * it loads them — is `undefined`, and the switch hands the conversation over instead (`portable`), never reattaching.
- * `sessions` are the thread's, newest first.
+ * The saved session of the SAME agent a switch may ask the computer to load again (harness switch S4): the thread's NEWEST
+ * earlier session with the same agent, folder and computer, when it recorded the agent's own session id and its report
+ * said the agent loads saved sessions. The newest is the only candidate: an older one has missed whatever the newest
+ * saw, and the catch-up a switch computes starts from the newest departure. Anything else — another folder, another
+ * computer, a newest session that cannot load — is `undefined`, and the switch hands the conversation over instead
+ * (`portable`), never reattaching. `sessions` are the thread's, newest first.
  */
 export const savedSessionFor = (
     sessions: ReadonlyArray<Session>,
     target: { agentKey: string; deviceId: Id<"devices">; folderId: string },
-): Session | undefined =>
-    sessions.find(
-        (session) =>
-            session.deviceId === target.deviceId &&
-            session.agentKey === target.agentKey &&
-            session.folderId === target.folderId &&
-            session.nativeSessionId !== undefined &&
-            isAvailable(capabilityOf(session.capabilities, "sessions.load")),
-    );
+): Session | undefined => {
+    const newest = sessions.find((session) => session.deviceId === target.deviceId && session.agentKey === target.agentKey && session.folderId === target.folderId);
+
+    return newest?.nativeSessionId !== undefined && isAvailable(capabilityOf(newest.capabilities, "sessions.load")) ? newest : undefined;
+};
 
 /**
  * Whether the agent a session was started for with a saved session id (`session.nativeSessionId`, recorded when the start

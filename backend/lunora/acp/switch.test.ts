@@ -974,6 +974,30 @@ describe("native reattach (S4)", () => {
         expect(first?.endsWith("carry on")).toBe(true);
     });
 
+    it("never reattaches an older session when the newest one of the pair cannot be resumed", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchAway(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+        // The agent opens a session without an id of its own: the newest claude session has nothing to load.
+        await openStartedSession(device, threadId);
+        expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
+        await finishSentTurn(device, threadId);
+        await run(async (ctx) => {
+            const { page } = await ctx.db.deviceCalls.findMany({ where: {} });
+
+            for (const call of page) {
+                await ctx.db.patch(call._id, { status: "completed" });
+            }
+        });
+        await switchAway(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+
+        expect((await lastStart()).nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
+    });
+
     it("turns the divider portable when the session it asked to resume never opened", async () => {
         const device = await pairedDevice(ownerId);
         const threadId = await loadableHostThread(device);
