@@ -680,7 +680,10 @@ written here is what is not.
   headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
   a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
   snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
-  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run — and when a
+  paused reply is ABANDONED: `stopActiveForThread` with nothing live (or a stopped stream that never started or was waiting
+  out a limit), and `createStreamWithMessage` (a new message moves past the request), both through `discardPausedThreadSecrets`.
+  The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and

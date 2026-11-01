@@ -7656,7 +7656,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/request-secret-prompt.tsx:191
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -8765,11 +8765,11 @@ msgid "Debug an error or review my code..."
 msgstr "Zdebuguj błąd lub przejrzyj mój kod..."
 
 #: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:267
+#: src/features/chat/thread/request-secret-prompt.tsx:291
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:196
+#: src/features/chat/thread/request-secret-prompt.tsx:210
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -16485,7 +16485,7 @@ msgstr "Mogła zostać usunięta albo nie masz już do niej dostępu."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "Mógł wygasnąć, zostać unieważniony lub już wykorzystany. Poproś o nowy link."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/request-secret-prompt.tsx:191
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -19250,7 +19250,7 @@ msgstr "Więcej kroków = wyższa jakość, dłuższe generowanie"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Więcej niż proxy — inteligentna warstwa między twoją aplikacją a każdym dostawcą LLM."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:134
+#: src/features/chat/thread/request-secret-prompt.tsx:141
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -22679,7 +22679,7 @@ msgstr "Wklej URL obrazu"
 msgid "Paste image URL..."
 msgstr "Wklej URL obrazu..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:258
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23366,7 +23366,7 @@ msgstr "Przejrzystość rozumowania klasy premium"
 msgid "Preparing a question…"
 msgstr "Przygotowywanie pytania…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:202
+#: src/features/chat/thread/request-secret-prompt.tsx:216
 msgid "Preparing a request…"
 msgstr ""
 
@@ -25743,6 +25743,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
+#: src/features/chat/thread/request-secret-prompt.tsx:270
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26265,7 +26266,7 @@ msgstr "Arabia Saudyjska"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:263
+#: src/features/chat/thread/request-secret-prompt.tsx:287
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26372,11 +26373,11 @@ msgstr "Zapisz przepływ pracy"
 msgid "Saved"
 msgstr "Zapisano"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:200
+#: src/features/chat/thread/request-secret-prompt.tsx:214
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:198
+#: src/features/chat/thread/request-secret-prompt.tsx:212
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -26796,7 +26797,7 @@ msgstr "stanowisko/mies."
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:231
+#: src/features/chat/thread/request-secret-prompt.tsx:245
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27298,11 +27299,12 @@ msgstr "Unieważniono sesje"
 msgid "Set a password for your account"
 msgstr "Ustaw hasło do konta"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:151
+#: src/features/chat/thread/request-secret-prompt.tsx:146
+#: src/features/chat/thread/request-secret-prompt.tsx:163
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:141
+#: src/features/chat/thread/request-secret-prompt.tsx:153
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr ""
 
@@ -30386,7 +30388,7 @@ msgstr "Asystent ma pytanie"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:213
+#: src/features/chat/thread/request-secret-prompt.tsx:227
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -31231,7 +31233,7 @@ msgstr ""
 msgid "This is how your organization appears to members"
 msgstr "Tak twoja organizacja jest widoczna dla członków"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:257
+#: src/features/chat/thread/request-secret-prompt.tsx:281
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
 
@@ -34087,7 +34089,7 @@ msgstr "Oczekiwanie na wynik…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:218
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -34106,7 +34108,7 @@ msgstr "Oczekiwanie na zatwierdzenie przez właściciela"
 msgid "Waiting for uploads to complete…"
 msgstr "Oczekiwanie na zakończenie przesyłania…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:218
 msgid "Waiting for you"
 msgstr ""
 
@@ -34530,7 +34532,7 @@ msgstr "Powszechnie zaufany w zastosowaniach produkcyjnych"
 msgid "Width"
 msgstr "Szerokość"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:128
+#: src/features/chat/thread/request-secret-prompt.tsx:135
 msgid "Will be saved as your {provider} API key"
 msgstr ""
 
@@ -34915,7 +34917,7 @@ msgstr "Nie masz jeszcze zindeksowanych plików wiedzy."
 msgid "You have no projects yet."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:146
+#: src/features/chat/thread/request-secret-prompt.tsx:158
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 
@@ -35246,6 +35248,10 @@ msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:57
 msgid "Your review was requested"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:267
+msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 
 #: src/lib/toast.ts:248

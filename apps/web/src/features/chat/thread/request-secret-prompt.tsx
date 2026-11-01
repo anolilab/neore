@@ -37,7 +37,7 @@ const PROVIDER_KEY_MAX = 500;
 
 type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
 
-type Server = { address: string; kind: "found" } | { kind: "ambiguous" } | { kind: "loading" } | { kind: "missing" };
+type Server = { address: string; kind: "found"; url: string } | { kind: "ambiguous" } | { kind: "failed" } | { kind: "loading" } | { kind: "missing" };
 
 interface RequestSecretInput {
     label?: string;
@@ -59,9 +59,9 @@ const addressOf = (url: string): string => {
 };
 
 /** Which of the user's saved MCP servers the card names. The answer binds the value to that server's address, so the card shows where that is. */
-const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | undefined, name: string): Server => {
+const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | undefined, name: string, failed: boolean): Server => {
     if (!servers) {
-        return { kind: "loading" };
+        return { kind: failed ? "failed" : "loading" };
     }
 
     const matches = servers.filter((server) => server.name === name);
@@ -70,7 +70,7 @@ const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | u
         return { kind: "ambiguous" };
     }
 
-    return matches[0] ? { address: addressOf(matches[0].url), kind: "found" } : { kind: "missing" };
+    return matches[0] ? { address: addressOf(matches[0].url), kind: "found", url: matches[0].url } : { kind: "missing" };
 };
 
 const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
@@ -84,6 +84,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const destinationId = useId();
     const tooLongId = useId();
     const saveErrorId = useId();
+    const loadErrorId = useId();
     const [draft, setDraft] = useState("");
     // Shown in the card, tied to the field: the typed value is cleared on send, so the person must know to type it again.
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -107,12 +108,16 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isWaiting = part.state === "approval-requested" && submitted === null;
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
-    const { data: preferences, isSuccess: preferencesLoaded } = useQuery(
-        crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && input.use?.kind === "mcp_header" ? {} : skipToken),
-    );
+    const {
+        data: preferences,
+        isError: preferencesFailed,
+        isFetching: preferencesFetching,
+        isSuccess: preferencesLoaded,
+        refetch: retryPreferences,
+    } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && input.use?.kind === "mcp_header" ? {} : skipToken));
     // A user who never saved a server has no `mcpServers` (or no row at all): once the read has answered, that is an empty list, not "still loading".
     const savedServers = preferences?.mcpServers ?? (preferencesLoaded ? [] : undefined);
-    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server) : undefined;
+    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server, preferencesFailed) : undefined;
     const valueMax = input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
     // Checked before anything is sent: the card clears the draft once it goes, and the server would refuse it after that.
     const tooLong = draft.trim().length > valueMax;
@@ -132,6 +137,11 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         switch (server?.kind) {
             case "ambiguous": {
                 destination = t`More than one of your MCP servers is named ${serverName}. Rename one in Settings first, or decline.`;
+
+                break;
+            }
+            case "failed": {
+                destination = t`Set as the ${header} header on your ${serverName} MCP server`;
 
                 break;
             }
@@ -164,13 +174,16 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             return;
         }
 
+        // The address the card displayed: the server refuses the save if the saved server has moved since.
+        const expectedUrl = value !== null && server?.kind === "found" ? server.url : undefined;
+
         // Cleared before the call returns: the value lives in this component for no longer than the keystrokes.
         setDraft("");
         setSaveError(null);
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
-            { approvalId, threadId: threadId as Id<"threads">, value },
+            { approvalId, ...(expectedUrl !== undefined && { expectedUrl }), threadId: threadId as Id<"threads">, value },
             {
                 onError: () => {
                     setSubmitted(null);
@@ -205,7 +218,13 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     }
 
     return (
-        <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
+        <div
+            aria-labelledby={headingId}
+            className="bg-muted/40 focus-visible:ring-ring mb-4 rounded-lg border p-3 outline-none focus-visible:ring-2"
+            ref={groupRef}
+            role="group"
+            tabIndex={-1}
+        >
             <div className="flex items-start gap-2">
                 <KeyRound aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -232,9 +251,16 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     </label>
                     <Input
                         aria-describedby={
-                            [destination ? destinationId : "", tooLong ? tooLongId : "", saveError ? saveErrorId : ""].filter(Boolean).join(" ") || undefined
+                            [
+                                destination ? destinationId : "",
+                                tooLong ? tooLongId : "",
+                                saveError ? saveErrorId : "",
+                                server?.kind === "failed" ? loadErrorId : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ") || undefined
                         }
-                        aria-invalid={tooLong || saveError !== null || undefined}
+                        aria-invalid={tooLong || saveError !== null || server?.kind === "failed" || undefined}
                         autoComplete="new-password"
                         autoCorrect="off"
                         id={valueId}
@@ -247,6 +273,16 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         type="password"
                         value={draft}
                     />
+                    {server?.kind === "failed" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-destructive text-xs" id={loadErrorId} role="alert">
+                                {t`Your saved MCP servers could not be loaded, so this cannot be saved yet.`}
+                            </p>
+                            <Button disabled={preferencesFetching} onClick={() => retryPreferences()} size="sm" type="button" variant="outline">
+                                {t`Retry`}
+                            </Button>
+                        </div>
+                    )}
                     {saveError && (
                         <p className="text-destructive text-xs" id={saveErrorId} role="alert">
                             {saveError}

@@ -200,6 +200,28 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
     return live.length;
 };
 
+/**
+ * A reply paused on a request (a consumer tool set to `ask` holds its saved references through the pause) that the person
+ * walks away from: Stop with nothing live, or a new message that moves the conversation past it. Drops the ciphertext of
+ * every reply with a pending snapshot on `threadId`. The request itself stays answerable; a late spend reads `used`.
+ */
+export const discardPausedThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
+    const runs = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+    const keys = new Set(runs.filter((run) => run.status === "pending").map((run) => run.config.replyKey ?? run.streamId));
+    let dropped = 0;
+
+    for (const replyKey of keys) {
+        if (replyKey !== undefined) {
+            dropped += await discardThreadSecrets(ctx, { replyKey, threadId: args.threadId });
+        }
+    }
+
+    return dropped;
+};
+
 /** Delete every row of `threadId`, ciphertext included — the thread is gone, and so is whatever a reply of it was holding. Returns how many. */
 export const deleteThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
     const rows = await ctx.db

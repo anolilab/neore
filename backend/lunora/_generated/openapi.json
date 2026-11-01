@@ -22584,6 +22584,9 @@
                       "approvalId": {
                         "type": "string"
                       },
+                      "expectedUrl": {
+                        "type": "string"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

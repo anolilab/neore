@@ -18172,7 +18172,7 @@
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 466,
+      "line": 478,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
@@ -20206,25 +20206,31 @@
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 205,
+      "line": 209,
+      "reason": "\"discardPausedThreadSecrets\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/secret-requests",
+      "kind": "read",
+      "line": 227,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 211,
+      "line": 233,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 219,
+      "line": 241,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 225,
+      "line": 247,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
@@ -20434,7 +20440,7 @@
     {
       "file": "chat/streaming/persistent/library",
       "kind": "write",
-      "line": 50,
+      "line": 51,
       "reason": "\"insertPersistentStream\" is not a registered function"
     },
     {

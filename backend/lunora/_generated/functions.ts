@@ -8883,7 +8883,7 @@ export interface Caller {
             retryRateLimitedRun: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ resumed: boolean }>;
         };
         request_secret: {
-            answerSecretRequest: (args: { approvalId: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
+            answerSecretRequest: (args: { approvalId: string; expectedUrl?: string; threadId: Id<"threads">; unlockProof?: string; value: string | null }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             consumeSecretAsMcpHeader: (args: { ref: string; startedBy: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
             consumeSecretAsProviderKey: (args: { ref: string; startedBy: string; threadId: string; userId: string }) => Promise<{ message: string; status: string } | { provider: string; status: "saved" } | { header: string; server: string; status: "saved" }>;
             discardSecretsOfThread: (args: { streamId: string; threadId: Id<"threads"> }) => Promise<null>;

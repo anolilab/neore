@@ -49,7 +49,7 @@ const asUse = (value: unknown): SecretUse | undefined => {
 };
 
 /** The destination with the address of the server it names, which must be exactly one of the owner's saved ones. */
-const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use: SecretUse): Promise<SecretUse> => {
+const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use: SecretUse, expectedUrl?: string): Promise<SecretUse> => {
     if (use.kind !== "mcp_header") {
         return use;
     }
@@ -68,14 +68,33 @@ const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use:
         throw new LunoraError("BAD_REQUEST", `More than one saved MCP server is named "${use.server}"; rename one in Settings first`);
     }
 
-    return { ...use, url: matches[0]!.url };
+    const { url } = matches[0]!;
+
+    // The card showed an address; the value goes to that one or nowhere, never to what the name points at by now.
+    if (expectedUrl !== undefined && expectedUrl !== url) {
+        throw new LunoraError(
+            "BAD_REQUEST",
+            `The address of the MCP server "${use.server}" changed since this request was shown. Reload the request and check it again`,
+        );
+    }
+
+    return { ...use, url };
 };
 
 export const claimSecretAnswer = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; now: number; reply: SecretReply; threadId: Id<"threads">; unlockProof?: string | null },
+    args: {
+        approvalId: string;
+        callerId: string;
+        /** The server address the card displayed; a header save is refused when the saved server is no longer there. */
+        expectedUrl?: string;
+        now: number;
+        reply: SecretReply;
+        threadId: Id<"threads">;
+        unlockProof?: string | null;
+    },
 ): Promise<SecretClaim> => {
-    const { approvalId, callerId, now, reply, threadId, unlockProof } = args;
+    const { approvalId, callerId, expectedUrl, now, reply, threadId, unlockProof } = args;
     const claim = await claimToolApproval(ctx, {
         approvalId,
         callerId,
@@ -124,7 +143,7 @@ export const claimSecretAnswer = async (
         throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break, a control character or a character above U+00FF");
     }
 
-    const use = await withServerUrl(ctx, claim.ownerId, asked);
+    const use = await withServerUrl(ctx, claim.ownerId, asked, expectedUrl);
 
     const label = typeof input.label === "string" ? input.label.slice(0, SECRET_LABEL_MAX) : "Secret";
     const ref = await storeRequestedSecret(ctx, {

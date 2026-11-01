@@ -55,6 +55,8 @@ export const answerSecretRequest = authMutation
     .use(rateLimit("chat/stream"))
     .input({
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
+        /** The address of the MCP server the card displayed; the save is refused when that server now lives elsewhere. */
+        expectedUrl: v.optional(v.string().max(MAX_LENGTH.url)),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         /**
@@ -69,10 +71,11 @@ export const answerSecretRequest = authMutation
         ),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { approvalId, threadId, unlockProof, value }, ctx }) => {
+    .mutation(async ({ args: { approvalId, expectedUrl, threadId, unlockProof, value }, ctx }) => {
         const claim = await claimSecretAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
+            expectedUrl,
             now: ctx.now,
             reply: value === null ? { kind: "decline" } : { kind: "save", value },
             threadId,
