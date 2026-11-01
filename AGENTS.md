@@ -1377,7 +1377,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 - **Codegen runs the advisor as an exit gate**, and a gate that exits 1 does so
   _before_ the chained post-codegen step — so an advisory regression leaves the
   tree half-generated with no clue why. Run the advisor deliberately with
-  `pnpm --filter @neore/backend run lunora:advise`; it scores 692 procedures and takes
+  `pnpm --filter @neore/backend run lunora:advise`; it scores 1,302 procedures and takes
   `--baseline` for regression gating.
 
 ### Modules
@@ -1433,12 +1433,13 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
 
 ### Reading advisories
 
-The tree draws **6 ERROR, 425 WARN, 668 INFO** (2026-10-06) — 100 WARN plus the
-325 accepted GDPR `cross_module_table_write` findings. The 6 ERRORs are
-`owner_field_from_args_not_auth` on guarded inserts the lint cannot see through:
-platform-admin `setMemberCreditOverride`, org-admin `addMember`/`addTeamMember`
-(they add ANOTHER user), and the active-org equality checks in
-`createPrompt`/`createSkill`. Advisories never fail codegen; test files
+The tree draws **0 ERROR, 284 WARN, 101 INFO** (2026-11-01, codegen alpha.384) — the
+accepted GDPR `cross_module_table_write` findings are most of the WARNs. Until
+alpha.384 there were six `owner_field_from_args_not_auth` ERRORs on guarded inserts
+the lint could not see through (platform-admin `setMemberCreditOverride`, org-admin
+`addMember`/`addTeamMember`, the active-org equality checks in
+`createPrompt`/`createSkill`); alpha.384 reports none of them as ERROR, and the
+INFO count fell from 668 to 101. Advisories never fail codegen; test files
 (`*.test.ts`, `__tests__/`, …) are not analysed. **Piping codegen's output truncates that list** at wildly
 different points (one run printed 88 and looked like the whole set), so redirect
 to a file and count there:
@@ -1661,11 +1662,15 @@ first real request. They were found by driving the app in a browser
   diffs `schema.ts` against the committed baseline
   `backend/lunora/.lunora-schema.json` and exits 1 on a breaking change with no
   migration — so a field rename fails the build long after working fine in dev,
-  because dev never consults the baseline. `lunora prepare
---update-schema-baseline` is the escape hatch for "you know data is compatible";
+  because dev never consults the baseline. Since `@lunora/cli@alpha.463` the gate
+  classifies each change by what it can do to stored data (a dropped index is safe;
+  a new unique index, a shorter TTL or a shard-mode flip needs a migration that
+  names it) and `--update-schema-baseline` is gone (an unknown option);
   `--allow-schema-drift` skips the gate for one run WITHOUT advancing the
-  baseline. Once there is data at rest, use the widen → migrate → narrow path
-  from the `lunora-migration-helper` skill instead.
+  baseline. Safe changes advance the baseline on `lunora prepare`, so commit
+  `.lunora-schema.json` with the change (a package bump can add columns to the
+  payment tables). Once there is data at rest, use the widen → migrate → narrow
+  path from the `lunora-migration-helper` skill instead.
 - **Delete audited rows one at a time.** Every write to a table in
   `lib/audit-triggers.ts#AUDIT_TABLES` fires a trigger, and a `Promise.all` of
   deletes over a batch nests them past the runtime's limit ("trigger recursion
@@ -1813,13 +1818,20 @@ first real request. They were found by driving the app in a browser
   a fresh wrapper per request re-runs it on every request (a timing proxy once
   did, costing ~3s per read). The old note here ("~1s per request, miniflare's
   loopback") was a misreading of this.
-- **An un-hinted `ctx.db.get(id)` of a `.global()` row probes EVERY global
-  table** in one batched D1 round trip (41 tables), because the id is not in
-  the shard's local table set — ~70-125ms locally each time, three of them made
-  a warm `getUserSettings` 0.4-0.5s (7-15ms after the fix). Read a global row
-  by id with `ctx.db.<table>.findFirst({ where: { _id } })` — ONE statement.
-  Neither `ctx.db.asId(table, id)` nor the facade's own `ctx.db.<table>.get(id)`
-  avoids the probe (measured). `lib/global-get.guard.test.ts` fails on a new one.
+- **`ctx.db` by-id calls take the TABLE first** (`@lunora/server` alpha.240+):
+  `get(table, id)`, `patch(table, id, values)`, `replace`, `delete`, `restore`,
+  `deleteMany(table, ids)`, `patchMany(table, patches)`. The bare-id forms probed
+  EVERY table (one batched D1 round trip across 41 global tables, ~70-125ms
+  locally each), which is why they are gone; an unknown table throws
+  `BAD_REQUEST`. The facades (`ctx.db.<table>.get(id)`) are unchanged. The id
+  itself carries no table — `db.normalizeId(table, id)` only checks its SHAPE and
+  returns the id for any table, so never use it to discover a row's table. The
+  `embeddings_*` tables are the one place the table is unknown at the call site:
+  `agent/vector/tables.ts#findVectorTable` reads each dimension's table in turn.
+  `lib/patch.ts`: `patchRow(db, table, row, changes)` / `patchById(db, table, id, changes)`.
+  A test callback typed `ctx: any` is NOT checked by `tsc`, so a stale one-argument
+  call fails at runtime ("<uuid> is not a table in this schema"); `lib/global-get.guard.test.ts`
+  still fails on a new un-hinted global read.
 - Multiply a slow first access by the one-at-a-time shard and N concurrent
   first-paint queries cost N × that of wall clock (measured before per-user
   sharding, on `__root__`): 5 concurrent = 4.9s, 10 = 8.8s and the backend dies. **Count your
@@ -1944,7 +1956,7 @@ first real request. They were found by driving the app in a browser
       admit, or its reads come back empty.
     - **"Load a child by id, then check its parent" returns `null` now** — the
       child is invisible until the parent is admitted. Use
-      `parentKeyOf(ctx, id, "threadId")`, decide on the parent, then read the
+      `parentKeyOf(ctx, "messages", id, "threadId")`, decide on the parent, then read the
       row through `ctx.db`. Likewise, run the access check BEFORE a parallel
       read that depends on it (`getThreadAccess` used to `Promise.all` them).
     - **`systemDb`/`parentKeyOf` bypass RLS** and every importing file is listed
@@ -1962,11 +1974,9 @@ first real request. They were found by driving the app in a browser
       return nothing). A test ctx without them (`lunoraTest` before
       `test/setup-harness.ts` binds them) has none behind `rls()` either — that
       is what #797 reported; do not re-add a workaround.
-    - **An un-hinted `ctx.db.get(id)` of a `.global()` row is expensive behind
-      RLS**: the wrapper cannot tell the table from the id, so it probes EVERY
-      policed table (`findFirst` each, in parallel). Shard rows short-circuit
-      through `lookupById`; global rows do not. Read global rows through the
-      table facade — `ctx.db.user.get(id)` — which passes the table.
+    - **By-id calls name their table** (`ctx.db.get("user", id)`), so the RLS
+      wrapper no longer probes every policed table for a bare id. The facade form
+      `ctx.db.user.get(id)` passes the table too.
     - **RLS layers AND together**, so an admin builder derived from a guarded
       user builder could never widen — each builder chain is spelled out from the
       generated builder.
@@ -2346,8 +2356,9 @@ error")` (any transport, including the SSRF-guarded tool
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
   beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags
-  and every `@lunora/*` package resolves to one version (2026-10-20: `lunorash` 405, `cli` 406,
-  `workflow` 87 everywhere). A meta-package release lags the package it pins by one release wave
+  and every `@lunora/*` package resolves to one version (2026-11-01: `lunorash` 464, `cli` 466,
+  `workflow` 106 everywhere; `pnpm dedupe` also collapsed `@lunora/errors`, whose range
+  dependencies had resolved to two versions). A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
   fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
   bumping, rather than overriding.
@@ -2390,6 +2401,12 @@ error")` (any transport, including the SSRF-guarded tool
   `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
   scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
   the best of several.
+  Since codegen alpha.384 the generated app already loads `@lunora/auth` and the
+  OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at
+  startup; an evaluation error there now 500s the first request instead of failing the upload.
+  `LUNORA_LAZY_FUNCTIONS=1` (or `--lazy-functions` on codegen/prepare/build/deploy) is the
+  opt-in that also defers the function modules, queue registry, workflow and agent
+  entrypoints (upstream measured -31 % on its synthetic app); it is not enabled here.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
