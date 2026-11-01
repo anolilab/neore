@@ -19773,25 +19773,25 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 763,
+      "line": 770,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 781,
+      "line": 788,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 791,
+      "line": 798,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 820,
+      "line": 827,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -20247,13 +20247,13 @@
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 42,
+      "line": 47,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 43,
+      "line": 48,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
