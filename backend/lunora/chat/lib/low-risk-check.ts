@@ -88,6 +88,7 @@ export const createRunLowRiskCheck = (
             await ctx.runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, {
                 permissionKey: call.key,
                 threadId: threadId as Id<"threads">,
+                trustId: call.trustId,
                 userId,
             }),
         untrustedContext: () => untrustedContext,

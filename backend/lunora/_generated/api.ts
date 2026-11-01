@@ -353,11 +353,12 @@ export interface ApiTypes {
             unsnoozeThread: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
         };
         tool_permissions: {
-            getToolPermissionSettings: FunctionReference<"query", {}, { autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: FunctionReference<"query", {}, { autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; lowRiskTrustedServers: Array<string>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             listMcpToolPermissions: FunctionReference<"action", {}, { servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             respondToToolApproval: FunctionReference<"mutation", { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: FunctionReference<"mutation", { key: string }, null>;
             setAutoApproveLowRisk: FunctionReference<"mutation", { enabled: boolean }, null>;
+            setLowRiskTrustedServer: FunctionReference<"mutation", { server: { kind: "mcp"; name: string; url: string } | { kind: "connector"; slug: string }; trusted: boolean }, null>;
             setToolPermission: FunctionReference<"mutation", { key: string; mode: "auto" | "ask" | "off" | null }, null>;
         };
         translate: {
@@ -1214,6 +1215,7 @@ export const api: ApiTypes = {
             respondToToolApproval: { __lunoraRef: "chat_tool_permissions:respondToToolApproval" },
             revokeToolPermissionGrant: { __lunoraRef: "chat_tool_permissions:revokeToolPermissionGrant" },
             setAutoApproveLowRisk: { __lunoraRef: "chat_tool_permissions:setAutoApproveLowRisk" },
+            setLowRiskTrustedServer: { __lunoraRef: "chat_tool_permissions:setLowRiskTrustedServer" },
             setToolPermission: { __lunoraRef: "chat_tool_permissions:setToolPermission" },
         },
         translate: {

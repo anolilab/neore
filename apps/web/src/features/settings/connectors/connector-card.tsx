@@ -9,6 +9,7 @@ import { BookOpen, CircleAlert, CircleCheck, Clock, ExternalLink, GitBranch, Har
 import type { FC } from "react";
 import { useId, useState } from "react";
 
+import { TrustServerSwitch } from "../components/chat/trust-server-switch";
 import connectorCategoryLabel from "./connector-category";
 import type { ConnectorDisplayStatus } from "./connector-status";
 import { connectorDisplayStatus } from "./connector-status";
@@ -152,6 +153,8 @@ const ConnectorCard: FC<{ entry: ConnectorCatalogEntry }> = ({ entry }) => {
                         </ul>
                     </div>
                 )}
+
+                {status === "connected" && <TrustServerSwitch server={{ kind: "connector", name: entry.name, slug: entry.slug }} />}
 
                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                     {(status === "not_connected" || (hasGrant && status !== "connected")) && (

@@ -22,6 +22,7 @@ export type AiUserPreferencesPatch = Partial<
         | "autoApproveLowRisk"
         | "browserSettings"
         | "customAIProviders"
+        | "lowRiskTrustedServers"
         | "mcpSecretHeaders"
         | "mcpServers"
         | "providerApiKeys"

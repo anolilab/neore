@@ -843,6 +843,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_thread_state:unsnoozeThread": lunora_chat_thread_state_87.unsnoozeThread as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:consumeLowRiskCheck": lunora_chat_tool_permissions_88.consumeLowRiskCheck as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getLowRiskApprovalContext": lunora_chat_tool_permissions_88.getLowRiskApprovalContext as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getLowRiskTrustedServers": lunora_chat_tool_permissions_88.getLowRiskTrustedServers as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_88.getPendingToolApproval as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionGrantsQuery": lunora_chat_tool_permissions_88.getToolPermissionGrantsQuery as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionSettings": lunora_chat_tool_permissions_88.getToolPermissionSettings as unknown as RegisteredLunoraFunction,
@@ -853,6 +854,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_tool_permissions:respondToToolApproval": lunora_chat_tool_permissions_88.respondToToolApproval as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:revokeToolPermissionGrant": lunora_chat_tool_permissions_88.revokeToolPermissionGrant as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:setAutoApproveLowRisk": lunora_chat_tool_permissions_88.setAutoApproveLowRisk as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:setLowRiskTrustedServer": lunora_chat_tool_permissions_88.setLowRiskTrustedServer as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:setToolPermission": lunora_chat_tool_permissions_88.setToolPermission as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:closeBrowserSession": lunora_chat_tools_browser_node_89.closeBrowserSession as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:executeBrowserAction": lunora_chat_tools_browser_node_89.executeBrowserAction as unknown as RegisteredLunoraFunction,
@@ -4479,6 +4481,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_chat_tool_permissions_88.getLowRiskTrustedServers.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_tool_permissions_88.getPendingToolApproval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8992,10 +9000,11 @@ export interface Caller {
         };
         tool_permissions: {
             consumeLowRiskCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
-            getLowRiskApprovalContext: (args: { permissionKey?: string; threadId: Id<"threads">; userId: string }) => Promise<boolean>;
+            getLowRiskApprovalContext: (args: { permissionKey?: string; threadId: Id<"threads">; trustId?: string; userId: string }) => Promise<boolean>;
+            getLowRiskTrustedServers: (args: { userId: string }) => Promise<Array<string>>;
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
             getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
-            getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; lowRiskTrustedServers: Array<string>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             pruneExpiredToolPermissionGrants: (args?: {}) => Promise<null>;
@@ -9003,6 +9012,7 @@ export interface Caller {
             respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: (args: { key: string }) => Promise<null>;
             setAutoApproveLowRisk: (args: { enabled: boolean }) => Promise<null>;
+            setLowRiskTrustedServer: (args: { server: { kind: "mcp"; name: string; url: string } | { kind: "connector"; slug: string }; trusted: boolean }) => Promise<null>;
             setToolPermission: (args: { key: string; mode: "auto" | "ask" | "off" | null }) => Promise<null>;
         };
         tools: {
@@ -10877,6 +10887,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         tool_permissions: {
             consumeLowRiskCheck: (args) => callRegistered(context, "chat_tool_permissions:consumeLowRiskCheck", args),
             getLowRiskApprovalContext: (args) => callRegistered(context, "chat_tool_permissions:getLowRiskApprovalContext", args),
+            getLowRiskTrustedServers: (args) => callRegistered(context, "chat_tool_permissions:getLowRiskTrustedServers", args),
             getPendingToolApproval: (args) => callRegistered(context, "chat_tool_permissions:getPendingToolApproval", args),
             getToolPermissionGrantsQuery: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionGrantsQuery", args),
             getToolPermissionSettings: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionSettings", args),
@@ -10887,6 +10898,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             respondToToolApproval: (args) => callRegistered(context, "chat_tool_permissions:respondToToolApproval", args),
             revokeToolPermissionGrant: (args) => callRegistered(context, "chat_tool_permissions:revokeToolPermissionGrant", args),
             setAutoApproveLowRisk: (args) => callRegistered(context, "chat_tool_permissions:setAutoApproveLowRisk", args),
+            setLowRiskTrustedServer: (args) => callRegistered(context, "chat_tool_permissions:setLowRiskTrustedServer", args),
             setToolPermission: (args) => callRegistered(context, "chat_tool_permissions:setToolPermission", args),
         },
         tools: {

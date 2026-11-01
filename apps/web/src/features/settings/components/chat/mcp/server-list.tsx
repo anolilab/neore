@@ -10,6 +10,7 @@ import type { FC } from "react";
 
 import { getServerFaviconUrl, getServerInitials } from "@/features/chat/core/utils/mcp";
 
+import { TrustServerSwitch } from "../trust-server-switch";
 import { StatusIndicator, ToolChips } from "./status-indicator";
 import type { MCPServerConfig, MCPServerSignIn, ServerStatusInfo } from "./types";
 import { isSensitiveKey, maskValue, serverKey } from "./utilities";
@@ -180,6 +181,8 @@ export const MCPServerList: FC<MCPServerListProps> = ({
 
                         {/* Tool chips — show when we have test results */}
                         {statusInfo?.status === "connected" && statusInfo.tools.length > 0 && <ToolChips tools={statusInfo.tools} />}
+
+                        <TrustServerSwitch server={{ kind: "mcp", name: server.name, url: server.url }} />
                     </div>
                 );
             })}

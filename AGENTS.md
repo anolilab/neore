@@ -514,14 +514,22 @@ written here is what is not.
   (`chat/toolAutoApprove`), then one utility-model call (no tools, strict `{lowRisk, reason}`, 8 s
   deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
   model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
-  defaults to `ask` is a person tool or a delegation), no user override (only the DEFAULT `ask`), no
+  defaults to `ask` is a person tool or a delegation), **only from a server the user trusts**
+  (`aiUserPreferences.lowRiskTrustedServers`, `chat/lib/low-risk-trust.ts`: a server's tool descriptions and
+  schemas reach the model unfiltered, so a malicious server could steer it into another server's read tool
+  with chat data, and the check sees only the key and arguments; an entry is an MCP server's name AND url,
+  or a connector's slug, so a url change drops the trust; written only by `setLowRiskTrustedServer`, at most
+  50; the run's `describe` stamps `ToolDescriptor.trustId` and the mid-run re-check in
+  `getLowRiskApprovalContext` takes it too, so revoking trust holds from the next call, and a call that
+  names no server is refused), no user override (only the DEFAULT `ask`), no
   destructive/open-world annotation, not headless, not an API-key run, and the thread must pass
   `isDeviceEligibleThread` (the owner alone — a collaborator's turn would otherwise replace the
   owner's consent). **The tool name must START with a read verb** (`READ_VERBS`: get, list, search,
   read, fetch, find, query, describe, lookup, view — the leading word of the key's tool name, split on
   `_ - .` or a camelCase boundary), so `create_issue`, `save_issue`, `create_event` and `sendemail` are
   never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
-  (`get_or_create_user`). An allowlist, not a blocklist: a new write verb is a prompt by default.
+  (`get_or_create_user`), scanned over the TOOL's name only (a server called "mail" does not turn its
+  tools away; a noun like `message` or `pr` in the tool's own name still does). An allowlist, not a blocklist: a new write verb is a prompt by default.
   **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
   (any tool result or attached file or image), `messagesCarryAttachedText` (`chat/lib/attached-text.ts`: an
   attached document's extracted text and a captured browser page, which `/chat/start` and the edit path put
