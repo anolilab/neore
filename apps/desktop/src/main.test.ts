@@ -10,6 +10,8 @@ import path from "node:path";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
+import { DICTATION_SHORTCUT } from "./dictation/hold.js";
+
 type Listener = (event: { preventDefault: () => void }, url: string) => void;
 
 interface FakeWindow {
@@ -418,7 +420,7 @@ describe("the microphone", () => {
     });
 
     it("starts no dictation window or shortcut while the switch in settings is off, which is the default", () => {
-        expect(fake().shortcuts.has("CommandOrControl+Shift+D")).toBe(false);
+        expect(fake().shortcuts.has(DICTATION_SHORTCUT)).toBe(false);
         expect(fake().windows.every((win) => win.loaded.every((url) => !url.includes("dictation")))).toBe(true);
     });
 
