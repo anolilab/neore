@@ -17,5 +17,15 @@ export const MAX_TRUSTED_SERVERS = 50;
 /** The trust entry for an MCP server. The pair is JSON so no name/url split can read as another server. */
 export const mcpTrustId = (name: string, url: string): string => `mcp:${JSON.stringify([name, url])}`;
 
+/**
+ * The entries still in force: a connector's, and an MCP server's only while a saved server has that name AND url. A
+ * server that was deleted loses its trust with it, so adding the same name and url again starts untrusted.
+ */
+export const liveTrustedServers = (trusted: ReadonlyArray<string> | undefined, saved: ReadonlyArray<{ name: string; url: string }> | undefined): string[] => {
+    const live = new Set((saved ?? []).map((server) => mcpTrustId(server.name, server.url)));
+
+    return (trusted ?? []).filter((entry) => !entry.startsWith("mcp:") || live.has(entry));
+};
+
 /** The trust entry for a connector. */
 export const connectorTrustId = (slug: string): string => `connector:${slug}`;

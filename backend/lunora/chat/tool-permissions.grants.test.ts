@@ -12,6 +12,7 @@ import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import {
     consumeLowRiskCheck,
     getLowRiskApprovalContext,
+    getLowRiskTrustedServers,
     getToolPermissionSettings,
     MAX_TRUST_ENTRY_LENGTH,
     pruneExpiredToolPermissionGrants,
@@ -467,6 +468,32 @@ describe("getLowRiskApprovalContext", () => {
         // Revoked while a run is going: the next call's re-check refuses.
         await setTrust(false);
         expect(await askFor(trustId)).toBe(false);
+    });
+
+    it("stops trusting a server that is no longer saved, for the run builder and for a call mid-run", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("Files", URL);
+        const askFor = async (): Promise<boolean> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey: KEY, threadId, trustId, userId: USER }));
+        const trustedNow = async (): Promise<string[]> => await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskTrustedServers, { userId: USER }));
+
+        await saveFilesServer();
+        await as().mutation(setLowRiskTrustedServer as never, { server: { kind: "mcp", name: "Files", url: URL }, trusted: true } as never);
+        expect(await askFor()).toBe(true);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q: any) => q.eq("userId", USER))
+                .unique();
+
+            await ctx.db.patch(row._id, { mcpServers: [] });
+        });
+
+        expect(await trustedNow()).toStrictEqual([]);
+        expect(await askFor()).toBe(false);
     });
 
     it("accepts the trust id of a server whose name and url are full of control characters at their caps", async () => {

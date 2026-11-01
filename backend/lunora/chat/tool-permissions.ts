@@ -50,7 +50,7 @@ import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
 import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
-import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
+import { connectorTrustId, liveTrustedServers, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
@@ -131,7 +131,7 @@ const quickCheckAllowed = async (
     }
 
     // Trust is the user's to take back, also while the run is going; a call that names no server is not trusted.
-    if (call !== undefined && (call.trustId === undefined || !prefs.lowRiskTrustedServers?.includes(call.trustId))) {
+    if (call !== undefined && (call.trustId === undefined || !liveTrustedServers(prefs.lowRiskTrustedServers, prefs.mcpServers).includes(call.trustId))) {
         return false;
     }
 
@@ -199,7 +199,7 @@ export const getLowRiskTrustedServers = internalQuery
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
 
-        return prefs?.lowRiskTrustedServers ?? [];
+        return liveTrustedServers(prefs?.lowRiskTrustedServers, prefs?.mcpServers);
     });
 
 /**
@@ -258,7 +258,7 @@ export const getToolPermissionSettings = authQuery
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
             grants: activeGrants(prefs?.toolPermissionGrants, Date.now()),
-            lowRiskTrustedServers: prefs?.lowRiskTrustedServers ?? [],
+            lowRiskTrustedServers: liveTrustedServers(prefs?.lowRiskTrustedServers, prefs?.mcpServers),
             overrides: prefs?.toolPermissions ?? {},
         };
     });
@@ -440,7 +440,7 @@ export const setLowRiskTrustedServer = authMutation
         }
 
         const id = server.kind === "mcp" ? mcpTrustId(server.name, server.url) : connectorTrustId(server.slug);
-        const next = (prefs?.lowRiskTrustedServers ?? []).filter((entry) => entry !== id);
+        const next = liveTrustedServers(prefs?.lowRiskTrustedServers, prefs?.mcpServers).filter((entry) => entry !== id);
 
         if (trusted) {
             next.push(id);
