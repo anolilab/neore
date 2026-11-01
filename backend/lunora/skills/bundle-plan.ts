@@ -537,48 +537,70 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
         .filter((entry) => entry.plan && selected.has(entry.key))
         .toSorted((a, b) => order[a.kind] - order[b.kind] || Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
 
-    const rollback = async (): Promise<{ failed: string[]; keptGroups: string[] }> => {
+    const planFor = (key: string): PlannedCreate | undefined => entries.find((entry) => entry.key === key)?.plan;
+
+    // `failed`: could not be removed and still needs deleting by hand. `kept`: stays on purpose, with the skills it uses.
+    const rollback = async (): Promise<{ failed: string[]; kept: string[] }> => {
         const failed: string[] = [];
-        const keptGroups: string[] = [];
-        let groupLeft = false;
+        const kept: string[] = [];
+        // Skill keys that a group chat which is still there names: they stay, or it would point at nothing.
+        const protectedBy = new Map<string, "failed" | "kept">();
 
         for (const item of created.toReversed()) {
-            // A group chat that is still there names the skills created before it: they stay, or it would point at nothing.
-            if (item.kind === "skill" && groupLeft) {
-                failed.push(item.title);
+            if (item.kind === "skill" && protectedBy.has(item.key)) {
+                (protectedBy.get(item.key) === "kept" ? kept : failed).push(item.title);
                 continue;
             }
+
+            let outcome: "failed" | "kept" | undefined;
 
             try {
                 const removed = await removeCreated(item, ops);
 
                 if (item.kind === "group" && (removed as { kept?: boolean } | undefined)?.kept === true) {
-                    failed.push(item.title);
-                    keptGroups.push(item.title);
-                    groupLeft = true;
+                    outcome = "kept";
                 }
             } catch {
-                failed.push(item.title);
-                groupLeft ||= item.kind === "group";
+                outcome = "failed";
+            }
+
+            if (outcome === undefined) {
+                continue;
+            }
+
+            (outcome === "kept" ? kept : failed).push(item.title);
+
+            const plan = item.kind === "group" ? planFor(item.key) : undefined;
+
+            if (plan?.kind === "group") {
+                for (const key of [...plan.create.participantKeys, ...(plan.create.synthesizerKey === undefined ? [] : [plan.create.synthesizerKey])]) {
+                    // A skill already held by a failed group stays "failed": that is the stricter note.
+                    if (protectedBy.get(key) !== "failed") {
+                        protectedBy.set(key, outcome);
+                    }
+                }
             }
         }
 
-        return { failed, keptGroups };
+        return { failed, kept };
     };
 
     for (const entry of todo) {
         try {
             created.push(await createPlanned(entry, ops, idByKey));
         } catch (error) {
-            const { failed: leftBehind, keptGroups } = await rollback();
+            const { failed, kept } = await rollback();
             const reason = messageOf(error);
-            const keptNote = keptGroups.length === 0 ? "" : ` ${keptGroups.join(", ")} already has messages, so it was kept together with the skills it uses.`;
+            const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;
+            const keptNote =
+                kept.length === 0 ? "" : ` Kept with the skills it uses, because a group chat that already has messages is not deleted: ${kept.join(", ")}.`;
+            const remaining = failed.length + kept.length;
 
             throw new BundleImportError(
-                leftBehind.length === 0
+                remaining === 0
                     ? `"${entry.title}" could not be imported (${reason}). Nothing was imported.`
-                    : `"${entry.title}" could not be imported (${reason}), and these could not be removed again: ${leftBehind.join(", ")}. They were created switched off; delete them by hand.${keptNote}`,
-                leftBehind,
+                    : `"${entry.title}" could not be imported (${reason}).${failedNote}${keptNote}`,
+                [...failed, ...kept],
             );
         }
     }
