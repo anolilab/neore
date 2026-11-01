@@ -40,7 +40,14 @@ jobs:
               run: |
                   if [ "${EVENT}" != "pull_request" ]; then
                       echo "changed=true" >> "${GITHUB_OUTPUT}"
-                  elif git diff --name-only "${BASE_SHA}...HEAD" | grep -qE '(\.rs$|(^|/)Cargo\.(toml|lock)$)'; then
+                      exit 0
+                  fi
+
+                  # Captured first, so a failing diff fails this job instead of reading as "no Rust"
+                  # (and no early-exiting `grep -q` can break the pipe under pipefail).
+                  files="$(git diff --name-only "${BASE_SHA}...HEAD")"
+
+                  if grep -E '(\.rs$|(^|/)Cargo\.(toml|lock)$)' <<< "${files}" > /dev/null; then
                       echo "changed=true" >> "${GITHUB_OUTPUT}"
                   else
                       echo "changed=false" >> "${GITHUB_OUTPUT}"
