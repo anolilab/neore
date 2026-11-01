@@ -48,6 +48,15 @@ vi.mock("../../lib/services", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../../lib/services")>()), gatewayFetch: () => async () => new Response("unreachable", { status: 500 }) };
 });
 
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
+
 vi.mock("../../lib/utility-model", () => {
     return {
         getUtilityModel: async () => {

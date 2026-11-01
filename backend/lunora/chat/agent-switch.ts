@@ -22,7 +22,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
@@ -53,6 +53,7 @@ import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
+import { loadModelFilterRules } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
@@ -495,10 +496,10 @@ export const beginSwitchSummary = internalMutation
 export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
 
 const summariseWith =
-    (ctx: Parameters<typeof gatewayFetch>[0], who: { threadId: string; userId: string }): Summarise =>
+    (ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "runQuery">, who: { threadId: string; userId: string }): Summarise =>
     async (older, omittedEarlier) => {
         try {
-            const model = await getUtilityModel(gatewayFetch(ctx), who);
+            const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules: await loadModelFilterRules(ctx, who.userId) });
             const { text } = await generateText({
                 maxOutputTokens: HANDOFF_SUMMARY_MAX_TOKENS,
                 model,

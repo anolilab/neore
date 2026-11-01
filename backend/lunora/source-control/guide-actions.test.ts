@@ -34,8 +34,9 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateObject };
 });
 
-vi.mock("../lib/utility-model", () => {
+vi.mock("../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
         getUtilityModel: async () => {
             return {};
         },

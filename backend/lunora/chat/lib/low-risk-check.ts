@@ -13,6 +13,7 @@ import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { gatewayFetch } from "../../lib/services";
 import { getUtilityModel } from "../../lib/utility-model";
+import { loadModelFilterRules } from "./model-filter-rules";
 import type { AutoApprovals, LowRiskCheck } from "./low-risk-approval";
 import { createLowRiskApprover, LOW_RISK_DEADLINE_MS, LOW_RISK_SYSTEM_PROMPT } from "./low-risk-approval";
 
@@ -34,8 +35,23 @@ export const createRunLowRiskCheck = (
     // No prototype: a provider's tool-call id is stored as an own key, `__proto__` and `constructor` included.
     const approvals: AutoApprovals = Object.create(null) as AutoApprovals;
 
+    // Resolved once per run, and ahead of the budget: a user whose model filters refuse the classifier spends none of it.
+    // Strict, because the model that judged is stamped on every approval it grants.
+    let modelPromise: ReturnType<typeof getUtilityModel> | undefined;
+    const resolveModel = (): ReturnType<typeof getUtilityModel> => {
+        modelPromise ??= loadModelFilterRules(ctx, userId).then(
+            async (rules) => await getUtilityModel(gatewayFetch(ctx), { rules, threadId, userId }, LOW_RISK_MODEL, { strict: true }),
+        );
+        // A failed attempt is not kept: the next call asks again.
+        modelPromise.catch(() => {
+            modelPromise = undefined;
+        });
+
+        return modelPromise;
+    };
+
     const classify = async (prompt: string): Promise<unknown> => {
-        const model = await getUtilityModel(gatewayFetch(ctx), { threadId, userId }, LOW_RISK_MODEL);
+        const model = await resolveModel();
         const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<never>((_resolve, reject) => {
@@ -68,7 +84,16 @@ export const createRunLowRiskCheck = (
     const check = createLowRiskApprover({
         classify,
         // Re-reads the setting and the thread's sharing, so switching the setting off or sharing the thread mid-run holds from the next call.
-        consumeBudget: async () => await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }),
+        consumeBudget: async () => {
+            // No allowed model: nothing will be asked, so none of the budget is spent.
+            const modelAvailable = await resolveModel()
+                .then(() => true)
+                .catch(() => false);
+
+            return (
+                modelAvailable && (await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }))
+            );
+        },
         model: LOW_RISK_MODEL,
         now: () => Date.now(),
         // An approval is also stamped on the saved call at `finishRun`; this is the trace a run that never gets there leaves.

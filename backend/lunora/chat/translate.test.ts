@@ -4,11 +4,14 @@
  * and the output budget follows the text's length.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 import { MAX_TRANSLATION_OUTPUT_TOKENS, translationOutputTokens } from "./lib/translate-message";
 import { TRANSLATE_GUEST_MESSAGE, translateMessage } from "./translate";
 
@@ -31,8 +34,9 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
 
-vi.mock("../lib/utility-model", () => {
+vi.mock("../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
         getUtilityModel: async () => {
             return {};
         },
@@ -108,6 +112,23 @@ afterEach(() => {
 });
 
 describe("translateMessage", () => {
+    it("answers a BAD_REQUEST that says so, not an internal error, when the model filter rules cannot be read", async () => {
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(translate(MEMBER, "Hello world")).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
     it("refuses a guest before any model call", async () => {
         await expect(translate(GUEST, "Hello world")).rejects.toThrow(TRANSLATE_GUEST_MESSAGE);
         expect(generateText).not.toHaveBeenCalled();

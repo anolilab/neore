@@ -6,9 +6,12 @@
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
 const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
     return {
@@ -36,8 +39,11 @@ vi.mock("../usage/schedule", () => {
     return { scheduleReplyUsage };
 });
 
-vi.mock("../lib/utility-model", () => {
-    return { getUtilityModel };
+vi.mock("../lib/utility-model", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
+        getUtilityModel,
+    };
 });
 
 vi.mock("./lib/get-agent", () => {
@@ -407,6 +413,41 @@ describe("askAside", () => {
         expect(promptOfCall()).not.toContain("importer");
     });
 
+    it("answers a BAD_REQUEST that says so, not an internal error, when the model filter rules cannot be read", async () => {
+        await patchThread({ mode: "image", model: "not-a-text-model" });
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("answers a BAD_REQUEST, not an internal error, when the rules cannot be read on a thread that runs on its own model", async () => {
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
     it("uses the utility model for a thread that is not on a text model", async () => {
         await patchThread({ mode: "image", model: "not-a-text-model" });
 
@@ -500,6 +541,15 @@ describe("askAside", () => {
             expect(promptOfCall()).toContain("refactor the importer");
             expect(await remainingText(OTHER)).toBe(reader - 1);
             expect(await remainingText(OWNER)).toBe(owner);
+        });
+
+        it("picks the utility model under the OWNER's identity for a reader, since the owner's messages are what it receives", async () => {
+            await patchThread({ mode: "image", model: "not-a-text-model" });
+            await grantRead();
+
+            await expect(ask(QUESTION, OTHER)).resolves.toMatchObject({ withThread: true });
+
+            expect(getUtilityModel).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: OWNER }), undefined);
         });
     });
 

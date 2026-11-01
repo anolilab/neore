@@ -29,6 +29,14 @@ const summaryModel = vi.hoisted(() =>
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText: summaryModel };
 });
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
 vi.mock("../utility-model", () => {
     return {
         getUtilityModel: async () => {
