@@ -394,7 +394,7 @@ test("only the dictation window is given the microphone", async () => {
 
 const SETTINGS_PAGE = /\/dictation-settings-window\/settings\.html$/u;
 const DICTATION_KEY = /dictation|settings/iu;
-const SHORTCUT = "CommandOrControl+Shift+D";
+const SHORTCUT = process.platform === "win32" ? "CommandOrControl+Shift+Y" : "CommandOrControl+Shift+D";
 
 /** Whether the app holds the dictation shortcut with the OS right now. */
 const shortcutHeld = (app: ElectronApplication): Promise<boolean> => app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), SHORTCUT);

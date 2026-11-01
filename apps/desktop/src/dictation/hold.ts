@@ -1,12 +1,18 @@
+/**
+ * The letter of the chord. Windows uses Y: on an arm64 Windows runner Windows refused Ctrl+Shift+D (another process held it),
+ * so the switch was on and the helper present, yet nothing was registered.
+ */
+export const DICTATION_LETTER = process.platform === "win32" ? "Y" : "D";
+
 /** The shortcut that starts a dictation, registered only while the switch in settings is on. It is held down while speaking. */
 // eslint-disable-next-line no-secrets/no-secrets -- a keyboard accelerator, not a credential
-export const DICTATION_SHORTCUT = "CommandOrControl+Shift+D";
+export const DICTATION_SHORTCUT = `CommandOrControl+Shift+${DICTATION_LETTER}`;
 
 /** The same shortcut as the settings page words it for a person. */
-export const DICTATION_SHORTCUT_LABEL = process.platform === "darwin" ? "⌘ Shift D" : "Ctrl Shift D";
+export const DICTATION_SHORTCUT_LABEL = process.platform === "darwin" ? `⌘ Shift ${DICTATION_LETTER}` : `Ctrl Shift ${DICTATION_LETTER}`;
 
 /** The keys of the chord, as `KeyboardEvent.key` values lower-cased. Letting go of any of them is the release. */
-const CHORD_KEYS = new Set(["control", "d", "meta", "shift"]);
+const CHORD_KEYS = new Set(["control", DICTATION_LETTER.toLowerCase(), "meta", "shift"]);
 
 export interface InputLike {
     key: string;
