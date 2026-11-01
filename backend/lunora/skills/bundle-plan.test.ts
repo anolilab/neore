@@ -23,6 +23,7 @@ const RE_12 = /Weekly/;
 const RE_13 = /not in this bundle/;
 const RE_14 = /at least one/;
 const RE_16 = /switched off/;
+const RE_KEPT = /Panel already has messages, so it was kept together with the skills it uses/;
 const RE_17 = /never fires|no next run/i;
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
@@ -358,6 +359,23 @@ describe("the import", () => {
 
         expect(ops.deleteSkill).not.toHaveBeenCalled();
         expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+    });
+
+    it("keeps the skills of a group chat that has messages by now, and says so", async () => {
+        const { ops } = fakeOps({
+            createTrigger: vi.fn(async () => {
+                throw new Error("boom");
+            }),
+            deleteGroupChat: vi.fn(async () => {
+                return { kept: true };
+            }),
+        });
+        const error = (await runBundleImport(plan(items), ALL, ops).catch((error_: unknown) => error_)) as BundleImportError;
+
+        expect(ops.deleteSkill).not.toHaveBeenCalled();
+        expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+        expect(error.message).toMatch(RE_KEPT);
+        expect(mayRetryImport(error)).toBe(false);
     });
 
     it("names what it could not remove again", async () => {

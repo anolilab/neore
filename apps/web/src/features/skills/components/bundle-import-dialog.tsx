@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { BundleReviewEntry } from "../lib/bundle-review";
-import { defaultSelection, fitsSkillSlots, selectedCount, toggleSelection } from "../lib/bundle-review";
+import { defaultSelection, fitsSkillSlots, selectedCount, toggleSelection, withSelectionSlugs } from "../lib/bundle-review";
 
 /** The server's cap on a bundle file (`BUNDLE_LIMITS.bytes`); a bigger file is refused before it is sent. */
 const MAX_BUNDLE_BYTES = 512 * 1024;
@@ -32,6 +32,7 @@ interface BundleImportDialogProps {
 interface Review {
     description: string;
     entries: BundleReviewEntry[];
+    existingSlugs: string[];
     name: string;
     skillSlotsLeft: number | null;
 }
@@ -290,7 +291,8 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
 
         input.value = "";
 
-        if (!file) {
+        // A new file mid-import would reset the review the running import was made from.
+        if (!file || isImporting) {
             return;
         }
 
@@ -340,7 +342,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
         }
     };
 
-    const entries = review?.entries ?? [];
+    const entries = review ? withSelectionSlugs(review.entries, selected, review.existingSlugs) : [];
     const fitsSlots = fitsSkillSlots(selected, entries, review?.skillSlotsLeft ?? null);
     const canImport = !!review && selected.size > 0 && fitsSlots && !isImporting;
 
@@ -352,7 +354,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
             </DialogHeader>
             <DialogPanel className="space-y-4">
                 <div className="flex items-center gap-2">
-                    <Button disabled={isReading} onClick={() => fileInput.current?.click()} type="button" variant="outline">
+                    <Button disabled={isReading || isImporting} onClick={() => fileInput.current?.click()} type="button" variant="outline">
                         {isReading ? (
                             <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />
                         ) : (
@@ -389,9 +391,9 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
                             </h3>
                             {review.description && <p className="text-muted-foreground text-xs">{review.description}</p>}
                         </div>
-                        {review.entries.length === 0 && <p className="text-muted-foreground text-sm">{t`This bundle has no items.`}</p>}
+                        {entries.length === 0 && <p className="text-muted-foreground text-sm">{t`This bundle has no items.`}</p>}
                         <ul className="space-y-3">
-                            {review.entries.map((entry) => {
+                            {entries.map((entry) => {
                                 const inputId = `${headingId}-${entry.key}`;
                                 const problemsId = `${inputId}-problems`;
                                 const blocked = entry.problems.length > 0;

@@ -21,6 +21,7 @@ import { planSkillImport } from "./import-plan";
 import { FREE_SKILL_LIMIT } from "./constants";
 import { MAX_LENGTH } from "../lib/validators";
 import { pickFreeSlug } from "./slug";
+import { slugRenamedWarning } from "./slug-pick";
 
 export interface PlanEnv {
     existingSkillCount: number;
@@ -93,6 +94,8 @@ export interface PlanEntry {
 export interface PlanView {
     group?: { debateRounds?: number; mode: string; model: string; participants: string[]; synthesizer?: string };
     skill?: {
+        /** The slug the file names, before a taken one is bumped: the review re-derives the slug for the current selection from it. */
+        baseSlug: string;
         description: string;
         disabledTools: string[];
         droppedTools: string[];
@@ -274,10 +277,11 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             }
 
             if (slug !== planned.slug) {
-                warnings.push(`You already have a skill named "${planned.slug}"; this one will be imported as "${slug}".`);
+                warnings.push(slugRenamedWarning(planned.slug, slug));
             }
 
             view.skill = {
+                baseSlug: planned.slug,
                 description: planned.description,
                 disabledTools: planned.config?.disabledTools ?? [],
                 droppedTools: planned.droppedTools,
@@ -436,7 +440,8 @@ export interface BundleOps {
     createGroupChat: (args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string }) => Promise<string>;
     createSkill: (args: SkillCreate) => Promise<string>;
     createTrigger: (args: TriggerCreate) => Promise<{ triggerId: string; webhookSecret?: string }>;
-    deleteGroupChat: (threadId: string) => Promise<unknown>;
+    /** `kept`: the group chat has messages by now, so it was not deleted. */
+    deleteGroupChat: (threadId: string) => Promise<undefined | void | { kept: boolean }>;
     deleteSkill: (skillId: string) => Promise<unknown>;
     deleteTrigger: (triggerId: string) => Promise<unknown>;
 }
@@ -532,8 +537,9 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
         .filter((entry) => entry.plan && selected.has(entry.key))
         .toSorted((a, b) => order[a.kind] - order[b.kind] || Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
 
-    const rollback = async (): Promise<string[]> => {
+    const rollback = async (): Promise<{ failed: string[]; keptGroups: string[] }> => {
         const failed: string[] = [];
+        const keptGroups: string[] = [];
         let groupLeft = false;
 
         for (const item of created.toReversed()) {
@@ -544,27 +550,34 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
             }
 
             try {
-                await removeCreated(item, ops);
+                const removed = await removeCreated(item, ops);
+
+                if (item.kind === "group" && (removed as { kept?: boolean } | undefined)?.kept === true) {
+                    failed.push(item.title);
+                    keptGroups.push(item.title);
+                    groupLeft = true;
+                }
             } catch {
                 failed.push(item.title);
                 groupLeft ||= item.kind === "group";
             }
         }
 
-        return failed;
+        return { failed, keptGroups };
     };
 
     for (const entry of todo) {
         try {
             created.push(await createPlanned(entry, ops, idByKey));
         } catch (error) {
-            const leftBehind = await rollback();
+            const { failed: leftBehind, keptGroups } = await rollback();
             const reason = messageOf(error);
+            const keptNote = keptGroups.length === 0 ? "" : ` ${keptGroups.join(", ")} already has messages, so it was kept together with the skills it uses.`;
 
             throw new BundleImportError(
                 leftBehind.length === 0
                     ? `"${entry.title}" could not be imported (${reason}). Nothing was imported.`
-                    : `"${entry.title}" could not be imported (${reason}), and these could not be removed again: ${leftBehind.join(", ")}. They were created switched off; delete them by hand.`,
+                    : `"${entry.title}" could not be imported (${reason}), and these could not be removed again: ${leftBehind.join(", ")}. They were created switched off; delete them by hand.${keptNote}`,
                 leftBehind,
             );
         }

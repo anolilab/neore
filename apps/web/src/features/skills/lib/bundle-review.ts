@@ -4,6 +4,7 @@
  * `importBundle` re-checks everything); this only keeps the picks consistent
  * so the review screen never offers a combination the server would refuse.
  */
+import { findFreeSlug, slugRenamedWarning } from "@neore/backend/skills/slug-pick";
 
 /** One item of the review screen, as `previewBundle` returns it. */
 export interface BundleReviewEntry {
@@ -14,6 +15,8 @@ export interface BundleReviewEntry {
     /** Keys of the skills a group chat needs in the same selection. */
     requires: string[];
     skill?: {
+        /** The slug the file names; `slug` is what the server picked with every skill reserved. */
+        baseSlug: string;
         description: string;
         disabledTools: string[];
         droppedTools: string[];
@@ -76,6 +79,54 @@ export const toggleSelection = (selected: ReadonlySet<string>, key: string, entr
     }
 
     return next;
+};
+
+const entryIndex = (entry: BundleReviewEntry): number => Number(entry.key.split(":", 2)[1]);
+
+/**
+ * The review with each skill's slug the way the import will pick it for THIS selection (the server's preview reserves
+ * every skill's slug, so an unticked skill would otherwise push a later one to a slug the import does not use). Mirrors
+ * `planBundle`: in file order, only a selected skill the server found importable takes its slug.
+ */
+export const withSelectionSlugs = (
+    entries: ReadonlyArray<BundleReviewEntry>,
+    selected: ReadonlySet<string>,
+    existingSlugs: ReadonlyArray<string>,
+): BundleReviewEntry[] => {
+    const taken = new Set(existingSlugs);
+    const slugs = new Map<string, string>();
+
+    const skillEntries = entries.filter((candidate) => candidate.skill).toSorted((a, b) => entryIndex(a) - entryIndex(b));
+
+    for (const entry of skillEntries) {
+        const { baseSlug } = entry.skill!;
+        const slug = findFreeSlug(baseSlug, taken) ?? entry.skill!.slug;
+
+        slugs.set(entry.key, slug);
+
+        if (entry.problems.length === 0 && selected.has(entry.key)) {
+            taken.add(slug);
+        }
+    }
+
+    return entries.map((entry) => {
+        const slug = slugs.get(entry.key);
+
+        if (!entry.skill || slug === undefined) {
+            return entry;
+        }
+
+        const stale = slugRenamedWarning(entry.skill.baseSlug, entry.skill.slug);
+
+        return {
+            ...entry,
+            skill: { ...entry.skill, slug },
+            warnings: [
+                ...entry.warnings.filter((warning) => warning !== stale),
+                ...(slug === entry.skill.baseSlug ? [] : [slugRenamedWarning(entry.skill.baseSlug, slug)]),
+            ],
+        };
+    });
 };
 
 export const selectedCount = (selected: ReadonlySet<string>, entries: ReadonlyArray<BundleReviewEntry>, kind?: BundleReviewEntry["kind"]): number =>
