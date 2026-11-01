@@ -26,10 +26,10 @@ export const acpSessions = sqliteTable("acpSessions", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId_agentKey_nativeSessionId: index("by_userId_agentKey_nativeSessionId").on(t.userId, t.agentKey, t.nativeSessionId),
-    by_deviceId_hostSessionId: index("by_deviceId_hostSessionId").on(t.deviceId, t.hostSessionId),
-    by_userId_status: index("by_userId_status").on(t.userId, t.status),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_userId_status: index("by_userId_status").on(t.userId, t.status),
+    by_deviceId_hostSessionId: index("by_deviceId_hostSessionId").on(t.deviceId, t.hostSessionId),
+    by_userId_agentKey_nativeSessionId: index("by_userId_agentKey_nativeSessionId").on(t.userId, t.agentKey, t.nativeSessionId),
 }));
 
 export const aiUserPreferences = sqliteTable("aiUserPreferences", {
@@ -107,9 +107,9 @@ export const browserExtensions = sqliteTable("browserExtensions", {
     status: text("status", { mode: "json" }).$type<"pending" | "paired" | "revoked">().notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_extensionId: index("by_extensionId").on(t.extensionId),
-    by_pairingCode: index("by_pairingCode").on(t.pairingCode),
     by_userId_status: index("by_userId_status").on(t.userId, t.status),
+    by_pairingCode: index("by_pairingCode").on(t.pairingCode),
+    by_extensionId: index("by_extensionId").on(t.extensionId),
 }));
 
 export const browserSessions = sqliteTable("browserSessions", {
@@ -129,9 +129,9 @@ export const browserSessions = sqliteTable("browserSessions", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_status: index("by_status").on(t.status),
-    by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
     by_userId: index("by_userId").on(t.userId),
+    by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
+    by_status: index("by_status").on(t.status),
 }));
 
 export const chatFileThreads = sqliteTable("chatFileThreads", {
@@ -142,9 +142,9 @@ export const chatFileThreads = sqliteTable("chatFileThreads", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_threadId: index("by_threadId").on(t.threadId),
     by_fileId_threadId: index("by_fileId_threadId").on(t.fileId, t.threadId),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const chatImportJobs = sqliteTable("chatImportJobs", {
@@ -164,8 +164,8 @@ export const chatImportJobs = sqliteTable("chatImportJobs", {
     totalConversations: real("totalConversations").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
 }));
 
 export const codingAgentRuns = sqliteTable("codingAgentRuns", {
@@ -205,10 +205,10 @@ export const codingAgentRuns = sqliteTable("codingAgentRuns", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_task_and_createdAt: index("by_task_and_createdAt").on(t.taskId, t.createdAt),
-    by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
-    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
+    by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
+    by_task_and_createdAt: index("by_task_and_createdAt").on(t.taskId, t.createdAt),
 }));
 
 export const cronRuns = sqliteTable("cronRuns", {
@@ -261,11 +261,11 @@ export const deviceCalls = sqliteTable("deviceCalls", {
     truncated: integer("truncated", { mode: "boolean" }),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_createdAt: index("by_createdAt").on(t.createdAt),
-    by_status_deadline: index("by_status_deadline").on(t.status, t.deadline),
-    by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
-    by_userId_toolCallId: index("by_userId_toolCallId").on(t.userId, t.toolCallId),
     by_deviceId_status: index("by_deviceId_status").on(t.deviceId, t.status),
+    by_userId_toolCallId: index("by_userId_toolCallId").on(t.userId, t.toolCallId),
+    by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
+    by_status_deadline: index("by_status_deadline").on(t.status, t.deadline),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
 export const devices = sqliteTable("devices", {
@@ -302,9 +302,9 @@ export const documents = sqliteTable("documents", {
     userId: text("userId").notNull(),
     version: real("version").notNull(),
 }, (t) => ({
-    by_threadId_and_kind: index("by_threadId_and_kind").on(t.threadId, t.kind),
-    by_userId: index("by_userId").on(t.userId),
     by_messageId: index("by_messageId").on(t.messageId),
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId_and_kind: index("by_threadId_and_kind").on(t.threadId, t.kind),
 }));
 
 export const documentVersions = sqliteTable("documentVersions", {
@@ -332,8 +332,8 @@ export const embeddings_128 = sqliteTable("embeddings_128", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_256 = sqliteTable("embeddings_256", {
@@ -347,8 +347,8 @@ export const embeddings_256 = sqliteTable("embeddings_256", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_512 = sqliteTable("embeddings_512", {
@@ -362,8 +362,8 @@ export const embeddings_512 = sqliteTable("embeddings_512", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_768 = sqliteTable("embeddings_768", {
@@ -377,8 +377,8 @@ export const embeddings_768 = sqliteTable("embeddings_768", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_1024 = sqliteTable("embeddings_1024", {
@@ -392,8 +392,8 @@ export const embeddings_1024 = sqliteTable("embeddings_1024", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_1408 = sqliteTable("embeddings_1408", {
@@ -407,8 +407,8 @@ export const embeddings_1408 = sqliteTable("embeddings_1408", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const embeddings_1536 = sqliteTable("embeddings_1536", {
@@ -422,8 +422,8 @@ export const embeddings_1536 = sqliteTable("embeddings_1536", {
     userId: text("userId"),
     vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
 }, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
     by_userId: index("by_userId").on(t.userId),
+    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
 }));
 
 export const evalCases = sqliteTable("evalCases", {
@@ -441,8 +441,8 @@ export const evalCases = sqliteTable("evalCases", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
     by_dataset_and_createdAt: index("by_dataset_and_createdAt").on(t.datasetId, t.createdAt),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const evalDatasets = sqliteTable("evalDatasets", {
@@ -484,8 +484,8 @@ export const evalResults = sqliteTable("evalResults", {
     tokens: real("tokens"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
     by_run_and_index: index("by_run_and_index").on(t.runId, t.index),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const evalRuns = sqliteTable("evalRuns", {
@@ -511,8 +511,8 @@ export const evalRuns = sqliteTable("evalRuns", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_dataset_and_createdAt: index("by_dataset_and_createdAt").on(t.datasetId, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_dataset_and_createdAt: index("by_dataset_and_createdAt").on(t.datasetId, t.createdAt),
 }));
 
 export const files = sqliteTable("files", {
@@ -537,13 +537,13 @@ export const files = sqliteTable("files", {
     url: text("url"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_folderId: index("by_folderId").on(t.folderId),
-    by_projectId: index("by_projectId").on(t.projectId),
-    by_organization_and_chatId: index("by_organization_and_chatId").on(t.organizationId, t.chatId),
-    by_user_and_chatId: index("by_user_and_chatId").on(t.userId, t.chatId),
-    by_chatId: index("by_chatId").on(t.chatId),
-    by_key: index("by_key").on(t.key),
     by_user_and_folder: index("by_user_and_folder").on(t.userId, t.folderId),
+    by_key: index("by_key").on(t.key),
+    by_chatId: index("by_chatId").on(t.chatId),
+    by_user_and_chatId: index("by_user_and_chatId").on(t.userId, t.chatId),
+    by_organization_and_chatId: index("by_organization_and_chatId").on(t.organizationId, t.chatId),
+    by_projectId: index("by_projectId").on(t.projectId),
+    by_folderId: index("by_folderId").on(t.folderId),
 }));
 
 export const folders = sqliteTable("folders", {
@@ -558,8 +558,8 @@ export const folders = sqliteTable("folders", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user_and_parent: index("by_user_and_parent").on(t.userId, t.parentId),
     by_parent: index("by_parent").on(t.parentId),
+    by_user_and_parent: index("by_user_and_parent").on(t.userId, t.parentId),
 }));
 
 export const followupSuggestions = sqliteTable("followupSuggestions", {
@@ -602,8 +602,8 @@ export const gatewayUsageDeductions = sqliteTable("gatewayUsageDeductions", {
     requestId: text("requestId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     by_requestId: index("by_requestId").on(t.requestId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const gdprAuditLog = sqliteTable("gdprAuditLog", {
@@ -615,9 +615,9 @@ export const gdprAuditLog = sqliteTable("gdprAuditLog", {
     timestamp: real("timestamp").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_timestamp: index("by_timestamp").on(t.timestamp),
-    by_action: index("by_action").on(t.action),
     by_user: index("by_user").on(t.userId),
+    by_action: index("by_action").on(t.action),
+    by_timestamp: index("by_timestamp").on(t.timestamp),
 }));
 
 export const gdprConsent = sqliteTable("gdprConsent", {
@@ -649,10 +649,10 @@ export const gdprRequests = sqliteTable("gdprRequests", {
     userId: text("userId").notNull(),
     workflowId: text("workflowId"),
 }, (t) => ({
-    by_status_and_expires: index("by_status_and_expires").on(t.status, t.expiresAt),
-    by_status_and_requestedAt: index("by_status_and_requestedAt").on(t.status, t.requestedAt),
-    by_expires: index("by_expires").on(t.expiresAt),
     by_user_and_type: index("by_user_and_type").on(t.userId, t.requestType),
+    by_expires: index("by_expires").on(t.expiresAt),
+    by_status_and_requestedAt: index("by_status_and_requestedAt").on(t.status, t.requestedAt),
+    by_status_and_expires: index("by_status_and_expires").on(t.status, t.expiresAt),
 }));
 
 export const goals = sqliteTable("goals", {
@@ -680,10 +680,10 @@ export const idempotencyClaims = sqliteTable("idempotencyClaims", {
     scope: text("scope").notNull(),
     userId: text("userId"),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_leaseExpiresAt: index("by_leaseExpiresAt").on(t.leaseExpiresAt),
-    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_scope_key: index("by_scope_key").on(t.scope, t.key),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_leaseExpiresAt: index("by_leaseExpiresAt").on(t.leaseExpiresAt),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const knowledgeChunks = sqliteTable("knowledgeChunks", {
@@ -697,9 +697,9 @@ export const knowledgeChunks = sqliteTable("knowledgeChunks", {
     tokenCount: real("tokenCount"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_embeddingId: index("by_embeddingId").on(t.embeddingId),
     by_fileId_chunkIndex: index("by_fileId_chunkIndex").on(t.fileId, t.chunkIndex),
+    by_embeddingId: index("by_embeddingId").on(t.embeddingId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const knowledgeCollectionLinks = sqliteTable("knowledgeCollectionLinks", {
@@ -711,10 +711,10 @@ export const knowledgeCollectionLinks = sqliteTable("knowledgeCollectionLinks", 
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_collectionId: index("by_collectionId").on(t.collectionId),
-    by_projectId: index("by_projectId").on(t.projectId),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_projectId: index("by_projectId").on(t.projectId),
+    by_collectionId: index("by_collectionId").on(t.collectionId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const knowledgeFiles = sqliteTable("knowledgeFiles", {
@@ -737,9 +737,9 @@ export const knowledgeFiles = sqliteTable("knowledgeFiles", {
     userId: text("userId").notNull(),
     vaultFileId: text("vaultFileId").references((): AnySQLiteColumn => files._id),
 }, (t) => ({
-    by_vaultFileId: index("by_vaultFileId").on(t.vaultFileId),
-    by_userId_collectionId: index("by_userId_collectionId").on(t.userId, t.collectionId),
     by_userId_status: index("by_userId_status").on(t.userId, t.status),
+    by_userId_collectionId: index("by_userId_collectionId").on(t.userId, t.collectionId),
+    by_vaultFileId: index("by_vaultFileId").on(t.vaultFileId),
 }));
 
 export const mcpServerGrants = sqliteTable("mcpServerGrants", {
@@ -781,11 +781,11 @@ export const memories = sqliteTable("memories", {
     userId: text("userId"),
     version: real("version"),
 }, (t) => ({
-    by_userId_botId: index("by_userId_botId").on(t.userId, t.botId, t.type),
-    by_userId_supersededBy: index("by_userId_supersededBy").on(t.userId, t.supersededBy),
-    by_userId_type: index("by_userId_type").on(t.userId, t.type),
-    embeddingId: index("embeddingId").on(t.embeddingId),
     threadId: index("threadId").on(t.threadId),
+    embeddingId: index("embeddingId").on(t.embeddingId),
+    by_userId_type: index("by_userId_type").on(t.userId, t.type),
+    by_userId_supersededBy: index("by_userId_supersededBy").on(t.userId, t.supersededBy),
+    by_userId_botId: index("by_userId_botId").on(t.userId, t.botId, t.type),
 }));
 
 export const memoryDigests = sqliteTable("memoryDigests", {
@@ -845,10 +845,10 @@ export const messages = sqliteTable("messages", {
     userId: text("userId"),
     warnings: text("warnings"),
 }, (t) => ({
-    embeddingId_threadId: index("embeddingId_threadId").on(t.embeddingId, t.threadId),
-    by_threadId_parentMessageId: index("by_threadId_parentMessageId").on(t.threadId, t.parentMessageId),
-    by_threadId_order_stepOrder: index("by_threadId_order_stepOrder").on(t.threadId, t.order, t.stepOrder),
     threadId_status_tool_order_stepOrder: index("threadId_status_tool_order_stepOrder").on(t.threadId, t.status, t.tool, t.order, t.stepOrder),
+    by_threadId_order_stepOrder: index("by_threadId_order_stepOrder").on(t.threadId, t.order, t.stepOrder),
+    by_threadId_parentMessageId: index("by_threadId_parentMessageId").on(t.threadId, t.parentMessageId),
+    embeddingId_threadId: index("embeddingId_threadId").on(t.embeddingId, t.threadId),
 }));
 
 export const messengerConnections = sqliteTable("messengerConnections", {
@@ -868,10 +868,10 @@ export const messengerConnections = sqliteTable("messengerConnections", {
     status: text("status", { mode: "json" }).$type<"active" | "paused" | "disconnected">().notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_status: index("by_status").on(t.status),
-    by_platform_and_userId: index("by_platform_and_userId").on(t.platform, t.platformUserId),
-    by_platform_and_chatId: index("by_platform_and_chatId").on(t.platform, t.platformChatId),
     by_user_and_platform: index("by_user_and_platform").on(t.userId, t.platform),
+    by_platform_and_chatId: index("by_platform_and_chatId").on(t.platform, t.platformChatId),
+    by_platform_and_userId: index("by_platform_and_userId").on(t.platform, t.platformUserId),
+    by_status: index("by_status").on(t.status),
 }));
 
 export const nodeExecutions = sqliteTable("nodeExecutions", {
@@ -905,10 +905,10 @@ export const notifications = sqliteTable("notifications", {
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
 }, (t) => ({
-    by_createdAt: index("by_createdAt").on(t.createdAt),
-    by_userId_dedupeKey: index("by_userId_dedupeKey").on(t.userId, t.dedupeKey),
-    by_userId_readAt_createdAt: index("by_userId_readAt_createdAt").on(t.userId, t.readAt, t.createdAt),
     by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
+    by_userId_readAt_createdAt: index("by_userId_readAt_createdAt").on(t.userId, t.readAt, t.createdAt),
+    by_userId_dedupeKey: index("by_userId_dedupeKey").on(t.userId, t.dedupeKey),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
 export const oauthStates = sqliteTable("oauthStates", {
@@ -922,9 +922,9 @@ export const oauthStates = sqliteTable("oauthStates", {
     target: text("target", { mode: "json" }).$type<{ kind: "connector"; slug: string } | { kind: "mcp"; name: string; trustedAuthorizationServerHosts?: Array<string>; url: string }>(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_state: index("by_state").on(t.state),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const outcomeEmails = sqliteTable("outcomeEmails", {
@@ -940,9 +940,9 @@ export const outcomeEmails = sqliteTable("outcomeEmails", {
     title: text("title").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_notificationId: index("by_notificationId").on(t.notificationId),
     by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
+    by_notificationId: index("by_notificationId").on(t.notificationId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const pageComments = sqliteTable("pageComments", {
@@ -962,8 +962,8 @@ export const pageComments = sqliteTable("pageComments", {
     status: text("status", { mode: "json" }).$type<"open" | "resolved">().notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
     by_page_and_created: index("by_page_and_created").on(t.pageId, t.createdAt),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const pageFavorites = sqliteTable("pageFavorites", {
@@ -973,8 +973,8 @@ export const pageFavorites = sqliteTable("pageFavorites", {
     pageId: text("pageId").references((): AnySQLiteColumn => pages._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_page: index("by_page").on(t.pageId),
     by_user_and_page: index("by_user_and_page").on(t.userId, t.pageId),
+    by_page: index("by_page").on(t.pageId),
 }));
 
 export const pagePresence = sqliteTable("pagePresence", {
@@ -988,9 +988,9 @@ export const pagePresence = sqliteTable("pagePresence", {
     userId: text("userId").notNull(),
     userName: text("userName").notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
-    by_session: index("by_session").on(t.sessionId),
     by_page: index("by_page").on(t.pageId),
+    by_session: index("by_session").on(t.sessionId),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const pages = sqliteTable("pages", {
@@ -1013,9 +1013,9 @@ export const pages = sqliteTable("pages", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
-    by_parent: index("by_parent").on(t.parentPageId),
     by_user: index("by_user").on(t.userId),
+    by_parent: index("by_parent").on(t.parentPageId),
+    by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
 }));
 
 export const pageVersions = sqliteTable("pageVersions", {
@@ -1030,8 +1030,8 @@ export const pageVersions = sqliteTable("pageVersions", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
     by_page_and_created: index("by_page_and_created").on(t.pageId, t.createdAt),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const persistentChunks = sqliteTable("persistentChunks", {
@@ -1072,13 +1072,13 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     threadId: text("threadId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_hostTurnId: index("by_hostTurnId").on(t.hostTurnId),
-    by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
-    by_threadId_messageId: index("by_threadId_messageId").on(t.threadId, t.messageId),
-    by_threadId: index("by_threadId").on(t.threadId),
-    by_userId_status: index("by_userId_status").on(t.userId, t.status),
-    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_status: index("by_status").on(t.status),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId_status: index("by_userId_status").on(t.userId, t.status),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_threadId_messageId: index("by_threadId_messageId").on(t.threadId, t.messageId),
+    by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
+    by_hostTurnId: index("by_hostTurnId").on(t.hostTurnId),
 }));
 
 export const playgroundApiKeys = sqliteTable("playgroundApiKeys", {
@@ -1104,8 +1104,8 @@ export const presentations = sqliteTable("presentations", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
     by_user_and_thread: index("by_user_and_thread").on(t.userId, t.threadId),
+    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
 }));
 
 export const presentationSlides = sqliteTable("presentationSlides", {
@@ -1128,8 +1128,8 @@ export const projectKnowledge = sqliteTable("projectKnowledge", {
     knowledgeFileId: text("knowledgeFileId").references((): AnySQLiteColumn => knowledgeFiles._id).notNull(),
     projectId: text("projectId").notNull(),
 }, (t) => ({
-    by_knowledgeFileId: index("by_knowledgeFileId").on(t.knowledgeFileId),
     by_projectId: index("by_projectId").on(t.projectId),
+    by_knowledgeFileId: index("by_knowledgeFileId").on(t.knowledgeFileId),
 }));
 
 export const pullRequestGuides = sqliteTable("pullRequestGuides", {
@@ -1154,8 +1154,8 @@ export const pullRequestGuides = sqliteTable("pullRequestGuides", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_threadId: index("by_threadId").on(t.threadId),
     by_user_and_pull: index("by_user_and_pull").on(t.userId, t.hostOrigin, t.repository, t.number),
+    by_threadId: index("by_threadId").on(t.threadId),
 }));
 
 export const pullRequestThreads = sqliteTable("pullRequestThreads", {
@@ -1172,8 +1172,8 @@ export const pullRequestThreads = sqliteTable("pullRequestThreads", {
     url: text("url").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user_and_threadId: index("by_user_and_threadId").on(t.userId, t.threadId),
     by_user_and_repository_number: index("by_user_and_repository_number").on(t.userId, t.repository, t.number),
+    by_user_and_threadId: index("by_user_and_threadId").on(t.userId, t.threadId),
 }));
 
 export const rateLimits = sqliteTable("rateLimits", {
@@ -1202,10 +1202,10 @@ export const requestedSecrets = sqliteTable("requestedSecrets", {
     use: text("use", { mode: "json" }).$type<{ header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string }>().notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_threadId: index("by_threadId").on(t.threadId),
-    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_ref: index("by_ref").on(t.ref),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const reviewDrafts = sqliteTable("reviewDrafts", {
@@ -1259,10 +1259,10 @@ export const sandboxSessions = sqliteTable("sandboxSessions", {
     timeoutMs: real("timeoutMs"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_status: index("by_status").on(t.status),
-    by_userId: index("by_userId").on(t.userId),
-    by_botId_status: index("by_botId_status").on(t.botId, t.status),
     by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
+    by_botId_status: index("by_botId_status").on(t.botId, t.status),
+    by_userId: index("by_userId").on(t.userId),
+    by_status: index("by_status").on(t.status),
 }));
 
 export const skillHistory = sqliteTable("skillHistory", {
@@ -1294,9 +1294,9 @@ export const skillInvocations = sqliteTable("skillInvocations", {
     trigger: text("trigger").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_skill_and_status: index("by_skill_and_status").on(t.skillId, t.status),
-    by_thread: index("by_thread").on(t.threadId),
     by_user: index("by_user").on(t.userId),
+    by_thread: index("by_thread").on(t.threadId),
+    by_skill_and_status: index("by_skill_and_status").on(t.skillId, t.status),
 }));
 
 export const streamDeltas = sqliteTable("streamDeltas", {
@@ -1325,8 +1325,8 @@ export const streamingMessages = sqliteTable("streamingMessages", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId"),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     threadId_state_order_stepOrder: index("threadId_state_order_stepOrder").on(t.threadId, t.stateKind, t.order, t.stepOrder),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const subAgentRuns = sqliteTable("subAgentRuns", {
@@ -1359,13 +1359,13 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_createdAt: index("by_createdAt").on(t.createdAt),
-    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
-    by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
-    by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
-    by_childThreadId_and_status: index("by_childThreadId_and_status").on(t.childThreadId, t.status),
-    by_childThreadId: index("by_childThreadId").on(t.childThreadId),
     by_parentThreadId_and_status: index("by_parentThreadId_and_status").on(t.parentThreadId, t.status),
+    by_childThreadId: index("by_childThreadId").on(t.childThreadId),
+    by_childThreadId_and_status: index("by_childThreadId_and_status").on(t.childThreadId, t.status),
+    by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
+    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
 export const systemPromptPresets = sqliteTable("systemPromptPresets", {
@@ -1399,9 +1399,9 @@ export const taskRuns = sqliteTable("taskRuns", {
     userId: text("userId").notNull(),
     verdict: text("verdict", { mode: "json" }).$type<{ pass: boolean; reasons: Array<string>; repairInstructions?: string }>(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
-    by_cycle_and_round: index("by_cycle_and_round").on(t.cycle, t.round),
     by_task_and_startedAt: index("by_task_and_startedAt").on(t.taskId, t.startedAt),
+    by_cycle_and_round: index("by_cycle_and_round").on(t.cycle, t.round),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const tasks = sqliteTable("tasks", {
@@ -1432,10 +1432,10 @@ export const tasks = sqliteTable("tasks", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
-    by_recurring_and_nextRunAt: index("by_recurring_and_nextRunAt").on(t.recurring, t.nextRunAt),
-    by_user_and_goal: index("by_user_and_goal").on(t.userId, t.goalId),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
+    by_user_and_goal: index("by_user_and_goal").on(t.userId, t.goalId),
+    by_recurring_and_nextRunAt: index("by_recurring_and_nextRunAt").on(t.recurring, t.nextRunAt),
+    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
 }));
 
 export const temporaryThreads = sqliteTable("temporaryThreads", {
@@ -1447,9 +1447,9 @@ export const temporaryThreads = sqliteTable("temporaryThreads", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId"),
 }, (t) => ({
-    by_userId_expiresAt: index("by_userId_expiresAt").on(t.userId, t.expiresAt),
-    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_thread: index("by_thread").on(t.threadId),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId_expiresAt: index("by_userId_expiresAt").on(t.userId, t.expiresAt),
 }));
 
 export const threadContextSummaries = sqliteTable("threadContextSummaries", {
@@ -1463,8 +1463,8 @@ export const threadContextSummaries = sqliteTable("threadContextSummaries", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const threadGoals = sqliteTable("threadGoals", {
@@ -1489,10 +1489,10 @@ export const threadGoals = sqliteTable("threadGoals", {
     userId: text("userId").notNull(),
     verdicts: text("verdicts", { mode: "json" }).$type<Array<{ at: number; met: boolean; order?: number; reason: string; round: number }>>().notNull(),
 }, (t) => ({
-    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
-    by_user: index("by_user").on(t.userId),
-    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
     by_thread: index("by_thread").on(t.threadId),
+    by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
+    by_user: index("by_user").on(t.userId),
+    by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
 }));
 
 export const threadKnowledge = sqliteTable("threadKnowledge", {
@@ -1502,8 +1502,8 @@ export const threadKnowledge = sqliteTable("threadKnowledge", {
     knowledgeFileId: text("knowledgeFileId").references((): AnySQLiteColumn => knowledgeFiles._id).notNull(),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
 }, (t) => ({
-    by_knowledgeFileId: index("by_knowledgeFileId").on(t.knowledgeFileId),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_knowledgeFileId: index("by_knowledgeFileId").on(t.knowledgeFileId),
 }));
 
 export const threadPasscodes = sqliteTable("threadPasscodes", {
@@ -1521,8 +1521,8 @@ export const threadPasscodes = sqliteTable("threadPasscodes", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     by_thread: index("by_thread").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const threadPins = sqliteTable("threadPins", {
@@ -1537,8 +1537,8 @@ export const threadPins = sqliteTable("threadPins", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_user_and_thread: index("by_user_and_thread").on(t.userId, t.threadId),
     by_thread: index("by_thread").on(t.threadId),
+    by_user_and_thread: index("by_user_and_thread").on(t.userId, t.threadId),
 }));
 
 export const threadRelationships = sqliteTable("threadRelationships", {
@@ -1551,9 +1551,9 @@ export const threadRelationships = sqliteTable("threadRelationships", {
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     userId: text("userId"),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_parent_and_thread: index("by_parent_and_thread").on(t.parentThreadId, t.threadId),
     by_thread: index("by_thread").on(t.threadId),
+    by_parent_and_thread: index("by_parent_and_thread").on(t.parentThreadId, t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const threads = sqliteTable("threads", {
@@ -1609,19 +1609,19 @@ export const threads = sqliteTable("threads", {
     userId: text("userId"),
     workerPolicy: text("workerPolicy", { mode: "json" }).$type<{ allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number }>(),
 }, (t) => ({
-    by_user_and_organization_and_updatedAt: index("by_user_and_organization_and_updatedAt").on(t.userId, t.organizationId, t.updatedAt),
-    by_user_and_updatedAt: index("by_user_and_updatedAt").on(t.userId, t.updatedAt),
-    by_user_and_order: index("by_user_and_order").on(t.userId, t.order),
-    by_userId_externalThreadId: index("by_userId_externalThreadId").on(t.userId, t.externalThreadId),
-    by_user_and_team: index("by_user_and_team").on(t.userId, t.teamId),
-    by_user_and_organization: index("by_user_and_organization").on(t.userId, t.organizationId),
-    by_projectId: index("by_projectId").on(t.projectId),
-    by_user_and_pinned_deleted: index("by_user_and_pinned_deleted").on(t.userId, t.deleted, t.pinnedAt),
-    by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
-    by_user_and_pinned: index("by_user_and_pinned").on(t.userId, t.pinnedAt),
-    by_user_and_status_createdAt: index("by_user_and_status_createdAt").on(t.userId, t.status, t.deleted, t.createdAt),
-    by_user_and_status: index("by_user_and_status").on(t.userId, t.status, t.deleted),
     by_userId: index("by_userId").on(t.userId),
+    by_user_and_status: index("by_user_and_status").on(t.userId, t.status, t.deleted),
+    by_user_and_status_createdAt: index("by_user_and_status_createdAt").on(t.userId, t.status, t.deleted, t.createdAt),
+    by_user_and_pinned: index("by_user_and_pinned").on(t.userId, t.pinnedAt),
+    by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
+    by_user_and_pinned_deleted: index("by_user_and_pinned_deleted").on(t.userId, t.deleted, t.pinnedAt),
+    by_projectId: index("by_projectId").on(t.projectId),
+    by_user_and_organization: index("by_user_and_organization").on(t.userId, t.organizationId),
+    by_user_and_team: index("by_user_and_team").on(t.userId, t.teamId),
+    by_userId_externalThreadId: index("by_userId_externalThreadId").on(t.userId, t.externalThreadId),
+    by_user_and_order: index("by_user_and_order").on(t.userId, t.order),
+    by_user_and_updatedAt: index("by_user_and_updatedAt").on(t.userId, t.updatedAt),
+    by_user_and_organization_and_updatedAt: index("by_user_and_organization_and_updatedAt").on(t.userId, t.organizationId, t.updatedAt),
 }));
 
 export const threadTags = sqliteTable("threadTags", {
@@ -1645,8 +1645,8 @@ export const threadVariables = sqliteTable("threadVariables", {
     userId: text("userId").notNull(),
     variables: text("variables", { mode: "json" }).$type<Array<{ name: string; value: string }>>().notNull(),
 }, (t) => ({
-    by_user: index("by_user").on(t.userId),
     by_thread: index("by_thread").on(t.threadId),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
@@ -1662,11 +1662,11 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     threadId: text("threadId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId_status_createdAt: index("by_userId_status_createdAt").on(t.userId, t.status, t.createdAt),
-    by_status_resolvedAt: index("by_status_resolvedAt").on(t.status, t.resolvedAt),
-    by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
-    by_threadId: index("by_threadId").on(t.threadId),
     by_approvalId: index("by_approvalId").on(t.approvalId),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
+    by_status_resolvedAt: index("by_status_resolvedAt").on(t.status, t.resolvedAt),
+    by_userId_status_createdAt: index("by_userId_status_createdAt").on(t.userId, t.status, t.createdAt),
 }));
 
 export const triggerExecutions = sqliteTable("triggerExecutions", {
@@ -1682,8 +1682,8 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     threadId: text("threadId"),
     triggerId: text("triggerId").references((): AnySQLiteColumn => triggers._id).notNull(),
 }, (t) => ({
-    by_triggerId_status: index("by_triggerId_status").on(t.triggerId, t.status),
     by_triggerId_startedAt: index("by_triggerId_startedAt").on(t.triggerId, t.startedAt),
+    by_triggerId_status: index("by_triggerId_status").on(t.triggerId, t.status),
 }));
 
 export const triggers = sqliteTable("triggers", {
@@ -1724,11 +1724,11 @@ export const triggers = sqliteTable("triggers", {
     webhookSecret: text("webhookSecret"),
     webhookSignatureScheme: text("webhookSignatureScheme", { mode: "json" }).$type<"timestamped" | "native" | "gitlab-token">(),
 }, (t) => ({
-    by_type_enabled_nextTriggerAt: index("by_type_enabled_nextTriggerAt").on(t.type, t.enabled, t.nextTriggerAt),
-    by_userId_type_enabled: index("by_userId_type_enabled").on(t.userId, t.type, t.enabled),
-    by_enabled_nextTriggerAt: index("by_enabled_nextTriggerAt").on(t.enabled, t.nextTriggerAt),
-    by_type_enabled: index("by_type_enabled").on(t.type, t.enabled),
     by_userId_organizationId: index("by_userId_organizationId").on(t.userId, t.organizationId),
+    by_type_enabled: index("by_type_enabled").on(t.type, t.enabled),
+    by_enabled_nextTriggerAt: index("by_enabled_nextTriggerAt").on(t.enabled, t.nextTriggerAt),
+    by_userId_type_enabled: index("by_userId_type_enabled").on(t.userId, t.type, t.enabled),
+    by_type_enabled_nextTriggerAt: index("by_type_enabled_nextTriggerAt").on(t.type, t.enabled, t.nextTriggerAt),
 }));
 
 export const usageBackfill = sqliteTable("usageBackfill", {
@@ -1761,9 +1761,9 @@ export const usageDaily = sqliteTable("usageDaily", {
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_date: index("by_date").on(t.date),
-    by_user_date: index("by_user_date").on(t.userId, t.date),
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
+    by_user_date: index("by_user_date").on(t.userId, t.date),
+    by_date: index("by_date").on(t.date),
 }));
 
 export const usageReplies = sqliteTable("usageReplies", {
@@ -1773,8 +1773,8 @@ export const usageReplies = sqliteTable("usageReplies", {
     replyKey: text("replyKey").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_recordedAt: index("by_recordedAt").on(t.recordedAt),
     by_user_reply: index("by_user_reply").on(t.userId, t.replyKey),
+    by_recordedAt: index("by_recordedAt").on(t.recordedAt),
 }));
 
 export const userConnectors = sqliteTable("userConnectors", {
@@ -1796,10 +1796,10 @@ export const userConnectors = sqliteTable("userConnectors", {
     tokenExpiresAt: real("tokenExpiresAt"),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_connectorDefinitionId: index("by_connectorDefinitionId").on(t.connectorDefinitionId),
-    by_status: index("by_status").on(t.status),
-    by_organization: index("by_organization").on(t.organizationId),
     by_user_and_definition: index("by_user_and_definition").on(t.userId, t.connectorDefinitionId),
+    by_organization: index("by_organization").on(t.organizationId),
+    by_status: index("by_status").on(t.status),
+    by_connectorDefinitionId: index("by_connectorDefinitionId").on(t.connectorDefinitionId),
 }));
 
 export const userSettings = sqliteTable("userSettings", {
@@ -1861,9 +1861,9 @@ export const userSkills = sqliteTable("userSkills", {
     skillId: text("skillId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_skillId: index("by_skillId").on(t.skillId),
-    by_user_and_enabled: index("by_user_and_enabled").on(t.userId, t.enabled),
     by_user_and_skill: index("by_user_and_skill").on(t.userId, t.skillId),
+    by_user_and_enabled: index("by_user_and_enabled").on(t.userId, t.enabled),
+    by_skillId: index("by_skillId").on(t.skillId),
 }));
 
 export const watchedRepositories = sqliteTable("watchedRepositories", {
@@ -1885,8 +1885,8 @@ export const watchedRepositories = sqliteTable("watchedRepositories", {
     webhookSecret: text("webhookSecret"),
     webhookSeenAt: real("webhookSeenAt").notNull(),
 }, (t) => ({
-    by_user_and_repository: index("by_user_and_repository").on(t.userId, t.hostOrigin, t.repository),
     by_nextPollAt: index("by_nextPollAt").on(t.nextPollAt),
+    by_user_and_repository: index("by_user_and_repository").on(t.userId, t.hostOrigin, t.repository),
 }));
 
 export const workflowExecutions = sqliteTable("workflowExecutions", {
@@ -1901,9 +1901,9 @@ export const workflowExecutions = sqliteTable("workflowExecutions", {
     userId: text("userId").notNull(),
     workflowSnapshot: text("workflowSnapshot"),
 }, (t) => ({
-    by_project_and_status: index("by_project_and_status").on(t.projectId, t.status),
-    by_status: index("by_status").on(t.status),
     by_user: index("by_user").on(t.userId),
+    by_status: index("by_status").on(t.status),
+    by_project_and_status: index("by_project_and_status").on(t.projectId, t.status),
 }));
 
 export const workflowPresence = sqliteTable("workflowPresence", {
@@ -1920,10 +1920,10 @@ export const workflowPresence = sqliteTable("workflowPresence", {
     userName: text("userName").notNull(),
     viewportCenter: text("viewportCenter", { mode: "json" }).$type<{ x: number; y: number; zoom: number } | null>(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
-    by_heartbeat: index("by_heartbeat").on(t.lastHeartbeat),
-    by_session: index("by_session").on(t.sessionId),
     by_project_and_user: index("by_project_and_user").on(t.projectId, t.userId),
+    by_session: index("by_session").on(t.sessionId),
+    by_heartbeat: index("by_heartbeat").on(t.lastHeartbeat),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const workflowVersions = sqliteTable("workflowVersions", {
@@ -1934,8 +1934,8 @@ export const workflowVersions = sqliteTable("workflowVersions", {
     projectId: text("projectId").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
-    by_userId: index("by_userId").on(t.userId),
     by_project: index("by_project").on(t.projectId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const payment_customers = sqliteTable("payment_customers", {
@@ -1975,6 +1975,7 @@ export const payment_sessions = sqliteTable("payment_sessions", {
     refundedMinor: real("refundedMinor").notNull(),
     state: text("state").notNull(),
     subscriptionId: text("subscriptionId"),
+    revision: real("revision"),
     updatedAt: real("updatedAt").notNull(),
 }, (t) => ({
     by_provider_session: uniqueIndex("by_provider_session").on(t.provider, t.providerSessionId),
@@ -1997,10 +1998,12 @@ export const payment_subscriptions = sqliteTable("payment_subscriptions", {
     quantity: real("quantity").notNull(),
     referenceId: text("referenceId").notNull(),
     state: text("state").notNull(),
+    revision: real("revision"),
     updatedAt: real("updatedAt").notNull(),
 }, (t) => ({
     by_provider_subscription: uniqueIndex("by_provider_subscription").on(t.provider, t.providerSubscriptionId),
     by_reference: index("by_reference").on(t.referenceId),
+    by_state: index("by_state").on(t.state),
 }));
 
 export const payment_usageEvents = sqliteTable("payment_usageEvents", {
