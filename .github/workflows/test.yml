@@ -358,7 +358,14 @@ jobs:
             - name: "Resolve the Playwright version"
               id: "playwright"
               shell: "bash"
-              run: 'echo "version=$(pnpm --filter @neore/web exec playwright --version | awk ''{print $2}'')" >> "$GITHUB_OUTPUT"'
+              # Captured first: a failing `playwright --version` must fail the step, not key the cache on an empty version.
+              run: |
+                  version="$(pnpm --filter @neore/web exec playwright --version | awk '{print $2}')"
+                  if [ -z "${version}" ]; then
+                      echo "could not read the Playwright version" >&2
+                      exit 1
+                  fi
+                  echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
             # The browser download is the slow half of `playwright install --with-deps`;
             # the system libraries live outside the cache and are always installed.
