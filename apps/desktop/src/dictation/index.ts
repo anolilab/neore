@@ -52,6 +52,8 @@ export interface DictationProbe {
     helperPid: () => number | undefined;
     openSettings?: () => void;
     outcome: () => string | undefined;
+    /** The shortcut's state as the main process sees it, so a test that expects it held can say why it is not. */
+    shortcut: () => { held: boolean; platform: string; refused: boolean; registered: boolean; wanted: boolean };
     state: () => string;
     /** Replaces the recogniser and its model with these, skipping the model store and the OS microphone check (a CI runner has no microphone, and Windows reports it denied). */
     useTestEngine?: (engine: { args: string[]; command: string; modelPath: string }) => void;
@@ -133,6 +135,13 @@ export const createDictation = (options: DictationOptions): Dictation => {
         audioBytes: 0,
         helperPid: () => recognizer?.pid,
         outcome: () => controller?.lastOutcome(),
+        shortcut: () => ({
+            held: shortcutHeld,
+            platform: `${process.platform}-${process.arch}`,
+            refused: shortcutRefused,
+            registered: globalShortcut.isRegistered(DICTATION_SHORTCUT),
+            wanted: settings.get().enabled && hasHelper(),
+        }),
         state: () => controller?.state() ?? "idle",
     };
 
