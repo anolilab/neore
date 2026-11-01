@@ -2178,7 +2178,7 @@ export const schema = defineSchema({
         ref: v.string(),
         // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
         replyKey: v.optional(v.string()),
-        status: v.union(v.literal("saved"), v.literal("used")),
+        status: v.union(v.literal("saved"), v.literal("used"), v.literal("abandoned")),
         threadId: v.string(),
         use: v.union(
             v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),

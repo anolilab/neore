@@ -1360,7 +1360,7 @@ export interface Doc_requestedSecrets {
     label: string;
     ref: string;
     replyKey?: string;
-    status: "saved" | "used";
+    status: "saved" | "used" | "abandoned";
     threadId: string;
     use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;
@@ -4329,7 +4329,7 @@ export interface Insert_requestedSecrets {
     label: string;
     ref: string;
     replyKey?: string;
-    status: "saved" | "used";
+    status: "saved" | "used" | "abandoned";
     threadId: string;
     use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;

@@ -260,6 +260,32 @@ describe("the secret request card", () => {
         expect(screen.queryByText(SERVERS_NOT_LOADED)).toBeNull();
     });
 
+    it("closes the card, with no form, when the server says the conversation moved on", async () => {
+        answer.mockRejectedValueOnce(Object.assign(new Error("closed"), { data: { code: "TOOL_REQUEST_ABANDONED" } }));
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        expect(await screen.findByText("Closed — the conversation moved on. Ask again in the chat.")).toBeTruthy();
+        expect(screen.queryByPlaceholderText("Paste it here — it is not shown in the chat")).toBeNull();
+    });
+
+    it("stops offering Save when a refresh of the saved servers fails after an earlier good read", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+
+        const client = mountCard(header);
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+
+        readFails.current = true;
+        await client.refetchQueries({ queryKey: ["getAIUserPreferences"] }).catch(() => undefined);
+
+        expect(await screen.findByText(SERVERS_NOT_LOADED)).toBeTruthy();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByRole("button", { name: RETRY })).toBeTruthy();
+    });
+
     it("shows a visible focus ring on the card, where focus lands after a send", () => {
         mountCard({ kind: "provider_key", provider: "openai" });
 

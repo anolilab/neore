@@ -124,12 +124,51 @@ describe("a paused reply that is abandoned", () => {
     });
 
     it("keeps it while a claimed live reply is stopped through its own run, which drops its references when it ends", async () => {
+        const live = String(await insertStream("streaming", Date.now()));
+        const ref = await storeSecret(live);
+
+        await insertSnapshot("pending", live);
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        expect(await holdsValue(ref)).toBe(true);
+    });
+
+    it("drops a stopped paused reply's references although another reply is live", async () => {
+        const paused = String(await insertStream("done", Date.now(), "prompt-A"));
+        const live = String(await insertStream("streaming", Date.now(), "prompt-B"));
+        const stopped = await storeSecret(paused);
+        const running = await storeSecret(live);
+
+        await insertSnapshot("pending", paused, paused);
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { messageId: "prompt-A", threadId }));
+
+        expect(await holdsValue(stopped)).toBe(false);
+        expect(await holdsValue(running)).toBe(true);
+    });
+
+    it("keeps a live continuation's references when it is past the first page of live streams", async () => {
         const ref = await storeSecret("stream-A");
 
         await insertSnapshot("pending", "stream-A");
-        await insertStream("streaming", Date.now());
 
-        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+        for (let index = 0; index < 55; index += 1) {
+            await insertStream("streaming", Date.now());
+        }
+
+        const continuation = await insertStream("streaming", Date.now());
+
+        await insertSnapshot("approved", "stream-A", continuation);
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(createStreamWithMessage, {
+                    messageId: "m2",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
 
         expect(await holdsValue(ref)).toBe(true);
     });
@@ -211,5 +250,31 @@ describe("a paused reply that is abandoned", () => {
 
         expect(await holdsValue(stopped)).toBe(false);
         expect(await holdsValue(paused)).toBe(true);
+    });
+
+    it("denies the abandoned pause's requests and reads a late spend as abandoned", async () => {
+        const ref = await storeSecret("stream-A");
+
+        await insertSnapshot("pending", "stream-A");
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(createStreamWithMessage, {
+                    messageId: "m2",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ resolvedBy: "abandoned", status: "denied" });
+
+        const { takeRequestedSecret } = await import("../../lib/secret-requests");
+        const spend = await run(
+            async (ctx) => await takeRequestedSecret(ctx, { kind: "provider_key", now: Date.now(), ref, startedBy: OWNER, threadId, userId: OWNER }),
+        );
+
+        expect(spend).toStrictEqual({ ok: false, status: "abandoned" });
     });
 });

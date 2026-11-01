@@ -20301,61 +20301,61 @@
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 82,
+      "line": 83,
       "reason": "\"storeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 115,
+      "line": 116,
       "reason": "\"takeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 170,
+      "line": 175,
       "reason": "\"replyKeyOfStream\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 190,
+      "line": 195,
       "reason": "\"discardThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 214,
+      "line": 224,
       "reason": "\"discardPausedThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 250,
+      "line": 282,
       "reason": "\"discardPausedThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 265,
+      "line": 297,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 271,
+      "line": 303,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 279,
+      "line": 311,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 285,
+      "line": 317,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
@@ -20397,13 +20397,13 @@
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "read",
-      "line": 152,
+      "line": 158,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "write",
-      "line": 179,
+      "line": 192,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
