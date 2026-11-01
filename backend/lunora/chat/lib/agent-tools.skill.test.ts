@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActionCtx } from "../../_generated/server";
 import { buildAgentTools } from "./agent-tools";
+import { mcpTrustId } from "./low-risk-trust";
 
 const fakeTool = (name: string) => ({ description: name, execute: async () => name, inputSchema: {} }) as unknown as ToolSet[string];
 
@@ -231,5 +232,45 @@ describe("buildAgentTools connector tools", () => {
         await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", snapshot: { mcpServerNames: ["Notion"], toolNames: [] }, userId: "user" });
 
         expect(requestedServers.map((server) => server.name)).toStrictEqual(["Notion"]);
+    });
+});
+
+describe("buildAgentTools quick-check trust", () => {
+    const URL = "https://docs.example/mcp";
+
+    beforeEach(() => {
+        mcpTools = {
+            descriptors: new Map([["mcp_docs__search_docs", { serverName: "docs", toolName: "search_docs" }]]),
+            tools: { mcp_docs__search_docs: fakeTool("search") },
+        };
+    });
+
+    const needsApproval = async (trusted: string[], url = URL): Promise<unknown> => {
+        const runQuery = vi.fn();
+
+        runQuery
+            .mockResolvedValueOnce([{ enabled: true, name: "docs", protocol: "http", url }])
+            .mockResolvedValueOnce(overrides)
+            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(trusted);
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            searchMode: "web",
+            threadId: "thread",
+            userId: "user",
+        });
+
+        return (tools["mcp_docs__search_docs"] as { needsApproval?: unknown }).needsApproval;
+    };
+
+    it("puts only a trusted server's read tool to the quick check", async () => {
+        expect(typeof (await needsApproval([mcpTrustId("docs", URL)]))).toBe("function");
+        expect(await needsApproval([])).toBe(true);
+    });
+
+    it("loses the trust when the server's url changed", async () => {
+        expect(await needsApproval([mcpTrustId("docs", URL)], "https://elsewhere.example/mcp")).toBe(true);
     });
 });

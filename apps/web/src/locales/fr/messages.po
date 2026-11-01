@@ -135,7 +135,7 @@ msgid "(old side)"
 msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:250
-#: src/features/settings/connectors/connector-card.tsx:199
+#: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "(s’ouvre dans un nouvel onglet)"
 
@@ -457,7 +457,7 @@ msgid "{0} conversations imported from {1}"
 msgstr "{0} conversations importées depuis {1}"
 
 #. placeholder {0}: server.headers.length
-#: src/features/settings/components/chat/mcp/server-list.tsx:104
+#: src/features/settings/components/chat/mcp/server-list.tsx:105
 msgid "{0} custom headers"
 msgstr "{0} en-têtes personnalisés"
 
@@ -1793,7 +1793,7 @@ msgid "About"
 msgstr "À propos"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:197
+#: src/features/settings/connectors/connector-card.tsx:200
 msgid "About {0}"
 msgstr "À propos de {0}"
 
@@ -3156,7 +3156,7 @@ msgstr "Amsterdam"
 msgid "An access key id starts with AKIA and is 20 characters"
 msgstr "Un ID de clé d'accès commence par AKIA et compte 20 caractères"
 
-#: src/features/settings/connectors/connector-card.tsx:134
+#: src/features/settings/connectors/connector-card.tsx:135
 msgid "An administrator needs to register an OAuth app for this connector before it can be used."
 msgstr "Un administrateur doit enregistrer une application OAuth pour ce connecteur avant qu’il puisse être utilisé."
 
@@ -4344,8 +4344,12 @@ msgid "Before"
 msgstr "Avant"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:246
-msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#~ msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+#~ msgstr ""
 
 #: src/features/workflow/templates/index.ts:126
 msgid "beginner"
@@ -4432,7 +4436,7 @@ msgstr "Photoréalisme inégalé dans sa catégorie"
 msgid "Best-in-class prompt-based image editing"
 msgstr "La meilleure retouche d’image par prompt de sa catégorie"
 
-#: src/features/settings/connectors/connector-card.tsx:103
+#: src/features/settings/connectors/connector-card.tsx:104
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:161
 msgid "Beta"
 msgstr "Bêta"
@@ -6871,7 +6875,7 @@ msgid "Connect"
 msgstr "Connecter"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:168
+#: src/features/settings/connectors/connector-card.tsx:171
 msgid "Connect {0}"
 msgstr "Connecter {0}"
 
@@ -7001,7 +7005,7 @@ msgid "Connect your messenger platforms to chat with AI directly from Telegram, 
 msgstr "Connectez vos plateformes de messagerie pour discuter avec l’IA directement depuis Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams ou WeChat. Les messages apparaissent dans votre liste de conversations avec le tag de la plateforme."
 
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
-#: src/features/settings/connectors/connector-card.tsx:73
+#: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
 #: src/features/skills/components/skill-builder-connector-status.tsx:36
 msgid "Connected"
@@ -7030,7 +7034,7 @@ msgid "Connected Accounts"
 msgstr "Comptes connectés"
 
 #. placeholder {0}: connection.accountLabel
-#: src/features/settings/connectors/connector-card.tsx:126
+#: src/features/settings/connectors/connector-card.tsx:127
 msgid "Connected to {0}"
 msgstr "Connecté à {0}"
 
@@ -8002,7 +8006,11 @@ msgid "country"
 msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:254
-msgid "Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to."
+#~ msgid "Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr ""
 
 #: src/features/marketing/data/models-data.ts:239
@@ -9046,7 +9054,7 @@ msgstr "Supprimer « {pendingDeleteTitle} » ?"
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
 #: src/features/settings/components/chat/bots-settings.tsx:175
-#: src/features/settings/components/chat/mcp/server-list.tsx:170
+#: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
 msgstr "Supprimer {0}"
@@ -9735,18 +9743,18 @@ msgid "Discard the review"
 msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:130
-#: src/features/settings/connectors/connector-card.tsx:186
-#: src/features/settings/connectors/connector-card.tsx:206
+#: src/features/settings/connectors/connector-card.tsx:189
+#: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
 msgstr "Déconnecter"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:180
+#: src/features/settings/connectors/connector-card.tsx:183
 msgid "Disconnect {0}"
 msgstr "Déconnecter {0}"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:214
+#: src/features/settings/connectors/connector-card.tsx:217
 msgid "Disconnect {0}?"
 msgstr "Déconnecter {0} ?"
 
@@ -11304,7 +11312,7 @@ msgstr "% err."
 #: src/features/evals/components/model-comparison.tsx:83
 #: src/features/evals/components/run-detail.tsx:32
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
-#: src/features/settings/connectors/connector-card.tsx:74
+#: src/features/settings/connectors/connector-card.tsx:75
 #: src/features/slides/components/presentation-viewer.tsx:267
 #: src/features/tasks/components/task-detail-dialog.tsx:133
 msgid "Error"
@@ -11750,7 +11758,7 @@ msgstr "expiré"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
 #: src/features/devices/components/devices-settings.tsx:244
-#: src/features/settings/connectors/connector-card.tsx:75
+#: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "Expiré"
 
@@ -12709,6 +12717,10 @@ msgstr "Échec de la mise à jour du cas"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:310
 msgid "Failed to update the quick check"
+msgstr ""
+
+#: src/features/settings/components/chat/trust-server-switch.tsx:40
+msgid "Failed to update the trusted servers"
 msgstr ""
 
 #: src/features/chat/sharing/thread-share-button.tsx:146
@@ -14767,7 +14779,7 @@ msgstr "Carte en dégradé"
 msgid "Grant the im:message and im:message:send_as_bot permissions, then under Events & Callbacks set an Encrypt Key and note the Verification Token."
 msgstr "Accordez les autorisations im:message et im:message:send_as_bot, puis sous Events & Callbacks définissez une Encrypt Key et notez le Verification Token."
 
-#: src/features/settings/connectors/connector-card.tsx:142
+#: src/features/settings/connectors/connector-card.tsx:143
 msgid "Granted permissions"
 msgstr "Autorisations accordées"
 
@@ -20442,7 +20454,7 @@ msgstr "Aucun nœud correspondant"
 msgid "No matching variable found."
 msgstr "Aucune variable correspondante trouvée."
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:49
+#: src/features/settings/components/chat/mcp/server-list.tsx:50
 msgid "No MCP servers configured. Add a server to extend AI capabilities."
 msgstr "Aucun serveur MCP configuré. Ajoutez un serveur pour étendre les capacités de l’IA."
 
@@ -20907,8 +20919,8 @@ msgid "not configured"
 msgstr "non configuré"
 
 #: src/features/settings/components/privacy/data-access.tsx:59
-#: src/features/settings/connectors/connector-card.tsx:76
-#: src/features/settings/connectors/connector-card.tsx:174
+#: src/features/settings/connectors/connector-card.tsx:77
+#: src/features/settings/connectors/connector-card.tsx:177
 msgid "Not configured"
 msgstr "Non configuré"
 
@@ -23314,7 +23326,7 @@ msgid "premium"
 msgstr "premium"
 
 #: src/features/settings/components/chat/models-settings.tsx:44
-#: src/features/settings/connectors/connector-card.tsx:108
+#: src/features/settings/connectors/connector-card.tsx:109
 msgid "Premium"
 msgstr "Premium"
 
@@ -24715,7 +24727,7 @@ msgid "Reconnect"
 msgstr "Reconnecter"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:168
+#: src/features/settings/connectors/connector-card.tsx:171
 msgid "Reconnect {0}"
 msgstr "Reconnecter {0}"
 
@@ -25462,7 +25474,7 @@ msgstr "Validation des requêtes, filtrage du contenu et authentification HMAC-S
 msgid "Request volume, cost, and error count per model"
 msgstr "Volume de requêtes, coût et nombre d’erreurs par modèle"
 
-#: src/features/settings/connectors/connector-card.tsx:142
+#: src/features/settings/connectors/connector-card.tsx:143
 msgid "Requested permissions"
 msgstr "Autorisations demandées"
 
@@ -27686,7 +27698,7 @@ msgstr "Barre latérale droite"
 #: src/features/auth/components/auth/auth-card.tsx:472
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
-#: src/features/settings/components/chat/mcp/server-list.tsx:126
+#: src/features/settings/components/chat/mcp/server-list.tsx:127
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Se connecter"
@@ -27764,7 +27776,7 @@ msgid "Sign Out"
 msgstr "Se déconnecter"
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:132
+#: src/features/settings/components/chat/mcp/server-list.tsx:133
 msgid "Sign out of {0}"
 msgstr "Se déconnecter de {0}"
 
@@ -27793,7 +27805,7 @@ msgstr "Inscription réussie"
 msgid "Sign up to unlock all models"
 msgstr "Inscrivez-vous pour débloquer tous les modèles"
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:97
+#: src/features/settings/components/chat/mcp/server-list.tsx:98
 msgid "Sign-in expired"
 msgstr "Connexion expirée"
 
@@ -27805,12 +27817,12 @@ msgstr "Échec de la déconnexion. Veuillez réessayer."
 msgid "Signature"
 msgstr ""
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:92
+#: src/features/settings/components/chat/mcp/server-list.tsx:93
 msgid "Signed in"
 msgstr "Connecté"
 
 #. placeholder {0}: ownSignIn.accountLabel
-#: src/features/settings/components/chat/mcp/server-list.tsx:92
+#: src/features/settings/components/chat/mcp/server-list.tsx:93
 msgid "Signed in · {0}"
 msgstr "Connecté · {0}"
 
@@ -30060,8 +30072,8 @@ msgid "terms"
 msgstr ""
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:634
-#: src/features/settings/components/chat/mcp/server-list.tsx:146
-#: src/features/settings/components/chat/mcp/server-list.tsx:161
+#: src/features/settings/components/chat/mcp/server-list.tsx:147
+#: src/features/settings/components/chat/mcp/server-list.tsx:162
 #: src/features/settings/components/chat/native-providers-settings.tsx:704
 msgid "Test connection"
 msgstr "Tester la connexion"
@@ -30366,7 +30378,7 @@ msgid "The AI learns from your conversations to personalize its responses, and r
 msgstr "L’IA apprend de vos conversations pour personnaliser ses réponses, et revient chaque nuit sur ce qu’elle a appris. Tout ce dont elle se souvient est listé ici — modifiez, reformulez, épinglez ou supprimez n’importe quel élément."
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:207
+#: src/features/settings/connectors/connector-card.tsx:210
 msgid "The AI will lose access to {0}, and the access token is revoked at the provider where possible."
 msgstr "L’IA perdra l’accès à {0}, et le jeton d’accès sera révoqué auprès du fournisseur lorsque c’est possible."
 
@@ -30755,6 +30767,10 @@ msgstr "Le prompt devient l’entrée du cas et cette réponse la réponse atten
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "Le fournisseur vous facture directement ces requêtes. Lorsque nous connaissons le prix du modèle, les frais de plateforme habituels pour vos propres clés sont prélevés en crédits."
 
+#: src/features/settings/components/chat/trust-server-switch.tsx:53
+msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:23
 msgid "The refinement did not change any field."
 msgstr "L’affinage n’a modifié aucun champ."
@@ -31108,7 +31124,7 @@ msgstr "Cet ordinateur est associé à un autre compte."
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Cet ordinateur est associé. Choisissez les dossiers à partager dans l'application de bureau."
 
-#: src/features/settings/connectors/connector-card.tsx:130
+#: src/features/settings/connectors/connector-card.tsx:131
 msgid "This connection needs to be renewed."
 msgstr "Cette connexion doit être renouvelée."
 
@@ -31668,7 +31684,7 @@ msgid "To"
 msgstr ""
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/features/settings/components/chat/mcp/server-list.tsx:128
 msgid "to {0}"
 msgstr "à {0}"
 
@@ -31688,7 +31704,7 @@ msgid "toggle"
 msgstr ""
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:165
+#: src/features/settings/components/chat/mcp/server-list.tsx:166
 msgid "Toggle {0}"
 msgstr "Activer/désactiver {0}"
 
@@ -32151,6 +32167,10 @@ msgstr "Découpage… {0} %"
 #: src/features/workflow/components/nodes/branch-node.tsx:20
 msgid "True"
 msgstr "Vrai"
+
+#: src/features/settings/components/chat/trust-server-switch.tsx:51
+msgid "Trust for auto-approval"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:328
 msgid "Trust this device"

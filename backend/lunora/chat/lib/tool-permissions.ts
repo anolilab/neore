@@ -49,6 +49,8 @@ export interface ToolDescriptor {
     /** Stable preference key, see {@link toolPermissionKey}. */
     key: string;
     source: ToolSource;
+    /** The server's entry in the user's quick-check trust list (`low-risk-trust.ts`). Absent: no known server, so never trusted. */
+    trustId?: string;
 }
 
 export type ToolPermissionOverrides = Record<string, ToolPermissionMode>;
@@ -141,6 +143,8 @@ export interface ToolPermissionOptions {
      * run is not one a person is in), every `ask` tool pauses exactly as it always did.
      */
     lowRiskCheck?: LowRiskCheck;
+    /** The servers the user trusts to have their tools put to the quick check (`low-risk-trust.ts`). Absent: none. */
+    lowRiskTrusted?: ReadonlySet<string>;
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
@@ -231,10 +235,10 @@ type AfterLapse = (input: unknown, options: NeedsApprovalOptions) => boolean | P
 
 /** A `needsApproval` that asks, unless the quick check clears the call. It never throws: a check that fails asks. */
 const needsApprovalUnless =
-    (check: LowRiskCheck, key: string) =>
+    (check: LowRiskCheck, { key, trustId }: ToolDescriptor) =>
     async (input: unknown, { messages, toolCallId }: NeedsApprovalOptions): Promise<boolean> => {
         try {
-            return !(await check({ input, key, messages, toolCallId }));
+            return !(await check({ input, key, messages, toolCallId, ...(trustId !== undefined && { trustId }) }));
         } catch {
             return true;
         }
@@ -297,19 +301,19 @@ export const applyToolPermissions = (
 
         // Only a tool the user left at its default `ask` can be put to the quick check; the rules are in `low-risk-approval.ts`.
         const check =
-            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, name, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
+            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
                 ? options.lowRiskCheck
                 : undefined;
 
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor.key) : true } as ToolSet[string];
+            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor) : true } as ToolSet[string];
             continue;
         }
 
         // Tools are built once per run and a run can outlast the grant, so the lapse is checked at every call.
         if (timedUntil !== undefined) {
-            const afterLapse: AfterLapse = check ? needsApprovalUnless(check, descriptor.key) : () => true;
+            const afterLapse: AfterLapse = check ? needsApprovalUnless(check, descriptor) : () => true;
 
             result[name] = { ...tool, needsApproval: withLapse(tool.needsApproval, timedUntil, afterLapse) } as ToolSet[string];
             continue;

@@ -86,6 +86,7 @@ export interface Doc_aiUserPreferences {
     enableKnowledge?: boolean;
     enablePlanner?: boolean;
     generalProviders?: unknown;
+    lowRiskTrustedServers?: Array<string>;
     mcpSecretHeaders?: Array<{ encryptedValue: string; header: string; server: string; url: string }>;
     mcpServers?: Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>;
     messengerKeys?: unknown;
@@ -3035,6 +3036,7 @@ export interface Insert_aiUserPreferences {
     enableKnowledge?: boolean;
     enablePlanner?: boolean;
     generalProviders?: unknown;
+    lowRiskTrustedServers?: Array<string>;
     mcpSecretHeaders?: Array<{ encryptedValue: string; header: string; server: string; url: string }>;
     mcpServers?: Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>;
     messengerKeys?: unknown;

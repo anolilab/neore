@@ -22,6 +22,7 @@ import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
@@ -215,6 +216,18 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
 
+    // A server counts as trusted by what it is (name AND url), so one whose url changed has lost it.
+    const trusted = quickCheckOn
+        ? new Set<string>(
+              await ctx.runQuery(internal.chat.tool_permissions.getLowRiskTrustedServers, { userId }).catch((error: unknown) => {
+                  toolsLogger.warn("[TOOLS] Trusted servers unavailable:", error);
+
+                  return [];
+              }),
+          )
+        : undefined;
+    const urlByServer = new Map(selectedServers.filter((s) => !s.connectorSlug).map((s) => [s.name, s.url]));
+
     // Keyed from where the tool came from, never parsed back out of its name.
     const describe = (runtimeName: string): ToolDescriptor | undefined => {
         const device = deviceResult.descriptors.get(runtimeName);
@@ -226,10 +239,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         const mcp = mcpResult.descriptors.get(runtimeName);
 
         if (mcp?.connectorSlug) {
-            return { annotations: mcp.annotations, key: toolPermissionKey("connector", mcp.toolName, mcp.connectorSlug), source: "connector" };
+            return {
+                annotations: mcp.annotations,
+                key: toolPermissionKey("connector", mcp.toolName, mcp.connectorSlug),
+                source: "connector",
+                trustId: connectorTrustId(mcp.connectorSlug),
+            };
         }
 
-        return mcp && { annotations: mcp.annotations, key: toolPermissionKey("mcp", mcp.toolName, mcp.serverName), source: "mcp" };
+        const url = mcp && urlByServer.get(mcp.serverName);
+
+        return (
+            mcp && {
+                annotations: mcp.annotations,
+                key: toolPermissionKey("mcp", mcp.toolName, mcp.serverName),
+                source: "mcp",
+                ...(url !== undefined && { trustId: mcpTrustId(mcp.serverName, url) }),
+            }
+        );
     };
 
     // Built per run: the approvals it records belong to this run's tool calls.
@@ -243,6 +270,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
+        ...(trusted && { lowRiskTrusted: trusted }),
         timedGrants,
     });
 

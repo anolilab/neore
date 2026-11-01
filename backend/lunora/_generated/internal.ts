@@ -478,7 +478,8 @@ export interface InternalApiTypes {
         };
         tool_permissions: {
             consumeLowRiskCheck: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
-            getLowRiskApprovalContext: FunctionReference<"query", { permissionKey?: string; threadId: Id<"threads">; userId: string }, boolean>;
+            getLowRiskApprovalContext: FunctionReference<"query", { permissionKey?: string; threadId: Id<"threads">; trustId?: string; userId: string }, boolean>;
+            getLowRiskTrustedServers: FunctionReference<"query", { userId: string }, Array<string>>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
@@ -1659,6 +1660,7 @@ export const internal: InternalApiTypes = {
         tool_permissions: {
             consumeLowRiskCheck: { __lunoraRef: "chat_tool_permissions:consumeLowRiskCheck" },
             getLowRiskApprovalContext: { __lunoraRef: "chat_tool_permissions:getLowRiskApprovalContext" },
+            getLowRiskTrustedServers: { __lunoraRef: "chat_tool_permissions:getLowRiskTrustedServers" },
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
             getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },
             getToolPermissionsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionsQuery" },

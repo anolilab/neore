@@ -25426,6 +25426,12 @@
                       },
                       "type": "object"
                     },
+                    "lowRiskTrustedServers": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "overrides": {
                       "additionalProperties": {
                         "anyOf": [
@@ -25453,6 +25459,7 @@
                     "autoApproveLowRisk",
                     "builtIn",
                     "grants",
+                    "lowRiskTrustedServers",
                     "overrides"
                   ],
                   "type": "object"
@@ -25834,6 +25841,108 @@
           }
         },
         "summary": "mutation: chat_tool_permissions:setAutoApproveLowRisk",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_tool_permissions:setLowRiskTrustedServer": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_tool_permissions:setLowRiskTrustedServer` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_tool_permissions:setLowRiskTrustedServer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "server": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "mcp",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "name",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "connector",
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "slug"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "trusted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "server",
+                      "trusted"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_tool_permissions:setLowRiskTrustedServer",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_tool_permissions:setLowRiskTrustedServer",
         "tags": [
           "chat"
         ],

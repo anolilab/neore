@@ -50,6 +50,7 @@ import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
 import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
+import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
@@ -64,6 +65,8 @@ const vToolPermissionGrants = v.record(v.string(), v.number());
 /** Keys are short identifiers, never free text; cap them so the record cannot bloat. */
 const MAX_KEY_LENGTH = 256;
 const MAX_OVERRIDES = 500;
+/** A trust entry is `mcp:` plus a JSON pair of a name and a url, each escaped at worst to twice its length. */
+const MAX_TRUST_ENTRY_LENGTH = 8 + 2 * (MAX_LENGTH.short + MAX_LENGTH.url);
 /** Preference rows one sweep looks at; a user shard holds the one row of its user. */
 const PRUNE_BATCH = 50;
 
@@ -103,7 +106,12 @@ type QuickCheckCtx = Pick<QueryCtx, "db">;
  * summaries folded in untrusted content: a summary reaches the model as notes in its system prompt, so a web page or
  * tool result that scrolled out of the window still shapes the call (`agent/thread-summary-taint.ts`).
  */
-const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, userId: string, permissionKey?: string): Promise<boolean> => {
+const quickCheckAllowed = async (
+    ctx: QuickCheckCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    call?: { permissionKey: string; trustId: string | undefined },
+): Promise<boolean> => {
     const prefs = await ctx.db
         .query("aiUserPreferences")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -114,7 +122,12 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
     }
 
     // A mode the user set for this tool themselves is theirs to answer, also when they set it while the run was going.
-    if (permissionKey !== undefined && prefs.toolPermissions?.[permissionKey] !== undefined) {
+    if (call !== undefined && prefs.toolPermissions?.[call.permissionKey] !== undefined) {
+        return false;
+    }
+
+    // Trust is the user's to take back, also while the run is going; a call that names no server is not trusted.
+    if (call !== undefined && (call.trustId === undefined || !prefs.lowRiskTrustedServers?.includes(call.trustId))) {
         return false;
     }
 
@@ -159,9 +172,31 @@ const quickCheckAllowed = async (ctx: QuickCheckCtx, threadId: Id<"threads">, us
  * may approve. Read once at run start; each call re-reads it in {@link consumeLowRiskCheck}.
  */
 export const getLowRiskApprovalContext = internalQuery
-    .input({ permissionKey: v.optional(v.string().max(MAX_KEY_LENGTH)), threadId: v.id("threads"), userId: v.string() })
+    .input({
+        permissionKey: v.optional(v.string().max(MAX_KEY_LENGTH)),
+        threadId: v.id("threads"),
+        // Which trusted server the call belongs to (`low-risk-trust.ts`); required with a `permissionKey`, or the call is refused.
+        trustId: v.optional(v.string().max(MAX_TRUST_ENTRY_LENGTH)),
+        userId: v.string(),
+    })
     .output(v.boolean())
-    .query(async ({ args: { permissionKey, threadId, userId }, ctx }) => await quickCheckAllowed(ctx, threadId, userId, permissionKey));
+    .query(
+        async ({ args: { permissionKey, threadId, trustId, userId }, ctx }) =>
+            await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
+    );
+
+/** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
+export const getLowRiskTrustedServers = internalQuery
+    .input({ userId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args: { userId }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        return prefs?.lowRiskTrustedServers ?? [];
+    });
 
 /**
  * Spends one unit of the user's quick-check budget for ONE call, after re-reading the setting and the thread's
@@ -202,6 +237,8 @@ export const getToolPermissionSettings = authQuery
             ),
             // Time-boxed allows still in force. A live query does not re-run when one lapses, so the page also hides by `expiresAt`.
             grants: vToolPermissionGrants,
+            // Servers trusted for the quick check, as `low-risk-trust.ts` names them.
+            lowRiskTrustedServers: v.array(v.string()),
             overrides: vToolPermissions,
         }),
     )
@@ -217,6 +254,7 @@ export const getToolPermissionSettings = authQuery
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
             grants: activeGrants(prefs?.toolPermissionGrants, Date.now()),
+            lowRiskTrustedServers: prefs?.lowRiskTrustedServers ?? [],
             overrides: prefs?.toolPermissions ?? {},
         };
     });
@@ -370,6 +408,47 @@ export const setAutoApproveLowRisk = authMutation
         await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { autoApproveLowRisk: enabled });
 
         ctx.log.event("chat.set_auto_approve_low_risk", { enabled });
+
+        return null;
+    });
+
+const vTrustedServer = v.union(
+    v.object({ kind: v.literal("mcp"), name: v.string().max(MAX_LENGTH.short), url: v.string().max(MAX_LENGTH.url) }),
+    v.object({ kind: v.literal("connector"), slug: v.string().max(MAX_LENGTH.short) }),
+);
+
+/**
+ * Trust (or stop trusting) ONE server for the quick check. The entry is built here from the server's identity, so a
+ * client cannot write anything else into the list, and only a server the user has saved can be added.
+ */
+export const setLowRiskTrustedServer = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ server: vTrustedServer, trusted: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args: { server, trusted }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        if (trusted && server.kind === "mcp" && !prefs?.mcpServers?.some((saved) => saved.name === server.name && saved.url === server.url)) {
+            throw new LunoraError("BAD_REQUEST", "Unknown MCP server");
+        }
+
+        const id = server.kind === "mcp" ? mcpTrustId(server.name, server.url) : connectorTrustId(server.slug);
+        const next = (prefs?.lowRiskTrustedServers ?? []).filter((entry) => entry !== id);
+
+        if (trusted) {
+            next.push(id);
+        }
+
+        if (next.length > MAX_TRUSTED_SERVERS) {
+            throw new LunoraError("BAD_REQUEST", "Too many trusted servers");
+        }
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { lowRiskTrustedServers: next });
+
+        ctx.log.event("chat.set_low_risk_trusted_server", { kind: server.kind, trusted });
 
         return null;
     });

@@ -135,7 +135,7 @@ msgid "(old side)"
 msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:250
-#: src/features/settings/connectors/connector-card.tsx:199
+#: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "（在新标签页中打开）"
 
@@ -457,7 +457,7 @@ msgid "{0} conversations imported from {1}"
 msgstr "已从 {1} 导入 {0} 个对话"
 
 #. placeholder {0}: server.headers.length
-#: src/features/settings/components/chat/mcp/server-list.tsx:104
+#: src/features/settings/components/chat/mcp/server-list.tsx:105
 msgid "{0} custom headers"
 msgstr "{0} 个自定义请求头"
 
@@ -1793,7 +1793,7 @@ msgid "About"
 msgstr "关于"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:197
+#: src/features/settings/connectors/connector-card.tsx:200
 msgid "About {0}"
 msgstr "关于 {0}"
 
@@ -3156,7 +3156,7 @@ msgstr "阿姆斯特丹"
 msgid "An access key id starts with AKIA and is 20 characters"
 msgstr "访问密钥 ID 以 AKIA 开头，共 20 个字符"
 
-#: src/features/settings/connectors/connector-card.tsx:134
+#: src/features/settings/connectors/connector-card.tsx:135
 msgid "An administrator needs to register an OAuth app for this connector before it can be used."
 msgstr "管理员需要先为此连接器注册 OAuth 应用才能使用。"
 
@@ -4344,8 +4344,12 @@ msgid "Before"
 msgstr "之前"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:246
-msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
 msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:246
+#~ msgid "Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default."
+#~ msgstr ""
 
 #: src/features/workflow/templates/index.ts:126
 msgid "beginner"
@@ -4432,7 +4436,7 @@ msgstr "同类最佳的照片级真实感"
 msgid "Best-in-class prompt-based image editing"
 msgstr "同类最佳的基于提示词的图像编辑"
 
-#: src/features/settings/connectors/connector-card.tsx:103
+#: src/features/settings/connectors/connector-card.tsx:104
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:161
 msgid "Beta"
 msgstr "Beta"
@@ -6871,7 +6875,7 @@ msgid "Connect"
 msgstr "连接"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:168
+#: src/features/settings/connectors/connector-card.tsx:171
 msgid "Connect {0}"
 msgstr "连接 {0}"
 
@@ -7001,7 +7005,7 @@ msgid "Connect your messenger platforms to chat with AI directly from Telegram, 
 msgstr "连接你的消息平台，直接在 Telegram、Slack、Discord、WhatsApp、LINE、Feishu/Lark、Microsoft Teams 或 WeChat 中与 AI 聊天。消息会带着平台标签出现在你的对话列表中。"
 
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
-#: src/features/settings/connectors/connector-card.tsx:73
+#: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
 #: src/features/skills/components/skill-builder-connector-status.tsx:36
 msgid "Connected"
@@ -7030,7 +7034,7 @@ msgid "Connected Accounts"
 msgstr "已关联账号"
 
 #. placeholder {0}: connection.accountLabel
-#: src/features/settings/connectors/connector-card.tsx:126
+#: src/features/settings/connectors/connector-card.tsx:127
 msgid "Connected to {0}"
 msgstr "已连接到 {0}"
 
@@ -8002,7 +8006,11 @@ msgid "country"
 msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:254
-msgid "Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to."
+#~ msgid "Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to."
+#~ msgstr ""
+
+#: src/features/settings/components/chat/tool-permissions-settings.tsx:254
+msgid "Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust."
 msgstr ""
 
 #: src/features/marketing/data/models-data.ts:239
@@ -9046,7 +9054,7 @@ msgstr "删除“{pendingDeleteTitle}”？"
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
 #: src/features/settings/components/chat/bots-settings.tsx:175
-#: src/features/settings/components/chat/mcp/server-list.tsx:170
+#: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
 msgstr "删除 {0}"
@@ -9735,18 +9743,18 @@ msgid "Discard the review"
 msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:130
-#: src/features/settings/connectors/connector-card.tsx:186
-#: src/features/settings/connectors/connector-card.tsx:206
+#: src/features/settings/connectors/connector-card.tsx:189
+#: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
 msgstr "断开连接"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:180
+#: src/features/settings/connectors/connector-card.tsx:183
 msgid "Disconnect {0}"
 msgstr "断开 {0}"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:214
+#: src/features/settings/connectors/connector-card.tsx:217
 msgid "Disconnect {0}?"
 msgstr "断开 {0}？"
 
@@ -11304,7 +11312,7 @@ msgstr "错误率%"
 #: src/features/evals/components/model-comparison.tsx:83
 #: src/features/evals/components/run-detail.tsx:32
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
-#: src/features/settings/connectors/connector-card.tsx:74
+#: src/features/settings/connectors/connector-card.tsx:75
 #: src/features/slides/components/presentation-viewer.tsx:267
 #: src/features/tasks/components/task-detail-dialog.tsx:133
 msgid "Error"
@@ -11750,7 +11758,7 @@ msgstr "已过期"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
 #: src/features/devices/components/devices-settings.tsx:244
-#: src/features/settings/connectors/connector-card.tsx:75
+#: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "已过期"
 
@@ -12709,6 +12717,10 @@ msgstr "无法更新用例"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:310
 msgid "Failed to update the quick check"
+msgstr ""
+
+#: src/features/settings/components/chat/trust-server-switch.tsx:40
+msgid "Failed to update the trusted servers"
 msgstr ""
 
 #: src/features/chat/sharing/thread-share-button.tsx:146
@@ -14767,7 +14779,7 @@ msgstr "渐变卡片"
 msgid "Grant the im:message and im:message:send_as_bot permissions, then under Events & Callbacks set an Encrypt Key and note the Verification Token."
 msgstr "授予 im:message 和 im:message:send_as_bot 权限，然后在“事件与回调”下设置 Encrypt Key，并记下 Verification Token。"
 
-#: src/features/settings/connectors/connector-card.tsx:142
+#: src/features/settings/connectors/connector-card.tsx:143
 msgid "Granted permissions"
 msgstr "已授予的权限"
 
@@ -20442,7 +20454,7 @@ msgstr "没有匹配的节点"
 msgid "No matching variable found."
 msgstr "未找到匹配的变量。"
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:49
+#: src/features/settings/components/chat/mcp/server-list.tsx:50
 msgid "No MCP servers configured. Add a server to extend AI capabilities."
 msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 
@@ -20907,8 +20919,8 @@ msgid "not configured"
 msgstr "未配置"
 
 #: src/features/settings/components/privacy/data-access.tsx:59
-#: src/features/settings/connectors/connector-card.tsx:76
-#: src/features/settings/connectors/connector-card.tsx:174
+#: src/features/settings/connectors/connector-card.tsx:77
+#: src/features/settings/connectors/connector-card.tsx:177
 msgid "Not configured"
 msgstr "未配置"
 
@@ -23314,7 +23326,7 @@ msgid "premium"
 msgstr "高端"
 
 #: src/features/settings/components/chat/models-settings.tsx:44
-#: src/features/settings/connectors/connector-card.tsx:108
+#: src/features/settings/connectors/connector-card.tsx:109
 msgid "Premium"
 msgstr "高级版"
 
@@ -24715,7 +24727,7 @@ msgid "Reconnect"
 msgstr "重新连接"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:168
+#: src/features/settings/connectors/connector-card.tsx:171
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
@@ -25462,7 +25474,7 @@ msgstr "每个请求均进行请求校验、内容过滤和 HMAC-SHA256 认证�
 msgid "Request volume, cost, and error count per model"
 msgstr "每个模型的请求量、成本和错误数"
 
-#: src/features/settings/connectors/connector-card.tsx:142
+#: src/features/settings/connectors/connector-card.tsx:143
 msgid "Requested permissions"
 msgstr "请求的权限"
 
@@ -27686,7 +27698,7 @@ msgstr "右侧边栏"
 #: src/features/auth/components/auth/auth-card.tsx:472
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
-#: src/features/settings/components/chat/mcp/server-list.tsx:126
+#: src/features/settings/components/chat/mcp/server-list.tsx:127
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "登录"
@@ -27764,7 +27776,7 @@ msgid "Sign Out"
 msgstr "退出登录"
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:132
+#: src/features/settings/components/chat/mcp/server-list.tsx:133
 msgid "Sign out of {0}"
 msgstr "退出 {0} 的登录"
 
@@ -27793,7 +27805,7 @@ msgstr "注册成功"
 msgid "Sign up to unlock all models"
 msgstr "注册以解锁所有模型"
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:97
+#: src/features/settings/components/chat/mcp/server-list.tsx:98
 msgid "Sign-in expired"
 msgstr "登录已过期"
 
@@ -27805,12 +27817,12 @@ msgstr "退出登录失败，请重试。"
 msgid "Signature"
 msgstr ""
 
-#: src/features/settings/components/chat/mcp/server-list.tsx:92
+#: src/features/settings/components/chat/mcp/server-list.tsx:93
 msgid "Signed in"
 msgstr "已登录"
 
 #. placeholder {0}: ownSignIn.accountLabel
-#: src/features/settings/components/chat/mcp/server-list.tsx:92
+#: src/features/settings/components/chat/mcp/server-list.tsx:93
 msgid "Signed in · {0}"
 msgstr "已登录 · {0}"
 
@@ -30060,8 +30072,8 @@ msgid "terms"
 msgstr ""
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:634
-#: src/features/settings/components/chat/mcp/server-list.tsx:146
-#: src/features/settings/components/chat/mcp/server-list.tsx:161
+#: src/features/settings/components/chat/mcp/server-list.tsx:147
+#: src/features/settings/components/chat/mcp/server-list.tsx:162
 #: src/features/settings/components/chat/native-providers-settings.tsx:704
 msgid "Test connection"
 msgstr "测试连接"
@@ -30366,7 +30378,7 @@ msgid "The AI learns from your conversations to personalize its responses, and r
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
 #. placeholder {0}: entry.name
-#: src/features/settings/connectors/connector-card.tsx:207
+#: src/features/settings/connectors/connector-card.tsx:210
 msgid "The AI will lose access to {0}, and the access token is revoked at the provider where possible."
 msgstr "AI 将无法再访问 {0}，并会尽可能在提供商处撤销访问令牌。"
 
@@ -30755,6 +30767,10 @@ msgstr "提示词将作为用例输入，此回答将作为预期答案。保存
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "这些请求由提供商直接向你计费。如果我们知道模型的价格，将以积分收取自有密钥的常规平台费用。"
 
+#: src/features/settings/components/chat/trust-server-switch.tsx:53
+msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:23
 msgid "The refinement did not change any field."
 msgstr "此次优化没有改变任何字段。"
@@ -31108,7 +31124,7 @@ msgstr "此计算机已与另一个账户配对。"
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
-#: src/features/settings/connectors/connector-card.tsx:130
+#: src/features/settings/connectors/connector-card.tsx:131
 msgid "This connection needs to be renewed."
 msgstr "此连接需要续期。"
 
@@ -31668,7 +31684,7 @@ msgid "To"
 msgstr ""
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/features/settings/components/chat/mcp/server-list.tsx:128
 msgid "to {0}"
 msgstr "到 {0}"
 
@@ -31688,7 +31704,7 @@ msgid "toggle"
 msgstr ""
 
 #. placeholder {0}: server.name
-#: src/features/settings/components/chat/mcp/server-list.tsx:165
+#: src/features/settings/components/chat/mcp/server-list.tsx:166
 msgid "Toggle {0}"
 msgstr "切换 {0}"
 
@@ -32151,6 +32167,10 @@ msgstr "正在裁剪… {0}%"
 #: src/features/workflow/components/nodes/branch-node.tsx:20
 msgid "True"
 msgstr "真"
+
+#: src/features/settings/components/chat/trust-server-switch.tsx:51
+msgid "Trust for auto-approval"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:328
 msgid "Trust this device"
