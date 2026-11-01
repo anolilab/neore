@@ -188,7 +188,7 @@ jobs:
             # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
             - name: "Install libdbus for the Linux keyring"
               if: "matrix.name == 'linux'"
-              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
             - name: "Add the x64 macOS Rust target"
               if: "matrix.name == 'macos'"

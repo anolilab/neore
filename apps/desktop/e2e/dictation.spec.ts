@@ -397,6 +397,9 @@ const SHORTCUT = "CommandOrControl+Shift+D";
 
 /** Whether the app holds the dictation shortcut with the OS right now. */
 const shortcutHeld = (app: ElectronApplication): Promise<boolean> => app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), SHORTCUT);
+
+// Registering the shortcut with the OS is slow on the Windows on ARM runner, which hit the default 5 s.
+const SHORTCUT_TIMEOUT = process.platform === "win32" && process.arch === "arm64" ? 15_000 : 5000;
 const MODEL_FILES = ["ggml-small.bin", "ggml-large-v3-turbo-q5_0.bin"];
 
 test("on a first run the switch is off: a press opens no window and downloads nothing", async () => {
@@ -447,7 +450,7 @@ test("the settings window turns dictation on, deletes a model file, and is out o
 
         await switchControl.check();
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
-        await expect.poll(() => shortcutHeld(app)).toBe(true);
+        await expect.poll(() => shortcutHeld(app), { timeout: SHORTCUT_TIMEOUT }).toBe(true);
 
         await page.getByLabel("Language").selectOption("de");
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).language).toBe("de");
@@ -458,7 +461,7 @@ test("the settings window turns dictation on, deletes a model file, and is out o
         await expect(page.getByRole("status").filter({ hasText: "was deleted from this computer" })).toBeVisible();
 
         await switchControl.uncheck();
-        await expect.poll(() => shortcutHeld(app)).toBe(false);
+        await expect.poll(() => shortcutHeld(app), { timeout: SHORTCUT_TIMEOUT }).toBe(false);
 
         // The window cannot reach the network either.
         const reached = await page.evaluate(async (site_) => {

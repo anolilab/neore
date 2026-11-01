@@ -165,10 +165,9 @@ jobs:
               if: "runner.os == 'Linux'"
               run: |
                   sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-                  sudo apt-get update
-                  sudo apt-get install -y xvfb
+                  bash .github/scripts/apt-retry.sh sudo apt-get install -y xvfb
                   # Electron needs the libraries Chromium does (GTK, NSS, GBM, ALSA); the arm64 image does not carry them all.
-                  pnpm --filter @neore/desktop exec playwright install-deps chromium
+                  bash .github/scripts/apt-retry.sh pnpm --filter @neore/desktop exec playwright install-deps chromium
 
             - name: "Build the speech helper (Windows)"
               if: "runner.os == 'Windows'"

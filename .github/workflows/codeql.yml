@@ -23,5 +23,8 @@ jobs:
             # `actions` analyses the workflow files themselves (script injection,
             # untrusted checkouts) alongside the application code; `rust` covers
             # services/document-parser.
-            languages: '["javascript-typescript", "actions", "rust"]'
+            #
+            # `rust` takes ~9 minutes and no ruleset requires a code-scanning result, so a
+            # pull request skips it; push to main and the weekly run still analyse it.
+            languages: '${{ github.event_name == ''pull_request'' && ''["javascript-typescript", "actions"]'' || ''["javascript-typescript", "actions", "rust"]'' }}'
             branches: '["main"]'

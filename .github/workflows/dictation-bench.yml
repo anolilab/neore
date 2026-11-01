@@ -101,7 +101,7 @@ jobs:
 
             - name: "Install GNU time (Linux)"
               if: "runner.os == 'Linux'"
-              run: "sudo apt-get install -y -qq time"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y -qq time"
 
             - name: "Run the benchmark"
               shell: "bash"
