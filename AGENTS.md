@@ -685,8 +685,9 @@ written here is what is not.
   stopped stream that never started or was waiting out a limit, and `createStreamWithMessage` (a new message moves past the
   request), all through `discardPausedThreadSecrets` (a group turn's pause is the same snapshot, so the same path). That
   call skips reply keys that still have a live stream (a pause with several requests shares one key), clears the thread's
-  references in one pass, DENIES the reply's pending requests (`resolvedBy: "abandoned"`; answering one is refused with
-  `TOOL_REQUEST_ABANDONED`) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
+  references in one pass, DENIES the reply's pending SECRET requests (`resolvedBy: "abandoned"`; answering one is refused with
+  `TOOL_REQUEST_ABANDONED`; other pending approvals stay answerable, and a Stop denies them even when a claimed run keeps its
+  ciphertext until it settles) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
   only that prompt's reply.
   The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
 

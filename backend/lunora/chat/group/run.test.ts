@@ -656,7 +656,7 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect(await streamStatus()).toBe("done");
     });
 
-    it("drops the paused turn's saved references and denies its request when a new message moves the conversation on", async () => {
+    it("drops the paused turn's saved references, and leaves its plain tool approval answerable, when a new message moves the conversation on", async () => {
         await setUpPausingWriter();
 
         await runTurn();
@@ -693,7 +693,7 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
 
         expect(secret).toMatchObject({ status: "abandoned" });
         expect(secret.encryptedValue).toBeUndefined();
-        expect(await approvalRow()).toMatchObject({ resolvedBy: "abandoned", status: "denied" });
+        expect(await approvalRow()).toMatchObject({ status: "pending" });
     });
 
     it("keeps what started the turn in the snapshot, so a person's answer does not turn an outside agent's turn into the lead's", async () => {
