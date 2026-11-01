@@ -32,9 +32,13 @@ export const savedSessionFor = (
     sessions: ReadonlyArray<Session>,
     target: { agentKey: string; deviceId: Id<"devices">; folderId: string },
 ): Session | undefined => {
-    const newest = sessions.find((session) => session.deviceId === target.deviceId && session.agentKey === target.agentKey && session.folderId === target.folderId);
+    const newest = sessions.find(
+        (session) => session.deviceId === target.deviceId && session.agentKey === target.agentKey && session.folderId === target.folderId,
+    );
 
-    return newest?.nativeSessionId !== undefined && nativeIdFits(newest.nativeSessionId) && isAvailable(capabilityOf(newest.capabilities, "sessions.load")) ? newest : undefined;
+    return newest?.nativeSessionId !== undefined && nativeIdFits(newest.nativeSessionId) && isAvailable(capabilityOf(newest.capabilities, "sessions.load"))
+        ? newest
+        : undefined;
 };
 
 /**

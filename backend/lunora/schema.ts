@@ -161,6 +161,9 @@ export const schema = defineSchema({
         deviceId: v.id("devices"),
         folderId: v.string(),
         folderLabel: v.string(),
+        // When a prompt sent from the app carried the handoff this session was opened for (`acp/lib/send-turn.ts`). A prompt typed
+        // in the computer's own window is a turn too but carries none, so a turn alone does not show the agent got it. Unset: not yet.
+        handoffSentAt: v.optional(v.number()),
         hostSessionId: v.string(),
         // An imported session (S6) takes its transcript from the host a turn at a time: `importedTurns` is how many the backend
         // holds, `importState` whether the host has sent the end. Unset on a session that ran here.

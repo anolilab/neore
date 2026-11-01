@@ -15,6 +15,7 @@ export const acpSessions = sqliteTable("acpSessions", {
     deviceId: text("deviceId").references((): AnySQLiteColumn => devices._id).notNull(),
     folderId: text("folderId").notNull(),
     folderLabel: text("folderLabel").notNull(),
+    handoffSentAt: real("handoffSentAt"),
     hostSessionId: text("hostSessionId").notNull(),
     importedTurns: real("importedTurns"),
     importState: text("importState", { mode: "json" }).$type<"importing" | "done">(),

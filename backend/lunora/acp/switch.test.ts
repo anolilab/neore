@@ -1459,6 +1459,43 @@ describe("a saved session is reattached only if it received the conversation", (
         expect((await acpSends()).at(-1)).toContain("question 0");
     });
 
+    it("hands the conversation over when the only prompt the agent got was typed in the computer's own window", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchTo(threadId, hostTarget(device, CODEX));
+        await openStartedSession(device, threadId, undefined, "native-codex", CAN_LOAD);
+
+        // A turn the computer reports that no send of the app carried: the handoff was not in it.
+        const [session] = (await rows("acpSessions", { agentKey: "codex", threadId })) as Row[];
+        const before = (await rows("messages", { threadId })).length;
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, {
+                    deviceId: device.deviceId,
+                    events: [
+                        { kind: "turn_start", text: "typed in the window" },
+                        { kind: "turn_end", reason: "finished" },
+                    ],
+                    firstSeq: 0,
+                    sessionId: session?.hostSessionId as string,
+                    threadId,
+                    turnId: crypto.randomUUID(),
+                }),
+        );
+        expect((await rows("messages", { threadId })).length).toBeGreaterThan(before);
+
+        await answerOpenCalls();
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+        await openStartedSession(device, threadId, { loaded: true }, "native-1");
+        await answerOpenCalls();
+        await switchTo(threadId, hostTarget(device, CODEX));
+
+        expect((await lastStart()).nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
+    });
+
     it("reattaches once the agent has been prompted with it", async () => {
         const device = await pairedDevice(ownerId);
         const threadId = await loadableHostThread(device);

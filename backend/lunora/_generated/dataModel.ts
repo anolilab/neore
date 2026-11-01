@@ -50,6 +50,7 @@ export interface Doc_acpSessions {
     deviceId: Id<"devices">;
     folderId: string;
     folderLabel: string;
+    handoffSentAt?: number;
     hostSessionId: string;
     importedTurns?: number;
     importState?: "importing" | "done";
@@ -2999,6 +3000,7 @@ export interface Insert_acpSessions {
     deviceId: Id<"devices">;
     folderId: string;
     folderLabel: string;
+    handoffSentAt?: number;
     hostSessionId: string;
     importedTurns?: number;
     importState?: "importing" | "done";

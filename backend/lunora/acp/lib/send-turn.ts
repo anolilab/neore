@@ -67,5 +67,10 @@ export const queueHostTurn = async (
     // A session still `starting` stays so (`touchSession`): the computer holds the message until the agent opens it.
     await touchSession(ctx, session, "busy", now);
 
+    if (handoff) {
+        // The agent is sent what it took over with this prompt: its saved session holds it from here on (`receivedItsHandoff`).
+        await ctx.db.patch(session._id, { handoffSentAt: now });
+    }
+
     return { messageId: prompt._id as string, streamId, turnId };
 };

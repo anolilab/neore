@@ -18100,13 +18100,13 @@
     {
       "file": "acp/lib/calls",
       "kind": "write",
-      "line": 67,
+      "line": 68,
       "reason": "\"endStartingSession\" is not a registered function"
     },
     {
       "file": "acp/lib/calls",
       "kind": "schedule",
-      "line": 110,
+      "line": 116,
       "reason": "\"onAcpCallEnded\" is not a registered function"
     },
     {
@@ -18138,6 +18138,12 @@
       "kind": "write",
       "line": 20,
       "reason": "\"endHostSessionsOfDevice\" is not a registered function"
+    },
+    {
+      "file": "acp/lib/send-turn",
+      "kind": "write",
+      "line": 72,
+      "reason": "\"queueHostTurn\" is not a registered function"
     },
     {
       "file": "acp/lib/sessions",
@@ -18172,7 +18178,7 @@
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 602,
+      "line": 624,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {

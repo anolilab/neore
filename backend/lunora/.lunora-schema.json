@@ -2611,6 +2611,12 @@
           "optional": false,
           "unique": false
         },
+        "handoffSentAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "hostSessionId": {
           "kind": "string",
           "nullable": false,

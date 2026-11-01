@@ -176,7 +176,9 @@ const handoffFor = async (
             return carried;
         }
 
-        return options.lenient ? OMITTED_HANDOFF : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
+        return options.lenient
+            ? OMITTED_HANDOFF
+            : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
     }
 
     try {
@@ -199,10 +201,17 @@ interface NativePlan {
 
 /**
  * Whether the agent's last stay in the thread, ending at `lastSeen`, began with nothing it had still to be sent. A handoff
- * (or a catch-up) rides in the agent's first prompt, so a stay that opened with one and had no turn since never delivered
- * it: the agent's saved session holds none of that conversation, and reattaching it would leave it blind.
+ * (or a catch-up) rides in the agent's first prompt, so a stay that opened with one and was never sent it by the app
+ * has none of that conversation in its saved session, and reattaching it would leave it blind. A turn alone does not
+ * show it was sent: a prompt typed in the computer's own window is a turn that carried none, so the session records
+ * when a prompt of the app carried it (`handoffSentAt`). The stay's session is the newest of the agent's own that opened
+ * with its divider (a session is started just before the divider that asked for it).
  */
-const receivedItsHandoff = async (ctx: MutationCtx, threadId: Id<"threads">, lastSeen: Doc<"messages">, agent: SwitchAgentRef) => {
+const receivedItsHandoff = async (
+    ctx: MutationCtx,
+    args: { agent: SwitchAgentRef; lastSeen: Doc<"messages">; sessions: ReadonlyArray<Session>; threadId: Id<"threads"> },
+) => {
+    const { agent, lastSeen, sessions, threadId } = args;
     const arrival = await findDividerEntering(ctx, threadId, lastSeen, agentKeyOf(agent));
 
     if (!arrival) {
@@ -216,9 +225,16 @@ const receivedItsHandoff = async (ctx: MutationCtx, threadId: Id<"threads">, las
         return true;
     }
 
-    const stay = await collectHandoffSource(ctx, threadId, lastSeen, { stopAtId: arrival.row._id });
+    const stay = sessions.find(
+        (session) =>
+            agent.kind === "host" &&
+            session.deviceId === agent.hostId &&
+            session.agentKey === agent.agentKey &&
+            session.folderId === agent.folderId &&
+            session._creationTime <= arrival.row._creationTime,
+    );
 
-    return stay.turns.length > 0;
+    return stay?.handoffSentAt !== undefined;
 };
 
 /**
@@ -247,7 +263,9 @@ const nativePlanFor = async (
 
     // The agent's session just ended, with nobody else having run since: it has seen everything.
     if (sameAgent(current.agent, to)) {
-        return (await receivedItsHandoff(ctx, thread._id, leaf, to)) ? { catchUp: "", nativeSessionId: saved.nativeSessionId } : undefined;
+        return (await receivedItsHandoff(ctx, { agent: to, lastSeen: leaf, sessions: earlier, threadId: thread._id }))
+            ? { catchUp: "", nativeSessionId: saved.nativeSessionId }
+            : undefined;
     }
 
     const departure = await findDividerLeaving(ctx, thread._id, leaf, agentKeyOf(to));
@@ -259,7 +277,7 @@ const nativePlanFor = async (
     const lastSeenId = ctx.db.normalizeId("messages", departure.part.startMessageId);
     const lastSeen = lastSeenId ? await ctx.db.get(lastSeenId) : null;
 
-    if (!lastSeen || !(await receivedItsHandoff(ctx, thread._id, lastSeen, to))) {
+    if (!lastSeen || !(await receivedItsHandoff(ctx, { agent: to, lastSeen, sessions: earlier, threadId: thread._id }))) {
         return undefined;
     }
 
