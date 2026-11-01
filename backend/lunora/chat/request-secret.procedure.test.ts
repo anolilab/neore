@@ -269,7 +269,10 @@ describe("answerSecretRequest", () => {
         );
         await insertRequest("sec-2", { label: "Files token", use: { header: "Authorization", kind: "mcp_header", server: "Files" } }, 3);
 
-        await expect(answer(OWNER, SECRET, "sec-2", FILES_URL)).rejects.toThrow(CHANGED);
+        await expect(answer(OWNER, SECRET, "sec-2", FILES_URL)).rejects.toMatchObject({
+            data: { code: "SECRET_SERVER_MOVED" },
+            message: expect.stringMatching(CHANGED),
+        });
         expect(await rows("requestedSecrets")).toHaveLength(0);
         expect(await runStatuses()).toStrictEqual(["pending", "pending"]);
         expect(queued).toHaveLength(0);

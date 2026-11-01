@@ -107,6 +107,7 @@ const SAVE = /^Save$/u;
 const DECLINE = /Decline/u;
 const FILES_ADDRESS = /https:\/\/files\.example\.com\/mcp/u;
 const FILES_ADDRESS_HTTP = /http:\/\/files\.example\.com\/mcp/u;
+const FILES_V2_ADDRESS = /https:\/\/files\.example\.com\/v2\/mcp/u;
 const HIDDEN_QUERY = /hidden/u;
 const TOO_LONG = /up to 500 characters/u;
 const SERVERS_NOT_LOADED = /saved MCP servers could not be loaded/u;
@@ -221,6 +222,24 @@ describe("the secret request card", () => {
 
         await waitFor(() => expect(answer).toHaveBeenCalled());
         expect(answer.mock.calls[0]?.[0]).toMatchObject({ approvalId: "approval-1", expectedUrl: "https://files.example.com/mcp?token=hidden" });
+    });
+
+    it("says the server's address changed and shows the current one when the save is refused for a moved server", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        answer.mockImplementationOnce(async () => {
+            servers.current = [{ name: "Files", url: "https://files.example.com/v2/mcp" }];
+
+            throw Object.assign(new Error("changed"), { data: { code: "SECRET_SERVER_MOVED" } });
+        });
+        mountCard(header);
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        expect(await screen.findByText("This server's address changed. Check the address below and save again.")).toBeTruthy();
+        expect(await screen.findByText(FILES_V2_ADDRESS)).toBeTruthy();
+        expect(screen.queryByText("It was not saved. Paste it again and save.")).toBeNull();
     });
 
     it("says a failed read of the saved servers in the card, tied to the field, and loads them again on retry", async () => {

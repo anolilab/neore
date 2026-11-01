@@ -79,3 +79,6 @@ export const SECRET_FAILURE_MESSAGES: Record<SecretFailure, string> = {
     wrong_run: "That reference can only be used in a reply the owner of the chat started. Ask the owner.",
     wrong_use: "That reference was requested for a different destination.",
 };
+
+/** `error.data.code` of the refusal when the saved MCP server's address is no longer the one the card showed; the card words it and reloads the address. */
+export const SECRET_SERVER_MOVED = "SECRET_SERVER_MOVED";

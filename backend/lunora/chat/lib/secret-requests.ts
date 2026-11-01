@@ -203,23 +203,61 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
 /**
  * A reply paused on a request (a consumer tool set to `ask` holds its saved references through the pause) that the person
  * walks away from: Stop with nothing live, or a new message that moves the conversation past it. Drops the ciphertext of
- * every reply with a pending snapshot on `threadId`. The request itself stays answerable; a late spend reads `used`.
+ * every reply with a pending snapshot on `threadId`, in one pass over the thread's saved references. The request itself
+ * stays answerable; a late spend reads `used`.
+ *
+ * A pause with several requests shares one reply key, so answering one starts a continuation while another stays
+ * pending: a key whose reply has a live stream is skipped, the live run still needs its references. `messageId` narrows
+ * it to the reply of that prompt (a Stop that names one); when no stream of the thread carries it, every paused reply goes.
  */
-export const discardPausedThreadSecrets = async (ctx: Database, args: { threadId: Id<"threads"> }): Promise<number> => {
+export const discardPausedThreadSecrets = async (ctx: Database, args: { messageId?: string; threadId: Id<"threads"> }): Promise<number> => {
     const runs = await ctx.db
         .query("toolApprovalRuns")
         .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
         .collect();
-    const keys = new Set(runs.filter((run) => run.status === "pending").map((run) => run.config.replyKey ?? run.streamId));
-    let dropped = 0;
+    const pending = runs.filter((run) => run.status === "pending");
 
-    for (const replyKey of keys) {
-        if (replyKey !== undefined) {
-            dropped += await discardThreadSecrets(ctx, { replyKey, threadId: args.threadId });
+    if (pending.length === 0) {
+        return 0;
+    }
+
+    const keyOfStream = (streamId: string): string => runs.find((run) => run.streamId === streamId)?.config.replyKey ?? streamId;
+    const keys = new Set(pending.map((run) => run.config.replyKey ?? run.streamId).filter((key): key is string => key !== undefined));
+    const live = await ctx.db.persistentStreams.findMany({ where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId } });
+
+    for (const stream of live.page) {
+        keys.delete(keyOfStream(stream._id));
+    }
+
+    if (args.messageId !== undefined) {
+        const named = await ctx.db.persistentStreams.findMany({ where: { messageId: args.messageId, threadId: args.threadId } });
+
+        if (named.page.length > 0) {
+            const own = new Set(named.page.map((stream) => keyOfStream(stream._id)));
+
+            for (const key of keys) {
+                if (!own.has(key)) {
+                    keys.delete(key);
+                }
+            }
         }
     }
 
-    return dropped;
+    if (keys.size === 0) {
+        return 0;
+    }
+
+    const rows = await ctx.db
+        .query("requestedSecrets")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+    const held = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey !== undefined && keys.has(row.replyKey));
+
+    for (const row of held) {
+        await patchRow(ctx.db, row, { encryptedValue: undefined });
+    }
+
+    return held.length;
 };
 
 /** Delete every row of `threadId`, ciphertext included — the thread is gone, and so is whatever a reply of it was holding. Returns how many. */

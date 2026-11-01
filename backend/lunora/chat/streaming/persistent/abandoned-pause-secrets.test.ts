@@ -58,12 +58,12 @@ const insertSnapshot = async (status: "approved" | "pending", replyKey: string, 
             }),
     );
 
-const insertStream = async (status: "done" | "streaming", runClaimedAt?: number) =>
+const insertStream = async (status: "done" | "streaming", runClaimedAt?: number, messageId = "prompt") =>
     await run(
         async (ctx) =>
             await ctx.db.insert("persistentStreams", {
                 expiresAt: Date.now() + 60_000,
-                messageId: "prompt",
+                messageId,
                 status,
                 streamingConfig: { contentType: "text", model: "m" },
                 threadId,
@@ -160,5 +160,56 @@ describe("a paused reply that is abandoned", () => {
         await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
 
         expect(await holdsValue(ref)).toBe(false);
+    });
+
+    it("keeps the references of a reply whose continuation is live while another request of the same pause stays pending", async () => {
+        const ref = await storeSecret("stream-A");
+        const continuation = await insertStream("streaming", Date.now());
+
+        await insertSnapshot("pending", "stream-A");
+        await insertSnapshot("approved", "stream-A", continuation);
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(createStreamWithMessage, {
+                    messageId: "m2",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await holdsValue(ref)).toBe(true);
+    });
+
+    it("clears only the paused replies' references in one pass and leaves a reply that was not paused", async () => {
+        const first = await storeSecret("stream-A");
+        const second = await storeSecret("stream-B");
+        const other = await storeSecret("stream-C");
+
+        await insertSnapshot("pending", "stream-A");
+        await insertSnapshot("pending", "stream-B");
+        await insertSnapshot("approved", "stream-C");
+
+        const { discardPausedThreadSecrets } = await import("../../lib/secret-requests");
+        const dropped = await run(async (ctx) => await discardPausedThreadSecrets(ctx, { threadId: threadId as never }));
+
+        expect(dropped).toBe(2);
+        expect(await holdsValue(first)).toBe(false);
+        expect(await holdsValue(second)).toBe(false);
+        expect(await holdsValue(other)).toBe(true);
+    });
+
+    it("loses only the stopped prompt's references when Stop names a prompt with nothing live", async () => {
+        const streamA = String(await insertStream("done", Date.now(), "prompt-A"));
+        const streamB = String(await insertStream("done", Date.now(), "prompt-B"));
+        const stopped = await storeSecret(streamA);
+        const paused = await storeSecret(streamB);
+
+        await insertSnapshot("pending", streamA, streamA);
+        await insertSnapshot("pending", streamB, streamB);
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { messageId: "prompt-A", threadId }));
+
+        expect(await holdsValue(stopped)).toBe(false);
+        expect(await holdsValue(paused)).toBe(true);
     });
 });

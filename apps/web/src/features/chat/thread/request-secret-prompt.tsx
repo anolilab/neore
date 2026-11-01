@@ -185,8 +185,17 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         mutate(
             { approvalId, ...(expectedUrl !== undefined && { expectedUrl }), threadId: threadId as Id<"threads">, value },
             {
-                onError: () => {
+                onError: (error) => {
                     setSubmitted(null);
+
+                    // The saved server's address moved since the card showed it: the card's copy is stale, so load the current one.
+                    if ((error as { data?: { code?: string } }).data?.code === "SECRET_SERVER_MOVED") {
+                        setSaveError(t`This server's address changed. Check the address below and save again.`);
+                        void retryPreferences();
+
+                        return;
+                    }
+
                     setSaveError(reply === "save" ? t`It was not saved. Paste it again and save.` : t`Could not answer. Please try again.`);
                 },
                 // The mutation's own copy of the arguments goes too.
