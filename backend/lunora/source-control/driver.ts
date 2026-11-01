@@ -30,9 +30,35 @@ import type {
     ViewedFile,
 } from "./types";
 
+/** The one write a coding agent asks a host for: a pull request for a branch that is already pushed. */
+export interface CreatePullRequestInput {
+    base: string;
+    body: string;
+    head: string;
+    /** `owner/name`: the host's own way of naming a repository. */
+    repository: string;
+    title: string;
+}
+
+export interface CreatedPullRequest {
+    /** The host's web page for the pull request it opened. */
+    url: string;
+}
+
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
+    /**
+     * Opens a pull request for an already-pushed branch, and answers its web page.
+     * Optional: a driver whose host cannot open one leaves it undeclared, and
+     * `pullRequest.create` reads as unsupported.
+     */
+    createPullRequest?: (request: HostRequest, input: CreatePullRequestInput) => Promise<CreatedPullRequest>;
+    /**
+     * The open pull request already made from `head` (a branch of `repository`), if any. Asked before a create, so a
+     * create whose answer was lost and is retried records the pull request the host holds instead of opening another.
+     */
+    findOpenPullRequest?: (request: HostRequest, input: { head: string; repository: string }) => Promise<CreatedPullRequest | undefined>;
     getMergeStatus: (request: HostRequest, ref: PullRequestRef) => Promise<MergeStatus>;
     getPullRequest: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestDetail>;
     /** The request headers the host's API wants, besides the token. */

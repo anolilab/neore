@@ -29,6 +29,7 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
+import { deletePullRequestLinksOfThread } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
@@ -526,6 +527,9 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const thread = await context.db.get(args.threadId);
 
         if (thread) {
+            // The pull requests it was attached to or opened name it; a link to a deleted thread is a dead one.
+            await deletePullRequestLinksOfThread(context, thread.userId, args.threadId);
+
             // Remove from aggregates before deleting
             await context.db.delete(args.threadId);
         }

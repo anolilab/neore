@@ -49,3 +49,27 @@ export const collectAllGuides = async (readPage: (cursor: string | null, page: n
         cursor = result.cursor;
     }
 };
+
+/** One page of `collectPullRequestThreadsForExport`: same contract as the drafts' page. */
+interface PullRequestThreadsPage {
+    cursor?: string | null;
+    links?: unknown[];
+}
+
+/** Walks every page of a user's pull request / thread links for the export workflow, one workflow step per page. */
+export const collectAllPullRequestThreads = async (readPage: (cursor: string | null, page: number) => Promise<unknown>): Promise<{ links: unknown[] }> => {
+    const links: unknown[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; ; page += 1) {
+        const result = (await readPage(cursor, page)) as PullRequestThreadsPage;
+
+        links.push(...(result.links ?? []));
+
+        if (!result.cursor) {
+            return { links };
+        }
+
+        cursor = result.cursor;
+    }
+};

@@ -685,7 +685,7 @@ msgstr "{0} 次使用"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:101
+#: src/features/develop/components/pull-request-view.tsx:102
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -1222,7 +1222,7 @@ msgstr "{providerName} · 你自己的 Bedrock 账号（{region}）"
 msgid "{requestCount} req"
 msgstr "{requestCount} 次请求"
 
-#: src/features/develop/components/pull-request-view.tsx:117
+#: src/features/develop/components/pull-request-view.tsx:125
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -5658,7 +5658,7 @@ msgstr "正在检查..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6144,7 +6144,7 @@ msgstr "关闭翻译"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 msgid "Closed"
 msgstr "已关闭"
 
@@ -6504,7 +6504,7 @@ msgstr "商业设计"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "需要 Black Forest Labs 顶级图像质量的商业项目"
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Commits"
 msgstr ""
 
@@ -7656,7 +7656,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:191
+#: src/features/chat/thread/request-secret-prompt.tsx:199
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -7800,6 +7800,10 @@ msgstr "无法加载记忆。"
 msgid "Could not load the skill breakdown."
 msgstr "无法加载技能明细。"
 
+#: src/features/develop/components/work-on-pull-request.tsx:73
+msgid "Could not load the threads for this {requestNoun}."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:17
 msgid "Could not load this"
 msgstr ""
@@ -7815,6 +7819,10 @@ msgstr "无法加载你的活动。"
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "无法移动页面"
+
+#: src/features/develop/components/work-on-pull-request.tsx:46
+msgid "Could not open a thread for this {requestNoun}. Try again."
+msgstr ""
 
 #: src/features/pages/components/open-as-page-button.tsx:28
 msgid "Could not open as a page"
@@ -8765,11 +8773,11 @@ msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
 
 #: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:291
+#: src/features/chat/thread/request-secret-prompt.tsx:312
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:210
+#: src/features/chat/thread/request-secret-prompt.tsx:218
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -9472,7 +9480,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -10081,7 +10089,7 @@ msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:80
+#: src/features/develop/components/pull-request-view.tsx:81
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "草稿"
@@ -13234,7 +13242,7 @@ msgstr "文件上传被拒绝。"
 msgid "Filename cannot be empty"
 msgstr "文件名不能为空"
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Files"
 msgstr ""
 
@@ -14891,7 +14899,7 @@ msgstr "访客账号只能使用免费模型。"
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Guide"
 msgstr ""
 
@@ -15924,7 +15932,7 @@ msgid "Improving..."
 msgstr "正在优化..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:106
+#: src/features/develop/components/pull-request-view.tsx:107
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -16485,7 +16493,7 @@ msgstr "它可能已被删除，或者你已无权访问。"
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "它可能已过期、被撤销或已被使用。请索取新的链接。"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:191
+#: src/features/chat/thread/request-secret-prompt.tsx:199
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -17562,7 +17570,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:56
+#: src/features/develop/components/pull-request-view.tsx:57
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "加载中"
@@ -17738,6 +17746,10 @@ msgstr "正在加载对话"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1055
 msgid "Loading threads..."
 msgstr "正在加载对话..."
+
+#: src/features/develop/components/work-on-pull-request.tsx:70
+msgid "Loading threads…"
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:679
 msgid "Loading triggers..."
@@ -18631,7 +18643,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 msgid "Merged"
 msgstr "已合并"
 
@@ -19250,7 +19262,7 @@ msgstr "步数越多 = 质量越高，生成越慢"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "不只是代理——而是介于你的应用与所有 LLM 提供商之间的智能层。"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:141
+#: src/features/chat/thread/request-secret-prompt.tsx:139
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -19910,7 +19922,7 @@ msgstr "新聊天"
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:88
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
-#: src/features/chat/header/chat-header.tsx:29
+#: src/features/chat/header/chat-header.tsx:30
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20333,7 +20345,7 @@ msgstr "还没有数据集"
 msgid "No description"
 msgstr "无描述"
 
-#: src/features/develop/components/pull-request-view.tsx:127
+#: src/features/develop/components/pull-request-view.tsx:135
 msgid "No description provided."
 msgstr ""
 
@@ -20730,6 +20742,10 @@ msgstr "此幻灯片无文本内容"
 #: ../../packages/chat-ui/src/chat/page-context-chip.tsx:84
 msgid "No text to show."
 msgstr "无可显示的文本。"
+
+#: src/features/develop/components/work-on-pull-request.tsx:77
+msgid "No thread has worked on this {requestNoun} yet."
+msgstr ""
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1074
 msgid "No threads found for"
@@ -21451,7 +21467,7 @@ msgstr "不透明度"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:679
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "打开"
@@ -21574,7 +21590,7 @@ msgid "Open new chat"
 msgstr "打开新聊天"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:92
+#: src/features/develop/components/pull-request-view.tsx:93
 msgid "Open on {0}"
 msgstr ""
 
@@ -21671,6 +21687,10 @@ msgstr "打开 Developer 标签页并启动服务器。"
 #. placeholder {0}: defaultShortcut("openModelPicker")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:134
 msgid "Open the model picker in the composer ({0})"
+msgstr ""
+
+#: src/features/develop/components/thread-pull-request-link.tsx:29
+msgid "Open the pull request {repository}#{number}"
 msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:118
@@ -21954,6 +21974,10 @@ msgstr ""
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
+#: src/features/develop/components/work-on-pull-request.tsx:86
+msgid "Opened from this thread"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Opening a blank chat"
 msgstr "正在打开空白对话"
@@ -21961,6 +21985,10 @@ msgstr "正在打开空白对话"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:156
 msgid "Opening a pull request — progress is in the log"
 msgstr "正在创建拉取请求——进度见日志"
+
+#: src/features/develop/components/work-on-pull-request.tsx:63
+msgid "Opening a thread…"
+msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:233
 msgid "Opening pull request…"
@@ -22679,7 +22707,7 @@ msgstr "粘贴图片 URL"
 msgid "Paste image URL..."
 msgstr "粘贴图片 URL..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:258
+#: src/features/chat/thread/request-secret-prompt.tsx:279
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23366,7 +23394,7 @@ msgstr "高端级推理透明度"
 msgid "Preparing a question…"
 msgstr "正在准备问题…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:216
+#: src/features/chat/thread/request-secret-prompt.tsx:224
 msgid "Preparing a request…"
 msgstr ""
 
@@ -25743,7 +25771,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/thread/request-secret-prompt.tsx:270
+#: src/features/chat/thread/request-secret-prompt.tsx:291
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26266,7 +26294,7 @@ msgstr "沙特阿拉伯"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:287
+#: src/features/chat/thread/request-secret-prompt.tsx:308
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26373,11 +26401,11 @@ msgstr "保存工作流"
 msgid "Saved"
 msgstr "已保存"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:214
+#: src/features/chat/thread/request-secret-prompt.tsx:222
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:212
+#: src/features/chat/thread/request-secret-prompt.tsx:220
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -26797,7 +26825,7 @@ msgstr "席位/月"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:245
+#: src/features/chat/thread/request-secret-prompt.tsx:259
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27299,12 +27327,12 @@ msgstr "会话已吊销"
 msgid "Set a password for your account"
 msgstr "为你的账号设置密码"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:146
-#: src/features/chat/thread/request-secret-prompt.tsx:163
+#: src/features/chat/thread/request-secret-prompt.tsx:144
+#: src/features/chat/thread/request-secret-prompt.tsx:161
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:153
+#: src/features/chat/thread/request-secret-prompt.tsx:151
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr ""
 
@@ -28731,6 +28759,10 @@ msgstr "开始于 {startedAgo}"
 msgid "Started <0>{0}</0>. Tool details and attachments are hidden on shared conversations."
 msgstr "开始于 <0>{0}</0>。共享对话中会隐藏工具详情和附件。"
 
+#: src/features/develop/components/work-on-pull-request.tsx:86
+msgid "Started here"
+msgstr ""
+
 #: src/features/tasks/components/task-detail-dialog.tsx:125
 msgid "started manually"
 msgstr "手动启动"
@@ -28796,7 +28828,7 @@ msgstr "在所有基准测试中表现顶尖"
 msgid "State:"
 msgstr "状态："
 
-#: src/features/chat/header/chat-header.tsx:154
+#: src/features/chat/header/chat-header.tsx:155
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:554
 msgid "Stateless"
 msgstr "无状态"
@@ -30388,7 +30420,7 @@ msgstr "助手有一个问题"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:227
+#: src/features/chat/thread/request-secret-prompt.tsx:241
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -30464,7 +30496,7 @@ msgstr "费用上限必须是正数（美元）。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "数据集、其用例及所有运行记录都将被删除。"
 
-#: src/features/develop/components/pull-request-view.tsx:129
+#: src/features/develop/components/pull-request-view.tsx:137
 msgid "The description is cut short."
 msgstr ""
 
@@ -31203,7 +31235,7 @@ msgstr ""
 #~ msgid "This host does not offer any view of a {0} yet."
 #~ msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:114
+#: src/features/develop/components/pull-request-view.tsx:122
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -31233,7 +31265,7 @@ msgstr ""
 msgid "This is how your organization appears to members"
 msgstr "这是你的组织向成员显示的名称"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:281
+#: src/features/chat/thread/request-secret-prompt.tsx:302
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
 
@@ -31356,6 +31388,10 @@ msgstr "所选内容过多，无法一次导入。请减少每次导入的文件
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "此服务器需要登录。请先保存，然后选择“登录”。"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:193
+msgid "This server's address changed. Check the address below and save again."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
@@ -31593,6 +31629,10 @@ msgstr "对话"
 #: src/features/marketing/components/landing-page.tsx:238
 msgid "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 msgstr "对话会保留完整历史。分支想法、置顶重要聊天，随时从上次中断的地方继续。"
+
+#: src/features/develop/components/work-on-pull-request.tsx:58
+msgid "Threads working on this {requestNoun}"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:215
 #: src/features/settings/components/chat/usage-settings.tsx:496
@@ -34089,7 +34129,7 @@ msgstr "正在等待输出…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:218
+#: src/features/chat/thread/request-secret-prompt.tsx:226
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -34108,7 +34148,7 @@ msgstr "正在等待所有者批准"
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:218
+#: src/features/chat/thread/request-secret-prompt.tsx:226
 msgid "Waiting for you"
 msgstr ""
 
@@ -34532,7 +34572,7 @@ msgstr "广泛用于生产工作负载，值得信赖"
 msgid "Width"
 msgstr "宽度"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:135
+#: src/features/chat/thread/request-secret-prompt.tsx:133
 msgid "Will be saved as your {provider} API key"
 msgstr ""
 
@@ -34567,6 +34607,10 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/popular-servers.ts:131
 msgid "Work management and team collaboration"
 msgstr "工作管理与团队协作"
+
+#: src/features/develop/components/work-on-pull-request.tsx:63
+msgid "Work on this {requestNoun}"
+msgstr ""
 
 #: src/features/sub-agents/components/worker-list.tsx:92
 msgid "Workers"
@@ -34917,7 +34961,7 @@ msgstr "你还没有已索引的知识文件。"
 msgid "You have no projects yet."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:158
+#: src/features/chat/thread/request-secret-prompt.tsx:156
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 
@@ -35250,7 +35294,7 @@ msgstr ""
 msgid "Your review was requested"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:267
+#: src/features/chat/thread/request-secret-prompt.tsx:288
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 
