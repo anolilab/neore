@@ -16,7 +16,13 @@ import { LunoraError } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import type { SecretUse } from "../tools/request-secret-constants";
-import { REQUEST_SECRET_TOOL_NAME, SECRET_DECLINED_REASON, SECRET_HEADER_VALUE_FORBIDDEN_RE, SECRET_LABEL_MAX } from "../tools/request-secret-constants";
+import {
+    REQUEST_SECRET_TOOL_NAME,
+    SECRET_DECLINED_REASON,
+    SECRET_SERVER_MOVED,
+    SECRET_HEADER_VALUE_FORBIDDEN_RE,
+    SECRET_LABEL_MAX,
+} from "../tools/request-secret-constants";
 import { invalidSecretUse, secretValueMax, storeRequestedSecret } from "./secret-requests";
 import type { ClaimResult } from "./tool-approval-claim";
 import { claimToolApproval, findPendingRequestOnLatestTurn } from "./tool-approval-claim";
@@ -75,6 +81,7 @@ const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use:
         throw new LunoraError(
             "BAD_REQUEST",
             `The address of the MCP server "${use.server}" changed since this request was shown. Reload the request and check it again`,
+            { data: { code: SECRET_SERVER_MOVED } },
         );
     }
 

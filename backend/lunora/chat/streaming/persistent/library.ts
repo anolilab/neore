@@ -287,7 +287,7 @@ export const stopActiveForThread = internalMutation
         // Nothing live: the person is stopping a reply that paused on a request (its stream is already closed). It is abandoned
         // here, and the secret it kept through the pause goes with it.
         if (live.length === 0) {
-            await discardPausedThreadSecrets(ctx, { threadId: args.threadId as Id<"threads"> });
+            await discardPausedThreadSecrets(ctx, { messageId: args.messageId, threadId: args.threadId as Id<"threads"> });
         }
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
