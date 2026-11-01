@@ -22,6 +22,7 @@ import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-paus
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
+import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -274,6 +275,19 @@ export const stopActiveForThread = internalMutation
                 ...(steers && { steers }),
                 ...(waiting && { pausedRun: undefined }),
             });
+
+            // No run is left to end this reply and drop what it was holding: one that never started, or one waiting out a limit.
+            if (waiting || stream.runClaimedAt === undefined) {
+                const threadId = stream.threadId as Id<"threads">;
+
+                await discardThreadSecrets(ctx, { replyKey: await replyKeyOfStream(ctx, { streamId: stream._id, threadId }), threadId });
+            }
+        }
+
+        // Nothing live: the person is stopping a reply that paused on a request (its stream is already closed). It is abandoned
+        // here, and the secret it kept through the pause goes with it.
+        if (live.length === 0) {
+            await discardPausedThreadSecrets(ctx, { threadId: args.threadId as Id<"threads"> });
         }
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.

@@ -10,8 +10,9 @@ import RequestSecretPrompt from "./request-secret-prompt";
 
 const SECRET = "sk-live-0123456789-supersecret";
 
-const { answer, preferencesRow, readPreferences, servers, thread } = vi.hoisted(() => {
+const { answer, preferencesRow, readFails, readPreferences, servers, thread } = vi.hoisted(() => {
     return {
+        readFails: { current: false },
         preferencesRow: { current: undefined as { mcpServers?: { name: string; url: string }[] } | null | undefined },
         readPreferences: vi.fn(),
         thread: { current: { userId: "owner" } },
@@ -73,6 +74,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             : async () => {
                                                   readPreferences();
 
+                                                  if (readFails.current) {
+                                                      throw new Error("offline");
+                                                  }
+
                                                   return preferencesRow.current === undefined ? { mcpServers: servers.current } : preferencesRow.current;
                                               },
                                     queryKey: ["getAIUserPreferences"],
@@ -104,6 +109,8 @@ const FILES_ADDRESS = /https:\/\/files\.example\.com\/mcp/u;
 const FILES_ADDRESS_HTTP = /http:\/\/files\.example\.com\/mcp/u;
 const HIDDEN_QUERY = /hidden/u;
 const TOO_LONG = /up to 500 characters/u;
+const SERVERS_NOT_LOADED = /saved MCP servers could not be loaded/u;
+const RETRY = /^Retry$/u;
 const NO_SERVER = /no saved MCP server named Files/u;
 
 const header = { header: "Authorization", kind: "mcp_header", server: "Files" } as const;
@@ -128,6 +135,7 @@ describe("the secret request card", () => {
     beforeEach(() => {
         thread.current = { userId: "owner" };
         preferencesRow.current = undefined;
+        readFails.current = false;
         readPreferences.mockClear();
         answer.mockClear();
     });
@@ -201,6 +209,45 @@ describe("the secret request card", () => {
 
         expect(await screen.findByText(NO_SERVER)).toBeTruthy();
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("sends the address it displayed with a header save, so the server can refuse a server that moved", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp?token=hidden" }];
+        mountCard(header);
+
+        await screen.findByText(FILES_ADDRESS);
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        await waitFor(() => expect(answer).toHaveBeenCalled());
+        expect(answer.mock.calls[0]?.[0]).toMatchObject({ approvalId: "approval-1", expectedUrl: "https://files.example.com/mcp?token=hidden" });
+    });
+
+    it("says a failed read of the saved servers in the card, tied to the field, and loads them again on retry", async () => {
+        readFails.current = true;
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        mountCard(header);
+
+        const alert = await screen.findByText(SERVERS_NOT_LOADED);
+
+        expect(alert.getAttribute("role")).toBe("alert");
+        expect(screen.getByPlaceholderText("Paste it here — it is not shown in the chat").getAttribute("aria-describedby")).toContain(alert.id);
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+
+        readFails.current = false;
+        fireEvent.click(screen.getByRole("button", { name: RETRY }));
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+        expect(screen.queryByText(SERVERS_NOT_LOADED)).toBeNull();
+    });
+
+    it("shows a visible focus ring on the card, where focus lands after a send", () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const className = screen.getByRole("group").getAttribute("class") ?? "";
+
+        expect(className).toContain("focus-visible:ring-2");
+        expect(className).toContain("focus-visible:ring-ring");
     });
 
     it("refuses a provider key longer than the server takes before sending, keeping what was typed", async () => {

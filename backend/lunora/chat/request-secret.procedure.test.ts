@@ -118,10 +118,13 @@ const insertRequest = async (approvalId: string, input: unknown, order = 1, conf
     });
 };
 
-const answer = async (userId: string, value: string | null, approvalId = "sec-1") =>
-    await harness.withIdentity({ userId } as never).mutation(answerSecretRequest as never, { approvalId, threadId, value } as never);
+const answer = async (userId: string, value: string | null, approvalId = "sec-1", expectedUrl?: string) =>
+    await harness
+        .withIdentity({ userId } as never)
+        .mutation(answerSecretRequest as never, { approvalId, ...(expectedUrl !== undefined && { expectedUrl }), threadId, value } as never);
 
 const RATE_LIMITED = /rate limit/iu;
+const CHANGED = /changed/iu;
 
 const rows = async (table: string) => await harness.run(async (ctx: any) => await ctx.db.query(table).collect());
 
@@ -254,6 +257,22 @@ describe("answerSecretRequest", () => {
         const [row] = (await rows("requestedSecrets")) as [{ use: unknown }];
 
         expect(row.use).toStrictEqual({ header: "Authorization", kind: "mcp_header", server: "Files", url: FILES_URL });
+    });
+
+    it("refuses a header save when the server's address is no longer the one the card displayed", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: "https://moved.example.com/mcp" }],
+                    userId: OWNER,
+                }),
+        );
+        await insertRequest("sec-2", { label: "Files token", use: { header: "Authorization", kind: "mcp_header", server: "Files" } }, 3);
+
+        await expect(answer(OWNER, SECRET, "sec-2", FILES_URL)).rejects.toThrow(CHANGED);
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+        expect(await runStatuses()).toStrictEqual(["pending", "pending"]);
+        expect(queued).toHaveLength(0);
     });
 
     it("answers a second submit with the first outcome", async () => {
