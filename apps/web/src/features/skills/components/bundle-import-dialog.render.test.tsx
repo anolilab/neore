@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
@@ -81,11 +81,18 @@ describe("BundleImportDialog while importing", () => {
         // eslint-disable-next-line testing-library/no-node-access
         const input = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-        fireEvent.change(input, { target: { files: [file()] } });
-        await new Promise((resolve) => {
-            setTimeout(resolve, 20);
+        // Reading the file is under the test's control: without the guard the read starts, finishes here and previews the file.
+        const chosen = file();
+        const text = vi.spyOn(chosen, "text").mockResolvedValue("---\nbundle: 1\nname: x\n---\n");
+
+        fireEvent.change(input, { target: { files: [chosen] } });
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
         });
 
-        await waitFor(() => expect(state.preview).not.toHaveBeenCalled());
+        expect(text).not.toHaveBeenCalled();
+        expect(state.preview).not.toHaveBeenCalled();
     });
 });
