@@ -431,6 +431,23 @@ describe("askAside", () => {
         expect(generateText).not.toHaveBeenCalled();
     });
 
+    it("answers a BAD_REQUEST, not an internal error, when the rules cannot be read on a thread that runs on its own model", async () => {
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
     it("uses the utility model for a thread that is not on a text model", async () => {
         await patchThread({ mode: "image", model: "not-a-text-model" });
 
@@ -524,6 +541,15 @@ describe("askAside", () => {
             expect(promptOfCall()).toContain("refactor the importer");
             expect(await remainingText(OTHER)).toBe(reader - 1);
             expect(await remainingText(OWNER)).toBe(owner);
+        });
+
+        it("picks the utility model under the OWNER's identity for a reader, since the owner's messages are what it receives", async () => {
+            await patchThread({ mode: "image", model: "not-a-text-model" });
+            await grantRead();
+
+            await expect(ask(QUESTION, OTHER)).resolves.toMatchObject({ withThread: true });
+
+            expect(getUtilityModel).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: OWNER }), undefined);
         });
     });
 

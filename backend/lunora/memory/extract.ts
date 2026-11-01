@@ -154,10 +154,10 @@ const classifyExtractionWorthiness = async (
     gateway: ServiceFetch,
     args: GateArgs,
     assistantQuestion: string | undefined,
-    rules: ModelFilterRules,
+    loadRules: () => Promise<ModelFilterRules>,
 ): Promise<GateDecision> => {
     try {
-        const model = await getUtilityModel(gateway, { rules, threadId: args.threadId, userId: args.userId });
+        const model = await getUtilityModel(gateway, { rules: await loadRules(), threadId: args.threadId, userId: args.userId });
         const result = await generateText({
             model,
             output: Output.object({ schema: z.object({ remember: z.boolean() }) }),
@@ -218,7 +218,7 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
 
     const decision =
         heuristic.verdict === "uncertain" && MEMORY_GATE_CLASSIFIER_ENABLED
-            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion, await loadModelFilterRules(ctx, args.userId))
+            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion, async () => await loadModelFilterRules(ctx, args.userId))
             : heuristic;
 
     // Marked whichever way the classifier answered — asking it again about the

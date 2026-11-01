@@ -58,7 +58,7 @@ import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadModelFilterRules, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
-import { getUtilityModelForUser } from "./lib/model-filter-rules";
+import { getUtilityModelForUser, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,
@@ -342,7 +342,10 @@ export const askAside = authAction
             const [prefs, userProviderKeys, modelFilterRules, runModel] = await Promise.all([
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
-                loadModelFilterRules(ctx, userId),
+                // An unreadable rules read answers like a refusal, not an internal error.
+                loadModelFilterRules(ctx, userId).catch((error: unknown) => {
+                    throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
+                }),
                 resolveRunModel(ctx, chosen.model, userId),
             ]);
             const agent = await getAgent(chosen.model, {
@@ -359,7 +362,8 @@ export const askAside = authAction
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
         } else {
-            model = await getUtilityModelForUser(ctx, gateway, { threadId, userId });
+            // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too.
+            model = await getUtilityModelForUser(ctx, gateway, { threadId, userId: thread?.userId ?? userId });
         }
 
         // Charged only now that the call is certain to be made: a refusal above, or a failure while the model was

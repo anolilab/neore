@@ -1699,9 +1699,10 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
         throwBadRequest("userId is required for createSummarizeChat");
     }
 
-    const background = await resolveBackgroundModel(context, userId, DEFAULT_SUMMARIZATION_MODEL);
+    // The thread's messages are the OWNER's: a collaborator who asked for the summary does not widen the models they go to.
+    const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_SUMMARIZATION_MODEL);
 
-    // The user's model filters allow no background model: the thread is left unsummarised.
+    // The owner's model filters allow no background model: the thread is left unsummarised.
     if (!background) {
         return;
     }
@@ -3670,9 +3671,10 @@ export const getFollowupSuggestions = authAction
         const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
         const language = threadLanguage || userLanguage;
 
-        const background = await resolveBackgroundModel(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
+        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
+        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
 
-        // The user's model filters allow no background model: no suggestions, as for a host-run thread.
+        // The model filters allow no background model: no suggestions, as for a host-run thread.
         if (!background) {
             return { suggestions: [] };
         }
@@ -3759,7 +3761,8 @@ export const generateFollowupSuggestionsForThread = internalAction
             const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
             const language = threadLanguage || userLanguage;
 
-            const background = await resolveBackgroundModel(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
+            // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
 
             if (!background) {
                 return;
