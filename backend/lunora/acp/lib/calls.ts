@@ -20,6 +20,7 @@ import { isForwardHostState, updateHostStream } from "../../chat/streaming/persi
 import { isAcpTool } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
+import { markReattachFailed } from "./reattach";
 
 type Call = Doc<"deviceCalls">;
 
@@ -65,6 +66,11 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
     }
 
     await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+
+    // A session that was to load its saved one never did: the divider that asked is no longer a resumed session.
+    if (session.nativeSessionId !== undefined) {
+        await markReattachFailed(ctx, session.threadId, "load_failed");
+    }
 
     const held = await ctx.db.persistentStreams.findFirst({
         orderBy: [{ _creationTime: "desc" }],
