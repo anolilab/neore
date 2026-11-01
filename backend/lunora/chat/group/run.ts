@@ -193,20 +193,20 @@ export const routeSpeakers = async (args: {
     /** The calling action's gateway binding. */
     gateway: ServiceFetch;
     history: ReadonlyArray<GroupHistoryRow>;
+    /** Reads the user's model filter rules, which the router model must satisfy; run inside the failure boundary. */
+    loadRules: () => Promise<ModelFilterRules>;
     participants: ReadonlyArray<GroupParticipantInfo>;
-    /** The user's model filter rules, which the router model must satisfy. */
-    rules: ModelFilterRules;
     threadId: string;
     userId: string;
 }): Promise<string[]> => {
-    const { gateway, history, participants, rules, threadId, userId } = args;
+    const { gateway, history, loadRules, participants, threadId, userId } = args;
 
     if (participants.length === 1) {
         return participants.map((p) => p.skillId);
     }
 
     try {
-        const model = await getUtilityModel(gateway, { rules, threadId, userId });
+        const model = await getUtilityModel(gateway, { rules: await loadRules(), threadId, userId });
         const result = await generateText({
             abortSignal: AbortSignal.timeout(ROUTER_TIMEOUT_MS),
             model,
@@ -723,7 +723,14 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
     if (plan.kind === "fixed") {
         queue = plan.speakers;
     } else if (plan.kind === "route") {
-        queue = await routeSpeakers({ gateway: gatewayFetch(ctx), history, participants, rules: await loadModelFilterRules(ctx, userId), threadId, userId });
+        queue = await routeSpeakers({
+            gateway: gatewayFetch(ctx),
+            history,
+            loadRules: async () => await loadModelFilterRules(ctx, userId),
+            participants,
+            threadId,
+            userId,
+        });
     }
 
     if (queue.length === 0) {

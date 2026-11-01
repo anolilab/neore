@@ -16,8 +16,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
-import { loadModelFilterRules } from "./lib/model-filter-rules";
+import { getUtilityModelForUser } from "./lib/model-filter-rules";
 import {
     MAX_LANGUAGE_TAG_LENGTH,
     MAX_MESSAGE_ID_LENGTH,
@@ -78,11 +77,7 @@ export const translateMessage = authAction
                     },
                     translate: async ({ prompt, system }) => {
                         // The model is resolved first: a user whose filters allow none is refused before anything is charged.
-                        const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId }).catch(
-                            (error: unknown) => {
-                                throw error instanceof NoAllowedUtilityModelError ? new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE) : error;
-                            },
-                        );
+                        const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId });
 
                         // Only a cache miss reaches here, so only a model call is charged.
                         const charge = await chargeDailyLimit(ctx, { _id: userId, isAnonymous: false, plan: plan ?? null, role: role ?? null }, "Text");

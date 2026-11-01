@@ -95,7 +95,7 @@ const progressProbe = vi.hoisted(() => {
     return { on: false };
 });
 const routerScript = vi.hoisted(() => {
-    return { calls: 0, speakers: [] as string[] };
+    return { calls: 0, failRulesReadAt: 0, rulesReads: 0, speakers: [] as string[] };
 });
 
 vi.mock("../lib/get-agent", () => {
@@ -174,6 +174,12 @@ const fakeProcedures = () => {
         return { language: undefined, location: undefined, memoryEnabled: false, timezone: undefined };
     });
     const agentPrefs = internalQuery.input({ userId: v.string() }).query(async () => {
+        routerScript.rulesReads += 1;
+
+        if (routerScript.rulesReads === routerScript.failRulesReadAt) {
+            throw new Error("D1 unavailable");
+        }
+
         return { autoMediaEnrichment: false };
     });
     const keys = internalQuery.input({ userId: v.string() }).query(async () => {
@@ -333,6 +339,8 @@ beforeEach(async () => {
     speakerTools.clear();
     progressProbe.on = false;
     routerScript.calls = 0;
+    routerScript.failRulesReadAt = 0;
+    routerScript.rulesReads = 0;
     routerScript.speakers = [];
     replyCharges.allow = Infinity;
     replyCharges.calls = 0;
@@ -374,6 +382,19 @@ afterEach(() => {
 });
 
 describe("runGroupTurn — supervisor with two routed speakers", () => {
+    it("falls back to the rotation, without asking the router, when the model filter rules cannot be read", async () => {
+        await setGroup("supervisor", ["writer", "checker", "reviewer"]);
+        routerScript.speakers = ["p2", "p1"];
+        // The turn context reads the rules first; the routing read is the second, and only it fails.
+        routerScript.failRulesReadAt = 2;
+
+        await runTurn();
+
+        expect(routerScript.calls).toBe(0);
+        expect(await speakersSaid()).toStrictEqual(["WRITER"]);
+        expect(await streamStatus()).toBe("done");
+    });
+
     it("saves both replies in order, labelled, the second continuing the first on the same branch", async () => {
         await setGroup("supervisor", ["writer", "checker", "reviewer"]);
         routerScript.speakers = ["p2", "p1"];

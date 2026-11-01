@@ -53,12 +53,12 @@ import { ASIDE_ADD_CLAIM_TTL_MS, ASIDE_ADD_SCOPE, claimOnce } from "../lib/claim
 import { authAction, authMutation, rateLimit } from "../lib/crpc";
 import { chatLogger } from "../lib/logger";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadModelFilterRules, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import { getUtilityModelForUser } from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,
@@ -359,9 +359,7 @@ export const askAside = authAction
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
         } else {
-            model = await getUtilityModel(gateway, { rules: await loadModelFilterRules(ctx, userId), threadId, userId }).catch((error: unknown) => {
-                throw error instanceof NoAllowedUtilityModelError ? new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE) : error;
-            });
+            model = await getUtilityModelForUser(ctx, gateway, { threadId, userId });
         }
 
         // Charged only now that the call is certain to be made: a refusal above, or a failure while the model was

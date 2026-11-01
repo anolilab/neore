@@ -6,9 +6,12 @@
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
 const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
     return {
@@ -408,6 +411,24 @@ describe("askAside", () => {
         expect(getAgent).not.toHaveBeenCalled();
         expect(generateText.mock.calls[0]![0].model).toStrictEqual({ id: "utility-model" });
         expect(promptOfCall()).not.toContain("importer");
+    });
+
+    it("answers a BAD_REQUEST that says so, not an internal error, when the model filter rules cannot be read", async () => {
+        await patchThread({ mode: "image", model: "not-a-text-model" });
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
     });
 
     it("uses the utility model for a thread that is not on a text model", async () => {

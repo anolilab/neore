@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveBackgroundModel } from "./background-model";
 import { createRunLowRiskCheck } from "./low-risk-check";
-import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "./model-filter-rules";
+import { NoAllowedUtilityModelError } from "../../lib/utility-model";
+import { getUtilityModelForUser, loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./model-filter-rules";
 
 const generateText = vi.hoisted(() => vi.fn());
 
@@ -118,5 +119,33 @@ describe("the plan carried by the rules", () => {
         await expect(resolveBackgroundModel(ctxOf(rules, { isAdmin: true, plan: null }), "u1", "moonshotai/kimi-k2-0905")).resolves.toMatchObject({
             model: "anthropic/claude-haiku-4.5",
         });
+    });
+});
+
+describe("getUtilityModelForUser", () => {
+    it("answers an unreadable rules read as a BAD_REQUEST with its own message", async () => {
+        await expect(getUtilityModelForUser(ctxOf(failing), async () => new Response("{}"), { userId: "u1" })).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+            message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE,
+        });
+    });
+
+    it("answers rules that allow no model as a BAD_REQUEST", async () => {
+        await expect(
+            getUtilityModelForUser(
+                ctxOf(() => prefs({ modelFilterRules: { allowedModels: ["no/such-model"] } })),
+                async () => new Response("{}"),
+                { userId: "u1" },
+            ),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("None of the background models") });
+    });
+});
+
+describe("ModelFilterRulesUnavailableError", () => {
+    it("reads as a settings problem, not as a refusal by the rules", () => {
+        const error = new ModelFilterRulesUnavailableError();
+
+        expect(error).toBeInstanceOf(NoAllowedUtilityModelError);
+        expect(error.message).toBe("Your model settings could not be read; try again.");
     });
 });
