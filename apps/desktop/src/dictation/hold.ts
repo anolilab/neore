@@ -1,8 +1,8 @@
 /**
- * The letter of the chord. Windows uses Y: on an arm64 Windows runner Windows refused Ctrl+Shift+D (another process held it),
- * so the switch was on and the helper present, yet nothing was registered.
+ * The letter of the chord. Windows on arm64 uses Y: there Windows refused Ctrl+Shift+D (another process held it), so the
+ * switch was on and the helper present, yet nothing was registered. x64 Windows keeps D.
  */
-export const DICTATION_LETTER = process.platform === "win32" ? "Y" : "D";
+export const DICTATION_LETTER = process.platform === "win32" && process.arch === "arm64" ? "Y" : "D";
 
 /** The shortcut that starts a dictation, registered only while the switch in settings is on. It is held down while speaking. */
 // eslint-disable-next-line no-secrets/no-secrets -- a keyboard accelerator, not a credential
