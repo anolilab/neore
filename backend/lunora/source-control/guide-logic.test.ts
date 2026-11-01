@@ -232,10 +232,31 @@ describe("extractJsonObject", () => {
         expect((extractJsonObject(`${diff}\n${planted}\n${diff}\n${real}`) as { stops: unknown[] }).stops).toHaveLength(10);
     });
 
+    it("stays cheap once the answer is found, however many braces an echoed diff put before it", () => {
+        const real = JSON.stringify({ stops: [{ title: "real" }], summary: "the real one" });
+        const stats = { scanned: 0 };
+
+        expect((extractJsonObject(`${"{ ".repeat(500_000)} ${real}`, stats) as { summary: string }).summary).toBe("the real one");
+        expect(stats.scanned).toBeLessThan(400_000);
+    });
+
     it("does not read an object nested in the answer, or one quoted in a string of it, as the answer", () => {
         const inner = String.raw`{"summary":"x","stops":[{"title":"t","explanation":"see {\"stops\":[]} here","files":[]}]}`;
 
         expect(extractJsonObject(inner)).toMatchObject({ summary: "x" });
+    });
+
+    it("prefers the answer that encloses a nested object with its own stops array", () => {
+        const answer = '{"summary":"s","stops":[{"title":"real"}],"metadata":{"stops":[]}}';
+
+        expect(extractJsonObject(`Done:\n${answer}`)).toEqual(JSON.parse(answer));
+    });
+
+    it("takes the later answer over an earlier echoed one", () => {
+        const echoed = '{"summary":"echo","stops":[{"title":"e"}],"metadata":{"stops":[]}}';
+        const real = '{"summary":"real","stops":[{"title":"r"}],"metadata":{"stops":[]}}';
+
+        expect(extractJsonObject(`${echoed}\n${real}`)).toMatchObject({ summary: "real" });
     });
 
     it("is null when there is no object with stops", () => {

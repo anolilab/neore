@@ -22,7 +22,8 @@ const RE_11 = /could not be removed again: alpha/;
 const RE_12 = /Weekly/;
 const RE_13 = /not in this bundle/;
 const RE_14 = /at least one/;
-const RE_16 = /switched off/;
+const RE_16 = /by hand/;
+const RE_KEPT = /Kept with the skills it uses.*Panel/;
 const RE_17 = /never fires|no next run/i;
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
@@ -358,6 +359,58 @@ describe("the import", () => {
 
         expect(ops.deleteSkill).not.toHaveBeenCalled();
         expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+    });
+
+    it("keeps the skills of a group chat that has messages by now, and says so", async () => {
+        const { ops } = fakeOps({
+            createTrigger: vi.fn(async () => {
+                throw new Error("boom");
+            }),
+            deleteGroupChat: vi.fn(async () => {
+                return { kept: true };
+            }),
+        });
+        const error = (await runBundleImport(plan(items), ALL, ops).catch((error_: unknown) => error_)) as BundleImportError;
+
+        expect(ops.deleteSkill).not.toHaveBeenCalled();
+        expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+        expect(error.message).toMatch(RE_KEPT);
+        expect(mayRetryImport(error)).toBe(false);
+    });
+
+    it("keeps only the skills of the group chat that stays, and deletes the rest", async () => {
+        const two: BundleItem[] = [
+            skill("alpha"),
+            skill("beta"),
+            skill("gamma"),
+            skill("delta"),
+            { group: GROUP, kind: "group" },
+            { group: { ...GROUP, participants: ["gamma", "delta"], title: "Second" }, kind: "group" },
+            { kind: "trigger", trigger: WEBHOOK },
+        ];
+        const { calls, ops } = fakeOps({
+            createTrigger: vi.fn(async () => {
+                throw new Error("boom");
+            }),
+            deleteGroupChat: vi.fn(async (id) => {
+                calls.push(`deleteGroup:${id}`);
+
+                return { kept: id === "thread-5" };
+            }),
+        });
+        const everything = new Set(["group:4", "group:5", "skill:0", "skill:1", "skill:2", "skill:3", "trigger:6"]);
+        const error = (await runBundleImport(plan(two), everything, ops).catch((error_: unknown) => error_)) as BundleImportError;
+
+        // thread-5 is "Panel" (alpha, beta = skill-1, skill-2): kept. "Second" (gamma, delta = skill-3, skill-4) is deleted with its skills.
+        expect(calls).toContain("deleteGroup:thread-6");
+        expect(calls).toContain("deleteSkill:skill-3");
+        expect(calls).toContain("deleteSkill:skill-4");
+        expect(calls).not.toContain("deleteSkill:skill-1");
+        expect(calls).not.toContain("deleteSkill:skill-2");
+        expect(error.leftBehind.toSorted(byText)).toStrictEqual(["alpha", "beta", "Panel"]);
+        expect(error.message).not.toContain("by hand");
+        expect(error.message).not.toContain("switched off");
+        expect(error.message).toMatch(RE_KEPT);
     });
 
     it("names what it could not remove again", async () => {
