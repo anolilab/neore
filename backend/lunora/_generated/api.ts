@@ -717,6 +717,11 @@ export interface ApiTypes {
             rerunCheck: FunctionReference<"action", { number: number; repository: string; checkId: string }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
             setAutoMerge: FunctionReference<"action", { number: number; repository: string; enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
+        pr_threads: {
+            getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
+            listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+            startWorkOnPullRequest: FunctionReference<"mutation", { baseBranch?: string; headBranch?: string; number: number; repository: string }, { created: boolean; threadId: string }>;
+        };
         review_drafts: {
             deleteDraftComment: FunctionReference<"mutation", { commentId: string; number: number; repository: string }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
             discardReviewDraft: FunctionReference<"mutation", { number: number; repository: string }, { status: "ok" } | { status: "submitting" }>;
@@ -1567,6 +1572,11 @@ export const api: ApiTypes = {
             mergePullRequest: { __lunoraRef: "source_control_merge_functions:mergePullRequest" },
             rerunCheck: { __lunoraRef: "source_control_merge_functions:rerunCheck" },
             setAutoMerge: { __lunoraRef: "source_control_merge_functions:setAutoMerge" },
+        },
+        pr_threads: {
+            getForThread: { __lunoraRef: "source_control_pr_threads:getForThread" },
+            listForPullRequest: { __lunoraRef: "source_control_pr_threads:listForPullRequest" },
+            startWorkOnPullRequest: { __lunoraRef: "source_control_pr_threads:startWorkOnPullRequest" },
         },
         review_drafts: {
             deleteDraftComment: { __lunoraRef: "source_control_review_drafts:deleteDraftComment" },
