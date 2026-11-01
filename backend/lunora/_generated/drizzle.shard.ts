@@ -1197,7 +1197,7 @@ export const requestedSecrets = sqliteTable("requestedSecrets", {
     label: text("label").notNull(),
     ref: text("ref").notNull(),
     replyKey: text("replyKey"),
-    status: text("status", { mode: "json" }).$type<"saved" | "used">().notNull(),
+    status: text("status", { mode: "json" }).$type<"saved" | "used" | "abandoned">().notNull(),
     threadId: text("threadId").notNull(),
     use: text("use", { mode: "json" }).$type<{ header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string }>().notNull(),
     userId: text("userId").notNull(),

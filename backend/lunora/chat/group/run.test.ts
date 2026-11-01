@@ -656,6 +656,46 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect(await streamStatus()).toBe("done");
     });
 
+    it("drops the paused turn's saved references, and leaves its plain tool approval answerable, when a new message moves the conversation on", async () => {
+        await setUpPausingWriter();
+
+        await runTurn();
+
+        const { storeRequestedSecret } = await import("../lib/secret-requests");
+        const { createStreamWithMessage } = await import("../streaming/index");
+        const row = await approvalRow();
+        const ref = await harness.run(
+            async (ctx: any) =>
+                await storeRequestedSecret(ctx, {
+                    approvalId: "other-approval",
+                    label: "L",
+                    now: Date.now(),
+                    replyKey: row.config.replyKey ?? row.streamId,
+                    threadId: threadId as never,
+                    use: { kind: "provider_key", provider: "openai" },
+                    userId: OWNER,
+                    value: "sk-live-0123456789-supersecret",
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStreamWithMessage, {
+                    messageId: "next",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const stored = await harness.run(async (ctx: any) => await ctx.db.query("requestedSecrets").collect());
+        const secret = stored.find((r: { ref: string }) => r.ref === ref);
+
+        expect(secret).toMatchObject({ status: "abandoned" });
+        expect(secret.encryptedValue).toBeUndefined();
+        expect(await approvalRow()).toMatchObject({ status: "pending" });
+    });
+
     it("keeps what started the turn in the snapshot, so a person's answer does not turn an outside agent's turn into the lead's", async () => {
         await setUpPausingWriter();
         await runTurn("Draft a tagline", "outside_agent");

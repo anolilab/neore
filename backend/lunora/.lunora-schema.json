@@ -20879,6 +20879,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"abandoned\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"saved\""
             },
             {

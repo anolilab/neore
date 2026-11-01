@@ -13,7 +13,9 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { decryptKey, encryptKey } from "../../lib/encryption";
 import { patchRow } from "../../lib/patch";
+import { APPROVAL_ABANDONED_BY } from "./tool-approval-claim";
 import type { SecretFailure, SecretUse } from "../tools/request-secret-constants";
+import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import {
     isForbiddenSecretHeader,
     SECRET_HEADER_NAME_MAX,
@@ -135,6 +137,10 @@ export const takeRequestedSecret = async (
         return { ok: false, status: "expired" };
     }
 
+    if (row.status === "abandoned") {
+        return { ok: false, status: "abandoned" };
+    }
+
     if (row.status === "used" || row.encryptedValue === undefined) {
         return { ok: false, status: "used" };
     }
@@ -198,6 +204,129 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
     }
 
     return live.length;
+};
+
+/**
+ * The ids of the thread's recent approval requests that are `requestSecret` calls. Read from the saved messages (the
+ * snapshot does not name the tool), a window deep enough to reach the turn a Stop or a new message just moved past.
+ */
+const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">): Promise<Set<string>> => {
+    const recent = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+        .order("desc")
+        .take(40);
+    const ids = new Set<string>();
+
+    for (const message of recent) {
+        const content = (message.message as { content?: unknown } | undefined)?.content;
+        const parts = Array.isArray(content) ? (content as { approvalId?: string; toolCallId?: string; toolName?: string; type?: string }[]) : [];
+        const secretCalls = new Set(
+            parts.filter((part) => part.type === "tool-call" && part.toolName === REQUEST_SECRET_TOOL_NAME).map((part) => part.toolCallId),
+        );
+
+        for (const part of parts) {
+            if (part.type === "tool-approval-request" && part.approvalId !== undefined && secretCalls.has(part.toolCallId)) {
+                ids.add(part.approvalId);
+            }
+        }
+    }
+
+    return ids;
+};
+
+/**
+ * A reply paused on a request (a consumer tool set to `ask` holds its saved references through the pause) that the person
+ * walks away from: Stop with nothing live, or a new message that moves the conversation past it. Drops the ciphertext of
+ * every reply with a pending snapshot on `threadId`, in one pass over the thread's saved references. Those requests are
+ * denied (`resolvedBy` {@link APPROVAL_ABANDONED_BY}), so none can be answered any more, and a late spend of a reference
+ * reads `abandoned`.
+ *
+ * A pause with several requests shares one reply key, so answering one starts a continuation while another stays
+ * pending: a key whose reply has a live stream is skipped, the live run still needs its references. `messageId` narrows
+ * it to the reply of that prompt (a Stop that names one); when no stream of the thread carries it, every paused reply goes.
+ * `keep` names reply keys whose references stay (a stop has just ended a claimed run that drops its own); their
+ * requests are still denied.
+ */
+export const discardPausedThreadSecrets = async (
+    ctx: Database,
+    args: { keep?: ReadonlySet<string>; messageId?: string; threadId: Id<"threads"> },
+): Promise<number> => {
+    const runs = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+    const pending = runs.filter((run) => run.status === "pending");
+
+    if (pending.length === 0) {
+        return 0;
+    }
+
+    const keyOfStream = (streamId: string): string => runs.find((run) => run.streamId === streamId)?.config.replyKey ?? streamId;
+    const keys = new Set(pending.map((run) => run.config.replyKey ?? run.streamId).filter((key): key is string => key !== undefined));
+
+    let cursor: string | undefined;
+
+    do {
+        const page = await ctx.db.persistentStreams.findMany({
+            cursor,
+            limit: 50,
+            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+        });
+
+        for (const stream of page.page) {
+            keys.delete(keyOfStream(stream._id));
+        }
+
+        cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+    } while (cursor);
+
+    if (args.messageId !== undefined) {
+        const named = await ctx.db.persistentStreams.findMany({ where: { messageId: args.messageId, threadId: args.threadId } });
+
+        if (named.page.length > 0) {
+            const own = new Set(named.page.map((stream) => keyOfStream(stream._id)));
+
+            for (const key of keys) {
+                if (!own.has(key)) {
+                    keys.delete(key);
+                }
+            }
+        }
+    }
+
+    if (keys.size === 0) {
+        return 0;
+    }
+
+    // The secret requests of the reply are denied with it: nothing is waiting on them, and a late answer must not resume it.
+    // Any other pending approval stays as it was, answerable.
+    const secretApprovals = await secretApprovalIdsOf(ctx, args.threadId);
+
+    for (const run of pending) {
+        if (keys.has(run.config.replyKey ?? run.streamId ?? "") && secretApprovals.has(run.approvalId)) {
+            await patchRow(ctx.db, run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
+        }
+    }
+
+    // A run the stop is still settling drops its own references when it ends.
+    const settling = args.keep ?? new Set<string>();
+
+    for (const key of settling) {
+        keys.delete(key);
+    }
+
+    const rows = await ctx.db
+        .query("requestedSecrets")
+        .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+        .collect();
+    const held = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey !== undefined && keys.has(row.replyKey));
+
+    for (const row of held) {
+        await patchRow(ctx.db, row, { encryptedValue: undefined, status: "abandoned" });
+    }
+
+    return held.length;
 };
 
 /** Delete every row of `threadId`, ciphertext included — the thread is gone, and so is whatever a reply of it was holding. Returns how many. */

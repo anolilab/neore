@@ -10,8 +10,9 @@ import RequestSecretPrompt from "./request-secret-prompt";
 
 const SECRET = "sk-live-0123456789-supersecret";
 
-const { answer, preferencesRow, readPreferences, servers, thread } = vi.hoisted(() => {
+const { answer, preferencesRow, readFails, readPreferences, servers, thread } = vi.hoisted(() => {
     return {
+        readFails: { current: false },
         preferencesRow: { current: undefined as { mcpServers?: { name: string; url: string }[] } | null | undefined },
         readPreferences: vi.fn(),
         thread: { current: { userId: "owner" } },
@@ -73,6 +74,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             : async () => {
                                                   readPreferences();
 
+                                                  if (readFails.current) {
+                                                      throw new Error("offline");
+                                                  }
+
                                                   return preferencesRow.current === undefined ? { mcpServers: servers.current } : preferencesRow.current;
                                               },
                                     queryKey: ["getAIUserPreferences"],
@@ -102,8 +107,11 @@ const SAVE = /^Save$/u;
 const DECLINE = /Decline/u;
 const FILES_ADDRESS = /https:\/\/files\.example\.com\/mcp/u;
 const FILES_ADDRESS_HTTP = /http:\/\/files\.example\.com\/mcp/u;
+const FILES_V2_ADDRESS = /https:\/\/files\.example\.com\/v2\/mcp/u;
 const HIDDEN_QUERY = /hidden/u;
 const TOO_LONG = /up to 500 characters/u;
+const SERVERS_NOT_LOADED = /saved MCP servers could not be loaded/u;
+const RETRY = /^Retry$/u;
 const NO_SERVER = /no saved MCP server named Files/u;
 
 const header = { header: "Authorization", kind: "mcp_header", server: "Files" } as const;
@@ -128,6 +136,7 @@ describe("the secret request card", () => {
     beforeEach(() => {
         thread.current = { userId: "owner" };
         preferencesRow.current = undefined;
+        readFails.current = false;
         readPreferences.mockClear();
         answer.mockClear();
     });
@@ -201,6 +210,89 @@ describe("the secret request card", () => {
 
         expect(await screen.findByText(NO_SERVER)).toBeTruthy();
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("sends the address it displayed with a header save, so the server can refuse a server that moved", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp?token=hidden" }];
+        mountCard(header);
+
+        await screen.findByText(FILES_ADDRESS);
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        await waitFor(() => expect(answer).toHaveBeenCalled());
+        expect(answer.mock.calls[0]?.[0]).toMatchObject({ approvalId: "approval-1", expectedUrl: "https://files.example.com/mcp?token=hidden" });
+    });
+
+    it("says the server's address changed and shows the current one when the save is refused for a moved server", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        answer.mockImplementationOnce(async () => {
+            servers.current = [{ name: "Files", url: "https://files.example.com/v2/mcp" }];
+
+            throw Object.assign(new Error("changed"), { data: { code: "SECRET_SERVER_MOVED" } });
+        });
+        mountCard(header);
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        expect(await screen.findByText("This server's address changed. Check the address below and save again.")).toBeTruthy();
+        expect(await screen.findByText(FILES_V2_ADDRESS)).toBeTruthy();
+        expect(screen.queryByText("It was not saved. Paste it again and save.")).toBeNull();
+    });
+
+    it("says a failed read of the saved servers in the card, tied to the field, and loads them again on retry", async () => {
+        readFails.current = true;
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        mountCard(header);
+
+        const alert = await screen.findByText(SERVERS_NOT_LOADED);
+
+        expect(alert.getAttribute("role")).toBe("alert");
+        expect(screen.getByPlaceholderText("Paste it here — it is not shown in the chat").getAttribute("aria-describedby")).toContain(alert.id);
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+
+        readFails.current = false;
+        fireEvent.click(screen.getByRole("button", { name: RETRY }));
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+        expect(screen.queryByText(SERVERS_NOT_LOADED)).toBeNull();
+    });
+
+    it("closes the card, with no form, when the server says the conversation moved on", async () => {
+        answer.mockRejectedValueOnce(Object.assign(new Error("closed"), { data: { code: "TOOL_REQUEST_ABANDONED" } }));
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        fireEvent.change(screen.getByPlaceholderText("Paste it here — it is not shown in the chat"), { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        expect(await screen.findByText("Closed — the conversation moved on. Ask again in the chat.")).toBeTruthy();
+        expect(screen.queryByPlaceholderText("Paste it here — it is not shown in the chat")).toBeNull();
+    });
+
+    it("stops offering Save when a refresh of the saved servers fails after an earlier good read", async () => {
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+
+        const client = mountCard(header);
+
+        expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
+
+        readFails.current = true;
+        await client.refetchQueries({ queryKey: ["getAIUserPreferences"] }).catch(() => undefined);
+
+        expect(await screen.findByText(SERVERS_NOT_LOADED)).toBeTruthy();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByRole("button", { name: RETRY })).toBeTruthy();
+    });
+
+    it("shows a visible focus ring on the card, where focus lands after a send", () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const className = screen.getByRole("group").getAttribute("class") ?? "";
+
+        expect(className).toContain("focus-visible:ring-2");
+        expect(className).toContain("focus-visible:ring-ring");
     });
 
     it("refuses a provider key longer than the server takes before sending, keeping what was typed", async () => {

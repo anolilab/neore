@@ -31,6 +31,7 @@ import {
     AgentRunError,
     buildRunStreamArgs,
     createRunSteering,
+    discardRunSecrets,
     endStoppedRun,
     failRun,
     finishRun,
@@ -725,6 +726,8 @@ export const continueAfterToolApproval = internalAction
 
             if (resumed.stopped) {
                 await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
+                // The stop ended the reply for good, so what it kept through its pause goes with it.
+                await discardRunSecrets(ctx, { streamId, threadId });
             }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);

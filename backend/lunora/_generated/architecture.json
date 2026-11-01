@@ -20283,7 +20283,7 @@
     {
       "file": "chat/lib/request-secret-claim",
       "kind": "read",
-      "line": 57,
+      "line": 63,
       "reason": "\"claimSecretAnswer\" is not a registered function"
     },
     {
@@ -20301,49 +20301,67 @@
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 82,
+      "line": 84,
       "reason": "\"storeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 115,
+      "line": 117,
       "reason": "\"takeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 170,
+      "line": 176,
       "reason": "\"replyKeyOfStream\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 190,
+      "line": 196,
       "reason": "\"discardThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 205,
+      "line": 214,
+      "reason": "\"discardPausedThreadSecrets\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/secret-requests",
+      "kind": "read",
+      "line": 255,
+      "reason": "\"discardPausedThreadSecrets\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/secret-requests",
+      "kind": "read",
+      "line": 319,
+      "reason": "\"discardPausedThreadSecrets\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/secret-requests",
+      "kind": "read",
+      "line": 334,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 211,
+      "line": 340,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 219,
+      "line": 348,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 225,
+      "line": 354,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
@@ -20385,13 +20403,13 @@
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "read",
-      "line": 152,
+      "line": 158,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-claim",
       "kind": "write",
-      "line": 179,
+      "line": 192,
       "reason": "\"claimToolApproval\" is not a registered function"
     },
     {
@@ -20553,7 +20571,7 @@
     {
       "file": "chat/streaming/persistent/library",
       "kind": "write",
-      "line": 50,
+      "line": 51,
       "reason": "\"insertPersistentStream\" is not a registered function"
     },
     {

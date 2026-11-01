@@ -680,7 +680,16 @@ written here is what is not.
   headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
   a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
   snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
-  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run — and when a
+  paused reply is ABANDONED: `stopActiveForThread` (also while another reply is live; a live reply keeps its own) or a
+  stopped stream that never started or was waiting out a limit, and `createStreamWithMessage` (a new message moves past the
+  request), all through `discardPausedThreadSecrets` (a group turn's pause is the same snapshot, so the same path). That
+  call skips reply keys that still have a live stream (a pause with several requests shares one key), clears the thread's
+  references in one pass, DENIES the reply's pending SECRET requests (`resolvedBy: "abandoned"`; answering one is refused with
+  `TOOL_REQUEST_ABANDONED`; other pending approvals stay answerable, and a Stop denies them even when a claimed run keeps its
+  ciphertext until it settles) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
+  only that prompt's reply.
+  The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
