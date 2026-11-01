@@ -288,7 +288,8 @@ export const stopActiveForThread = internalMutation
         // is live: it is abandoned here, and the secret it kept through the pause goes with it. A reply that was live keeps its
         // own (a stopped run drops them when it ends; one still running needs them).
         const threadId = args.threadId as Id<"threads">;
-        const keep = new Set(await Promise.all(live.map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId }))));
+        const settling = live.filter((stream) => stream.runClaimedAt !== undefined);
+        const keep = new Set(await Promise.all(settling.map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId }))));
 
         await discardPausedThreadSecrets(ctx, { keep, messageId: args.messageId, threadId });
 

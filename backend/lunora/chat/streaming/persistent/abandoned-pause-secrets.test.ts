@@ -44,11 +44,31 @@ let threadId: string;
 
 const run = async <T>(body: (context: any) => Promise<T>): Promise<T> => await harness.run(body);
 
-const insertSnapshot = async (status: "approved" | "pending", replyKey: string, streamId?: string) =>
+/** An assistant row that asks for `approvalId` on a call of `toolName`, the way the run saves it. */
+const insertRequestMessage = async (approvalId: string, toolName = "requestSecret") =>
+    await run(
+        async (ctx) =>
+            await ctx.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: {}, toolCallId: `call-${approvalId}`, toolName, type: "tool-call" },
+                        { approvalId, toolCallId: `call-${approvalId}`, type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 1,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                userId: OWNER,
+            }),
+    );
+
+const insertSnapshot = async (status: "approved" | "pending", replyKey: string, streamId?: string, approvalId = `appr-${replyKey}-${status}`) =>
     await run(
         async (ctx) =>
             await ctx.db.insert("toolApprovalRuns", {
-                approvalId: `appr-${replyKey}-${status}`,
+                approvalId,
                 config: { ...CONFIG, replyKey },
                 createdAt: Date.now(),
                 status,
@@ -255,6 +275,7 @@ describe("a paused reply that is abandoned", () => {
     it("denies the abandoned pause's requests and reads a late spend as abandoned", async () => {
         const ref = await storeSecret("stream-A");
 
+        await insertRequestMessage("appr-stream-A-pending");
         await insertSnapshot("pending", "stream-A");
         await run(
             async (ctx) =>
@@ -276,5 +297,42 @@ describe("a paused reply that is abandoned", () => {
         );
 
         expect(spend).toStrictEqual({ ok: false, status: "abandoned" });
+    });
+
+    it("leaves a plain tool approval answerable when its paused reply is stopped, although its references go", async () => {
+        const ref = await storeSecret("stream-A");
+
+        await insertRequestMessage("appr-stream-A-pending", "mcp_files__read");
+        await insertSnapshot("pending", "stream-A");
+        await insertStream("done", Date.now());
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ status: "pending" });
+        expect(await holdsValue(ref)).toBe(false);
+    });
+
+    describe.each([
+        { claimed: false, keepsValue: false },
+        { claimed: true, keepsValue: true },
+    ])("Stop of a reply whose continuation is live (claimed: $claimed)", ({ claimed, keepsValue }) => {
+        it("denies the other secret request of the reply and keeps only what a claimed run settles", async () => {
+            const continuation = String(await insertStream("streaming", claimed ? Date.now() : undefined));
+            const ref = await storeSecret("stream-A");
+
+            await insertRequestMessage("answered");
+            await insertRequestMessage("other");
+            await insertSnapshot("approved", "stream-A", continuation, "answered");
+            await insertSnapshot("pending", "stream-A", undefined, "other");
+
+            await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+            const runs = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+            expect(runs.find((row: { approvalId: string }) => row.approvalId === "other")).toMatchObject({ resolvedBy: "abandoned", status: "denied" });
+            expect(await holdsValue(ref)).toBe(keepsValue);
+        });
     });
 });
