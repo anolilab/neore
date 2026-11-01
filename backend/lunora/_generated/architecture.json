@@ -20301,61 +20301,67 @@
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 83,
+      "line": 84,
       "reason": "\"storeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 116,
+      "line": 117,
       "reason": "\"takeRequestedSecret\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 175,
+      "line": 176,
       "reason": "\"replyKeyOfStream\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 195,
+      "line": 196,
       "reason": "\"discardThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 224,
+      "line": 214,
       "reason": "\"discardPausedThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 282,
+      "line": 255,
       "reason": "\"discardPausedThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 297,
+      "line": 319,
+      "reason": "\"discardPausedThreadSecrets\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/secret-requests",
+      "kind": "read",
+      "line": 334,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 303,
+      "line": 340,
       "reason": "\"deleteThreadSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "read",
-      "line": 311,
+      "line": 348,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/secret-requests",
       "kind": "write",
-      "line": 317,
+      "line": 354,
       "reason": "\"sweepExpiredSecrets\" is not a registered function"
     },
     {
