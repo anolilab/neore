@@ -516,6 +516,19 @@ mod tests {
             Some(AcpCommand::Start { native_session_id: Some(ref id), .. }) if id == "sess_1"
         ));
 
+        // Exactly the cap, counted in UTF-8 bytes (128 two-byte characters), is kept as sent.
+        let longest = "\u{e9}".repeat(128);
+        let mut input = start_input("claude", "f1");
+
+        input["nativeSessionId"] = json!(longest);
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(matches!(
+            prepared.command,
+            Some(AcpCommand::Start { native_session_id: Some(ref id), .. }) if *id == longest
+        ));
+
         for bad in [json!(""), json!("x".repeat(257)), json!(7)] {
             let mut input = start_input("claude", "f1");
 
