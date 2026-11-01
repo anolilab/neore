@@ -526,11 +526,11 @@ describe("the relay", () => {
         await expect(as(STRANGER).query(functions.listPendingDeviceCalls as never, { deviceId } as never)).resolves.toEqual([]);
     });
 
-    it("signs the taint it is given and does not re-read the thread's summaries", async () => {
+    it("signs the union of the taint it is given and a summary committed after that snapshot", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);
 
-        // A summary written after the run's context was built: the model never saw it.
+        // A summary committed after the run's taint snapshot may still reach the model's prompt: it must taint the call.
         await harness.run(async (ctx: any) => {
             const messageId = await ctx.db.insert("messages", {
                 message: { content: "hi", role: "user" },
@@ -570,8 +570,8 @@ describe("the relay", () => {
         }[];
 
         await expect(verifyDevicePayload(secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(true);
-        expect(JSON.parse(pending[0]!.envelope)).toMatchObject({ taintedBy: ["web"] });
-        expect(((await readCall(created.callId)) as { taintedBy: string[] }).taintedBy).toStrictEqual(["web"]);
+        expect(JSON.parse(pending[0]!.envelope)).toMatchObject({ taintedBy: ["web", "mcp"] });
+        expect(((await readCall(created.callId)) as { taintedBy: string[] }).taintedBy).toStrictEqual(["web", "mcp"]);
     });
 
     it("claims once and accepts only a result the device signed", async () => {

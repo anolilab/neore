@@ -152,10 +152,10 @@ export const createDeviceCall = internalMutation
             return { error: "rate_limited" as const };
         }
 
-        // `args.taintedBy` is the taint of the context the model saw: the summaries and takeover as the run's tool set
-        // was built (`getDeviceToolContext`) plus its messages for this step. Re-reading them here could miss a row
-        // added after the build or count one the model never saw.
-        const { taintedBy } = args;
+        // Taint only grows. `args.taintedBy` is what the run saw when its context was built plus its messages for this step,
+        // but the queries that load the summary and takeover into the prompt run after that snapshot, so a summary committed
+        // in between reaches the model unseen by it. The fresh read is unioned in; a row the model never saw only over-asks.
+        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId), await threadHandoffTaint(ctx, threadId));
         const deadline = now + DEVICE_CALL_DEADLINE_MS;
         const callId = await ctx.db.insert("deviceCalls", {
             createdAt: now,
