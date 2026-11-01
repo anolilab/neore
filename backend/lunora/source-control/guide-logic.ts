@@ -428,14 +428,17 @@ export const pickGuide = <T extends Pickable>(guides: ReadonlyArray<T>, headSha:
 /** The characters of a reply read in looking for the answer, summed over every candidate start. */
 const MAX_JSON_SCAN_CHARS = 4_000_000;
 
+/** What is still read once an answer is found, looking for an object that encloses it: a wrapper sits next to its answer, an echoed diff does not. */
+const ENCLOSING_SCAN_CHARS = 100_000;
+
 const BRACE_STEP: Readonly<Record<string, number>> = { "{": 1, "}": -1 };
 
 /** The end of the JSON object that opens at `start`, or -1: strings and escapes are skipped, so a brace inside text does not count. */
-const objectEnd = (source: string, start: number): number => {
+const objectEnd = (source: string, start: number, limit: number = source.length): number => {
     let depth = 0;
     let inString = false;
 
-    for (let index = start; index < source.length; index += 1) {
+    for (let index = start; index < Math.min(limit, source.length); index += 1) {
         const char = source[index];
 
         if (inString) {
@@ -467,14 +470,19 @@ const hasStops = (value: unknown): boolean => typeof value === "object" && value
  * An object nested in the answer that also has `stops` is met first, then replaced by the answer enclosing it. `null`
  * when there is none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
  */
-export const extractJsonObject = (reply: string): unknown => {
+export const extractJsonObject = (reply: string, stats?: { scanned: number }): unknown => {
     let budget = MAX_JSON_SCAN_CHARS;
     let found: { end: number; value: unknown } | null = null;
 
     for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0; from = reply.lastIndexOf("{", from - 1)) {
-        const end = objectEnd(reply, from);
+        const end = objectEnd(reply, from, from + budget);
+        const read = (end === -1 ? Math.min(reply.length, from + budget) : end + 1) - from;
 
-        budget -= (end === -1 ? reply.length : end + 1) - from;
+        budget -= read;
+
+        if (stats) {
+            stats.scanned += read;
+        }
 
         // Once an answer is found, only an object that ENCLOSES it can replace it: that is the same answer with the hit
         // nested inside (`"metadata":{"stops":[]}`), whereas one that ends before it is an earlier, echoed answer.
@@ -484,6 +492,7 @@ export const extractJsonObject = (reply: string): unknown => {
 
                 if (hasStops(parsed)) {
                     found = { end, value: parsed };
+                    budget = Math.min(budget, ENCLOSING_SCAN_CHARS);
                 }
             } catch {
                 // Not JSON: try the previous opening brace.

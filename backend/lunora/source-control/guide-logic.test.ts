@@ -232,6 +232,14 @@ describe("extractJsonObject", () => {
         expect((extractJsonObject(`${diff}\n${planted}\n${diff}\n${real}`) as { stops: unknown[] }).stops).toHaveLength(10);
     });
 
+    it("stays cheap once the answer is found, however many braces an echoed diff put before it", () => {
+        const real = JSON.stringify({ stops: [{ title: "real" }], summary: "the real one" });
+        const stats = { scanned: 0 };
+
+        expect((extractJsonObject(`${"{ ".repeat(500_000)} ${real}`, stats) as { summary: string }).summary).toBe("the real one");
+        expect(stats.scanned).toBeLessThan(400_000);
+    });
+
     it("does not read an object nested in the answer, or one quoted in a string of it, as the answer", () => {
         const inner = String.raw`{"summary":"x","stops":[{"title":"t","explanation":"see {\"stops\":[]} here","files":[]}]}`;
 
