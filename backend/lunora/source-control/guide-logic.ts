@@ -464,23 +464,26 @@ const hasStops = (value: unknown): boolean => typeof value === "object" && value
  * The JSON object a coding agent answered with, out of whatever text surrounds it (prose, a fenced block): the LAST
  * object that has a `stops` array. The transcript can echo text a pull request planted, and an agent that echoes a diff
  * has any number of braces before its answer, so the scan runs from the end and the first hit is the agent's last word.
- * Objects nested in the answer are met first and skipped, because only the top level has `stops`. `null` when there is
- * none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
+ * An object nested in the answer that also has `stops` is met first, then replaced by the answer enclosing it. `null`
+ * when there is none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
  */
 export const extractJsonObject = (reply: string): unknown => {
     let budget = MAX_JSON_SCAN_CHARS;
+    let found: { end: number; value: unknown } | null = null;
 
     for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0; from = reply.lastIndexOf("{", from - 1)) {
         const end = objectEnd(reply, from);
 
         budget -= (end === -1 ? reply.length : end + 1) - from;
 
-        if (end !== -1) {
+        // Once an answer is found, only an object that ENCLOSES it can replace it: that is the same answer with the hit
+        // nested inside (`"metadata":{"stops":[]}`), whereas one that ends before it is an earlier, echoed answer.
+        if (end !== -1 && (found === null || end > found.end)) {
             try {
                 const parsed = JSON.parse(reply.slice(from, end + 1)) as unknown;
 
                 if (hasStops(parsed)) {
-                    return parsed;
+                    found = { end, value: parsed };
                 }
             } catch {
                 // Not JSON: try the previous opening brace.
@@ -492,7 +495,7 @@ export const extractJsonObject = (reply: string): unknown => {
         }
     }
 
-    return null;
+    return found?.value ?? null;
 };
 
 /**

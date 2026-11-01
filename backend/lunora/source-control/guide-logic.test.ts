@@ -238,6 +238,19 @@ describe("extractJsonObject", () => {
         expect(extractJsonObject(inner)).toMatchObject({ summary: "x" });
     });
 
+    it("prefers the answer that encloses a nested object with its own stops array", () => {
+        const answer = '{"summary":"s","stops":[{"title":"real"}],"metadata":{"stops":[]}}';
+
+        expect(extractJsonObject(`Done:\n${answer}`)).toEqual(JSON.parse(answer));
+    });
+
+    it("takes the later answer over an earlier echoed one", () => {
+        const echoed = '{"summary":"echo","stops":[{"title":"e"}],"metadata":{"stops":[]}}';
+        const real = '{"summary":"real","stops":[{"title":"r"}],"metadata":{"stops":[]}}';
+
+        expect(extractJsonObject(`${echoed}\n${real}`)).toMatchObject({ summary: "real" });
+    });
+
     it("is null when there is no object with stops", () => {
         expect(extractJsonObject("no json here")).toBeNull();
         expect(extractJsonObject('{"a":1}')).toBeNull();
