@@ -1178,6 +1178,8 @@ export const getAgentModulePreferencesQuery = internalQuery
                     requireZDR: v.optional(v.boolean()),
                 }),
             ),
+            /** The read failed and the other fields are defaults, not the user's choices: a privacy rule may be hiding behind them. */
+            readFailed: v.optional(v.boolean()),
         }),
     )
     .query(async ({ args: { userId }, ctx: context }) => {
@@ -1203,6 +1205,7 @@ export const getAgentModulePreferencesQuery = internalQuery
                 enableKnowledge: false,
                 enablePlanner: false,
                 modelFilterRules: undefined,
+                readFailed: true,
             };
         }
     });

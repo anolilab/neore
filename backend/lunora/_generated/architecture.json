@@ -20128,7 +20128,13 @@
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 13,
+      "line": 31,
+      "reason": "\"loadModelFilterRules\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/model-filter-rules",
+      "kind": "call",
+      "line": 32,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {

@@ -14,7 +14,13 @@ export const resolveBackgroundModel = async (
     userId: string | undefined,
     preferred: string,
 ): Promise<{ model: string; modelFilterRules: ModelFilterRules } | undefined> => {
-    const modelFilterRules = userId ? await loadModelFilterRules(ctx, userId) : {};
+    // Unreadable rules skip the step: picking a model without them could send the content to one the user forbade.
+    const modelFilterRules = userId ? await loadModelFilterRules(ctx, userId).catch(() => undefined) : {};
+
+    if (modelFilterRules === undefined) {
+        return undefined;
+    }
+
     const model = pickUtilityModelId(modelFilterRules, preferred);
 
     return model === undefined ? undefined : { model, modelFilterRules };

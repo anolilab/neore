@@ -5,7 +5,7 @@
  */
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
-import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
+import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules, requiresPaidPlan } from "@neore/ai/models";
 import type { AgentConfig } from "@neore/ai/providers";
 
 import { backupFilterRejection } from "../chat/lib/backup-model.js";
@@ -42,8 +42,21 @@ export class NoAllowedUtilityModelError extends Error {
 export const NO_ALLOWED_UTILITY_MODEL_MESSAGE = "None of the background models is allowed by your model filter rules, so this step was skipped.";
 
 /**
+ * Marks a rules object as belonging to a user whose plan opens paid-plan models (an admin or a paid tier), the
+ * gate a chat run applies (`canRunPaidModel`). A symbol key, so it survives a spread, stays out of the JSON the
+ * gateway receives and out of `hasActiveFilters`. Absent means the plan is unknown or free: background calls run
+ * on the platform's keys, so a free user's candidate must be a free-tier model.
+ */
+const PAID_PLAN_GRANT = Symbol("neore.utilityPaidPlanGrant");
+
+/** `rules` carrying whether the user's plan opens paid-plan models, for `pickUtilityModelId`. */
+export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): ModelFilterRules =>
+    granted ? ({ ...rules, [PAID_PLAN_GRANT]: true } as ModelFilterRules) : rules;
+
+/**
  * The first of `preferred` then the fallbacks (or `preferred` alone with `strict`) that the user's rules allow,
- * judged by the same predicate that vets a run's backup model. `undefined` when none does.
+ * judged by the same predicate that vets a run's backup model, and by the paid-plan rule: a model outside the free
+ * tier needs the plan grant (`withPaidPlanGrant`). `undefined` when none does.
  */
 export const pickUtilityModelId = (
     rules: ModelFilterRules | undefined,
@@ -52,10 +65,17 @@ export const pickUtilityModelId = (
 ): string | undefined => {
     const candidates = strict ? [preferred] : [preferred, ...UTILITY_FALLBACK_MODELS.filter((id) => id !== preferred)];
 
+    const paidPlan = rules !== undefined && (rules as Record<symbol, unknown>)[PAID_PLAN_GRANT] === true;
+
     return candidates.find((id) => {
         const definition = MODEL_LOOKUP.get(id);
 
-        return definition !== undefined && definition.enabled !== false && backupFilterRejection(definition, rules) === null;
+        return (
+            definition !== undefined &&
+            definition.enabled !== false &&
+            (paidPlan || !requiresPaidPlan(definition)) &&
+            backupFilterRejection(definition, rules) === null
+        );
     });
 };
 
