@@ -109,7 +109,7 @@ const partitionLinks = async (ctx: QueryCtx | MutationCtx, rows: PullRequestThre
  * nothing and opens nothing — it names the thread already working on it, so a double click cannot make two.
  */
 export const startWorkOnPullRequest = authMutation
-    .use(rateLimit("sourceControl/write"))
+    .use(rateLimit("chat/create"))
     .input({
         baseBranch: v.optional(v.string().max(MAX_LENGTH.short)),
         headBranch: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -148,6 +148,20 @@ export const startWorkOnPullRequest = authMutation
             updatedAt: now,
             userId,
         });
+        const created = await ctx.db.get(threadId);
+
+        // The same audit record any other new thread gets (`chat.createThread`, through `lib/document-history.ts`).
+        if (created) {
+            await ctx.db.insert("documentHistory", {
+                attribution: { action: "insert", source: "manual" },
+                doc: created,
+                documentId: threadId,
+                isDeleted: false,
+                tableName: "threads",
+                ts: now,
+                userId,
+            });
+        }
 
         // The pull request is the thread's first turn: the agent that reads it knows what it is working on.
         await addMessagesHandler(ctx, {
@@ -237,7 +251,7 @@ export const recordOpenedPullRequest = internalMutation
         const address = parsePullRequestUrl(args.prUrl);
         const thread = await ctx.db.get(args.threadId as Id<"threads">);
 
-        if (!thread) {
+        if (!thread || thread.deleted === true) {
             throw new LunoraError("NOT_FOUND", "That thread is not there");
         }
 

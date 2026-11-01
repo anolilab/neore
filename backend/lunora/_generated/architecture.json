@@ -6743,6 +6743,11 @@
     {
       "from": "function:source_control_pr_threads:startWorkOnPullRequest",
       "kind": "write",
+      "to": "table:documentHistory"
+    },
+    {
+      "from": "function:source_control_pr_threads:startWorkOnPullRequest",
+      "kind": "write",
       "to": "table:pullRequestThreads"
     },
     {

@@ -113,6 +113,11 @@ describe("starting work on a pull request", () => {
         expect(messages).toHaveLength(1);
         expect(messages[0]).toMatchObject({ userId: A });
         expect(messages[0].message).toMatchObject({ content: expect.stringContaining(URL), role: "user" });
+
+        // Audited like any other new thread.
+        const history = await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect());
+
+        expect(history).toEqual([expect.objectContaining({ documentId: result.threadId, isDeleted: false, tableName: "threads", userId: A })]);
     });
 
     it("attaches the next turn to the same thread, once", async () => {
@@ -169,6 +174,15 @@ describe("a PR the coding agent opened is recorded", () => {
 
         await expect(record(B, theirs)).rejects.toMatchObject({ status: 403 });
         await expect(record(A, "j58abc123def")).rejects.toBeDefined();
+        expect(await links()).toHaveLength(0);
+    });
+
+    it("records nothing for a thread deleted before the run finished", async () => {
+        const threadId = (await plainThread(A)) as string;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+
+        await expect(record(A, threadId)).rejects.toBeDefined();
         expect(await links()).toHaveLength(0);
     });
 
