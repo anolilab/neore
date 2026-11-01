@@ -32,6 +32,9 @@ export const useGuide = (address: PullRequestAddress, headSha: string, enabled: 
  * A guide is reserved under the head the host reported when it was started, which can be newer than the head this page
  * loaded. A guide for another head than the page's is therefore a reason to read the pull request again, once per such
  * head: if the page's head moves it matches and the guide reads as current, and if it does not the guide is older.
+ * The files and commits are read again with it: they are keyed by address alone, and the merge and review panels act on
+ * the pull's head, so a head that moved under a diff loaded for the old one would let a reviewer act on a commit they never saw.
+ * Remembered per user and pull request, so the same guide head on another pull request refreshes that one too.
  */
 export const useRefreshPullForOtherGuideHead = (address: PullRequestAddress, guideHeadSha: string | undefined, pageHeadSha: string): void => {
     const queryClient = useQueryClient();
@@ -39,12 +42,17 @@ export const useRefreshPullForOtherGuideHead = (address: PullRequestAddress, gui
     const refreshed = useRef(new Set<string>());
 
     useEffect(() => {
-        if (guideHeadSha === undefined || guideHeadSha === pageHeadSha || refreshed.current.has(guideHeadSha)) {
+        const seen = `${String(userId)}|${address.repository}#${String(address.number)}|${String(guideHeadSha)}`;
+
+        if (guideHeadSha === undefined || guideHeadSha === pageHeadSha || refreshed.current.has(seen)) {
             return;
         }
 
-        refreshed.current.add(guideHeadSha);
-        void queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "pull", address] });
+        refreshed.current.add(seen);
+
+        for (const kind of ["pull", "files", "commits"]) {
+            void queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, kind, address] });
+        }
     }, [address, guideHeadSha, pageHeadSha, queryClient, userId]);
 };
 

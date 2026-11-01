@@ -45,12 +45,34 @@ describe("useRefreshPullForOtherGuideHead", () => {
 
         rerender({ guide: "newer" });
 
-        expect(state.invalidateQueries).toHaveBeenCalledTimes(1);
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(3);
         expect(state.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["develop", "user-a", "pull", address] });
 
         rerender({ guide: "other" });
 
-        expect(state.invalidateQueries).toHaveBeenCalledTimes(2);
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(6);
+    });
+
+    it("reads the files and commits again with the pull request, so the diff shown is the head acted on", () => {
+        renderHook(() => useRefreshPullForOtherGuideHead(address, "newer", "page"));
+
+        expect(state.invalidateQueries.mock.calls.map(([options]) => (options as { queryKey: string[] }).queryKey[2])).toStrictEqual([
+            "pull",
+            "files",
+            "commits",
+        ]);
+    });
+
+    it("refreshes another pull request that has the same guide head", () => {
+        const other = { number: 2, repository: "a/b" };
+        const { rerender } = renderHook(({ at }: { at: typeof address }) => useRefreshPullForOtherGuideHead(at, "newer", "page"), {
+            initialProps: { at: address },
+        });
+
+        rerender({ at: other });
+
+        expect(state.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["develop", "user-a", "pull", other] });
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(6);
     });
 
     it("does nothing for a guide of the page's head or no guide", () => {
