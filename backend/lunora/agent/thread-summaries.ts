@@ -26,8 +26,10 @@
  * - **Opt-in** (`userSettings.threadSummariesEnabled === true`); switching it off
  *   erases the user's summaries ({@link eraseUserThreadSummaries}).
  * - **Taint.** Each row records the untrusted sources of the rows it folded plus
- *   the previous summary's (`taintedBy`); `createDeviceCall` adds them to a call's
- *   own, so a summary of web or tool content still makes a device call ask.
+ *   the previous summary's (`taintedBy`); `getDeviceToolContext` snapshots them
+ *   when the run's tool set is built and `createDeviceCall` unions that with a fresh
+ *   re-read, so a summary of web or tool content still makes a device call ask even
+ *   when it was committed after the snapshot.
  * - **Epoch.** An in-place edit moves `threads.summaryEpoch` and erases the
  *   summaries covering the edited turns ({@link dropSummariesFromEdit}); a run
  *   prepared before it refuses to store.

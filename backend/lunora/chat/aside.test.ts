@@ -86,7 +86,7 @@ import schema from "../schema";
 // eslint-disable-next-line import/first
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 // eslint-disable-next-line import/first
-import { addAsideToThread, askAside } from "./aside";
+import { addAsideToThread, askAside, readAsideSnapshot } from "./aside";
 
 type Harness = ReturnType<typeof lunoraTest>;
 type Asked = { answer: string; token: string; withThread: boolean };
@@ -553,6 +553,17 @@ describe("askAside", () => {
 
         expect(generateText).not.toHaveBeenCalled();
         expect(await remainingText(OTHER)).toBe(before);
+    });
+
+    it("re-checks access where it reads the snapshot: a grant gone since the action's check yields no rows", async () => {
+        const snapshotFor = async (userId: string) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(readAsideSnapshot as never, { threadId, userId } as never));
+
+        await expect(snapshotFor(OWNER)).resolves.toHaveProperty("rows");
+        await expect(snapshotFor(OTHER)).rejects.toThrow();
+
+        await grantRead(OTHER);
+        await expect(snapshotFor(OTHER)).resolves.toHaveProperty("rows");
     });
 
     it("refuses an empty question", async () => {

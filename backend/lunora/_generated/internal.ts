@@ -329,7 +329,7 @@ export interface InternalApiTypes {
             planAgentSwitch: FunctionReference<"query", { clientId: string; mode?: "full" | "portable"; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string }; allowance?: boolean; leafId?: string; mode?: "full" | "portable" | "delta"; omittedEarlier?: boolean; turns?: Array<{ role: "assistant" | "user"; text: string }> }>;
         };
         aside: {
-            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
+            readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string; userId: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
         };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;
@@ -596,7 +596,7 @@ export interface InternalApiTypes {
             createDeviceCall: FunctionReference<"mutation", { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }, { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "rate_limited" }>;
             expireDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; reason: string }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: FunctionReference<"query", { callId: Id<"deviceCalls"> }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
-            getDeviceToolContext: FunctionReference<"query", { now: number; threadId: Id<"threads">; userId: string }, null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }> }>;
+            getDeviceToolContext: FunctionReference<"query", { now: number; threadId: Id<"threads">; userId: string }, null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }>; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files"> }>;
             sweepDeviceCalls: FunctionReference<"mutation", {}, null>;
         };
     };
@@ -940,6 +940,11 @@ export interface InternalApiTypes {
             getPublicPageOwner: FunctionReference<"query", { publicAccessToken: string }, string | null>;
             readPublicPage: FunctionReference<"query", { publicAccessToken: string }, ({ contentJson?: unknown; } & { icon: string | null; title: string; updatedAt: number; }) | null>;
             redeemPageInvite: FunctionReference<"mutation", { token: string; userId: string }, { pageId: Id<"pages"> }>;
+        };
+    };
+    projects: {
+        functions: {
+            getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
         };
     };
     prompts: {
@@ -2125,6 +2130,11 @@ export const internal: InternalApiTypes = {
             getPublicPageOwner: { __lunoraRef: "pages_sharing:getPublicPageOwner" },
             readPublicPage: { __lunoraRef: "pages_sharing:readPublicPage" },
             redeemPageInvite: { __lunoraRef: "pages_sharing:redeemPageInvite" },
+        },
+    },
+    projects: {
+        functions: {
+            getProjectContextForRun: { __lunoraRef: "projects_functions:getProjectContextForRun" },
         },
     },
     prompts: {

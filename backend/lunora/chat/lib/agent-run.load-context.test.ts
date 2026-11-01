@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { api } from "../../_generated/api";
 import { internal } from "../../_generated/internal";
 import { loadRunContext } from "./agent-run";
 
@@ -26,9 +25,6 @@ const deferred = <T>() => {
 const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{ projectId?: string } | null>) => {
     const runQuery = vi.fn(async (reference: unknown) => {
         switch (reference) {
-            case api.agent.projects.getProject: {
-                return { context: "Project notes" };
-            }
             case internal.auth.functions.getDecryptedProviderKeysQuery: {
                 return {};
             }
@@ -41,6 +37,9 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
             case internal.lib.action_cache.get: {
                 // The memory cache misses on every call here: the test is about ordering.
                 return { kind: "miss" };
+            }
+            case internal.projects.functions.getProjectContextForRun: {
+                return "Project notes";
             }
             default: {
                 throw new Error("unexpected query");
@@ -84,7 +83,7 @@ describe(loadRunContext, () => {
     it("starts knowledge retrieval before the preferences and settings are read", async () => {
         const prefs = deferred<{ memoryEnabled: boolean }>();
         const settings = deferred<{ projectId?: string } | null>();
-        const { ctx, runAction } = makeCtx(prefs.promise, settings.promise);
+        const { ctx, runAction, runQuery } = makeCtx(prefs.promise, settings.promise);
 
         const loading = loadRunContext(ctx, args);
 
@@ -104,6 +103,8 @@ describe(loadRunContext, () => {
         expect(result.contextParts[1]).toContain("[1] doc.pdf (passage 3):\nExcerpt");
         expect(result.knowledgeSources).toHaveLength(1);
         expect(result.contextParts[2]).toBe("PROJECT CONTEXT:\nProject notes");
+        // Loaded for the run's user under createThread's access rule, not through the owner-only read.
+        expect(runQuery).toHaveBeenCalledWith(internal.projects.functions.getProjectContextForRun, { projectId: "p1", userId: "u1" });
         expect(result.retrievedMemories).toStrictEqual([{ memoryId: "m1", score: 0.9 }]);
     });
 
@@ -134,7 +135,7 @@ describe(loadRunContext, () => {
         const result = await loadRunContext(ctx, args);
 
         expect(runAction).not.toHaveBeenCalledWith(internal.memory.retrieve.retrieveRelevantMemories, expect.anything());
-        expect(runQuery).not.toHaveBeenCalledWith(api.agent.projects.getProject, expect.anything());
+        expect(runQuery).not.toHaveBeenCalledWith(internal.projects.functions.getProjectContextForRun, expect.anything());
         expect(result.memoryEnabled).toBe(false);
         expect(result.retrievedMemories).toStrictEqual([]);
     });

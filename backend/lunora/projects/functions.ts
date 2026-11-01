@@ -4,45 +4,53 @@ import { listPinnedProjectsHandler, listProjectsHandler } from "../agent/project
 import { vProjectDocFields } from "../agent/validators";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
-import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
+import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+
+/** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
+export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
+    // Decide on the row's owner and organization past RLS: a project of a member's
+    // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
+
+    if (!found) {
+        return null;
+    }
+
+    if (found.userId && found.userId !== userId) {
+        if (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId))) {
+            return null;
+        }
+
+        // A proven membership: the project passes row-level security.
+        admitOrganization(context, found.organizationId);
+    }
+
+    return await context.db.projects.findFirst({ where: { _id: projectId } });
+};
+
+/** A project's `context` text for a run on behalf of `userId`, under the same access rule as `createThread` (owner or organization member). */
+export const getProjectContextForRun = internalQuery
+    .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args: { projectId, userId }, ctx: context }) => {
+        const project = await readableProject(context, projectId, userId);
+
+        return project?.context ?? null;
+    });
 
 export const getProject = authQuery
     .input({
         projectId: v.id("projects"),
     })
-    .query(async ({ args: { projectId }, ctx: context }) => {
-        const { userId } = context.user;
-
-        // Inline DB access - bypasses runQuery validator overhead
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
-
-        if (!project) {
-            return null;
-        }
-
-        // Check access: user must own the project or it must be in their organization
-        if (project.userId && project.userId !== userId) {
-            // Check if user has access via organization membership
-            if (project.organizationId) {
-                const member = await getMemberByOrganizationAndUser(context, project.organizationId, userId);
-
-                if (!member) {
-                    return null;
-                }
-                // User is a member of the organization, allow access
-            } else {
-                return null;
-            }
-        }
-
-        return project;
-    });
+    .query(async ({ args: { projectId }, ctx: context }) => await readableProject(context, projectId as Id<"projects">, context.user.userId));
 
 export const listProjects = authQuery
     .input({

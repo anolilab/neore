@@ -20,6 +20,12 @@ describe("taintOfTool", () => {
 });
 
 describe("computeTaint", () => {
+    it("treats history compressed to text as having read a page", () => {
+        expect(computeTaint([{ content: "[Context from earlier in this conversation]\nnotes", role: "user" }])).toEqual(["web"]);
+        expect(computeTaint([{ content: "[Earlier conversation was removed to fit the context window]", role: "user" }])).toEqual(["web"]);
+        expect(computeTaint([{ content: "hello", role: "user" }])).toEqual([]);
+    });
+
     it("is empty for a plain conversation", () => {
         expect(
             computeTaint([
