@@ -135,13 +135,15 @@ export const createDictation = (options: DictationOptions): Dictation => {
         audioBytes: 0,
         helperPid: () => recognizer?.pid,
         outcome: () => controller?.lastOutcome(),
-        shortcut: () => ({
-            held: shortcutHeld,
-            platform: `${process.platform}-${process.arch}`,
-            refused: shortcutRefused,
-            registered: globalShortcut.isRegistered(DICTATION_SHORTCUT),
-            wanted: settings.get().enabled && hasHelper(),
-        }),
+        shortcut: () => {
+            return {
+                held: shortcutHeld,
+                platform: `${process.platform}-${process.arch}`,
+                refused: shortcutRefused,
+                registered: globalShortcut.isRegistered(DICTATION_SHORTCUT),
+                wanted: settings.get().enabled && hasHelper(),
+            };
+        },
         state: () => controller?.state() ?? "idle",
     };
 

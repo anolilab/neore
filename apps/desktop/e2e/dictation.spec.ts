@@ -451,7 +451,7 @@ test("the settings window turns dictation on, deletes a model file, and is out o
         await switchControl.check();
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
         // Polls the whole state: when it stays unheld, the failure shows whether the switch wanted it, and what Windows said.
-        await expect.poll(() => shortcutState(app)).toMatchObject({ held: true });
+        await expect.poll(() => shortcutState(app)).toEqual({ held: true, platform: expect.any(String), refused: false, registered: true, wanted: true });
 
         await page.getByLabel("Language").selectOption("de");
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).language).toBe("de");
