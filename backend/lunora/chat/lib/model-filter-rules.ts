@@ -16,6 +16,17 @@ export class ModelFilterRulesUnavailableError extends NoAllowedUtilityModelError
     }
 }
 
+const FAILED = Symbol("read failed");
+
+/** A query's answer, or `FAILED` when it threw (or could not be sent). */
+const settled = async <T>(read: () => Promise<T>): Promise<T | typeof FAILED> => {
+    try {
+        return await read();
+    } catch {
+        return FAILED;
+    }
+};
+
 /**
  * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
  * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
@@ -28,13 +39,13 @@ export class ModelFilterRulesUnavailableError extends NoAllowedUtilityModelError
  */
 export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules> => {
     const [preferences, plan] = await Promise.all([
-        ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }).catch(() => undefined),
-        ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId }).catch(() => undefined),
+        settled(async () => await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId })),
+        settled(async () => await ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId })),
     ]);
 
-    if (preferences === undefined || preferences.readFailed === true) {
+    if (preferences === FAILED || preferences?.readFailed === true) {
         throw new ModelFilterRulesUnavailableError();
     }
 
-    return withPaidPlanGrant(preferences.modelFilterRules ?? {}, plan !== undefined && (plan.isAdmin || plan.plan === "premium"));
+    return withPaidPlanGrant(preferences?.modelFilterRules ?? {}, plan !== FAILED && plan !== null && (plan.isAdmin || plan.plan === "premium"));
 };

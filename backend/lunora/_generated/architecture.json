@@ -20247,13 +20247,13 @@
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 31,
+      "line": 42,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 32,
+      "line": 43,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {

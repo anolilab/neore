@@ -139,8 +139,9 @@ vi.mock("../lib/agent-tools", () => {
     };
 });
 
-vi.mock("../../lib/utility-model", () => {
+vi.mock("../../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../../lib/utility-model")>()),
         getUtilityModel: async () => {
             routerScript.calls += 1;
 

@@ -6,7 +6,14 @@
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { describe, expect, it, vi } from "vitest";
 
-import { getUtilityModel, NoAllowedUtilityModelError, pickUtilityModelId, UTILITY_FALLBACK_MODELS } from "./utility-model";
+import {
+    getUtilityModel,
+    NoAllowedUtilityModelError,
+    pickUtilityModelId,
+    requireUtilityModelId,
+    UTILITY_FALLBACK_MODELS,
+    withPaidPlanGrant,
+} from "./utility-model";
 
 vi.mock("@neore/ai/providers", async () => {
     const { MODEL_REGISTRY } = await import("@neore/ai/models");
@@ -25,7 +32,25 @@ describe("pickUtilityModelId", () => {
 
     it("takes the next allowed candidate when the rules exclude the default", () => {
         expect(pickUtilityModelId({ blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL] })).toBe(UTILITY_FALLBACK_MODELS[0]);
-        expect(pickUtilityModelId({ blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, UTILITY_FALLBACK_MODELS[0]!] })).toBe(UTILITY_FALLBACK_MODELS[1]);
+        expect(pickUtilityModelId(withPaidPlanGrant({ blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, UTILITY_FALLBACK_MODELS[0]!] }, true))).toBe(
+            UTILITY_FALLBACK_MODELS[1],
+        );
+    });
+
+    it("keeps a free user on free-tier models, which chat runs would also allow them", () => {
+        const rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, UTILITY_FALLBACK_MODELS[0]!] };
+
+        // The paid fallbacks (haiku, ministral) are skipped: the next free one is gemini-2.5-flash-lite.
+        expect(pickUtilityModelId(rules)).toBe("google/gemini-2.5-flash-lite");
+        expect(pickUtilityModelId(withPaidPlanGrant(rules, false))).toBe("google/gemini-2.5-flash-lite");
+    });
+
+    it("refuses a free user whose rules leave only paid candidates, and serves a paid user", () => {
+        const rules = { allowedModels: ["anthropic/claude-haiku-4.5"] };
+
+        expect(pickUtilityModelId(rules)).toBeUndefined();
+        expect(() => requireUtilityModelId(rules)).toThrow(NoAllowedUtilityModelError);
+        expect(pickUtilityModelId(withPaidPlanGrant(rules, true))).toBe("anthropic/claude-haiku-4.5");
     });
 
     it("judges candidates by their hosting regions, as the chat model gate does", () => {

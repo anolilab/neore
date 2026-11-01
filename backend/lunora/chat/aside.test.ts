@@ -36,8 +36,11 @@ vi.mock("../usage/schedule", () => {
     return { scheduleReplyUsage };
 });
 
-vi.mock("../lib/utility-model", () => {
-    return { getUtilityModel };
+vi.mock("../lib/utility-model", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
+        getUtilityModel,
+    };
 });
 
 vi.mock("./lib/get-agent", () => {
