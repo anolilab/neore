@@ -62,15 +62,14 @@ export const queueHostTurn = async (
         throw new LunoraError("INTERNAL", "The prompt was not saved");
     }
 
-    const streamId = await createHostStream(ctx, { hostState: "accepted", messageId: prompt._id, threadId, turnId, userId }, now);
+    const streamId = await createHostStream(
+        ctx,
+        { carriesHandoff: Boolean(handoff), hostState: "accepted", messageId: prompt._id, threadId, turnId, userId },
+        now,
+    );
 
     // A session still `starting` stays so (`touchSession`): the computer holds the message until the agent opens it.
     await touchSession(ctx, session, "busy", now);
-
-    if (handoff) {
-        // The agent is sent what it took over with this prompt: its saved session holds it from here on (`receivedItsHandoff`).
-        await ctx.db.patch(session._id, { handoffSentAt: now });
-    }
 
     return { messageId: prompt._id as string, streamId, turnId };
 };

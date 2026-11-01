@@ -346,6 +346,11 @@ const applyTurnPost = async (
             hostState = "received";
         }
 
+        // The agent opened the turn whose prompt carried the handoff: only now does its saved session hold it (`receivedItsHandoff`).
+        if (event.kind === "turn_start" && stream.carriesHandoff === true && session.handoffSentAt === undefined) {
+            await ctx.db.patch(session._id, { handoffSentAt: now });
+        }
+
         if (isAgentEvent(event)) {
             sawContent = true;
 

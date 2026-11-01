@@ -18140,12 +18140,6 @@
       "reason": "\"endHostSessionsOfDevice\" is not a registered function"
     },
     {
-      "file": "acp/lib/send-turn",
-      "kind": "write",
-      "line": 72,
-      "reason": "\"queueHostTurn\" is not a registered function"
-    },
-    {
       "file": "acp/lib/sessions",
       "kind": "write",
       "line": 29,
@@ -20416,19 +20410,19 @@
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 37,
+      "line": 45,
       "reason": "\"createHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 81,
+      "line": 90,
       "reason": "\"extendHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 97,
+      "line": 106,
       "reason": "\"appendHostChunk\" is not a registered function"
     },
     {

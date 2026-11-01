@@ -1053,6 +1053,7 @@ export const persistentChunks = sqliteTable("persistentChunks", {
 export const persistentStreams = sqliteTable("persistentStreams", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    carriesHandoff: integer("carriesHandoff", { mode: "boolean" }),
     earlySteps: text("earlySteps", { mode: "json" }).$type<Array<string>>(),
     expiresAt: real("expiresAt").notNull(),
     hostEndReason: text("hostEndReason", { mode: "json" }).$type<"finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped">(),

@@ -1429,13 +1429,32 @@ describe("a saved session is reattached only if it received the conversation", (
             }
         });
 
-    const codexOpensAndLeaves = async (device: Device, threadId: string, prompted: boolean) => {
+    /** `queued`: the app queued a send that carried the handoff, but the agent never opened the turn (it failed, expired or was refused). */
+    const codexOpensAndLeaves = async (device: Device, threadId: string, prompted: boolean | "queued") => {
         await switchTo(threadId, hostTarget(device, CODEX));
         await openStartedSession(device, threadId, undefined, "native-codex", CAN_LOAD);
 
         if (prompted) {
             expect((await sendText(threadId, "look at the build")).outcome).toBe("sent");
+        }
+
+        if (prompted === true) {
             await finishSentTurn(device, threadId);
+        } else if (prompted === "queued") {
+            await run(async (ctx) => {
+                const { page } = await ctx.db.persistentStreams.findMany({ where: { producer: "host" } });
+
+                for (const stream of page) {
+                    await ctx.db.patch(stream._id, { hostEndReason: "timeout", hostState: "ended", status: "timeout" });
+                }
+
+                // The turn ended without the agent opening it: the session is free again.
+                const { page: sessions } = await ctx.db.acpSessions.findMany({ where: { threadId } });
+
+                for (const session of sessions) {
+                    await ctx.db.patch(session._id, { status: "idle" });
+                }
+            });
         }
 
         await answerOpenCalls();
@@ -1457,6 +1476,41 @@ describe("a saved session is reattached only if it received the conversation", (
         await openStartedSession(device, threadId);
         expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
         expect((await acpSends()).at(-1)).toContain("question 0");
+    });
+
+    it("hands the whole conversation over when the send that carried the handoff was queued but the agent never opened the turn", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await codexOpensAndLeaves(device, threadId, "queued");
+
+        const [codex] = (await rows("acpSessions", { agentKey: "codex", threadId })) as Row[];
+
+        expect(codex?.handoffSentAt).toBeUndefined();
+
+        await switchTo(threadId, hostTarget(device, CODEX));
+
+        expect((await lastStart()).nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
+    });
+
+    it("marks the handoff delivered when the agent opens the turn that carried it", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchTo(threadId, hostTarget(device, CODEX));
+        await openStartedSession(device, threadId, undefined, "native-codex", CAN_LOAD);
+        expect((await sendText(threadId, "look at the build")).outcome).toBe("sent");
+
+        const [queued] = (await rows("acpSessions", { agentKey: "codex", threadId })) as Row[];
+
+        expect(queued?.handoffSentAt).toBeUndefined();
+
+        await finishSentTurn(device, threadId);
+
+        const [started] = (await rows("acpSessions", { agentKey: "codex", threadId })) as Row[];
+
+        expect(started?.handoffSentAt).toBeTypeOf("number");
     });
 
     it("hands the conversation over when the only prompt the agent got was typed in the computer's own window", async () => {

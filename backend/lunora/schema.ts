@@ -1799,6 +1799,8 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // The turn's prompt carried a handoff; `turn_start` is the proof the agent received it (`acpSessions.handoffSentAt`).
+        carriesHandoff: v.optional(v.boolean()),
         // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
         // such a step may pause once more. It still counts toward the cap on pauses.
         earlySteps: v.optional(v.array(v.string())),

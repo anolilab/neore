@@ -1166,6 +1166,7 @@ export interface Doc_persistentChunks {
 export interface Doc_persistentStreams {
     _id: Id<"persistentStreams">;
     _creationTime: number;
+    carriesHandoff?: boolean;
     earlySteps?: Array<string>;
     expiresAt: number;
     hostEndReason?: "finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped";
@@ -4116,6 +4117,7 @@ export interface Insert_persistentChunks {
 export interface Insert_persistentStreams {
     _id?: Id<"persistentStreams">;
     _creationTime?: number;
+    carriesHandoff?: boolean;
     earlySteps?: Array<string>;
     expiresAt: number;
     hostEndReason?: "finished" | "cancelled" | "failed" | "interrupted" | "timeout" | "revoked" | "stopped";
