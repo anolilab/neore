@@ -107,7 +107,13 @@ const PullRequestView = ({
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
-            {detail.state === "open" && <WorkOnPullRequest address={address} requestNoun={requestNoun} />}
+            <WorkOnPullRequest
+                address={address}
+                baseBranch={detail.baseBranch}
+                canStart={detail.state === "open"}
+                headBranch={detail.headBranch}
+                requestNoun={requestNoun}
+            />
             {detail.state === "open" && !detail.draft && (
                 <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
             )}

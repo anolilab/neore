@@ -14,7 +14,20 @@ import { usePullRequestThreads, useStartWorkOnPullRequest } from "../lib/use-dev
  * already working on it, names it instead of opening a second. Below it, every thread that has worked on this pull
  * request: the one started here, and the ones a coding agent opened it from.
  */
-const WorkOnPullRequest = ({ address, requestNoun }: { address: PullRequestAddress; requestNoun: string }) => {
+/** The linked threads show in every state, so a closed or merged pull request keeps them; only an open one can start work. */
+const WorkOnPullRequest = ({
+    address,
+    baseBranch,
+    canStart,
+    headBranch,
+    requestNoun,
+}: {
+    address: PullRequestAddress;
+    baseBranch: string;
+    canStart: boolean;
+    headBranch: string;
+    requestNoun: string;
+}) => {
     const { t } = useLingui();
     const navigate = useNavigate();
     const titleId = useId();
@@ -27,7 +40,7 @@ const WorkOnPullRequest = ({ address, requestNoun }: { address: PullRequestAddre
     const run = async () => {
         setError(null);
 
-        const result = await start.mutateAsync({ number: address.number, repository: address.repository }).catch(() => undefined);
+        const result = await start.mutateAsync({ baseBranch, headBranch, number: address.number, repository: address.repository }).catch(() => undefined);
 
         if (result === undefined) {
             setError(t`Could not open a thread for this ${requestNoun}. Try again.`);
@@ -44,10 +57,12 @@ const WorkOnPullRequest = ({ address, requestNoun }: { address: PullRequestAddre
                 <h3 className="text-sm font-semibold" id={titleId}>
                     {t`Threads working on this ${requestNoun}`}
                 </h3>
-                <Button disabled={start.isPending} onClick={run} size="sm" variant="outline">
-                    <GitPullRequestArrow aria-hidden className="size-4" />
-                    {start.isPending ? t`Opening a thread…` : t`Work on this ${requestNoun}`}
-                </Button>
+                {canStart && (
+                    <Button disabled={start.isPending} onClick={run} size="sm" variant="outline">
+                        <GitPullRequestArrow aria-hidden className="size-4" />
+                        {start.isPending ? t`Opening a thread…` : t`Work on this ${requestNoun}`}
+                    </Button>
+                )}
             </div>
             <div aria-live="polite" role="status">
                 {error !== null && <p className="text-destructive text-sm">{error}</p>}

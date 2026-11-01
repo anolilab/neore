@@ -45,7 +45,7 @@ describe("WorkOnPullRequest thread list", () => {
 
     it("says it is loading, not that nothing worked on it", () => {
         threads.current = { isPending: true };
-        render(<WorkOnPullRequest address={address} requestNoun="pull request" />);
+        render(<WorkOnPullRequest address={address} baseBranch="main" canStart headBranch="feature" requestNoun="pull request" />);
 
         expect(screen.getByText("Loading threads…")).toBeTruthy();
         expect(screen.queryByText(NONE)).toBeNull();
@@ -53,7 +53,7 @@ describe("WorkOnPullRequest thread list", () => {
 
     it("says it failed to load", () => {
         threads.current = { isError: true };
-        render(<WorkOnPullRequest address={address} requestNoun="pull request" />);
+        render(<WorkOnPullRequest address={address} baseBranch="main" canStart headBranch="feature" requestNoun="pull request" />);
 
         expect(screen.getByRole("alert").textContent).toContain("Could not load the threads");
         expect(screen.queryByText(NONE)).toBeNull();
@@ -61,8 +61,16 @@ describe("WorkOnPullRequest thread list", () => {
 
     it("says nothing worked on it only when the list is empty", () => {
         threads.current = { data: [], isError: false, isPending: false };
-        render(<WorkOnPullRequest address={address} requestNoun="pull request" />);
+        render(<WorkOnPullRequest address={address} baseBranch="main" canStart headBranch="feature" requestNoun="pull request" />);
 
         expect(screen.getByText(NONE)).toBeTruthy();
+    });
+
+    it("keeps a closed pull request's threads listed, without offering to start work", () => {
+        threads.current = { data: [{ kind: "attached", threadId: "t1", title: "Work on o/r#1" }], isError: false, isPending: false };
+        render(<WorkOnPullRequest address={address} baseBranch="main" canStart={false} headBranch="feature" requestNoun="pull request" />);
+
+        expect(screen.getByText("Work on o/r#1")).toBeTruthy();
+        expect(screen.queryByRole("button")).toBeNull();
     });
 });
