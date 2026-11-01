@@ -1222,7 +1222,7 @@ msgstr "{providerName} · il tuo account Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} rich."
 
-#: src/features/develop/components/pull-request-view.tsx:119
+#: src/features/develop/components/pull-request-view.tsx:125
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -7800,7 +7800,7 @@ msgstr "Impossibile caricare i ricordi."
 msgid "Could not load the skill breakdown."
 msgstr "Impossibile caricare la ripartizione per skill."
 
-#: src/features/develop/components/work-on-pull-request.tsx:58
+#: src/features/develop/components/work-on-pull-request.tsx:73
 msgid "Could not load the threads for this {requestNoun}."
 msgstr ""
 
@@ -7820,7 +7820,7 @@ msgstr "Impossibile caricare la tua attività."
 msgid "Could not move the page"
 msgstr "Impossibile spostare la pagina"
 
-#: src/features/develop/components/work-on-pull-request.tsx:33
+#: src/features/develop/components/work-on-pull-request.tsx:46
 msgid "Could not open a thread for this {requestNoun}. Try again."
 msgstr ""
 
@@ -7981,7 +7981,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:138
+#: src/features/chat/model-settings/use-model-combobox.ts:148
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -14936,7 +14936,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Handed over"
 msgstr ""
 
@@ -17747,7 +17747,7 @@ msgstr "Caricamento conversazioni"
 msgid "Loading threads..."
 msgstr "Caricamento delle conversazioni..."
 
-#: src/features/develop/components/work-on-pull-request.tsx:55
+#: src/features/develop/components/work-on-pull-request.tsx:70
 msgid "Loading threads…"
 msgstr ""
 
@@ -20345,7 +20345,7 @@ msgstr "Ancora nessun dataset"
 msgid "No description"
 msgstr "Nessuna descrizione"
 
-#: src/features/develop/components/pull-request-view.tsx:129
+#: src/features/develop/components/pull-request-view.tsx:135
 msgid "No description provided."
 msgstr ""
 
@@ -20743,7 +20743,7 @@ msgstr "Nessun contenuto testuale in questa slide"
 msgid "No text to show."
 msgstr "Nessun testo da mostrare."
 
-#: src/features/develop/components/work-on-pull-request.tsx:62
+#: src/features/develop/components/work-on-pull-request.tsx:77
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr ""
 
@@ -21208,7 +21208,7 @@ msgstr ""
 msgid "Older"
 msgstr "Meno recenti"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -21974,7 +21974,7 @@ msgstr ""
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
-#: src/features/develop/components/work-on-pull-request.tsx:71
+#: src/features/develop/components/work-on-pull-request.tsx:86
 msgid "Opened from this thread"
 msgstr ""
 
@@ -21986,7 +21986,7 @@ msgstr "Apertura di una chat vuota"
 msgid "Opening a pull request — progress is in the log"
 msgstr "Apertura di una pull request: l'avanzamento è nel log"
 
-#: src/features/develop/components/work-on-pull-request.tsx:49
+#: src/features/develop/components/work-on-pull-request.tsx:63
 msgid "Opening a thread…"
 msgstr ""
 
@@ -28757,7 +28757,7 @@ msgstr "Avviato {startedAgo}"
 msgid "Started <0>{0}</0>. Tool details and attachments are hidden on shared conversations."
 msgstr "Iniziata il <0>{0}</0>. I dettagli degli strumenti e gli allegati sono nascosti nelle conversazioni condivise."
 
-#: src/features/develop/components/work-on-pull-request.tsx:71
+#: src/features/develop/components/work-on-pull-request.tsx:86
 msgid "Started here"
 msgstr ""
 
@@ -29650,9 +29650,9 @@ msgstr "Passa a un'organizzazione per condividerla con essa."
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Cambia spazio di lavoro: attuale {triggerLabel}"
 
-#. placeholder {0}: nameOf(part.from.model)
-#. placeholder {1}: nameOf(part.to.model)
-#: src/features/chat/thread/agent-switch-divider.tsx:14
+#. placeholder {0}: switchAgentName(part.from, nameOf)
+#. placeholder {1}: switchAgentName(part.to, nameOf)
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr ""
 
@@ -30494,7 +30494,7 @@ msgstr "Il limite di costo deve essere un numero positivo di dollari."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Il dataset, i suoi casi e tutte le sue esecuzioni vengono rimossi."
 
-#: src/features/develop/components/pull-request-view.tsx:131
+#: src/features/develop/components/pull-request-view.tsx:137
 msgid "The description is cut short."
 msgstr ""
 
@@ -31233,7 +31233,7 @@ msgstr ""
 #~ msgid "This host does not offer any view of a {0} yet."
 #~ msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:116
+#: src/features/develop/components/pull-request-view.tsx:122
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -31624,7 +31624,7 @@ msgstr "Conversazioni"
 msgid "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 msgstr "Le conversazioni conservano tutta la cronologia. Crea branch delle idee, fissa le chat importanti e riprendi esattamente da dove avevi lasciato."
 
-#: src/features/develop/components/work-on-pull-request.tsx:45
+#: src/features/develop/components/work-on-pull-request.tsx:58
 msgid "Threads working on this {requestNoun}"
 msgstr ""
 
@@ -34602,7 +34602,7 @@ msgstr ""
 msgid "Work management and team collaboration"
 msgstr "Gestione del lavoro e collaborazione in team"
 
-#: src/features/develop/components/work-on-pull-request.tsx:49
+#: src/features/develop/components/work-on-pull-request.tsx:63
 msgid "Work on this {requestNoun}"
 msgstr ""
 

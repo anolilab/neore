@@ -169,6 +169,9 @@ export const schema = defineSchema({
         lastEventAt: v.optional(v.number()),
         nativeSessionId: v.optional(v.string()),
         status: vAcpSessionStatus,
+        // The untrusted content the agent was handed when it took over (`agent/thread-summary-taint.ts`), signed onto every
+        // prompt it is sent. Unset: it was handed none.
+        taintedBy: v.optional(v.array(vDeviceTaintSource)),
         threadId: v.id("threads"),
         updatedAt: v.number(),
         userId: v.string(),

@@ -20,6 +20,7 @@ interface Probe {
     helperPid: () => number | undefined;
     openSettings: () => void;
     outcome: () => string | undefined;
+    shortcut: () => { held: boolean; platform: string; refused: boolean; registered: boolean; wanted: boolean };
     state: () => string;
     useTestEngine: (engine: { args: string[]; command: string; modelPath: string }) => void;
 }
@@ -393,10 +394,12 @@ test("only the dictation window is given the microphone", async () => {
 
 const SETTINGS_PAGE = /\/dictation-settings-window\/settings\.html$/u;
 const DICTATION_KEY = /dictation|settings/iu;
-const SHORTCUT = "CommandOrControl+Shift+D";
+const SHORTCUT = process.platform === "win32" && process.arch === "arm64" ? "CommandOrControl+Shift+Y" : "CommandOrControl+Shift+D";
 
 /** Whether the app holds the dictation shortcut with the OS right now. */
 const shortcutHeld = (app: ElectronApplication): Promise<boolean> => app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), SHORTCUT);
+const shortcutState = (app: ElectronApplication): Promise<ReturnType<Probe["shortcut"]>> =>
+    app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.shortcut());
 const MODEL_FILES = ["ggml-small.bin", "ggml-large-v3-turbo-q5_0.bin"];
 
 test("on a first run the switch is off: a press opens no window and downloads nothing", async () => {
@@ -447,6 +450,9 @@ test("the settings window turns dictation on, deletes a model file, and is out o
 
         await switchControl.check();
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
+        // Polls the whole state: when it stays unheld, the failure shows whether the switch wanted it, and what Windows said.
+        await expect.poll(() => shortcutState(app)).toEqual({ held: true, platform: expect.any(String), refused: false, registered: true, wanted: true });
+        // The app's state comes from its own constant; this checks the accelerator this spec names for the platform.
         await expect.poll(() => shortcutHeld(app)).toBe(true);
 
         await page.getByLabel("Language").selectOption("de");

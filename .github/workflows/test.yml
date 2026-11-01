@@ -81,8 +81,9 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
 
@@ -105,7 +106,7 @@ jobs:
             # keyring backend links libdbus at build time (see the Rust job below).
             - name: "Install libdbus for the Linux keyring"
               shell: "bash"
-              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
             - name: "Build affected packages"
               shell: "bash"
@@ -126,14 +127,6 @@ jobs:
               shell: "bash"
               run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
 
-            # The Rust Worker is the one project with a `test` target and no
-            # `test:coverage` (cargo test has no v8 coverage), so it is not part
-            # of the step above. `--if-present` keeps a change that touches only
-            # it from failing that step; this step runs its tests.
-            - name: "Run the Rust Worker tests (affected)"
-              shell: "bash"
-              run: 'pnpm exec vis affected test --tag document-parser --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
-
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
             # for a pull_request from a fork: secrets are not exposed there, so
             # the upload would fail for a reason that has nothing to do with the
@@ -146,6 +139,45 @@ jobs:
               with:
                   token: "${{ secrets.CODECOV_TOKEN }}"
                   fail_ci_if_error: false
+
+    # The Rust Worker is the one project with a `test` target and no `test:coverage`
+    # (cargo test has no v8 coverage), so the coverage run in `test` skips it. Its own
+    # job, in parallel: it needs no workspace build and was the tail of `test`.
+    rust-worker:
+        name: "Rust Worker tests"
+        if: "needs.files-changed.outputs.packages == 'true'"
+        needs: "files-changed"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 45
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "24.22.1"
+                  npm-version: "11"
+                  skip-playwright: "true"
+
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Build the document-parser Worker"
+              shell: "bash"
+              run: "pnpm --filter document-parser run build:worker"
+
+            - name: "Run the Rust Worker tests (affected)"
+              shell: "bash"
+              run: 'pnpm exec vis affected test --tag document-parser --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
     e2e:
         name: "E2E (chromium, shard ${{ matrix.shard }}/3)"
@@ -189,10 +221,13 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
+                  # The browsers come from the cache below (or its miss install), not from setup.
+                  skip-playwright: "true"
 
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
@@ -324,9 +359,36 @@ jobs:
               shell: "bash"
               run: "pnpm --filter @neore/web exec fumadocs-mdx"
 
-            - name: "Install Chromium"
+            - name: "Resolve the Playwright version"
+              id: "playwright"
               shell: "bash"
-              run: "pnpm --filter @neore/web exec playwright install --with-deps chromium"
+              # Captured first: a failing `playwright --version` must fail the step, not key the cache on an empty version.
+              run: |
+                  version="$(pnpm --filter @neore/web exec playwright --version | awk '{print $2}')"
+                  if [ -z "${version}" ]; then
+                      echo "could not read the Playwright version" >&2
+                      exit 1
+                  fi
+                  echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+            # The browser download is the slow half of `playwright install --with-deps`;
+            # the system libraries live outside the cache and are always installed.
+            - name: "Cache Playwright browsers"
+              id: "playwright-cache"
+              uses: "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "~/.cache/ms-playwright"
+                  key: "playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}"
+
+            - name: "Install Chromium"
+              if: "steps.playwright-cache.outputs.cache-hit != 'true'"
+              shell: "bash"
+              run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install --with-deps chromium"
+
+            - name: "Install Chromium system dependencies (browsers cached)"
+              if: "steps.playwright-cache.outputs.cache-hit == 'true'"
+              shell: "bash"
+              run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install-deps chromium"
 
             # Playwright's webServer starts the Lunora backend and the app itself.
             # No TURNSTILE_SECRET_KEY is set here, so better-auth loads without the
@@ -411,13 +473,13 @@ jobs:
             # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
             - name: "Install libdbus for the Linux keyring"
               if: "matrix.os == 'ubuntu-22.04'"
-              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
             # The SSH transport tests (`tests/ssh_host.rs`) start a throwaway `sshd` on 127.0.0.1, as the
             # runner's own user with its own host key. Ubuntu needs the privilege-separation directory to exist.
             - name: "Install sshd for the SSH transport tests"
               if: "matrix.os == 'ubuntu-22.04'"
-              run: "sudo apt-get update && sudo apt-get install -y openssh-server openssh-client && sudo mkdir -p /run/sshd"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y openssh-server openssh-client && sudo mkdir -p /run/sshd"
 
             # rustfmt is OS-independent, so it runs once, on the Linux leg.
             - name: "Check Rust formatting"
@@ -491,7 +553,7 @@ jobs:
                   NEORE_REQUIRE_SANDBOX: "1"
               run: |
                   set -euo pipefail
-                  sudo apt-get install -y musl-tools
+                  bash .github/scripts/apt-retry.sh sudo apt-get install -y musl-tools
                   rustup target add x86_64-unknown-linux-musl
                   manifest=packages/device-core/Cargo.toml
                   cargo build --manifest-path "$manifest" --release --no-default-features --bin neore-host --target x86_64-unknown-linux-musl
@@ -527,8 +589,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -543,7 +606,7 @@ jobs:
                   workspaces: "packages/device-core-node -> target"
 
             - name: "Install libdbus for the Linux keyring"
-              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
             - name: "Build the device-execution addon"
               run: "pnpm --filter @neore/device-core-node run build"
@@ -583,8 +646,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -639,8 +703,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -685,7 +750,7 @@ jobs:
               run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
 
     test-required-check:
-        needs: ["files-changed", "test", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
+        needs: ["files-changed", "test", "rust-worker", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

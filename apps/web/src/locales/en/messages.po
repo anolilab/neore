@@ -1221,7 +1221,7 @@ msgstr "{providerName} · your own Bedrock account ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} req"
 
-#: src/features/develop/components/pull-request-view.tsx:119
+#: src/features/develop/components/pull-request-view.tsx:125
 msgid "{requestNoun} views"
 msgstr "{requestNoun} views"
 
@@ -7799,7 +7799,7 @@ msgstr "Could not load the memories."
 msgid "Could not load the skill breakdown."
 msgstr "Could not load the skill breakdown."
 
-#: src/features/develop/components/work-on-pull-request.tsx:58
+#: src/features/develop/components/work-on-pull-request.tsx:73
 msgid "Could not load the threads for this {requestNoun}."
 msgstr "Could not load the threads for this {requestNoun}."
 
@@ -7819,7 +7819,7 @@ msgstr "Could not load your activity."
 msgid "Could not move the page"
 msgstr "Could not move the page"
 
-#: src/features/develop/components/work-on-pull-request.tsx:33
+#: src/features/develop/components/work-on-pull-request.tsx:46
 msgid "Could not open a thread for this {requestNoun}. Try again."
 msgstr "Could not open a thread for this {requestNoun}. Try again."
 
@@ -7980,7 +7980,7 @@ msgstr "Could not stop the sub-agent."
 msgid "Could not stop the worker."
 msgstr "Could not stop the worker."
 
-#: src/features/chat/model-settings/use-model-combobox.ts:138
+#: src/features/chat/model-settings/use-model-combobox.ts:148
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
@@ -14935,7 +14935,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -17746,7 +17746,7 @@ msgstr "Loading threads"
 msgid "Loading threads..."
 msgstr "Loading threads..."
 
-#: src/features/develop/components/work-on-pull-request.tsx:55
+#: src/features/develop/components/work-on-pull-request.tsx:70
 msgid "Loading threads…"
 msgstr "Loading threads…"
 
@@ -20344,7 +20344,7 @@ msgstr "No datasets yet"
 msgid "No description"
 msgstr "No description"
 
-#: src/features/develop/components/pull-request-view.tsx:129
+#: src/features/develop/components/pull-request-view.tsx:135
 msgid "No description provided."
 msgstr "No description provided."
 
@@ -20742,7 +20742,7 @@ msgstr "No text content on this slide"
 msgid "No text to show."
 msgstr "No text to show."
 
-#: src/features/develop/components/work-on-pull-request.tsx:62
+#: src/features/develop/components/work-on-pull-request.tsx:77
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "No thread has worked on this {requestNoun} yet."
 
@@ -21207,7 +21207,7 @@ msgstr "old lines {text}"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:18
+#: src/features/chat/thread/agent-switch-divider.tsx:19
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -21973,7 +21973,7 @@ msgstr "Opened {tabLabel}"
 msgid "Opened {tabLabel}: {label}"
 msgstr "Opened {tabLabel}: {label}"
 
-#: src/features/develop/components/work-on-pull-request.tsx:71
+#: src/features/develop/components/work-on-pull-request.tsx:86
 msgid "Opened from this thread"
 msgstr "Opened from this thread"
 
@@ -21985,7 +21985,7 @@ msgstr "Opening a blank chat"
 msgid "Opening a pull request — progress is in the log"
 msgstr "Opening a pull request — progress is in the log"
 
-#: src/features/develop/components/work-on-pull-request.tsx:49
+#: src/features/develop/components/work-on-pull-request.tsx:63
 msgid "Opening a thread…"
 msgstr "Opening a thread…"
 
@@ -28756,7 +28756,7 @@ msgstr "Started {startedAgo}"
 msgid "Started <0>{0}</0>. Tool details and attachments are hidden on shared conversations."
 msgstr "Started <0>{0}</0>. Tool details and attachments are hidden on shared conversations."
 
-#: src/features/develop/components/work-on-pull-request.tsx:71
+#: src/features/develop/components/work-on-pull-request.tsx:86
 msgid "Started here"
 msgstr "Started here"
 
@@ -29649,9 +29649,9 @@ msgstr "Switch to an organization to share with it."
 msgid "Switch workspace: currently {triggerLabel}"
 msgstr "Switch workspace: currently {triggerLabel}"
 
-#. placeholder {0}: nameOf(part.from.model)
-#. placeholder {1}: nameOf(part.to.model)
-#: src/features/chat/thread/agent-switch-divider.tsx:14
+#. placeholder {0}: switchAgentName(part.from, nameOf)
+#. placeholder {1}: switchAgentName(part.to, nameOf)
+#: src/features/chat/thread/agent-switch-divider.tsx:15
 msgid "Switched from {0} to {1}"
 msgstr "Switched from {0} to {1}"
 
@@ -30493,7 +30493,7 @@ msgstr "The cost cap must be a positive number of dollars."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "The dataset, its cases and every run of it are removed."
 
-#: src/features/develop/components/pull-request-view.tsx:131
+#: src/features/develop/components/pull-request-view.tsx:137
 msgid "The description is cut short."
 msgstr "The description is cut short."
 
@@ -31232,7 +31232,7 @@ msgstr "This host does not offer an inbox yet."
 #~ msgid "This host does not offer any view of a {0} yet."
 #~ msgstr "This host does not offer any view of a {0} yet."
 
-#: src/features/develop/components/pull-request-view.tsx:116
+#: src/features/develop/components/pull-request-view.tsx:122
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "This host does not offer any view of a {requestNoun} yet."
 
@@ -31623,7 +31623,7 @@ msgstr "Threads"
 msgid "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 msgstr "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 
-#: src/features/develop/components/work-on-pull-request.tsx:45
+#: src/features/develop/components/work-on-pull-request.tsx:58
 msgid "Threads working on this {requestNoun}"
 msgstr "Threads working on this {requestNoun}"
 
@@ -34601,7 +34601,7 @@ msgstr "work"
 msgid "Work management and team collaboration"
 msgstr "Work management and team collaboration"
 
-#: src/features/develop/components/work-on-pull-request.tsx:49
+#: src/features/develop/components/work-on-pull-request.tsx:63
 msgid "Work on this {requestNoun}"
 msgstr "Work on this {requestNoun}"
 

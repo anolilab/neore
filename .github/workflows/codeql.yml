@@ -13,7 +13,51 @@ concurrency:
     cancel-in-progress: "${{ github.event_name == 'pull_request' }}"
 
 jobs:
+    # A pull request runs the Rust analysis only when it changes Rust; push to main and the
+    # weekly run always do.
+    changes:
+        name: "Rust changed"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            contents: "read"
+        outputs:
+            rust: "${{ steps.rust.outputs.changed }}"
+        steps:
+            - name: "Git checkout"
+              if: "github.event_name == 'pull_request'"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: "Look for Rust changes"
+              id: "rust"
+              shell: "bash"
+              env:
+                  BASE_SHA: "${{ github.event.pull_request.base.sha }}"
+                  EVENT: "${{ github.event_name }}"
+              run: |
+                  if [ "${EVENT}" != "pull_request" ]; then
+                      echo "changed=true" >> "${GITHUB_OUTPUT}"
+                      exit 0
+                  fi
+
+                  # Written to a file first, so a failing diff fails this job instead of reading as "no Rust"
+                  # (no pipe for an early-exiting grep to break). NUL-separated, so git never quotes a name.
+                  files="$(mktemp)"
+                  git diff --name-only -z "${BASE_SHA}...HEAD" > "${files}"
+
+                  if grep -qzE '(\.rs$|(^|/)Cargo\.(toml|lock)$)' "${files}"; then
+                      echo "changed=true" >> "${GITHUB_OUTPUT}"
+                  else
+                      echo "changed=false" >> "${GITHUB_OUTPUT}"
+                  fi
+
     codeql:
+        needs: ["changes"]
+        # Runs even when the change check did not finish; Rust is then analysed too (below).
+        if: "${{ !cancelled() }}"
         permissions:
             security-events: "write"
             actions: "read"
@@ -23,5 +67,8 @@ jobs:
             # `actions` analyses the workflow files themselves (script injection,
             # untrusted checkouts) alongside the application code; `rust` covers
             # services/document-parser.
-            languages: '["javascript-typescript", "actions", "rust"]'
+            #
+            # `rust` takes ~9 minutes: a pull request that changes no Rust skips it. An unknown
+            # answer (the check did not finish) analyses Rust as well.
+            languages: '${{ needs.changes.outputs.rust == ''false'' && ''["javascript-typescript", "actions"]'' || ''["javascript-typescript", "actions", "rust"]'' }}'
             branches: '["main"]'

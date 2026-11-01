@@ -44,6 +44,7 @@ vi.mock("../../_generated/api", async (importOriginal) => registeredApi(await im
 vi.mock("../../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
 const MODULES = {
+    acp_switch: async () => await import("../../acp/switch"),
     agent_messages: async () => await import("../../agent/messages"),
     chat_agent_switch: async () => await import("../../chat/agent-switch"),
     chat_functions: async () => await import("../../chat/functions"),

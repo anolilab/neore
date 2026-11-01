@@ -14,7 +14,6 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimOnce } from "../lib/claim-once";
-import { sha256Hex } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
@@ -23,6 +22,7 @@ import { countOpenCalls, isDeviceOnline } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
+import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
 import { vPendingPermission } from "./validators";
 
@@ -96,7 +96,7 @@ export interface StartHostSessionInput {
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
 export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
     const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
-    const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
+    const offer = offerOf(device, args.agentKey, args.folderId);
 
     if (!device?.encryptedSecret || !offer) {
         throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
@@ -107,7 +107,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     }
 
     // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
-    const hostSessionId = `web-${await sha256Hex(`${userId}:${args.clientId}`)}`;
+    const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
 
     if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
         // The first try's answer may have been lost: hand back the session it made.
@@ -132,10 +132,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
 
     if ("error" in call) {
         // Throwing rolls the thread and the session back with the claim.
-        throw new LunoraError(
-            "BAD_REQUEST",
-            call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
-        );
+        throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
     }
 
     ctx.log.event("acp.start_host_session", { started: true });

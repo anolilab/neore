@@ -2700,6 +2700,55 @@
             }
           ]
         },
+        "taintedBy": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "union",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "members": [
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"device\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"files\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"knowledge\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"mcp\""
+              },
+              {
+                "kind": "literal",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "literal": "\"web\""
+              }
+            ]
+          }
+        },
         "threadId": {
           "kind": "id",
           "nullable": false,

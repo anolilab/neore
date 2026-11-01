@@ -19,6 +19,8 @@ import { touchSession } from "./sessions";
 export const queueHostTurn = async (
     ctx: MutationCtx,
     args: {
+        /** What an agent that took the thread over is told first (`pending-handoff.ts`): sent in the call, never saved as the user's message. */
+        handoff?: string;
         session: Doc<"acpSessions">;
         /** Untrusted content the text carries; signed into the call so the computer never offers "Always allow" for the turn. */
         taintedBy?: ReadonlyArray<DeviceTaintSource>;
@@ -28,11 +30,19 @@ export const queueHostTurn = async (
     },
     now: number,
 ): Promise<{ error: Extract<AcpCallResult, { error: string }>["error"] } | { messageId: string; streamId: Id<"persistentStreams">; turnId: string }> => {
-    const { session, taintedBy, text, threadId, userId } = args;
+    const { handoff, session, taintedBy, text, threadId, userId } = args;
     const turnId = crypto.randomUUID();
     const call = await createAcpCall(
         ctx,
-        { deviceId: session.deviceId, input: { sessionId: session.hostSessionId, text, turnId }, kind: "acp_send", taintedBy, threadId, userId },
+        {
+            deviceId: session.deviceId,
+            input: { sessionId: session.hostSessionId, text: handoff ? `${handoff}\n\n${text}` : text, turnId },
+            kind: "acp_send",
+            // What the agent took over from another thread is in its context for as long as the session lasts.
+            taintedBy: [...(session.taintedBy ?? []), ...(taintedBy ?? [])],
+            threadId,
+            userId,
+        },
         now,
     );
 

@@ -1034,6 +1034,10 @@ written here is what is not.
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.
+  **A host thread can have several sessions** (harness switch S3): a switch to another host agent ends the thread's session
+  and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
+  The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
+  the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
 
 - **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, plans/acp-agent-host.md) —
   the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the

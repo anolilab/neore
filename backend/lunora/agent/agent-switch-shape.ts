@@ -12,14 +12,20 @@ const SWITCH_MODES: ReadonlySet<unknown> = new Set(["delta", "full", "portable"]
 
 const isSwitchMode = (value: unknown): value is AgentSwitchPart["mode"] => SWITCH_MODES.has(value);
 
-const isModelRef = (value: unknown): value is { kind: "model"; model: string } => {
+const HOST_TEXT_FIELDS = ["agentKey", "agentLabel", "folderId", "folderLabel", "hostId"] as const;
+
+const isAgentRef = (value: unknown): value is AgentSwitchPart["from"] => {
     if (typeof value !== "object" || value === null) {
         return false;
     }
 
-    const { kind, model } = value as { kind?: unknown; model?: unknown };
+    const fields = value as Record<string, unknown>;
 
-    return kind === "model" && typeof model === "string";
+    if (fields.kind === "model") {
+        return typeof fields.model === "string";
+    }
+
+    return fields.kind === "host" && HOST_TEXT_FIELDS.every((key) => typeof fields[key] === "string");
 };
 
 /** The switch part a row carries when it has the stored shape, else `undefined`. */
@@ -32,5 +38,9 @@ export const readAgentSwitch = (row: { providerMetadata?: unknown }): AgentSwitc
 
     const { from, mode, startMessageId, to } = stored as { from?: unknown; mode?: unknown; startMessageId?: unknown; to?: unknown };
 
-    return isModelRef(from) && isModelRef(to) && isSwitchMode(mode) && typeof startMessageId === "string" ? { from, mode, startMessageId, to } : undefined;
+    return isAgentRef(from) && isAgentRef(to) && isSwitchMode(mode) && typeof startMessageId === "string" ? { from, mode, startMessageId, to } : undefined;
 };
+
+/** The name a divider shows for an agent: the model's name (looked up by the caller), or the coding agent and its folder. */
+export const switchAgentName = (agent: AgentSwitchPart["from"], modelName: (model: string) => string): string =>
+    agent.kind === "model" ? modelName(agent.model) : `${agent.agentLabel} · ${agent.folderLabel}`;

@@ -98,7 +98,9 @@ const runner = {
                 }
             }
         }),
-    runQuery: async (_reference: unknown, args: any) => await run(async (ctx) => await planAgentSwitchHandler(ctx, args)),
+    runQuery: async (reference: any, args: any) =>
+        // Not a coding-agent thread: the routing question `runAgentSwitch` asks first (`acp/switch.ts`).
+        reference.__lunoraRef === "acp_switch:isHostSwitchSource" ? false : await run(async (ctx) => await planAgentSwitchHandler(ctx, args)),
 };
 
 const summaryClaim = async (): Promise<boolean> => await run(async (ctx) => await hasClaim(ctx, "switch-summary", threadId));
