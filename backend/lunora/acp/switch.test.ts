@@ -1175,6 +1175,16 @@ describe("native reattach (S4)", () => {
         // The agent's own session needs none of it.
         await switchTo(threadId, hostTarget(device, CLAUDE));
         expect((await dividers(threadId)).at(-1)).toMatchObject({ mode: "native" });
+
+        // The load fails: the first prompt still carries a bounded handoff that says the earlier turns are not in it.
+        await openStartedSession(device, threadId, { loaded: false, reason: "load_failed" });
+        expect((await dividers(threadId)).at(-1)).toMatchObject({ fallbackReason: "load_failed", mode: "portable" });
+        expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
+
+        const first = (await acpSends()).at(-1);
+
+        expect(first).toContain("Earlier turns are not included");
+        expect(first?.endsWith("carry on")).toBe(true);
     });
 
     it("lets a switch back to an agent whose session ended pick it up where it left off", async () => {

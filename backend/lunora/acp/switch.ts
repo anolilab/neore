@@ -28,7 +28,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import { leafRowOf, resolvePathAgent } from "../agent/agent-switch";
 import { agentKeyOf, sameAgent } from "../agent/agent-switch-logic";
 import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agent/agent-switch-validators";
-import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
+import { composeHandoff, composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
 import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -141,10 +141,14 @@ const currentAgent = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<
     return session && { agent: sessionRefOf(session), session };
 };
 
+/** The handoff of a conversation too large to hand over, for a switch that does not need one unless its load fails: no turns, and the note saying so. */
+const OMITTED_HANDOFF = composeHandoff({ kind: "portable", omittedTurns: 0, tail: [] });
+
 /**
  * The newest turns of the thread as the handoff text of a switch to `target`; empty when the thread has no turn with text.
  * A switch that reattaches the agent's own session (`lenient`) stores it only for the load that fails, so one too large to
- * hand over is left out rather than refusing a switch that does not need it.
+ * hand over does not refuse a switch that does not need it: the stored fallback is then a frame that says the earlier
+ * turns are not included, which is still a handoff the first prompt carries if the load fails.
  */
 const handoffFor = async (
     ctx: MutationCtx,
@@ -172,14 +176,14 @@ const handoffFor = async (
             return carried;
         }
 
-        return options.lenient ? "" : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
+        return options.lenient ? OMITTED_HANDOFF : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
     }
 
     try {
         return composeTailHandoff(source.turns, maxBytes, source.omittedEarlier);
     } catch (error) {
         if (error instanceof HandoffTooLargeError) {
-            return options.lenient ? "" : refuse(error.code, error.message);
+            return options.lenient ? OMITTED_HANDOFF : refuse(error.code, error.message);
         }
 
         throw error;
