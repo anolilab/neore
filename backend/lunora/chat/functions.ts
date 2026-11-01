@@ -3857,11 +3857,12 @@ export const streamAsync = internalAction
         let projectContext: string | undefined;
 
         if (appThread?.projectId) {
-            const project = await context.runQuery(api.agent.projects.getProject, {
-                projectId: appThread.projectId as Id<"projects">,
-            });
-
-            projectContext = project?.context;
+            // The access `createThread` applied (owner or organization member), not the owner-only read.
+            projectContext =
+                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                    projectId: appThread.projectId as Id<"projects">,
+                    userId,
+                })) ?? undefined;
         }
 
         // Get model definition

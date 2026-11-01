@@ -7,6 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
+import { getProjectContextForRun } from "../projects/functions";
 import { createThread } from "./functions";
 
 const OWNER = "user-owner";
@@ -55,6 +56,9 @@ let harness: ReturnType<typeof lunoraTest>;
 beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "auth_functions", await import("../auth/functions"));
+    registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+    registerModule(registry, "projects_functions", await import("../projects/functions"));
 }, 30_000);
 
 beforeEach(() => {
@@ -80,5 +84,44 @@ describe("createThread with a projectId", () => {
 
         await harness.run(async (ctx: any) => await ctx.db.delete(gone));
         await expect(create(OWNER, gone)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+});
+
+describe("a project of an organization the caller belongs to", () => {
+    const ORG = "org-1";
+    const MEMBER = "user-member";
+    const orgProject = async () =>
+        (await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { context: "Org notes", createdAt: 0, organizationId: ORG, title: "p", userId: OWNER }),
+        )) as string;
+    const join = async (userId: string, organizationId = ORG) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 1, organizationId, role: "member", userId }));
+    const create = (userId: string, projectId: string) =>
+        harness.withIdentity({ userId }).mutation(createThread as never, { model: "gpt-4o", projectId } as never);
+
+    it("lets a member whose active organization differs create a thread in it", async () => {
+        const projectId = await orgProject();
+
+        await join(MEMBER);
+        await expect(create(MEMBER, projectId)).resolves.toBeDefined();
+    });
+
+    it("refuses a user who is not a member of that organization", async () => {
+        const projectId = await orgProject();
+
+        await join(STRANGER, "org-other");
+        await expect(create(STRANGER, projectId)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    it("hands a member's run the project context, and a non-member none", async () => {
+        const projectId = await orgProject();
+
+        await join(MEMBER);
+
+        const read = async (userId: string) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId }));
+
+        expect(await read(MEMBER)).toBe("Org notes");
+        expect(await read(STRANGER)).toBeNull();
     });
 });

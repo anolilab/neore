@@ -942,6 +942,11 @@ export interface InternalApiTypes {
             redeemPageInvite: FunctionReference<"mutation", { token: string; userId: string }, { pageId: Id<"pages"> }>;
         };
     };
+    projects: {
+        functions: {
+            getProjectContextForRun: FunctionReference<"query", { projectId: Id<"projects">; userId: string }, string | null>;
+        };
+    };
     prompts: {
         functions: {
             calculatePromptCount: FunctionReference<"action", { isPremium: boolean; userId: string }, { canCreate: boolean; count: number; isPremium: boolean; limit: number | null }>;
@@ -2125,6 +2130,11 @@ export const internal: InternalApiTypes = {
             getPublicPageOwner: { __lunoraRef: "pages_sharing:getPublicPageOwner" },
             readPublicPage: { __lunoraRef: "pages_sharing:readPublicPage" },
             redeemPageInvite: { __lunoraRef: "pages_sharing:redeemPageInvite" },
+        },
+    },
+    projects: {
+        functions: {
+            getProjectContextForRun: { __lunoraRef: "projects_functions:getProjectContextForRun" },
         },
     },
     prompts: {

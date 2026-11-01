@@ -16,7 +16,6 @@ import { MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, parseCustomM
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
 
-import { api } from "../../_generated/api";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -432,7 +431,9 @@ export const loadRunContext = async (
         }),
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
-            settings?.projectId ? await ctx.runQuery(api.agent.projects.getProject, { projectId: settings.projectId as Id<"projects"> }) : null,
+            settings?.projectId
+                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId })
+                : null,
         ),
         botPromise,
     ]);
@@ -448,8 +449,8 @@ export const loadRunContext = async (
         contextParts.push(knowledgeContext.context);
     }
 
-    if (project?.context) {
-        contextParts.push(`PROJECT CONTEXT:\n${project.context}`);
+    if (project) {
+        contextParts.push(`PROJECT CONTEXT:\n${project}`);
     }
 
     if (bot) {
@@ -484,7 +485,7 @@ export const loadRunContext = async (
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
             memory: memoryContext?.context,
-            project: project?.context,
+            project: project ?? undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),
         userProviderKeys,

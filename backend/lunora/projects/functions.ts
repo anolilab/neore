@@ -9,30 +9,42 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
-import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
+import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
 /** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
 export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
-    // Inline DB access - bypasses runQuery validator overhead
-    const project = await context.db.projects.findFirst({ where: { _id: projectId } });
+    // Decide on the row's owner and organization past RLS: a project of a member's
+    // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId } });
 
-    if (!project) {
+    if (!found) {
         return null;
     }
 
-    // Check access: user must own the project or it must be in their organization
-    if (
-        project.userId &&
-        project.userId !== userId &&
-        (!project.organizationId || !(await getMemberByOrganizationAndUser(context, project.organizationId, userId)))
-    ) {
-        return null;
+    if (found.userId && found.userId !== userId) {
+        if (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId))) {
+            return null;
+        }
+
+        // A proven membership: the project passes row-level security.
+        admitOrganization(context, found.organizationId);
     }
 
-    return project;
+    return await context.db.projects.findFirst({ where: { _id: projectId } });
 };
+
+/** A project's `context` text for a run on behalf of `userId`, under the same access rule as `createThread` (owner or organization member). */
+export const getProjectContextForRun = internalQuery
+    .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args: { projectId, userId }, ctx: context }) => {
+        const project = await readableProject(context, projectId, userId);
+
+        return project?.context ?? null;
+    });
 
 export const getProject = authQuery
     .input({
