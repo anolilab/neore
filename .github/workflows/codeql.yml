@@ -55,6 +55,8 @@ jobs:
 
     codeql:
         needs: ["changes"]
+        # Runs even when the change check did not finish; Rust is then analysed too (below).
+        if: "${{ !cancelled() }}"
         permissions:
             security-events: "write"
             actions: "read"
@@ -65,6 +67,7 @@ jobs:
             # untrusted checkouts) alongside the application code; `rust` covers
             # services/document-parser.
             #
-            # `rust` takes ~9 minutes: a pull request that changes no Rust skips it.
-            languages: '${{ needs.changes.outputs.rust == ''true'' && ''["javascript-typescript", "actions", "rust"]'' || ''["javascript-typescript", "actions"]'' }}'
+            # `rust` takes ~9 minutes: a pull request that changes no Rust skips it. An unknown
+            # answer (the check did not finish) analyses Rust as well.
+            languages: '${{ needs.changes.outputs.rust == ''false'' && ''["javascript-typescript", "actions"]'' || ''["javascript-typescript", "actions", "rust"]'' }}'
             branches: '["main"]'
