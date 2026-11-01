@@ -1813,11 +1813,6 @@
     {
       "from": "function:chat_functions:createThread",
       "kind": "call",
-      "to": "function:agent_projects:getProject"
-    },
-    {
-      "from": "function:chat_functions:createThread",
-      "kind": "call",
       "to": "function:agent_threads:createTemporaryThread"
     },
     {
@@ -20235,13 +20230,13 @@
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 71,
+      "line": 77,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 88,
+      "line": 94,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
