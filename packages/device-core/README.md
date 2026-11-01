@@ -21,8 +21,8 @@ The `keychain` feature (on by default) selects the half:
 
 | Half                               | Modules                                                                                       | Builds with                   |
 | ---------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------- |
-| Paired side (desktop)              | `approval`, `engine` (+ `engine/hosts`), `envelope`, `hmac`, `store`, `install`, `ssh`, `acp` | default features (`keychain`) |
-| Shared actions (also `neore-host`) | `actions`, `fs`, `shell`, `sandbox`, `mcp`, `frame`, `host`, `acp_permission`                 | `--no-default-features`       |
+| Paired side (desktop)              | `approval`, `engine` (+ `engine/hosts`, `engine/host_agents`), `envelope`, `hmac`, `store`, `install`, `ssh`, `acp` | default features (`keychain`) |
+| Shared actions (also `neore-host`) | `actions`, `fs`, `shell`, `sandbox`, `mcp`, `frame`, `host`, `agent_host`, `agent_env`, `acp_permission` | `--no-default-features`       |
 
 `actions.rs` plans and runs `fs_*`, `shell_run` and local MCP calls from
 explicit inputs (shared folders, shell policy) and imports no pairing,

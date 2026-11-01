@@ -22,6 +22,7 @@ use serde_json::{json, Value};
 
 use crate::engine::{now_ms, usable_pairing, DeviceState, Outcome};
 use crate::envelope::{self, CallEnvelope, Domain, Signed};
+use crate::store::Host;
 
 /// Ids the backend mints (session, turn, thread, request) and the agent's own option ids.
 const ID_MAX: usize = 128;
@@ -53,6 +54,9 @@ pub fn is_acp_tool(tool: &str) -> bool {
 )]
 pub enum AcpCommand {
     Cancel {
+        /// Keep the prompts queued behind the turn (a worker's stop, whose later messages are other runs). Absent or
+        /// anything but `true` drops them, as a person's Stop does.
+        keep_queue: bool,
         session_id: String,
         turn_id: String,
     },
@@ -91,8 +95,20 @@ const NATIVE_ID_MAX: usize = 256;
 pub struct AcpPrepared {
     pub call_id: String,
     pub command: Option<AcpCommand>,
+    /// The device the call was made for: this computer's, or one of its servers'. Whoever acts on the command needs it
+    /// to know where the agent runs.
+    pub device_id: String,
     pub expires_at: u64,
     pub refusal: Option<String>,
+    /// The server's name when the command is for a server.
+    pub server: Option<String>,
+}
+
+/// Whose secret verifies and signs a call: this computer's pairing, or a server's own.
+struct Signer {
+    device_id: String,
+    host: Option<Host>,
+    secret: String,
 }
 
 fn id_of(input: &Value, key: &str) -> Option<String> {
@@ -109,27 +125,49 @@ fn refusal(reason: &str) -> Result<AcpCommand, String> {
 }
 
 impl DeviceState {
-    fn verified_acp_call(&self, signed: &Signed) -> Result<CallEnvelope, String> {
+    /// The device a call names, if it is one of this computer's servers: only picks the secret to verify with, and
+    /// nothing in the payload is trusted until that secret has verified it.
+    fn signer_for(&self, signed: &Signed) -> Result<Signer, String> {
+        if let Some(host) = self.server_named_by(&signed.payload) {
+            if host.secret.is_empty() {
+                return Err(
+                    "the server's secret is unavailable: the keychain could not be read".into(),
+                );
+            }
+
+            return Ok(Signer {
+                device_id: host.device_id.clone(),
+                secret: host.secret.clone(),
+                host: Some(host),
+            });
+        }
+
         let pairing = usable_pairing(&self.settings())?;
-        let call = envelope::verify_call_unrecorded(
-            &pairing.secret,
-            &pairing.device_id,
-            signed,
-            now_ms(),
-        )?;
+
+        Ok(Signer {
+            device_id: pairing.device_id,
+            host: None,
+            secret: pairing.secret,
+        })
+    }
+
+    fn verified_acp_call(&self, signed: &Signed) -> Result<(CallEnvelope, Signer), String> {
+        let signer = self.signer_for(signed)?;
+        let call =
+            envelope::verify_call_unrecorded(&signer.secret, &signer.device_id, signed, now_ms())?;
 
         if !TOOLS.contains(&call.tool.as_str()) {
             return Err("that is not a coding-agent command".into());
         }
 
-        Ok(call)
+        Ok((call, signer))
     }
 
     /// Step 1: checks the call and the command in it. A command Rust will not allow comes back as `refusal`, to be
     /// signed by step 3; a call that is not valid at all (signature, device, expiry) is an `Err` and gets no result.
     pub fn acp_prepare(&self, signed: &Signed) -> Result<AcpPrepared, String> {
-        let call = self.verified_acp_call(signed)?;
-        let (command, refusal) = match self.acp_command(&call) {
+        let (call, signer) = self.verified_acp_call(signed)?;
+        let (command, refusal) = match self.acp_command(&call, signer.host.as_ref()) {
             Ok(command) => (Some(command), None),
             Err(reason) => (None, Some(reason)),
         };
@@ -137,16 +175,17 @@ impl DeviceState {
         Ok(AcpPrepared {
             call_id: call.call_id,
             command,
+            device_id: signer.device_id,
             expires_at: call.expires_at,
             refusal,
+            server: signer.host.map(|host| host.name),
         })
     }
 
     /// Step 3: the signed result of a call. `outcome` is `accepted` or the reason the command was not carried out.
     /// The call is verified again, so this signs a result only for a command the backend really sent.
     pub fn acp_sign(&self, signed: &Signed, outcome: &str) -> Result<Signed, String> {
-        let call = self.verified_acp_call(signed)?;
-        let pairing = usable_pairing(&self.settings())?;
+        let (call, signer) = self.verified_acp_call(signed)?;
         let accepted = outcome == "accepted";
         let reason: String = outcome.chars().take(200).collect();
         let result = if accepted {
@@ -155,14 +194,20 @@ impl DeviceState {
             Outcome::failed("denied", format!("refused: {reason}"))
         };
 
-        self.audit(json!({
+        let mut audit = json!({
             "at": now_ms(), "callId": call.call_id, "decision": result.decision,
             "detail": if accepted { String::new() } else { reason },
             "status": result.status, "thread": call.thread_title, "tool": call.tool,
-        }));
+        });
+
+        if let Some(host) = &signer.host {
+            audit["host"] = json!(host.name);
+        }
+
+        self.audit(audit);
 
         let mut payload = json!({
-            "v": 1, "kind": "result", "callId": call.call_id, "deviceId": pairing.device_id,
+            "v": 1, "kind": "result", "callId": call.call_id, "deviceId": signer.device_id,
             "status": result.status, "decision": result.decision, "truncated": false,
         });
 
@@ -175,18 +220,19 @@ impl DeviceState {
         }
 
         Ok(envelope::sign_value(
-            &pairing.secret,
+            &signer.secret,
             Domain::Result,
             &payload,
         ))
     }
 
-    fn acp_command(&self, call: &CallEnvelope) -> Result<AcpCommand, String> {
+    fn acp_command(&self, call: &CallEnvelope, host: Option<&Host>) -> Result<AcpCommand, String> {
         let input = &call.input;
 
         match call.tool.as_str() {
             "acp_cancel" => match (id_of(input, "sessionId"), id_of(input, "turnId")) {
                 (Some(session_id), Some(turn_id)) => Ok(AcpCommand::Cancel {
+                    keep_queue: input.get("keepQueue").and_then(Value::as_bool) == Some(true),
                     session_id,
                     turn_id,
                 }),
@@ -224,13 +270,13 @@ impl DeviceState {
                     _ => refusal("a send names a session and a turn and carries a prompt"),
                 }
             }
-            _ => self.acp_start_command(input),
+            _ => self.acp_start_command(input, host),
         }
     }
 
     /// The consent check. The pair must be one the user approved in the local window, by the ids the offers
     /// named; the folder path comes from that approval, never from the call.
-    fn acp_start_command(&self, input: &Value) -> Result<AcpCommand, String> {
+    fn acp_start_command(&self, input: &Value, host: Option<&Host>) -> Result<AcpCommand, String> {
         let (Some(session_id), Some(thread_id), Some(agent_key), Some(folder_id)) = (
             id_of(input, "sessionId"),
             id_of(input, "threadId"),
@@ -245,19 +291,24 @@ impl DeviceState {
             Some(_) => return refusal("a start's saved session id is not valid"),
         };
         let settings = self.settings();
-        let agent = settings
-            .acp_agents
-            .iter()
-            .find(|agent| agent.key == agent_key);
-        let consent = settings
-            .acp_consents
+        // A server's pairs are its own: an approval for this computer says nothing about a server, or the other way round.
+        let (agents, consents) = match host {
+            Some(host) => (&host.acp_agents, &host.acp_consents),
+            None => (&settings.acp_agents, &settings.acp_consents),
+        };
+        let agent = agents.iter().find(|agent| agent.key == agent_key);
+        let consent = consents
             .iter()
             .find(|consent| consent.agent_key == agent_key && consent.folder_id == folder_id);
 
         match (agent, consent) {
             (Some(agent), Some(consent)) => Ok(AcpCommand::Start {
                 agent_key,
-                agent_label: agent.label.clone(),
+                // The label names the server, so the approval prompts and the thread say where the agent runs.
+                agent_label: host.map_or_else(
+                    || agent.label.clone(),
+                    |host| format!("{} on {}", agent.label, host.name),
+                ),
                 folder_id,
                 folder_label: consent.folder_label.clone(),
                 folder_path: consent.folder_path.clone(),
@@ -547,6 +598,40 @@ mod tests {
 
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_cancel_keeps_the_queue_only_when_it_says_so() {
+        let (state, dir, _) = state("keep-queue");
+
+        for (input, keep) in [
+            (json!({ "sessionId": "s1", "turnId": "u1" }), false),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": false }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": "yes" }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": true }),
+                true,
+            ),
+        ] {
+            let prepared = state.acp_prepare(&call("acp_cancel", input)).unwrap();
+
+            assert_eq!(
+                prepared.command,
+                Some(AcpCommand::Cancel {
+                    keep_queue: keep,
+                    session_id: "s1".into(),
+                    turn_id: "u1".into()
+                })
+            );
         }
 
         let _ = std::fs::remove_dir_all(&dir);

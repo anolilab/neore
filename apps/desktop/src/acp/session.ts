@@ -37,6 +37,18 @@ const MAX_PROMPT_LENGTH = 100_000;
 /** After a cancel, how long the agent has to answer its prompt before the process is ended. */
 const DEFAULT_CANCEL_GRACE_MS = 5000;
 
+/**
+ * After a cancelled turn, how long the next queued prompt waits. An update carries no turn id, so output an agent
+ * flushes after answering the cancelled prompt would otherwise land in the next turn; in this window it stays with
+ * the cancelled one.
+ */
+const DEFAULT_CANCEL_SETTLE_MS = 500;
+
+const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
 
@@ -70,9 +82,12 @@ export interface SessionOptions {
     agentLabel: string;
     appVersion: string;
     cancelGraceMs?: number;
+    cancelSettleMs?: number;
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
+    /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
+    folderIsRemote?: boolean;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
@@ -107,6 +122,9 @@ export class AgentSession {
     private readonly connection: JsonRpcConnection;
 
     private cancelTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** Until when a new prompt waits after a cancelled turn, so output the agent flushes late is not credited to it. */
+    private settleUntil = 0;
 
     private cancelRequested = false;
 
@@ -236,9 +254,15 @@ export class AgentSession {
             this.observe((observer) => observer.turnReceived?.(this.id, turnId, prompt));
         }
 
-        if (this.status === "busy") {
+        // Right after a cancelled turn the agent may still flush that turn's output: a prompt waits out the pause.
+        if (this.status === "busy" || Date.now() < this.settleUntil) {
             this.queue.push({ prompt, turnId });
             this.options.onChange();
+
+            if (this.status !== "busy") {
+                this.status = "busy";
+                this.startNextAfter(sleep(this.settleUntil - Date.now()));
+            }
 
             return { position: this.queue.length, status: "queued" };
         }
@@ -248,10 +272,17 @@ export class AgentSession {
         return { status: "started" };
     }
 
-    /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
-    public cancelTurn(turnId: string): boolean {
+    /**
+     * Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means.
+     * What waits behind it is dropped, as a person's Stop does (those are prompts typed in the desktop window), unless
+     * the backend signed `keepQueue` (a worker's stop: the prompts behind it are other runs' messages).
+     */
+    public cancelTurn(turnId: string, options: { keepQueue?: boolean } = {}): boolean {
         if (this.current?.id === turnId) {
-            this.cancel();
+            // A stop already under way keeps its choice: the backend's end of the same turn arrives as a second cancel.
+            if (!this.cancelRequested) {
+                this.cancel(options);
+            }
 
             return true;
         }
@@ -270,8 +301,8 @@ export class AgentSession {
         return true;
     }
 
-    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
-    public cancel(): void {
+    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later, unless `keepQueue` keeps them to run after it. */
+    public cancel(options: { keepQueue?: boolean } = {}): void {
         if (this.status !== "busy" || this.current === undefined) {
             this.dropQueue();
             this.options.onChange();
@@ -279,7 +310,10 @@ export class AgentSession {
             return;
         }
 
-        this.dropQueue();
+        if (options.keepQueue !== true) {
+            this.dropQueue();
+        }
+
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
         // The spec requires pending permission requests to be answered `cancelled`.
@@ -383,7 +417,7 @@ export class AgentSession {
     private run(prompt: string, turnId?: string): void {
         const turn = new Turn(prompt, this.options.process.scrub, turnId);
 
-        if (this.options.observer !== undefined) {
+        if (this.options.observer !== undefined && this.options.folderIsRemote !== true) {
             this.changes.set(turn, new TurnChanges(this.options.folder, this.options.process.scrub));
         }
 
@@ -443,6 +477,8 @@ export class AgentSession {
             return;
         }
 
+        const cancelled = this.cancelRequested || reason === "cancelled";
+
         turn.end(this.cancelRequested ? "cancelled" : reason);
         this.observeUnanswered(turn);
 
@@ -461,10 +497,17 @@ export class AgentSession {
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
 
-        if (delivered === undefined) {
+        const settleMs = this.options.cancelSettleMs ?? DEFAULT_CANCEL_SETTLE_MS;
+
+        // Also covers a prompt that arrives after this one ended, when the queue was still empty (`send`).
+        this.settleUntil = cancelled ? Date.now() + settleMs : 0;
+
+        const settled = cancelled && this.queue.length > 0 ? sleep(settleMs) : undefined;
+
+        if (delivered === undefined && settled === undefined) {
             this.startNext();
         } else {
-            this.startNextAfter(delivered);
+            this.startNextAfter(delivered, settled);
         }
     }
 
@@ -485,8 +528,8 @@ export class AgentSession {
         }
     }
 
-    private async startNextAfter(delivered: Promise<void>): Promise<void> {
-        await delivered;
+    private async startNextAfter(...waits: (Promise<void> | undefined)[]): Promise<void> {
+        await Promise.all(waits);
         this.startNext();
     }
 

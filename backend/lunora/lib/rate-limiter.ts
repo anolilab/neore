@@ -217,6 +217,9 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/steer:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     "chat/stream:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/stream:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
+    // The opt-in quick check that approves low-risk tool calls (`chat/lib/low-risk-check.ts`): one utility-model call per
+    // `ask` tool call, per user. Untiered: the check is a guard, and the cap is for runaway loops, not for plans.
+    "chat/toolAutoApprove": Ratelimit.tokenBucket(20, MINUTE, 30),
     // "Translate" on a message: one short utility-model call per cache miss
     // (`chat/translate.ts`); its own family so it does not spend the optimizer's.
     // No `:public` tier: the action requires a session.
@@ -478,6 +481,11 @@ export const RATE_LIMIT_CONFIGS = {
     // not starve the prompt optimizer's `chat/promptImprovement`.
     "skills/builder:free": Ratelimit.tokenBucket(10, MINUTE, 20),
     "skills/builder:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
+    // Exporting, previewing and importing a team bundle (`skills/bundle.ts`). The creates an import makes are
+    // charged to their own families (`skills/create`, `triggers/create`, `chat/create`); this one only bounds the
+    // parsing and reading around them.
+    "skills/bundle:free": Ratelimit.fixedWindow(10, MINUTE),
+    "skills/bundle:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/create:free": Ratelimit.fixedWindow(10, MINUTE),
 
     "skills/create:premium": Ratelimit.fixedWindow(30, MINUTE),
@@ -498,53 +506,66 @@ export const RATE_LIMIT_CONFIGS = {
     // Edits to a review draft: no host call, but a person typing saves often.
     "sourceControl/draft:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/draft:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // Asking for a guide: a paid model call over the diff, on top of the daily text quota it is charged to.
+    "sourceControl/guide:free": Ratelimit.fixedWindow(10, HOUR),
+    "sourceControl/guide:premium": Ratelimit.fixedWindow(40, HOUR),
     "sourceControl/read:free": Ratelimit.fixedWindow(240, MINUTE),
     "sourceControl/read:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // "Refresh on open": up to twenty conditional reads of the host (a 304 is free, but the call is not).
+    "sourceControl/refresh:free": Ratelimit.fixedWindow(12, MINUTE),
+    "sourceControl/refresh:premium": Ratelimit.fixedWindow(30, MINUTE),
     // A write to the Git host (a reply, a resolve, a viewed mark, a submitted review) is a user action
     // that the host rate-limits too; GitHub's content-creation limit is the tighter one.
+    // Watching a repository, stopping, and the webhook secret: a handful of clicks, each a small write.
+    "sourceControl/watch:free": Ratelimit.fixedWindow(30, MINUTE),
+    "sourceControl/watch:premium": Ratelimit.fixedWindow(60, MINUTE),
+    // Inbound repository webhook deliveries per watched repository, charged once the signature is proven.
+    "sourceControl/webhook": Ratelimit.fixedWindow(60, MINUTE),
+    // The same route per client address, charged on the root shard BEFORE the owner's shard reads anything.
+    "sourceControl/webhookIp": Ratelimit.fixedWindow(120, MINUTE),
     "sourceControl/write:free": Ratelimit.fixedWindow(60, MINUTE),
     "sourceControl/write:premium": Ratelimit.fixedWindow(120, MINUTE),
+
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),
 
     "subAgents/run:premium": Ratelimit.fixedWindow(60, HOUR),
-
     // Tag limits
     "tag/create:free": Ratelimit.fixedWindow(10, MINUTE),
     "tag/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tag/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "tag/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tag/update:free": Ratelimit.fixedWindow(20, MINUTE),
+
     "tag/update:premium": Ratelimit.fixedWindow(60, MINUTE),
 
     // Tasks and goals (`tasks/functions.ts`). `run` also covers review decisions:
     // each one can start a full headless agent run plus a verifier call.
     "tasks/create:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "tasks/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Rounds per day, on top of `chat/dailyText` (`tasks/account.ts:chargeRound`):
     // a recurring task must not spend a user's whole message allowance.
     "tasks/dailyRuns:free": Ratelimit.fixedWindow(10, DAY),
-    "tasks/dailyRuns:premium": Ratelimit.fixedWindow(200, DAY),
 
+    "tasks/dailyRuns:premium": Ratelimit.fixedWindow(200, DAY),
     "tasks/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "tasks/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tasks/run:free": Ratelimit.fixedWindow(5, MINUTE),
     "tasks/run:premium": Ratelimit.fixedWindow(20, MINUTE),
-    "tasks/update:free": Ratelimit.fixedWindow(20, MINUTE),
 
+    "tasks/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "tasks/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Team limits
     "team/addMember:free": Ratelimit.fixedWindow(10, MINUTE),
-    "team/addMember:premium": Ratelimit.fixedWindow(30, MINUTE),
 
+    "team/addMember:premium": Ratelimit.fixedWindow(30, MINUTE),
     "team/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/create:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
-    "team/leave:free": Ratelimit.fixedWindow(5, MINUTE),
 
+    "team/leave:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/leave:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/removeMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/removeMember:premium": Ratelimit.fixedWindow(30, MINUTE),

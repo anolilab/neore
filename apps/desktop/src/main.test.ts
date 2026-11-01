@@ -141,6 +141,7 @@ vi.mock("electron", () => {
     return {
         app: {
             getPath: () => path.join(os.tmpdir(), "neore-desktop-test"),
+            getVersion: () => "0.0.0-test",
             isPackaged: false,
             isReady: () => true,
             on: (event: string, listener: (...args: unknown[]) => void) => fakeElectron.appHandlers.set(event, listener),

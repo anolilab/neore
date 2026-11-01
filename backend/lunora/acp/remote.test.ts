@@ -917,6 +917,8 @@ describe("cancelHostTurn", () => {
         const turnId = await streamField(threadId, "hostTurnId");
 
         expect(JSON.parse(stop?.envelope as string).input).toMatchObject({ sessionId: "host-s1", turnId });
+        // A person's Stop drops the prompts queued on the computer: only a worker run's stop keeps them.
+        expect(JSON.parse(stop?.envelope as string).input).not.toHaveProperty("keepQueue");
         await expect(cancel(threadId)).resolves.toEqual({ cancelled: false });
         expect(await sessionStatus()).toBe("idle");
     });

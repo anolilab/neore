@@ -19,7 +19,7 @@ vi.mock("./get-agent", () => {
 vi.mock("./agent-tools", () => {
     return {
         buildAgentTools: vi.fn(async () => {
-            return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
         }),
     };
 });
@@ -53,6 +53,13 @@ const stoppedCtx = (saved: boolean) => {
     return { ctx, mutations };
 };
 
+const RECORD = { at: 1234, by: "quick-check" as const, model: "utility-model", reason: "Reads a forecast." };
+/** An assistant row holding a call the quick check let run unasked. */
+const APPROVED_CALL_ROW = {
+    _id: "row-1",
+    message: { content: [{ toolCallId: "call-1", toolName: "mcp_Weather__get_forecast", type: "tool-call" }], role: "assistant" },
+};
+
 const STOP_ARGS = {
     continuation: false,
     order: 1,
@@ -60,6 +67,7 @@ const STOP_ARGS = {
     result: { consumeStream: async () => undefined },
     stop: new AbortController(),
     streamId: "stream-1",
+    threadId: "thread-1",
 };
 
 describe("a stop during a long tool step", () => {
@@ -87,8 +95,9 @@ describe("a stop during a long tool step", () => {
         const saved = await endStoppedRun(ctx as never, error, { ...STOP_ARGS, result: { consumeStream: async () => undefined }, stop });
 
         expect(saved).toStrictEqual(["stopped-1"]);
-        expect(mutations.at(-1)?.ref).toBe(internal.chat.streaming.persistent.library.finishStoppedReply);
-        expect(mutations.at(-1)?.args).toMatchObject({ pendingText: "Searching. " });
+        const stoppedReply = mutations.find((call) => call.ref === internal.chat.streaming.persistent.library.finishStoppedReply);
+
+        expect(stoppedReply?.args).toMatchObject({ pendingText: "Searching. " });
         expect(stop.signal.aborted).toBe(true);
         await vi.waitFor(() => expect(toolEnded.aborted).toBe(true));
     });
@@ -101,8 +110,11 @@ describe(endStoppedRun, () => {
 
         await endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), { ...STOP_ARGS, stop });
 
-        expect(mutations).toHaveLength(1);
-        expect(mutations[0]?.ref).toBe(internal.chat.streaming.persistent.library.finishStoppedReply);
+        // The reply is saved first; the thread's secret references go once the stopped reply is written.
+        expect(mutations.map((call) => call.ref)).toStrictEqual([
+            internal.chat.streaming.persistent.library.finishStoppedReply,
+            internal.chat.request_secret.discardSecretsOfThread,
+        ]);
         expect(mutations[0]?.args).toMatchObject({ continuation: false, order: 1, pendingText: "Hello.", promptMessageId: "prompt-1" });
         expect(stop.signal.aborted).toBe(true);
     });
@@ -149,6 +161,41 @@ describe(endStoppedRun, () => {
         ).rejects.toBe(rejected);
         expect(stop.signal.aborted).toBe(true);
         expect(drained).toStrictEqual([true]);
+    });
+
+    it("stamps the calls the quick check approved onto the rows saved before the stop", async () => {
+        const { ctx, mutations } = stoppedCtx(true);
+
+        await endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), {
+            ...STOP_ARGS,
+            result: { consumeStream: async () => undefined, savedMessages: [APPROVED_CALL_ROW] },
+            stamp: { autoApprovals: { "call-1": RECORD }, mcpLabels: {}, userId: "owner-1" },
+        });
+
+        expect(mutations.find((mutation) => mutation.ref === internal.chat.mcp_tool_labels.labelToolCalls)?.args).toMatchObject({
+            autoApprovals: { "call-1": RECORD },
+            messageIds: ["row-1"],
+            userId: "owner-1",
+        });
+    });
+
+    it("still ends the run when stamping fails", async () => {
+        const { ctx } = stoppedCtx(true);
+        const runMutation = vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+            if (ref === internal.chat.mcp_tool_labels.labelToolCalls) {
+                throw new Error("label write failed");
+            }
+
+            return await ctx.runMutation(ref, args);
+        });
+
+        await expect(
+            endStoppedRun({ runMutation } as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), {
+                ...STOP_ARGS,
+                result: { consumeStream: async () => undefined, savedMessages: [APPROVED_CALL_ROW] },
+                stamp: { autoApprovals: { "call-1": RECORD }, mcpLabels: {}, userId: "owner-1" },
+            }),
+        ).resolves.toStrictEqual(["stopped-1"]);
     });
 
     it("rethrows the original error when nothing was stopped, and does not abort", async () => {
@@ -209,7 +256,52 @@ describe(finishRun, () => {
             awaitingInput: undefined,
             paused: false,
         });
-        expect(ctx.runMutation).toHaveBeenLastCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.streaming.persistent.library.addChunk, expect.objectContaining({ final: true }));
+    });
+
+    it("a final end drops that reply's saved secret references, and a failing drop does not fail the run", async () => {
+        const ctx = {
+            runMutation: vi.fn(async (ref: unknown) => {
+                if (ref === internal.chat.request_secret.discardSecretsOfThread) {
+                    throw new Error("shard busy");
+                }
+
+                return null;
+            }),
+        };
+
+        await expect(finishRun(ctx as never, { ...runArgs, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
+            paused: false,
+        });
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, { streamId: "stream-1", threadId: "thread-1" });
+    });
+
+    it("a pause keeps them (a consumer set to ask resumes the run), and so does a group turn that goes on to its next speaker", async () => {
+        const ctx = { runMutation: vi.fn(async () => null) };
+        const paused = {
+            ...runArgs,
+            pending: { reasoning: "", text: "x" },
+            savedMessages: [{ _id: "m1", message: { content: [{ approvalId: "a1", toolCallId: "c1", type: "tool-approval-request" }], role: "assistant" } }],
+        };
+
+        await expect(finishRun(ctx as never, paused)).resolves.toStrictEqual({ awaitingInput: "approval", paused: true });
+        await expect(finishRun(ctx as never, { ...runArgs, keepOpenUnlessPaused: true, pending: { reasoning: "", text: "x" } })).resolves.toStrictEqual({
+            awaitingInput: undefined,
+            paused: false,
+        });
+        expect(ctx.runMutation).not.toHaveBeenCalledWith(internal.chat.request_secret.discardSecretsOfThread, expect.anything());
+    });
+
+    it("a stop that ends the reply drops them too, with the thread and stream it names", async () => {
+        const { ctx, mutations } = stoppedCtx(true);
+
+        await endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), { ...STOP_ARGS, stop: new AbortController() });
+
+        expect(mutations.find((call) => call.ref === internal.chat.request_secret.discardSecretsOfThread)?.args).toStrictEqual({
+            streamId: "stream-1",
+            threadId: "thread-1",
+        });
     });
 
     describe("what a pause waits for", () => {
@@ -298,6 +390,61 @@ describe(resumeApprovedRun, () => {
             promptMessageId: "tool-result-1",
         });
     });
+    it("a stop during a continuation keeps the record of a call the quick check approved", async () => {
+        const { ctx, mutations } = stoppedCtx(true);
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.chat.tool_permissions.getPendingToolApproval) {
+                return { approvalId: "approval-1", toolName: null };
+            }
+
+            if (ref === internal.auth.functions.getUserPreferencesQuery) {
+                return {};
+            }
+
+            return ref === internal.auth.functions.getDecryptedProviderKeysQuery ? {} : null;
+        });
+        const agent = {
+            approveToolCall: vi.fn(async () => {
+                return {
+                    consumeStream: async () => {},
+                    fullStream: resumedStream(),
+                    order: 2,
+                    promptMessageId: "tool-result-1",
+                    savedMessages: [APPROVED_CALL_ROW],
+                };
+            }),
+            options: {},
+        };
+
+        vi.mocked(getAgent).mockResolvedValue(agent as never);
+        vi.mocked(buildAgentTools).mockResolvedValueOnce({
+            autoApprovals: { "call-1": RECORD },
+            mcpClients: [],
+            mcpLabels: {},
+            mcpServerNames: [],
+            permissionKeys: {},
+            tools: {},
+        } as never);
+
+        await resumeApprovedRun(
+            { runMutation: ctx.runMutation, runQuery } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: { autoMediaEnrichment: false, mcpServerNames: [], model: "gpt-4o", searchMode: "chat", toolNames: [] } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId: "owner-1",
+            },
+            {},
+        );
+
+        expect(mutations.find((mutation) => mutation.ref === internal.chat.mcp_tool_labels.labelToolCalls)?.args).toMatchObject({
+            autoApprovals: { "call-1": RECORD },
+            messageIds: ["row-1"],
+        });
+    });
+
     it("records the usage of each reply a steered continuation saved", async () => {
         const runAfter = vi.fn(async () => "job");
         const runMutation = vi.fn(async () => null);

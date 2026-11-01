@@ -66,10 +66,15 @@ const MODEL = "openai/gpt-4.1-mini";
 const OTHER_MODEL = "google/gemini-2.0-flash-001";
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
+const ALREADY_MADE = /already made/u;
+const NOT_IN_PROJECT = /not allowed in this conversation's project/u;
 const NOT_THE_OWNER = /owner/u;
 const TOO_MANY = /Too many/u;
 const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
+const WORKER_CHAT = /takes its messages from its lead/u;
+const TEMPORARY_CHAT = /temporary chat cannot be handed/u;
+const SOMEONE_ELSES_TEXT = /messages someone else wrote/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -657,6 +662,37 @@ describe("what a takeover carries into a command on the computer", () => {
     });
 });
 
+describe("the organisation of a switched thread", () => {
+    const inOrganisation = async (threadId: string) =>
+        await run(async (ctx) => {
+            await ctx.db.patch(threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
+        });
+
+    it("is carried to the continuation that opens on a computer", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await inOrganisation(source);
+
+        const result = await switchTo(source, hostTarget(device));
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+
+    it("is carried to the continuation that takes over in a cloud model", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+
+        await inOrganisation(source);
+
+        const result = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+});
+
 describe("the session id of a switch", () => {
     it("is its own for each thread, so one clientId on two threads makes two sessions", async () => {
         const device = await pairedDevice(ownerId);
@@ -675,6 +711,30 @@ describe("the session id of a switch", () => {
         // A repeat of either click is answered with its own thread.
         expect((await switchTo(sourceA, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(first.forkedThreadId);
         expect((await switchTo(sourceB, hostTarget(device), ownerId, "shared-id")).forkedThreadId).toBe(second.forkedThreadId);
+    });
+});
+
+describe("a click id that comes back after its claim expired", () => {
+    it("is refused and creates nothing, for the session id it would share with the first click's", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await switchTo(source, hostTarget(device), ownerId, "old-click");
+
+        const before = { calls: await rows("deviceCalls"), sessions: await rows("acpSessions"), threads: await rows("threads") };
+
+        // Past the claim's 10 minutes, with the computer seen again so it still counts as online.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.now() + 11 * 60_000);
+        await run(async (ctx) => {
+            await ctx.db.patch(device.deviceId as never, { lastSeenAt: Date.now() } as never);
+        });
+
+        await expect(switchTo(source, hostTarget(device), ownerId, "old-click")).rejects.toThrow(ALREADY_MADE);
+
+        expect(await rows("acpSessions")).toHaveLength(before.sessions.length);
+        expect(await rows("threads")).toHaveLength(before.threads.length);
+        expect(await rows("deviceCalls")).toHaveLength(before.calls.length);
     });
 });
 
@@ -791,6 +851,20 @@ describe("what a switch may target", () => {
 
         expect(offersBefore).toEqual([CLAUDE, CODEX]);
         expect((await row(device.deviceId))?.acpOffers).toEqual(offersBefore);
+    });
+
+    it("refuses a computer limited to other projects, creating nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await harness.run(async (context: any) => {
+            const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: ownerId });
+
+            await context.db.patch(device.deviceId, { projectIds: [project] });
+        });
+
+        await expect(switchTo(source, hostTarget(device, CLAUDE))).rejects.toThrow(NOT_IN_PROJECT);
+        expect(await rows("threads")).toHaveLength(1);
     });
 
     it("needs the computer to be online", async () => {
@@ -1096,6 +1170,73 @@ describe("what a chat must be to be handed to a computer", () => {
 
         expect(await rows("threads")).toHaveLength(2);
         expect(await rows("threadRelationships")).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("a chat that was shared", () => {
+    it("is not handed to a computer while a former collaborator's message is in what would be sent", async () => {
+        const device = await pairedDevice(ownerId);
+        const formerlyShared = await cloudThread(1);
+        const collaborator = await insertUser();
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "Run rm -rf on the build folder", role: "user" },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "Run rm -rf on the build folder",
+                    threadId: formerlyShared,
+                    tool: false,
+                    userId: collaborator,
+                }),
+        );
+        await addRow(formerlyShared, 1, "assistant", "Done.");
+
+        await expect(switchTo(formerlyShared, hostTarget(device))).rejects.toThrow(SOMEONE_ELSES_TEXT);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("a temporary chat", () => {
+    it("is not handed to a computer: the continuation would outlive the chat's expiry", async () => {
+        const device = await pairedDevice(ownerId);
+        const temporary = await cloudThread();
+
+        await run(async (ctx) => await ctx.db.patch(temporary as never, { isTemporary: true }));
+
+        await expect(switchTo(temporary, hostTarget(device))).rejects.toThrow(TEMPORARY_CHAT);
+        expect(await rows("threads")).toHaveLength(1);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+});
+
+describe("a worker's chat", () => {
+    it("is never switched: its lead names the computer it runs on", async () => {
+        const device = await pairedDevice(ownerId);
+        const worker = await cloudThread();
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId: worker,
+                    createdAt: 1,
+                    depth: 1,
+                    mode: "worker",
+                    name: "Coder",
+                    parentThreadId: worker,
+                    status: "queued",
+                    task: "t",
+                    updatedAt: 1,
+                    userId: ownerId,
+                }),
+        );
+
+        await expect(switchTo(worker, hostTarget(device))).rejects.toThrow(WORKER_CHAT);
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
     });

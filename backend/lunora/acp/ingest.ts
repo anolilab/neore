@@ -105,7 +105,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
 
-        // A session the backend started with a saved session id (`startHostSessionIn` records it on the row) that the agent
+        // A session the backend started with a saved session id (`openHostSession` records it on the row) that the agent
         // did not end up in: the thread says so and hands the conversation over instead. An agent that cannot say it
         // loaded the session counts as one that did not.
         const requestedNativeId = opened ? existing.nativeSessionId : undefined;
@@ -187,8 +187,9 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
         return { ended: true, next: 0, outcome: "applied" };
     }
 
-    await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
+    // Ended first: a worker run that finishes with its turn starts the next queued message, and must find the session gone.
     await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
 
     return { ended: true, next: 0, outcome: "applied", threadId: session.threadId as string };
 };

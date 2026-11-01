@@ -279,8 +279,17 @@ export const stopActiveForThread = internalMutation
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
         const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
 
+        // A stopped coding-agent turn can start the next queued message of a worker in this same transaction
+        // (`stopHostTurn` → `finishRun`): its stream is new, so the thread is still running.
+        const known = new Set(live.map((stream) => stream._id));
+        const liveNow = await ctx.db.persistentStreams.findMany({
+            limit: LIVE_STREAM_PAGE,
+            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+        });
+        const startedMeanwhile = liveNow.page.some((stream) => !known.has(stream._id));
+
         // The thread leaves `running` only when no live reply is left to keep running.
-        if ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0)) {
+        if (!startedMeanwhile && ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0))) {
             const threadId = args.threadId as Id<"threads">;
 
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });

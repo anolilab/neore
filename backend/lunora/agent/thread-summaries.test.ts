@@ -6,6 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { documentTextPart } from "../chat/lib/attached-text";
+import { formatPageContextPart } from "../chat/lib/page-context";
 import schema from "../schema";
 import { threadSummaryTaint } from "./thread-summary-taint";
 import { deleteAllForThreadIdAsync } from "./threads";
@@ -572,6 +574,25 @@ describe("what a summary carries over from the rows it folds in", () => {
 
         expect(stored?.coveredUpToMessageId).toBe(rowIds[79]);
         expect(stored?.taintedBy).toStrictEqual(["web"]);
+    });
+
+    it.each([
+        ["an attached document's extracted text", documentTextPart("report.pdf", "Quarterly numbers.")],
+        ["a captured browser page", formatPageContextPart({ text: "page body", title: "A page", url: "https://example.com" })],
+    ])("records %s as untrusted, since the summary no longer shows it", async (_name, part) => {
+        expect.assertions(1);
+
+        await seedThread(0);
+
+        for (let index = 0; index < ROWS; index += 1) {
+            rowIds.push(await insertRow(index, index === 10 ? { message: { content: [part, { text: "summarise it", type: "text" }], role: "user" } } : {}));
+        }
+
+        await runJob(rowIds.at(-1)!);
+
+        const [head] = await summaries();
+
+        expect(head?.taintedBy).toStrictEqual(["files"]);
     });
 
     it("keeps a clean summary clean", async () => {

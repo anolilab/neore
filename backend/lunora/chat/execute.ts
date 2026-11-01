@@ -42,12 +42,15 @@ import {
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunStartedBy,
     setThreadStatus,
+    stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
+import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClients } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
@@ -140,6 +143,8 @@ export const runStreamingAgent = internalAction
             const { customSystemPrompt, model: requestedModel, reasoningEffort, statelessMode } = streamingConfig;
             // Reassigned once, when an invoked skill names a preferred model.
             let model = requestedModel;
+            // Set once the run has saved rows: a run that fails still leaves the record of the calls the quick check approved.
+            let stampSavedCalls: (() => Promise<void>) | undefined;
 
             try {
                 streamLogger.debug(`[BgAgent] Starting background agent execution`, {
@@ -231,6 +236,12 @@ export const runStreamingAgent = internalAction
 
                 const invokedSkill = skillRun.invocation;
 
+                // The one answer the quick check reads: at the first call from the tools below, and from the snapshot a pause leaves.
+
+                const untrustedContext = runContextPromise.then((context) => context.untrustedContext || injectsSkillText(skillRun));
+
+                untrustedContext.catch(() => undefined);
+
                 // A live bot keeps its pinned model (`/chat/start`); a skill's preferred model does not replace it.
                 const liveBot = thread?.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId }) : null;
 
@@ -297,9 +308,12 @@ export const runStreamingAgent = internalAction
                               skillTools: invokedSkill?.config
                                   ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
                                   : undefined,
+                              threadId,
+                              // The tools are built while the context loads; the quick check reads this at the first call.
+                              untrustedContext: untrustedContext.catch(() => true),
                               userId,
                           })
-                        : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
+                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
                     runContextPromise,
                 ]);
 
@@ -310,6 +324,8 @@ export const runStreamingAgent = internalAction
 
                 setResearchDepth(ctx, effectiveResearchDepth);
                 setDispatchOrigin(ctx, origin ?? "lead");
+                // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
+                setRunStartedBy(ctx, userId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -422,6 +438,15 @@ export const runStreamingAgent = internalAction
                 let piped: PipedStream;
 
                 const skill = invokedSkill ? { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } : undefined;
+
+                stampSavedCalls = async () =>
+                    await stampSavedToolCalls(ctx, {
+                        autoApprovals: toolResult.autoApprovals,
+                        mcpLabels: toolResult.mcpLabels,
+                        savedMessages: result.savedMessages,
+                        userId,
+                    });
+
                 // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
                 const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
                     await afterRun(ctx, {
@@ -445,8 +470,10 @@ export const runStreamingAgent = internalAction
                         order: result.order,
                         promptMessageId: result.promptMessageId,
                         result,
+                        stamp: { autoApprovals: toolResult.autoApprovals, mcpLabels: toolResult.mcpLabels, userId },
                         stop: stopping,
                         streamId,
+                        threadId,
                     });
 
                     // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
@@ -519,6 +546,7 @@ export const runStreamingAgent = internalAction
 
                 try {
                     finished = await finishRun(ctx, {
+                        autoApprovals: toolResult.autoApprovals,
                         mcpLabels: toolResult.mcpLabels,
                         pending,
                         savedMessages: result.savedMessages,
@@ -532,11 +560,16 @@ export const runStreamingAgent = internalAction
                             model,
                             promptMessageId: messageId,
                             reasoningEffort: threadReasoningEffort,
+                            // The reply is named by its first stream; every continuation inherits it.
+                            replyKey: streamId,
                             researchDepth: effectiveResearchDepth,
                             searchMode: effectiveSearchMode,
                             shouldAutoContinue: isAutoContinue,
+                            startedBy: userId,
                             toolNames: Object.keys(tools),
                             toolPermissionKeys: toolResult.permissionKeys,
+                            // A continuation does not reload the context, so the quick check reads this off the snapshot.
+                            untrustedContext: await untrustedContext,
                         },
                         streamId,
                         threadId,
@@ -596,7 +629,7 @@ export const runStreamingAgent = internalAction
                     safeMessage = "The custom endpoint for this model was removed or disabled. Pick another model or re-enable it in Settings → API Keys.";
                 }
 
-                await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "error" });
+                await failRun(ctx, { safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
 
                 // A run that failed after its pause still answered with the steps from before it, and with any it saved since: those are its reply.
                 if (priorRows.length > 0) {

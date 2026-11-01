@@ -52,6 +52,7 @@ import {
 } from "../chat/agent-switch";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
 import { loadEligibleThread } from "../devices/internal";
+import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
@@ -62,8 +63,10 @@ import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
 import { savedSessionFor } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
-import { offerOf, startFailureMessage, startHostSessionIn, webSessionId } from "./lib/start";
+import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
+import { openHostSession } from "./lib/start-session";
 import { liveHostStream } from "./remote";
+import { isWorkerThread } from "../sub-agents/worker-thread";
 
 type Device = Doc<"devices">;
 type Offer = NonNullable<Device["acpOffers"]>[number];
@@ -91,7 +94,7 @@ const hostTitle = (offer: Offer): string => `${offer.agentLabel} · ${offer.fold
  * The target, resolved. A host pair must be in the offer list of one of the caller's own paired, online computers;
  * a model must be one a send may use now. Throws a coded refusal otherwise, before anything is written.
  */
-const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, now: number): Promise<ResolvedTarget> => {
+const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, thread: Doc<"threads">, now: number): Promise<ResolvedTarget> => {
     const { target } = args;
 
     if (target.kind === "model") {
@@ -111,6 +114,15 @@ const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, now: number): P
 
     if (!isDeviceOnline(device, now)) {
         return refuse(AGENT_SWITCH_HOST_OFFLINE, "That computer is not online.");
+    }
+
+    // A computer limited to some projects takes only those projects' chats, the rule the device tools follow: the
+    // handoff carries this chat to it.
+    if (!isDeviceInScope(device, await resolveThreadProject(ctx, thread, args.userId, [device]))) {
+        return refuse(
+            AGENT_SWITCH_NOT_OFFERED,
+            "That computer is not allowed in this conversation's project. Change which projects it may be used in, in its settings.",
+        );
     }
 
     return { device, kind: "host", offer };
@@ -142,6 +154,12 @@ const handoffFor = async (
     options: { lenient?: boolean } = {},
 ): Promise<string> => {
     const source = await collectHandoffSource(ctx, thread._id, leaf);
+
+    // The chat may have been shared and no longer is: text a former collaborator wrote must not reach the computer.
+    if (target.kind === "host" && source.authorIds.some((authorId) => authorId !== thread.userId)) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat holds messages someone else wrote, so it cannot be handed to a computer");
+    }
+
     // A cloud thread is sent its handoff as a message of its own, with the room a cloud handoff has anywhere; a computer is
     // sent it in front of the prompt, inside the signed call.
     const maxBytes = target.kind === "host" ? HOST_HANDOFF_MAX_BYTES : HANDOFF_BUDGET_TOKENS * CHARACTERS_PER_TOKEN;
@@ -385,6 +403,11 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Guests run on the free model");
     }
 
+    // A worker's chat belongs to its lead, which names the computer it runs on: a switch would leave the worker pointing at the old one.
+    if (await isWorkerThread(ctx, thread._id)) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "A worker's chat takes its messages from its lead");
+    }
+
     const fromHost = isHostRunThread(thread);
 
     if (!fromHost && (hasFixedAgent(thread) || args.target.kind === "model")) {
@@ -411,6 +434,12 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const toHost = args.target.kind === "host";
     const forks = fromHost !== toHost;
 
+    // A switch across the runner copies the newest turns into a new, permanent thread, which a temporary chat's expiry
+    // would never reach.
+    if (forks && thread.isTemporary === true) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "A temporary chat cannot be handed between a model and a computer");
+    }
+
     // A click already answered: the same answer, not a second thread. Before the target is looked up, which needs the
     // computer to be online and to still offer the pair.
     if (claimedAt !== null) {
@@ -425,7 +454,7 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         });
     }
 
-    const target = await resolveTarget(ctx, args, now);
+    const target = await resolveTarget(ctx, args, thread, now);
     const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
 
     if (fromHost) {
@@ -516,7 +545,14 @@ const startOn = async (
     },
 ) => {
     const hostSessionId = await webSessionId(args.userId, args.clientId, { kind: "switch", threadId: args.sourceThreadId });
-    const call = await startHostSessionIn(
+
+    // The claim that made a click one switch outlives it by minutes only, and the same click id gives the same session id: a
+    // session already on this computer under it is the click's earlier one, and a second row would share its (device, id) pair.
+    if (await ctx.db.acpSessions.findFirst({ where: { deviceId: args.device._id, hostSessionId } })) {
+        throw new LunoraError("CONFLICT", "That switch was already made. Reload the chat and switch again.");
+    }
+
+    const call = await openHostSession(
         ctx,
         {
             device: args.device,
@@ -592,6 +628,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   mode: "text",
                   model: target.offer.agentKey,
                   ...(thread.projectId && { projectId: thread.projectId }),
+                  ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  ...(thread.teamId && { teamId: thread.teamId }),
                   runner: "host",
                   status: "active",
                   tags: ["chat", "host"],
@@ -608,6 +646,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   mode: "text",
                   model: target.model,
                   ...(thread.projectId && { projectId: thread.projectId }),
+                  ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  ...(thread.teamId && { teamId: thread.teamId }),
                   status: "active",
                   tags: ["chat"],
                   title: thread.title ?? "",

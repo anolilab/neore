@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { isHostCapabilityAvailable } from "@neore/backend/source-control/capabilities";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { Skeleton } from "@neore/ui/components/skeleton";
 
@@ -12,6 +13,7 @@ import FailureNotice from "./failure-notice";
 import type { HostInfo } from "./host-info";
 import InboxList, { availableSections } from "./inbox-list";
 import PullRequestView from "./pull-request-view";
+import WatchedRepositories from "./watched-repositories";
 
 /**
  * The Develop page: the inbox on the left, one pull request on the right. What it shows is
@@ -52,6 +54,14 @@ const DevelopPage = ({ onSearchChange, search }: { onSearchChange: (next: Develo
                             section={section}
                             selected={selected}
                         />
+                        {isHostCapabilityAvailable(info.capabilities, "freshness.conditionalPolling") && (
+                            <div className="mt-6">
+                                <WatchedRepositories
+                                    onSelect={(repo, number) => onSearchChange({ number, repository: repo, section })}
+                                    webhooks={isHostCapabilityAvailable(info.capabilities, "freshness.webhooks")}
+                                />
+                            </div>
+                        )}
                     </section>
                     <section aria-label={t`Selected ${requestNoun}`} className="min-w-0 flex-1">
                         {selected ? (

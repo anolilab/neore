@@ -241,7 +241,8 @@ const MCPSettings: FC = () => {
                 const updatedServers = servers.filter((_, i) => i !== index);
 
                 await updateAIUserPreferences({
-                    mcpServers: updatedServers.length > 0 ? updatedServers : undefined,
+                    // An empty list, not `undefined` (which the backend reads as "unchanged"), so the last server and its saved header secrets go too.
+                    mcpServers: updatedServers,
                 });
 
                 toast.success(t`MCP server removed`);
