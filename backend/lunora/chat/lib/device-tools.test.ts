@@ -118,12 +118,24 @@ describe("buildDeviceTools", () => {
                 tools: [{ description: "Read", inputSchema: { properties: {}, type: "object" }, kind: "fs", name: "fs_read", readOnly: true }],
             },
         ],
+        taintedBy: [] as string[],
     };
 
     it("builds nothing for an ineligible thread", async () => {
         const { ctx } = fakeCtx([]);
 
         await expect(buildDeviceTools(ctx as never, { threadId: "t", userId: "u" })).resolves.toMatchObject({ tools: {} });
+    });
+
+    it("carries the taint snapshotted when the context was built into every call", async () => {
+        const { created, ctx } = fakeCtx([{ createdAt: 0, deadline: Number.MAX_SAFE_INTEGER, output: "body", status: "completed" }], {
+            context: { ...context, taintedBy: ["mcp"] },
+        });
+        const { descriptors, tools } = await buildDeviceTools(ctx as never, { threadId: "t", userId: "u" });
+        const { execute } = tools[[...descriptors.keys()][0]!] as { execute: (input: unknown, options: unknown) => Promise<unknown> };
+
+        await execute({}, { messages: [{ content: [{ toolName: "webSearch", type: "tool-result" }], role: "tool" }], toolCallId: "1" });
+        expect(created[0]).toMatchObject({ taintedBy: ["web", "mcp"] });
     });
 
     it("signs the taint of what the model read into the call, and caps calls per run", async () => {
