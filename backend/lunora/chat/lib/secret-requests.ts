@@ -13,6 +13,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { decryptKey, encryptKey } from "../../lib/encryption";
 import { patchRow } from "../../lib/patch";
+import { APPROVAL_ABANDONED_BY } from "./tool-approval-claim";
 import type { SecretFailure, SecretUse } from "../tools/request-secret-constants";
 import {
     isForbiddenSecretHeader,
@@ -135,6 +136,10 @@ export const takeRequestedSecret = async (
         return { ok: false, status: "expired" };
     }
 
+    if (row.status === "abandoned") {
+        return { ok: false, status: "abandoned" };
+    }
+
     if (row.status === "used" || row.encryptedValue === undefined) {
         return { ok: false, status: "used" };
     }
@@ -203,14 +208,19 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
 /**
  * A reply paused on a request (a consumer tool set to `ask` holds its saved references through the pause) that the person
  * walks away from: Stop with nothing live, or a new message that moves the conversation past it. Drops the ciphertext of
- * every reply with a pending snapshot on `threadId`, in one pass over the thread's saved references. The request itself
- * stays answerable; a late spend reads `used`.
+ * every reply with a pending snapshot on `threadId`, in one pass over the thread's saved references. Those requests are
+ * denied (`resolvedBy` {@link APPROVAL_ABANDONED_BY}), so none can be answered any more, and a late spend of a reference
+ * reads `abandoned`.
  *
  * A pause with several requests shares one reply key, so answering one starts a continuation while another stays
  * pending: a key whose reply has a live stream is skipped, the live run still needs its references. `messageId` narrows
  * it to the reply of that prompt (a Stop that names one); when no stream of the thread carries it, every paused reply goes.
+ * `keep` names reply keys to leave alone besides the live ones (a stop has just ended a claimed run that drops its own).
  */
-export const discardPausedThreadSecrets = async (ctx: Database, args: { messageId?: string; threadId: Id<"threads"> }): Promise<number> => {
+export const discardPausedThreadSecrets = async (
+    ctx: Database,
+    args: { keep?: ReadonlySet<string>; messageId?: string; threadId: Id<"threads"> },
+): Promise<number> => {
     const runs = await ctx.db
         .query("toolApprovalRuns")
         .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
@@ -223,11 +233,28 @@ export const discardPausedThreadSecrets = async (ctx: Database, args: { messageI
 
     const keyOfStream = (streamId: string): string => runs.find((run) => run.streamId === streamId)?.config.replyKey ?? streamId;
     const keys = new Set(pending.map((run) => run.config.replyKey ?? run.streamId).filter((key): key is string => key !== undefined));
-    const live = await ctx.db.persistentStreams.findMany({ where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId } });
 
-    for (const stream of live.page) {
-        keys.delete(keyOfStream(stream._id));
+    const keep = args.keep ?? new Set<string>();
+
+    for (const key of keep) {
+        keys.delete(key);
     }
+
+    let cursor: string | undefined;
+
+    do {
+        const page = await ctx.db.persistentStreams.findMany({
+            cursor,
+            limit: 50,
+            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+        });
+
+        for (const stream of page.page) {
+            keys.delete(keyOfStream(stream._id));
+        }
+
+        cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+    } while (cursor);
 
     if (args.messageId !== undefined) {
         const named = await ctx.db.persistentStreams.findMany({ where: { messageId: args.messageId, threadId: args.threadId } });
@@ -247,6 +274,13 @@ export const discardPausedThreadSecrets = async (ctx: Database, args: { messageI
         return 0;
     }
 
+    // The requests of the reply are denied with it: nothing is waiting on them, and a late answer must not resume it.
+    for (const run of pending) {
+        if (keys.has(run.config.replyKey ?? run.streamId ?? "")) {
+            await patchRow(ctx.db, run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
+        }
+    }
+
     const rows = await ctx.db
         .query("requestedSecrets")
         .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
@@ -254,7 +288,7 @@ export const discardPausedThreadSecrets = async (ctx: Database, args: { messageI
     const held = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey !== undefined && keys.has(row.replyKey));
 
     for (const row of held) {
-        await patchRow(ctx.db, row, { encryptedValue: undefined });
+        await patchRow(ctx.db, row, { encryptedValue: undefined, status: "abandoned" });
     }
 
     return held.length;

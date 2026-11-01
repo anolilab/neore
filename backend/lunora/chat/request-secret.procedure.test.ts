@@ -278,6 +278,17 @@ describe("answerSecretRequest", () => {
         expect(queued).toHaveLength(0);
     });
 
+    it("refuses to answer a request whose pause was abandoned, and stores nothing", async () => {
+        const { discardPausedThreadSecrets } = await import("./lib/secret-requests");
+
+        await harness.run(async (ctx: any) => await discardPausedThreadSecrets(ctx, { threadId: threadId as never }));
+
+        await expect(answer(OWNER, SECRET)).rejects.toMatchObject({ data: { code: "TOOL_REQUEST_ABANDONED" } });
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+        expect(queued).toHaveLength(0);
+        expect(await runStatuses()).toStrictEqual(["denied"]);
+    });
+
     it("answers a second submit with the first outcome", async () => {
         await answer(OWNER, SECRET);
 

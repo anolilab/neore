@@ -60,8 +60,13 @@ const addressOf = (url: string): string => {
 
 /** Which of the user's saved MCP servers the card names. The answer binds the value to that server's address, so the card shows where that is. */
 const resolveServer = (servers: ReadonlyArray<{ name: string; url: string }> | undefined, name: string, failed: boolean): Server => {
+    // A failed refresh counts even when an earlier read left servers in the cache: that copy may be the stale address.
+    if (failed) {
+        return { kind: "failed" };
+    }
+
     if (!servers) {
-        return { kind: failed ? "failed" : "loading" };
+        return { kind: "loading" };
     }
 
     const matches = servers.filter((server) => server.name === name);
@@ -89,6 +94,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // Shown in the card, tied to the field: the typed value is cleared on send, so the person must know to type it again.
     const [saveError, setSaveError] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
+    // The server closed this request when the conversation moved on: nothing is waiting for an answer.
+    const [closed, setClosed] = useState(false);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
     // The mutation cache holds a mutation's variables for five minutes after it settles; `gcTime: 0` drops them (the value) at once.
@@ -105,7 +112,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const approvalId = part.approval?.id;
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
-    const isWaiting = part.state === "approval-requested" && submitted === null;
+    const isWaiting = part.state === "approval-requested" && submitted === null && !closed;
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
     const {
@@ -188,6 +195,12 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 onError: (error) => {
                     setSubmitted(null);
 
+                    if ((error as { data?: { code?: string } }).data?.code === "TOOL_REQUEST_ABANDONED") {
+                        setClosed(true);
+
+                        return;
+                    }
+
                     // The saved server's address moved since the card showed it: the card's copy is stale, so load the current one.
                     if ((error as { data?: { code?: string } }).data?.code === "SECRET_SERVER_MOVED") {
                         setSaveError(t`This server's address changed. Check the address below and save again.`);
@@ -220,6 +233,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         statusText = t`Saved — the assistant can use it once, in this reply`;
     } else if (submitted || part.state === "approval-responded") {
         statusText = t`Saved — continuing`;
+    } else if (closed) {
+        statusText = t`Closed — the conversation moved on. Ask again in the chat.`;
     } else if (part.state === "input-streaming" || part.state === "input-available") {
         statusText = t`Preparing a request…`;
     } else {

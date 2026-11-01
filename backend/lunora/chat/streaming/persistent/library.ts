@@ -284,11 +284,13 @@ export const stopActiveForThread = internalMutation
             }
         }
 
-        // Nothing live: the person is stopping a reply that paused on a request (its stream is already closed). It is abandoned
-        // here, and the secret it kept through the pause goes with it.
-        if (live.length === 0) {
-            await discardPausedThreadSecrets(ctx, { messageId: args.messageId, threadId: args.threadId as Id<"threads"> });
-        }
+        // The person is stopping a reply that paused on a request (its stream is already closed), whether or not another reply
+        // is live: it is abandoned here, and the secret it kept through the pause goes with it. A reply that was live keeps its
+        // own (a stopped run drops them when it ends; one still running needs them).
+        const threadId = args.threadId as Id<"threads">;
+        const keep = new Set(await Promise.all(live.map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId }))));
+
+        await discardPausedThreadSecrets(ctx, { keep, messageId: args.messageId, threadId });
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
         const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
@@ -304,8 +306,6 @@ export const stopActiveForThread = internalMutation
 
         // The thread leaves `running` only when no live reply is left to keep running.
         if (!startedMeanwhile && ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0))) {
-            const threadId = args.threadId as Id<"threads">;
-
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
             await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }

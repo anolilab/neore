@@ -67,9 +67,10 @@ export interface RequestSecretInput {
 export type RequestSecretOutput = { message: string; status: "unavailable" } | { ref: string; status: "saved" };
 
 /** Why a reference could not be used. */
-export type SecretFailure = "destination_missing" | "expired" | "not_found" | "unreadable" | "used" | "wrong_run" | "wrong_use";
+export type SecretFailure = "abandoned" | "destination_missing" | "expired" | "not_found" | "unreadable" | "used" | "wrong_run" | "wrong_use";
 
 export const SECRET_FAILURE_MESSAGES: Record<SecretFailure, string> = {
+    abandoned: "The user moved on from the pause that held that reference, so it was dropped. Ask the user again with requestSecret.",
     destination_missing:
         "The destination the user approved no longer exists as they approved it. Tell the user; the reference stays valid until this reply ends.",
     expired: "That reference has expired. Ask the user again with requestSecret.",
