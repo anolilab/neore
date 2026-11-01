@@ -19197,25 +19197,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 156,
+      "line": 157,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 284,
+      "line": 294,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 310,
+      "line": 320,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 806,
+      "line": 816,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {
@@ -20589,19 +20589,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 362,
+      "line": 363,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 462,
+      "line": 463,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 620,
+      "line": 621,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
