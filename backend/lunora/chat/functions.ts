@@ -61,6 +61,7 @@ import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGr
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
+import { readableProject } from "../projects/functions";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { headersForConnectionTest } from "../auth/lib/mcp-secret-headers";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -508,21 +509,18 @@ export const createThread = authMutation
             } = {};
 
             if (projectId) {
-                const project = await context.runQuery(api.agent.projects.getProject, {
-                    projectId: projectId as Id<"projects">,
-                });
+                // A project id from the client is stored on the thread: refuse one the caller cannot read, a missing one alike.
+                const project = await readableProject(context, projectId as Id<"projects">, userId);
 
-                if (project) {
-                    if (project.userId && project.userId !== userId) {
-                        throw new LunoraError("FORBIDDEN", "Project not found or access denied");
-                    }
-
-                    projectDefaults = {
-                        defaultEnabledFeatures: project.defaultEnabledFeatures,
-                        defaultModel: project.defaultModel,
-                        defaultReasoningEffort: project.defaultReasoningEffort,
-                    };
+                if (!project) {
+                    throw new LunoraError("FORBIDDEN", "Project not found or access denied");
                 }
+
+                projectDefaults = {
+                    defaultEnabledFeatures: project.defaultEnabledFeatures,
+                    defaultModel: project.defaultModel,
+                    defaultReasoningEffort: project.defaultReasoningEffort,
+                };
             }
 
             // A bot chat runs on the bot's model. A bot the caller does not own is a
