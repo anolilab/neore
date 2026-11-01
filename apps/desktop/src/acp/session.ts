@@ -371,7 +371,6 @@ export class AgentSession {
         };
     }
 
-    /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, resumeSessionId, startupTimeoutMs } = this.options;
@@ -398,6 +397,7 @@ export class AgentSession {
         return await newSession(this.connection, folder, startupTimeoutMs);
     }
 
+    /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
     private dropQueue(reason: StopReason | "failed" = "cancelled", error?: string): void {
         const dropped = [...this.queue];
 
