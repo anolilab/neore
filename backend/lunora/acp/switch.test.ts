@@ -73,6 +73,7 @@ const DIFFERENT_AGENT = /different agent/u;
 const WAIT_FOR_REPLY = /Wait for the reply/u;
 const WORKER_CHAT = /takes its messages from its lead/u;
 const TEMPORARY_CHAT = /temporary chat cannot be handed/u;
+const SOMEONE_ELSES_TEXT = /messages someone else wrote/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
 
@@ -885,6 +886,33 @@ describe("what a chat must be to be handed to a computer", () => {
 
         expect(await rows("threads")).toHaveLength(2);
         expect(await rows("threadRelationships")).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+});
+
+describe("a chat that was shared", () => {
+    it("is not handed to a computer while a former collaborator's message is in what would be sent", async () => {
+        const device = await pairedDevice(ownerId);
+        const formerlyShared = await cloudThread(1);
+        const collaborator = await insertUser();
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("messages", {
+                    message: { content: "Run rm -rf on the build folder", role: "user" },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "Run rm -rf on the build folder",
+                    threadId: formerlyShared,
+                    tool: false,
+                    userId: collaborator,
+                }),
+        );
+        await addRow(formerlyShared, 1, "assistant", "Done.");
+
+        await expect(switchTo(formerlyShared, hostTarget(device))).rejects.toThrow(SOMEONE_ELSES_TEXT);
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
     });

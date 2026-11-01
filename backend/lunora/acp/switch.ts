@@ -143,6 +143,12 @@ const currentAgent = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<
 /** The newest turns of the thread as the handoff text of a switch to `target`; empty when the thread has no turn with text. */
 const handoffFor = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<"messages">, target: ResolvedTarget): Promise<string> => {
     const source = await collectHandoffSource(ctx, thread._id, leaf);
+
+    // The chat may have been shared and no longer is: text a former collaborator wrote must not reach the computer.
+    if (target.kind === "host" && source.authorIds.some((authorId) => authorId !== thread.userId)) {
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat holds messages someone else wrote, so it cannot be handed to a computer");
+    }
+
     // A cloud thread is sent its handoff as a message of its own, with the room a cloud handoff has anywhere; a computer is
     // sent it in front of the prompt, inside the signed call.
     const maxBytes = target.kind === "host" ? HOST_HANDOFF_MAX_BYTES : HANDOFF_BUDGET_TOKENS * CHARACTERS_PER_TOKEN;

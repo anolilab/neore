@@ -64,6 +64,8 @@ const joinSameRole = (turns: HandoffTurn[]): HandoffTurn[] => {
 };
 
 export interface HandoffSource {
+    /** Who wrote the rows the turns came from: a computer is never handed text someone else wrote. */
+    authorIds: string[];
     /** Rows older than the ones read exist, so the summary does not cover the whole thread. */
     omittedEarlier: boolean;
     /** Newest first. */
@@ -82,6 +84,7 @@ export const collectHandoffSource = async (
 ): Promise<HandoffSource> => {
     const limit = (HANDOFF_BUDGET_TOKENS + HANDOFF_SUMMARY_INPUT_TOKENS) * CHARACTERS_PER_TOKEN;
     const turns: HandoffTurn[] = [];
+    const authorIds = new Set<string>();
     let characters = 0;
     let cursor: Row | null = leaf;
     let cutShort = false;
@@ -95,6 +98,10 @@ export const collectHandoffSource = async (
             if (turn) {
                 turns.push(turn);
                 characters += turn.text.length;
+
+                if (typeof row.userId === "string") {
+                    authorIds.add(row.userId);
+                }
             }
 
             // The limit is checked per row, not per page, so one page of large messages cannot overshoot it.
@@ -108,7 +115,11 @@ export const collectHandoffSource = async (
     }
 
     // The walk stops AT `stopAtId`, leaving it as `cursor`: not a row that was left unread.
-    return { omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId), turns: joinSameRole(turns) };
+    return {
+        authorIds: [...authorIds],
+        omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId),
+        turns: joinSameRole(turns),
+    };
 };
 
 /**
