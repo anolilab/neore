@@ -26,7 +26,7 @@
  * regenerate).
  */
 import type { MCPClient } from "@ai-sdk/mcp";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
 import { generateText, Output } from "ai";
 import z from "zod/v4";
@@ -194,17 +194,19 @@ export const routeSpeakers = async (args: {
     gateway: ServiceFetch;
     history: ReadonlyArray<GroupHistoryRow>;
     participants: ReadonlyArray<GroupParticipantInfo>;
+    /** The user's model filter rules, which the router model must satisfy. */
+    rules: ModelFilterRules;
     threadId: string;
     userId: string;
 }): Promise<string[]> => {
-    const { gateway, history, participants, threadId, userId } = args;
+    const { gateway, history, participants, rules, threadId, userId } = args;
 
     if (participants.length === 1) {
         return participants.map((p) => p.skillId);
     }
 
     try {
-        const model = await getUtilityModel(gateway, { threadId, userId });
+        const model = await getUtilityModel(gateway, { rules, threadId, userId });
         const result = await generateText({
             abortSignal: AbortSignal.timeout(ROUTER_TIMEOUT_MS),
             model,
@@ -721,7 +723,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
     if (plan.kind === "fixed") {
         queue = plan.speakers;
     } else if (plan.kind === "route") {
-        queue = await routeSpeakers({ gateway: gatewayFetch(ctx), history, participants, threadId, userId });
+        queue = await routeSpeakers({ gateway: gatewayFetch(ctx), history, participants, rules: await loadModelFilterRules(ctx, userId), threadId, userId });
     }
 
     if (queue.length === 0) {

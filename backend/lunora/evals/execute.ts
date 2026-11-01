@@ -18,7 +18,7 @@
  * reports once at the end, so everything between is safe to lose.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
@@ -28,6 +28,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { sumMessageCosts } from "../agent/message-cost";
 import { getMaxSteps } from "../chat/lib/auto-continue";
@@ -83,12 +84,14 @@ const judge = async (input: {
     /** The calling action's gateway binding. */
     gateway: ServiceFetch;
     prompt: string;
+    /** The user's model filter rules, which the judge model must satisfy. */
+    rules: ModelFilterRules;
     system: string;
     threadId?: string;
     userId: string;
 }): Promise<{ costMicrodollars?: number; tokens?: number; verdict: JudgeVerdict }> => {
     const { getUtilityModel } = await import("../lib/utility-model");
-    const model = await getUtilityModel(input.gateway, { threadId: input.threadId, userId: input.userId });
+    const model = await getUtilityModel(input.gateway, { rules: input.rules, threadId: input.threadId, userId: input.userId });
 
     try {
         const result = await generateText({
@@ -275,11 +278,12 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
     let faithfulness: JudgeVerdict | undefined;
 
     try {
+        const rules = await loadModelFilterRules(ctx, userId);
         const wantsCorrectness = claim.judgeEnabled && (claim.datasetKind === "agent" || claim.expectedAnswer !== undefined || claim.rubric !== undefined);
 
         if (wantsCorrectness) {
             const prompt = buildCorrectnessPrompt({ answer, expectedAnswer: claim.expectedAnswer, input: claim.input, rubric: claim.rubric });
-            const verdict = await judge({ gateway: gatewayFetch(ctx), prompt, system: CORRECTNESS_JUDGE_SYSTEM_PROMPT, threadId: run.threadId, userId });
+            const verdict = await judge({ gateway: gatewayFetch(ctx), prompt, rules, system: CORRECTNESS_JUDGE_SYSTEM_PROMPT, threadId: run.threadId, userId });
 
             correctness = verdict.verdict;
             spend.add(verdict, prompt);
@@ -287,7 +291,14 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
 
         if (claim.judgeEnabled && retrieved && retrieved.chunks.length > 0) {
             const prompt = buildFaithfulnessPrompt({ answer, contexts: retrieved.chunks, question: claim.input });
-            const verdict = await judge({ gateway: gatewayFetch(ctx), prompt, system: FAITHFULNESS_JUDGE_SYSTEM_PROMPT, threadId: run.threadId, userId });
+            const verdict = await judge({
+                gateway: gatewayFetch(ctx),
+                prompt,
+                rules,
+                system: FAITHFULNESS_JUDGE_SYSTEM_PROMPT,
+                threadId: run.threadId,
+                userId,
+            });
 
             faithfulness = verdict.verdict;
             spend.add(verdict, prompt);

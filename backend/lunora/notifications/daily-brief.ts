@@ -34,6 +34,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { loadHomeOverview } from "../home/overview";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { planActivityUpdate } from "../memory/reflection-logic";
@@ -306,7 +307,7 @@ export const runDailyBrief = internalAction
         try {
             const result = await generateText({
                 maxOutputTokens: BRIEF_LIMITS.maxOutputTokens,
-                model: await getUtilityModel(gatewayFetch(ctx), { userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId }),
                 prompt: buildBriefPrompt(inputs),
                 system: BRIEF_SYSTEM_PROMPT,
             });

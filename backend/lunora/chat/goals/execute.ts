@@ -16,6 +16,7 @@ import { enqueueJob } from "../../lib/job-queue";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch } from "../../lib/services";
 import { setThreadStatus } from "../lib/agent-run";
+import { loadModelFilterRules } from "../lib/model-filter-rules";
 import type { GoalVerdict } from "./logic";
 import { reviewRound } from "./review";
 
@@ -122,6 +123,7 @@ export const reviewGoalRound = internalAction
                 gateway: gatewayFetch(ctx),
                 goal: goal.text,
                 round,
+                rules: await loadModelFilterRules(ctx, goal.userId),
                 threadId: goal.threadId,
                 transcript: read.transcript,
                 userId: goal.userId,

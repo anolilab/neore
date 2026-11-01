@@ -54,6 +54,7 @@ import { messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { vDeviceTaintSource } from "../devices/validators";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { isThreadLocked } from "../lib/thread-lock";
 import { getUtilityModel } from "../lib/utility-model";
@@ -411,7 +412,11 @@ export const runThreadSummary = internalAction
                 // A stalled gateway call must not hold the user's scheduler lane: it fails, and the cut is released.
                 abortSignal: AbortSignal.timeout(SUMMARY_CALL_TIMEOUT_MS),
                 maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
-                model: await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: job.userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), {
+                    rules: await loadModelFilterRules(ctx, job.userId),
+                    threadId: args.threadId,
+                    userId: job.userId,
+                }),
                 prompt: buildSummaryPrompt(job.previousSummary, job.transcript),
                 system: SUMMARY_SYSTEM_PROMPT,
             });

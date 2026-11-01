@@ -13,6 +13,7 @@ import z from "zod/v4";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
@@ -97,7 +98,7 @@ export const runCloudGuide = internalAction
             const { object } = await generateObject({
                 abortSignal: AbortSignal.timeout(GUIDE_TIMEOUT_MS),
                 maxOutputTokens: GUIDE_MAX_OUTPUT_TOKENS,
-                model: await getUtilityModel(gatewayFetch(ctx), { userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId }),
                 prompt,
                 schema: guideOutputSchema,
                 system,

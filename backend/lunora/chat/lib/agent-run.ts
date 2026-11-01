@@ -26,6 +26,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
+import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
@@ -148,17 +149,6 @@ const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: strin
     }
 
     throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
-};
-
-/**
- * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
- * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
- * and `resolveBackupModelId`. Every run path loads them here, so the chosen model and its backup are routed alike.
- */
-export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules> => {
-    const preferences = await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId });
-
-    return preferences?.modelFilterRules ?? {};
 };
 
 /**
@@ -1403,3 +1393,5 @@ export const failRun = async (
         streamLogger.warn("[AgentRun] Could not stamp the saved tool calls:", error);
     }
 };
+
+export { loadModelFilterRules } from "./model-filter-rules";

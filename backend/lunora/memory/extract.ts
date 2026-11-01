@@ -1,3 +1,4 @@
+import type { ModelFilterRules } from "@neore/ai/models";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 
 /**
@@ -38,8 +39,9 @@ import {
     processedExchangeFingerprint,
     truncateUserMessage,
 } from "./gate";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
 
 const WHITESPACE_RE = /\s+/;
@@ -148,9 +150,14 @@ interface GateArgs {
  * Stage 2: one small structured yes/no call. Fails OPEN — a classifier outage
  * must degrade to "extract everything", never to "remember nothing".
  */
-const classifyExtractionWorthiness = async (gateway: ServiceFetch, args: GateArgs, assistantQuestion: string | undefined): Promise<GateDecision> => {
+const classifyExtractionWorthiness = async (
+    gateway: ServiceFetch,
+    args: GateArgs,
+    assistantQuestion: string | undefined,
+    rules: ModelFilterRules,
+): Promise<GateDecision> => {
     try {
-        const model = await getUtilityModel(gateway, { threadId: args.threadId, userId: args.userId });
+        const model = await getUtilityModel(gateway, { rules, threadId: args.threadId, userId: args.userId });
         const result = await generateText({
             model,
             output: Output.object({ schema: z.object({ remember: z.boolean() }) }),
@@ -211,7 +218,7 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
 
     const decision =
         heuristic.verdict === "uncertain" && MEMORY_GATE_CLASSIFIER_ENABLED
-            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion)
+            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion, await loadModelFilterRules(ctx, args.userId))
             : heuristic;
 
     // Marked whichever way the classifier answered — asking it again about the
@@ -300,7 +307,24 @@ export const extractMemories = internalAction
             toolResultsSection = `\n\nTOOL RESULTS FROM THIS TURN:\n${toolLines}`;
         }
 
-        const model = await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: args.userId });
+        let model: Awaited<ReturnType<typeof getUtilityModel>>;
+
+        try {
+            model = await getUtilityModel(gatewayFetch(ctx), {
+                rules: await loadModelFilterRules(ctx, args.userId),
+                threadId: args.threadId,
+                userId: args.userId,
+            });
+        } catch (error) {
+            // The user's model filters leave no background model to read the turn with: nothing is extracted.
+            if (error instanceof NoAllowedUtilityModelError) {
+                ctx.log.event(GATE_EVENT, { reason: "no-allowed-utility-model", threadId: args.threadId, userId: args.userId, verdict: "skip" });
+
+                return;
+            }
+
+            throw error;
+        }
 
         let extractedFacts: z.infer<typeof extractedFactSchema>[] = [];
 

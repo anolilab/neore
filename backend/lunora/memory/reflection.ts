@@ -36,6 +36,7 @@ import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
@@ -601,7 +602,7 @@ export const runMemoryReflection = internalAction
         let model: UtilityModel | undefined;
 
         try {
-            model = await getUtilityModel(gatewayFetch(ctx), { userId });
+            model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId });
         } catch (error) {
             console.warn("[memory/reflection] Utility model unavailable, applying the deterministic plan only:", error);
         }
