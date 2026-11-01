@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
@@ -12,6 +13,7 @@ import {
     consumeLowRiskCheck,
     getLowRiskApprovalContext,
     getToolPermissionSettings,
+    MAX_TRUST_ENTRY_LENGTH,
     pruneExpiredToolPermissionGrants,
     recordApprovalPreference,
     revokeToolPermissionGrant,
@@ -465,6 +467,16 @@ describe("getLowRiskApprovalContext", () => {
         // Revoked while a run is going: the next call's re-check refuses.
         await setTrust(false);
         expect(await askFor(trustId)).toBe(false);
+    });
+
+    it("accepts the trust id of a server whose name and url are full of control characters at their caps", async () => {
+        const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("\u{1}".repeat(MAX_LENGTH.short), "\u{1}".repeat(MAX_LENGTH.url));
+
+        expect(trustId.length).toBeLessThanOrEqual(MAX_TRUST_ENTRY_LENGTH);
+        await expect(
+            harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey: KEY, threadId, trustId, userId: USER })),
+        ).resolves.toBe(false);
     });
 
     it("is false once a context summary of the thread folded in untrusted content", async () => {

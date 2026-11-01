@@ -1159,6 +1159,24 @@ export const pullRequestGuides = sqliteTable("pullRequestGuides", {
     by_user_and_pull: index("by_user_and_pull").on(t.userId, t.hostOrigin, t.repository, t.number),
 }));
 
+export const pullRequestThreads = sqliteTable("pullRequestThreads", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    baseBranch: text("baseBranch"),
+    createdAt: real("createdAt").notNull(),
+    headBranch: text("headBranch"),
+    kind: text("kind", { mode: "json" }).$type<"attached" | "opened">().notNull(),
+    number: real("number").notNull(),
+    repository: text("repository").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    title: text("title").notNull(),
+    url: text("url").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_user_and_threadId: index("by_user_and_threadId").on(t.userId, t.threadId),
+    by_user_and_repository_number: index("by_user_and_repository_number").on(t.userId, t.repository, t.number),
+}));
+
 export const rateLimits = sqliteTable("rateLimits", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

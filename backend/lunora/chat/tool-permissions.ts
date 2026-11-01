@@ -65,8 +65,12 @@ const vToolPermissionGrants = v.record(v.string(), v.number());
 /** Keys are short identifiers, never free text; cap them so the record cannot bloat. */
 const MAX_KEY_LENGTH = 256;
 const MAX_OVERRIDES = 500;
-/** A trust entry is `mcp:` plus a JSON pair of a name and a url, each escaped at worst to twice its length. */
-const MAX_TRUST_ENTRY_LENGTH = 8 + 2 * (MAX_LENGTH.short + MAX_LENGTH.url);
+
+/**
+ * A trust entry is `mcp:` plus a JSON pair of a name and a url. `JSON.stringify` writes a control character as
+ * `\u00XX`, six characters for one, so the capped name and url can grow six-fold; the fixed part is `mcp:["","]"`.
+ */
+export const MAX_TRUST_ENTRY_LENGTH = 11 + 6 * (MAX_LENGTH.short + MAX_LENGTH.url);
 /** Preference rows one sweep looks at; a user shard holds the one row of its user. */
 const PRUNE_BATCH = 50;
 

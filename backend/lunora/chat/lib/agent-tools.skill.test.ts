@@ -40,7 +40,7 @@ vi.mock("./tool-builder", () => {
 let mcpTools: {
     descriptors: Map<
         string,
-        { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean }; connectorSlug?: string; serverName: string; toolName: string }
+        { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean }; connectorSlug?: string; serverName: string; toolName: string; url?: string }
     >;
     tools: ToolSet;
 };
@@ -240,7 +240,7 @@ describe("buildAgentTools quick-check trust", () => {
 
     beforeEach(() => {
         mcpTools = {
-            descriptors: new Map([["mcp_docs__search_docs", { serverName: "docs", toolName: "search_docs" }]]),
+            descriptors: new Map([["mcp_docs__search_docs", { serverName: "docs", toolName: "search_docs", url: URL }]]),
             tools: { mcp_docs__search_docs: fakeTool("search") },
         };
     });
@@ -271,6 +271,42 @@ describe("buildAgentTools quick-check trust", () => {
     });
 
     it("loses the trust when the server's url changed", async () => {
+        mcpTools.descriptors.set("mcp_docs__search_docs", { serverName: "docs", toolName: "search_docs", url: "https://elsewhere.example/mcp" });
+
         expect(await needsApproval([mcpTrustId("docs", URL)], "https://elsewhere.example/mcp")).toBe(true);
+    });
+
+    it("keys each tool on its own server when two saved servers share a name", async () => {
+        const [first, second] = ["https://one.example/mcp", "https://two.example/mcp"];
+
+        mcpTools = {
+            descriptors: new Map([
+                ["mcp_files__read_a", { serverName: "files", toolName: "read_a", url: first }],
+                ["mcp_files__read_b", { serverName: "files", toolName: "read_b", url: second }],
+            ]),
+            tools: { mcp_files__read_a: fakeTool("a"), mcp_files__read_b: fakeTool("b") },
+        };
+
+        const runQuery = vi.fn();
+
+        runQuery
+            .mockResolvedValueOnce([
+                { enabled: true, name: "files", protocol: "http", url: first },
+                { enabled: true, name: "files", protocol: "http", url: second },
+            ])
+            .mockResolvedValueOnce(overrides)
+            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce([mcpTrustId("files", second)]);
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            searchMode: "web",
+            threadId: "thread",
+            userId: "user",
+        });
+
+        expect((tools["mcp_files__read_a"] as { needsApproval?: unknown }).needsApproval).toBe(true);
+        expect(typeof (tools["mcp_files__read_b"] as { needsApproval?: unknown }).needsApproval).toBe("function");
     });
 });

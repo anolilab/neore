@@ -226,7 +226,6 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
               }),
           )
         : undefined;
-    const urlByServer = new Map(selectedServers.filter((s) => !s.connectorSlug).map((s) => [s.name, s.url]));
 
     // Keyed from where the tool came from, never parsed back out of its name.
     const describe = (runtimeName: string): ToolDescriptor | undefined => {
@@ -247,14 +246,12 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
             };
         }
 
-        const url = mcp && urlByServer.get(mcp.serverName);
-
         return (
             mcp && {
                 annotations: mcp.annotations,
                 key: toolPermissionKey("mcp", mcp.toolName, mcp.serverName),
                 source: "mcp",
-                ...(url !== undefined && { trustId: mcpTrustId(mcp.serverName, url) }),
+                ...(mcp.url !== undefined && { trustId: mcpTrustId(mcp.serverName, mcp.url) }),
             }
         );
     };

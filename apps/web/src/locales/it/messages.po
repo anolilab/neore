@@ -685,7 +685,7 @@ msgstr "{0} utilizzi"
 #. placeholder {1}: detail.commitCount
 #. placeholder {2}: detail.baseBranch
 #. placeholder {3}: detail.headBranch
-#: src/features/develop/components/pull-request-view.tsx:101
+#: src/features/develop/components/pull-request-view.tsx:102
 msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2} from {3}"
 msgstr ""
 
@@ -1222,7 +1222,7 @@ msgstr "{providerName} · il tuo account Bedrock ({region})"
 msgid "{requestCount} req"
 msgstr "{requestCount} rich."
 
-#: src/features/develop/components/pull-request-view.tsx:117
+#: src/features/develop/components/pull-request-view.tsx:125
 msgid "{requestNoun} views"
 msgstr ""
 
@@ -5662,7 +5662,7 @@ msgstr "Verifica in corso..."
 msgid "Checking…"
 msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/case-fields.tsx:150
 #: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
@@ -6148,7 +6148,7 @@ msgstr "Chiudi traduzione"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread/widgets/places-widget.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 msgid "Closed"
 msgstr "Chiuso"
 
@@ -6508,7 +6508,7 @@ msgstr "design commerciale"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Progetti commerciali che richiedono la massima qualità d'immagine di Black Forest Labs"
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Commits"
 msgstr ""
 
@@ -7804,6 +7804,10 @@ msgstr "Impossibile caricare i ricordi."
 msgid "Could not load the skill breakdown."
 msgstr "Impossibile caricare la ripartizione per skill."
 
+#: src/features/develop/components/work-on-pull-request.tsx:73
+msgid "Could not load the threads for this {requestNoun}."
+msgstr ""
+
 #: src/features/develop/components/failure-notice.tsx:17
 msgid "Could not load this"
 msgstr ""
@@ -7819,6 +7823,10 @@ msgstr "Impossibile caricare la tua attività."
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "Impossibile spostare la pagina"
+
+#: src/features/develop/components/work-on-pull-request.tsx:46
+msgid "Could not open a thread for this {requestNoun}. Try again."
+msgstr ""
 
 #: src/features/pages/components/open-as-page-button.tsx:28
 msgid "Could not open as a page"
@@ -9480,7 +9488,7 @@ msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it,
 msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aumentane la risoluzione, poi rimuovi lo sfondo\""
 
 #: src/components/model-picker/model-picker.tsx:165
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -10089,7 +10097,7 @@ msgstr "I download aprono la pagina delle release su GitHub. Se lì non compaion
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/inbox-list.tsx:118
-#: src/features/develop/components/pull-request-view.tsx:80
+#: src/features/develop/components/pull-request-view.tsx:81
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
 msgstr "Bozza"
@@ -13246,7 +13254,7 @@ msgstr "Caricamento del file rifiutato."
 msgid "Filename cannot be empty"
 msgstr "Il nome del file non può essere vuoto"
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Files"
 msgstr ""
 
@@ -14903,7 +14911,7 @@ msgstr "Gli account ospite usano solo modelli gratuiti."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gli account ospite usano solo modelli gratuiti. Registrati per sbloccare tutti i modelli."
 
-#: src/features/develop/components/pull-request-view.tsx:71
+#: src/features/develop/components/pull-request-view.tsx:72
 msgid "Guide"
 msgstr ""
 
@@ -15936,7 +15944,7 @@ msgid "Improving..."
 msgstr "Miglioramento..."
 
 #. placeholder {0}: detail.changedFiles
-#: src/features/develop/components/pull-request-view.tsx:106
+#: src/features/develop/components/pull-request-view.tsx:107
 msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
@@ -17574,7 +17582,7 @@ msgstr ""
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
 #: src/features/develop/components/inbox-list.tsx:86
-#: src/features/develop/components/pull-request-view.tsx:56
+#: src/features/develop/components/pull-request-view.tsx:57
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
 msgstr "Caricamento"
@@ -17750,6 +17758,10 @@ msgstr "Caricamento conversazioni"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1055
 msgid "Loading threads..."
 msgstr "Caricamento delle conversazioni..."
+
+#: src/features/develop/components/work-on-pull-request.tsx:70
+msgid "Loading threads…"
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:679
 msgid "Loading triggers..."
@@ -18643,7 +18655,7 @@ msgid "Merge when ready?"
 msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 msgid "Merged"
 msgstr "Unito"
 
@@ -19922,7 +19934,7 @@ msgstr "Nuova chat"
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:88
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
-#: src/features/chat/header/chat-header.tsx:29
+#: src/features/chat/header/chat-header.tsx:30
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20345,7 +20357,7 @@ msgstr "Ancora nessun dataset"
 msgid "No description"
 msgstr "Nessuna descrizione"
 
-#: src/features/develop/components/pull-request-view.tsx:127
+#: src/features/develop/components/pull-request-view.tsx:135
 msgid "No description provided."
 msgstr ""
 
@@ -20742,6 +20754,10 @@ msgstr "Nessun contenuto testuale in questa slide"
 #: ../../packages/chat-ui/src/chat/page-context-chip.tsx:84
 msgid "No text to show."
 msgstr "Nessun testo da mostrare."
+
+#: src/features/develop/components/work-on-pull-request.tsx:77
+msgid "No thread has worked on this {requestNoun} yet."
+msgstr ""
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1074
 msgid "No threads found for"
@@ -21463,7 +21479,7 @@ msgstr "Opacità"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:679
 #: src/components/command-palette.tsx:618
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/develop/components/pull-request-view.tsx:72
+#: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/tasks/hooks/use-task-notifications.ts:30
 msgid "Open"
 msgstr "Apri"
@@ -21586,7 +21602,7 @@ msgid "Open new chat"
 msgstr "Apri nuova chat"
 
 #. placeholder {0}: host.label
-#: src/features/develop/components/pull-request-view.tsx:92
+#: src/features/develop/components/pull-request-view.tsx:93
 msgid "Open on {0}"
 msgstr ""
 
@@ -21683,6 +21699,10 @@ msgstr "Apri la scheda Developer e avvia il server."
 #. placeholder {0}: defaultShortcut("openModelPicker")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:134
 msgid "Open the model picker in the composer ({0})"
+msgstr ""
+
+#: src/features/develop/components/thread-pull-request-link.tsx:29
+msgid "Open the pull request {repository}#{number}"
 msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:118
@@ -21966,6 +21986,10 @@ msgstr ""
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
+#: src/features/develop/components/work-on-pull-request.tsx:86
+msgid "Opened from this thread"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Opening a blank chat"
 msgstr "Apertura di una chat vuota"
@@ -21973,6 +21997,10 @@ msgstr "Apertura di una chat vuota"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:156
 msgid "Opening a pull request — progress is in the log"
 msgstr "Apertura di una pull request: l'avanzamento è nel log"
+
+#: src/features/develop/components/work-on-pull-request.tsx:63
+msgid "Opening a thread…"
+msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:233
 msgid "Opening pull request…"
@@ -28741,6 +28769,10 @@ msgstr "Avviato {startedAgo}"
 msgid "Started <0>{0}</0>. Tool details and attachments are hidden on shared conversations."
 msgstr "Iniziata il <0>{0}</0>. I dettagli degli strumenti e gli allegati sono nascosti nelle conversazioni condivise."
 
+#: src/features/develop/components/work-on-pull-request.tsx:86
+msgid "Started here"
+msgstr ""
+
 #: src/features/tasks/components/task-detail-dialog.tsx:125
 msgid "started manually"
 msgstr "avviata manualmente"
@@ -28806,7 +28838,7 @@ msgstr "Prestazioni allo stato dell’arte in tutti i benchmark"
 msgid "State:"
 msgstr "Stato:"
 
-#: src/features/chat/header/chat-header.tsx:154
+#: src/features/chat/header/chat-header.tsx:155
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:554
 msgid "Stateless"
 msgstr "Senza stato"
@@ -30474,7 +30506,7 @@ msgstr "Il limite di costo deve essere un numero positivo di dollari."
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "Il dataset, i suoi casi e tutte le sue esecuzioni vengono rimossi."
 
-#: src/features/develop/components/pull-request-view.tsx:129
+#: src/features/develop/components/pull-request-view.tsx:137
 msgid "The description is cut short."
 msgstr ""
 
@@ -31217,7 +31249,7 @@ msgstr ""
 #~ msgid "This host does not offer any view of a {0} yet."
 #~ msgstr ""
 
-#: src/features/develop/components/pull-request-view.tsx:114
+#: src/features/develop/components/pull-request-view.tsx:122
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr ""
 
@@ -31607,6 +31639,10 @@ msgstr "Conversazioni"
 #: src/features/marketing/components/landing-page.tsx:238
 msgid "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 msgstr "Le conversazioni conservano tutta la cronologia. Crea branch delle idee, fissa le chat importanti e riprendi esattamente da dove avevi lasciato."
+
+#: src/features/develop/components/work-on-pull-request.tsx:58
+msgid "Threads working on this {requestNoun}"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:215
 #: src/features/settings/components/chat/usage-settings.tsx:496
@@ -34585,6 +34621,10 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/popular-servers.ts:131
 msgid "Work management and team collaboration"
 msgstr "Gestione del lavoro e collaborazione in team"
+
+#: src/features/develop/components/work-on-pull-request.tsx:63
+msgid "Work on this {requestNoun}"
+msgstr ""
 
 #: src/features/sub-agents/components/worker-list.tsx:92
 msgid "Workers"
