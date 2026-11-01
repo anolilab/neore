@@ -81,8 +81,9 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
 
@@ -189,8 +190,9 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
 
@@ -527,8 +529,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -583,8 +586,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -639,8 +643,9 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
