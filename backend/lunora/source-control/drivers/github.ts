@@ -9,7 +9,7 @@ import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
 import { requirementOf } from "../checks-logic";
-import type { HostDriver } from "../driver";
+import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
@@ -95,7 +95,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
+        pullRequest: { checks: NATIVE, commits: NATIVE, create: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,
@@ -857,6 +857,63 @@ const branchPath = (branch: string): string | undefined => {
     }
 };
 
+const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() });
+
+/**
+ * Opens a pull request for a branch that is already pushed, and answers its web page. The branch names become JSON
+ * values (never a URL path), and the repository address is the host's own `owner/name`.
+ *
+ * A 2xx whose body cannot be read is NOT a failure to report as "nothing happened": the host may have opened it, so the
+ * answer is marked unconfirmed and a caller looks before trying again.
+ */
+const createPullRequest = async (request: HostRequest, input: CreatePullRequestInput): Promise<CreatedPullRequest> => {
+    const parts = splitGithubRepo(input.repository);
+
+    if (!parts) {
+        throw new HostApiError("Not a GitHub pull request address", 404);
+    }
+
+    // The names are JSON values, not path parts: `branchPath` only vets them (an encoded `+` would name another branch).
+    if (branchPath(input.base) === undefined || branchPath(input.head) === undefined) {
+        throw new HostApiError("Not a branch this can open a pull request from", 404);
+    }
+
+    const response = await request(`/repos/${parts.owner}/${parts.name}/pulls`, {
+        json: { base: input.base, body: input.body, head: input.head, title: input.title },
+        method: "POST",
+    });
+    let created: z.infer<typeof createdPullRequestSchema>;
+
+    try {
+        created = parse(createdPullRequestSchema, await readJson(response));
+    } catch {
+        // The host answered 2xx, so it took the request; we just cannot say which pull request it is.
+        throw new HostApiError("The host's answer to the pull request could not be read", 0, false, { unconfirmed: true });
+    }
+
+    return { url: webUrl(created.html_url) ?? `${GITHUB_WEB_ORIGIN}/${parts.owner}/${parts.name}/pull/${String(created.number)}` };
+};
+
+const openPullRequestsSchema = z.array(z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() }));
+
+/** The open pull request from a branch of the repository itself, or `undefined`. The head is `owner:branch`, as the host wants it. */
+const findOpenPullRequest = async (request: HostRequest, input: { head: string; repository: string }): Promise<CreatedPullRequest | undefined> => {
+    const parts = splitGithubRepo(input.repository);
+
+    if (!parts || branchPath(input.head) === undefined) {
+        return undefined;
+    }
+
+    const response = await request(`/repos/${parts.owner}/${parts.name}/pulls`, {
+        query: { head: `${parts.owner}:${input.head}`, per_page: 1, state: "open" },
+    });
+    const [found] = parse(openPullRequestsSchema, await readJson(response));
+
+    return found === undefined
+        ? undefined
+        : { url: webUrl(found.html_url) ?? `${GITHUB_WEB_ORIGIN}/${parts.owner}/${parts.name}/pull/${String(found.number)}` };
+};
+
 /** Reads a source of required-check rules, which may be withheld: only a sign-in or rate-limit problem is the caller's. */
 const readable = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
     try {
@@ -1202,6 +1259,8 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    createPullRequest,
+    findOpenPullRequest,
     getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },
