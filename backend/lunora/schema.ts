@@ -2096,6 +2096,26 @@ export const schema = defineSchema({
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
 
+    // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
+    // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
+    // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both
+    // ways, so the PR lists its threads and a thread names its PR.
+    pullRequestThreads: defineTable({
+        baseBranch: v.optional(v.string()),
+        createdAt: v.number(),
+        headBranch: v.optional(v.string()),
+        kind: v.union(v.literal("attached"), v.literal("opened")),
+        number: v.number(),
+        repository: v.string(),
+        threadId: v.id("threads"),
+        title: v.string(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_repository_number", ["userId", "repository", "number"])
+        .index("by_user_and_threadId", ["userId", "threadId"]),
+
     /**
      * better-auth's own rate-limit store.
      *

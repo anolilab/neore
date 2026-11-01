@@ -498,6 +498,8 @@ export const generateExportFile = internalAction
         prompts: v.any(),
         // AI guides of pull requests (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
         pullRequestGuides: v.optional(v.any()),
+        // The links between threads and pull requests (`source-control/gdpr.ts`). Optional for the same reason.
+        pullRequestThreads: v.optional(v.any()),
         // `requestId` is new. Lunora's `storage.store` takes the object key, and
         // keying the export by its request id makes the blob traceable back to the
         // row that produced it — otherwise a stray object in the bucket is
@@ -547,6 +549,7 @@ export const generateExportFile = internalAction
             profile: args.profile,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
+            pullRequestThreads: args.pullRequestThreads ?? { links: [] },
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
