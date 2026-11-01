@@ -13,7 +13,41 @@ concurrency:
     cancel-in-progress: "${{ github.event_name == 'pull_request' }}"
 
 jobs:
+    # A pull request runs the Rust analysis only when it changes Rust; push to main and the
+    # weekly run always do.
+    changes:
+        name: "Rust changed"
+        runs-on: "ubuntu-latest"
+        timeout-minutes: 5
+        permissions:
+            contents: "read"
+        outputs:
+            rust: "${{ steps.rust.outputs.changed }}"
+        steps:
+            - name: "Git checkout"
+              if: "github.event_name == 'pull_request'"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: "Look for Rust changes"
+              id: "rust"
+              shell: "bash"
+              env:
+                  BASE_SHA: "${{ github.event.pull_request.base.sha }}"
+                  EVENT: "${{ github.event_name }}"
+              run: |
+                  if [ "${EVENT}" != "pull_request" ]; then
+                      echo "changed=true" >> "${GITHUB_OUTPUT}"
+                  elif git diff --name-only "${BASE_SHA}...HEAD" | grep -qE '(\.rs$|(^|/)Cargo\.(toml|lock)$)'; then
+                      echo "changed=true" >> "${GITHUB_OUTPUT}"
+                  else
+                      echo "changed=false" >> "${GITHUB_OUTPUT}"
+                  fi
+
     codeql:
+        needs: ["changes"]
         permissions:
             security-events: "write"
             actions: "read"
@@ -24,7 +58,6 @@ jobs:
             # untrusted checkouts) alongside the application code; `rust` covers
             # services/document-parser.
             #
-            # `rust` takes ~9 minutes and no ruleset requires a code-scanning result, so a
-            # pull request skips it; push to main and the weekly run still analyse it.
-            languages: '${{ github.event_name == ''pull_request'' && ''["javascript-typescript", "actions"]'' || ''["javascript-typescript", "actions", "rust"]'' }}'
+            # `rust` takes ~9 minutes: a pull request that changes no Rust skips it.
+            languages: '${{ needs.changes.outputs.rust == ''true'' && ''["javascript-typescript", "actions", "rust"]'' || ''["javascript-typescript", "actions"]'' }}'
             branches: '["main"]'

@@ -155,18 +155,9 @@ jobs:
                   npm-version: "11"
                   skip-playwright: "true"
 
-            # The same toolchain and build as the type check: typed rules read the
-            # packages' emitted declarations, and `build:packages` includes
-            # packages/device-core-node (Rust + libdbus). The document-parser Worker
-            # itself is not built here, as eslint does not read it.
-            - name: "Setup Rust Worker toolchain"
-              uses: "./.github/actions/setup-rust-worker"
-
-            # `lint:types` builds packages/device-core-node, whose Linux keyring backend links libdbus at build time.
-            - name: "Install libdbus for the Linux keyring"
-              shell: "bash"
-              run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
-
+            # Typed rules read the packages' emitted declarations. `build:packages` builds the
+            # `type:package` projects (`ai`, `service-sdk`), which need neither the Rust toolchain
+            # nor libdbus: those stay with the type check, which builds the native module.
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"

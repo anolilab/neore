@@ -4,7 +4,9 @@
 # also reaches apt calls made by other tools, e.g. `playwright install-deps`.
 #
 #   .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config
-set -uo pipefail
+# errexit: a failed config write stops the script. The retried apt calls run inside an
+# `if`, which errexit leaves alone, so a mirror failure is still retried.
+set -euo pipefail
 
 if [ "$#" -eq 0 ]; then
     echo "usage: apt-retry.sh <command...>" >&2
