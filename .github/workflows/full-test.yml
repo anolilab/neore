@@ -89,7 +89,7 @@ jobs:
     # downloaded Chromium in all three shards. Same path and key as the E2E job in test.yml.
     warm-playwright:
         name: "Warm the Playwright cache"
-        if: "github.event_name == 'push'"
+        if: "github.event_name == 'push' && github.repository == 'anolilab/neore'"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 20
         permissions:

@@ -43,11 +43,12 @@ jobs:
                       exit 0
                   fi
 
-                  # Captured first, so a failing diff fails this job instead of reading as "no Rust"
-                  # (and no early-exiting `grep -q` can break the pipe under pipefail).
-                  files="$(git diff --name-only "${BASE_SHA}...HEAD")"
+                  # Written to a file first, so a failing diff fails this job instead of reading as "no Rust"
+                  # (no pipe for an early-exiting grep to break). NUL-separated, so git never quotes a name.
+                  files="$(mktemp)"
+                  git diff --name-only -z "${BASE_SHA}...HEAD" > "${files}"
 
-                  if grep -E '(\.rs$|(^|/)Cargo\.(toml|lock)$)' <<< "${files}" > /dev/null; then
+                  if grep -qzE '(\.rs$|(^|/)Cargo\.(toml|lock)$)' "${files}"; then
                       echo "changed=true" >> "${GITHUB_OUTPUT}"
                   else
                       echo "changed=false" >> "${GITHUB_OUTPUT}"
