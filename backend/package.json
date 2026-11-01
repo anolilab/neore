@@ -1,6 +1,6 @@
 {
     "name": "@neore/backend",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "private": true,
     "description": "Lunora backend for the AI Chat application.",
     "license": "FSL-1.1-ALv2",
