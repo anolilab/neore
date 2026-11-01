@@ -1,6 +1,7 @@
 import { v } from "lunorash/server";
 
 import { internalMutation } from "../../_generated/server";
+import { endHostThread } from "../../acp/lib/thread-removed";
 import { deleteAccountsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
 import { deleteShardRoutesOf } from "../../lib/shard-routes";
 import { eraseConnectorsForUser } from "../../connectors/gdpr";
@@ -90,7 +91,9 @@ export const THREAD_CASCADE_PAGE = 25;
  * found through the user's threads — a page of threads per call, walked with
  * a cursor the workflow passes back in. A thread whose children fill a batch
  * is visited again (the same cursor comes back), so no call grows with the
- * account. The threads themselves are deleted by a LATER step
+ * account. A host thread (a coding agent on a paired computer) is ended here first (`endHostThread`: queued worker
+ * runs cancelled, live turns ended, undelivered calls withdrawn), while its streams and runs still exist for that to
+ * find; the later steps then delete rows nothing is still working on. The threads themselves are deleted by a LATER step
  * (`agent_users.deleteAllForUserIdAsync`, through `deleteMessage`, which
  * drops file refcounts), so this walk still finds them.
  */
@@ -106,7 +109,10 @@ export const deleteUserThreadCascade = internalMutation
         });
         let revisit = false;
 
+        const now = Date.now();
+
         for (const thread of threads.page) {
+            await endHostThread(context, thread, now);
             // Not `revisit ||= await …`: a short-circuit would skip the threads after the first full one.
             const threadFull = await eraseThreadSuggestionsAndInvites(context, thread._id);
 

@@ -3,7 +3,7 @@
  * SDK's schema), with an in-memory agent so every frame the host writes can be compared exactly.
  */
 import { PROTOCOL_VERSION as SDK_PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
@@ -15,6 +15,18 @@ const sleep = (ms: number): Promise<void> =>
     new Promise((resolve) => {
         setTimeout(resolve, ms);
     });
+
+/** The cancel-settle window is a timer and a clock read: these tests drive both by hand instead of waiting on the scheduler. */
+const useSettleClock = (): void => {
+    vi.useFakeTimers({ toFake: ["clearTimeout", "Date", "setTimeout"] });
+};
+
+/** Longer than the settle window (500 ms), so the prompt held back by it is released. */
+const PAST_SETTLE_MS = 600;
+
+afterEach(() => {
+    vi.useRealTimers();
+});
 
 const refuseAll: PermissionGate = {
     ask: async () => {
@@ -172,6 +184,7 @@ describe("the end of a turn", () => {
     it("queues a prompt that arrives while a cancel is still settling: it runs after the cancelled turn's response, never beside it", async () => {
         const { agent, session } = await setup();
 
+        useSettleClock();
         session.send("first", "turn-1");
         await expect.poll(() => agent.written.length).toBe(3);
         session.cancel();
@@ -179,13 +192,14 @@ describe("the end of a turn", () => {
         // The agent has not answered the cancel yet: the session is still busy, so the next message waits.
         expect(session.send("second", "turn-2")).toEqual({ position: 1, status: "queued" });
         expect(session.snapshot().status).toBe("busy");
-        await sleep(60);
+        await vi.advanceTimersByTimeAsync(60);
         expect(agent.written.filter((frame) => frame.method === "session/prompt")).toHaveLength(1);
 
         const prompt = agent.written.find((frame) => frame.method === "session/prompt");
 
         expect(prompt).toBeDefined();
         agent.say({ id: prompt?.id as number, result: { stopReason: "cancelled" } });
+        await vi.advanceTimersByTimeAsync(PAST_SETTLE_MS);
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
     });
 
@@ -218,6 +232,7 @@ describe("the end of a turn", () => {
     it("keeps a cancelled turn's late output out of the queued turn that runs next", async () => {
         const { agent, session } = await setup();
 
+        useSettleClock();
         session.send("first", "turn-1");
         await expect.poll(() => agent.written.length).toBe(3);
         session.send("second", "turn-2");
@@ -225,8 +240,9 @@ describe("the end of a turn", () => {
 
         agent.say({ id: agent.written[2].id as number, result: { stopReason: "cancelled" } });
         // An agent that flushes the cancelled turn's output a moment after it answered the prompt.
-        await sleep(30);
+        await vi.advanceTimersByTimeAsync(30);
         agent.say(update("agent_message_chunk", { content: { text: "late from the first", type: "text" } }));
+        await vi.advanceTimersByTimeAsync(PAST_SETTLE_MS);
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
 
         const [, second] = session.snapshot().turns;
@@ -237,6 +253,7 @@ describe("the end of a turn", () => {
     it("keeps the pause after a cancel for a prompt sent once the cancelled turn has ended", async () => {
         const { agent, session } = await setup();
 
+        useSettleClock();
         session.send("first", "turn-1");
         await expect.poll(() => agent.written.length).toBe(3);
         session.cancelTurn("turn-1");
@@ -245,8 +262,9 @@ describe("the end of a turn", () => {
 
         // Nothing was queued when the turn ended; the next prompt arrives just after.
         session.send("second", "turn-2");
-        await sleep(30);
+        await vi.advanceTimersByTimeAsync(30);
         agent.say(update("agent_message_chunk", { content: { text: "late from the first", type: "text" } }));
+        await vi.advanceTimersByTimeAsync(PAST_SETTLE_MS);
         await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
 
         const [, second] = session.snapshot().turns;

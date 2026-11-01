@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { SESSION_TOUCH_MS } from "./constants";
 
 type Session = Doc<"acpSessions">;
@@ -10,7 +10,7 @@ type SessionStatus = Session["status"];
  * to another host agent in the same thread (plans/harness-switch.md, S3) ends it and opens the next, so a thread's
  * earlier sessions stay as `ended` rows and only the newest can be written into.
  */
-export const sessionOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<Session | null> =>
+export const sessionOfThread = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<Session | null> =>
     await ctx.db.acpSessions.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { threadId } });
 
 /**
