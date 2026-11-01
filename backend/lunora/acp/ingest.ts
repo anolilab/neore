@@ -40,7 +40,7 @@ import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
-import { markReattachFailed, reattachFailureOf } from "./lib/reattach";
+import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
 import { vHostEvent } from "./validators";
@@ -78,11 +78,14 @@ const sessionTitle = (event: Extract<Event, { kind: "session_open" }>): string =
  * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread.
  */
 const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ApplyResult> => {
-    const [open] = events;
+    const [received] = events;
 
-    if (events.length !== 1 || open?.kind !== "session_open") {
+    if (events.length !== 1 || received?.kind !== "session_open") {
         return REFUSED;
     }
+
+    // An id the computer's core would refuse to load again is never stored, so a later switch cannot choose it.
+    const open = received.nativeSessionId !== undefined && !nativeIdFits(received.nativeSessionId) ? { ...received, nativeSessionId: undefined } : received;
 
     const existing = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 

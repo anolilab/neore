@@ -14,6 +14,12 @@ type Session = Doc<"acpSessions">;
 /** Rows looked at for the divider a session was opened for: it is the newest, the session was opened right after it. */
 const SCAN_ROWS = 20;
 
+/** The most UTF-8 bytes of an agent's own session id the computer's core accepts in a start (`acp_call.rs#NATIVE_ID_MAX`). */
+export const NATIVE_ID_MAX_BYTES = 256;
+
+/** Whether an id the agent reported can be asked for again: the core counts bytes, the validators count characters. */
+export const nativeIdFits = (id: string): boolean => new TextEncoder().encode(id).length <= NATIVE_ID_MAX_BYTES;
+
 /**
  * The saved session of the SAME agent a switch may ask the computer to load again (harness switch S4): the thread's NEWEST
  * earlier session with the same agent, folder and computer, when it recorded the agent's own session id and its report
@@ -28,7 +34,7 @@ export const savedSessionFor = (
 ): Session | undefined => {
     const newest = sessions.find((session) => session.deviceId === target.deviceId && session.agentKey === target.agentKey && session.folderId === target.folderId);
 
-    return newest?.nativeSessionId !== undefined && isAvailable(capabilityOf(newest.capabilities, "sessions.load")) ? newest : undefined;
+    return newest?.nativeSessionId !== undefined && nativeIdFits(newest.nativeSessionId) && isAvailable(capabilityOf(newest.capabilities, "sessions.load")) ? newest : undefined;
 };
 
 /**

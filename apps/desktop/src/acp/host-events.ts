@@ -95,6 +95,9 @@ const MAX_OPTIONS = 16;
 const MAX_COMMAND_CHARS = 10_000;
 const MAX_TARGET_CHARS = 2000;
 
+/** The most UTF-8 bytes of an agent's own session id the core accepts in a start (`acp_call.rs#NATIVE_ID_MAX`); a JS length counts code units. */
+const MAX_NATIVE_ID_BYTES = 256;
+
 /** A session's labels, cut to what the backend takes. */
 export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
     return {
@@ -103,7 +106,7 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
         ...info.capabilities !== undefined && { capabilities: info.capabilities },
-        ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && { nativeSessionId: info.nativeSessionId.slice(0, 256) },
+        ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId },
         ...info.reattach !== undefined && { reattach: { loaded: info.reattach.loaded, ...info.reattach.reason !== undefined && { reason: info.reattach.reason } } },
     };
 };
