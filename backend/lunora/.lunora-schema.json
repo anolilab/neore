@@ -2611,6 +2611,12 @@
           "optional": false,
           "unique": false
         },
+        "handoffSentAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "hostSessionId": {
           "kind": "string",
           "nullable": false,
@@ -17600,6 +17606,27 @@
                   "optional": true,
                   "unique": false,
                   "refined": true
+                },
+                "reattach": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "loaded": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "reason": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
                 }
               }
             },
@@ -18477,6 +18504,12 @@
     "persistentStreams": {
       "commitOrdered": false,
       "fields": {
+        "carriesHandoff": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "earlySteps": {
           "kind": "array",
           "nullable": false,

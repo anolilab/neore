@@ -14,6 +14,8 @@ export const openHostSession = async (
     args: {
         device: Doc<"devices">;
         hostSessionId: string;
+        /** The agent's own session id this one asks the computer to load again (harness switch S4). */
+        nativeSessionId?: string;
         offer: NonNullable<Doc<"devices">["acpOffers"]>[number];
         /** What the agent is handed when it takes over, kept on the session for every prompt it is sent. */
         taintedBy?: ReadonlyArray<DeviceTaintSource>;
@@ -22,7 +24,7 @@ export const openHostSession = async (
     },
     now: number,
 ): Promise<AcpCallResult> => {
-    const { device, hostSessionId, offer, threadId, userId } = args;
+    const { device, hostSessionId, nativeSessionId, offer, threadId, userId } = args;
     const taintedBy = mergeTaint(args.taintedBy);
 
     await ctx.db.insert("acpSessions", {
@@ -33,6 +35,9 @@ export const openHostSession = async (
         folderId: offer.folderId,
         folderLabel: offer.folderLabel,
         hostSessionId,
+        // Kept on the row so the agent's `session_open` can be checked against it: a session that opens under another id did
+        // not load this one.
+        ...(nativeSessionId !== undefined && { nativeSessionId }),
         status: "starting",
         ...(taintedBy.length > 0 && { taintedBy }),
         threadId,
@@ -44,7 +49,13 @@ export const openHostSession = async (
         ctx,
         {
             deviceId: device._id,
-            input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
+            input: {
+                agentKey: offer.agentKey,
+                folderId: offer.folderId,
+                ...(nativeSessionId !== undefined && { nativeSessionId }),
+                sessionId: hostSessionId,
+                threadId: threadId as string,
+            },
             kind: "acp_start",
             threadId,
             userId,

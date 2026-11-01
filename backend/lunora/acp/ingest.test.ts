@@ -658,6 +658,21 @@ describe("importing an agent's saved session", () => {
         await expect(importSession(device, TURNS)).resolves.toMatchObject({ opened: { json: { existing: true, threadId } } });
     });
 
+    it("keeps an id of 256 UTF-8 bytes and drops one the computer's core would refuse (bytes, not characters)", async () => {
+        const device = await pair(ownerId);
+        const fits = "é".repeat(128);
+        const first = await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: fits }], sessionId: "fits" });
+        const long = await ingest(device, { events: [{ ...SESSION_OPEN, nativeSessionId: `${fits}é` }], sessionId: "long" });
+
+        expect(first.status).toBe(200);
+        expect(long.status).toBe(200);
+
+        const rows = await sessionRows();
+
+        expect(rows.find((entry) => entry.hostSessionId === "fits")?.nativeSessionId).toBe(fits);
+        expect(rows.find((entry) => entry.hostSessionId === "long")?.nativeSessionId).toBeUndefined();
+    });
+
     it("gives each user their own thread for the same agent session id", async () => {
         const other = await insertUser();
         const mine = await importSession(await pair(ownerId), TURNS);

@@ -18100,13 +18100,13 @@
     {
       "file": "acp/lib/calls",
       "kind": "write",
-      "line": 67,
+      "line": 68,
       "reason": "\"endStartingSession\" is not a registered function"
     },
     {
       "file": "acp/lib/calls",
       "kind": "schedule",
-      "line": 110,
+      "line": 116,
       "reason": "\"onAcpCallEnded\" is not a registered function"
     },
     {
@@ -18148,7 +18148,7 @@
     {
       "file": "acp/lib/start-session",
       "kind": "write",
-      "line": 28,
+      "line": 30,
       "reason": "\"openHostSession\" is not a registered function"
     },
     {
@@ -18166,13 +18166,13 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 227,
+      "line": 235,
       "reason": "\"hostSendHttpAction\" is not a registered function"
     },
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 466,
+      "line": 624,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
@@ -20410,19 +20410,19 @@
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 37,
+      "line": 45,
       "reason": "\"createHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 81,
+      "line": 90,
       "reason": "\"extendHostStream\" is not a registered function"
     },
     {
       "file": "chat/streaming/persistent/host",
       "kind": "write",
-      "line": 97,
+      "line": 106,
       "reason": "\"appendHostChunk\" is not a registered function"
     },
     {

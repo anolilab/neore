@@ -18,6 +18,7 @@ export type HostSendError =
     | "offline"
     | "rate_limited"
     | "session_ended"
+    | "session_starting"
     | "too_large"
     | "turn_running"
     | "unreachable"
@@ -33,6 +34,7 @@ const KNOWN: ReadonlySet<string> = new Set([
     "offline",
     "rate_limited",
     "session_ended",
+    "session_starting",
     "too_large",
     "turn_running",
     "worker_thread",

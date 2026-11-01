@@ -434,6 +434,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     ): Promise<void> => {
         try {
             const sessionId = await (server?.acp ?? requireAcp()).startSession(command.agentKey, command.agentLabel, command.folderPath, {
+                ...command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId },
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });

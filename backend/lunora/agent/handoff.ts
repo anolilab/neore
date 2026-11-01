@@ -165,11 +165,17 @@ export const jsonBytes = (text: string): number => encoder.encode(JSON.stringify
  * the signed call carries them) is reached, and a line saying how many earlier ones are left out. A turn is never
  * cut: when the newest alone does not fit this throws, before anything is written.
  *
- * `omittedEarlier` says rows older than `newestFirst` exist, which the count cannot know.
+ * `omittedEarlier` says rows older than `newestFirst` exist, which the count cannot know. `kind` is `delta` for the turns
+ * an agent that stepped away has not seen.
  */
-export const composeTailHandoff = (newestFirst: ReadonlyArray<HandoffTurn>, maxBytes: number, omittedEarlier = false): string => {
+export const composeTailHandoff = (
+    newestFirst: ReadonlyArray<HandoffTurn>,
+    maxBytes: number,
+    omittedEarlier = false,
+    kind: HandoffKind = "portable",
+): string => {
     // The frame, and the longest line that can name the turns left out.
-    const room = maxBytes - jsonBytes(composeHandoff({ kind: "portable", omittedTurns: newestFirst.length + 1, tail: [] }));
+    const room = maxBytes - jsonBytes(composeHandoff({ kind, omittedTurns: newestFirst.length + 1, tail: [] }));
     let used = 0;
     let count = 0;
 
@@ -192,7 +198,7 @@ export const composeTailHandoff = (newestFirst: ReadonlyArray<HandoffTurn>, maxB
 
     // Zero stands for "some, not counted": the rows older than the ones read.
     return composeHandoff({
-        kind: "portable",
+        kind,
         ...((omitted > 0 || omittedEarlier) && { omittedTurns: omittedEarlier ? 0 : omitted }),
         tail: newestFirst.slice(0, count).toReversed(),
     });

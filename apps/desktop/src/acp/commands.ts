@@ -47,7 +47,7 @@ export type AcpCommand
     = | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
         | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
         | { kind: "send"; sessionId: string; text: string; turnId: string }
-        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
+        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; nativeSessionId?: string; sessionId: string; threadId: string };
 
 interface Prepared {
     callId: string;

@@ -26,10 +26,10 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { leafRowOf, resolvePathAgent } from "../agent/agent-switch";
-import { sameAgent } from "../agent/agent-switch-logic";
+import { agentKeyOf, sameAgent } from "../agent/agent-switch-logic";
 import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agent/agent-switch-validators";
-import { composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
-import { collectHandoffSource } from "../agent/handoff-source";
+import { composeHandoff, composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
+import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { inheritPasscodeHandler } from "../agent/thread-lock";
@@ -61,6 +61,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
+import { savedSessionFor } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
@@ -140,8 +141,22 @@ const currentAgent = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<
     return session && { agent: sessionRefOf(session), session };
 };
 
-/** The newest turns of the thread as the handoff text of a switch to `target`; empty when the thread has no turn with text. */
-const handoffFor = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<"messages">, target: ResolvedTarget): Promise<string> => {
+/** The handoff of a conversation too large to hand over, for a switch that does not need one unless its load fails: no turns, and the note saying so. */
+const OMITTED_HANDOFF = composeHandoff({ kind: "portable", omittedTurns: 0, tail: [] });
+
+/**
+ * The newest turns of the thread as the handoff text of a switch to `target`; empty when the thread has no turn with text.
+ * A switch that reattaches the agent's own session (`lenient`) stores it only for the load that fails, so one too large to
+ * hand over does not refuse a switch that does not need it: the stored fallback is then a frame that says the earlier
+ * turns are not included, which is still a handoff the first prompt carries if the load fails.
+ */
+const handoffFor = async (
+    ctx: MutationCtx,
+    thread: Doc<"threads">,
+    leaf: Doc<"messages">,
+    target: ResolvedTarget,
+    options: { lenient?: boolean } = {},
+): Promise<string> => {
     const source = await collectHandoffSource(ctx, thread._id, leaf);
 
     // The chat may have been shared and no longer is: text a former collaborator wrote must not reach the computer.
@@ -157,8 +172,12 @@ const handoffFor = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<"m
         // A thread that took over and has said nothing since holds the conversation only in its own handoff: pass that on.
         const carried = (await pendingHandoffOf(ctx, thread)) ?? "";
 
-        return jsonBytes(carried) <= maxBytes
-            ? carried
+        if (jsonBytes(carried) <= maxBytes) {
+            return carried;
+        }
+
+        return options.lenient
+            ? OMITTED_HANDOFF
             : refuse(HANDOFF_REFUSED_TOO_LARGE, "The conversation handed over is too long to hand on again. Send a message first.");
     }
 
@@ -166,7 +185,113 @@ const handoffFor = async (ctx: MutationCtx, thread: Doc<"threads">, leaf: Doc<"m
         return composeTailHandoff(source.turns, maxBytes, source.omittedEarlier);
     } catch (error) {
         if (error instanceof HandoffTooLargeError) {
-            return refuse(error.code, error.message);
+            return options.lenient ? OMITTED_HANDOFF : refuse(error.code, error.message);
+        }
+
+        throw error;
+    }
+};
+
+/** What a switch back to an agent with a saved session asks the computer to reattach, and what that session has missed. */
+interface NativePlan {
+    /** The turns since the agent left, as a delta handoff; empty when no other agent ran in between. */
+    catchUp: string;
+    nativeSessionId: string;
+}
+
+/**
+ * Whether the agent's last stay in the thread, ending at `lastSeen`, began with nothing it had still to be sent. A handoff
+ * (or a catch-up) rides in the agent's first prompt, so a stay that opened with one and was never sent it by the app
+ * has none of that conversation in its saved session, and reattaching it would leave it blind. A turn alone does not
+ * show it was sent: a prompt typed in the computer's own window is a turn that carried none, so the session records
+ * when a prompt of the app carried it (`handoffSentAt`). The stay's session is the newest of the agent's own that opened
+ * with its divider (a session is started just before the divider that asked for it).
+ */
+const receivedItsHandoff = async (
+    ctx: MutationCtx,
+    args: { agent: SwitchAgentRef; lastSeen: Doc<"messages">; sessions: ReadonlyArray<Session>; threadId: Id<"threads"> },
+) => {
+    const { agent, lastSeen, sessions, threadId } = args;
+    const arrival = await findDividerEntering(ctx, threadId, lastSeen, agentKeyOf(agent));
+
+    if (!arrival) {
+        // It opened the thread itself: nothing was due.
+        return true;
+    }
+
+    const due = arrival.part.mode === "native" ? arrival.part.catchUp : arrival.part.handoff;
+
+    if (!due) {
+        return true;
+    }
+
+    const stay = sessions.find(
+        (session) =>
+            agent.kind === "host" &&
+            session.deviceId === agent.hostId &&
+            session.agentKey === agent.agentKey &&
+            session.folderId === agent.folderId &&
+            session._creationTime <= arrival.row._creationTime,
+    );
+
+    return stay?.handoffSentAt !== undefined;
+};
+
+/**
+ * The reattach of a host-to-host switch (harness switch S4): the same agent, folder and computer as an earlier session of this
+ * thread that can load itself again. That session has seen the thread up to where the agent left and nothing after, so
+ * whatever another agent did since goes with the first prompt as a delta. Nothing to reattach to, or what it missed
+ * cannot be told (the divider it left through is gone, or the turns do not fit), is `undefined`: the switch hands the
+ * whole conversation over instead.
+ */
+const nativePlanFor = async (
+    ctx: MutationCtx,
+    args: { current: { agent: SwitchAgentRef }; leaf: Doc<"messages">; target: ResolvedTarget; thread: Doc<"threads">; to: SwitchAgentRef },
+): Promise<NativePlan | undefined> => {
+    const { current, leaf, target, thread, to } = args;
+
+    if (target.kind !== "host" || !isHostRunThread(thread)) {
+        return undefined;
+    }
+
+    const { page: earlier } = await ctx.db.acpSessions.findMany({ orderBy: [{ _creationTime: "desc" }], where: { threadId: thread._id } });
+    const saved = savedSessionFor(earlier, { agentKey: target.offer.agentKey, deviceId: target.device._id, folderId: target.offer.folderId });
+
+    if (saved?.nativeSessionId === undefined) {
+        return undefined;
+    }
+
+    // The agent's session just ended, with nobody else having run since: it has seen everything.
+    if (sameAgent(current.agent, to)) {
+        return (await receivedItsHandoff(ctx, { agent: to, lastSeen: leaf, sessions: earlier, threadId: thread._id }))
+            ? { catchUp: "", nativeSessionId: saved.nativeSessionId }
+            : undefined;
+    }
+
+    const departure = await findDividerLeaving(ctx, thread._id, leaf, agentKeyOf(to));
+
+    if (!departure) {
+        return undefined;
+    }
+
+    const lastSeenId = ctx.db.normalizeId("messages", departure.part.startMessageId);
+    const lastSeen = lastSeenId ? await ctx.db.get(lastSeenId) : null;
+
+    if (!lastSeen || !(await receivedItsHandoff(ctx, { agent: to, lastSeen, sessions: earlier, threadId: thread._id }))) {
+        return undefined;
+    }
+
+    const missed = await collectHandoffSource(ctx, thread._id, leaf, { stopAtId: departure.part.startMessageId });
+
+    if (missed.turns.length === 0) {
+        return { catchUp: "", nativeSessionId: saved.nativeSessionId };
+    }
+
+    try {
+        return { catchUp: composeTailHandoff(missed.turns, HOST_HANDOFF_MAX_BYTES, missed.omittedEarlier, "delta"), nativeSessionId: saved.nativeSessionId };
+    } catch (error) {
+        if (error instanceof HandoffTooLargeError) {
+            return undefined;
         }
 
         throw error;
@@ -384,9 +509,10 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         }
     }
 
-    const handoff = await handoffFor(ctx, thread, leaf, target);
+    const native = await nativePlanFor(ctx, { current, leaf, target, thread, to });
+    const handoff = await handoffFor(ctx, thread, leaf, target, { lenient: native !== undefined });
     const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
-    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, now, taintedBy, target, thread, to, userId: args.userId });
+    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, native, now, taintedBy, target, thread, to, userId: args.userId });
 
     if (!(await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
         // Another click took it between the check and here: this transaction's writes go with the throw.
@@ -415,6 +541,7 @@ interface WriteArgs {
     current: { agent: SwitchAgentRef; session?: Session };
     handoff: string;
     leaf: Doc<"messages">;
+    native: NativePlan | undefined;
     now: number;
     taintedBy: DeviceTaintSource[];
     target: ResolvedTarget;
@@ -429,6 +556,7 @@ const startOn = async (
     args: {
         clientId: string;
         device: Device;
+        nativeSessionId?: string;
         now: number;
         offer: Offer;
         /** The thread the click was made on, which keys the session id; the session itself opens in `threadId`. */
@@ -448,7 +576,15 @@ const startOn = async (
 
     const call = await openHostSession(
         ctx,
-        { device: args.device, hostSessionId, offer: args.offer, taintedBy: args.taintedBy, threadId: args.threadId, userId: args.userId },
+        {
+            device: args.device,
+            hostSessionId,
+            ...(args.nativeSessionId !== undefined && { nativeSessionId: args.nativeSessionId }),
+            offer: args.offer,
+            taintedBy: args.taintedBy,
+            threadId: args.threadId,
+            userId: args.userId,
+        },
         args.now,
     );
 
@@ -458,14 +594,24 @@ const startOn = async (
 };
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
-    const { current, handoff, leaf, now, taintedBy, target, thread, to, userId } = args;
-    const part = { from: current.agent, mode: "portable" as const, startMessageId: leaf._id, to, ...(handoff && { handoff }) };
+    const { current, handoff, leaf, native, now, taintedBy, target, thread, to, userId } = args;
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.
     if (target.kind === "host" && isHostRunThread(thread)) {
+        // The agent reattaches to its own session (`native`); the portable handoff is stored all the same, for the load that fails.
+        const part = {
+            ...(native?.catchUp && { catchUp: native.catchUp }),
+            from: current.agent,
+            mode: native ? ("native" as const) : ("portable" as const),
+            startMessageId: leaf._id,
+            to,
+            ...(handoff && { handoff }),
+        };
+
         await startOn(ctx, {
             clientId: args.clientId,
             device: target.device,
+            ...(native && { nativeSessionId: native.nativeSessionId }),
             now,
             offer: target.offer,
             sourceThreadId: thread._id,

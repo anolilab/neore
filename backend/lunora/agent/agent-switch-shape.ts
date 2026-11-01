@@ -8,7 +8,7 @@ import type { AgentSwitchPart } from "./agent-switch-validators";
 /** The `providerMetadata` key that marks a row as an agent switch. */
 export const AGENT_SWITCH_KEY = "neoreAgentSwitch";
 
-const SWITCH_MODES: ReadonlySet<unknown> = new Set(["delta", "full", "portable"]);
+const SWITCH_MODES: ReadonlySet<unknown> = new Set(["delta", "full", "native", "portable"]);
 
 const isSwitchMode = (value: unknown): value is AgentSwitchPart["mode"] => SWITCH_MODES.has(value);
 

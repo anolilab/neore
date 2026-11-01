@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import type { PermissionRequestEvent } from "./host-events";
-import { capPermissionRequest } from "./host-events";
+import { capPermissionRequest, capSessionInfo } from "./host-events";
+
+describe("capSessionInfo", () => {
+    const info = (nativeSessionId: string) => capSessionInfo({ agentKey: "claude", agentLabel: "Claude", folderId: "f", folderLabel: "d", nativeSessionId });
+
+    it("keeps an agent session id of 256 UTF-8 bytes, which is what the core accepts", () => {
+        const id = "é".repeat(128);
+
+        expect(info(id).nativeSessionId).toBe(id);
+    });
+
+    it("drops one longer in bytes even when short in characters, rather than cutting it into another id", () => {
+        expect(info("é".repeat(129))).not.toHaveProperty("nativeSessionId");
+        expect(info("x".repeat(257))).not.toHaveProperty("nativeSessionId");
+    });
+});
 
 const request = (fields: Partial<PermissionRequestEvent> = {}): PermissionRequestEvent => {
     return {
