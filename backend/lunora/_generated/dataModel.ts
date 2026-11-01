@@ -56,6 +56,7 @@ export interface Doc_acpSessions {
     lastEventAt?: number;
     nativeSessionId?: string;
     status: "starting" | "idle" | "busy" | "offline" | "ended";
+    taintedBy?: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     updatedAt: number;
     userId: string;
@@ -3004,6 +3005,7 @@ export interface Insert_acpSessions {
     lastEventAt?: number;
     nativeSessionId?: string;
     status: "starting" | "idle" | "busy" | "offline" | "ended";
+    taintedBy?: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
     updatedAt: number;
     userId: string;

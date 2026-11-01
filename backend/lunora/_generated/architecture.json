@@ -7813,6 +7813,20 @@
       "module": "acp"
     },
     {
+      "detail": "mutation",
+      "id": "function:acp_switch:commitHostSwitch",
+      "kind": "function",
+      "name": "acp.switch.commitHostSwitch",
+      "module": "acp"
+    },
+    {
+      "detail": "query",
+      "id": "function:acp_switch:isHostSwitchSource",
+      "kind": "function",
+      "name": "acp.switch.isHostSwitchSource",
+      "module": "acp"
+    },
+    {
       "detail": "action",
       "id": "function:acp_upload:finalizeHostUpload",
       "kind": "function",
@@ -18128,13 +18142,13 @@
     {
       "file": "acp/lib/sessions",
       "kind": "write",
-      "line": 25,
+      "line": 29,
       "reason": "\"touchSession\" is not a registered function"
     },
     {
       "file": "acp/lib/start-session",
       "kind": "write",
-      "line": 18,
+      "line": 28,
       "reason": "\"openHostSession\" is not a registered function"
     },
     {
@@ -18152,8 +18166,14 @@
     {
       "file": "acp/send",
       "kind": "call",
-      "line": 223,
+      "line": 227,
       "reason": "\"hostSendHttpAction\" is not a registered function"
+    },
+    {
+      "file": "acp/switch",
+      "kind": "write",
+      "line": 466,
+      "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
       "file": "acp/upload-http",
@@ -19004,7 +19024,7 @@
     {
       "file": "agent/thread-summary-taint",
       "kind": "read",
-      "line": 17,
+      "line": 19,
       "reason": "\"threadSummaryTaint\" is not a registered function"
     },
     {
@@ -19340,37 +19360,49 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 541,
+      "line": 556,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 559,
+      "line": 575,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 570,
+      "line": 576,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 589,
+      "line": 585,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 612,
+      "line": 596,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 615,
+      "reason": "\"runAgentSwitch\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 638,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 613,
+      "line": 639,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

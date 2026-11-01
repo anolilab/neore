@@ -21,6 +21,7 @@ export const acpSessions = sqliteTable("acpSessions", {
     lastEventAt: real("lastEventAt"),
     nativeSessionId: text("nativeSessionId"),
     status: text("status", { mode: "json" }).$type<"starting" | "idle" | "busy" | "offline" | "ended">().notNull(),
+    taintedBy: text("taintedBy", { mode: "json" }).$type<Array<"web" | "knowledge" | "mcp" | "device" | "files">>(),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),

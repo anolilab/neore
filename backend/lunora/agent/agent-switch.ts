@@ -15,7 +15,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
 import { childrenOf, getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import { findDividerLeaving, findPathHandoff, pathTokens } from "./handoff-source";
@@ -80,7 +80,9 @@ const findPathSwitchRows = async (context: Reader, threadId: Id<"threads">, from
 export const resolvePathAgent = async (context: Reader, thread: Doc<"threads">, from: Row | null): Promise<AgentRef | null> => {
     const found = thread.activeAgent ? await findPathSwitch(context, thread._id, from) : undefined;
 
-    if (found) {
+    // A host agent never runs a cloud thread's turns: a divider that names one (a thread that took over from a
+    // coding agent) is read for its model target only.
+    if (found?.to.kind === "model") {
         return found.to;
     }
 
@@ -121,7 +123,7 @@ const handoffBlocksAt = async (context: Reader, threadId: Id<"threads">, from: R
 /** What the target of the `delta` divider `part` saw when it left: the stand-in for the thread through its earlier divider, `[]` when it has none. */
 const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSwitchPart, depth: number): Promise<string[]> => {
     const start = await getThreadRow(context, threadId, part.startMessageId);
-    const earlier = start && (await findDividerLeaving(context, threadId, start, part.to.model));
+    const earlier = start && (await findDividerLeaving(context, threadId, start, agentKeyOf(part.to)));
 
     // The earlier divider's own handoff describes the thread up to the point the model left.
     return earlier ? await handoffBlocksAt(context, threadId, earlier.row, depth) : [];
@@ -332,8 +334,10 @@ export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threa
     }
 
     if (switches[0]) {
+        const { to } = switches[0].part;
+
         await patchThread(context.db, threadId, {
-            activeAgent: switches[0].part.to,
+            ...(to.kind === "model" && { activeAgent: to }),
             ...(switches.some(({ part }) => part.handoff) && { hasHandoff: true }),
         });
     }

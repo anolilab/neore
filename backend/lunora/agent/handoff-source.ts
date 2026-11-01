@@ -8,7 +8,7 @@ import type { ModelMessage } from "ai";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { walkPath } from "./branch-rows";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
@@ -64,6 +64,8 @@ const joinSameRole = (turns: HandoffTurn[]): HandoffTurn[] => {
 };
 
 export interface HandoffSource {
+    /** Who wrote the rows the turns came from: a computer is never handed text someone else wrote. */
+    authorIds: string[];
     /** Rows older than the ones read exist, so the summary does not cover the whole thread. */
     omittedEarlier: boolean;
     /** Newest first. */
@@ -82,6 +84,7 @@ export const collectHandoffSource = async (
 ): Promise<HandoffSource> => {
     const limit = (HANDOFF_BUDGET_TOKENS + HANDOFF_SUMMARY_INPUT_TOKENS) * CHARACTERS_PER_TOKEN;
     const turns: HandoffTurn[] = [];
+    const authorIds = new Set<string>();
     let characters = 0;
     let cursor: Row | null = leaf;
     let cutShort = false;
@@ -95,6 +98,10 @@ export const collectHandoffSource = async (
             if (turn) {
                 turns.push(turn);
                 characters += turn.text.length;
+
+                if (typeof row.userId === "string") {
+                    authorIds.add(row.userId);
+                }
             }
 
             // The limit is checked per row, not per page, so one page of large messages cannot overshoot it.
@@ -108,7 +115,11 @@ export const collectHandoffSource = async (
     }
 
     // The walk stops AT `stopAtId`, leaving it as `cursor`: not a row that was left unread.
-    return { omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId), turns: joinSameRole(turns) };
+    return {
+        authorIds: [...authorIds],
+        omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId),
+        turns: joinSameRole(turns),
+    };
 };
 
 /**
@@ -205,7 +216,7 @@ const findDivider = async (
 
 /** The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread through its `startMessageId`. */
 export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => part.from.model === model);
+    await findDivider(context, threadId, from, (part) => agentKeyOf(part.from) === model);
 
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>

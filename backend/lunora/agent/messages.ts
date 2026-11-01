@@ -34,7 +34,7 @@ import {
     vMessageWithMetadataInternal,
     vPaginationResult,
 } from "./validators";
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentSwitchOf, withoutSwitchIds } from "./agent-switch-logic";
 import { loadBranchTree, parentOf, resolveLeafRow } from "./branch-rows";
 import { BRANCH_ROOT, resolveActivePath, resolveBranchParent } from "./branch-tree";
 import { changeMessageFiles, changeRefcount } from "./files";
@@ -864,8 +864,9 @@ export const listMessagesByThreadId = query
         }
 
         const messages = await listMessagesByThreadIdHandler(ctx, args);
+        const isOwner = access.thread.userId === identity?.userId;
 
-        return { ...messages, page: (messages.page as unknown as Doc<"messages">[]).map((item) => publicMessage(item)) };
+        return { ...messages, page: (messages.page as unknown as Doc<"messages">[]).map((item) => publicMessage(isOwner ? item : withoutSwitchIds(item))) };
     });
 
 /**

@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { createAcpCall, type AcpCallResult } from "../../devices/lib/acp-call";
+import { type DeviceTaintSource, mergeTaint } from "../../devices/lib/taint";
 
 /**
  * Opens a session for a host thread on a computer that offered the (agent, folder) pair: the `starting` session row and
@@ -10,10 +11,19 @@ import { createAcpCall, type AcpCallResult } from "../../devices/lib/acp-call";
  */
 export const openHostSession = async (
     ctx: MutationCtx,
-    args: { device: Doc<"devices">; hostSessionId: string; offer: NonNullable<Doc<"devices">["acpOffers"]>[number]; threadId: Id<"threads">; userId: string },
+    args: {
+        device: Doc<"devices">;
+        hostSessionId: string;
+        offer: NonNullable<Doc<"devices">["acpOffers"]>[number];
+        /** What the agent is handed when it takes over, kept on the session for every prompt it is sent. */
+        taintedBy?: ReadonlyArray<DeviceTaintSource>;
+        threadId: Id<"threads">;
+        userId: string;
+    },
     now: number,
 ): Promise<AcpCallResult> => {
     const { device, hostSessionId, offer, threadId, userId } = args;
+    const taintedBy = mergeTaint(args.taintedBy);
 
     await ctx.db.insert("acpSessions", {
         agentKey: offer.agentKey,
@@ -24,6 +34,7 @@ export const openHostSession = async (
         folderLabel: offer.folderLabel,
         hostSessionId,
         status: "starting",
+        ...(taintedBy.length > 0 && { taintedBy }),
         threadId,
         updatedAt: now,
         userId,

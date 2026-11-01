@@ -116,6 +116,9 @@ export class AgentSession {
 
     private cancelTimer: ReturnType<typeof setTimeout> | undefined;
 
+    /** Until when a new prompt waits after a cancelled turn, so output the agent flushes late is not credited to it. */
+    private settleUntil = 0;
+
     private cancelRequested = false;
 
     private current: Turn | undefined;
@@ -240,9 +243,15 @@ export class AgentSession {
             this.observe((observer) => observer.turnReceived?.(this.id, turnId, prompt));
         }
 
-        if (this.status === "busy") {
+        // Right after a cancelled turn the agent may still flush that turn's output: a prompt waits out the pause.
+        if (this.status === "busy" || Date.now() < this.settleUntil) {
             this.queue.push({ prompt, turnId });
             this.options.onChange();
+
+            if (this.status !== "busy") {
+                this.status = "busy";
+                this.startNextAfter(sleep(this.settleUntil - Date.now()));
+            }
 
             return { position: this.queue.length, status: "queued" };
         }
@@ -451,7 +460,12 @@ export class AgentSession {
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
 
-        const settled = cancelled && this.queue.length > 0 ? sleep(this.options.cancelSettleMs ?? DEFAULT_CANCEL_SETTLE_MS) : undefined;
+        const settleMs = this.options.cancelSettleMs ?? DEFAULT_CANCEL_SETTLE_MS;
+
+        // Also covers a prompt that arrives after this one ended, when the queue was still empty (`send`).
+        this.settleUntil = cancelled ? Date.now() + settleMs : 0;
+
+        const settled = cancelled && this.queue.length > 0 ? sleep(settleMs) : undefined;
 
         if (delivered === undefined && settled === undefined) {
             this.startNext();

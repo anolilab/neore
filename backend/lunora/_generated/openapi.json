@@ -14940,12 +14940,26 @@
                           },
                           {
                             "properties": {
+                              "agentKey": {
+                                "type": "string"
+                              },
+                              "folderId": {
+                                "type": "string"
+                              },
+                              "hostId": {
+                                "description": "Id<\"devices\">",
+                                "type": "string",
+                                "x-lunora-table": "devices"
+                              },
                               "kind": {
                                 "const": "host",
                                 "type": "string"
                               }
                             },
                             "required": [
+                              "agentKey",
+                              "folderId",
+                              "hostId",
                               "kind"
                             ],
                             "type": "object"
@@ -14993,23 +15007,62 @@
                 "schema": {
                   "properties": {
                     "agent": {
-                      "properties": {
-                        "kind": {
-                          "const": "model",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "model",
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "model"
+                          ],
+                          "type": "object"
                         },
-                        "model": {
-                          "type": "string"
+                        {
+                          "properties": {
+                            "agentKey": {
+                              "type": "string"
+                            },
+                            "agentLabel": {
+                              "type": "string"
+                            },
+                            "folderId": {
+                              "type": "string"
+                            },
+                            "folderLabel": {
+                              "type": "string"
+                            },
+                            "hostId": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "host",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "agentKey",
+                            "agentLabel",
+                            "folderId",
+                            "folderLabel",
+                            "hostId",
+                            "kind"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "model"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     "coldStartCostly": {
                       "type": "boolean"
+                    },
+                    "forkedThreadId": {
+                      "type": "string"
                     },
                     "messageId": {
                       "anyOf": [

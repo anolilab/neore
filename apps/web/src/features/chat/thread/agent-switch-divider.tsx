@@ -1,17 +1,18 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { switchAgentName } from "@neore/backend/agent/agent-switch-shape";
 import type { AgentSwitchPart } from "@neore/backend/agent/agent-switch-validators";
 import type { FC } from "react";
 
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
-/** Where the thread's agent changed: a rule across the transcript naming the model it moved to. */
+/** Where the thread's agent changed: a rule across the transcript naming the model or coding agent it moved to. */
 const AgentSwitchDivider: FC<{ part: AgentSwitchPart }> = ({ part }) => {
     const { t } = useLingui();
     const models = useFeatureFlaggedModels();
     const nameOf = (model: string): string => models.find((candidate) => candidate.id === model)?.name ?? model;
-    const label = t`Switched from ${nameOf(part.from.model)} to ${nameOf(part.to.model)}`;
+    const label = t`Switched from ${switchAgentName(part.from, nameOf)} to ${switchAgentName(part.to, nameOf)}`;
     let note: string | null = null;
 
     if (part.mode !== "full") {

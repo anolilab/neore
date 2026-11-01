@@ -28,6 +28,7 @@ import { isWorkerThread } from "../sub-agents/worker-thread";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
+import { pendingHandoffOf } from "./lib/pending-handoff";
 import { queueHostTurn } from "./lib/send-turn";
 import { sessionOfThread } from "./lib/sessions";
 
@@ -125,7 +126,10 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "rate_limited" as const };
     }
 
-    const queued = await queueHostTurn(ctx, { session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
+    // The first prompt after a switch carries what the agent is taking over (plans/harness-switch.md, S3); the saved
+    // message is the user's own words alone. A prompt too long for the call with it is refused, never cut.
+    const handoff = await pendingHandoffOf(ctx, thread);
+    const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
 
     if ("error" in queued) {
         const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline" } as const;
