@@ -425,7 +425,7 @@ export const attachSkillTestDrive = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const thread = await ctx.db.get(args.threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
 
         // NOT_FOUND for someone else's thread too, so a probe learns nothing.
         // A locked chat takes no draft changes either: the lock answers as not found.

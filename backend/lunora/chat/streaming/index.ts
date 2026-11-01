@@ -104,7 +104,7 @@ export const getStreamBody = optionalAuthQuery
     .query(async ({ args: input, ctx }) => {
         // Decided on the stream's THREAD (which admits it), so the stream row is
         // found by its thread id first — row-level security hides it until then.
-        const threadId = await parentKeyOf(ctx, input.streamId, "threadId");
+        const threadId = await parentKeyOf(ctx, "persistentStreams", input.streamId, "threadId");
         const access = threadId ? await resolveThreadReadAccess(ctx, threadId as Id<"threads">, ctx.user?.userId, input.unlockProof) : null;
 
         if (!access) {
@@ -161,7 +161,7 @@ export const createStreamWithMessage = internalMutation
         // enqueueing the run — one more round trip before the client could
         // start streaming, and, on the one-at-a-time scheduler, able to land
         // AFTER a short run had already set the thread back to `active`.
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread) {
             await patchThread(context.db, thread._id, { status: "running", updatedAt: context.now });

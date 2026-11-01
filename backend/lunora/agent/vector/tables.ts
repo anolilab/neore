@@ -62,14 +62,29 @@ export const getVectorTableName = (dimension: VectorDimension) => `embeddings_${
  */
 export const getVectorIndexName = (dimension: VectorDimension) => `embeddings-${dimension}`;
 
-export const getVectorIdInfo = (context: QueryContext, id: VectorTableId) => {
+/**
+ * The `embeddings_*` table holding the row `id`, or `null` when none does. An id carries no table of its
+ * own (`db.normalizeId` only checks its shape), and `ctx.db` by-id calls take the table first, so it is found
+ * by reading each dimension's table in turn.
+ */
+export const findVectorTable = async (db: { get: (table: never, id: never) => Promise<unknown> }, id: string): Promise<VectorTableName | null> => {
     for (const dimension of VectorDimensions) {
         const tableName = getVectorTableName(dimension);
 
-        if (context.db.normalizeId(tableName, id)) {
-            return { dimension, tableName };
+        if ((await db.get(tableName as never, id as never)) !== null) {
+            return tableName;
         }
     }
 
-    throw new Error(`Unknown vector table id: ${id}`);
+    return null;
+};
+
+export const getVectorIdInfo = async (context: QueryContext, id: VectorTableId) => {
+    const tableName = await findVectorTable(context.db, id);
+
+    if (tableName === null) {
+        throw new Error(`Unknown vector table id: ${id}`);
+    }
+
+    return { dimension: Number(tableName.slice("embeddings_".length)) as VectorDimension, tableName };
 };

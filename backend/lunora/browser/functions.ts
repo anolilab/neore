@@ -77,6 +77,7 @@ export const updateSession = internalMutation
     })
     .mutation(async ({ args: { sessionId, ...updates }, ctx }) => {
         await ctx.db.patch(
+            "browserSessions",
             sessionId,
             withoutUndefined({
                 ...updates,
@@ -116,6 +117,7 @@ export const closeSession = internalMutation
     })
     .mutation(async ({ args: { errorMessage, sessionId, status }, ctx }) => {
         await ctx.db.patch(
+            "browserSessions",
             sessionId,
             withoutUndefined({
                 completedAt: ctx.now,
@@ -164,7 +166,7 @@ export const completePairing = internalMutation
         }
 
         // `undefined` removes a field here: the one-time code in particular.
-        await patchRow(ctx.db, extension, {
+        await patchRow(ctx.db, "browserExtensions", extension, {
             browserInfo,
             capabilities,
             extensionId,
@@ -196,13 +198,13 @@ export const revokeExtension = internalMutation
         userId: v.string(),
     })
     .mutation(async ({ args: { extensionDocId, userId }, ctx }) => {
-        const extension = await ctx.db.get(extensionDocId);
+        const extension = await ctx.db.get("browserExtensions", extensionDocId);
 
         if (!extension || extension.userId !== userId) {
             return { success: false };
         }
 
-        await ctx.db.patch(extensionDocId, {
+        await ctx.db.patch("browserExtensions", extensionDocId, {
             status: "revoked",
         });
 
@@ -220,7 +222,7 @@ export const extensionHeartbeat = internalMutation
             .first();
 
         if (extension && extension.status === "paired") {
-            await ctx.db.patch(extension._id, {
+            await ctx.db.patch("browserExtensions", extension._id, {
                 lastSeenAt: ctx.now,
             });
         }

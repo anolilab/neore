@@ -88,14 +88,14 @@ describe("searchMessages", () => {
                 const inactive = await message(branched, 1, prompt);
                 const active = await message(branched, 1, prompt);
 
-                await context.db.patch(branched, { activeLeafMessageId: active });
+                await context.db.patch("threads", branched, { activeLeafMessageId: active });
 
                 const abandoned = await thread({});
                 const abandonedPrompt = await message(abandoned, 0);
                 const abandonedReply = await message(abandoned, 1, abandonedPrompt);
                 const kept = await message(abandoned, 1, abandonedPrompt);
 
-                await context.db.patch(abandoned, { activeLeafMessageId: kept });
+                await context.db.patch("threads", abandoned, { activeLeafMessageId: kept });
 
                 const plain = await thread({});
                 const plainMessage = await message(plain, 0);
@@ -134,7 +134,7 @@ describe("searchMessages", () => {
 
                 const active = await message(thread, 1, prompt);
 
-                await context.db.patch(thread, { activeLeafMessageId: active });
+                await context.db.patch("threads", thread, { activeLeafMessageId: active });
 
                 return { active, inactive, prompt, thread };
             });

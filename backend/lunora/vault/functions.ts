@@ -105,7 +105,7 @@ export const applyFileMetadata = internalMutation
 
         // Only the uploader's own row: the key arrives from a client.
         if (row && row.userId === args.userId) {
-            await ctx.db.patch(row._id as Id<"files">, { size: args.size, type: args.type });
+            await ctx.db.patch("files", row._id as Id<"files">, { size: args.size, type: args.type });
         }
 
         return null;
@@ -192,13 +192,13 @@ export const markNsfwChecking = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: arguments_, ctx: context }) => {
-        const file = await context.db.get(arguments_.fileId as Id<"files">);
+        const file = await context.db.get("files", arguments_.fileId as Id<"files">);
 
         if (!file) {
             return null;
         }
 
-        await context.db.patch(arguments_.fileId, {
+        await context.db.patch("files", arguments_.fileId, {
             nsfwStatus: "checking",
         });
 
@@ -213,14 +213,14 @@ export const saveNsfwResult = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: arguments_, ctx: context }) => {
-        const file = await context.db.get(arguments_.fileId as Id<"files">);
+        const file = await context.db.get("files", arguments_.fileId as Id<"files">);
 
         if (!file) {
             return null;
         }
 
         // `v.any()` arguments can arrive undefined, which a patch refuses.
-        await context.db.patch(arguments_.fileId, {
+        await context.db.patch("files", arguments_.fileId, {
             ...withoutUndefined({ nsfwScores: arguments_.scores }),
             nsfwStatus: arguments_.isNsfw ? "blocked" : "safe",
         });
@@ -234,13 +234,13 @@ export const markNsfwFailed = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: arguments_, ctx: context }) => {
-        const file = await context.db.get(arguments_.fileId as Id<"files">);
+        const file = await context.db.get("files", arguments_.fileId as Id<"files">);
 
         if (!file) {
             return null;
         }
 
-        await context.db.patch(arguments_.fileId, {
+        await context.db.patch("files", arguments_.fileId, {
             nsfwStatus: "failed",
         });
 
@@ -294,7 +294,7 @@ export const internalSaveGenerated = internalMutation
 
         const safeName = sanitizeAndValidateFileName(arguments_.fileName);
 
-        await patchRow(context.db, existing, {
+        await patchRow(context.db, "files", existing, {
             chatId: arguments_.chatId,
             isGenerated: true,
             name: safeName,
@@ -365,7 +365,7 @@ export const getAttachment = authQuery
 
         // Looked up past row-level security and returned only if `hasFileAccess`
         // passes: a chat grantee's file is not visible until its chat is admitted.
-        const attachment = await systemDb(ctx).get(attachmentId as Id<"files">);
+        const attachment = await systemDb(ctx).get("files", attachmentId as Id<"files">);
 
         if (!attachment || !(await hasFileAccess(ctx, attachment, userId))) {
             throw new LunoraError("FORBIDDEN", "Not authorized to access this file");
@@ -568,7 +568,7 @@ export const deleteAttachments = authMutation
         // One at a time: `files` is audited, and parallel deletes of an audited table nest
         // its trigger past the recursion limit (see `lib/audit-triggers.ts`).
         for (const id of idsToDelete) {
-            await ctx.db.delete(id);
+            await ctx.db.delete("files", id);
         }
 
         ctx.log.event("vault.delete_attachments", { deleted: idsToDelete.length, requested: attachmentIds.length });
@@ -731,7 +731,7 @@ export const discardUnfiledVaultFile = internalMutation
     .input({ fileId: v.id("files"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.fileId);
+        const row = await ctx.db.get("files", args.fileId);
 
         if (!row || row.userId !== args.userId || row.chatId !== undefined || row.folderId !== undefined) {
             return null;
@@ -747,7 +747,7 @@ export const discardUnfiledVaultFile = internalMutation
         }
 
         await scheduleObjectDeletion(ctx, [row.key]);
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("files", row._id);
 
         return null;
     });

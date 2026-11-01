@@ -94,13 +94,13 @@ export const claimStreamRun = internalMutation
     .input({ streamId: v.id("persistentStreams") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const stream = await ctx.db.get(args.streamId);
+        const stream = await ctx.db.get("persistentStreams", args.streamId);
 
         if (!stream || !canClaimStreamRun(stream)) {
             return false;
         }
 
-        await ctx.db.patch(args.streamId, { runClaimedAt: ctx.now });
+        await ctx.db.patch("persistentStreams", args.streamId, { runClaimedAt: ctx.now });
 
         return true;
     });
@@ -175,7 +175,7 @@ export const addChunk = internalMutation
             // The run is over: a steer it never took keeps no text on the row (`withoutQueuedText`).
             const steers = args.final ? withoutQueuedText(stream.steers as SteerEntry[] | undefined) : undefined;
 
-            await ctx.db.patch(args.streamId, { status, ...(steers && { steers }) });
+            await ctx.db.patch("persistentStreams", args.streamId, { status, ...(steers && { steers }) });
         }
     });
 
@@ -200,7 +200,7 @@ export const setStreamStatus = internalMutation
         // Any status past the live ones ends the run: a steer it never took keeps no text on the row.
         const steers = args.status === "pending" || args.status === "streaming" ? undefined : withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-        await ctx.db.patch(args.streamId, {
+        await ctx.db.patch("persistentStreams", args.streamId, {
             status: args.status,
             ...(steers && { steers }),
         });
@@ -268,7 +268,7 @@ export const stopActiveForThread = internalMutation
 
             // Only a claimed run is still to settle the stop (`finishStoppedReply`); a queued one that has not started
             // never will (`claimStreamRun` refuses a `done` stream), so it leaves nothing for a switch to wait on.
-            await patchRow(ctx.db, stream, {
+            await patchRow(ctx.db, "persistentStreams", stream, {
                 status: "done",
                 ...(stream.runClaimedAt !== undefined && { stoppedAt: ctx.now }),
                 ...(steers && { steers }),
@@ -305,12 +305,12 @@ export const stopActiveForThread = internalMutation
  */
 const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
     const parent = await parentOf(ctx, threadId, pending);
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
 
     await deleteMessage(ctx, pending);
 
     if (thread?.activeLeafMessageId === pending._id) {
-        await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+        await patchRow(ctx.db, "threads", thread, { activeLeafMessageId: parent?._id });
 
         if (parent) {
             await syncActiveAgent(ctx, threadId, parent._id);
@@ -354,7 +354,7 @@ export const finishStoppedReply = internalMutation
 
         // The owed text is saved below, in this transaction, so the stop is settled when it commits.
         if (stream.stoppedAt !== undefined) {
-            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+            await patchRow(ctx.db, "persistentStreams", stream, { stoppedAt: undefined });
         }
 
         // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
@@ -427,7 +427,7 @@ export const settleStoppedRun = internalMutation
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
         if (stream?.stoppedAt !== undefined) {
-            await patchRow(ctx.db, stream, { stoppedAt: undefined });
+            await patchRow(ctx.db, "persistentStreams", stream, { stoppedAt: undefined });
         }
 
         return null;
@@ -439,7 +439,7 @@ export const getStreamStatus = internalQuery
     })
     .output(v.from(streamStatusValidator))
     .query(async ({ args, ctx }) => {
-        const stream = await ctx.db.get(args.streamId);
+        const stream = await ctx.db.get("persistentStreams", args.streamId);
 
         return (stream?.status ?? "error") as StreamStatus;
     });
@@ -489,7 +489,7 @@ export const getStreamText = internalQuery
         }),
     )
     .query(async ({ args, ctx }) => {
-        const stream = await ctx.db.get(args.streamId);
+        const stream = await ctx.db.get("persistentStreams", args.streamId);
 
         if (!stream) {
             throw new LunoraError("NOT_FOUND", "Stream not found");
@@ -769,7 +769,7 @@ const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">):
     // No run will take a follow-up typed during the pause: its text goes, as on every other end of a stream.
     const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
-    await patchRow(ctx.db, stream, { pausedRun: undefined, status: "done", ...(steers && { steers }) });
+    await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined, status: "done", ...(steers && { steers }) });
 
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: 2,
@@ -869,7 +869,12 @@ export const pauseRunForRateLimit = internalMutation
             status: args.status,
         };
 
-        await ctx.db.patch(stream._id, { expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS), pause, pausedRun, pausedSteps });
+        await ctx.db.patch("persistentStreams", stream._id, {
+            expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS),
+            pause,
+            pausedRun,
+            pausedSteps,
+        });
         // A moment after the provider's time, so the resume does not land just before the limit lifts.
         await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
 
@@ -914,7 +919,7 @@ export const claimRunResume = internalMutation
         }
 
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
-        await patchRow(ctx.db, stream, { expiresAt: ctx.now + STREAM_TTL_MS, pause: undefined });
+        await patchRow(ctx.db, "persistentStreams", stream, { expiresAt: ctx.now + STREAM_TTL_MS, pause: undefined });
 
         const done = stream.pausedRun;
 
@@ -959,7 +964,7 @@ export const retryPausedRunsNow = internalMutation
 
             const due = { ...pause, retryAt: ctx.now };
 
-            await ctx.db.patch(stream._id, { pause: due, ...(early && { earlySteps: [...(stream.earlySteps ?? []), pause.from] }) });
+            await ctx.db.patch("persistentStreams", stream._id, { pause: due, ...(early && { earlySteps: [...(stream.earlySteps ?? []), pause.from] }) });
             await enqueueRunResume(due, 0);
             resumed = true;
         }

@@ -102,7 +102,7 @@ const signedResult = async (deviceId: string, secret: string, callId: string, fi
     return { callId, deviceId, payload, signature: await signDevicePayload(secret, "result", payload) };
 };
 
-const readCall = async (callId: string) => await harness.run(async (ctx: any) => await ctx.db.get(callId));
+const readCall = async (callId: string) => await harness.run(async (ctx: any) => await ctx.db.get("deviceCalls", callId));
 
 let ownerId: string;
 
@@ -305,7 +305,7 @@ describe("a device's project scope in the GDPR export", () => {
         const offer = { agentKey: "claude", agentLabel: "Claude Code", folderId: "folder-1", folderLabel: "neore" };
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(deviceId, { acpOffers: [offer] });
+            await ctx.db.patch("devices", deviceId, { acpOffers: [offer] });
         });
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(gdpr.collectDevicesForExport, { userId: ownerId }))) as {
@@ -404,7 +404,7 @@ describe("a device's project scope", () => {
         const threadId = await insertThread(ownerId, { projectId: chosen });
 
         await setScope(ownerId, deviceId, [chosen]);
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { projectId: other }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { projectId: other }));
 
         expect(await offered(threadId)).toEqual([]);
         expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "ineligible" });
@@ -418,13 +418,13 @@ describe("a device's project scope", () => {
         const stale = await insertThread(ownerId, { projectId: doomed });
 
         await setScope(ownerId, deviceId, [kept, doomed]);
-        await harness.run(async (ctx: any) => await ctx.db.delete(doomed));
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", doomed));
 
         expect(await scopeOf()).toEqual([kept]);
         expect(await offered(stale)).toEqual([]);
         expect(await createCall({ deviceId, threadId: stale, userId: ownerId })).toEqual({ error: "ineligible" });
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(kept));
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", kept));
 
         expect(await scopeOf()).toEqual([]);
     });

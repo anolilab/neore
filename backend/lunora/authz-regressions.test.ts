@@ -305,7 +305,9 @@ describe("slides", () => {
             _id: presentationId,
         });
         await as(OWNER).mutation(procedureAt("chat_slides_functions", "updateSlide"), { htmlContent: "<p>edited</p>", slideId } as never);
-        expect(await run(async (context) => ((await context.db.get(slideId)) as { htmlContent: string }).htmlContent)).toBe("<p>edited</p>");
+        expect(await run(async (context) => ((await context.db.get("presentationSlides", slideId)) as { htmlContent: string }).htmlContent)).toBe(
+            "<p>edited</p>",
+        );
     });
 });
 
@@ -325,7 +327,7 @@ describe("chat import", () => {
             uploadId: "V1StGXR8_Z5jdHi6B-myT",
         } as never)) as { jobId: string };
 
-        expect(await run(async (context) => ((await context.db.get(jobId as never)) as { r2Key: string }).r2Key)).toBe(
+        expect(await run(async (context) => ((await context.db.get("chatImportJobs", jobId as never)) as { r2Key: string }).r2Key)).toBe(
             `uploads/${STRANGER}/V1StGXR8_Z5jdHi6B-myT`,
         );
     });
@@ -380,7 +382,7 @@ describe("projects and organizations", () => {
                 projectId: ownProject,
             } as never),
         ).rejects.toThrow();
-        expect(await run(async (context) => await context.db.get(ownProject))).not.toBeNull();
+        expect(await run(async (context) => await context.db.get("projects", ownProject))).not.toBeNull();
     });
 });
 
@@ -561,10 +563,10 @@ describe("vault", () => {
         );
 
         await as(STRANGER).mutation(procedureAt("vault_functions", "deleteAttachments"), { attachmentIds: [fileId] } as never);
-        expect(await run(async (context) => await context.db.get(fileId))).not.toBeNull();
+        expect(await run(async (context) => await context.db.get("files", fileId))).not.toBeNull();
 
         await as(OWNER).mutation(procedureAt("vault_functions", "deleteAttachments"), { attachmentIds: [fileId] } as never);
-        expect(await run(async (context) => await context.db.get(fileId))).toBeNull();
+        expect(await run(async (context) => await context.db.get("files", fileId))).toBeNull();
     });
 });
 
@@ -580,8 +582,8 @@ describe("crons", () => {
 
         await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
 
-        expect(await run(async (context) => await context.db.get(expired))).toBeNull();
-        expect(await run(async (context) => await context.db.get(live))).not.toBeNull();
+        expect(await run(async (context) => await context.db.get("threads", expired))).toBeNull();
+        expect(await run(async (context) => await context.db.get("threads", live))).not.toBeNull();
         expect(await run(async (context) => await context.db.query("temporaryThreads").collect())).toHaveLength(1);
     });
 
@@ -609,7 +611,7 @@ describe("crons", () => {
         await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
 
         // The chain is queued, so the thread and its marker stay. The marker is leased into the future.
-        expect(await run(async (context) => await context.db.get(threadId))).not.toBeNull();
+        expect(await run(async (context) => await context.db.get("threads", threadId))).not.toBeNull();
         const [leased] = await run(async (context) => await context.db.query("temporaryThreads").collect());
 
         expect(leased.expiresAt).toBeGreaterThan(Date.now());
@@ -631,7 +633,7 @@ describe("crons", () => {
             await run(async (context) => await context.runMutation(procedureAt("agent_threads", "deleteAllForThreadIdAsync"), args as never));
         }
 
-        expect(await run(async (context) => await context.db.get(threadId))).toBeNull();
+        expect(await run(async (context) => await context.db.get("threads", threadId))).toBeNull();
         expect(await run(async (context) => await context.db.query("temporaryThreads").collect())).toHaveLength(0);
     });
 
@@ -644,7 +646,7 @@ describe("crons", () => {
 
         await run(async (context) => await context.runMutation(procedureAt("agent_threads", "deleteAllForThreadIdAsync"), { threadId }));
 
-        expect(await run(async (context) => await context.db.get(threadId))).toBeNull();
+        expect(await run(async (context) => await context.db.get("threads", threadId))).toBeNull();
         expect(await run(async (context) => await context.db.query("temporaryThreads").collect())).toHaveLength(0);
     });
 });
@@ -756,7 +758,7 @@ describe("remaining low findings", () => {
 
         await as(OWNER).mutation(procedureAt("chat_functions", "updateThreadVisibility"), { isPublic: true, publicAccessToken: "chosen", threadId } as never);
 
-        const token = await run(async (context) => ((await context.db.get(threadId)) as { publicAccessToken?: string }).publicAccessToken);
+        const token = await run(async (context) => ((await context.db.get("threads", threadId)) as { publicAccessToken?: string }).publicAccessToken);
 
         expect(token).toMatch(UUID_SHAPE);
     });
@@ -842,7 +844,7 @@ describe("stored media survives the owner's legitimate copies", () => {
                 .withIndex("by_userId", (q: any) => q.eq("userId", userId))
                 .collect();
 
-            const files = await Promise.all(grants.map(async (grant: { fileId: string }) => await context.db.get(grant.fileId)));
+            const files = await Promise.all(grants.map(async (grant: { fileId: string }) => await context.db.get("chatFiles", grant.fileId)));
 
             return files.map((file: { storageId: string }) => file.storageId);
         });
@@ -933,7 +935,7 @@ describe("stored media survives the owner's legitimate copies", () => {
         const { projectId } = (await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never)) as {
             projectId: string;
         };
-        const forked = await run(async (context) => await context.db.get(projectId));
+        const forked = await run(async (context) => await context.db.get("projects", projectId));
 
         expect(forked.workflowContent.nodes[0].data).toEqual({ imageUrl: toStorageRef(MINE), maskUrl: "" });
         expect(await grantsOf(STRANGER)).toEqual([MINE]);
@@ -1007,8 +1009,8 @@ describe("stored media survives the owner's legitimate copies", () => {
                     .query("files")
                     .withIndex("by_user_and_folder", (q: any) => q.eq("userId", STRANGER))
                     .collect(),
-                forked: await context.db.get(projectId),
-                source: await context.db.get(sourceProjectId),
+                forked: await context.db.get("projects", projectId),
+                source: await context.db.get("projects", sourceProjectId),
             };
         });
 
@@ -1038,7 +1040,7 @@ describe("stored media survives the owner's legitimate copies", () => {
         const fork = async () =>
             ((await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never)) as { projectId: string }).projectId;
         const countOf = async () => {
-            const project = await run(async (context) => await context.db.get(sourceProjectId));
+            const project = await run(async (context) => await context.db.get("projects", sourceProjectId));
 
             return project.galleryForkCount;
         };
@@ -1048,7 +1050,7 @@ describe("stored media survives the owner's legitimate copies", () => {
         await fork();
         expect(await countOf()).toBe(2);
 
-        await run(async (context) => await context.db.delete(first as never));
+        await run(async (context) => await context.db.delete("projects", first as never));
         await fork();
         expect(await countOf()).toBe(2);
     });
@@ -1074,7 +1076,7 @@ describe("assistant reply edits run through row-level security", () => {
             async (context) => await context.db.insert("embeddings_1536", { model: "m", table: "messages", threadId, userId: OWNER, vector: [] }),
         );
 
-        await run(async (context) => await context.db.patch(replyId, { embeddingId: vectorId }));
+        await run(async (context) => await context.db.patch("messages", replyId, { embeddingId: vectorId }));
 
         await expect(
             as(STRANGER).mutation(procedureAt("agent_branches", "editAssistantReply"), { messageId: replyId, text: "hijack", threadId } as never),
@@ -1082,10 +1084,10 @@ describe("assistant reply edits run through row-level security", () => {
 
         await as(OWNER).mutation(procedureAt("agent_branches", "editAssistantReply"), { messageId: replyId, text: "new", threadId } as never);
 
-        const reply = await run(async (context) => await context.db.get(replyId));
+        const reply = await run(async (context) => await context.db.get("messages", replyId));
 
         expect(reply).toMatchObject({ message: { content: [{ text: "new", type: "text" }] }, text: "new" });
         expect(reply.embeddingId).toBeUndefined();
-        expect(await run(async (context) => await context.db.get(vectorId))).toBeNull();
+        expect(await run(async (context) => await context.db.get("embeddings_1536", vectorId))).toBeNull();
     });
 });

@@ -72,7 +72,12 @@ export const deleteBillingRows = internalMutation
         ]);
         const pages = [subscriptions.page, sessions.page, customers.page, usageEvents.page];
 
-        await Promise.all(pages.flat().map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all([
+            ...subscriptions.page.map(async (row) => await ctx.db.delete("payment_subscriptions", row._id)),
+            ...sessions.page.map(async (row) => await ctx.db.delete("payment_sessions", row._id)),
+            ...customers.page.map(async (row) => await ctx.db.delete("payment_customers", row._id)),
+            ...usageEvents.page.map(async (row) => await ctx.db.delete("payment_usageEvents", row._id)),
+        ]);
 
         return { hasMore: pages.some((page) => page.length >= BATCH) };
     });

@@ -106,7 +106,7 @@ describe("getChunksAfter pendingRequest", () => {
         await harness.run(async (context: any) => {
             const row = await context.db.toolApprovalRuns.findFirst({ where: { approvalId: "ap1" } });
 
-            await context.db.patch(row._id, { createdAt: Date.now() + 1, status: "approved" });
+            await context.db.patch("toolApprovalRuns", row._id, { createdAt: Date.now() + 1, status: "approved" });
         });
 
         expect(await read(true)).not.toHaveProperty("pendingRequest");

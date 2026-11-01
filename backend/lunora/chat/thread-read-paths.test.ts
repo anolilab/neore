@@ -211,7 +211,7 @@ describe("the owner's thread state on the reads a grantee reaches", () => {
 
     const withState = async (harness: ReturnType<typeof lunoraTest>, threadId: string) =>
         await harness.run(async (context: any) => {
-            await context.db.patch(threadId, OWNER_STATE);
+            await context.db.patch("threads", threadId, OWNER_STATE);
 
             return await context.db.insert("persistentStreams", {
                 expiresAt: Date.now() + 60_000,

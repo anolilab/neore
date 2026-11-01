@@ -52,7 +52,7 @@ export const failImportStart = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        const job = await context.db.get(args.jobId);
+        const job = await context.db.get("chatImportJobs", args.jobId);
 
         // Only the run that failed to start may act on the job: a stale start must not touch a newer run.
         if (!job || job.runId !== args.runId) {
@@ -64,13 +64,14 @@ export const failImportStart = internalMutation
 
         // Cancelled before its workflow could start: nothing will finalize the job, so the file it holds goes now.
         if (job.status !== "processing") {
-            await context.db.patch(args.jobId, { r2Key: "" });
+            await context.db.patch("chatImportJobs", args.jobId, { r2Key: "" });
             await scheduleObjectDeletion(context, [restart ? keptKey : args.r2Key]);
 
             return null;
         }
 
         await context.db.patch(
+            "chatImportJobs",
             args.jobId,
             withoutUndefined({
                 completedAt: context.now,

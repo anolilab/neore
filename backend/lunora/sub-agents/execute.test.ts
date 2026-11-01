@@ -133,7 +133,7 @@ describe("a worker's runs", () => {
     it("runs on the worker thread's model, not the lead's", async () => {
         const first = await dispatch({ model: "anthropic/claude-sonnet-4", parentModel: "anthropic/claude-sonnet-4.5", toolCallId: "call-1" });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.childThreadId, { model: "anthropic/claude-sonnet-4.5" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.childThreadId, { model: "anthropic/claude-sonnet-4.5" }));
         await execute(first._id);
 
         expect(runs[0]!.model).toBe("anthropic/claude-sonnet-4.5");

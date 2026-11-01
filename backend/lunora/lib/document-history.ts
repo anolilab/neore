@@ -109,7 +109,7 @@ export const vacuumHistory = internalMutation
         const { page: stale } = await ctx.db.documentHistory.findMany({ limit: HISTORY_PAGE, where: { ts: { lt: args.minTsToKeep } } });
 
         for (const entry of stale) {
-            await ctx.db.delete(entry._id);
+            await ctx.db.delete("documentHistory", entry._id);
         }
 
         return stale.length;

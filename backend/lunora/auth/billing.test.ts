@@ -156,7 +156,7 @@ describe("setOrganizationBillingTier", () => {
 
     it("answers NOT_FOUND for an organization that does not exist", async () => {
         await seed(async (db) => {
-            await db.delete(otherOrgId);
+            await db.delete("organization", otherOrgId);
         });
 
         await expect(as(PLATFORM_ADMIN).mutation(setOrganizationBillingTier as never, args(otherOrgId) as never)).rejects.toMatchObject({ code: "NOT_FOUND" });

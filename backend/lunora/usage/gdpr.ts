@@ -12,8 +12,12 @@ import { BATCH, full, type BatchResult } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
 
 /** Deletes a usage row that may already be gone (a retried round, or a dangling id). */
-const deleteQuietly = async (ctx: MutationCtx, id: Id<"usageDaily"> | Id<"usageReplies"> | Id<"usageBackfill">, what: string): Promise<void> => {
-    await ctx.db.delete(id).catch((error: unknown) => {
+const deleteQuietly = async (
+    ctx: MutationCtx,
+    id: Id<"usageDaily"> | Id<"usageReplies"> | Id<"usageBackfill">,
+    what: "usageBackfill" | "usageDaily" | "usageReplies",
+): Promise<void> => {
+    await ctx.db.delete(what, id as Id<"usageDaily">).catch((error: unknown) => {
         gdprLogger.error(`Failed to delete ${what} ${id}:`, error);
     });
 };
@@ -60,7 +64,7 @@ export const pruneUsageDaysBefore = async (ctx: MutationCtx, cutoffDate: string,
         where: { date: { lt: cutoffDate } },
     });
 
-    await Promise.all(days.map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all(days.map(async (row) => await ctx.db.delete("usageDaily", row._id)));
 
     return days.length;
 };

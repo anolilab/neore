@@ -120,19 +120,31 @@ export const deleteUserPages = internalMutation
                 const replies = pageComments.filter((reply) => reply.parentId === comment._id);
 
                 for (const reply of replies) {
-                    await ctx.db.delete(reply._id);
+                    await ctx.db.delete("pageComments", reply._id);
                 }
             }
 
-            await ctx.db.delete(comment._id).catch(() => undefined);
+            await ctx.db.delete("pageComments", comment._id).catch(() => undefined);
         }
 
-        for (const row of [...grants, ...presence, ...invites, ...favorites]) {
-            await ctx.db.delete(row._id);
+        for (const row of grants) {
+            await ctx.db.delete("pageAccess", row._id);
+        }
+
+        for (const row of presence) {
+            await ctx.db.delete("pagePresence", row._id);
+        }
+
+        for (const row of invites) {
+            await ctx.db.delete("pageInvites", row._id);
+        }
+
+        for (const row of favorites) {
+            await ctx.db.delete("pageFavorites", row._id);
         }
 
         for (const version of authored) {
-            await ctx.db.patch(version._id, { userId: DELETED_USER_MARKER });
+            await ctx.db.patch("pageVersions", version._id, { userId: DELETED_USER_MARKER });
         }
 
         return { hasMore: owned.length >= PAGES_PER_CALL || [comments, grants, presence, invites, authored, favorites].some((rows) => rows.length >= BATCH) };

@@ -273,7 +273,14 @@ const chunkTexts = async (streamId: string): Promise<string[]> => {
     return chunks.map((chunk) => chunk.text);
 };
 
-const row = async (id: string) => (await harness.run(async (ctx: any) => await ctx.db.get(id))) as Record<string, any> | null;
+const row = async (id: string) =>
+    (await harness.run(
+        async (ctx: any) =>
+            (await ctx.db.get("threads", id as never)) ??
+            (await ctx.db.get("acpSessions", id as never)) ??
+            (await ctx.db.get("chatFiles", id as never)) ??
+            (await ctx.db.get("devices", id as never)),
+    )) as Record<string, any> | null;
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -724,7 +731,7 @@ describe("importing an agent's saved session", () => {
         const device = await pair(ownerId);
         const first = await importSession(device, TURNS);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { deleted: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.threadId, { deleted: true }));
 
         // Undo must still find the session: nothing is deleted and no second thread is made.
         const second = await importSession(device, TURNS);
@@ -735,7 +742,7 @@ describe("importing an agent's saved session", () => {
 
         await harness.run(async (ctx: any) => {
             await ctx.runMutation(deleteSessionsOfThread, { threadId: first.threadId });
-            await ctx.db.delete(first.threadId);
+            await ctx.db.delete("threads", first.threadId);
         });
         expect(await sessionRows()).toHaveLength(0);
 
@@ -745,7 +752,7 @@ describe("importing an agent's saved session", () => {
         await expect(transcriptOf(third.threadId)).resolves.toHaveLength(4);
 
         // A session left behind by anything else than a delete is replaced all the same.
-        await harness.run(async (ctx: any) => await ctx.db.delete(third.threadId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", third.threadId));
 
         const fourth = await importSession(device, TURNS);
 
@@ -756,7 +763,7 @@ describe("importing an agent's saved session", () => {
         const device = await pair(ownerId);
         const first = await importSession(device, TURNS);
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(first.threadId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", first.threadId));
 
         const second = await importSession(device, TURNS);
 
@@ -770,7 +777,7 @@ describe("importing an agent's saved session", () => {
         const { json } = await ingest(device, { events: [IMPORT_OPEN], sessionId });
 
         await ingest(device, { events: [IMPORT_TURN("fix the bug", "Done.")], firstSeq: 0, sessionId, threadId: json.threadId });
-        await harness.run(async (ctx: any) => await ctx.db.patch(json.threadId, { deleted: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", json.threadId, { deleted: true }));
         await expect(
             ingest(device, { events: [IMPORT_TURN("and the tests", "Tests too."), IMPORT_END], firstSeq: 1, sessionId, threadId: json.threadId }),
         ).resolves.toMatchObject({
@@ -868,7 +875,7 @@ describe("importing an agent's saved session", () => {
         await harness.run(async (ctx: any) => {
             const { page } = await ctx.db.acpSessions.findMany({});
 
-            await ctx.db.patch(page[0]._id, { importedTurns: MAX_IMPORT_TURNS - 1 });
+            await ctx.db.patch("acpSessions", page[0]._id, { importedTurns: MAX_IMPORT_TURNS - 1 });
         });
 
         await expect(
@@ -1054,7 +1061,7 @@ describe("a host turn", () => {
         const threadId = await openSession(device);
 
         await turn(device, threadId, "t1", 0, [START("hello"), TEXT("half")]);
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
         await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished" }]);
 
         const saved = await messagesOf(threadId);
@@ -1287,7 +1294,7 @@ const expire = async (turnId: string, at: number) =>
     await harness.run(async (ctx: any) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: turnId } });
 
-        await ctx.db.patch(stream._id, { expiresAt: at });
+        await ctx.db.patch("persistentStreams", stream._id, { expiresAt: at });
     });
 
 const reap = async () => await harness.run(async (ctx: any) => await ctx.runMutation(reapHostStreams, {}));
@@ -1332,7 +1339,7 @@ describe("the reaper", () => {
         await harness.run(async (ctx: any) => {
             const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: "t1" } });
 
-            await ctx.db.delete(stream.messageId);
+            await ctx.db.delete("messages", stream.messageId);
         });
         await expire("t1", Date.now() - 1000);
         await reap();
@@ -1442,7 +1449,7 @@ describe("the reaper", () => {
 
         // Not for ever: a turn older than the cap is timed out whatever it waits on.
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(stream?._id, { expiresAt: Date.now() - 1000 });
+            await ctx.db.patch("persistentStreams", stream?._id, { expiresAt: Date.now() - 1000 });
         });
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(Date.now() + HOST_TURN_MAX_MS + 1000);
@@ -1538,7 +1545,7 @@ describe("device routes", () => {
         await harness.run(async (ctx: any) => {
             const route = await ctx.db.shardRoutes.findFirst({ where: { key: `device:${device.deviceId}` } });
 
-            await ctx.db.delete(route._id);
+            await ctx.db.delete("shardRoutes", route._id);
         });
         expect(await routeOf(device.deviceId)).toBeNull();
 
@@ -1571,7 +1578,7 @@ describe("acp calls", () => {
 
         // 30 s old: past a device tool's 20 s window, inside an acp call's 60 s.
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(call?._id, { createdAt: Date.now() - 30_000 });
+            await ctx.db.patch("deviceCalls", call?._id, { createdAt: Date.now() - 30_000 });
         });
         await expect(as(ownerId).mutation(devices.claimDeviceCall as never, { callId: call?._id, deviceId: device.deviceId } as never)).resolves.toEqual({
             claimed: true,

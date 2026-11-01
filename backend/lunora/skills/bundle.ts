@@ -327,8 +327,8 @@ export const loadBundleSources = internalQuery
             throw new LunoraError("NOT_FOUND", "One of the items to export was not found");
         };
         const skills = await Promise.all(args.skillIds.map(async (skillId) => await ctx.db.skills.findFirst({ where: { _id: skillId } })));
-        const triggers = await Promise.all(args.triggerIds.map(async (triggerId) => await ctx.db.get(triggerId)));
-        const threads = await Promise.all(args.groupChatIds.map(async (threadId) => await ctx.db.get(threadId)));
+        const triggers = await Promise.all(args.triggerIds.map(async (triggerId) => await ctx.db.get("triggers", triggerId)));
+        const threads = await Promise.all(args.groupChatIds.map(async (threadId) => await ctx.db.get("threads", threadId)));
 
         return {
             groupChats: threads.map((thread) => {
@@ -540,11 +540,11 @@ export const removeImportedItem = internalMutation
                     .withIndex("by_skill_version", (q) => q.eq("skillId", skill._id))
                     .collect();
 
-                await Promise.all(history.map(async (row) => await ctx.db.delete(row._id)));
+                await Promise.all(history.map(async (row) => await ctx.db.delete("skillHistory", row._id)));
                 await deleteSkillRows(ctx, skill._id, userId);
             }
         } else if (kind === "trigger") {
-            const trigger = await ctx.db.get(id as Id<"triggers">);
+            const trigger = await ctx.db.get("triggers", id as Id<"triggers">);
 
             if (trigger && trigger.userId !== userId) {
                 return forbidden();
@@ -554,7 +554,7 @@ export const removeImportedItem = internalMutation
                 await deleteTriggerRows(ctx, trigger._id);
             }
         } else {
-            const thread = await ctx.db.get(id as Id<"threads">);
+            const thread = await ctx.db.get("threads", id as Id<"threads">);
 
             if (thread && (thread.userId !== userId || !thread.groupChat)) {
                 return forbidden();

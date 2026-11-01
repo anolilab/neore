@@ -68,7 +68,7 @@ export const listThreadItem = (thread: Doc<"threads">): ThreadDoc =>
     isThreadLocked(thread) ? (toLockedThreadStub(publicThread(thread)) as unknown as ThreadDoc) : publicThread(thread);
 
 /** The full row, unchecked — shared by both procedures below, which differ only in who may see it. */
-const getThreadRow = async (ctx: QueryContext, threadId: Id<"threads">) => await ctx.db.get(threadId);
+const getThreadRow = async (ctx: QueryContext, threadId: Id<"threads">) => await ctx.db.get("threads", threadId);
 
 /**
  * Server-side twin of `getThread`: the FULL row, no caller check.
@@ -220,7 +220,7 @@ export const createThread = internalMutation
             status: "active",
         });
         const threadId = insertedId as Id<"threads">;
-        const thread = (await ctx.db.get(threadId))!;
+        const thread = (await ctx.db.get("threads", threadId))!;
 
         // Insert into aggregates if applicable
         return publicThread(thread);
@@ -268,18 +268,18 @@ export const updateThread = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
         // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
         if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
-            await patchRow(ctx.db, oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
+            await patchRow(ctx.db, "threads", oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
         } else {
-            await ctx.db.patch(args.threadId, withoutUndefined(args.patch));
+            await ctx.db.patch("threads", args.threadId, withoutUndefined(args.patch));
         }
 
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Update aggregates
         // Handle thread orders aggregate
@@ -328,7 +328,7 @@ export const searchThreadTitles = query
 
 /** The archive write itself, shared by manual archive and the auto-archive sweep (`auto-archive.ts`). */
 export const markThreadArchived = async (context: MutationContext, threadId: Id<"threads">): Promise<void> => {
-    await context.db.patch(threadId, {
+    await context.db.patch("threads", threadId, {
         status: "archived",
         updatedAt: context.now,
     });
@@ -338,11 +338,11 @@ export const archiveThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
         await markThreadArchived(ctx, args.threadId);
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Update aggregate - status changed
         return publicThread(newThread);
@@ -352,14 +352,14 @@ export const unarchiveThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
+        await ctx.db.patch("threads", args.threadId, {
             status: "active",
             updatedAt: ctx.now,
         });
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(newThread);
     });
@@ -453,13 +453,13 @@ export const deleteAllForThreadIdAsync = internalMutation
                 .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
                 .collect();
 
-            await Promise.all(markers.map((marker) => ctx.db.delete(marker._id)));
+            await Promise.all(markers.map((marker) => ctx.db.delete("temporaryThreads", marker._id)));
 
             // The passcode row of a deleted locked chat goes with it (the hash has no other use).
             const passcode = await readPasscodeRow(ctx.db, args.threadId);
 
             if (passcode) {
-                await ctx.db.delete(passcode._id);
+                await ctx.db.delete("threadPasscodes", passcode._id);
             }
 
             await deleteThreadSummaries(ctx, args.threadId);
@@ -481,7 +481,7 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     // A coding agent's live turn and session end before the first page of messages goes: the ingest keeps taking
     // posts into the thread until the session is ended, and a paged delete leaves it standing for several calls.
     if (args.cursor === undefined) {
-        const host = await context.db.get(args.threadId);
+        const host = await context.db.get("threads", args.threadId);
 
         if (host) {
             await endHostThread(context, host, context.now);
@@ -524,14 +524,14 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         // Here, not above the link batches: this page re-runs once per batch of links.
         await dropQueuedSteersForThread(context, args.threadId);
 
-        const thread = await context.db.get(args.threadId);
+        const thread = await context.db.get("threads", args.threadId);
 
         if (thread) {
             // The pull requests it was attached to or opened name it; a link to a deleted thread is a dead one.
             await deletePullRequestLinksOfThread(context, thread.userId, args.threadId);
 
             // Remove from aggregates before deleting
-            await context.db.delete(args.threadId);
+            await context.db.delete("threads", args.threadId);
         }
 
         // The temporary-chat marker goes with the thread on EVERY delete path.
@@ -543,7 +543,7 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
             .collect();
 
-        await Promise.all(markers.map((marker) => context.db.delete(marker._id)));
+        await Promise.all(markers.map((marker) => context.db.delete("temporaryThreads", marker._id)));
     }
 
     return {
@@ -557,14 +557,14 @@ export const pinThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
+        await ctx.db.patch("threads", args.threadId, {
             pinnedAt: ctx.now,
             updatedAt: ctx.now,
         });
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(newThread);
     });
@@ -573,14 +573,14 @@ export const unpinThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await patchRow(ctx.db, oldThread, {
+        await patchRow(ctx.db, "threads", oldThread, {
             pinnedAt: undefined,
             updatedAt: ctx.now,
         });
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(newThread);
     });
@@ -631,14 +631,14 @@ export const updateThreadOrder = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
+        await ctx.db.patch("threads", args.threadId, {
             order: args.order,
             updatedAt: ctx.now,
         });
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Update thread counts aggregate
         // Update thread orders aggregate
@@ -695,7 +695,7 @@ export const updateThreadVisibility = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
 
@@ -707,12 +707,12 @@ export const updateThreadVisibility = internalMutation
 
         // An absent token REMOVES the stored one — making a thread private must
         // revoke its old link, not leave it valid.
-        await patchRow(ctx.db, thread, {
+        await patchRow(ctx.db, "threads", thread, {
             isPublic: args.isPublic,
             publicAccessToken: args.publicAccessToken,
             updatedAt: ctx.now,
         });
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(newThread);
     });
@@ -741,10 +741,10 @@ export const softDeleteThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
+        await ctx.db.patch("threads", args.threadId, {
             deleted: true,
             deletedAt: ctx.now,
             updatedAt: ctx.now,
@@ -752,7 +752,7 @@ export const softDeleteThread = internalMutation
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Remove from aggregates when soft deleted
         return publicThread(newThread);
@@ -762,10 +762,10 @@ export const restoreThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const oldThread = await ctx.db.get(args.threadId);
+        const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await patchRow(ctx.db, oldThread, {
+        await patchRow(ctx.db, "threads", oldThread, {
             deleted: false,
             deletedAt: undefined,
             updatedAt: ctx.now,
@@ -776,7 +776,7 @@ export const restoreThread = internalMutation
             await restoreHostThread(ctx, oldThread, ctx.now);
         }
 
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Re-add to aggregates when restored
         return publicThread(newThread);
@@ -799,7 +799,7 @@ export const updateThreadSettings = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
 
@@ -812,9 +812,9 @@ export const updateThreadSettings = internalMutation
         // mentioned — a partial update that silently is not partial.
         const patch = Object.fromEntries(Object.entries(args.patch).filter(([, value]) => value !== undefined));
 
-        await ctx.db.patch(args.threadId, { ...patch, updatedAt: ctx.now });
+        await ctx.db.patch("threads", args.threadId, { ...patch, updatedAt: ctx.now });
 
-        const newThread = (await ctx.db.get(args.threadId))!;
+        const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(newThread);
     });
@@ -834,7 +834,7 @@ export const createThreadRelationship = internalMutation
         let { userId } = args;
 
         if (!userId) {
-            const thread = await ctx.db.get(args.threadId);
+            const thread = await ctx.db.get("threads", args.threadId);
 
             userId = thread?.userId ?? undefined;
         }
@@ -875,7 +875,7 @@ export const getThreadRelationship = query
             return null;
         }
 
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.userId !== identity.userId) {
             return null;
@@ -912,7 +912,7 @@ export const getChildThreads = query
             return [];
         }
 
-        const thread = await ctx.db.get(args.parentThreadId);
+        const thread = await ctx.db.get("threads", args.parentThreadId);
 
         if (!thread || thread.userId !== identity.userId) {
             return [];
@@ -936,7 +936,7 @@ export const deleteThreadRelationship = internalMutation
             .unique();
 
         if (relationship) {
-            await ctx.db.delete(relationship._id);
+            await ctx.db.delete("threadRelationships", relationship._id);
         }
 
         return null;
@@ -1205,7 +1205,7 @@ export const createTemporaryThread = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         await ctx.db.insert("temporaryThreads", {
             expiresAt: args.expiresAt,
@@ -1216,7 +1216,7 @@ export const createTemporaryThread = internalMutation
 
         // Denormalize isTemporary onto thread for efficient filtering
         if (thread) {
-            await ctx.db.patch(args.threadId, { isTemporary: true });
+            await ctx.db.patch("threads", args.threadId, { isTemporary: true });
         }
 
         return null;
@@ -1249,13 +1249,13 @@ export const getTemporaryThreads = query
         const nonExpiredRecords = allTemporaryThreadRecords.page.filter((record) => record.expiresAt > now);
 
         const threadIds = nonExpiredRecords.map((r) => r.threadId as Id<"threads">);
-        const threadsForFilter = await Promise.all(threadIds.map((id) => ctx.db.get(id)));
+        const threadsForFilter = await Promise.all(threadIds.map((id) => ctx.db.get("threads", id)));
         const userThreadIds = new Set(
             threadsForFilter.filter((t): t is Doc<"threads"> => t !== null && (t as Doc<"threads">).userId === scopedUserId).map((t) => t._id),
         );
         const filteredRecords = nonExpiredRecords.filter((r) => userThreadIds.has(r.threadId));
 
-        const threads = await Promise.all(filteredRecords.map((record) => ctx.db.get(record.threadId as Id<"threads">)));
+        const threads = await Promise.all(filteredRecords.map((record) => ctx.db.get("threads", record.threadId as Id<"threads">)));
         const validThreads = threads.filter((t): t is Doc<"threads"> => t !== null && !(t as Doc<"threads">).deleted);
 
         return {
@@ -1287,7 +1287,7 @@ export const getTemporaryThread = query
 
         // Ownership check: only the thread owner sees the expiration row.
         // Otherwise expiresAt becomes a side-channel oracle for any thread id.
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.userId !== identity.userId) {
             return null;
@@ -1319,6 +1319,7 @@ export const updateTemporaryThread = internalMutation
         }
 
         await ctx.db.patch(
+            "temporaryThreads",
             temporaryThread._id,
             withoutUndefined({
                 expiresAt: args.expiresAt,
@@ -1346,7 +1347,7 @@ export const getTemporaryThreadsByThreadIds = query
 
         await Promise.all(
             args.threadIds.map(async (threadId) => {
-                const thread = await ctx.db.get(threadId);
+                const thread = await ctx.db.get("threads", threadId);
 
                 if (thread && thread.userId === identity.userId) {
                     ownedThreadIds.add(threadId);
@@ -1389,9 +1390,9 @@ export const convertTemporaryToPermanent = internalMutation
             throw new LunoraError("NOT_FOUND", `Temporary thread ${args.threadId} not found`);
         }
 
-        await ctx.db.delete(temporaryThread._id);
+        await ctx.db.delete("temporaryThreads", temporaryThread._id);
         // Clear denormalized flag
-        await patchById(ctx.db, args.threadId, { isTemporary: undefined });
+        await patchById(ctx.db, "threads", args.threadId, { isTemporary: undefined });
 
         return null;
     });
@@ -1403,19 +1404,19 @@ export const moveThreadToProject = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
 
         const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
-        await ctx.db.patch(args.threadId, {
+        await ctx.db.patch("threads", args.threadId, {
             projectId: args.projectId,
             updatedAt: ctx.now,
         });
 
-        const updatedThread = (await ctx.db.get(args.threadId))!;
+        const updatedThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(updatedThread);
     });
@@ -1426,15 +1427,15 @@ export const removeThreadFromProject = internalMutation
     })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
-        await patchRow(ctx.db, thread, {
+        await patchRow(ctx.db, "threads", thread, {
             projectId: undefined,
             updatedAt: ctx.now,
         });
 
-        const updatedThread = (await ctx.db.get(args.threadId))!;
+        const updatedThread = (await ctx.db.get("threads", args.threadId))!;
 
         return publicThread(updatedThread);
     });
@@ -1472,9 +1473,9 @@ export const deleteExpiredTemporaryThreads = internalMutation
         const validRecords = recordsToDelete.filter((r): r is NonNullable<typeof r> => r !== null);
 
         await Promise.all([
-            ...validRecords.map((record) => ctx.db.delete(record._id)),
+            ...validRecords.map((record) => ctx.db.delete("temporaryThreads", record._id)),
             // Clear denormalized isTemporary flag on threads
-            ...args.threadIds.map((threadId) => patchById(ctx.db, threadId, { isTemporary: undefined })),
+            ...args.threadIds.map((threadId) => patchById(ctx.db, "threads", threadId, { isTemporary: undefined })),
         ]);
 
         return {
@@ -1502,7 +1503,7 @@ export const getThreadUsage = query
 
         // Ownership check: token usage stats are user-billing-relevant data and
         // must not leak across thread boundaries.
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.userId !== identity.userId) {
             return { inputTokens: 0, outputTokens: 0, totalTokens: 0 };

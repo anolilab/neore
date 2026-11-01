@@ -26,7 +26,9 @@ import { MAX_LENGTH } from "../lib/validators";
 // Internal Queries
 // ============================================================================
 
-export const getFile = internalQuery.input({ fileId: v.id("knowledgeFiles") }).query(async ({ args: { fileId }, ctx }) => await ctx.db.get(fileId));
+export const getFile = internalQuery
+    .input({ fileId: v.id("knowledgeFiles") })
+    .query(async ({ args: { fileId }, ctx }) => await ctx.db.get("knowledgeFiles", fileId));
 
 export const getIndexedFileIds = internalQuery.input({ userId: v.string() }).query(async ({ args: { userId }, ctx }) => {
     const files = await ctx.db
@@ -111,7 +113,7 @@ export const getChunksByEmbeddingIds = internalQuery
         );
         const ownedChunks = chunks.flatMap((chunk) => (chunk && chunk.userId === userId && fileIdSet.has(chunk.fileId as string) ? [chunk] : []));
         const uniqueFileIds = [...new Set(ownedChunks.map((chunk) => chunk.fileId))];
-        const files = new Map(await Promise.all(uniqueFileIds.map(async (fileId) => [fileId as string, await ctx.db.get(fileId)] as const)));
+        const files = new Map(await Promise.all(uniqueFileIds.map(async (fileId) => [fileId as string, await ctx.db.get("knowledgeFiles", fileId)] as const)));
 
         for (const chunk of ownedChunks) {
             const file = files.get(chunk.fileId as string);
@@ -215,7 +217,7 @@ export const keywordSearchChunks = internalQuery
 
             if (fileName === undefined) {
                 // Explicit fileIds may name a file that is not (or no longer) `indexed`.
-                const file = await ctx.db.get(candidate.chunk.fileId);
+                const file = await ctx.db.get("knowledgeFiles", candidate.chunk.fileId);
 
                 if (!file || file.userId !== userId) {
                     continue;
@@ -242,7 +244,7 @@ export const keywordSearchChunks = internalQuery
     });
 
 export const getVaultFile = internalQuery.input({ vaultFileId: v.id("files") }).query(async ({ args: { vaultFileId }, ctx }) => {
-    const vaultFile = await ctx.db.get(vaultFileId);
+    const vaultFile = await ctx.db.get("files", vaultFileId);
 
     if (!vaultFile) {
         return undefined;
@@ -295,7 +297,7 @@ export const updateFileStatus = internalMutation
 
         if (size !== undefined) patch.size = size;
 
-        await ctx.db.patch(fileId, withoutUndefined(patch));
+        await ctx.db.patch("knowledgeFiles", fileId, withoutUndefined(patch));
 
         return true;
     });
@@ -362,7 +364,7 @@ export const recordKnowledgeSources = internalMutation
     .input({ messageId: v.id("messages"), sources: v.array(vSource) })
     .output(v.null())
     .mutation(async ({ args: { messageId, sources }, ctx }) => {
-        const message = await ctx.db.get(messageId);
+        const message = await ctx.db.get("messages", messageId);
 
         if (!message) {
             return null;
@@ -413,7 +415,7 @@ export const addFile = authMutation
         // The vault file must be the caller's own. Without this, anyone holding
         // another user's file id could ingest that file into their own knowledge
         // base and read it back through search.
-        const vaultFile = await ctx.db.get(input.vaultFileId as Id<"files">);
+        const vaultFile = await ctx.db.get("files", input.vaultFileId as Id<"files">);
 
         if (!vaultFile || vaultFile.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "File not found");
@@ -457,7 +459,7 @@ export const removeFile = authMutation
     })
     .mutation(async ({ args: input, ctx }) => {
         const fileId = input.fileId as Id<"knowledgeFiles">;
-        const file = await ctx.db.get(fileId);
+        const file = await ctx.db.get("knowledgeFiles", fileId);
 
         if (!file || file.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
@@ -492,7 +494,7 @@ export const attachToThread = authMutation
         await requireOwnedThread(ctx, threadId, ctx.user.userId, input.unlockProof);
 
         // Verify ownership
-        const file = await ctx.db.get(knowledgeFileId);
+        const file = await ctx.db.get("knowledgeFiles", knowledgeFileId);
 
         if (!file || file.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
@@ -543,7 +545,7 @@ export const detachFromThread = authMutation
         const link = links.find((l) => (l.knowledgeFileId as string) === (knowledgeFileId as string));
 
         if (link) {
-            await ctx.db.delete(link._id);
+            await ctx.db.delete("threadKnowledge", link._id);
         }
 
         ctx.log.event("knowledge.detach_from_thread", { removed: Boolean(link) });
@@ -581,7 +583,7 @@ export const getThreadKnowledge = authQuery
 
         const files = await Promise.all(
             links.map(async (link) => {
-                const file = await ctx.db.get(link.knowledgeFileId);
+                const file = await ctx.db.get("knowledgeFiles", link.knowledgeFileId);
 
                 if (!file || file.userId !== thread.userId) {
                     return null;

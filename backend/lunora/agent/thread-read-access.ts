@@ -85,7 +85,7 @@ export const resolveThreadReadAccess = async (
     // owner's row until it is admitted); the admission below is what then lets
     // the procedure's own reads of the thread and its rows through.
     const db = systemDb(context);
-    const thread = await db.get(threadId);
+    const thread = await db.get("threads", threadId);
 
     if (!thread) {
         return null;
@@ -144,7 +144,7 @@ export const requireOwnedThread = async (
     userId: string,
     unlockProof?: string | null,
 ): Promise<Doc<"threads">> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread || thread.userId !== userId) {
         return throwThreadNotFound();
@@ -166,7 +166,7 @@ export const requireOwnedThread = async (
  * write content.
  */
 export const requireOwnedThreadIgnoringLock = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">, userId: string): Promise<Doc<"threads">> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread || thread.userId !== userId) {
         return throwThreadNotFound();

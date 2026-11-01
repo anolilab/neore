@@ -620,7 +620,7 @@ export const readThreadShareToken = internalQuery
     .input({ threadId: v.id("threads") })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { threadId }, ctx: context }): Promise<string | null> => {
-        const thread = await systemDb(context).get(threadId);
+        const thread = await systemDb(context).get("threads", threadId);
 
         if (!thread || thread.isPublic !== true || thread.deleted === true || thread.isTemporary === true) {
             return null;

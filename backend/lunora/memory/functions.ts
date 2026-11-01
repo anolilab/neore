@@ -42,7 +42,7 @@ const toMemoryView = (m: Doc<"memories">) => {
 
 /** Loads a memory the caller owns, or throws. */
 const requireOwnMemory = async (ctx: Pick<MutationCtx, "db">, memoryId: string, userId: string): Promise<Doc<"memories">> => {
-    const memory = await ctx.db.get(memoryId as Id<"memories">);
+    const memory = await ctx.db.get("memories", memoryId as Id<"memories">);
 
     if (!memory) {
         throw new LunoraError("NOT_FOUND", "Memory not found");
@@ -155,10 +155,12 @@ type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
  */
 const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<void> => {
     let vectorId: Id<VectorTableName>;
+    let vectorTable: VectorTableName;
 
     try {
-        const { tableName } = getVectorIdInfo(context, orphan.embeddingId as VectorTableId);
+        const { tableName } = await getVectorIdInfo(context, orphan.embeddingId as VectorTableId);
 
+        vectorTable = tableName;
         vectorId = context.db.asId(tableName, orphan.embeddingId);
     } catch (error) {
         memoryLogger.error(`Memory ${orphan.memoryId} of user ${orphan.userId} points at embedding ${orphan.embeddingId}, which is not a vector row id`, error);
@@ -170,7 +172,7 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
         await deleteVectorRow(context.db, vectorId);
     } catch (error) {
         // Already gone (a retry of a delete that did land): nothing is orphaned.
-        if ((await context.db.get(vectorId).catch(() => undefined)) === null) {
+        if ((await context.db.get(vectorTable, vectorId).catch(() => undefined)) === null) {
             return;
         }
 
@@ -219,7 +221,7 @@ export const deleteMemory = authMutation
     .mutation(async ({ args: { memoryId }, ctx: context }) => {
         const memory = await requireOwnMemory(context, memoryId, context.user.userId);
 
-        await context.db.delete(memory._id);
+        await context.db.delete("memories", memory._id);
 
         // The row goes first: a vector with no row is an orphan a retry can find, a row
         // pointing at a deleted vector is not.
@@ -257,6 +259,7 @@ export const updateMemory = authMutation
         const textChanged = text !== undefined && text !== existing.memory;
 
         await context.db.patch(
+            "memories",
             existing._id,
             withoutUndefined({
                 lastConfirmedAt: now,
@@ -291,7 +294,7 @@ export const setMemoryPinned = authMutation
     .mutation(async ({ args: { memoryId, pinned }, ctx: context }) => {
         const existing = await requireOwnMemory(context, memoryId, context.user.userId);
 
-        await context.db.patch(existing._id, { pinned, updatedAt: context.now });
+        await context.db.patch("memories", existing._id, { pinned, updatedAt: context.now });
 
         context.log.event("memory.set_memory_pinned", { pinned });
 
@@ -324,13 +327,13 @@ export const clearAllUserMemories = authMutation
 
         await Promise.all([
             ...userMemories.map(async (m) => {
-                await context.db.delete(m._id);
+                await context.db.delete("memories", m._id);
 
                 if (m.embeddingId) {
                     await deleteMemoryVector(context, { embeddingId: m.embeddingId, memoryId: m._id, userId });
                 }
             }),
-            ...digests.map((d) => context.db.delete(d._id)),
+            ...digests.map((d) => context.db.delete("memoryDigests", d._id)),
         ]);
 
         context.log.event("memory.clear_all_user_memories", { digestCount: digests.length, memoryCount: userMemories.length });
@@ -362,13 +365,13 @@ export const getMessageMemoryUsage = authQuery
         const { userId } = context.user;
         // The reply row carries whoever started the run, so it is found through
         // its thread: decide on the thread, admit it, then read the row.
-        const threadId = await parentKeyOf(context, messageId, "threadId");
+        const threadId = await parentKeyOf(context, "messages", messageId, "threadId");
 
         if (!threadId) {
             throw new LunoraError("NOT_FOUND", "Message not found");
         }
 
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread?.userId !== userId) {
             throw new LunoraError("FORBIDDEN", "Not authorized to view this message");
@@ -376,7 +379,7 @@ export const getMessageMemoryUsage = authQuery
 
         await requireOwnedThread(context, threadId as Id<"threads">, userId, unlockProof);
 
-        const message = await context.db.get(messageId as Id<"messages">);
+        const message = await context.db.get("messages", messageId as Id<"messages">);
 
         if (!message) {
             throw new LunoraError("NOT_FOUND", "Message not found");
@@ -384,7 +387,7 @@ export const getMessageMemoryUsage = authQuery
 
         return Promise.all(
             (message.retrievedMemories ?? []).map(async ({ memoryId, score }) => {
-                const memory = await context.db.get(memoryId as Id<"memories">);
+                const memory = await context.db.get("memories", memoryId as Id<"memories">);
 
                 if (memory?.userId !== userId) {
                     return { memoryId, score, status: "deleted" as const };
@@ -450,7 +453,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
     });
 
     if (mem.supersedes) {
-        await ctx.db.patch(mem.supersedes, { supersededBy: memoryId, updatedAt: now });
+        await ctx.db.patch("memories", mem.supersedes, { supersededBy: memoryId, updatedAt: now });
     }
 
     return memoryId;
@@ -488,6 +491,7 @@ export const updateMemoryInternal = internalMutation
     })
     .mutation(async ({ args, ctx }) => {
         await ctx.db.patch(
+            "memories",
             args.memoryId,
             withoutUndefined({
                 confidence: args.confidence,
@@ -511,10 +515,10 @@ export const confirmMemories = internalMutation
         const { now } = ctx;
 
         for (const memoryId of args.memoryIds) {
-            const memory = await ctx.db.get(memoryId);
+            const memory = await ctx.db.get("memories", memoryId);
 
             if (memory?.userId === args.userId && !memory.supersededBy) {
-                await ctx.db.patch(memoryId, { lastConfirmedAt: now });
+                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
             }
         }
 
@@ -638,7 +642,7 @@ export const getMemoriesByEmbeddingIds = internalQuery
     });
 
 export const markMemorySupersededByCompression = internalMutation.input({ memoryId: v.id("memories"), userId: v.string() }).mutation(async ({ args, ctx }) => {
-    const memory = await ctx.db.get(args.memoryId);
+    const memory = await ctx.db.get("memories", args.memoryId);
 
     // Ownership guard: skip silently if memory doesn't exist or belongs to another user
     if (!memory || memory.userId !== args.userId) {
@@ -651,7 +655,7 @@ export const markMemorySupersededByCompression = internalMutation.input({ memory
         return;
     }
 
-    await ctx.db.patch(args.memoryId, {
+    await ctx.db.patch("memories", args.memoryId, {
         // Sentinel: memory points to itself to signal "retired by compression".
         // All active-memory queries filter by !supersededBy, so this record
         // is hidden from normal queries without needing a separate boolean field.
@@ -660,7 +664,7 @@ export const markMemorySupersededByCompression = internalMutation.input({ memory
     });
 });
 
-export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get(args.memoryId));
+export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));
 
 /**
  * Records which memories were injected into a reply's system prompt, on the
@@ -674,13 +678,13 @@ export const recordRetrievedMemories = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const message = await ctx.db.get(args.messageId);
+        const message = await ctx.db.get("messages", args.messageId);
 
         if (!message || args.memories.length === 0) {
             return null;
         }
 
-        const thread = await ctx.db.get(message.threadId);
+        const thread = await ctx.db.get("threads", message.threadId);
 
         // A locked chat's message rows are not written to (its proof is not here).
         if (!thread || thread.userId !== args.userId || isThreadLocked(thread)) {
@@ -715,7 +719,7 @@ export const isThreadTemporary = internalQuery
     .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         return thread?.isTemporary === true;
     });
@@ -725,7 +729,7 @@ export const isThreadLockedForMemory = internalQuery
     .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         return thread !== null && isThreadLocked(thread);
     });

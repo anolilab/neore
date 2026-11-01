@@ -279,7 +279,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     }
 
     if (settings) {
-        await context.db.patch(settings._id, withoutUndefined(toStore));
+        await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
     } else {
         await context.db.insert(tableName, {
             userId,
@@ -1031,7 +1031,7 @@ export const initializeUserSettings = authMutation
             }
 
             if (Object.keys(updates).length > 0) {
-                await context.db.patch(existingSettings._id, withoutUndefined(updates));
+                await context.db.patch("userSettings", existingSettings._id, withoutUndefined(updates));
             }
         } else {
             // Create new user settings with timezone and location

@@ -58,7 +58,7 @@ export const isLockedWithoutProof = async (
     unlockProof: string | null | undefined,
 ): Promise<boolean> => {
     const db = systemDb(context);
-    const thread = await db.get(threadId);
+    const thread = await db.get("threads", threadId);
 
     return !!thread && isThreadLocked(thread) && !(await isUnlockProofValid(db, thread, thread.userId ?? "", unlockProof, Date.now()));
 };

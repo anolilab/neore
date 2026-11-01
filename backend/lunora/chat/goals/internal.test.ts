@@ -70,7 +70,14 @@ let promptId: string;
 
 const run = async (reference: unknown, args: Record<string, unknown>): Promise<any> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(reference, args));
-const read = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const read = async (id: string): Promise<any> =>
+    await harness.run(
+        async (ctx: any) =>
+            (await ctx.db.get("threadGoals", id as never)) ??
+            (await ctx.db.get("threads", id as never)) ??
+            (await ctx.db.get("messages", id as never)) ??
+            (await ctx.db.get("persistentStreams", id as never)),
+    );
 const count = async (table: string): Promise<number> => await harness.run(async (ctx: any) => (await ctx.db.query(table).collect()).length);
 
 const start = async (overrides: Record<string, unknown> = {}): Promise<string> => {
@@ -104,7 +111,7 @@ const review = async (
 
 /** Pushes a goal past the stall window, as an hour of silence would. */
 const stall = async (goalId: string): Promise<void> => {
-    await harness.run(async (ctx: any) => await ctx.db.patch(goalId, { updatedAt: Date.now() - GOAL_STALL_MS - 1000 }));
+    await harness.run(async (ctx: any) => await ctx.db.patch("threadGoals", goalId, { updatedAt: Date.now() - GOAL_STALL_MS - 1000 }));
 };
 
 beforeEach(async () => {
@@ -384,7 +391,7 @@ describe("ending a goal from outside", () => {
     it("the housekeeping sweep ends a goal whose round was lost", async () => {
         const goalId = await start();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(goalId, { updatedAt: Date.now() - GOAL_STALL_MS - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threadGoals", goalId, { updatedAt: Date.now() - GOAL_STALL_MS - 1000 }));
 
         expect(await run(reapStalledGoals, {})).toBe(1);
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });
@@ -440,7 +447,7 @@ describe("a chat locked while its goal runs", () => {
     it("ends the goal instead of starting another round", async () => {
         const goalId = await start();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() }));
 
         const outcome = await review(goalId, 1, { met: false });
 
@@ -463,7 +470,7 @@ describe("a round whose branch was left", () => {
             return { other, reply };
         });
     const setLeaf = async (leaf: string): Promise<void> => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: leaf }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: leaf }));
     };
 
     it("shows the reviewer only the branch on display", async () => {
@@ -553,7 +560,7 @@ describe("a round whose branch was left", () => {
 
 describe("a goal whose thread is gone", () => {
     const deleteThread = async (): Promise<void> => {
-        await harness.run(async (ctx: any) => await ctx.db.delete(threadId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", threadId));
     };
 
     it("ends on a verdict without throwing", async () => {
@@ -613,7 +620,7 @@ describe("a goal whose thread is gone", () => {
     it("treats a trashed chat as gone when a goal somehow outlives it", async () => {
         const goalId = await start();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true, deletedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true, deletedAt: Date.now() }));
 
         expect(await review(goalId, 1, { met: false })).toEqual({ outcome: "ended" });
         expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "error" });

@@ -26,5 +26,5 @@ export const touchSession = async (ctx: Pick<MutationCtx, "db">, session: Sessio
         return;
     }
 
-    await ctx.db.patch(session._id, { lastEventAt: now, updatedAt: now, ...(statusChanged && { status }) });
+    await ctx.db.patch("acpSessions", session._id, { lastEventAt: now, updatedAt: now, ...(statusChanged && { status }) });
 };
