@@ -84,7 +84,6 @@ jobs:
                   token: "${{ secrets.CODECOV_TOKEN }}"
                   fail_ci_if_error: false
 
-    # Nobody watches the nightly run, and a red push to main is easy to miss: open an
     # Saves the Playwright browser cache from `main`. Caches saved on a pull request or a merge-queue
     # ref are scoped to that ref, so without this every PR's first E2E run, and every queue entry,
     # downloaded Chromium in all three shards. Same path and key as the E2E job in test.yml.
@@ -137,11 +136,12 @@ jobs:
               shell: "bash"
               run: "pnpm --filter @neore/web exec playwright install chromium"
 
+    # Nobody watches the nightly run, and a red push to main is easy to miss: open an
     # issue, or comment on the one that is already open.
     notify:
         name: "Report a failure"
-        needs: "full-test"
-        if: "always() && needs.full-test.result == 'failure' && github.event_name != 'workflow_dispatch'"
+        needs: ["full-test", "warm-playwright"]
+        if: "always() && (needs.full-test.result == 'failure' || needs.warm-playwright.result == 'failure') && github.event_name != 'workflow_dispatch'"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 5
         permissions:
@@ -155,7 +155,8 @@ jobs:
                       const title = "Full test run is failing";
                       const { owner, repo } = context.repo;
                       const url = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-                      const line = `${context.eventName === "schedule" ? "Nightly run" : `Push ${context.sha.slice(0, 7)}`}: ${url}`;
+                      const what = "${{ needs.full-test.result == 'failure' && 'the full test run' || 'warming the Playwright cache' }}";
+                      const line = `${context.eventName === "schedule" ? "Nightly run" : `Push ${context.sha.slice(0, 7)}`} (${what} failed): ${url}`;
 
                       const { data: open } = await github.rest.issues.listForRepo({ owner, repo, state: "open", labels: "ci", per_page: 100 });
                       const existing = open.find((issue) => issue.title === title && !issue.pull_request);

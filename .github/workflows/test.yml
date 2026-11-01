@@ -224,6 +224,8 @@ jobs:
               with:
                   node-version: "24.22.1"
                   npm-version: "11"
+                  # The browsers come from the cache below (or its miss install), not from setup.
+                  skip-playwright: "true"
 
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
