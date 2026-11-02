@@ -171,7 +171,7 @@ const failCheck = async (ctx: MutationCtx, trigger: Doc<"triggers">, error: stri
     const wait = retries > 0 ? Math.min(interval * 2 ** (retries - 1), Math.max(EVENT_MAX_BACKOFF_MS, interval)) : interval;
     const counters = { ...(streak > 0 && { checkFailures: streak }), ...(retries > 0 && { checkRetries: retries }) };
 
-    await patchRow(ctx.db, trigger, {
+    await patchRow(ctx.db, "triggers", trigger, {
         eventState: { ...withoutCheckMarks(trigger.eventState), checkedAt: now, ...counters },
         lastError: error,
         nextTriggerAt: pause ? undefined : now + wait,
@@ -219,7 +219,7 @@ export const dispatchDueEventTriggers = internalMutation
         for (const trigger of due.slice(0, EVENT_DISPATCH_BATCH)) {
             if (!trigger.eventSource) {
                 // A row from before event triggers worked: nothing to watch.
-                await patchRow(ctx.db, trigger, {
+                await patchRow(ctx.db, "triggers", trigger, {
                     enabled: false,
                     lastError: "This event trigger has no condition to watch.",
                     nextTriggerAt: undefined,
@@ -245,7 +245,7 @@ export const dispatchDueEventTriggers = internalMutation
                 continue;
             }
 
-            await ctx.db.patch(trigger._id, { eventState: { ...trigger.eventState, leasedAt: now }, nextTriggerAt: now + EVENT_CHECK_LEASE_MS });
+            await ctx.db.patch("triggers", trigger._id, { eventState: { ...trigger.eventState, leasedAt: now }, nextTriggerAt: now + EVENT_CHECK_LEASE_MS });
             dispatched += 1;
         }
 
@@ -512,7 +512,7 @@ export const isEventRunPending = internalQuery
     .input({ firing: v.number(), triggerId: v.id("triggers") })
     .output(v.boolean())
     .query(async ({ args: { firing, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         return trigger?.eventState?.pendingRun?.firing === firing;
     });
@@ -526,7 +526,7 @@ export const settleEventRun = internalMutation
     .input({ attempt: v.number(), firing: v.number(), sent: v.boolean(), triggerId: v.id("triggers") })
     .output(v.null())
     .mutation(async ({ args: { attempt, firing, sent, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
         const pending = trigger?.eventState?.pendingRun;
 
         if (!trigger || pending?.firing !== firing) {
@@ -537,7 +537,7 @@ export const settleEventRun = internalMutation
         const rest = withoutPendingRun(trigger.eventState);
 
         if (sent) {
-            await patchRow(ctx.db, trigger, { eventState: rest });
+            await patchRow(ctx.db, "triggers", trigger, { eventState: rest });
 
             return null;
         }
@@ -556,7 +556,7 @@ export const settleEventRun = internalMutation
 
         const error = "A run of this trigger could not be queued and was dropped.";
 
-        await patchRow(ctx.db, trigger, {
+        await patchRow(ctx.db, "triggers", trigger, {
             eventState: rest,
             lastError: error,
             updatedAt: now,
@@ -600,7 +600,7 @@ export const recordEventCheck = internalMutation
     })
     .output(v.object({ fired: v.boolean() }))
     .mutation(async ({ args: { error, fire, read, state, transient, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         // Switched off, edited, deleted or overtaken by another check while this one ran: its answer is about something else now.
         if (
@@ -641,7 +641,7 @@ export const recordEventCheck = internalMutation
         const foldIntoPending = payload !== undefined && pendingRun !== undefined && now - pendingRun.firing < EVENT_PENDING_RUN_HORIZON_MS;
         const nextPendingRun = payload === undefined ? pendingRun : nextPending(pendingRun, foldIntoPending, { firing: now, payload });
 
-        await patchRow(ctx.db, trigger, {
+        await patchRow(ctx.db, "triggers", trigger, {
             eventState: {
                 ...kept,
                 checkedAt: now,

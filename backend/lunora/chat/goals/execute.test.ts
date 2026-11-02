@@ -155,7 +155,7 @@ afterEach(() => {
 });
 
 const review = async (round = 1): Promise<unknown> => await harness.action(async (ctx: any) => await ctx.runAction(reviewGoalRound, { goalId, round }));
-const goal = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(goalId));
+const goal = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("threadGoals", goalId));
 const runs = (): { args: Record<string, any> }[] =>
     jobsQueueMessages
         .filter((message) => message.body.functionPath.includes("runStreamingAgent"))
@@ -191,7 +191,7 @@ describe("reviewGoalRound", () => {
             userId: OWNER,
         });
 
-        const instruction = await harness.run(async (ctx: any) => await ctx.db.get(next!.args.messageId));
+        const instruction = await harness.run(async (ctx: any) => await ctx.db.get("messages", next!.args.messageId));
 
         expect(JSON.stringify(instruction.message.content)).toContain("The charts are missing.");
         expect(instruction.agentName).toBe("neore:goal");
@@ -200,9 +200,11 @@ describe("reviewGoalRound", () => {
 
     it("carries the originating run's origin and skill into every further round", async () => {
         await harness.run(async (ctx: any) => {
-            const row = await ctx.db.get(goalId);
+            const row = await ctx.db.get("threadGoals", goalId);
 
-            await ctx.db.patch(goalId, { config: { ...row.config, origin: "outside_agent", skill: { rawArgs: "the report", slug: "summarize" } } });
+            await ctx.db.patch("threadGoals", goalId, {
+                config: { ...row.config, origin: "outside_agent", skill: { rawArgs: "the report", slug: "summarize" } },
+            });
         });
 
         await review();
@@ -243,7 +245,7 @@ describe("reviewGoalRound", () => {
 
         expect(await goal()).toMatchObject({ status: "stopped", stopReason: "error" });
         expect(runs()).toHaveLength(0);
-        expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("active");
+        expect((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).status).toBe("active");
     });
 
     it("treats an unreadable verdict as not met and goes on", async () => {
@@ -262,7 +264,7 @@ describe("reviewGoalRound", () => {
 
         expect(await goal()).toMatchObject({ status: "stopped", stopReason: "review_failed" });
         expect(runs()).toHaveLength(0);
-        expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("active");
+        expect((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).status).toBe("active");
     });
 
     it("leaves the thread alone when the goal was ended while the reviewer failed", async () => {
@@ -273,14 +275,14 @@ describe("reviewGoalRound", () => {
         modelState.during = async () => {
             await harness.run(async (ctx: any) => {
                 await ctx.runMutation(internal.chat.goals.internal.endGoalsForThread, { reason: "user", threadId });
-                await ctx.db.patch(threadId, { status: "abort" });
+                await ctx.db.patch("threads", threadId, { status: "abort" });
             });
         };
 
         await review();
 
         expect(await goal()).toMatchObject({ status: "stopped", stopReason: "user" });
-        expect((await harness.run(async (ctx: any) => await ctx.db.get(threadId))).status).toBe("abort");
+        expect((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).status).toBe("abort");
     });
 
     it("spends one reviewer call and queues one round however often the job is delivered", async () => {

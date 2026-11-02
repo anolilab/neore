@@ -102,7 +102,7 @@ describe("starting work on a pull request", () => {
 
         expect(row).toMatchObject({ ...PULL, kind: "attached", threadId: result.threadId, title: "Work on octo/hello#7", url: URL });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(result.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", result.threadId));
 
         expect(thread).toMatchObject({ status: "active", title: "Work on octo/hello#7" });
         expect(thread.model).toBeUndefined();
@@ -180,7 +180,7 @@ describe("a PR the coding agent opened is recorded", () => {
     it("records nothing for a thread deleted before the run finished", async () => {
         const threadId = (await plainThread(A)) as string;
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
 
         await expect(record(A, threadId)).rejects.toBeDefined();
         expect(await links()).toHaveLength(0);
@@ -236,7 +236,7 @@ describe("both sides of the link", () => {
 
 describe("a thread that is gone", () => {
     const softDelete = async (threadId: string): Promise<void> => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true, deletedAt: 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true, deletedAt: 1 }));
     };
 
     it("is not returned by another click on 'Work on this PR': the dead link is cleared and a new thread opens", async () => {

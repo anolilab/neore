@@ -13,7 +13,7 @@ export const eraseGatewayNotificationsForUser = async (ctx: MutationCtx, userId:
         .withIndex("by_userId_isRead", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("gatewayNotifications", row._id)));
 
     return { hasMore: full(rows) };
 };

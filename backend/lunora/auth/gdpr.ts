@@ -17,7 +17,7 @@ export const deleteSessionsOf = async (ctx: MutationCtx, userId: string): Promis
     const sessions = await ctx.db.session.findMany({ where: { userId: userId as Id<"user"> } }).then((result) => result.page);
 
     for (const row of sessions) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("session", row._id);
     }
 };
 
@@ -26,7 +26,7 @@ export const deleteAccountsOf = async (ctx: MutationCtx, userId: string): Promis
     const accounts = await ctx.db.account.findMany({ where: { userId: userId as Id<"user"> } }).then((result) => result.page);
 
     for (const row of accounts) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("account", row._id);
     }
 };
 
@@ -44,7 +44,8 @@ export const deleteUserSettingRows = async (ctx: MutationCtx, userId: string): P
     ]);
 
     // Audited tables: one delete at a time (`gdpr/batch.ts`).
-    await deleteOneByOne(ctx, [...settings, ...aiPreferences]);
+    await deleteOneByOne(ctx, "userSettings", settings);
+    await deleteOneByOne(ctx, "aiUserPreferences", aiPreferences);
 };
 
 /**
@@ -58,7 +59,7 @@ export const anonymiseGatewayUsage = async (ctx: MutationCtx, userId: string): P
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.patch(row._id, { userId: DELETED_USER_MARKER })));
+    await Promise.all(rows.map((row) => ctx.db.patch("gatewayUsageDeductions", row._id, { userId: DELETED_USER_MARKER })));
 
     return { hasMore: full(rows) };
 };
@@ -91,35 +92,35 @@ export type IdentityRows = Awaited<ReturnType<typeof readIdentityRows>>;
 /** Deletes the rows {@link readIdentityRows} returned, one at a time (every delete fires the audit triggers). */
 export const deleteIdentityRows = async (ctx: MutationCtx, rows: IdentityRows): Promise<void> => {
     for (const row of rows.twoFactors) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("twoFactor", row._id);
     }
 
     for (const row of rows.passkeys) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("passkey", row._id);
     }
 
     for (const row of rows.members) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("member", row._id);
     }
 
     for (const row of rows.memberCredits) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("memberCredits", row._id);
     }
 
     for (const row of rows.teamMembers) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("teamMember", row._id);
     }
 
     for (const row of rows.apiKeys) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("apikey", row._id);
     }
 
     for (const row of rows.invitations) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("invitation", row._id);
     }
 
     for (const row of rows.signUpInvitations) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("signUpInvitation", row._id);
     }
 };
 
@@ -128,6 +129,6 @@ export const deleteUserRecord = async (ctx: MutationCtx, userId: Id<"user">): Pr
     const user = await ctx.db.user.findFirst({ where: { _id: userId } });
 
     if (user) {
-        await ctx.db.delete(userId);
+        await ctx.db.delete("user", userId);
     }
 };

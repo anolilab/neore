@@ -305,7 +305,7 @@ export const claimDueCronJobs = internalMutation
             const existing = byName.get(name);
 
             if (existing) {
-                await ctx.db.patch(existing._id, { lastRunAt: now, lastSlot: slot });
+                await ctx.db.patch("cronRuns", existing._id, { lastRunAt: now, lastSlot: slot });
             } else {
                 await ctx.db.insert("cronRuns", { lastRunAt: now, lastSlot: slot, name });
             }

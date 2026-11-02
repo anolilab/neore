@@ -7,12 +7,16 @@ import { v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { type ActionCtx as ActionContext, internalMutation, internalQuery, type MutationCtx as MutationContext } from "../../_generated/server";
 import { mergedStream, stream } from "../../lib/streams";
+import { deleteVectorRow } from "../table-writes";
 import {
     type EmbeddingsWithoutDenormalizedFields,
+    findVectorTable,
     getVectorIndexName,
     getVectorTableName,
     type VectorDimension,
     type VectorTableId,
+    type VectorTableName,
+    validateVectorDimension,
     vVectorDimension,
     vVectorId,
 } from "./tables";
@@ -71,7 +75,7 @@ export const deleteBatchForThread = internalMutation
     )
     .mutation(async ({ args, ctx }) => {
         const tableName = getVectorTableName(args.vectorDimension);
-        const vectors = await mergedStream<{ _id: Id<"embeddings_1536"> }>(
+        const vectors = await mergedStream<{ _id: Id<VectorTableName> }>(
             ["thread", "memory"].map((table) =>
                 stream(ctx.db)
                     .query(tableName)
@@ -83,7 +87,7 @@ export const deleteBatchForThread = internalMutation
             numItems: args.limit,
         });
 
-        await Promise.all(vectors.page.map((vector) => ctx.db.delete(vector._id)));
+        await Promise.all(vectors.page.map((vector) => ctx.db.delete(tableName, vector._id)));
 
         return {
             continueCursor: vectors.continueCursor,
@@ -118,7 +122,7 @@ export const insertBatch = internalMutation
                 const embeddingId = await insertVector(ctx, args.vectorDimension, vector);
 
                 if (messageId) {
-                    await ctx.db.patch(messageId, { embeddingId });
+                    await ctx.db.patch("messages", messageId, { embeddingId });
                 }
 
                 return embeddingId;
@@ -179,12 +183,22 @@ export const updateBatch = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await Promise.all(
-            args.vectors.map((embedding) =>
-                ctx.db.patch(embedding.id, {
-                    model: embedding.model,
-                    vector: embedding.vector,
-                }),
-            ),
+            args.vectors.map(async (embedding) => {
+                validateVectorDimension(embedding.vector.length);
+
+                const table = await findVectorTable(ctx.db, embedding.id);
+
+                // The row is gone (deleted since the re-embed was queued): nothing to update.
+                if (table === null) {
+                    return;
+                }
+
+                if (table !== getVectorTableName(embedding.vector.length)) {
+                    throw new Error(`Cannot update ${embedding.id}: a ${embedding.vector.length}-dimension vector does not fit ${table}`);
+                }
+
+                await ctx.db.patch(table, embedding.id as Id<VectorTableName>, { model: embedding.model, vector: embedding.vector });
+            }),
         );
 
         return null;
@@ -196,7 +210,7 @@ export const deleteBatch = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await Promise.all(args.ids.map((id) => ctx.db.delete(id)));
+        await Promise.all(args.ids.map((id) => deleteVectorRow(ctx.db, id)));
 
         return null;
     });

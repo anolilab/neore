@@ -47,7 +47,7 @@ export const checkPasscode = async (context: MutationCtx, row: PasscodeRow, pass
 
     if (await verifyPasscode(passcode, passcodeHashOf(row))) {
         if (row.failedAttempts !== 0 || row.lockoutUntil !== undefined) {
-            await patchRow(context.db, row, { failedAttempts: 0, lockoutUntil: undefined });
+            await patchRow(context.db, "threadPasscodes", row, { failedAttempts: 0, lockoutUntil: undefined });
         }
 
         return { ok: true };
@@ -56,7 +56,7 @@ export const checkPasscode = async (context: MutationCtx, row: PasscodeRow, pass
     const failedAttempts = row.failedAttempts + 1;
     const wait = backoffMs(failedAttempts);
 
-    await patchRow(context.db, row, { failedAttempts, lockoutUntil: wait > 0 ? now + wait : undefined });
+    await patchRow(context.db, "threadPasscodes", row, { failedAttempts, lockoutUntil: wait > 0 ? now + wait : undefined });
 
     return { ok: false, retryAfterMs: wait > 0 ? wait : undefined };
 };
@@ -120,7 +120,7 @@ export const enableThreadLock = authMutation
             updatedAt: now,
             userId,
         });
-        await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
         // Condensed copies of its content made before the lock are not kept (`thread-summaries.ts`).
         await deleteThreadSummaries(context, threadId);
         // Index the chat's attachments; until the walk stamps the row, the file gate scans its messages.
@@ -178,8 +178,8 @@ export const lockThread = authMutation
         const row = await requireLockedRow(context, threadId);
 
         // `lockedAt` moves too: a stream or background run started under the earlier proof is "created before the lock" and stops (`lockedAfterCreation`).
-        await patchRow(context.db, row, { epoch: newPasscodeEpoch(), updatedAt: now });
-        await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        await patchRow(context.db, "threadPasscodes", row, { epoch: newPasscodeEpoch(), updatedAt: now });
+        await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
 
         if (row.filesIndexedAt === undefined) {
             await scheduleFileLinkBackfill(context, threadId, userId);
@@ -220,8 +220,8 @@ export const changeThreadPasscode = authMutation
         const epoch = newPasscodeEpoch();
         const { hash, iterations, salt } = await hashPasscode(newPasscode);
 
-        await patchRow(context.db, row, { epoch, failedAttempts: 0, hash, iterations, lockoutUntil: undefined, salt, updatedAt: now });
-        await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        await patchRow(context.db, "threadPasscodes", row, { epoch, failedAttempts: 0, hash, iterations, lockoutUntil: undefined, salt, updatedAt: now });
+        await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch, threadId, userId }, unlockSecret(), now);
 
@@ -252,8 +252,8 @@ export const removeThreadPasscode = authMutation
             return { ok: false, retryAfterMs: verdict.retryAfterMs };
         }
 
-        await context.db.delete(row._id);
-        await patchRow(context.db, thread, { lockedAt: undefined, updatedAt: now });
+        await context.db.delete("threadPasscodes", row._id);
+        await patchRow(context.db, "threads", thread, { lockedAt: undefined, updatedAt: now });
 
         return { ok: true };
     });
@@ -267,7 +267,7 @@ export const removeThreadPasscode = authMutation
  */
 export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThreadId: Id<"threads">; targetThreadId: Id<"threads"> }): Promise<null> => {
     const source = await readPasscodeRow(ctx.db, args.sourceThreadId);
-    const target = await ctx.db.get(args.targetThreadId);
+    const target = await ctx.db.get("threads", args.targetThreadId);
 
     if (!source || !target) {
         throw new LunoraError("INTERNAL", "The locked chat's passcode is missing; the branch was not created.");
@@ -288,7 +288,7 @@ export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThr
         updatedAt: now,
         userId: ownerId,
     });
-    await patchRow(ctx.db, target, { lockedAt: now, updatedAt: now });
+    await patchRow(ctx.db, "threads", target, { lockedAt: now, updatedAt: now });
     await scheduleFileLinkBackfill(ctx, args.targetThreadId, ownerId);
 
     return null;
@@ -307,7 +307,7 @@ export const dropPasscodeRowsHandler = async (ctx: MutationCtx, args: { threadId
         .collect();
 
     for (const row of rows) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("threadPasscodes", row._id);
     }
 
     return null;

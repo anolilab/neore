@@ -85,7 +85,7 @@ export const tryStartCompression = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread) {
             return false;

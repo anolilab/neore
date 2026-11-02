@@ -251,8 +251,8 @@ export const isOrganizationAdmin = (scope: RlsScope, organizationId: unknown): b
  * Only the key crosses the bypass: decide access on the parent (which admits
  * it), then read the row itself through `ctx.db`.
  */
-export const parentKeyOf = async (ctx: { db: RawDatabase }, id: string, field: string): Promise<string | null> => {
-    const row = (await (systemDb(ctx) as QueryCtx["db"]).get(id as never)) as Record<string, unknown> | null;
+export const parentKeyOf = async (ctx: { db: RawDatabase }, table: string, id: string, field: string): Promise<string | null> => {
+    const row = (await (systemDb(ctx) as QueryCtx["db"]).get(table as never, id as never)) as Record<string, unknown> | null;
     const key = row?.[field];
 
     return typeof key === "string" ? key : null;

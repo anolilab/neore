@@ -207,7 +207,7 @@ export const applyGuideProposal = authMutation
             return { status: saved.status === "not_found" ? ("not_found" as const) : saved.status };
         }
 
-        await ctx.db.patch(guide._id, {
+        await ctx.db.patch("pullRequestGuides", guide._id, {
             proposals: guide.proposals.map((candidate) => (candidate.id === proposal.id ? { ...candidate, status: "applied" as const } : candidate)),
             updatedAt: ctx.now,
         });
@@ -229,7 +229,7 @@ export const dismissGuideProposal = authMutation
             return { status: "not_found" as const };
         }
 
-        await ctx.db.patch(guide._id, {
+        await ctx.db.patch("pullRequestGuides", guide._id, {
             proposals: guide.proposals.map((candidate) => (candidate.id === proposal.id ? { ...candidate, status: "dismissed" as const } : candidate)),
             updatedAt: ctx.now,
         });

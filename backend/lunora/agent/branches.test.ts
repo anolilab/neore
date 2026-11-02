@@ -71,7 +71,7 @@ beforeEach(async () => {
     await insertRow("aNew", 0, 2, assistantText("done differently"), { parentMessageId: ids.u1 });
     await insertRow("u2", 1, 0, { content: "thanks", role: "user" });
     await insertRow("a2", 1, 1, assistantText("you're welcome"));
-    await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.aOld }));
+    await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.aOld }));
 });
 
 afterEach(() => {
@@ -85,7 +85,7 @@ describe("inserting into an earlier turn", () => {
             const existing = await ctx.db.query("messages").collect();
 
             for (const row of existing) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("messages", row._id);
             }
         });
         await insertRow("u1", 0, 0, { content: "hi", role: "user" });
@@ -162,7 +162,7 @@ describe("forking a branched thread", () => {
     // that a raw row index counts and the UI does not show.
     const forkEndOf = async (target: { index?: number; messageId?: string }) =>
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 });
+            await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 });
             const end = await ctx.runQuery(resolveForkEnd, { ...target, threadId });
 
             return end?.endId;
@@ -171,7 +171,7 @@ describe("forking a branched thread", () => {
     /** Forks like `branchThread` does, and returns the copy's rows beside the parent context recorded for it. */
     const forkAndRead = async (target: { index?: number; messageId?: string }) =>
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 });
+            await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 });
             const copy = await ctx.db.insert("threads", { status: "active", title: "Fork", userId: OWNER });
             const end = await ctx.runQuery(resolveForkEnd, { ...target, threadId });
 
@@ -191,7 +191,7 @@ describe("forking a branched thread", () => {
             const contextIds: string[] = await ctx.runQuery(getForkContextIds, { index: end.index, threadId });
             const context = await Promise.all(
                 contextIds.map(async (id) => {
-                    const row = await ctx.db.get(id);
+                    const row = await ctx.db.get("messages", id);
 
                     return row.message;
                 }),
@@ -234,7 +234,7 @@ describe("forking a branched thread", () => {
 });
 
 describe("listActivePathPage past 25 rows", () => {
-    const readThread = async () => await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+    const readThread = async () => await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
 
     const pageThrough = async (numberItems: number) => {
         const thread = await readThread();
@@ -267,7 +267,7 @@ describe("listActivePathPage past 25 rows", () => {
             const existing = await ctx.db.query("messages").collect();
 
             for (const row of existing) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("messages", row._id);
             }
         });
         threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Long", userId: OWNER }));
@@ -280,7 +280,7 @@ describe("listActivePathPage past 25 rows", () => {
         }
 
         // Regenerate turn 8, then carry on for 12 turns from the new reply.
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.u8 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.u8 }));
         await addMessages({ failPendingSteps: true, messages: [{ message: assistantText("a8 again") }], promptMessageId: ids.u8 });
 
         for (let turn = 0; turn < 12; turn += 1) {
@@ -292,7 +292,7 @@ describe("listActivePathPage past 25 rows", () => {
         // Edit prompt 3 as a sibling (what `saveEditedSibling` stores), and reply.
         const edited = await addMessages({ messages: [{ message: { content: "q3 edited", role: "user" } }], parentMessageId: ids.a2b });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: edited.messages[0]?._id }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: edited.messages[0]?._id }));
         await addMessages({ messages: [{ message: assistantText("a3 edited") }] });
     });
 
@@ -305,7 +305,7 @@ describe("listActivePathPage past 25 rows", () => {
         // The edited branch, then the long regenerated one.
         for (const leaf of [undefined, regeneratedLeaf]) {
             if (leaf) {
-                await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: leaf }));
+                await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: leaf }));
             }
 
             const { branches, collected, thread } = await pageThrough(7);
@@ -336,7 +336,7 @@ describe("listActivePathPage past 25 rows", () => {
     });
 
     it("follows a switch into an older branch", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a19b }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a19b }));
 
         const { collected } = await pageThrough(9);
         const tree = buildBranchTree(await allRows());
@@ -391,7 +391,7 @@ describe("editing an assistant reply in place", () => {
             { text: "Answer A." },
         );
         await insertRow("rB0", 3, 3, { content: [{ text: "Answer B.", type: "text" }], role: "assistant" }, { parentMessageId: ids.u3 });
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.rA2 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.rA2 }));
     });
 
     const edit = async (messageId: string, text: string, userId = OWNER) =>
@@ -461,7 +461,7 @@ describe("editing an assistant reply in place", () => {
         const left = (await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect())) as { summary: string }[];
 
         expect(left.map((row) => row.summary)).toStrictEqual(["Earlier turns."]);
-        expect(((await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { summaryEpoch?: number }).summaryEpoch).toBe(1);
+        expect(((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))) as { summaryEpoch?: number }).summaryEpoch).toBe(1);
     });
 
     it("writes nothing when the same text is saved again", async () => {
@@ -514,6 +514,6 @@ describe("saving an edited prompt", () => {
                 }),
         );
 
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("threadGoals", goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 });

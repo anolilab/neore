@@ -247,7 +247,7 @@ const setGroup = async (
 ) =>
     await harness.run(
         async (ctx: any) =>
-            await ctx.db.patch(threadId, {
+            await ctx.db.patch("threads", threadId, {
                 groupChat: {
                     ...(options.debateRounds !== undefined && { debateRounds: options.debateRounds }),
                     ...(options.synthesizer !== undefined && { synthesizerSkillId: skillIds[options.synthesizer] }),
@@ -325,7 +325,7 @@ const chunks = async (): Promise<any[]> =>
 
 const statusOf = async (id: string) =>
     await harness.run(async (ctx: any) => {
-        const stream = await ctx.db.get(id);
+        const stream = await ctx.db.get("persistentStreams", id);
 
         return stream.status;
     });
@@ -495,9 +495,9 @@ describe("runGroupTurn — stop", () => {
             "INSTR:writer",
             scriptedModel([textStep("writer says hi.")], async () => {
                 await harness.run(async (ctx: any) => {
-                    const thread = await ctx.db.get(threadId);
+                    const thread = await ctx.db.get("threads", threadId);
 
-                    await ctx.db.patch(threadId, { groupChat: { ...thread.groupChat, stopRequestedAt: Date.now() } });
+                    await ctx.db.patch("threads", threadId, { groupChat: { ...thread.groupChat, stopRequestedAt: Date.now() } });
                 });
             }),
         );
@@ -602,9 +602,9 @@ describe("runGroupTurn — stop", () => {
     it("does not carry a stop from an earlier turn into the next one", async () => {
         await setGroup("supervisor", ["writer", "checker"]);
         await harness.run(async (ctx: any) => {
-            const thread = await ctx.db.get(threadId);
+            const thread = await ctx.db.get("threads", threadId);
 
-            await ctx.db.patch(threadId, { groupChat: { ...thread.groupChat, stopRequestedAt: Date.now() - 60_000 } });
+            await ctx.db.patch("threads", threadId, { groupChat: { ...thread.groupChat, stopRequestedAt: Date.now() - 60_000 } });
         });
         routerScript.speakers = ["p1", "p2"];
 
@@ -723,7 +723,7 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
 
         const awaiting = async () =>
             await harness.run(async (ctx: any) => {
-                const thread = await ctx.db.get(threadId);
+                const thread = await ctx.db.get("threads", threadId);
 
                 return thread?.awaitingInput;
             });
@@ -812,7 +812,7 @@ describe("runGroupTurn — participant access between turns", () => {
                 .withIndex("by_user_and_skill", (q: any) => q.eq("userId", OWNER).eq("skillId", skillIds.writer))
                 .collect();
 
-            await ctx.db.patch(row._id, { enabled: false });
+            await ctx.db.patch("userSkills", row._id, { enabled: false });
         });
         skillRows.delete(skillIds.checker!);
 
@@ -874,7 +874,7 @@ describe("participant management", () => {
             .withIdentity({ userId: OWNER } as never)
             .mutation(updateGroupChat as never, { mode: "round-robin", skillIds: [skillIds.writer, skillIds.reviewer], threadId } as never);
 
-        const thread: any = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread: any = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
 
         expect(thread.groupChat.mode).toBe("round-robin");
         expect(thread.groupChat.participants.map((p: any) => p.skillId)).toStrictEqual([skillIds.writer, skillIds.reviewer]);

@@ -53,7 +53,7 @@ let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
 
 const as = (userId: string) => harness.withIdentity({ userId });
-const read = async (): Promise<any> => await harness.run(async (context: any) => await context.db.get(threadId));
+const read = async (): Promise<any> => await harness.run(async (context: any) => await context.db.get("threads", threadId));
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -140,7 +140,7 @@ describe("markThreadViewed", () => {
 
     it("is a no-op for a thread that never replied", async () => {
         await harness.run(async (context: any) => {
-            await context.db.replace(threadId, { status: "active", userId: OWNER });
+            await context.db.replace("threads", threadId, { status: "active", userId: OWNER });
         });
 
         expect(await as(OWNER).mutation(markThreadViewed as never, { threadId } as never)).toStrictEqual({ updated: false });
@@ -188,7 +188,7 @@ describe("snooze and unsnooze", () => {
 describe("who can read the state", () => {
     it("shows it to the owner and strips it for a grantee", async () => {
         await harness.run(async (context: any) => {
-            await context.db.patch(threadId, { lastViewedAt: 3000, snoozedUntil: Date.now() + DAY });
+            await context.db.patch("threads", threadId, { lastViewedAt: 3000, snoozedUntil: Date.now() + DAY });
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: GRANTEE });
         });
 

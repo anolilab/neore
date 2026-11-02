@@ -82,7 +82,7 @@ describe("createThread with a projectId", () => {
     it("refuses a project that does not exist", async () => {
         const gone = await projectOf(OWNER);
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(gone));
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", gone));
         await expect(create(OWNER, gone)).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 });
@@ -123,7 +123,7 @@ describe("a project of an organization the caller belongs to", () => {
         await expect(create(MEMBER, projectId)).resolves.toBeDefined();
         expect(await read()).toBe("Ownerless notes");
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(memberId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("member", memberId));
         expect(await read()).toBeNull();
         await expect(create(MEMBER, projectId)).rejects.toMatchObject({ code: "FORBIDDEN" });
     });

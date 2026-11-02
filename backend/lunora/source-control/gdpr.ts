@@ -79,7 +79,7 @@ export const deleteUserReviewDrafts = internalMutation
             .withIndex("by_user_and_pull", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(drafts.map((draft) => ctx.db.delete(draft._id)));
+        await Promise.all(drafts.map((draft) => ctx.db.delete("reviewDrafts", draft._id)));
 
         return { hasMore: drafts.length >= BATCH };
     });
@@ -129,7 +129,7 @@ export const deleteUserWatchedRepositories = internalMutation
             .withIndex("by_user_and_repository", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+        await Promise.all(rows.map((row) => ctx.db.delete("watchedRepositories", row._id)));
 
         return { hasMore: rows.length >= BATCH };
     });
@@ -197,7 +197,7 @@ export const deleteUserGuides = internalMutation
             .withIndex("by_user_and_pull", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(guides.map((guide) => ctx.db.delete(guide._id)));
+        await Promise.all(guides.map((guide) => ctx.db.delete("pullRequestGuides", guide._id)));
 
         return { hasMore: guides.length >= BATCH };
     });
@@ -263,7 +263,7 @@ export const deleteUserPullRequestThreads = internalMutation
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(links.map((link) => ctx.db.delete(link._id)));
+        await Promise.all(links.map((link) => ctx.db.delete("pullRequestThreads", link._id)));
 
         return { hasMore: links.length >= BATCH };
     });

@@ -140,7 +140,7 @@ describe("the summarizer's input", () => {
             const threadId = await ctx.db.insert("threads", { status: "regular", title: "Salary", updatedAt: NOW, userId: USER });
 
             await ctx.db.insert("notifications", { createdAt: NOW - 1000, link: `/chat/${threadId}`, title: "Salary", type: "task", userId: USER });
-            await ctx.db.patch(threadId, { lockedAt: NOW });
+            await ctx.db.patch("threads", threadId, { lockedAt: NOW });
         });
 
         const { events } = await inputsSince(NOW - 60_000);
@@ -183,7 +183,7 @@ describe("a claim outside the morning window", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR });
+            await ctx.db.patch("dailyBriefState", row._id, { lastActiveAt: LATE - HOUR });
         });
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "outside_window" });
@@ -220,8 +220,8 @@ describe("a claim outside the morning window", () => {
             const settings = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
             const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(settings._id, { dailyBriefEnabled: false });
-            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
+            await ctx.db.patch("userSettings", settings._id, { dailyBriefEnabled: false });
+            await ctx.db.patch("dailyBriefState", row._id, { lastActiveAt: LATE - HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
         });
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "disabled" });
@@ -236,7 +236,7 @@ describe("a claim outside the morning window", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(row._id, { lastActiveAt: LATE - 3 * 24 * HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
+            await ctx.db.patch("dailyBriefState", row._id, { lastActiveAt: LATE - 3 * 24 * HOUR, scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
         });
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "inactive" });
@@ -253,7 +253,7 @@ describe("a claim outside the morning window", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.dailyBriefState.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(row._id, { lastActiveAt: LATE - HOUR, scheduledFor: later, scheduledJobId: "job-later" });
+            await ctx.db.patch("dailyBriefState", row._id, { lastActiveAt: LATE - HOUR, scheduledFor: later, scheduledJobId: "job-later" });
         });
 
         await expect(claim()).resolves.toEqual({ claimed: false, reason: "outside_window" });

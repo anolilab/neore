@@ -31,7 +31,7 @@ export const eraseVaultForUser = async (ctx: MutationCtx, userId: string): Promi
         // deleted concurrently counts as one nested trigger chain (the
         // engine refuses past 50 levels).
         for (const file of files) {
-            await ctx.db.delete(file._id);
+            await ctx.db.delete("files", file._id);
         }
 
         return { hasMore: true };
@@ -43,7 +43,7 @@ export const eraseVaultForUser = async (ctx: MutationCtx, userId: string): Promi
         .take(BATCH);
 
     for (const folder of folders) {
-        await ctx.db.delete(folder._id);
+        await ctx.db.delete("folders", folder._id);
     }
 
     return { hasMore: folders.length >= BATCH };

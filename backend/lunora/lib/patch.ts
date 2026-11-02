@@ -15,6 +15,7 @@
  * `patch-undefined.guard.test.ts` type-checks every `db.patch` call and fails on
  * one that can still pass `undefined`.
  */
+import type { Id, TableName } from "../_generated/dataModel";
 
 /**
  * With `exactOptionalPropertyTypes` off, an optional key always reads as
@@ -32,10 +33,12 @@ export type Defined<T> = UndefinedStripped & { [K in keyof T]?: Exclude<T[K], un
 export const withoutUndefined = <T extends object>(fields: T): Defined<T> =>
     Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Defined<T>;
 
-interface RowWriter<Id> {
-    get: (id: Id) => Promise<unknown>;
-    patch: (id: Id, value: never) => Promise<unknown>;
-    replace: (id: Id, value: never) => Promise<unknown>;
+// `never` parameters: the real writer's by-id methods are generic over the table, and a
+// `never` target accepts any of them. `table` and `row._id` are tied together below.
+interface RowWriter {
+    get: (table: never, id: never) => Promise<unknown>;
+    patch: (table: never, id: never, value: never) => Promise<unknown>;
+    replace: (table: never, id: never, value: never) => Promise<unknown>;
 }
 
 /** System-managed keys (`_id`, `_creationTime`, …) are never written back. */
@@ -46,12 +49,17 @@ const isSystemKey = (key: string): boolean => key.startsWith("_");
  * With nothing to remove it is a plain patch; otherwise the row is replaced from
  * its current contents minus the removed keys.
  */
-export const patchRow = async <Id, R extends { _id: Id }>(db: Pick<RowWriter<Id>, "patch" | "replace">, row: R, changes: object): Promise<void> => {
+export const patchRow = async <T extends TableName, R extends { _id: Id<T> }>(
+    db: Pick<RowWriter, "patch" | "replace">,
+    table: T,
+    row: R,
+    changes: object,
+): Promise<void> => {
     const entries = Object.entries(changes);
     const removed = new Set(entries.filter(([, value]) => value === undefined).map(([key]) => key));
 
     if (removed.size === 0) {
-        await db.patch(row._id, changes as never);
+        await db.patch(table as never, row._id as never, changes as never);
 
         return;
     }
@@ -60,19 +68,18 @@ export const patchRow = async <Id, R extends { _id: Id }>(db: Pick<RowWriter<Id>
         Object.entries({ ...row, ...changes }).filter(([key, value]) => !isSystemKey(key) && !removed.has(key) && value !== undefined),
     );
 
-    // eslint-disable-next-line unicorn/no-unsafe-string-replacement -- `db.replace` is the row writer, not `String#replace`.
-    await db.replace(row._id, next as never);
+    await db.replace(table as never, row._id as never, next as never);
 };
 
 /** The same as {@link patchRow}, for a row not loaded yet. Returns `false`, writing nothing, when the row is gone. */
-export const patchById = async <Id>(db: RowWriter<Id>, id: Id, changes: object): Promise<boolean> => {
-    const row = (await db.get(id)) as { _id: Id } | null;
+export const patchById = async <T extends TableName>(db: RowWriter, table: T, id: Id<T>, changes: object): Promise<boolean> => {
+    const row = (await db.get(table as never, id as never)) as { _id: Id<T> } | null;
 
     if (!row) {
         return false;
     }
 
-    await patchRow(db, row, changes);
+    await patchRow(db, table, row, changes);
 
     return true;
 };

@@ -36,7 +36,7 @@ describe("locked chat notifications", () => {
             const locked = await ctx.db.insert("notifications", { ...base, body: "reply text", link: `/chat/${lockedId}`, title: "Salary" });
             const open = await ctx.db.insert("notifications", { ...base, body: "fine", link: `/chat/${openId}`, title: "Open" });
 
-            return [await ctx.db.get(locked), await ctx.db.get(open)];
+            return [await ctx.db.get("notifications", locked), await ctx.db.get("notifications", open)];
         });
         const views = await harness.run(async (ctx: any) => await toRedactedNotificationViews(ctx.db, rows));
 

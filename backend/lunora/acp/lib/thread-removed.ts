@@ -61,7 +61,7 @@ export const endHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"threads"
     const session = await sessionOfThread(ctx, thread._id);
 
     if (session && session.status !== "ended") {
-        await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+        await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
     }
 };
 
@@ -82,6 +82,6 @@ export const restoreHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"thre
 
     // A revoked device is deleted, and its sessions stay ended: nothing is left to post.
     if (session?.status === "ended" && (await ctx.db.devices.findFirst({ where: { _id: session.deviceId } }))) {
-        await ctx.db.patch(session._id, { status: "offline", updatedAt: now });
+        await ctx.db.patch("acpSessions", session._id, { status: "offline", updatedAt: now });
     }
 };

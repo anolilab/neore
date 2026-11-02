@@ -26,8 +26,8 @@ export const eraseConnectorsForUser = async (ctx: MutationCtx, userId: string): 
         .collect();
 
     await Promise.all([
-        ...userConnectors.map((uc) => ctx.db.delete(uc._id)),
-        ...oauthStates.map((os) => ctx.db.delete(os._id)),
-        ...mcpServerGrants.map((grant) => ctx.db.delete(grant._id)),
+        ...userConnectors.map((uc) => ctx.db.delete("userConnectors", uc._id)),
+        ...oauthStates.map((os) => ctx.db.delete("oauthStates", os._id)),
+        ...mcpServerGrants.map((grant) => ctx.db.delete("mcpServerGrants", grant._id)),
     ]);
 };

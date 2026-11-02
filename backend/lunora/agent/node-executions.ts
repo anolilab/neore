@@ -6,7 +6,9 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
 
-export const get = internalQuery.input({ nodeExecutionId: v.id("nodeExecutions") }).query(async ({ args, ctx }) => await ctx.db.get(args.nodeExecutionId));
+export const get = internalQuery
+    .input({ nodeExecutionId: v.id("nodeExecutions") })
+    .query(async ({ args, ctx }) => await ctx.db.get("nodeExecutions", args.nodeExecutionId));
 
 export const listByExecution = internalQuery.input({ executionId: v.id("workflowExecutions") }).query(async ({ args, ctx }) => {
     const nodeExecutions = await ctx.db
@@ -41,7 +43,7 @@ export const create = internalMutation
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
     })
     .mutation(async ({ args, ctx }) => {
-        const execution = await ctx.db.get(args.executionId);
+        const execution = await ctx.db.get("workflowExecutions", args.executionId);
 
         assert(execution, `Execution ${args.executionId} not found`);
 
@@ -58,7 +60,7 @@ export const create = internalMutation
         });
         const nodeExecutionId = insertedId as Id<"nodeExecutions">;
 
-        const nodeExecution = await ctx.db.get(nodeExecutionId);
+        const nodeExecution = await ctx.db.get("nodeExecutions", nodeExecutionId);
 
         assert(nodeExecution, `Node execution ${nodeExecutionId} not found`);
 
@@ -81,14 +83,15 @@ export const update = internalMutation
         ),
     })
     .mutation(async ({ args, ctx }) => {
-        const nodeExecution = await ctx.db.get(args.nodeExecutionId);
+        const nodeExecution = await ctx.db.get("nodeExecutions", args.nodeExecutionId);
 
         assert(nodeExecution, `Node execution ${args.nodeExecutionId} not found`);
 
-        const execution = await ctx.db.get(nodeExecution.executionId);
+        const execution = await ctx.db.get("workflowExecutions", nodeExecution.executionId);
 
         assert(execution, `Execution ${nodeExecution.executionId} not found`);
         await ctx.db.patch(
+            "nodeExecutions",
             args.nodeExecutionId,
             withoutUndefined({
                 completedAt: args.completedAt,
@@ -101,7 +104,7 @@ export const update = internalMutation
             }),
         );
 
-        return await ctx.db.get(args.nodeExecutionId);
+        return await ctx.db.get("nodeExecutions", args.nodeExecutionId);
     });
 
 export const deleteByExecution = internalMutation
@@ -113,7 +116,7 @@ export const deleteByExecution = internalMutation
             .withIndex("by_execution_and_node", (q) => q.eq("executionId", args.executionId))
             .collect();
 
-        await Promise.all(nodeExecs.map((nodeExecution) => ctx.db.delete(nodeExecution._id)));
+        await Promise.all(nodeExecs.map((nodeExecution) => ctx.db.delete("nodeExecutions", nodeExecution._id)));
 
         return null;
     });

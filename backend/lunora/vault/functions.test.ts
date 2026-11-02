@@ -59,7 +59,7 @@ describe("deleteAttachments", () => {
 
         await harness.withIdentity({ userId: OWNER } as never).mutation(deleteAttachments as never, { attachmentIds: ids } as never);
 
-        const remaining = await harness.run(async (ctx: any) => await Promise.all(ids.map(async (id) => await ctx.db.get(id))));
+        const remaining = await harness.run(async (ctx: any) => await Promise.all(ids.map(async (id) => await ctx.db.get("files", id))));
 
         expect(remaining.filter(Boolean)).toHaveLength(0);
     });
@@ -71,14 +71,14 @@ describe("deleteAttachments", () => {
 
         await harness.withIdentity({ userId: OWNER } as never).mutation(deleteAttachments as never, { attachmentIds: [orphan] } as never);
 
-        expect(await harness.run(async (ctx: any) => Boolean(await ctx.db.get(orphan)))).toBe(true);
+        expect(await harness.run(async (ctx: any) => Boolean(await ctx.db.get("files", orphan)))).toBe(true);
     });
 });
 
 describe("discardUnfiledVaultFile", () => {
     const discard = async (fileId: string, userId = OWNER) =>
         await harness.run(async (ctx: any) => await ctx.runMutation(discardUnfiledVaultFile, { fileId, userId }));
-    const exists = async (id: string) => await harness.run(async (ctx: any) => Boolean(await ctx.db.get(id)));
+    const exists = async (id: string) => await harness.run(async (ctx: any) => Boolean(await ctx.db.get("files", id)));
 
     it("deletes an unfiled chat-less file of the user", async () => {
         const id = await harness.run(

@@ -78,7 +78,7 @@ const seedPausedRun = async (harness: ReturnType<typeof lunoraTest>, lockedAt: n
         });
 
         if (lockedAt !== undefined) {
-            await ctx.db.patch(threadId, { lockedAt });
+            await ctx.db.patch("threads", threadId, { lockedAt });
         }
 
         return { streamId: String(streamId), threadId: String(threadId) };
@@ -99,8 +99,8 @@ const resume = async (harness: ReturnType<typeof lunoraTest>, ids: { streamId: s
 
 const readRows = async (harness: ReturnType<typeof lunoraTest>, ids: { streamId: string; threadId: string }) =>
     await harness.run(async (ctx: any) => {
-        const thread = await ctx.db.get(ids.threadId as never);
-        const stream = await ctx.db.get(ids.streamId as never);
+        const thread = await ctx.db.get("threads", ids.threadId as never);
+        const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
 
         return { status: thread?.status, streamStatus: stream?.status };
     });
@@ -149,7 +149,7 @@ describe("continueAfterToolApproval and the chat lock", () => {
 describe("continueAfterToolApproval and the pause it answered", () => {
     const awaitingOf = async (harness: ReturnType<typeof lunoraTest>, ids: { threadId: string }) =>
         await harness.run(async (ctx: any) => {
-            const thread = await ctx.db.get(ids.threadId as never);
+            const thread = await ctx.db.get("threads", ids.threadId as never);
 
             return { awaitingInput: thread?.awaitingInput, status: thread?.status };
         });
@@ -160,10 +160,10 @@ describe("continueAfterToolApproval and the pause it answered", () => {
         try {
             const ids = await seedPausedRun(harness, undefined);
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { awaitingInput: "approval" }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "approval" }));
             // A stop ends the stream before the run returns.
             vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
-                await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { status: "done" }));
+                await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { status: "done" }));
 
                 return { lastMessageId: undefined, paused: false, stopped: true };
             });
@@ -183,7 +183,7 @@ describe("continueAfterToolApproval and the pause it answered", () => {
             const ids = await seedPausedRun(harness, undefined);
 
             // The stream is still live: a newer run owns `awaitingInput` now.
-            await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { awaitingInput: "question" }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "question" }));
             vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ lastMessageId: undefined, paused: false, stopped: true });
 
             await resume(harness, ids);

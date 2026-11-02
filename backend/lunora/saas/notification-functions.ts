@@ -94,7 +94,7 @@ export const markNotificationsRead = authMutation.use(rateLimit("notifications/u
         .withIndex("by_userId_isRead", (q) => q.eq("userId", userId).eq("isRead", false))
         .collect();
 
-    await Promise.all(unread.map((n: any) => ctx.db.patch(n._id, { isRead: true })));
+    await Promise.all(unread.map((n: any) => ctx.db.patch("gatewayNotifications", n._id, { isRead: true })));
 
     ctx.log.event("saas.mark_notifications_read", { count: unread.length });
 });

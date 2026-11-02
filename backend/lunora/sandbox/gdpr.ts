@@ -21,14 +21,14 @@ export const eraseSandboxSessionsForUser = async (ctx: MutationCtx, userId: stri
             .withIndex("by_sessionId_timestamp", (q) => q.eq("sessionId", session._id))
             .take(BATCH);
 
-        await Promise.all(actions.map((action) => ctx.db.delete(action._id)));
+        await Promise.all(actions.map((action) => ctx.db.delete("sandboxActions", action._id)));
 
         if (full(actions)) {
             hasMore = true;
             continue;
         }
 
-        await ctx.db.delete(session._id);
+        await ctx.db.delete("sandboxSessions", session._id);
     }
 
     return { hasMore: hasMore || full(sessions) };

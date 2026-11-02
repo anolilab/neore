@@ -86,19 +86,19 @@ export const getUser = async (context: AuthContext, userId: string): Promise<(Do
  * Typed wrapper for patching Better Auth organization.
  */
 export const patchOrganization = async (context: MutationContext, organizationId: string, updates: Partial<Doc<"organization">>): Promise<void> => {
-    await context.db.patch(context.db.asId("organization", organizationId), withoutUndefined(updates));
+    await context.db.patch("organization", context.db.asId("organization", organizationId), withoutUndefined(updates));
 };
 
 /**
  * Typed wrapper for patching Better Auth member.
  */
 export const patchMember = async (context: MutationContext, memberId: string, updates: Partial<Doc<"member">>): Promise<void> => {
-    await context.db.patch(context.db.asId("member", memberId), withoutUndefined(updates));
+    await context.db.patch("member", context.db.asId("member", memberId), withoutUndefined(updates));
 };
 
 /**
  * Typed wrapper for patching Better Auth invitation.
  */
 export const patchInvitation = async (context: MutationContext, invitationId: string, updates: Partial<Doc<"invitation">>): Promise<void> => {
-    await context.db.patch(context.db.asId("invitation", invitationId), withoutUndefined(updates));
+    await context.db.patch("invitation", context.db.asId("invitation", invitationId), withoutUndefined(updates));
 };

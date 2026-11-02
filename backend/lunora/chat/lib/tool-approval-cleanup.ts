@@ -55,7 +55,7 @@ export const deleteToolApprovalRunsForThread = async (ctx: Pick<MutationCtx, "db
         .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
         .collect();
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("toolApprovalRuns", row._id)));
 
     return rows.length;
 };
@@ -78,7 +78,7 @@ export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">,
 
     const expired = [...pending, ...approved, ...denied];
 
-    await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(expired.map((row) => ctx.db.delete("toolApprovalRuns", row._id)));
     await releaseExpiredPauses(ctx, expired);
 
     return expired.length;
@@ -103,7 +103,7 @@ export const purgeExpiredToolApprovalRunsForUser = async (ctx: Pick<MutationCtx,
         .take(PURGE_BATCH);
     const expired = rows.filter((row) => isToolApprovalRunExpired(row, now));
 
-    await Promise.all(expired.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(expired.map((row) => ctx.db.delete("toolApprovalRuns", row._id)));
     await releaseExpiredPauses(ctx, expired);
 
     return expired.length;

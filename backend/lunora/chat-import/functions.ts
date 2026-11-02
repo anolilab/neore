@@ -92,7 +92,7 @@ const RECENT_IMPORTS_RELEASED = 10;
  * cancelled run still holds.
  */
 export const releaseSupersededImportFiles = async (
-    context: { db: { patch: (id: never, value: { r2Key: string }) => Promise<unknown>; query: any }; scheduler: unknown },
+    context: { db: { patch: (table: "chatImportJobs", id: never, value: { r2Key: string }) => Promise<unknown>; query: any }; scheduler: unknown },
     userId: string,
 ): Promise<void> => {
     const recent = await context.db
@@ -104,7 +104,7 @@ export const releaseSupersededImportFiles = async (
         (job: { _id: string; r2Key?: string; status: string }) => job.status === "failed" && job.r2Key === keptImportKeyFor(userId, job._id),
     );
 
-    await Promise.all(kept.map((job: { _id: never }) => context.db.patch(job._id, { r2Key: "" })));
+    await Promise.all(kept.map((job: { _id: never }) => context.db.patch("chatImportJobs", job._id, { r2Key: "" })));
     await scheduleObjectDeletion(
         context,
         kept.map((job: { r2Key?: string }) => job.r2Key),
@@ -198,7 +198,7 @@ export const restartImportJob = authMutation
     .mutation(async ({ args: input, ctx }) => {
         const { userId } = ctx.user;
         const jobId = ctx.db.asId("chatImportJobs", input.jobId);
-        const job = await ctx.db.get(jobId);
+        const job = await ctx.db.get("chatImportJobs", jobId);
 
         if (!job || job.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Import job not found");
@@ -233,7 +233,7 @@ export const restartImportJob = authMutation
         // finalize, if it is redelivered now, no longer matches the job and does nothing.
         const runId = String(ctx.now);
 
-        await patchRow(ctx.db, job, {
+        await patchRow(ctx.db, "chatImportJobs", job, {
             completedAt: undefined,
             currentStep: "processing_conversations",
             errorMessage: undefined,
@@ -269,14 +269,14 @@ export const cancelImportJob = authMutation
         const { userId } = ctx.user;
         // `jobId` arrives as a wire string; `asId` is the parse boundary that brands it.
         const jobId = ctx.db.asId("chatImportJobs", input.jobId);
-        const job = await ctx.db.get(jobId);
+        const job = await ctx.db.get("chatImportJobs", jobId);
 
         if (!job || job.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Import job not found");
         }
 
         if (job.status === "processing") {
-            await ctx.db.patch(jobId, {
+            await ctx.db.patch("chatImportJobs", jobId, {
                 completedAt: ctx.now,
                 errorMessage: "Cancelled by user",
                 status: "failed",

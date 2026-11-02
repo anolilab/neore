@@ -14,7 +14,7 @@ export const threadIdOfLink = (link: string | undefined): string | undefined => 
 
 /** True when `link` names a thread that is currently locked. Unreadable threads are not locked here. */
 export const linksToLockedThread = async (
-    db: { get: (id: Id<"threads">) => Promise<{ lockedAt?: number | null } | null> },
+    db: { get: (table: "threads", id: Id<"threads">) => Promise<{ lockedAt?: number | null } | null> },
     link: string | undefined,
 ): Promise<boolean> => {
     const threadId = threadIdOfLink(link);
@@ -23,7 +23,7 @@ export const linksToLockedThread = async (
         return false;
     }
 
-    const thread = await db.get(threadId as Id<"threads">);
+    const thread = await db.get("threads", threadId as Id<"threads">);
 
     return thread !== null && isThreadLocked(thread);
 };

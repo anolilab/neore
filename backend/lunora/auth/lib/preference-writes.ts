@@ -42,7 +42,7 @@ export const saveAiUserPreferences = async (
     fields: AiUserPreferencesPatch,
 ): Promise<void> => {
     if (existing) {
-        await db.patch(existing._id, withoutUndefined(fields));
+        await db.patch("aiUserPreferences", existing._id, withoutUndefined(fields));
     } else {
         await db.insert("aiUserPreferences", { ...fields, userId });
     }
@@ -56,7 +56,7 @@ export const saveUserSettings = async (
     fields: UserSettingsPatch,
 ): Promise<void> => {
     if (existing) {
-        await db.patch(existing._id, withoutUndefined(fields));
+        await db.patch("userSettings", existing._id, withoutUndefined(fields));
     } else {
         await db.insert("userSettings", { ...fields, userId });
     }

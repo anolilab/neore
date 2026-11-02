@@ -87,7 +87,7 @@ const ensureScheduled = async (ctx: MutationCtx, userId: string, timeZone: strin
     }
 
     if (state) {
-        await ctx.db.patch(state._id, { lastActiveAt: now, ...scheduled });
+        await ctx.db.patch("dailyBriefState", state._id, { lastActiveAt: now, ...scheduled });
     } else {
         await ctx.db.insert("dailyBriefState", { lastActiveAt: now, userId, ...scheduled });
     }
@@ -175,9 +175,9 @@ export const claimDailyBrief = internalMutation
                 const scheduledFor = nextBriefRunAt(now, settings?.timezone, userId);
                 const scheduledJobId = await ctx.scheduler.runAt(scheduledFor, internal.notifications.daily_brief.runDailyBrief, { userId });
 
-                await patchRow(ctx.db, state, { scheduledFor, scheduledJobId });
+                await patchRow(ctx.db, "dailyBriefState", state, { scheduledFor, scheduledJobId });
             } else {
-                await patchRow(ctx.db, state, clearPending);
+                await patchRow(ctx.db, "dailyBriefState", state, clearPending);
             }
 
             return { claimed: false as const, reason: eligibility.reason };
@@ -185,7 +185,7 @@ export const claimDailyBrief = internalMutation
 
         const since = state.lastRunAt ?? now - DAY_MS;
 
-        await patchRow(ctx.db, state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
+        await patchRow(ctx.db, "dailyBriefState", state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
 
         return { claimed: true as const, localDay: eligibility.localDay, since };
     });

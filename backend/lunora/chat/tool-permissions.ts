@@ -135,7 +135,7 @@ const quickCheckAllowed = async (
         return false;
     }
 
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
     const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
     if (!isDeviceEligibleThread(thread, userId, grant !== null)) {
@@ -544,7 +544,7 @@ export const recordPendingToolApprovals = internalMutation
     .output(v.null())
     .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, secretApprovalIds, threadId, userId }, ctx }) => {
         const createdAt = ctx.now;
-        const thread = await ctx.db.get(threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">);
         // The row belongs to the thread OWNER, whoever's turn paused: only the
         // owner can answer (`claimToolApproval` requires `run.userId` to be the
         // owner), and their home's "Needs you" lists rows by `userId`. Stored
@@ -691,7 +691,7 @@ export const getPendingToolApproval = internalQuery
     .input({ approvalId: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.union(v.object({ toolName: v.union(v.string(), v.null()) }), v.null()))
     .query(async ({ args: { approvalId, threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">);
 
         if (!thread || thread.deleted || thread.userId !== userId) {
             return null;

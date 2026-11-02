@@ -10,5 +10,5 @@ type CallFields = Partial<Omit<Doc<"deviceCalls">, "_creationTime" | "_id">>;
  * caller's transaction and the `cross_module_table_write` rule sees it go through the owner's surface.
  */
 export const patchDeviceCall = async (ctx: Pick<MutationCtx, "db">, callId: Id<"deviceCalls">, fields: CallFields): Promise<void> => {
-    await ctx.db.patch(callId, withoutUndefined(fields));
+    await ctx.db.patch("deviceCalls", callId, withoutUndefined(fields));
 };

@@ -75,7 +75,11 @@ export const deleteUserTasks = internalMutation
                 .take(BATCH),
         ]);
 
-        await Promise.all([...runs, ...tasks, ...goals].map((row) => ctx.db.delete(row._id)));
+        await Promise.all([
+            ...runs.map((row) => ctx.db.delete("taskRuns", row._id)),
+            ...tasks.map((row) => ctx.db.delete("tasks", row._id)),
+            ...goals.map((row) => ctx.db.delete("goals", row._id)),
+        ]);
 
         return { hasMore: [runs, tasks, goals].some((rows) => rows.length >= BATCH) };
     });

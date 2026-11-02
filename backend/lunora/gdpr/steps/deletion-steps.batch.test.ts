@@ -264,13 +264,13 @@ describe("batched account-deletion steps", () => {
                 await ctx.db.insert("files", { folderId: folder, key: `k-${String(index)}`, name: "f", size: 1, type: "text/plain", userId: A });
             }
 
-            const parent = await ctx.db.get(folder);
-            const firstPass = await deleteParentsWithChildren(ctx, [parent], async () => {
+            const parent = await ctx.db.get("folders", folder);
+            const firstPass = await deleteParentsWithChildren(ctx, { child: "files", parent: "folders" }, [parent], async () => {
                 const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
 
                 return page;
             });
-            const secondPass = await deleteParentsWithChildren(ctx, [parent], async () => {
+            const secondPass = await deleteParentsWithChildren(ctx, { child: "files", parent: "folders" }, [parent], async () => {
                 const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
 
                 return page;
