@@ -14,6 +14,7 @@ import {
     HANDOFF_REFUSED_OVER_BUDGET,
     HANDOFF_SUMMARY_MAX_TOKENS,
     HandoffTooLargeError,
+    handoffLimitsFor,
     handoffTokens,
     type HandoffTurn,
     planHandoff,
@@ -153,5 +154,46 @@ describe("the budget, measured", () => {
         expect(report.handoffTokens).toBeLessThanOrEqual(HANDOFF_BUDGET_TOKENS);
         expect(report.threadTokens).toBeGreaterThan(PROMPT_CACHE_COLD_START_TOKENS * 3);
         expect(report.tailTurns).toBeGreaterThanOrEqual(20);
+    });
+});
+
+describe("handoffLimitsFor", () => {
+    const fixture = longThreadFixture();
+    const newestFirst = fixture.toReversed();
+
+    it("keeps the measured budget for a window that is roomy and for one that is unknown", () => {
+        expect(handoffLimitsFor(128_000)).toStrictEqual({ budgetTokens: HANDOFF_BUDGET_TOKENS, summaryMaxTokens: HANDOFF_SUMMARY_MAX_TOKENS });
+        expect(handoffLimitsFor()).toStrictEqual(handoffLimitsFor(128_000));
+        expect(handoffLimitsFor(NaN)).toStrictEqual(handoffLimitsFor(128_000));
+    });
+
+    it("takes a quarter of a small window, with a floor, and scales the summary with it", () => {
+        expect(handoffLimitsFor(16_000)).toStrictEqual({ budgetTokens: 4000, summaryMaxTokens: 666 });
+        expect(handoffLimitsFor(1000).budgetTokens).toBeGreaterThan(0);
+        expect(handoffLimitsFor(1000)).toStrictEqual(handoffLimitsFor(2000));
+    });
+
+    it("plans a handoff that fits a small window, summary at its limit included", () => {
+        const limits = handoffLimitsFor(8000);
+        const { older, tail } = planHandoff(newestFirst, limits);
+        const text = assertWithinBudget(composeHandoff({ kind: "portable", summary: "x".repeat(limits.summaryMaxTokens * 4), tail }), limits);
+
+        expect(older.length).toBeGreaterThan(0);
+        expect(handoffTokens(text)).toBeLessThanOrEqual(limits.budgetTokens);
+        expect(limits.budgetTokens * 4).toBeLessThan(8000 * 4);
+        expect(tail.length).toBeLessThan(planHandoff(newestFirst).tail.length);
+    });
+
+    it("refuses a handoff over the small budget that the default budget would take", () => {
+        const text = composeHandoff({ kind: "portable", summary: "x".repeat(HANDOFF_SUMMARY_MAX_TOKENS * 4), tail: [] });
+
+        expect(assertWithinBudget(text)).toBe(text);
+        expect(() => assertWithinBudget(text, handoffLimitsFor(8000))).toThrow(HandoffTooLargeError);
+    });
+
+    it("cuts a summary to the small allotment", () => {
+        const limits = handoffLimitsFor(8000);
+
+        expect(capSummary("y".repeat(HANDOFF_SUMMARY_MAX_TOKENS * 4), limits).length).toBeLessThanOrEqual(limits.summaryMaxTokens * 4);
     });
 });

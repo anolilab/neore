@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentSwitchOf } from "../agent/agent-switch-logic";
 import { handoffAboveOf, handoffBeforeDeltaOf } from "../agent/agent-switch";
 import { collectHandoffSource } from "../agent/handoff-source";
-import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_MAX_TOKENS, handoffTokens } from "../agent/handoff";
+import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_MAX_TOKENS, handoffLimitsFor, handoffTokens } from "../agent/handoff";
 import { assembleHandoffContext } from "../agent/handoff-context";
 import { hasClaim, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
@@ -22,6 +22,17 @@ import {
     switchThreadAgentHandler,
     type Summarise,
 } from "./agent-switch";
+
+// A model whose window a test sets: the registry's models all have 128k or more, which no handoff budget has to shrink for.
+const { windows } = vi.hoisted(() => {
+    return { windows: new Map<string, number>() };
+});
+
+vi.mock(import("./lib/auto-continue"), async (importOriginal) => {
+    const original = await importOriginal();
+
+    return { ...original, getModelContextWindow: (modelId: string) => windows.get(modelId) ?? original.getModelContextWindow(modelId) };
+});
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -142,6 +153,7 @@ beforeEach(async () => {
 
 afterEach(() => {
     harness.close();
+    windows.clear();
 });
 
 describe("a switch above the cold-start threshold", () => {
@@ -582,5 +594,62 @@ describe("a window that starts below the divider", () => {
         await switchTo(A, "click-2", "portable");
 
         expect(await handoffFlag()).toBe(true);
+    });
+});
+
+describe("a switch to a model with a small context window", () => {
+    const SMALL_WINDOW = 6000;
+
+    beforeEach(async () => {
+        windows.set(C, SMALL_WINDOW);
+
+        // 12 turns of 2,000 characters: 6k tokens. Well under the cold-start threshold, so the history would go whole
+        // to a big model, but it does not fit the small one beside a reply.
+        for (let index = 0; index < 12; index += 1) {
+            await addTurn(`question ${index} ${"q".repeat(900)}`, `answer ${index} ${"a".repeat(900)}`);
+        }
+    });
+
+    it("hands over a summary inside a budget derived from the window, instead of the whole history", async () => {
+        const limits = handoffLimitsFor(SMALL_WINDOW);
+        const result = await switchTo(C, "click-1");
+        const [part] = await dividers();
+
+        expect(result).toMatchObject({ agent: { model: C }, switched: true });
+        expect(part).toMatchObject({ mode: "portable", summarized: true });
+        expect(limits.budgetTokens).toBeLessThan(HANDOFF_BUDGET_TOKENS);
+        expect(handoffTokens(part!.handoff!)).toBeLessThanOrEqual(limits.budgetTokens);
+        expect(summaryCalls).toHaveBeenCalledWith(expect.any(Array), expect.any(Boolean), limits);
+    });
+
+    it("cuts a summary that outgrows the smaller allotment", async () => {
+        const limits = handoffLimitsFor(SMALL_WINDOW);
+
+        summaryCalls.mockResolvedValue(Array.from({ length: 4000 }, (_, index) => `point ${index}`).join("\n"));
+
+        expect(await switchTo(C, "click-1")).toMatchObject({ switched: true });
+
+        const [part] = await dividers();
+
+        expect(handoffTokens(part!.handoff!)).toBeLessThanOrEqual(limits.budgetTokens);
+        expect(part!.handoff).not.toContain("> point 3999");
+    });
+
+    it("keeps the whole history for a model whose window holds it", async () => {
+        expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
+        expect(await dividers()).toMatchObject([{ mode: "full" }]);
+        expect(summaryCalls).not.toHaveBeenCalled();
+    });
+
+    it("hands over even when the whole history was asked for, rather than overflow the window", async () => {
+        expect(await switchTo(C, "click-1", "full")).toMatchObject({ switched: true });
+        expect(await dividers()).toMatchObject([{ mode: "portable", summarized: true }]);
+    });
+
+    it("previews a handoff as the default for it, within its own budget", async () => {
+        const preview = await run(async (ctx) => await previewAgentSwitchHandler(ctx, { model: C, threadId: threadId as never, userId: owner }));
+
+        expect(preview).toMatchObject({ coldStartCostly: false, defaultMode: "portable" });
+        expect(preview.handoffTokens).toBeLessThanOrEqual(handoffLimitsFor(SMALL_WINDOW).budgetTokens);
     });
 });

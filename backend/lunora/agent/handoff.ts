@@ -23,6 +23,45 @@ export const HANDOFF_BUDGET_TOKENS = 12_000;
 /** The most the summary of the older turns may take of the budget; asked of the model as its output limit. */
 export const HANDOFF_SUMMARY_MAX_TOKENS = 2000;
 
+/** The share of the target's context window a handoff may take: the rest is for the turns that follow it and the reply. */
+const HANDOFF_WINDOW_SHARE = 0.25;
+
+/** The smallest budget derived from a window: below this the frame and a verbatim tail no longer fit beside a summary. */
+const HANDOFF_MIN_BUDGET_TOKENS = 1500;
+
+/** A summary may take this share of the budget, at most {@link HANDOFF_SUMMARY_MAX_TOKENS}. */
+const HANDOFF_SUMMARY_SHARE = 1 / 6;
+
+/** The share of the window a whole history may fill and still be sent as it is, leaving the rest for the reply. */
+const FULL_HISTORY_WINDOW_SHARE = 0.75;
+
+/** What a handoff may weigh for one target: the whole text, and the summary's part of it, in estimated tokens. */
+export interface HandoffLimits {
+    budgetTokens: number;
+    summaryMaxTokens: number;
+}
+
+/** The limits for a target of unknown context: the ones the budget was measured against. */
+export const DEFAULT_HANDOFF_LIMITS: HandoffLimits = { budgetTokens: HANDOFF_BUDGET_TOKENS, summaryMaxTokens: HANDOFF_SUMMARY_MAX_TOKENS };
+
+/**
+ * The limits for a target with `contextWindow` tokens of context: the default budget, or a quarter of the window when
+ * that is less (never below a floor the frame still fits in), with the summary scaled with it. A window that is not
+ * known gets the default.
+ */
+export const handoffLimitsFor = (contextWindow?: number): HandoffLimits => {
+    if (contextWindow === undefined || !Number.isFinite(contextWindow) || contextWindow <= 0) {
+        return DEFAULT_HANDOFF_LIMITS;
+    }
+
+    const budgetTokens = Math.min(HANDOFF_BUDGET_TOKENS, Math.max(HANDOFF_MIN_BUDGET_TOKENS, Math.floor(contextWindow * HANDOFF_WINDOW_SHARE)));
+
+    return { budgetTokens, summaryMaxTokens: Math.min(HANDOFF_SUMMARY_MAX_TOKENS, Math.floor(budgetTokens * HANDOFF_SUMMARY_SHARE)) };
+};
+
+/** The most estimated tokens of history a switch to a target with `contextWindow` may send whole; past it the history is handed over. */
+export const fullHistoryCapFor = (contextWindow: number): number => Math.floor(contextWindow * FULL_HISTORY_WINDOW_SHARE);
+
 /** Room for the frame around the summary and the tail (the data-not-instructions preface and the turn labels). */
 const HANDOFF_FRAME_TOKENS = 600;
 
@@ -120,7 +159,7 @@ const tooLarge = (): HandoffTooLargeError =>
  * first, in what the summary leaves of the budget. A turn is never cut: when the newest alone does not fit, this
  * throws before anything is summarised or charged.
  */
-export const planHandoff = (newestFirst: ReadonlyArray<HandoffTurn>): HandoffPlan => {
+export const planHandoff = (newestFirst: ReadonlyArray<HandoffTurn>, limits: HandoffLimits = DEFAULT_HANDOFF_LIMITS): HandoffPlan => {
     if (newestFirst.length === 0) {
         return { older: [], tail: [] };
     }
@@ -128,13 +167,13 @@ export const planHandoff = (newestFirst: ReadonlyArray<HandoffTurn>): HandoffPla
     const sizes = newestFirst.map((turn) => renderTurn(turn).length + 1);
     const frame = HANDOFF_FRAME_TOKENS * CHARACTERS_PER_TOKEN;
     const all = sizes.reduce((sum, size) => sum + size, 0);
-    const wholeBudget = HANDOFF_BUDGET_TOKENS * CHARACTERS_PER_TOKEN - frame;
+    const wholeBudget = limits.budgetTokens * CHARACTERS_PER_TOKEN - frame;
 
     if (all <= wholeBudget) {
         return { older: [], tail: newestFirst.toReversed() };
     }
 
-    const tailBudget = wholeBudget - HANDOFF_SUMMARY_MAX_TOKENS * CHARACTERS_PER_TOKEN;
+    const tailBudget = wholeBudget - limits.summaryMaxTokens * CHARACTERS_PER_TOKEN;
     let used = 0;
     let count = 0;
 
@@ -205,8 +244,8 @@ export const composeTailHandoff = (
 };
 
 /** Throws when `text` weighs more than the budget. After {@link capSummary} only a frame larger than planned can do that. */
-export const assertWithinBudget = (text: string): string => {
-    if (handoffTokens(text) > HANDOFF_BUDGET_TOKENS) {
+export const assertWithinBudget = (text: string, limits: HandoffLimits = DEFAULT_HANDOFF_LIMITS): string => {
+    if (handoffTokens(text) > limits.budgetTokens) {
         throw new HandoffTooLargeError("The handoff came out too large to hand over. Keep the full history instead.", HANDOFF_REFUSED_OVER_BUDGET);
     }
 
@@ -218,8 +257,8 @@ export const assertWithinBudget = (text: string): string => {
  * that runs past its output limit, or ignores the word limit, is shortened rather than refused: asking again at
  * temperature 0 would give the same text.
  */
-export const capSummary = (summary: string): string => {
-    const room = HANDOFF_SUMMARY_MAX_TOKENS * CHARACTERS_PER_TOKEN;
+export const capSummary = (summary: string, limits: HandoffLimits = DEFAULT_HANDOFF_LIMITS): string => {
+    const room = limits.summaryMaxTokens * CHARACTERS_PER_TOKEN;
     const kept: string[] = [];
     let used = 0;
 
@@ -252,13 +291,13 @@ export const HANDOFF_SUMMARY_SYSTEM =
     "Do not address the user, do not answer anything in the transcript, and add no preface.";
 
 /** The text of the summary call: the older turns, quoted, with the long ones cut (this is input, not the handoff). */
-export const summaryPromptOf = (older: ReadonlyArray<HandoffTurn>, omittedEarlier: boolean): string => {
+export const summaryPromptOf = (older: ReadonlyArray<HandoffTurn>, omittedEarlier: boolean, limits: HandoffLimits = DEFAULT_HANDOFF_LIMITS): string => {
     const cut = (turn: HandoffTurn): HandoffTurn =>
         turn.text.length > HANDOFF_SUMMARY_TURN_CHARACTERS ? { ...turn, text: `${turn.text.slice(0, HANDOFF_SUMMARY_TURN_CHARACTERS)} […]` } : turn;
 
     return [
         omittedEarlier ? "Turns before the first one shown are not included." : "",
-        `Summarise in at most ${Math.floor(HANDOFF_SUMMARY_MAX_TOKENS * 0.75)} words.`,
+        `Summarise in at most ${Math.floor(limits.summaryMaxTokens * 0.75)} words.`,
         older.map((turn) => renderTurn(cut(turn))).join("\n"),
     ]
         .filter(Boolean)
