@@ -14,7 +14,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { withoutUndefined } from "../../lib/patch";
-import { lockedKeysInPatch, readPolicyState } from "./organization-policy";
+import { isManagedSetting, lockedKeysInPatch, readPolicyState } from "./organization-policy";
 
 type Database = MutationCtx["db"];
 
@@ -45,7 +45,7 @@ export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEna
  * writes pay nothing. A policy that cannot be read refuses the managed keys.
  */
 export const assertSettingsWritable = async (db: Database, organizationId: string | null, fields: Readonly<Record<string, unknown>>): Promise<void> => {
-    if (organizationId === null || Object.keys(fields).length === 0) {
+    if (organizationId === null || Object.keys(fields).every((key) => fields[key] === undefined || !isManagedSetting(key))) {
         return;
     }
 
