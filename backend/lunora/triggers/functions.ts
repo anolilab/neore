@@ -18,7 +18,17 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { CLAIM_PREFIX_BATCH, holdClaim, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import {
+    CLAIM_PREFIX_BATCH,
+    claimOnce,
+    hasClaim,
+    holdClaim,
+    JOB_CLAIM_TTL_MS,
+    releaseClaim,
+    releaseClaimsWithPrefix,
+    TRIGGER_DELIVERY_CLAIM_TTL_MS,
+    TRIGGER_DELIVERY_SCOPE,
+} from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
@@ -1140,6 +1150,9 @@ const giveBackClaim = async (
  * delivery that no longer matches is recorded as filtered (replacing the running
  * row `executionId` names), is never charged, and answers `{ filtered }`.
  */
+/** The scope recording that an execution was admitted and charged, so a retry of its admission does not charge it again. */
+export const TRIGGER_ADMISSION_SCOPE = "trigger-admission";
+
 export const admitTriggerRun = internalMutation
     .input({
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
@@ -1155,6 +1168,12 @@ export const admitTriggerRun = internalMutation
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.union(v.literal("disabled"), v.literal("duplicate")) })))
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
+        // The caller retries an admission that threw. If the first try committed and only its answer was lost, the charge is
+        // already taken: answer the recorded outcome (a run that may go ahead) instead of charging the same execution again.
+        if (executionId && (await hasClaim(ctx, TRIGGER_ADMISSION_SCOPE, executionId))) {
+            return null;
+        }
+
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -1237,6 +1256,11 @@ export const admitTriggerRun = internalMutation
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {
             return await refused(DAILY_LIMIT_MESSAGE);
+        }
+
+        // Recorded in the transaction that charged, so the record exists exactly when the charge does.
+        if (executionId) {
+            await claimOnce(ctx, TRIGGER_ADMISSION_SCOPE, executionId, JOB_CLAIM_TTL_MS, trigger.userId);
         }
 
         return null;

@@ -17,7 +17,7 @@ import { releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_C
 import { hmacSha256Hex } from "../lib/crypto";
 import { DAILY_LIMIT_MESSAGE } from "../tasks/account";
 import { executeTrigger } from "./execute";
-import { admitTriggerRun } from "./functions";
+import { admitTriggerRun, TRIGGER_ADMISSION_SCOPE } from "./functions";
 import handleTriggerWebhook from "./http";
 
 const world = vi.hoisted(() => {
@@ -30,6 +30,7 @@ const world = vi.hoisted(() => {
         registry: new Map<string, unknown>(),
         releaseFailures: 0,
         retriesUnschedulable: false,
+        threadsCreated: 0,
         userExists: true,
         userLookupFailures: 0,
         userLookupThrows: false,
@@ -51,6 +52,9 @@ vi.mock("../chat/lib/headless-run", () => {
             if (world.failAt === "thread") {
                 throw new Error("thread creation failed");
             }
+
+            // The real run creates the thread here, before the model call.
+            world.threadsCreated += 1;
 
             await options.onGenerationStart?.();
 
@@ -146,6 +150,7 @@ beforeEach(() => {
     world.releaseFailures = 0;
     world.charges = 0;
     world.headlessCalls = 0;
+    world.threadsCreated = 0;
     world.userLookupFailures = 0;
     world.retriesUnschedulable = false;
     harness = lunoraTest(schema as never);
@@ -223,7 +228,12 @@ const deliver = async (
     return scheduled[0];
 };
 
-const claims = async (): Promise<{ scope: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+/** The delivery claims (the per-execution admission record sits beside them and is not what these tests are about). */
+const claims = async (): Promise<{ scope: string }[]> => {
+    const rows: { scope: string }[] = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+    return rows.filter((row) => row.scope !== TRIGGER_ADMISSION_SCOPE);
+};
 
 /** What `executeTrigger` does first with a scheduled delivery. */
 const admit = async (delivery: Scheduled) =>
@@ -539,6 +549,48 @@ describe("a gitlab-token claim is kept only for a run that reached the model", (
     });
 });
 
+describe("a retried admission", () => {
+    it("charges the daily run once when the first try committed and only its answer was lost", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: first.releaseUnlessRun,
+            triggerId: first.triggerId,
+        };
+        const admitOnce = async () => await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args));
+
+        expect(await admitOnce()).toBeNull();
+        // The caller saw an error and asks again with the same execution.
+        expect(await admitOnce()).toBeNull();
+        expect(world.charges).toBe(1);
+    });
+
+    it("still reports a refusal each time, and a refused charge is not recorded as one", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: first.releaseUnlessRun,
+            triggerId: first.triggerId,
+        };
+
+        world.chargeOk = false;
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).toBe(DAILY_LIMIT_MESSAGE);
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).not.toBeNull();
+    });
+});
+
 describe("a delivery whose claim lapsed before it was admitted", () => {
     const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
 
@@ -569,6 +621,7 @@ describe("a delivery whose claim lapsed before it was admitted", () => {
         // No model call (so no thread), no daily run used, no row, and the redelivery's claim untouched.
         expect(world.agentRuns).toBe(0);
         expect(world.headlessCalls).toBe(0);
+        expect(world.threadsCreated).toBe(0);
         expect(world.charges).toBe(0);
         expect(await executions()).toEqual([]);
         expect(await claims()).toEqual([expect.objectContaining({ claimedAt: redelivery.claim!.claimedAt })]);
