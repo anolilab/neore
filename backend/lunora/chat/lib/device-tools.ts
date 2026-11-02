@@ -27,7 +27,7 @@ import {
 } from "../../devices/lib/constants";
 import type { DeviceManifestTool } from "../../devices/lib/manifest";
 import { capUtf8 } from "../../devices/lib/signing";
-import { computeTaint } from "../../devices/lib/taint";
+import { computeTaint, mergeTaint } from "../../devices/lib/taint";
 import { toolsLogger } from "../../lib/logger";
 import { sleep } from "../tools/utilities";
 
@@ -199,7 +199,7 @@ export const buildDeviceTools = async (ctx: DeviceCtx, options: { threadId: stri
                     const created = await ctx.runMutation(internal.devices.internal.createDeviceCall, {
                         deviceId: device.deviceId as Id<"devices">,
                         input: JSON.stringify(input ?? {}),
-                        taintedBy: computeTaint(messages),
+                        taintedBy: mergeTaint(context.taintedBy, computeTaint(messages)),
                         threadId: threadId as Id<"threads">,
                         toolCallId,
                         toolName: manifestTool.name,

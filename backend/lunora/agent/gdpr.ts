@@ -8,6 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
+import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
 const EMBEDDING_TABLES = [
@@ -22,9 +23,11 @@ const EMBEDDING_TABLES = [
 
 /** Deletes an embedding row that may already be gone (a retried round, or a dangling id). */
 export const eraseEmbeddingRow = async (ctx: MutationCtx, id: string, what: string): Promise<void> => {
-    await ctx.db.delete(id as Id<VectorTableName>).catch((error: unknown) => {
+    try {
+        await deleteVectorRow(ctx.db, id as Id<VectorTableName>);
+    } catch (error: unknown) {
         gdprLogger.error(`Failed to delete ${what} ${id}:`, error);
-    });
+    }
 };
 
 /**
@@ -41,7 +44,7 @@ export const eraseEmbeddingsForUser = async (ctx: MutationCtx, userId: string): 
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+        await Promise.all(rows.map((row) => ctx.db.delete(table, row._id)));
         hasMore ||= full(rows);
     }
 
@@ -55,7 +58,7 @@ export const eraseStreamingMessagesForUser = async (ctx: MutationCtx, userId: st
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("streamingMessages", row._id)));
 
     return { hasMore: full(rows) };
 };
@@ -67,7 +70,7 @@ export const eraseStreamingMessagesForUser = async (ctx: MutationCtx, userId: st
 export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const { page: rows } = await ctx.db.chatFileAccess.findMany({ limit: BATCH, where: { userId } });
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("chatFileAccess", row._id)));
 
     return { hasMore: full(rows) };
 };
@@ -79,7 +82,7 @@ export const eraseChatFileThreadsForUser = async (ctx: MutationCtx, userId: stri
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("chatFileThreads", row._id)));
 
     return { hasMore: full(rows) };
 };
@@ -103,9 +106,9 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
     ]);
 
     await Promise.all([
-        ...relationships.map((r) => ctx.db.delete(r._id)),
-        ...temporaryThreads.map((t) => ctx.db.delete(t._id)),
-        ...threadAccess.map((a) => ctx.db.delete(a._id)),
+        ...relationships.map((r) => ctx.db.delete("threadRelationships", r._id)),
+        ...temporaryThreads.map((t) => ctx.db.delete("temporaryThreads", t._id)),
+        ...threadAccess.map((a) => ctx.db.delete("threadAccess", a._id)),
     ]);
 };
 
@@ -123,7 +126,11 @@ export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadI
         ctx.db.threadInvites.findMany({ limit: BATCH, where: { threadId } }),
     ]);
 
-    await Promise.all([...suggestions, ...summaries, ...invites].map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all([
+        ...suggestions.map(async (row) => await ctx.db.delete("followupSuggestions", row._id)),
+        ...summaries.map(async (row) => await ctx.db.delete("threadContextSummaries", row._id)),
+        ...invites.map(async (row) => await ctx.db.delete("threadInvites", row._id)),
+    ]);
 
     return full(suggestions) || full(summaries) || full(invites);
 };
@@ -132,7 +139,7 @@ export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadI
 export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     const { page: projects } = await ctx.db.projects.findMany({ where: { userId } });
 
-    await Promise.all(projects.map((p) => ctx.db.delete(p._id)));
+    await Promise.all(projects.map((p) => ctx.db.delete("projects", p._id)));
 };
 
 /** Deletes a batch of executions, each after its node rows; `true` when one was left for the next round. */
@@ -145,14 +152,14 @@ const eraseExecutionBatch = async (ctx: MutationCtx, executions: { _id: Id<"work
             .withIndex("by_execution_and_node", (q) => q.eq("executionId", execution._id))
             .take(BATCH);
 
-        await Promise.all(nodes.map((node) => ctx.db.delete(node._id)));
+        await Promise.all(nodes.map((node) => ctx.db.delete("nodeExecutions", node._id)));
 
         if (full(nodes)) {
             hasMore = true;
             continue;
         }
 
-        await ctx.db.delete(execution._id);
+        await ctx.db.delete("workflowExecutions", execution._id);
     }
 
     return hasMore;

@@ -84,7 +84,7 @@ describe("creating a worker", () => {
         expect(created).toBe(true);
         expect(run).toMatchObject({ depth: 1, mode: "worker", parentThreadId: leadId, runner: { kind: "headless" }, status: "queued", userId });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(run.childThreadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", run.childThreadId));
 
         expect(thread).toMatchObject({ status: "active", tags: ["sub-agent", "worker"], title: "Researcher", userId });
 
@@ -187,13 +187,13 @@ describe("dispatching to a worker", () => {
 
         await claim(first.run._id);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "archived" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.run.childThreadId, { status: "archived" }));
 
         const archived = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" });
 
         expect(archived).toMatchObject({ kind: "archived" });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.run.childThreadId, { status: "active" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.run.childThreadId, { status: "active" }));
 
         expect(await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-archived" })).toMatchObject({ created: true });
     });
@@ -215,7 +215,7 @@ describe("dispatching to a worker", () => {
 
     it("counts a message to an existing worker against the concurrent cap, not the lifetime cap", async () => {
         // Premium, so the hourly start limit does not end the loop below first.
-        await harness.run(async (ctx: any) => await ctx.db.patch(userId, { plan: "premium" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("user", userId, { plan: "premium" }));
 
         const workers = [];
 
@@ -254,7 +254,7 @@ describe("dispatching to a worker", () => {
     });
 
     it("counts a worker once toward the lifetime cap however many runs it had, for a one-shot sub-agent too", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(userId, { plan: "premium" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("user", userId, { plan: "premium" }));
 
         const lead = await create();
         const nested = lead.run.childThreadId as string;
@@ -321,7 +321,7 @@ describe("a worker run's claim", () => {
 
     it("marks the worker's thread running, and active again when the run ends", async () => {
         const { run } = await create();
-        const statusOf = async () => ((await harness.run(async (ctx: any) => await ctx.db.get(run.childThreadId))) as { status: string }).status;
+        const statusOf = async () => ((await harness.run(async (ctx: any) => await ctx.db.get("threads", run.childThreadId))) as { status: string }).status;
 
         await claim(run._id);
         expect(await statusOf()).toBe("running");
@@ -355,8 +355,8 @@ describe("a worker run's claim", () => {
 });
 
 describe("archiving a worker", () => {
-    const archive = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { status: "archived" }));
-    const statusOf = async (threadId: string) => ((await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { status: string }).status;
+    const archive = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { status: "archived" }));
+    const statusOf = async (threadId: string) => ((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))) as { status: string }).status;
 
     it("stays archived after the running run ends, and the next dispatch is refused", async () => {
         const { run } = await create();
@@ -463,7 +463,7 @@ describe("a Stop in a worker's thread", () => {
 
 describe("the dispatch policy", () => {
     const setPolicy = async (policy: Record<string, unknown> | undefined) =>
-        await harness.run(async (ctx: any) => await ctx.db.patch(leadId, { workerPolicy: policy }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", leadId, { workerPolicy: policy }));
 
     it("refuses a source the lead does not allow at admission, before any limit or charge, and lets an allowed one through afterwards", async () => {
         const keysBefore = await rateLimitKeys();

@@ -212,13 +212,16 @@ describe("collection CRUD and ownership", () => {
         const listed = (await as(OWNER).query(procedureAt("knowledge_functions", "listFiles"), {} as never)) as { _id: string }[];
 
         expect(listed.map((file) => file._id)).toEqual([kept]);
-        const marked = await run(async (context) => await context.db.get(dropped));
+        const marked = await run(async (context) => await context.db.get("knowledgeFiles", dropped));
 
         expect(marked.status).toBe("deleting");
 
         await run(async (context) => await context.runMutation(procedureAt("knowledge_housekeeping", "drainDeletingFiles"), {}));
 
-        const [keptRow, droppedRow] = await run(async (context) => [await context.db.get(kept), await context.db.get(dropped)]);
+        const [keptRow, droppedRow] = await run(async (context) => [
+            await context.db.get("knowledgeFiles", kept),
+            await context.db.get("knowledgeFiles", dropped),
+        ]);
 
         expect(keptRow).not.toBeNull();
         expect(keptRow.collectionId).toBeUndefined();
@@ -233,12 +236,12 @@ describe("filing files", () => {
         const fileId = await newFile(OWNER);
 
         await as(OWNER).mutation(procedureAt("knowledge_collections", "setFileCollection"), { collectionId, fileIds: [fileId] } as never);
-        const filed = await run(async (context) => await context.db.get(fileId));
+        const filed = await run(async (context) => await context.db.get("knowledgeFiles", fileId));
 
         expect(filed.collectionId).toBe(collectionId);
 
         await as(OWNER).mutation(procedureAt("knowledge_collections", "setFileCollection"), { fileIds: [fileId] } as never);
-        const unfiled = await run(async (context) => await context.db.get(fileId));
+        const unfiled = await run(async (context) => await context.db.get("knowledgeFiles", fileId));
 
         expect(unfiled.collectionId).toBeUndefined();
     });
@@ -370,7 +373,7 @@ describe("adding a URL", () => {
     it("accepts a public page into the caller's collection and refuses private addresses", async () => {
         const collectionId = await create(OWNER, "Web");
         const id = await as(OWNER).mutation(procedureAt("knowledge_documents", "addUrl"), { collectionId, url: "https://example.com/docs#top" } as never);
-        const row = await run(async (context) => await context.db.get(id));
+        const row = await run(async (context) => await context.db.get("knowledgeFiles", id));
 
         expect(row).toMatchObject({ collectionId, name: "example.com/docs", sourceUrl: "https://example.com/docs", userId: OWNER });
 

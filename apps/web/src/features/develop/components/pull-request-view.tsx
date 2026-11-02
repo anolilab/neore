@@ -23,6 +23,7 @@ import GuideTab from "./guide-tab";
 import type { HostInfo } from "./host-info";
 import MergePanel from "./merge-panel";
 import ReviewPanel from "./review-panel";
+import WorkOnPullRequest from "./work-on-pull-request";
 
 const TAB_CAPABILITY: Record<DevelopTab, HostCapabilityKey> = {
     checks: "pullRequest.checks",
@@ -106,6 +107,13 @@ const PullRequestView = ({
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
+            <WorkOnPullRequest
+                address={address}
+                baseBranch={detail.baseBranch}
+                canStart={detail.state === "open"}
+                headBranch={detail.headBranch}
+                requestNoun={requestNoun}
+            />
             {detail.state === "open" && !detail.draft && (
                 <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
             )}

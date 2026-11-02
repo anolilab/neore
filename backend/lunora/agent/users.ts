@@ -225,7 +225,7 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
     });
 
     if (streamResult.isDone) {
-        await context.db.delete(threadInProgress);
+        await context.db.delete("threads", threadInProgress);
         threadInProgress = null;
         messagesCursor = null;
         isStreamsInProgress = false;
@@ -253,7 +253,7 @@ export const getThreadUserId = internalQuery
     })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         return thread?.userId ?? null;
     });

@@ -102,7 +102,12 @@ export interface ParsedRepo {
     /** Set for github.com repositories — the only host a connector token or a PR applies to. */
     github?: { owner: string; repo: string };
     host: string;
+    /** The origin a credential for this repository may be sent to. Never another host's. */
+    origin: string;
 }
+
+/** The origin a GitHub connector token belongs to: the one place it is ever offered. */
+export const GITHUB_CREDENTIAL_ORIGIN = "https://github.com";
 
 const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/u;
 
@@ -155,10 +160,10 @@ export const parseRepoUrl = (raw: string): ParsedRepo => {
             throw new Error("GitHub repository URL must look like https://github.com/owner/repo");
         }
 
-        return { cloneUrl: `https://github.com/${owner}/${repo}.git`, github: { owner, repo }, host: "github.com" };
+        return { cloneUrl: `https://github.com/${owner}/${repo}.git`, github: { owner, repo }, host: "github.com", origin: GITHUB_CREDENTIAL_ORIGIN };
     }
 
-    return { cloneUrl: url.href, host };
+    return { cloneUrl: url.href, host, origin: url.origin };
 };
 
 const BRANCH = /^[\w./-]{1,200}$/u;
@@ -172,17 +177,27 @@ export const isValidBranchName = (branch: string): boolean =>
 /** The Basic credential git sends for a GitHub token. Also a redaction target. */
 export const githubBasicCredential = (token: string): string => btoa(`x-access-token:${token}`);
 
+/** The git config key that carries a credential for one origin, and for no other. */
+export const extraheaderKey = (origin: string): string => `http.${origin}/.extraheader`;
+
 /**
- * Git configuration that authenticates https://github.com/ without the token
- * ever touching a command line, a remote URL or `.git/config`: `GIT_CONFIG_*`
- * (git >= 2.31) injects one config entry per process.
+ * The credential for `repo`, and only when the token was saved for that repository's own origin. A token connected for
+ * github.com is never offered to a clone of another host, even though the same run may have asked for both.
  */
-export const gitAuthEnv = (githubToken: string | undefined): Record<string, string> => {
+export const credentialFor = (token: string | undefined, repo: ParsedRepo, savedOrigin = GITHUB_CREDENTIAL_ORIGIN): string | undefined =>
+    token && repo.origin === savedOrigin ? githubBasicCredential(token) : undefined;
+
+/**
+ * Git configuration that authenticates the origin the token was saved for without the token ever touching a command
+ * line, a remote URL or `.git/config`: `GIT_CONFIG_*` (git >= 2.31) injects one config entry per process. Cleartext
+ * `http` never gets it.
+ */
+export const gitAuthEnv = (githubToken: string | undefined, origin = GITHUB_CREDENTIAL_ORIGIN): Record<string, string> => {
     const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0" };
 
-    if (githubToken) {
+    if (githubToken && origin.startsWith("https://")) {
         env["GIT_CONFIG_COUNT"] = "1";
-        env["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader";
+        env["GIT_CONFIG_KEY_0"] = extraheaderKey(origin);
         env["GIT_CONFIG_VALUE_0"] = `AUTHORIZATION: basic ${githubBasicCredential(githubToken)}`;
     }
 
@@ -325,7 +340,7 @@ export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; r
         `finish() { echo "$1" > ${RUN_STATUS_PATH}; exit 0; }`,
         "cd /home/user",
         `echo ${shellQuote(`$ git clone ${input.repo.cloneUrl}${input.branch ? ` (branch ${input.branch})` : ""}`)}`,
-        `( if [ -s ${GIT_AUTH_PATH} ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; fi; rm -f ${GIT_AUTH_PATH}; timeout ${String(CLONE_TIMEOUT_S)} ${buildCloneCommand(input.repo, input.branch)} ) || { rm -f ${GIT_AUTH_PATH}; finish setup-failed:clone; }`,
+        `( if [ -s ${GIT_AUTH_PATH} ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(input.repo.origin))} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; fi; rm -f ${GIT_AUTH_PATH}; timeout ${String(CLONE_TIMEOUT_S)} ${buildCloneCommand(input.repo, input.branch)} ) || { rm -f ${GIT_AUTH_PATH}; finish setup-failed:clone; }`,
         `rm -f ${GIT_AUTH_PATH}`,
         `cd ${REPO_DIR} || finish setup-failed:clone`,
         `{ git rev-parse HEAD && git rev-parse --abbrev-ref HEAD; } > ${BASE_INFO_PATH} || finish setup-failed:rev-parse`,
@@ -442,7 +457,7 @@ export const PR_STATUS_PATH = "/tmp/neore-pr.status";
  */
 export const buildPullRequestScript = (input: { baseBranch: string; branch: string; message: string; repo: ParsedRepo }): string => {
     const withAuth = (command: string): string =>
-        `( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; timeout ${String(CLONE_TIMEOUT_S)} ${command} )`;
+        `( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(input.repo.origin))} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; timeout ${String(CLONE_TIMEOUT_S)} ${command} )`;
 
     return [
         "#!/bin/bash",

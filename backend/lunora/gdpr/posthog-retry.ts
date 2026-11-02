@@ -224,21 +224,21 @@ export const schedulePostHogRetry = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args: { failureId, requestId, userEmail, userId }, ctx: context }) => {
-        const request = await context.db.get(requestId);
+        const request = await context.db.get("gdprRequests", requestId);
 
         if (request?.userId !== userId || (request.status !== "processing" && request.status !== "failed")) {
             return false;
         }
 
         if (request.status === "processing") {
-            await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+            await context.db.patch("gdprRequests", requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
         }
 
         if (await claimOnce(context, CHAIN_SCOPE, `${requestId}:${failureId}`, ATTEMPT_CLAIM_TTL_MS)) {
             // A re-run that fails after an earlier chain ended finds the address minimised: the workflow's
             // own copy goes back on the request for this chain's confirmation (it is minimised again at its end).
             if (request.userEmail === "" && userEmail !== "") {
-                await context.db.patch(requestId, { userEmail });
+                await context.db.patch("gdprRequests", requestId, { userEmail });
             }
 
             await scheduleAttempt(context, { attempt: 1, chain: (await chainCount(context, requestId, userId)) + 1, requestId, userId });
@@ -301,7 +301,7 @@ export const startPostHogRetry = internalMutation
     .input({ attempt: v.number(), chain: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
     .output(vStartMode)
     .mutation(async ({ args: { attempt, chain, requestId, userId }, ctx: context }) => {
-        const request = await context.db.get(requestId);
+        const request = await context.db.get("gdprRequests", requestId);
 
         if (request?.userId !== userId) {
             return "skip";
@@ -351,7 +351,7 @@ export const startPostHogRetry = internalMutation
             return "skip";
         }
 
-        await context.db.patch(request._id, { status: "processing" });
+        await context.db.patch("gdprRequests", request._id, { status: "processing" });
         await record(context, "deletion_retry_started", userId, { attempt, chain, requestId });
 
         return "erase";
@@ -372,7 +372,7 @@ export const recordPostHogErased = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { posthog, ...target }, ctx: context }) => {
-        const request = await context.db.get(target.requestId);
+        const request = await context.db.get("gdprRequests", target.requestId);
 
         if (request?.userId === target.userId && !(await isStaleChain(context, target))) {
             await claimOnce(context, ERASED_SCOPE, `${attemptKey(target)}:${posthog}`, ATTEMPT_CLAIM_TTL_MS);
@@ -390,7 +390,7 @@ export const recordPostHogErased = internalMutation
  */
 const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass: string, { isRequestKept = false } = {}): Promise<void> => {
     const { attempt, chain, requestId, userId } = target;
-    const request = await context.db.get(requestId);
+    const request = await context.db.get("gdprRequests", requestId);
 
     // `failed` counts too: a re-run or a sweep that failed the request under a running attempt must
     // not leave the chain without an outcome, successor or end. Completed and cancelled stay as they are.
@@ -414,7 +414,7 @@ const failAttempt = async (context: MutationCtx, target: RetryTarget, errorClass
     }
 
     if (!isRequestKept) {
-        await context.db.patch(requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
+        await context.db.patch("gdprRequests", requestId, { errorMessage: POSTHOG_FAILED_MESSAGE, status: "failed" });
     }
 
     await record(context, "deletion_retry_failed", userId, { attempt, chain, errorClass, requestId });
@@ -462,7 +462,7 @@ export const expireStalePostHogRetry = internalMutation
             return null;
         }
 
-        const request = await context.db.get(args.requestId);
+        const request = await context.db.get("gdprRequests", args.requestId);
         const isFinished = await hasClaim(context, OUTCOME_SCOPE, key);
 
         if (isFinished ? await isConfirmationOwed(context, args, request) : (await erasedOutcomeOf(context, args)) !== null) {
@@ -492,7 +492,7 @@ export const getRetryConfirmationEmail = internalQuery
     .input({ requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.string())
     .query(async ({ args: { requestId, userId }, ctx: context }) => {
-        const request = await context.db.get(requestId);
+        const request = await context.db.get("gdprRequests", requestId);
 
         if (request?.userId !== userId || request.status !== "completed") {
             return "";
@@ -522,7 +522,7 @@ export const recordPostHogRetrySuccess = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args: { attempt, chain, posthog, requestId, userId }, ctx: context }) => {
-        const request = await context.db.get(requestId);
+        const request = await context.db.get("gdprRequests", requestId);
         const target = { attempt, chain, requestId, userId };
 
         // `failed` is this attempt's to complete too: a newer chain would have made it stale, so a failed
@@ -539,7 +539,12 @@ export const recordPostHogRetrySuccess = internalMutation
             return false;
         }
 
-        await context.db.patch(requestId, { completedAt: context.now, expiresAt: context.now + EXPORT_EXPIRY_MS, progress: 100, status: "completed" });
+        await context.db.patch("gdprRequests", requestId, {
+            completedAt: context.now,
+            expiresAt: context.now + EXPORT_EXPIRY_MS,
+            progress: 100,
+            status: "completed",
+        });
         await record(context, "deletion_retry_succeeded", userId, { attempt, chain, posthog, requestId });
         await record(context, "deletion_completed", userId, { posthog, requestId });
         await minimiseUserRecords(context, userId, requestId);
@@ -555,7 +560,7 @@ export const settleRetryConfirmation = internalMutation
     .input({ isSent: v.boolean(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { isSent, requestId, userId }, ctx: context }) => {
-        const request = await context.db.get(requestId);
+        const request = await context.db.get("gdprRequests", requestId);
 
         if (request?.userId !== userId) {
             return null;
@@ -565,7 +570,7 @@ export const settleRetryConfirmation = internalMutation
             await record(context, "deletion_confirmation_sent", userId, { requestId });
         }
 
-        await context.db.patch(requestId, { userEmail: "" });
+        await context.db.patch("gdprRequests", requestId, { userEmail: "" });
 
         return null;
     });

@@ -102,7 +102,7 @@ const signedResult = async (deviceId: string, secret: string, callId: string, fi
     return { callId, deviceId, payload, signature: await signDevicePayload(secret, "result", payload) };
 };
 
-const readCall = async (callId: string) => await harness.run(async (ctx: any) => await ctx.db.get(callId));
+const readCall = async (callId: string) => await harness.run(async (ctx: any) => await ctx.db.get("deviceCalls", callId));
 
 let ownerId: string;
 
@@ -194,6 +194,7 @@ describe("getDeviceToolContext", () => {
     const contextFor = async (threadId: string, userId = ownerId, now = Date.now()) =>
         (await harness.run(async (ctx: any) => await ctx.runQuery(internals.getDeviceToolContext, { now, threadId, userId }))) as {
             devices: { deviceId: string }[];
+            taintedBy: string[];
         } | null;
 
     it("offers the owner's online devices in a thread they own alone", async () => {
@@ -203,6 +204,38 @@ describe("getDeviceToolContext", () => {
         const context = await contextFor(threadId);
 
         expect(context?.devices.map((device) => device.deviceId)).toEqual([deviceId]);
+    });
+
+    it("snapshots the taint of the thread's context summaries", async () => {
+        await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+
+        // A web page the model read once, then lost to the window: only the summary of it remains.
+        await harness.run(async (ctx: any) => {
+            const messageId = await ctx.db.insert("messages", {
+                message: { content: "hi", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: ownerId,
+            });
+
+            await ctx.db.insert("threadContextSummaries", {
+                coveredCount: 1,
+                coveredUpToMessageId: messageId,
+                createdAt: 1,
+                summary: "notes",
+                taintedBy: ["mcp"],
+                threadId,
+                userId: ownerId,
+            });
+        });
+
+        const context = await contextFor(threadId);
+
+        expect(context?.taintedBy).toStrictEqual(["mcp"]);
     });
 
     it("leaves out a device that stopped beating", async () => {
@@ -305,7 +338,7 @@ describe("a device's project scope in the GDPR export", () => {
         const offer = { agentKey: "claude", agentLabel: "Claude Code", folderId: "folder-1", folderLabel: "neore" };
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(deviceId, { acpOffers: [offer] });
+            await ctx.db.patch("devices", deviceId, { acpOffers: [offer] });
         });
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(gdpr.collectDevicesForExport, { userId: ownerId }))) as {
@@ -404,7 +437,7 @@ describe("a device's project scope", () => {
         const threadId = await insertThread(ownerId, { projectId: chosen });
 
         await setScope(ownerId, deviceId, [chosen]);
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { projectId: other }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { projectId: other }));
 
         expect(await offered(threadId)).toEqual([]);
         expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "ineligible" });
@@ -418,13 +451,13 @@ describe("a device's project scope", () => {
         const stale = await insertThread(ownerId, { projectId: doomed });
 
         await setScope(ownerId, deviceId, [kept, doomed]);
-        await harness.run(async (ctx: any) => await ctx.db.delete(doomed));
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", doomed));
 
         expect(await scopeOf()).toEqual([kept]);
         expect(await offered(stale)).toEqual([]);
         expect(await createCall({ deviceId, threadId: stale, userId: ownerId })).toEqual({ error: "ineligible" });
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(kept));
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", kept));
 
         expect(await scopeOf()).toEqual([]);
     });
@@ -493,11 +526,11 @@ describe("the relay", () => {
         await expect(as(STRANGER).query(functions.listPendingDeviceCalls as never, { deviceId } as never)).resolves.toEqual([]);
     });
 
-    it("adds the taint of the thread's context summaries to a call, in the signed envelope and the stored row", async () => {
+    it("signs the union of the taint it is given and a summary committed after that snapshot", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);
 
-        // A web page the model read once, then lost to the window: only the summary of it remains.
+        // A summary committed after the run's taint snapshot may still reach the model's prompt: it must taint the call.
         await harness.run(async (ctx: any) => {
             const messageId = await ctx.db.insert("messages", {
                 message: { content: "hi", role: "user" },
@@ -522,7 +555,14 @@ describe("the relay", () => {
 
         const created = (await harness.run(
             async (ctx: any) =>
-                await ctx.runMutation(internals.createDeviceCall, { deviceId, input: "{}", taintedBy: [], threadId, toolName: "fs_read", userId: ownerId }),
+                await ctx.runMutation(internals.createDeviceCall, {
+                    deviceId,
+                    input: "{}",
+                    taintedBy: ["web"],
+                    threadId,
+                    toolName: "fs_read",
+                    userId: ownerId,
+                }),
         )) as { callId: string };
         const pending = (await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as {
             envelope: string;
@@ -530,8 +570,8 @@ describe("the relay", () => {
         }[];
 
         await expect(verifyDevicePayload(secret, "call", pending[0]!.envelope, pending[0]!.signature)).resolves.toBe(true);
-        expect(JSON.parse(pending[0]!.envelope)).toMatchObject({ taintedBy: ["mcp"] });
-        expect(((await readCall(created.callId)) as { taintedBy: string[] }).taintedBy).toStrictEqual(["mcp"]);
+        expect(JSON.parse(pending[0]!.envelope)).toMatchObject({ taintedBy: ["web", "mcp"] });
+        expect(((await readCall(created.callId)) as { taintedBy: string[] }).taintedBy).toStrictEqual(["web", "mcp"]);
     });
 
     it("claims once and accepts only a result the device signed", async () => {

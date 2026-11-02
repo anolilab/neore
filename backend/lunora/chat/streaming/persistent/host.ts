@@ -75,7 +75,7 @@ export const updateHostStream = async (
 ): Promise<void> => {
     const { pending } = changes;
 
-    await patchRow(ctx.db, stream, {
+    await patchRow(ctx.db, "persistentStreams", stream, {
         ...withoutUndefined({ expiresAt: changes.expiresAt, hostState: changes.hostState, status: changes.streaming ? "streaming" : undefined }),
         // `patchRow` removes a key set to `undefined`: only the permission list is ever meant to go.
         ...(pending !== undefined && (pending.length > 0 ? { hostPendingPermissions: pending } : { hostPendingPermissions: undefined })),
@@ -87,7 +87,7 @@ export const updateHostStream = async (
 const hardDeadlineOf = (stream: Pick<Stream, "_creationTime">): number => stream._creationTime + HOST_TURN_MAX_MS;
 
 export const extendHostStream = async (ctx: Pick<MutationCtx, "db">, stream: Stream, now: number): Promise<void> => {
-    await ctx.db.patch(stream._id, { expiresAt: Math.min(now + HOST_STREAM_IDLE_MS, hardDeadlineOf(stream)) });
+    await ctx.db.patch("persistentStreams", stream._id, { expiresAt: Math.min(now + HOST_STREAM_IDLE_MS, hardDeadlineOf(stream)) });
 };
 
 /** The `seq` the next event must carry: one past the last chunk, read off `by_streamId_seq`. */
@@ -154,7 +154,7 @@ export const endHostStream = async (
         return false;
     }
 
-    await patchRow(ctx.db, stream, {
+    await patchRow(ctx.db, "persistentStreams", stream, {
         hostEndReason: end.reason,
         hostState: "ended",
         status: end.status,

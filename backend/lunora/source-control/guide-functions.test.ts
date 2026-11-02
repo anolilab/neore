@@ -133,7 +133,7 @@ describe("a guide and the head commit", () => {
         expect(await guideFor(A, HEAD)).toMatchObject({ guide: { status: "generating" } });
 
         await run(async (ctx) => {
-            await ctx.db.patch(first.guideId, { updatedAt: Date.now() - GUIDE_RUN_WINDOW_MS - 1000 });
+            await ctx.db.patch("pullRequestGuides", first.guideId, { updatedAt: Date.now() - GUIDE_RUN_WINDOW_MS - 1000 });
         });
 
         expect(await guideFor(A, HEAD)).toMatchObject({ guide: { failure: "abandoned", status: "failed" } });
@@ -162,7 +162,7 @@ describe("a guide and the head commit", () => {
         const first = await begin(A);
 
         await run(async (ctx) => {
-            await ctx.db.patch(first.guideId, { updatedAt: Date.now() - GUIDE_RUN_WINDOW_MS - 1000 });
+            await ctx.db.patch("pullRequestGuides", first.guideId, { updatedAt: Date.now() - GUIDE_RUN_WINDOW_MS - 1000 });
         });
 
         expect(await finish(A, first.guideId)).toBe(false);

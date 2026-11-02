@@ -2968,6 +2968,18 @@
           "optional": true,
           "unique": false
         },
+        "lowRiskTrustedServers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "mcpSecretHeaders": {
           "kind": "array",
           "nullable": false,
@@ -12337,6 +12349,12 @@
           "optional": false,
           "unique": false
         },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "state": {
           "kind": "string",
           "nullable": false,
@@ -12457,6 +12475,12 @@
           "optional": false,
           "unique": false
         },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "state": {
           "kind": "string",
           "nullable": false,
@@ -12481,6 +12505,12 @@
         "by_reference": {
           "fields": [
             "referenceId"
+          ],
+          "unique": false
+        },
+        "by_state": {
+          "fields": [
+            "state"
           ],
           "unique": false
         }
@@ -20672,6 +20702,108 @@
             "hostOrigin",
             "repository",
             "number"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "pullRequestThreads": {
+      "commitOrdered": false,
+      "fields": {
+        "baseBranch": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "headBranch": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"attached\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"opened\""
+            }
+          ]
+        },
+        "number": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "repository": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "title": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "url": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user_and_repository_number": {
+          "fields": [
+            "userId",
+            "repository",
+            "number"
+          ],
+          "unique": false
+        },
+        "by_user_and_threadId": {
+          "fields": [
+            "userId",
+            "threadId"
           ],
           "unique": false
         }

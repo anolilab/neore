@@ -20,7 +20,7 @@ type Database = MutationCtx["db"];
 export const deleteSkillRatings = async (db: Database, skillId: Id<"skills">): Promise<number> => {
     const { page } = await db.skillRatings.findMany({ where: { skillId } });
 
-    await Promise.all(page.map((row) => db.delete(row._id)));
+    await Promise.all(page.map((row) => db.delete("skillRatings", row._id)));
 
     return page.length;
 };
@@ -37,6 +37,6 @@ export const recomputeSkillRatings = async (db: Database, skillIds: Iterable<Id<
         const [ratings, stats] = await Promise.all([db.skillRatings.findMany({ where: { skillId } }), db.skillStats.findMany({ where: { skillId } })]);
         const summary = summarizeRatings(ratings.page, excludeUserId);
 
-        await Promise.all(stats.page.map((row) => db.patch(row._id, summary)));
+        await Promise.all(stats.page.map((row) => db.patch("skillStats", row._id, summary)));
     }
 };

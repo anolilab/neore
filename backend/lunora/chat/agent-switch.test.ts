@@ -67,7 +67,7 @@ const nextMillisecond = async () => {
     });
 };
 
-const thread = async (): Promise<any> => await run(async (ctx) => await ctx.db.get(threadId));
+const thread = async (): Promise<any> => await run(async (ctx) => await ctx.db.get("threads", threadId));
 const activeAgentOf = async () => {
     const { activeAgent } = await thread();
 
@@ -187,7 +187,7 @@ describe("a switch in a thread that never branched", () => {
         await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
         expect(await switchRows()).toHaveLength(0);
 
-        await run(async (ctx) => await ctx.db.patch(streamId, { status: "done" }));
+        await run(async (ctx) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
     });
@@ -208,7 +208,9 @@ describe("a switch in a thread that never branched", () => {
         await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
         expect(await switchRows()).toHaveLength(0);
 
-        await run(async (ctx) => await ctx.db.patch(streamId, { state: { endedAt: Date.now(), kind: "finished" }, stateKind: "finished" }));
+        await run(
+            async (ctx) => await ctx.db.patch("streamingMessages", streamId, { state: { endedAt: Date.now(), kind: "finished" }, stateKind: "finished" }),
+        );
 
         expect(await switchTo(B, "click-1")).toMatchObject({ switched: true });
     });
@@ -271,7 +273,7 @@ describe("a switch in a thread that never branched", () => {
             role: "assistant",
         };
 
-        await run(async (ctx) => await ctx.db.delete(ids.a1));
+        await run(async (ctx) => await ctx.db.delete("messages", ids.a1));
         await insertRow("paused", 0, 1, approval, { tool: true });
         await run(
             async (ctx) =>
@@ -333,20 +335,20 @@ describe("a switch in a thread that never branched", () => {
                 await ctx.db.insert("user", { createdAt: 1, email: "guest@example.com", emailVerified: false, isAnonymous: true, name: "Guest", updatedAt: 1 }),
         );
 
-        await run(async (ctx) => await ctx.db.patch(threadId, { userId: guestId }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { userId: guestId }));
         await insertRow("u1", 0, 0, text("user", "hello"), { userId: guestId });
 
         await expect(switchTo(B, "c", guestId)).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
     });
 
     it("refuses a thread that runs on a fixed agent", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [] } }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { groupChat: { mode: "round-robin", participants: [] } }));
 
         await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
     });
 
     it("refuses a coding-agent thread, whose turns run on its host", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { runner: "host" }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { runner: "host" }));
 
         await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
         expect(await switchRows()).toHaveLength(0);
@@ -355,7 +357,7 @@ describe("a switch in a thread that never branched", () => {
     it("refuses a messenger thread, which replies on its connection's model", async () => {
         const connectionId = await run(async (ctx) => await ctx.db.insert("messengerConnections", { platform: "telegram", userId: OWNER } as never));
 
-        await run(async (ctx) => await ctx.db.patch(threadId, { messengerConnectionId: connectionId }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { messengerConnectionId: connectionId }));
 
         await expect(switchTo(B, "c")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_UNSUPPORTED } });
         expect(await switchRows()).toHaveLength(0);
@@ -462,7 +464,7 @@ describe("a switch in a thread that never branched", () => {
 
             await expect(switchTo(B, "click-1")).rejects.toMatchObject({ data: { code: AGENT_SWITCH_STREAMING } });
 
-            await run(async (ctx) => await ctx.db.patch(streamId, { stoppedAt: Date.now() - 3 * 60_000 }));
+            await run(async (ctx) => await ctx.db.patch("persistentStreams", streamId, { stoppedAt: Date.now() - 3 * 60_000 }));
 
             expect(await switchTo(B, "click-2")).toMatchObject({ switched: true });
         });
@@ -481,7 +483,7 @@ describe("a switch in a thread that never branched", () => {
         await run(async (ctx) => {
             const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: COLLABORATOR } });
 
-            await ctx.db.patch(grant._id, { permission: "write" });
+            await ctx.db.patch("threadAccess", grant._id, { permission: "write" });
         });
 
         expect(await switchTo(B, "c2", COLLABORATOR)).toMatchObject({ switched: true });
@@ -511,13 +513,13 @@ describe("the agent of each branch", () => {
         await run(async (ctx) => {
             const leaf = await descendFrom(ctx, threadId as never, (await getThreadRow(ctx, threadId as never, ids[name]!))!);
 
-            await ctx.db.patch(threadId, { activeLeafMessageId: leaf._id });
+            await ctx.db.patch("threads", threadId, { activeLeafMessageId: leaf._id });
             await syncActiveAgent(ctx, threadId as never, leaf._id);
         });
     };
 
     it("places the divider under the displayed leaf, past every order, without touching the other branch", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a1b }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a1b }));
 
         const result = await switchTo(B, "click-1");
         const all = await rows();
@@ -534,7 +536,7 @@ describe("the agent of each branch", () => {
     });
 
     it("restores each branch's agent when the user moves between them", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 }));
         await switchTo(B, "click-1");
 
         expect(await runModel()).toBe(B);
@@ -556,7 +558,7 @@ describe("the agent of each branch", () => {
     });
 
     it("runs a regenerate or an edit of an older message on the model recorded on its path", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 }));
         await switchTo(B, "click-1");
         await run(async (ctx) => {
             await addMessagesHandler(ctx, {
@@ -579,7 +581,7 @@ describe("the agent of each branch", () => {
     });
 
     it("runs a regenerate of the latest turn on the agent picked after its reply, an earlier turn on its own path", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 }));
         await switchTo(B, "click-1");
 
         // The divider hangs under a2, off the path through u2; u2 is still the newest turn.
@@ -588,12 +590,12 @@ describe("the agent of each branch", () => {
     });
 
     it("keeps the cache in step when a regenerate points the thread at an older prompt", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.a2 }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.a2 }));
         await switchTo(B, "click-1");
 
         // `setActiveLeaf` points AT the prompt without descending: a switch below it is not on its path.
         await run(async (ctx) => {
-            await ctx.db.patch(threadId, { activeLeafMessageId: ids.u2 });
+            await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.u2 });
             await syncActiveAgent(ctx, threadId as never, ids.u2!);
         });
 

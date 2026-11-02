@@ -29,7 +29,7 @@ export const listVersions = query
             return [];
         }
 
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         if (!documentRow || documentRow.userId !== identity.userId) {
             return [];
@@ -78,7 +78,7 @@ export const getVersion = query
             return null;
         }
 
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         if (!documentRow || documentRow.userId !== identity.userId) {
             return null;

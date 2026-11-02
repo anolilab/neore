@@ -54,7 +54,7 @@ export const cancelUserCodingAgentRuns = internalMutation
                     sandboxIds.push(run.sandboxId);
                 }
 
-                await patchById(ctx.db, run._id, { completedAt: now, error: "Account deletion", status: "cancelled", updatedAt: now });
+                await patchById(ctx.db, "codingAgentRuns", run._id, { completedAt: now, error: "Account deletion", status: "cancelled", updatedAt: now });
             }
         }
 
@@ -83,7 +83,7 @@ export const deleteUserCodingAgentRuns = internalMutation
             .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
             .take(BATCH);
 
-        await Promise.all(runs.map(async (run) => await ctx.db.delete(run._id)));
+        await Promise.all(runs.map(async (run) => await ctx.db.delete("codingAgentRuns", run._id)));
 
         return { hasMore: runs.length >= BATCH };
     });

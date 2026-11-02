@@ -108,7 +108,14 @@ const scored = (overrides: Record<string, unknown> = {}) => {
     };
 };
 
-const getDoc = async (id: string): Promise<any> => await run(async (ctx) => await ctx.db.get(id));
+const getDoc = async (id: string): Promise<any> =>
+    await run(
+        async (ctx) =>
+            (await ctx.db.get("evalRuns", id as never)) ??
+            (await ctx.db.get("evalResults", id as never)) ??
+            (await ctx.db.get("evalCases", id as never)) ??
+            (await ctx.db.get("evalDatasets", id as never)),
+    );
 
 /** Rounds go on the jobs queue, not the scheduler (`lib/job-queue.ts`); the test stub records them. */
 const caseJobs = (): { args: Record<string, unknown> }[] =>
@@ -200,7 +207,7 @@ describe("claimCase", () => {
     it("records a case deleted since the run started as skipped and moves on", async () => {
         const { caseIds, runId } = await seedRun();
 
-        await run(async (ctx) => await ctx.db.delete(caseIds[0]));
+        await run(async (ctx) => await ctx.db.delete("evalCases", caseIds[0]));
 
         expect(await claim(runId, 0)).toBeNull();
 
@@ -295,7 +302,7 @@ describe("completeCase", () => {
         const { runId } = await seedRun();
         const first = await claim(runId, 0);
 
-        await run(async (ctx) => await ctx.db.patch(runId, { status: "cancelled" }));
+        await run(async (ctx) => await ctx.db.patch("evalRuns", runId, { status: "cancelled" }));
         await complete(first.resultId, scored());
 
         expect(await getDoc(first.resultId)).toMatchObject({ status: "scored" });

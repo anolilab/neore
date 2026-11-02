@@ -33,7 +33,7 @@ export const deleteKnowledgeFileChunks = async (
     const batch = chunks.slice(0, limit);
     const embeddingIds = batch.map((chunk) => chunk.embeddingId).filter((id): id is string => typeof id === "string" && id.length > 0);
 
-    await Promise.all(batch.map((chunk) => ctx.db.delete(chunk._id)));
+    await Promise.all(batch.map((chunk) => ctx.db.delete("knowledgeChunks", chunk._id)));
 
     if (embeddingIds.length > 0) {
         await ctx.scheduler.runAfter(0, internal.knowledge.delete_embeddings.deleteEmbeddingsBatch, { embeddingIds });
@@ -49,7 +49,7 @@ export const deleteKnowledgeFile = async (ctx: Pick<MutationCtx, "db" | "schedul
         .collect();
     const embeddingIds = chunks.map((chunk) => chunk.embeddingId).filter((id): id is string => typeof id === "string" && id.length > 0);
 
-    await Promise.all(chunks.map((chunk) => ctx.db.delete(chunk._id)));
+    await Promise.all(chunks.map((chunk) => ctx.db.delete("knowledgeChunks", chunk._id)));
 
     if (embeddingIds.length > 0) {
         await ctx.scheduler.runAfter(0, internal.knowledge.delete_embeddings.deleteEmbeddingsBatch, { embeddingIds });
@@ -66,7 +66,10 @@ export const deleteKnowledgeFile = async (ctx: Pick<MutationCtx, "db" | "schedul
             .collect(),
     ]);
 
-    await Promise.all([...threadLinks, ...projectLinks].map((link) => ctx.db.delete(link._id)));
+    await Promise.all([
+        ...threadLinks.map((link) => ctx.db.delete("threadKnowledge", link._id)),
+        ...projectLinks.map((link) => ctx.db.delete("projectKnowledge", link._id)),
+    ]);
     await scheduleObjectDeletion(ctx, [file.storageKey]);
-    await ctx.db.delete(file._id);
+    await ctx.db.delete("knowledgeFiles", file._id);
 };

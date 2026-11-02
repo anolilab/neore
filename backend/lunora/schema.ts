@@ -215,6 +215,9 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        // Servers whose tools the quick check may judge (chat/lib/low-risk-trust.ts): an MCP server by name AND url, a connector by slug.
+        // Absent = none, bounded by `MAX_TRUSTED_SERVERS`. Server-written only (`chat_tool_permissions.setLowRiskTrustedServer`); `auth/fields.ts` omits it.
+        lowRiskTrustedServers: v.optional(v.array(v.string())),
         /**
          * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
          * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from
@@ -2100,6 +2103,26 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
+
+    // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
+    // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
+    // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both
+    // ways, so the PR lists its threads and a thread names its PR.
+    pullRequestThreads: defineTable({
+        baseBranch: v.optional(v.string()),
+        createdAt: v.number(),
+        headBranch: v.optional(v.string()),
+        kind: v.union(v.literal("attached"), v.literal("opened")),
+        number: v.number(),
+        repository: v.string(),
+        threadId: v.id("threads"),
+        title: v.string(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_repository_number", ["userId", "repository", "number"])
+        .index("by_user_and_threadId", ["userId", "threadId"]),
 
     /**
      * better-auth's own rate-limit store.

@@ -31,6 +31,7 @@ import roleGuard from "./lib/role-guard";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { liveTrustedServers } from "../chat/lib/low-risk-trust";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
@@ -194,6 +195,15 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         );
     }
 
+    // A server saved away takes its trust with it, so adding the same name and url again does not start trusted.
+    if (tableName === "aiUserPreferences" && Array.isArray(toStore.mcpServers)) {
+        const trusted = (settings as { lowRiskTrustedServers?: string[] } | null)?.lowRiskTrustedServers;
+
+        if (trusted?.some((entry) => entry.startsWith("mcp:"))) {
+            toStore.lowRiskTrustedServers = liveTrustedServers(trusted, toStore.mcpServers as { name: string; url: string }[]);
+        }
+    }
+
     const savedKeyPurposes = Object.keys(inputArguments).filter((k) => KEY_INPUT_FIELDS.has(k));
 
     if (savedKeyPurposes.length > 0) {
@@ -279,7 +289,7 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     }
 
     if (settings) {
-        await context.db.patch(settings._id, withoutUndefined(toStore));
+        await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
     } else {
         await context.db.insert(tableName, {
             userId,
@@ -1031,7 +1041,7 @@ export const initializeUserSettings = authMutation
             }
 
             if (Object.keys(updates).length > 0) {
-                await context.db.patch(existingSettings._id, withoutUndefined(updates));
+                await context.db.patch("userSettings", existingSettings._id, withoutUndefined(updates));
             }
         } else {
             // Create new user settings with timezone and location

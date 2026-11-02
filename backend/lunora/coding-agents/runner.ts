@@ -32,9 +32,9 @@ import {
     buildPullRequestScript,
     buildRunScript,
     CODEX_LAST_MESSAGE_PATH,
+    credentialFor,
     DIFF_MAX_BYTES,
     GIT_AUTH_PATH,
-    githubBasicCredential,
     parsePullRequestStatus,
     parseRunStatus,
     PATCH_PATH,
@@ -50,6 +50,8 @@ import {
     TIMEOUT_EXIT_CODE,
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
+import type { HostDriver } from "../source-control/driver";
+import { createBoundRequester, HostApiError } from "../source-control/origin-fetch";
 
 export interface CommandOutcome {
     exitCode: number;
@@ -156,8 +158,11 @@ export const startRun = async (
         await sandbox.writeFile(RUN_SCRIPT_PATH, script);
         await sandbox.writeFile(PROMPT_PATH, buildAgentPrompt(spec.prompt));
 
-        if (spec.githubToken) {
-            await sandbox.writeFile(GIT_AUTH_PATH, githubBasicCredential(spec.githubToken));
+        // The credential is written only for the origin the token was saved for; a clone of another host gets none.
+        const credential = credentialFor(spec.githubToken, spec.repo);
+
+        if (credential !== undefined) {
+            await sandbox.writeFile(GIT_AUTH_PATH, credential);
         }
 
         // The provider key is the one secret the script's environment carries:
@@ -377,7 +382,14 @@ export const startPullRequest = async (
         sandbox = await dependencies.sandboxes.create({ metadata: { purpose: "coding-agent-pr", runId: spec.runId }, timeoutMs: PR_SANDBOX_TIMEOUT_MS });
 
         await sandbox.writeFile(PATCH_PATH, spec.diff);
-        await sandbox.writeFile(GIT_AUTH_PATH, githubBasicCredential(spec.githubToken));
+
+        // The push carries the credential, so it is written only for the origin the token was saved for.
+        const credential = credentialFor(spec.githubToken, spec.repo);
+
+        if (credential !== undefined) {
+            await sandbox.writeFile(GIT_AUTH_PATH, credential);
+        }
+
         await sandbox.writeFile(
             PR_SCRIPT_PATH,
             buildPullRequestScript({ baseBranch: spec.baseBranch, branch: prBranchName(spec.runId), message: spec.title, repo: spec.repo }),
@@ -425,25 +437,71 @@ export const checkPullRequest = async (sandbox: SandboxHandle, input: { runId: s
 };
 
 export interface PullRequestApi {
-    /** The GitHub API call, made from the backend — never from the sandbox. */
-    createPullRequest: (input: { base: string; body: string; head: string; owner: string; repo: string; title: string }) => Promise<string>;
+    /** The host's call that opens the PR, made from the backend — never from the sandbox. */
+    createPullRequest: (input: { base: string; body: string; head: string; repository: string; title: string }) => Promise<{ url: string }>;
+    /** The open pull request already made from this branch, if the host can say. */
+    findOpenPullRequest?: (input: { head: string; repository: string }) => Promise<{ url: string } | undefined>;
 }
+
+/**
+ * The host adapter's pull-request call, bound to the driver's own origin: the token is sent there and nowhere else. A
+ * driver that does not declare `createPullRequest` cannot open one, and says so rather than reaching GitHub itself.
+ */
+export const pullRequestApiFromDriver = (
+    driver: Pick<HostDriver, "apiOrigin" | "createPullRequest" | "findOpenPullRequest" | "headers">,
+    token: string,
+): PullRequestApi => {
+    const create = driver.createPullRequest;
+
+    if (!create) {
+        throw new Error("This host's adapter cannot open a pull request");
+    }
+
+    const request = createBoundRequester({ headers: driver.headers, origin: driver.apiOrigin, token });
+
+    const find = driver.findOpenPullRequest;
+
+    return {
+        createPullRequest: async (input) => await create(request, input),
+        ...(find && { findOpenPullRequest: async (input: { head: string; repository: string }) => await find(request, input) }),
+    };
+};
 
 /** The final, short step: open the PR for a pushed branch. */
 export const openPullRequestForBranch = async (
     input: { baseBranch: string; body: string; branch: string; repo: ParsedRepo; title: string },
     dependencies: PullRequestApi,
-): Promise<string> => {
+): Promise<{ url: string }> => {
     if (!input.repo.github) {
         throw new Error("Pull requests are only supported for github.com repositories");
+    }
+
+    const address = `${input.repo.github.owner}/${input.repo.github.repo}`;
+
+    // A retry after a create whose answer was lost must find the pull request the host may hold, not open a second.
+    // The lookup is an aid: when it fails, the create is still the honest next step.
+    const existing = await dependencies.findOpenPullRequest?.({ head: input.branch, repository: address }).catch(() => undefined);
+
+    if (existing) {
+        return existing;
     }
 
     return await dependencies.createPullRequest({
         base: input.baseBranch,
         body: input.body,
         head: input.branch,
-        owner: input.repo.github.owner,
-        repo: input.repo.github.repo,
+        repository: address,
         title: input.title,
     });
+};
+
+/** The log line for a failed create: the host's own reason (untrusted, redacted), and a warning when it may have opened it anyway. */
+export const describePullRequestFailure = (error: unknown, secrets: string[]): string => {
+    const host = error instanceof HostApiError ? error : undefined;
+    const reason = [error instanceof Error ? error.message : String(error), host?.detail].filter(Boolean).join(": ");
+    const text = `Could not open the pull request: ${redactSecrets(reason, secrets).slice(0, 1000)}`;
+
+    return host?.unconfirmed
+        ? `${text}\nThe host may have opened it anyway: check the repository's pull requests before trying again. A retry looks for an open one first.`
+        : text;
 };

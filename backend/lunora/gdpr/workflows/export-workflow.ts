@@ -21,7 +21,7 @@ import { LunoraError } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
-import { collectAllGuides, collectAllReviewDrafts } from "../../source-control/export-pages";
+import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -95,6 +95,19 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     ),
             );
         });
+        const pullRequestThreads = await collectAllPullRequestThreads(async (cursor, page) => {
+            const name = `collect-pull-request-threads-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () =>
+                    await context.run(
+                        internal.source_control.gdpr.collectPullRequestThreadsForExport,
+                        { cursor, userId },
+                        { dedupId: `collect-pull-request-threads:${requestId}:${String(page)}` },
+                    ),
+            );
+        });
         const watchedRepositories = await context.step.do(
             "collect-watched-repositories",
             // An id of its own: a replay skips finished steps, which shifts the body's positional dispatch ids.
@@ -162,6 +175,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         profile,
                         prompts,
                         pullRequestGuides,
+                        pullRequestThreads,
                         requestId,
                         reviewDrafts,
                         settings,

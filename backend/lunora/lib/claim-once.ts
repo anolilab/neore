@@ -151,7 +151,7 @@ export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { le
             return null;
         }
 
-        await ctx.db.delete(existing._id);
+        await ctx.db.delete("idempotencyClaims", existing._id);
     }
 
     await ctx.db.insert("idempotencyClaims", {
@@ -200,7 +200,7 @@ export const completeClaim = async (ctx: ClaimCtx, scope: string, key: string): 
         return;
     }
 
-    await patchRow(ctx.db, existing, { leaseExpiresAt: undefined, onLapse: undefined });
+    await patchRow(ctx.db, "idempotencyClaims", existing, { leaseExpiresAt: undefined, onLapse: undefined });
 };
 
 /**
@@ -215,7 +215,7 @@ export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string, cl
     const existing = await findClaim(ctx, scope, key);
 
     if (existing && (claimedAt === undefined || existing.claimedAt === claimedAt)) {
-        await ctx.db.delete(existing._id);
+        await ctx.db.delete("idempotencyClaims", existing._id);
     }
 };
 
@@ -243,7 +243,7 @@ export const releaseClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, pref
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
         .take(limit);
 
-    await Promise.all(rows.map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("idempotencyClaims", row._id)));
 
     return rows.length >= limit;
 };
@@ -363,7 +363,7 @@ export const reapLapsedClaims = internalMutation
                 await ctx.scheduler.runAfter(0, row.onLapse.target, { ...args, claimKey: row.key });
             }
 
-            await patchRow(ctx.db, row, { leaseExpiresAt: undefined, onLapse: undefined });
+            await patchRow(ctx.db, "idempotencyClaims", row, { leaseExpiresAt: undefined, onLapse: undefined });
         }
 
         return lapsed.length;
@@ -379,7 +379,7 @@ export const purgeExpiredClaims = internalMutation
             .withIndex("by_expiresAt", (q) => q.lt("expiresAt", ctx.now))
             .take(CLAIM_PURGE_BATCH);
 
-        await Promise.all(expired.map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all(expired.map(async (row) => await ctx.db.delete("idempotencyClaims", row._id)));
 
         if (expired.length === CLAIM_PURGE_BATCH) {
             await ctx.scheduler.runAfter(0, internal.lib.claim_once.purgeExpiredClaims, {});

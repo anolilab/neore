@@ -50,7 +50,7 @@ const fakeDb = (tables: Record<string, Record<string, unknown>[]>) => {
 
     const db = new Proxy(
         {
-            delete: async (id: string) => {
+            delete: async (_table: string, id: string) => {
                 const call = deleteCalls;
                 const table = rows.get(id)?.table ?? "?";
 

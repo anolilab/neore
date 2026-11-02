@@ -82,7 +82,7 @@ describe("enabling a trigger", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: true, triggerId: id }));
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(id));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("triggers", id));
 
         expect(row.enabled).toBe(true);
         expect(row.nextTriggerAt).toBeGreaterThan(NOW);
@@ -94,7 +94,7 @@ describe("enabling a trigger", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(setTriggerEnabledInternal, { enabled: true, triggerId: id }));
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(id));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("triggers", id));
 
         expect(row.enabled).toBe(true);
         expect(row.nextTriggerAt).toBeUndefined();

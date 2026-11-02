@@ -381,7 +381,7 @@ describe("the source of a handoff", () => {
         }
 
         const source = await run(async (ctx) => {
-            const thread = await ctx.db.get(threadId);
+            const thread = await ctx.db.get("threads", threadId);
             const all: any[] = await ctx.db.query("messages").collect();
             const [leaf] = all.toSorted((a, b) => b.order - a.order || b.stepOrder - a.stepOrder);
 
@@ -566,7 +566,8 @@ describe("a window that starts below the divider", () => {
         expect(above).toStrictEqual([all.map((row) => agentSwitchOf(row)).find(Boolean)!.handoff]);
     });
     it("marks only a thread a switch stored a handoff on, so one switched with its full history walks nothing", async () => {
-        const handoffFlag = async () => await run(async (ctx) => ((await ctx.db.get(threadId as never)) as { hasHandoff?: boolean } | null)?.hasHandoff);
+        const handoffFlag = async () =>
+            await run(async (ctx) => ((await ctx.db.get("threads", threadId as never)) as { hasHandoff?: boolean } | null)?.hasHandoff);
 
         await addTurn("hello", "hi");
         await switchTo(B, "click-1", "full");

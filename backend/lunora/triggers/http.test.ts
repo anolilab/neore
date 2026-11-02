@@ -356,7 +356,7 @@ describe("trigger webhook signing", () => {
             expect(rows[0].payload).toBeUndefined();
 
             // Nothing counts as a run: the trigger's bookkeeping is untouched.
-            const trigger = await harness.run(async (ctx: any) => await ctx.db.get(triggerId));
+            const trigger = await harness.run(async (ctx: any) => await ctx.db.get("triggers", triggerId));
 
             expect(trigger).toMatchObject({ triggerCount: 0 });
             expect(trigger.lastTriggeredAt).toBeUndefined();

@@ -138,7 +138,7 @@ export const setPagePublic = authMutation
         // A fresh token on every publish: unpublishing then re-publishing revokes the old link.
         const publicAccessToken = args.isPublic ? crypto.randomUUID() : undefined;
 
-        await patchRow(ctx.db, page, { isPublic: args.isPublic ? true : undefined, publicAccessToken });
+        await patchRow(ctx.db, "pages", page, { isPublic: args.isPublic ? true : undefined, publicAccessToken });
 
         // The anonymous `/p/$token` page resolves its token to this page's shard
         // through `shardRoutes`; a rotated or withdrawn token stops routing.
@@ -201,14 +201,14 @@ export const revokePageInvite = authMutation
     .input({ inviteId: v.id("pageInvites") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const pageId = await parentKeyOf(ctx, args.inviteId, "pageId");
+        const pageId = await parentKeyOf(ctx, "pageInvites", args.inviteId, "pageId");
 
         if (!pageId) {
             throw new LunoraError("NOT_FOUND", "Invite not found");
         }
 
         await requirePageAccess(ctx, pageId as Id<"pages">, ctx.user.userId, "admin");
-        await ctx.db.patch(args.inviteId, { status: "revoked" });
+        await ctx.db.patch("pageInvites", args.inviteId, { status: "revoked" });
 
         ctx.log.event("pages.revoke_page_invite", { revoked: true });
 
@@ -287,7 +287,7 @@ export const redeemPageInvite = internalMutation
         const { page } = inviterAccess;
 
         admitPageInvite(ctx, invite._id);
-        await ctx.db.patch(invite._id, { acceptedAt: ctx.now, acceptedBy: userId, status: "accepted" });
+        await ctx.db.patch("pageInvites", invite._id, { acceptedAt: ctx.now, acceptedBy: userId, status: "accepted" });
 
         // The owner opening their own link spends it and changes nothing.
         if (page.userId === userId) {
@@ -299,7 +299,7 @@ export const redeemPageInvite = internalMutation
         if (existing) {
             // An invite only raises access; lowering goes through `updatePageGrant`.
             if (!meetsPagePermission(existing.permission, invite.permission)) {
-                await ctx.db.patch(existing._id, { permission: invite.permission });
+                await ctx.db.patch("pageAccess", existing._id, { permission: invite.permission });
             }
         } else {
             // Every grant on the page counts toward the cap, not only the ones
@@ -338,7 +338,7 @@ export const updatePageGrant = authMutation
             throw new LunoraError("NOT_FOUND", "That person has no access to this page");
         }
 
-        await ctx.db.patch(grant._id, { permission: args.permission });
+        await ctx.db.patch("pageAccess", grant._id, { permission: args.permission });
 
         ctx.log.event("pages.update_page_grant", { permission: args.permission });
 
@@ -360,7 +360,7 @@ export const removePageGrant = authMutation
         const grant = await ctx.db.pageAccess.findFirst({ where: { pageId: args.pageId, userId: args.targetUserId } });
 
         if (grant) {
-            await ctx.db.delete(grant._id);
+            await ctx.db.delete("pageAccess", grant._id);
         }
 
         // A star on a page they can no longer open is dead weight in their sidebar.
@@ -370,7 +370,7 @@ export const removePageGrant = authMutation
             .first();
 
         if (favorite) {
-            await ctx.db.delete(favorite._id);
+            await ctx.db.delete("pageFavorites", favorite._id);
         }
 
         ctx.log.event("pages.remove_page_grant", { removedFavorite: favorite !== null, removedGrant: grant !== null });

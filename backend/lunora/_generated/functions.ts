@@ -193,34 +193,35 @@ import * as lunora_source_control_guide_host_188 from "../source-control/guide-h
 import * as lunora_source_control_guide_internal_189 from "../source-control/guide-internal.js";
 import * as lunora_source_control_guide_job_190 from "../source-control/guide-job.js";
 import * as lunora_source_control_merge_functions_191 from "../source-control/merge-functions.js";
-import * as lunora_source_control_review_drafts_192 from "../source-control/review-drafts.js";
-import * as lunora_source_control_review_functions_193 from "../source-control/review-functions.js";
-import * as lunora_source_control_review_internal_194 from "../source-control/review-internal.js";
-import * as lunora_sub_agents_execute_195 from "../sub-agents/execute.js";
-import * as lunora_sub_agents_functions_196 from "../sub-agents/functions.js";
-import * as lunora_system_prompts_functions_197 from "../system-prompts/functions.js";
-import * as lunora_tasks_execute_198 from "../tasks/execute.js";
-import * as lunora_tasks_functions_199 from "../tasks/functions.js";
-import * as lunora_tasks_gdpr_200 from "../tasks/gdpr.js";
-import * as lunora_tasks_internal_201 from "../tasks/internal.js";
-import * as lunora_triggers_events_202 from "../triggers/events.js";
-import * as lunora_triggers_execute_203 from "../triggers/execute.js";
-import * as lunora_triggers_functions_204 from "../triggers/functions.js";
-import * as lunora_triggers_quiet_inputs_205 from "../triggers/quiet-inputs.js";
-import * as lunora_triggers_schedule_206 from "../triggers/schedule.js";
-import * as lunora_usage_activity_207 from "../usage/activity.js";
-import * as lunora_usage_backfill_208 from "../usage/backfill.js";
-import * as lunora_vault_fork_copy_209 from "../vault/fork-copy.js";
-import * as lunora_vault_functions_210 from "../vault/functions.js";
-import * as lunora_voice_functions_211 from "../voice/functions.js";
-import * as lunora_voice_speech_212 from "../voice/speech.js";
-import * as lunora_workflow_executor_213 from "../workflow/executor.js";
-import * as lunora_workflow_fork_214 from "../workflow/fork.js";
-import * as lunora_workflow_functions_215 from "../workflow/functions.js";
-import * as lunora_workflow_gallery_216 from "../workflow/gallery.js";
-import * as lunora_workflow_generate_217 from "../workflow/generate.js";
-import * as lunora_workflow_media_ops_218 from "../workflow/media-ops.js";
-import * as lunora_workflow_presence_219 from "../workflow/presence.js";
+import * as lunora_source_control_pr_threads_192 from "../source-control/pr-threads.js";
+import * as lunora_source_control_review_drafts_193 from "../source-control/review-drafts.js";
+import * as lunora_source_control_review_functions_194 from "../source-control/review-functions.js";
+import * as lunora_source_control_review_internal_195 from "../source-control/review-internal.js";
+import * as lunora_sub_agents_execute_196 from "../sub-agents/execute.js";
+import * as lunora_sub_agents_functions_197 from "../sub-agents/functions.js";
+import * as lunora_system_prompts_functions_198 from "../system-prompts/functions.js";
+import * as lunora_tasks_execute_199 from "../tasks/execute.js";
+import * as lunora_tasks_functions_200 from "../tasks/functions.js";
+import * as lunora_tasks_gdpr_201 from "../tasks/gdpr.js";
+import * as lunora_tasks_internal_202 from "../tasks/internal.js";
+import * as lunora_triggers_events_203 from "../triggers/events.js";
+import * as lunora_triggers_execute_204 from "../triggers/execute.js";
+import * as lunora_triggers_functions_205 from "../triggers/functions.js";
+import * as lunora_triggers_quiet_inputs_206 from "../triggers/quiet-inputs.js";
+import * as lunora_triggers_schedule_207 from "../triggers/schedule.js";
+import * as lunora_usage_activity_208 from "../usage/activity.js";
+import * as lunora_usage_backfill_209 from "../usage/backfill.js";
+import * as lunora_vault_fork_copy_210 from "../vault/fork-copy.js";
+import * as lunora_vault_functions_211 from "../vault/functions.js";
+import * as lunora_voice_functions_212 from "../voice/functions.js";
+import * as lunora_voice_speech_213 from "../voice/speech.js";
+import * as lunora_workflow_executor_214 from "../workflow/executor.js";
+import * as lunora_workflow_fork_215 from "../workflow/fork.js";
+import * as lunora_workflow_functions_216 from "../workflow/functions.js";
+import * as lunora_workflow_gallery_217 from "../workflow/gallery.js";
+import * as lunora_workflow_generate_218 from "../workflow/generate.js";
+import * as lunora_workflow_media_ops_219 from "../workflow/media-ops.js";
+import * as lunora_workflow_presence_220 from "../workflow/presence.js";
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
 import { LunoraError } from "lunorash/server";
@@ -842,6 +843,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_thread_state:unsnoozeThread": lunora_chat_thread_state_87.unsnoozeThread as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:consumeLowRiskCheck": lunora_chat_tool_permissions_88.consumeLowRiskCheck as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getLowRiskApprovalContext": lunora_chat_tool_permissions_88.getLowRiskApprovalContext as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:getLowRiskTrustedServers": lunora_chat_tool_permissions_88.getLowRiskTrustedServers as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getPendingToolApproval": lunora_chat_tool_permissions_88.getPendingToolApproval as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionGrantsQuery": lunora_chat_tool_permissions_88.getToolPermissionGrantsQuery as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:getToolPermissionSettings": lunora_chat_tool_permissions_88.getToolPermissionSettings as unknown as RegisteredLunoraFunction,
@@ -852,6 +854,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_tool_permissions:respondToToolApproval": lunora_chat_tool_permissions_88.respondToToolApproval as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:revokeToolPermissionGrant": lunora_chat_tool_permissions_88.revokeToolPermissionGrant as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:setAutoApproveLowRisk": lunora_chat_tool_permissions_88.setAutoApproveLowRisk as unknown as RegisteredLunoraFunction,
+    "chat_tool_permissions:setLowRiskTrustedServer": lunora_chat_tool_permissions_88.setLowRiskTrustedServer as unknown as RegisteredLunoraFunction,
     "chat_tool_permissions:setToolPermission": lunora_chat_tool_permissions_88.setToolPermission as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:closeBrowserSession": lunora_chat_tools_browser_node_89.closeBrowserSession as unknown as RegisteredLunoraFunction,
     "chat_tools_browser_node:executeBrowserAction": lunora_chat_tools_browser_node_89.executeBrowserAction as unknown as RegisteredLunoraFunction,
@@ -1280,6 +1283,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "projects_functions:createProject": lunora_projects_functions_162.createProject as unknown as RegisteredLunoraFunction,
     "projects_functions:deleteProject": lunora_projects_functions_162.deleteProject as unknown as RegisteredLunoraFunction,
     "projects_functions:getProject": lunora_projects_functions_162.getProject as unknown as RegisteredLunoraFunction,
+    "projects_functions:getProjectContextForRun": lunora_projects_functions_162.getProjectContextForRun as unknown as RegisteredLunoraFunction,
     "projects_functions:listPinnedProjects": lunora_projects_functions_162.listPinnedProjects as unknown as RegisteredLunoraFunction,
     "projects_functions:listProjects": lunora_projects_functions_162.listProjects as unknown as RegisteredLunoraFunction,
     "projects_functions:listThreadsByProject": lunora_projects_functions_162.listThreadsByProject as unknown as RegisteredLunoraFunction,
@@ -1415,9 +1419,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "source_control_functions:getPullRequestCommits": lunora_source_control_functions_185.getPullRequestCommits as unknown as RegisteredLunoraFunction,
     "source_control_functions:getPullRequestFiles": lunora_source_control_functions_185.getPullRequestFiles as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:collectGuidesForExport": lunora_source_control_gdpr_186.collectGuidesForExport as unknown as RegisteredLunoraFunction,
+    "source_control_gdpr:collectPullRequestThreadsForExport": lunora_source_control_gdpr_186.collectPullRequestThreadsForExport as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:collectReviewDraftsForExport": lunora_source_control_gdpr_186.collectReviewDraftsForExport as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:collectWatchedRepositoriesForExport": lunora_source_control_gdpr_186.collectWatchedRepositoriesForExport as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:deleteUserGuides": lunora_source_control_gdpr_186.deleteUserGuides as unknown as RegisteredLunoraFunction,
+    "source_control_gdpr:deleteUserPullRequestThreads": lunora_source_control_gdpr_186.deleteUserPullRequestThreads as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:deleteUserReviewDrafts": lunora_source_control_gdpr_186.deleteUserReviewDrafts as unknown as RegisteredLunoraFunction,
     "source_control_gdpr:deleteUserWatchedRepositories": lunora_source_control_gdpr_186.deleteUserWatchedRepositories as unknown as RegisteredLunoraFunction,
     "source_control_guide_functions:applyGuideProposal": lunora_source_control_guide_functions_187.applyGuideProposal as unknown as RegisteredLunoraFunction,
@@ -1439,158 +1445,162 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "source_control_merge_functions:mergePullRequest": lunora_source_control_merge_functions_191.mergePullRequest as unknown as RegisteredLunoraFunction,
     "source_control_merge_functions:rerunCheck": lunora_source_control_merge_functions_191.rerunCheck as unknown as RegisteredLunoraFunction,
     "source_control_merge_functions:setAutoMerge": lunora_source_control_merge_functions_191.setAutoMerge as unknown as RegisteredLunoraFunction,
-    "source_control_review_drafts:deleteDraftComment": lunora_source_control_review_drafts_192.deleteDraftComment as unknown as RegisteredLunoraFunction,
-    "source_control_review_drafts:discardReviewDraft": lunora_source_control_review_drafts_192.discardReviewDraft as unknown as RegisteredLunoraFunction,
-    "source_control_review_drafts:getReviewDraft": lunora_source_control_review_drafts_192.getReviewDraft as unknown as RegisteredLunoraFunction,
-    "source_control_review_drafts:saveDraftComment": lunora_source_control_review_drafts_192.saveDraftComment as unknown as RegisteredLunoraFunction,
-    "source_control_review_drafts:setDraftReview": lunora_source_control_review_drafts_192.setDraftReview as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:getReviewThreads": lunora_source_control_review_functions_193.getReviewThreads as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:getViewedFiles": lunora_source_control_review_functions_193.getViewedFiles as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:replyToReviewThread": lunora_source_control_review_functions_193.replyToReviewThread as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:setFileViewed": lunora_source_control_review_functions_193.setFileViewed as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:setReviewThreadResolved": lunora_source_control_review_functions_193.setReviewThreadResolved as unknown as RegisteredLunoraFunction,
-    "source_control_review_functions:submitReview": lunora_source_control_review_functions_193.submitReview as unknown as RegisteredLunoraFunction,
-    "source_control_review_internal:claimDraftForSubmit": lunora_source_control_review_internal_194.claimDraftForSubmit as unknown as RegisteredLunoraFunction,
-    "source_control_review_internal:finishDraftSubmit": lunora_source_control_review_internal_194.finishDraftSubmit as unknown as RegisteredLunoraFunction,
-    "source_control_review_internal:releaseDraftSubmit": lunora_source_control_review_internal_194.releaseDraftSubmit as unknown as RegisteredLunoraFunction,
-    "sub_agents_execute:runSubAgent": lunora_sub_agents_execute_195.runSubAgent as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:attachChildThread": lunora_sub_agents_functions_196.attachChildThread as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:cancelRun": lunora_sub_agents_functions_196.cancelRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:claimRun": lunora_sub_agents_functions_196.claimRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:completeRun": lunora_sub_agents_functions_196.completeRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:createRun": lunora_sub_agents_functions_196.createRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:createWorker": lunora_sub_agents_functions_196.createWorker as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:dispatchToWorker": lunora_sub_agents_functions_196.dispatchToWorker as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_196.getRunByToolCall as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:getWorker": lunora_sub_agents_functions_196.getWorker as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:isHostWorker": lunora_sub_agents_functions_196.isHostWorker as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:listActiveWorkerRuns": lunora_sub_agents_functions_196.listActiveWorkerRuns as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:listWorkers": lunora_sub_agents_functions_196.listWorkers as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:messageWorker": lunora_sub_agents_functions_196.messageWorker as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:postResult": lunora_sub_agents_functions_196.postResult as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:reapRun": lunora_sub_agents_functions_196.reapRun as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:retryHostRunStart": lunora_sub_agents_functions_196.retryHostRunStart as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:setWorkerPolicy": lunora_sub_agents_functions_196.setWorkerPolicy as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_196.shouldRunStop as unknown as RegisteredLunoraFunction,
-    "sub_agents_functions:stopWorker": lunora_sub_agents_functions_196.stopWorker as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:createPreset": lunora_system_prompts_functions_197.createPreset as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:deletePreset": lunora_system_prompts_functions_197.deletePreset as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:listPresets": lunora_system_prompts_functions_197.listPresets as unknown as RegisteredLunoraFunction,
-    "system_prompts_functions:updatePreset": lunora_system_prompts_functions_197.updatePreset as unknown as RegisteredLunoraFunction,
-    "tasks_execute:finishCodingAgentRound": lunora_tasks_execute_198.finishCodingAgentRound as unknown as RegisteredLunoraFunction,
-    "tasks_execute:runTaskRound": lunora_tasks_execute_198.runTaskRound as unknown as RegisteredLunoraFunction,
-    "tasks_functions:cancelTask": lunora_tasks_functions_199.cancelTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:createGoal": lunora_tasks_functions_199.createGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:createTask": lunora_tasks_functions_199.createTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:deleteGoal": lunora_tasks_functions_199.deleteGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:deleteTask": lunora_tasks_functions_199.deleteTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:getTaskBoard": lunora_tasks_functions_199.getTaskBoard as unknown as RegisteredLunoraFunction,
-    "tasks_functions:getTaskRuns": lunora_tasks_functions_199.getTaskRuns as unknown as RegisteredLunoraFunction,
-    "tasks_functions:listTaskSkillOptions": lunora_tasks_functions_199.listTaskSkillOptions as unknown as RegisteredLunoraFunction,
-    "tasks_functions:reviewTask": lunora_tasks_functions_199.reviewTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:runTask": lunora_tasks_functions_199.runTask as unknown as RegisteredLunoraFunction,
-    "tasks_functions:updateGoal": lunora_tasks_functions_199.updateGoal as unknown as RegisteredLunoraFunction,
-    "tasks_functions:updateTask": lunora_tasks_functions_199.updateTask as unknown as RegisteredLunoraFunction,
-    "tasks_gdpr:collectTasksForExport": lunora_tasks_gdpr_200.collectTasksForExport as unknown as RegisteredLunoraFunction,
-    "tasks_gdpr:deleteUserTasks": lunora_tasks_gdpr_200.deleteUserTasks as unknown as RegisteredLunoraFunction,
-    "tasks_internal:canRunForUser": lunora_tasks_internal_201.canRunForUser as unknown as RegisteredLunoraFunction,
-    "tasks_internal:checkDueTasks": lunora_tasks_internal_201.checkDueTasks as unknown as RegisteredLunoraFunction,
-    "tasks_internal:claimRound": lunora_tasks_internal_201.claimRound as unknown as RegisteredLunoraFunction,
-    "tasks_internal:completeRound": lunora_tasks_internal_201.completeRound as unknown as RegisteredLunoraFunction,
-    "tasks_internal:getTaskForVerification": lunora_tasks_internal_201.getTaskForVerification as unknown as RegisteredLunoraFunction,
-    "tasks_internal:isRoundRunning": lunora_tasks_internal_201.isRoundRunning as unknown as RegisteredLunoraFunction,
-    "tasks_internal:resolveTaskSkill": lunora_tasks_internal_201.resolveTaskSkill as unknown as RegisteredLunoraFunction,
-    "triggers_events:dispatchDueEventTriggers": lunora_triggers_events_202.dispatchDueEventTriggers as unknown as RegisteredLunoraFunction,
-    "triggers_events:isEventRunPending": lunora_triggers_events_202.isEventRunPending as unknown as RegisteredLunoraFunction,
-    "triggers_events:latestThreadReply": lunora_triggers_events_202.latestThreadReply as unknown as RegisteredLunoraFunction,
-    "triggers_events:recordEventCheck": lunora_triggers_events_202.recordEventCheck as unknown as RegisteredLunoraFunction,
-    "triggers_events:runEventCheck": lunora_triggers_events_202.runEventCheck as unknown as RegisteredLunoraFunction,
-    "triggers_events:settleEventRun": lunora_triggers_events_202.settleEventRun as unknown as RegisteredLunoraFunction,
-    "triggers_events:startEventRun": lunora_triggers_events_202.startEventRun as unknown as RegisteredLunoraFunction,
-    "triggers_execute:default": lunora_triggers_execute_203.default as unknown as RegisteredLunoraFunction,
-    "triggers_execute:executeTrigger": lunora_triggers_execute_203.executeTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:admitTriggerRun": lunora_triggers_functions_204.admitTriggerRun as unknown as RegisteredLunoraFunction,
-    "triggers_functions:createExecution": lunora_triggers_functions_204.createExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:createTrigger": lunora_triggers_functions_204.createTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:deleteTrigger": lunora_triggers_functions_204.deleteTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getDueScheduleTriggers": lunora_triggers_functions_204.getDueScheduleTriggers as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggerExecutions": lunora_triggers_functions_204.getTriggerExecutions as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggerInternal": lunora_triggers_functions_204.getTriggerInternal as unknown as RegisteredLunoraFunction,
-    "triggers_functions:getTriggers": lunora_triggers_functions_204.getTriggers as unknown as RegisteredLunoraFunction,
-    "triggers_functions:recordFilteredExecution": lunora_triggers_functions_204.recordFilteredExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:releaseQuietWindow": lunora_triggers_functions_204.releaseQuietWindow as unknown as RegisteredLunoraFunction,
-    "triggers_functions:reserveQuietWindow": lunora_triggers_functions_204.reserveQuietWindow as unknown as RegisteredLunoraFunction,
-    "triggers_functions:setTriggerEnabled": lunora_triggers_functions_204.setTriggerEnabled as unknown as RegisteredLunoraFunction,
-    "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_204.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
-    "triggers_functions:switchOffConsumedMoment": lunora_triggers_functions_204.switchOffConsumedMoment as unknown as RegisteredLunoraFunction,
-    "triggers_functions:testRunTrigger": lunora_triggers_functions_204.testRunTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateExecution": lunora_triggers_functions_204.updateExecution as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateTrigger": lunora_triggers_functions_204.updateTrigger as unknown as RegisteredLunoraFunction,
-    "triggers_functions:updateTriggerStats": lunora_triggers_functions_204.updateTriggerStats as unknown as RegisteredLunoraFunction,
-    "triggers_quiet_inputs:loadQuietSnapshot": lunora_triggers_quiet_inputs_205.loadQuietSnapshot as unknown as RegisteredLunoraFunction,
-    "triggers_schedule:checkDueTriggers": lunora_triggers_schedule_206.checkDueTriggers as unknown as RegisteredLunoraFunction,
-    "usage_activity:getActivityHeatmap": lunora_usage_activity_207.getActivityHeatmap as unknown as RegisteredLunoraFunction,
-    "usage_activity:getSkillBreakdown": lunora_usage_activity_207.getSkillBreakdown as unknown as RegisteredLunoraFunction,
-    "usage_activity:recordReplyUsage": lunora_usage_activity_207.recordReplyUsage as unknown as RegisteredLunoraFunction,
-    "usage_backfill:getUsageBackfillStatus": lunora_usage_backfill_208.getUsageBackfillStatus as unknown as RegisteredLunoraFunction,
-    "usage_backfill:runUsageBackfillStep": lunora_usage_backfill_208.runUsageBackfillStep as unknown as RegisteredLunoraFunction,
-    "usage_backfill:startUsageBackfill": lunora_usage_backfill_208.startUsageBackfill as unknown as RegisteredLunoraFunction,
-    "usage_backfill:sweepUsageRollup": lunora_usage_backfill_208.sweepUsageRollup as unknown as RegisteredLunoraFunction,
-    "vault_fork_copy:copyVaultObjects": lunora_vault_fork_copy_209.copyVaultObjects as unknown as RegisteredLunoraFunction,
-    "vault_functions:applyFileMetadata": lunora_vault_functions_210.applyFileMetadata as unknown as RegisteredLunoraFunction,
-    "vault_functions:deleteAttachments": lunora_vault_functions_210.deleteAttachments as unknown as RegisteredLunoraFunction,
-    "vault_functions:discardUnfiledVaultFile": lunora_vault_functions_210.discardUnfiledVaultFile as unknown as RegisteredLunoraFunction,
-    "vault_functions:findAttachmentByKey": lunora_vault_functions_210.findAttachmentByKey as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachment": lunora_vault_functions_210.getAttachment as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForChat": lunora_vault_functions_210.getAttachmentsForChat as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForOrganization": lunora_vault_functions_210.getAttachmentsForOrganization as unknown as RegisteredLunoraFunction,
-    "vault_functions:getAttachmentsForUser": lunora_vault_functions_210.getAttachmentsForUser as unknown as RegisteredLunoraFunction,
-    "vault_functions:getDownloadUrl": lunora_vault_functions_210.getDownloadUrl as unknown as RegisteredLunoraFunction,
-    "vault_functions:getStorageUrl": lunora_vault_functions_210.getStorageUrl as unknown as RegisteredLunoraFunction,
-    "vault_functions:insertVaultFile": lunora_vault_functions_210.insertVaultFile as unknown as RegisteredLunoraFunction,
-    "vault_functions:internalSaveGenerated": lunora_vault_functions_210.internalSaveGenerated as unknown as RegisteredLunoraFunction,
-    "vault_functions:markNsfwChecking": lunora_vault_functions_210.markNsfwChecking as unknown as RegisteredLunoraFunction,
-    "vault_functions:markNsfwFailed": lunora_vault_functions_210.markNsfwFailed as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveGeneratedImage": lunora_vault_functions_210.saveGeneratedImage as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveNsfwResult": lunora_vault_functions_210.saveNsfwResult as unknown as RegisteredLunoraFunction,
-    "vault_functions:saveVaultFile": lunora_vault_functions_210.saveVaultFile as unknown as RegisteredLunoraFunction,
-    "vault_functions:syncMetadata": lunora_vault_functions_210.syncMetadata as unknown as RegisteredLunoraFunction,
-    "voice_functions:authorizeScribeToken": lunora_voice_functions_211.authorizeScribeToken as unknown as RegisteredLunoraFunction,
-    "voice_speech:synthesizeSpeech": lunora_voice_speech_212.synthesizeSpeech as unknown as RegisteredLunoraFunction,
-    "workflow_executor:executeWorkflow": lunora_workflow_executor_213.executeWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_fork:completeFork": lunora_workflow_fork_214.completeFork as unknown as RegisteredLunoraFunction,
-    "workflow_fork:forkWorkflow": lunora_workflow_fork_214.forkWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_fork:getAuthorVaultRows": lunora_workflow_fork_214.getAuthorVaultRows as unknown as RegisteredLunoraFunction,
-    "workflow_fork:getForkSource": lunora_workflow_fork_214.getForkSource as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createExecution": lunora_workflow_functions_215.createExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createNodeExecution": lunora_workflow_functions_215.createNodeExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:createWorkflow": lunora_workflow_functions_215.createWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_functions:getExecution": lunora_workflow_functions_215.getExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:getWorkflow": lunora_workflow_functions_215.getWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listExecutions": lunora_workflow_functions_215.listExecutions as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listNodeExecutions": lunora_workflow_functions_215.listNodeExecutions as unknown as RegisteredLunoraFunction,
-    "workflow_functions:listWorkflows": lunora_workflow_functions_215.listWorkflows as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateExecutionStatus": lunora_workflow_functions_215.updateExecutionStatus as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateNodeExecution": lunora_workflow_functions_215.updateNodeExecution as unknown as RegisteredLunoraFunction,
-    "workflow_functions:updateWorkflowContent": lunora_workflow_functions_215.updateWorkflowContent as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:browseGallery": lunora_workflow_gallery_216.browseGallery as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getFeaturedWorkflows": lunora_workflow_gallery_216.getFeaturedWorkflows as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getPublicWorkflow": lunora_workflow_gallery_216.getPublicWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:getPublicWorkflowOwner": lunora_workflow_gallery_216.getPublicWorkflowOwner as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:publishWorkflow": lunora_workflow_gallery_216.publishWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:readPublicWorkflow": lunora_workflow_gallery_216.readPublicWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_216.unpublishWorkflow as unknown as RegisteredLunoraFunction,
-    "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_216.updateGalleryMeta as unknown as RegisteredLunoraFunction,
-    "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_217.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
-    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_218.extractVideoFrame as unknown as RegisteredLunoraFunction,
-    "workflow_presence:checkNodeLock": lunora_workflow_presence_219.checkNodeLock as unknown as RegisteredLunoraFunction,
-    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_219.cleanupStalePresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:disconnect": lunora_workflow_presence_219.disconnect as unknown as RegisteredLunoraFunction,
-    "workflow_presence:heartbeat": lunora_workflow_presence_219.heartbeat as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listPresence": lunora_workflow_presence_219.listPresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listVersions": lunora_workflow_presence_219.listVersions as unknown as RegisteredLunoraFunction,
-    "workflow_presence:restoreVersion": lunora_workflow_presence_219.restoreVersion as unknown as RegisteredLunoraFunction,
-    "workflow_presence:saveVersion": lunora_workflow_presence_219.saveVersion as unknown as RegisteredLunoraFunction,
+    "source_control_pr_threads:getForThread": lunora_source_control_pr_threads_192.getForThread as unknown as RegisteredLunoraFunction,
+    "source_control_pr_threads:listForPullRequest": lunora_source_control_pr_threads_192.listForPullRequest as unknown as RegisteredLunoraFunction,
+    "source_control_pr_threads:recordOpenedPullRequest": lunora_source_control_pr_threads_192.recordOpenedPullRequest as unknown as RegisteredLunoraFunction,
+    "source_control_pr_threads:startWorkOnPullRequest": lunora_source_control_pr_threads_192.startWorkOnPullRequest as unknown as RegisteredLunoraFunction,
+    "source_control_review_drafts:deleteDraftComment": lunora_source_control_review_drafts_193.deleteDraftComment as unknown as RegisteredLunoraFunction,
+    "source_control_review_drafts:discardReviewDraft": lunora_source_control_review_drafts_193.discardReviewDraft as unknown as RegisteredLunoraFunction,
+    "source_control_review_drafts:getReviewDraft": lunora_source_control_review_drafts_193.getReviewDraft as unknown as RegisteredLunoraFunction,
+    "source_control_review_drafts:saveDraftComment": lunora_source_control_review_drafts_193.saveDraftComment as unknown as RegisteredLunoraFunction,
+    "source_control_review_drafts:setDraftReview": lunora_source_control_review_drafts_193.setDraftReview as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:getReviewThreads": lunora_source_control_review_functions_194.getReviewThreads as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:getViewedFiles": lunora_source_control_review_functions_194.getViewedFiles as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:replyToReviewThread": lunora_source_control_review_functions_194.replyToReviewThread as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:setFileViewed": lunora_source_control_review_functions_194.setFileViewed as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:setReviewThreadResolved": lunora_source_control_review_functions_194.setReviewThreadResolved as unknown as RegisteredLunoraFunction,
+    "source_control_review_functions:submitReview": lunora_source_control_review_functions_194.submitReview as unknown as RegisteredLunoraFunction,
+    "source_control_review_internal:claimDraftForSubmit": lunora_source_control_review_internal_195.claimDraftForSubmit as unknown as RegisteredLunoraFunction,
+    "source_control_review_internal:finishDraftSubmit": lunora_source_control_review_internal_195.finishDraftSubmit as unknown as RegisteredLunoraFunction,
+    "source_control_review_internal:releaseDraftSubmit": lunora_source_control_review_internal_195.releaseDraftSubmit as unknown as RegisteredLunoraFunction,
+    "sub_agents_execute:runSubAgent": lunora_sub_agents_execute_196.runSubAgent as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:attachChildThread": lunora_sub_agents_functions_197.attachChildThread as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:cancelRun": lunora_sub_agents_functions_197.cancelRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:claimRun": lunora_sub_agents_functions_197.claimRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:completeRun": lunora_sub_agents_functions_197.completeRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:createRun": lunora_sub_agents_functions_197.createRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:createWorker": lunora_sub_agents_functions_197.createWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:dispatchToWorker": lunora_sub_agents_functions_197.dispatchToWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_197.getRunByToolCall as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:getWorker": lunora_sub_agents_functions_197.getWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:isHostWorker": lunora_sub_agents_functions_197.isHostWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:listActiveWorkerRuns": lunora_sub_agents_functions_197.listActiveWorkerRuns as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:listWorkers": lunora_sub_agents_functions_197.listWorkers as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:messageWorker": lunora_sub_agents_functions_197.messageWorker as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:postResult": lunora_sub_agents_functions_197.postResult as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:reapRun": lunora_sub_agents_functions_197.reapRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:retryHostRunStart": lunora_sub_agents_functions_197.retryHostRunStart as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:setWorkerPolicy": lunora_sub_agents_functions_197.setWorkerPolicy as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_197.shouldRunStop as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:stopWorker": lunora_sub_agents_functions_197.stopWorker as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:createPreset": lunora_system_prompts_functions_198.createPreset as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:deletePreset": lunora_system_prompts_functions_198.deletePreset as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:listPresets": lunora_system_prompts_functions_198.listPresets as unknown as RegisteredLunoraFunction,
+    "system_prompts_functions:updatePreset": lunora_system_prompts_functions_198.updatePreset as unknown as RegisteredLunoraFunction,
+    "tasks_execute:finishCodingAgentRound": lunora_tasks_execute_199.finishCodingAgentRound as unknown as RegisteredLunoraFunction,
+    "tasks_execute:runTaskRound": lunora_tasks_execute_199.runTaskRound as unknown as RegisteredLunoraFunction,
+    "tasks_functions:cancelTask": lunora_tasks_functions_200.cancelTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:createGoal": lunora_tasks_functions_200.createGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:createTask": lunora_tasks_functions_200.createTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:deleteGoal": lunora_tasks_functions_200.deleteGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:deleteTask": lunora_tasks_functions_200.deleteTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:getTaskBoard": lunora_tasks_functions_200.getTaskBoard as unknown as RegisteredLunoraFunction,
+    "tasks_functions:getTaskRuns": lunora_tasks_functions_200.getTaskRuns as unknown as RegisteredLunoraFunction,
+    "tasks_functions:listTaskSkillOptions": lunora_tasks_functions_200.listTaskSkillOptions as unknown as RegisteredLunoraFunction,
+    "tasks_functions:reviewTask": lunora_tasks_functions_200.reviewTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:runTask": lunora_tasks_functions_200.runTask as unknown as RegisteredLunoraFunction,
+    "tasks_functions:updateGoal": lunora_tasks_functions_200.updateGoal as unknown as RegisteredLunoraFunction,
+    "tasks_functions:updateTask": lunora_tasks_functions_200.updateTask as unknown as RegisteredLunoraFunction,
+    "tasks_gdpr:collectTasksForExport": lunora_tasks_gdpr_201.collectTasksForExport as unknown as RegisteredLunoraFunction,
+    "tasks_gdpr:deleteUserTasks": lunora_tasks_gdpr_201.deleteUserTasks as unknown as RegisteredLunoraFunction,
+    "tasks_internal:canRunForUser": lunora_tasks_internal_202.canRunForUser as unknown as RegisteredLunoraFunction,
+    "tasks_internal:checkDueTasks": lunora_tasks_internal_202.checkDueTasks as unknown as RegisteredLunoraFunction,
+    "tasks_internal:claimRound": lunora_tasks_internal_202.claimRound as unknown as RegisteredLunoraFunction,
+    "tasks_internal:completeRound": lunora_tasks_internal_202.completeRound as unknown as RegisteredLunoraFunction,
+    "tasks_internal:getTaskForVerification": lunora_tasks_internal_202.getTaskForVerification as unknown as RegisteredLunoraFunction,
+    "tasks_internal:isRoundRunning": lunora_tasks_internal_202.isRoundRunning as unknown as RegisteredLunoraFunction,
+    "tasks_internal:resolveTaskSkill": lunora_tasks_internal_202.resolveTaskSkill as unknown as RegisteredLunoraFunction,
+    "triggers_events:dispatchDueEventTriggers": lunora_triggers_events_203.dispatchDueEventTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_events:isEventRunPending": lunora_triggers_events_203.isEventRunPending as unknown as RegisteredLunoraFunction,
+    "triggers_events:latestThreadReply": lunora_triggers_events_203.latestThreadReply as unknown as RegisteredLunoraFunction,
+    "triggers_events:recordEventCheck": lunora_triggers_events_203.recordEventCheck as unknown as RegisteredLunoraFunction,
+    "triggers_events:runEventCheck": lunora_triggers_events_203.runEventCheck as unknown as RegisteredLunoraFunction,
+    "triggers_events:settleEventRun": lunora_triggers_events_203.settleEventRun as unknown as RegisteredLunoraFunction,
+    "triggers_events:startEventRun": lunora_triggers_events_203.startEventRun as unknown as RegisteredLunoraFunction,
+    "triggers_execute:default": lunora_triggers_execute_204.default as unknown as RegisteredLunoraFunction,
+    "triggers_execute:executeTrigger": lunora_triggers_execute_204.executeTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:admitTriggerRun": lunora_triggers_functions_205.admitTriggerRun as unknown as RegisteredLunoraFunction,
+    "triggers_functions:createExecution": lunora_triggers_functions_205.createExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:createTrigger": lunora_triggers_functions_205.createTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:deleteTrigger": lunora_triggers_functions_205.deleteTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getDueScheduleTriggers": lunora_triggers_functions_205.getDueScheduleTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggerExecutions": lunora_triggers_functions_205.getTriggerExecutions as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggerInternal": lunora_triggers_functions_205.getTriggerInternal as unknown as RegisteredLunoraFunction,
+    "triggers_functions:getTriggers": lunora_triggers_functions_205.getTriggers as unknown as RegisteredLunoraFunction,
+    "triggers_functions:recordFilteredExecution": lunora_triggers_functions_205.recordFilteredExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:releaseQuietWindow": lunora_triggers_functions_205.releaseQuietWindow as unknown as RegisteredLunoraFunction,
+    "triggers_functions:reserveQuietWindow": lunora_triggers_functions_205.reserveQuietWindow as unknown as RegisteredLunoraFunction,
+    "triggers_functions:setTriggerEnabled": lunora_triggers_functions_205.setTriggerEnabled as unknown as RegisteredLunoraFunction,
+    "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_205.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
+    "triggers_functions:switchOffConsumedMoment": lunora_triggers_functions_205.switchOffConsumedMoment as unknown as RegisteredLunoraFunction,
+    "triggers_functions:testRunTrigger": lunora_triggers_functions_205.testRunTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateExecution": lunora_triggers_functions_205.updateExecution as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateTrigger": lunora_triggers_functions_205.updateTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:updateTriggerStats": lunora_triggers_functions_205.updateTriggerStats as unknown as RegisteredLunoraFunction,
+    "triggers_quiet_inputs:loadQuietSnapshot": lunora_triggers_quiet_inputs_206.loadQuietSnapshot as unknown as RegisteredLunoraFunction,
+    "triggers_schedule:checkDueTriggers": lunora_triggers_schedule_207.checkDueTriggers as unknown as RegisteredLunoraFunction,
+    "usage_activity:getActivityHeatmap": lunora_usage_activity_208.getActivityHeatmap as unknown as RegisteredLunoraFunction,
+    "usage_activity:getSkillBreakdown": lunora_usage_activity_208.getSkillBreakdown as unknown as RegisteredLunoraFunction,
+    "usage_activity:recordReplyUsage": lunora_usage_activity_208.recordReplyUsage as unknown as RegisteredLunoraFunction,
+    "usage_backfill:getUsageBackfillStatus": lunora_usage_backfill_209.getUsageBackfillStatus as unknown as RegisteredLunoraFunction,
+    "usage_backfill:runUsageBackfillStep": lunora_usage_backfill_209.runUsageBackfillStep as unknown as RegisteredLunoraFunction,
+    "usage_backfill:startUsageBackfill": lunora_usage_backfill_209.startUsageBackfill as unknown as RegisteredLunoraFunction,
+    "usage_backfill:sweepUsageRollup": lunora_usage_backfill_209.sweepUsageRollup as unknown as RegisteredLunoraFunction,
+    "vault_fork_copy:copyVaultObjects": lunora_vault_fork_copy_210.copyVaultObjects as unknown as RegisteredLunoraFunction,
+    "vault_functions:applyFileMetadata": lunora_vault_functions_211.applyFileMetadata as unknown as RegisteredLunoraFunction,
+    "vault_functions:deleteAttachments": lunora_vault_functions_211.deleteAttachments as unknown as RegisteredLunoraFunction,
+    "vault_functions:discardUnfiledVaultFile": lunora_vault_functions_211.discardUnfiledVaultFile as unknown as RegisteredLunoraFunction,
+    "vault_functions:findAttachmentByKey": lunora_vault_functions_211.findAttachmentByKey as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachment": lunora_vault_functions_211.getAttachment as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForChat": lunora_vault_functions_211.getAttachmentsForChat as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForOrganization": lunora_vault_functions_211.getAttachmentsForOrganization as unknown as RegisteredLunoraFunction,
+    "vault_functions:getAttachmentsForUser": lunora_vault_functions_211.getAttachmentsForUser as unknown as RegisteredLunoraFunction,
+    "vault_functions:getDownloadUrl": lunora_vault_functions_211.getDownloadUrl as unknown as RegisteredLunoraFunction,
+    "vault_functions:getStorageUrl": lunora_vault_functions_211.getStorageUrl as unknown as RegisteredLunoraFunction,
+    "vault_functions:insertVaultFile": lunora_vault_functions_211.insertVaultFile as unknown as RegisteredLunoraFunction,
+    "vault_functions:internalSaveGenerated": lunora_vault_functions_211.internalSaveGenerated as unknown as RegisteredLunoraFunction,
+    "vault_functions:markNsfwChecking": lunora_vault_functions_211.markNsfwChecking as unknown as RegisteredLunoraFunction,
+    "vault_functions:markNsfwFailed": lunora_vault_functions_211.markNsfwFailed as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveGeneratedImage": lunora_vault_functions_211.saveGeneratedImage as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveNsfwResult": lunora_vault_functions_211.saveNsfwResult as unknown as RegisteredLunoraFunction,
+    "vault_functions:saveVaultFile": lunora_vault_functions_211.saveVaultFile as unknown as RegisteredLunoraFunction,
+    "vault_functions:syncMetadata": lunora_vault_functions_211.syncMetadata as unknown as RegisteredLunoraFunction,
+    "voice_functions:authorizeScribeToken": lunora_voice_functions_212.authorizeScribeToken as unknown as RegisteredLunoraFunction,
+    "voice_speech:synthesizeSpeech": lunora_voice_speech_213.synthesizeSpeech as unknown as RegisteredLunoraFunction,
+    "workflow_executor:executeWorkflow": lunora_workflow_executor_214.executeWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_fork:completeFork": lunora_workflow_fork_215.completeFork as unknown as RegisteredLunoraFunction,
+    "workflow_fork:forkWorkflow": lunora_workflow_fork_215.forkWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_fork:getAuthorVaultRows": lunora_workflow_fork_215.getAuthorVaultRows as unknown as RegisteredLunoraFunction,
+    "workflow_fork:getForkSource": lunora_workflow_fork_215.getForkSource as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createExecution": lunora_workflow_functions_216.createExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createNodeExecution": lunora_workflow_functions_216.createNodeExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:createWorkflow": lunora_workflow_functions_216.createWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_functions:getExecution": lunora_workflow_functions_216.getExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:getWorkflow": lunora_workflow_functions_216.getWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listExecutions": lunora_workflow_functions_216.listExecutions as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listNodeExecutions": lunora_workflow_functions_216.listNodeExecutions as unknown as RegisteredLunoraFunction,
+    "workflow_functions:listWorkflows": lunora_workflow_functions_216.listWorkflows as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateExecutionStatus": lunora_workflow_functions_216.updateExecutionStatus as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateNodeExecution": lunora_workflow_functions_216.updateNodeExecution as unknown as RegisteredLunoraFunction,
+    "workflow_functions:updateWorkflowContent": lunora_workflow_functions_216.updateWorkflowContent as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:browseGallery": lunora_workflow_gallery_217.browseGallery as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getFeaturedWorkflows": lunora_workflow_gallery_217.getFeaturedWorkflows as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getPublicWorkflow": lunora_workflow_gallery_217.getPublicWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:getPublicWorkflowOwner": lunora_workflow_gallery_217.getPublicWorkflowOwner as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:publishWorkflow": lunora_workflow_gallery_217.publishWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:readPublicWorkflow": lunora_workflow_gallery_217.readPublicWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_217.unpublishWorkflow as unknown as RegisteredLunoraFunction,
+    "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_217.updateGalleryMeta as unknown as RegisteredLunoraFunction,
+    "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_218.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
+    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_219.extractVideoFrame as unknown as RegisteredLunoraFunction,
+    "workflow_presence:checkNodeLock": lunora_workflow_presence_220.checkNodeLock as unknown as RegisteredLunoraFunction,
+    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_220.cleanupStalePresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:disconnect": lunora_workflow_presence_220.disconnect as unknown as RegisteredLunoraFunction,
+    "workflow_presence:heartbeat": lunora_workflow_presence_220.heartbeat as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listPresence": lunora_workflow_presence_220.listPresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listVersions": lunora_workflow_presence_220.listVersions as unknown as RegisteredLunoraFunction,
+    "workflow_presence:restoreVersion": lunora_workflow_presence_220.restoreVersion as unknown as RegisteredLunoraFunction,
+    "workflow_presence:saveVersion": lunora_workflow_presence_220.saveVersion as unknown as RegisteredLunoraFunction,
 };
 
 /**
@@ -4473,6 +4483,12 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_chat_tool_permissions_88.getLowRiskTrustedServers.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_chat_tool_permissions_88.getPendingToolApproval.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -5243,34 +5259,40 @@ if (source["pullRequestGuides"] !== undefined) {
 __val10 = source["pullRequestGuides"];
 __has10 = true;
 }
-if (typeof source["requestId"] !== "string") return DEFER;
 let __has11 = false;
 let __val11;
-if (source["reviewDrafts"] !== undefined) {
-__val11 = source["reviewDrafts"];
+if (source["pullRequestThreads"] !== undefined) {
+__val11 = source["pullRequestThreads"];
 __has11 = true;
 }
+if (typeof source["requestId"] !== "string") return DEFER;
 let __has12 = false;
 let __val12;
-if (source["tasks"] !== undefined) {
-__val12 = source["tasks"];
+if (source["reviewDrafts"] !== undefined) {
+__val12 = source["reviewDrafts"];
 __has12 = true;
 }
 let __has13 = false;
 let __val13;
-if (source["threadTags"] !== undefined) {
-__val13 = source["threadTags"];
+if (source["tasks"] !== undefined) {
+__val13 = source["tasks"];
 __has13 = true;
+}
+let __has14 = false;
+let __val14;
+if (source["threadTags"] !== undefined) {
+__val14 = source["threadTags"];
+__has14 = true;
 }
 if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-let __has14 = false;
-let __val14;
+let __has15 = false;
+let __val15;
 if (source["watchedRepositories"] !== undefined) {
-__val14 = source["watchedRepositories"];
-__has14 = true;
+__val15 = source["watchedRepositories"];
+__has15 = true;
 }
-return { ...(__has1 ? { "acpSessions": __val1 } : {}), ...(__has2 ? { "activity": __val2 } : {}), ...(__has3 ? { "bots": __val3 } : {}), ...(__has4 ? { "codingAgentRuns": __val4 } : {}), "conversations": source["conversations"], ...(__has5 ? { "devices": __val5 } : {}), ...(__has6 ? { "evals": __val6 } : {}), "files": source["files"], ...(__has7 ? { "memories": __val7 } : {}), ...(__has8 ? { "notifications": __val8 } : {}), ...(__has9 ? { "pages": __val9 } : {}), "profile": source["profile"], "prompts": source["prompts"], ...(__has10 ? { "pullRequestGuides": __val10 } : {}), "requestId": source["requestId"], ...(__has11 ? { "reviewDrafts": __val11 } : {}), "settings": source["settings"], ...(__has12 ? { "tasks": __val12 } : {}), ...(__has13 ? { "threadTags": __val13 } : {}), "userEmail": source["userEmail"], "userId": source["userId"], ...(__has14 ? { "watchedRepositories": __val14 } : {}) };
+return { ...(__has1 ? { "acpSessions": __val1 } : {}), ...(__has2 ? { "activity": __val2 } : {}), ...(__has3 ? { "bots": __val3 } : {}), ...(__has4 ? { "codingAgentRuns": __val4 } : {}), "conversations": source["conversations"], ...(__has5 ? { "devices": __val5 } : {}), ...(__has6 ? { "evals": __val6 } : {}), "files": source["files"], ...(__has7 ? { "memories": __val7 } : {}), ...(__has8 ? { "notifications": __val8 } : {}), ...(__has9 ? { "pages": __val9 } : {}), "profile": source["profile"], "prompts": source["prompts"], ...(__has10 ? { "pullRequestGuides": __val10 } : {}), ...(__has11 ? { "pullRequestThreads": __val11 } : {}), "requestId": source["requestId"], ...(__has12 ? { "reviewDrafts": __val12 } : {}), "settings": source["settings"], ...(__has13 ? { "tasks": __val13 } : {}), ...(__has14 ? { "threadTags": __val14 } : {}), "userEmail": source["userEmail"], "userId": source["userId"], ...(__has15 ? { "watchedRepositories": __val15 } : {}) };
 });
 installCompiledValidatorMap(lunora_gdpr_steps_115.sendExportReadyEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -5846,7 +5868,8 @@ const __e1 = source["ids"][__i1];
 if (typeof __e1 !== "string") return DEFER;
 __arr1[__i1] = __e1;
 }
-return { "ids": __arr1 };
+if (typeof source["table"] !== "string") return DEFER;
+return { "ids": __arr1, "table": source["table"] };
 });
 installCompiledValidatorMap(lunora_lib_account_merge_132.importShardRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7680,38 +7703,38 @@ if (typeof source["lease"] !== "number" || !Number.isFinite(source["lease"])) re
 if (typeof source["watchId"] !== "string") return DEFER;
 return { "lease": source["lease"], "watchId": source["watchId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_execute_195.runSubAgent.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_execute_196.runSubAgent.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.attachChildThread.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.attachChildThread.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["childThreadId"] !== "string") return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.cancelRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.cancelRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.claimRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.getWorker.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.getWorker.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["workerId"] !== "string") return DEFER;
 return { "workerId": source["workerId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.postResult.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.postResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
@@ -7725,7 +7748,7 @@ __has1 = true;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.reapRun.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7738,43 +7761,43 @@ __has1 = true;
 if (typeof source["runId"] !== "string") return DEFER;
 return { ...(__has1 ? { "claimedAt": __val1 } : {}), "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.retryHostRunStart.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.retryHostRunStart.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_196.shouldRunStop.args, (source) => {
+installCompiledValidatorMap(lunora_sub_agents_functions_197.shouldRunStop.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_tasks_execute_198.finishCodingAgentRound.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_execute_199.finishCodingAgentRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["codingRunId"] !== "string") return DEFER;
 return { "codingRunId": source["codingRunId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_199.cancelTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_200.cancelTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_199.deleteGoal.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_200.deleteGoal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["goalId"] !== "string") return DEFER;
 return { "goalId": source["goalId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_199.deleteTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_200.deleteTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_199.getTaskRuns.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_200.getTaskRuns.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7787,43 +7810,43 @@ __has1 = true;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { ...(__has1 ? { "limit": __val1 } : {}), "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_functions_199.runTask.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_functions_200.runTask.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_gdpr_200.collectTasksForExport.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_gdpr_201.collectTasksForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_gdpr_200.deleteUserTasks.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_gdpr_201.deleteUserTasks.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_201.canRunForUser.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_202.canRunForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_201.getTaskForVerification.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_202.getTaskForVerification.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_201.isRoundRunning.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_202.isRoundRunning.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_tasks_internal_201.resolveTaskSkill.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_internal_202.resolveTaskSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7837,20 +7860,20 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "skillId": source["skillId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_triggers_events_202.isEventRunPending.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_events_203.isEventRunPending.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "firing": source["firing"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_events_202.runEventCheck.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_events_203.runEventCheck.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_events_202.settleEventRun.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_events_203.settleEventRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
@@ -7859,7 +7882,7 @@ if (typeof source["sent"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "attempt": source["attempt"], "firing": source["firing"], "sent": source["sent"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.createExecution.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7879,25 +7902,25 @@ __has2 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "firing": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.deleteTrigger.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.deleteTrigger.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.getDueScheduleTriggers.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.getDueScheduleTriggers.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "now": source["now"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.getTriggerInternal.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.getTriggerInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.releaseQuietWindow.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.releaseQuietWindow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7910,7 +7933,7 @@ __has1 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.reserveQuietWindow.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.reserveQuietWindow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7924,21 +7947,21 @@ if (typeof source["triggerId"] !== "string") return DEFER;
 if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.setTriggerEnabled.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.setTriggerEnabledInternal.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.setTriggerEnabledInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.updateExecution.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.updateExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7966,7 +7989,7 @@ __has3 = true;
 }
 return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}), ...(__has3 ? { "userFixable": __val3 } : {}) };
 });
-installCompiledValidatorMap(lunora_triggers_functions_204.updateTriggerStats.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_functions_205.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -7993,7 +8016,7 @@ __has3 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "error": __val1 } : {}), ...(__has2 ? { "lastTriggeredAt": __val2 } : {}), ...(__has3 ? { "nextTriggerAt": __val3 } : {}), "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_usage_activity_207.recordReplyUsage.args, (source) => {
+installCompiledValidatorMap(lunora_usage_activity_208.recordReplyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["at"] !== "number" || !Number.isFinite(source["at"])) return DEFER;
@@ -8012,14 +8035,14 @@ if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) 
 if (typeof source["userId"] !== "string") return DEFER;
 return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_usage_backfill_208.runUsageBackfillStep.args, (source) => {
+installCompiledValidatorMap(lunora_usage_backfill_209.runUsageBackfillStep.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "runId": source["runId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_fork_copy_209.copyVaultObjects.args, (source) => {
+installCompiledValidatorMap(lunora_vault_fork_copy_210.copyVaultObjects.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["copies"])) return DEFER;
@@ -8035,7 +8058,7 @@ __arr1[__i1] = __obj2;
 }
 return { "copies": __arr1 };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.applyFileMetadata.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.applyFileMetadata.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -8044,19 +8067,19 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.getAttachment.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.getAttachment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.getDownloadUrl.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.getDownloadUrl.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.insertVaultFile.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.insertVaultFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -8073,7 +8096,7 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "name": source["name"], ...(__has1 ? { "organizationId": __val1 } : {}), "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.internalSaveGenerated.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.internalSaveGenerated.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["chatId"] !== "string") return DEFER;
@@ -8091,87 +8114,87 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "chatId": source["chatId"], "fileName": source["fileName"], "fileSize": source["fileSize"], "fileType": source["fileType"], "key": source["key"], ...(__has1 ? { "url": __val1 } : {}), "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.markNsfwChecking.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.markNsfwChecking.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.markNsfwFailed.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.markNsfwFailed.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_vault_functions_210.saveNsfwResult.args, (source) => {
+installCompiledValidatorMap(lunora_vault_functions_211.saveNsfwResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 if (typeof source["isNsfw"] !== "boolean") return DEFER;
 return { "fileId": source["fileId"], "isNsfw": source["isNsfw"], "scores": source["scores"] };
 });
-installCompiledValidatorMap(lunora_workflow_fork_214.getAuthorVaultRows.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_215.getAuthorVaultRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["authorId"] !== "string") return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;
 return { "authorId": source["authorId"], "sourceProjectId": source["sourceProjectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_fork_214.getForkSource.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_215.getForkSource.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;
 return { "sourceProjectId": source["sourceProjectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_215.createExecution.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_216.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_215.getExecution.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_216.getExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;
 return { "executionId": source["executionId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_215.getWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_216.getWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_functions_215.listNodeExecutions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_functions_216.listNodeExecutions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;
 return { "executionId": source["executionId"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_216.getPublicWorkflowOwner.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_217.getPublicWorkflowOwner.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_216.readPublicWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_217.readPublicWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["publicAccessToken"] !== "string") return DEFER;
 return { "publicAccessToken": source["publicAccessToken"] };
 });
-installCompiledValidatorMap(lunora_workflow_gallery_216.unpublishWorkflow.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_gallery_217.unpublishWorkflow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_219.listPresence.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_220.listPresence.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_219.listVersions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_220.listVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -8184,6 +8207,13 @@ __has1 = true;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { ...(__has1 ? { "limit": __val1 } : {}), "projectId": source["projectId"] };
 });
+
+/**
+ * Queries and shapes that may read `ctx.ip`, decided statically (failing closed). The generated ShardDO marks them
+ * address-keyed from its first run, so it never resumes one warm: its rows can depend on the address the cursor
+ * was read at, which a claims fingerprint leaves out.
+ */
+export const LUNORA_IP_READER_PATHS: ReadonlySet<string> = new Set(["acp_functions:getThreadCapabilities", "acp_gdpr:collectAcpSessionsForExport", "acp_ingest:verifyHostPost", "acp_remote:getHostPendingPermissions", "acp_upload:hostStreamNext", "acp_upload:verifyHostUpload", "agent_agent_switch:getHandoffAbove", "agent_agent_switch:getHandoffBeforeDelta", "agent_agent_switch:getRunAgentModel", "agent_branches:getContextPathIds", "agent_branches:getForkContextIds", "agent_branches:getMaxOrder", "agent_branches:resolveForkEnd", "agent_document_history:getVersion", "agent_document_history:listVersions", "agent_documents:getDocument", "agent_documents:getDocumentByMessage", "agent_documents:getDocumentInternal", "agent_documents:getDocumentsByThread", "agent_files:getFileForUser", "agent_followup_suggestions:getCachedFollowupSuggestions", "agent_messages:_fetchSearchMessages", "agent_messages:getMessagesByIds", "agent_messages:getMessageSearchFields", "agent_messages:listMessagesByThreadId", "agent_messages:listMessagesByThreadIdAdmitted", "agent_messages:listMessagesByThreadIdInternal", "agent_messages:textSearch", "agent_projects:getProject", "agent_projects:listPinnedProjects", "agent_projects:listProjects", "agent_projects:listThreadsByProject", "agent_sharing:getGrantOwner", "agent_sharing:getThreadInvitesWithAccessCheck", "agent_sharing:listThreadAccess", "agent_sharing:listThreadInvites", "agent_streams:list", "agent_streams:listDeltas", "agent_thread_summaries:getThreadSummaryForContext", "agent_thread_summaries:listThreadSummariesForExport", "agent_threads:checkThreadAccessBatch", "agent_threads:getChildThreads", "agent_threads:getTemporaryThread", "agent_threads:getTemporaryThreads", "agent_threads:getTemporaryThreadsByThreadIds", "agent_threads:getThread", "agent_threads:getThreadInternal", "agent_threads:getThreadListDataBatch", "agent_threads:getThreadRelationship", "agent_threads:getThreadUsage", "agent_threads:getThreadWithAccess", "agent_threads:listPinnedThreads", "agent_threads:listThreadOrders", "agent_threads:listThreadsByUserId", "agent_threads:listThreadsByUserIdInternal", "agent_threads:searchThreadsByTitleAndSummary", "agent_threads:searchThreadTitles", "agent_workflow_executions:get", "agent_workflow_executions:listByProject", "auth_billing:creditsLeftQuery", "auth_billing:getBillingInfo", "auth_billing:getMemberCredits", "auth_billing:getRunPlanForOrganizationQuery", "auth_billing:listMemberCredits", "auth_functions:getCurrentUser", "auth_functions:getPaidModelAccess", "auth_functions:getSessionUserQuery", "auth_functions:getUserAuthFlagsQuery", "auth_functions:getUserRunPlanQuery", "auth_functions:hasPassword", "auth_organization:checkSlug", "auth_organization:listOrganizations", "auth_organization:listUserInvitations", "auth_session_organization:getActiveOrganizationIdForSession", "auth_team:listTeamMembers", "billing_checkout:getBillingSubject", "billing_checkout:getMyPlan", "chat_agent_switch:planAgentSwitch", "chat_agent_switch:previewAgentSwitch", "chat_aside:readAsideSnapshot", "chat_composite:getThreadListData", "chat_composite:getThreadWithData", "chat_custom_providers:getDecryptedCustomProvider", "chat_custom_providers:isCustomProviderRunnable", "chat_custom_providers:listCustomProviders", "chat_functions:gateThreadAction", "chat_functions:getAllThreadRelationships", "chat_functions:getAnonymousMessageLimit", "chat_functions:getBrowserExtensions", "chat_functions:getBrowserSession", "chat_functions:getCachedFollowupSuggestions", "chat_functions:getChildThreads", "chat_functions:getFullThreadForExport", "chat_functions:getPinnedThreads", "chat_functions:getStreamingThreadIds", "chat_functions:getTemporaryThreads", "chat_functions:getThread", "chat_functions:getThreadMessages", "chat_functions:getThreadOrders", "chat_functions:getThreadRelationship", "chat_functions:getThreads", "chat_functions:getThreadSettings", "chat_functions:getThreadsWithTemporaryFilter", "chat_functions:getThreadUIMessages", "chat_functions:searchMessages", "chat_functions:searchThreads", "chat_functions:validateThreadExists", "chat_goals_functions:getThreadGoal", "chat_goals_internal:getActiveGoalForRun", "chat_goals_internal:otherGoalHoldsThread", "chat_goals_internal:roundTranscript", "chat_group_functions:getGroupChat", "chat_group_functions:getGroupHistory", "chat_group_functions:getGroupRunConfig", "chat_group_functions:listGroupCandidates", "chat_pins_functions:getThreadPins", "chat_prompt_outline:getThreadPromptOutline", "chat_sharing:checkThreadAccess", "chat_sharing:checkThreadAccessWithData", "chat_sharing:getPublicThreadOwner", "chat_sharing:getThreadAccess", "chat_sharing:getThreadInvites", "chat_sharing:readPublicThread", "chat_sharing:readThreadShareToken", "chat_sharing:resolveThreadShard", "chat_slides_functions:getGeneratingPresentation", "chat_slides_functions:getPresentation", "chat_slides_functions:getPresentationSlides", "chat_slides_functions:getThreadPresentations", "chat_streaming:getActiveStreamForThread", "chat_streaming:getStreamBody", "chat_streaming:streamRunThread", "chat_streaming_persistent_library:getChunksAfter", "chat_tool_permissions:getLowRiskApprovalContext", "chat_tool_permissions:getPendingToolApproval", "coding_agents_gdpr:collectCodingAgentRunsForExport", "connectors_store:getCurrentEncryptedTokens", "devices_functions:listDevices", "devices_internal:getDeviceToolContext", "evals_functions:compareModels", "evals_functions:compareRuns", "evals_functions:getDataset", "evals_functions:getRun", "evals_functions:listRuns", "evals_gdpr:collectEvalsForExport", "evals_internal:canRunForUser", "file:getChatFileExtraction", "file:getChatFileImageUrl", "gdpr_functions:getDataAccessSummary", "gdpr_posthog_retry:getRetryConfirmationEmail", "home_overview:getHomeOverview", "knowledge_collections:gatedKnowledgeFileIds", "knowledge_collections:getThreadCollections", "knowledge_collections:listFilesInCollection", "knowledge_collections:resolveRetrievalScope", "knowledge_collections:resolveSharedCollectionFiles", "knowledge_functions:getThreadKnowledge", "lib_account_merge:listShardRowIds", "lib_account_merge:listShardRowsPage", "lib_shard_routes:getRouteOwner", "memory_functions:getMessageMemoryUsage", "memory_gdpr:collectMemoriesForExport", "messenger_functions:aiDisclosureSent", "notifications_daily_brief:loadDailyBriefInputs", "notifications_functions:getNotificationInbox", "notifications_task_email:loadRecipientEmail", "pages_agent:getPageForAgent", "pages_comments:listPageComments", "pages_functions:getPage", "pages_functions:getPageVersion", "pages_functions:listPageTree", "pages_functions:listPageVersions", "pages_functions:searchPages", "pages_gdpr:collectPagesForExport", "pages_presence:listPagePresence", "pages_sharing:getPageSharing", "pages_sharing:getPublicPageOwner", "pages_sharing:readPublicPage", "projects_functions:getProject", "projects_functions:getProjectContextForRun", "projects_functions:listPinnedProjects", "projects_functions:listProjects", "projects_functions:listThreadsByProject", "prompts_functions:applyThreadVariablesToPrompt", "prompts_functions:getThreadVariables", "skills_builder:searchMarketplaceForBuilder", "skills_bundle:listBundleCandidates", "skills_executor:getEnabledSkillsForSystemPromptQuery", "skills_executor:loadSkillForInvocationQuery", "skills_executor:resolveSkillsForRun", "skills_functions:getEnabledSkillsMetadata", "skills_marketplace:searchSkills", "source_control_guide_functions:getGuide", "source_control_guide_host:readHostGuideAnswer", "source_control_pr_threads:getForThread", "source_control_pr_threads:listForPullRequest", "source_control_review_drafts:getReviewDraft", "sub_agents_functions:getWorker", "sub_agents_functions:isHostWorker", "sub_agents_functions:listWorkers", "sub_agents_functions:shouldRunStop", "tasks_functions:getTaskBoard", "tasks_functions:getTaskRuns", "tasks_gdpr:collectTasksForExport", "tasks_internal:canRunForUser", "tasks_internal:resolveTaskSkill", "triggers_events:latestThreadReply", "triggers_quiet_inputs:loadQuietSnapshot", "usage_backfill:getUsageBackfillStatus", "vault_functions:findAttachmentByKey", "vault_functions:getAttachment", "vault_functions:getAttachmentsForChat", "vault_functions:getStorageUrl", "workflow_functions:getExecution", "workflow_functions:getWorkflow", "workflow_functions:listExecutions", "workflow_functions:listNodeExecutions", "workflow_functions:listWorkflows", "workflow_gallery:readPublicWorkflow", "workflow_presence:checkNodeLock", "workflow_presence:listPresence", "workflow_presence:listVersions", "workflow_presence:restoreVersion"]);
 
 /**
  * Lifecycle manifest: the function paths the generated ShardDO dispatches when a
@@ -8366,8 +8396,8 @@ export interface Caller {
             getCachedFollowupSuggestions: (args: { threadId: string }) => Promise<{ lastMessageId: string; suggestions: Array<string> } | null>;
         };
         messages: {
-            _fetchSearchMessages: (args: { beforeMessageId?: Id<"messages">; embeddingIds: Array<unknown>; limit: number; messageRange: { after: number; before: number }; searchAllMessagesForUserId?: string; textSearchMessages?: Array<{  }>; threadId?: Id<"threads">; unlockProof?: string }) => Promise<({ agentName?: string | undefined; createdAt?: number | undefined; embeddingId?: string | undefined; error?: string | undefined; fileIds?: string[] | undefined; finishReason?: "unknown" | "length" | "error" | "stop" | "content-filter" | "tool-calls" | "other" | undefined; message?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ mediaType?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { image: string | ArrayBuffer; type: "image"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }))[]; role: "user"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; type: "redacted-reasoning"; }) | ({ input?: unknown; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-call"; }) | ({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; } & { id: string; sourceType: "url"; type: "source"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { approvalId: string; toolCallId: string; type: "tool-approval-request"; }))[]; role: "assistant"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: (({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { approvalId: string; approved: boolean; type: "tool-approval-response"; }))[]; role: "tool"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string; role: "system"; }) | undefined; model?: string | undefined; parentMessageId?: string | undefined; provider?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reasoning?: string | undefined; reasoningDetails?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ signature?: string | undefined; } & { text: string; type: "text"; }) | ({} & { data: string; type: "redacted"; }))[] | undefined; retrievedMemories?: ({} & { memoryId: string; score: number; })[] | undefined; sources?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; type?: "source" | undefined; } & { id: string; sourceType: "url"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }))[] | undefined; speakerSkillId?: string | undefined; text?: string | undefined; usage?: ({ cachedInputTokens?: number | undefined; cacheReadTokens?: number | undefined; cacheWriteTokens?: number | undefined; durationMs?: number | undefined; reasoningTokens?: number | undefined; ttftMs?: number | undefined; } & { completionTokens: number; promptTokens: number; totalTokens: number; }) | undefined; userId?: string | undefined; warnings?: (({ details?: string | undefined; } & { setting: string; type: "unsupported-setting"; }) | ({ details?: string | undefined; tool?: unknown; } & { type: "unsupported-tool"; }) | ({} & { message: string; type: "other"; }))[] | undefined; } & { _creationTime: number; _id: string; order: number; status: "failed" | "pending" | "success"; stepOrder: number; threadId: string; tool: boolean; })[]>;
-            addMessages: (args: { agentName?: string; embeddings?: { dimension: unknown; model: string; vectors: Array<Array<number> | null> }; failPendingSteps?: boolean; fromUser?: boolean; hideFromUserIdSearch?: boolean; messages: Array<{  }>; overrideOrder?: number; parentMessageId?: string; pendingMessageId?: Id<"messages">; promptMessageId?: Id<"messages">; threadId: Id<"threads">; userId?: string }) => Promise<{} & { messages: ({ agentName?: string | undefined; createdAt?: number | undefined; embeddingId?: string | undefined; error?: string | undefined; fileIds?: string[] | undefined; finishReason?: "unknown" | "length" | "error" | "stop" | "content-filter" | "tool-calls" | "other" | undefined; message?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ mediaType?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { image: string | ArrayBuffer; type: "image"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }))[]; role: "user"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; type: "redacted-reasoning"; }) | ({ input?: unknown; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-call"; }) | ({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; } & { id: string; sourceType: "url"; type: "source"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { approvalId: string; toolCallId: string; type: "tool-approval-request"; }))[]; role: "assistant"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: (({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { approvalId: string; approved: boolean; type: "tool-approval-response"; }))[]; role: "tool"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string; role: "system"; }) | undefined; model?: string | undefined; parentMessageId?: string | undefined; provider?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reasoning?: string | undefined; reasoningDetails?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ signature?: string | undefined; } & { text: string; type: "text"; }) | ({} & { data: string; type: "redacted"; }))[] | undefined; retrievedMemories?: ({} & { memoryId: string; score: number; })[] | undefined; sources?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; type?: "source" | undefined; } & { id: string; sourceType: "url"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }))[] | undefined; speakerSkillId?: string | undefined; text?: string | undefined; usage?: ({ cachedInputTokens?: number | undefined; cacheReadTokens?: number | undefined; cacheWriteTokens?: number | undefined; durationMs?: number | undefined; reasoningTokens?: number | undefined; ttftMs?: number | undefined; } & { completionTokens: number; promptTokens: number; totalTokens: number; }) | undefined; userId?: string | undefined; warnings?: (({ details?: string | undefined; } & { setting: string; type: "unsupported-setting"; }) | ({ details?: string | undefined; tool?: unknown; } & { type: "unsupported-tool"; }) | ({} & { message: string; type: "other"; }))[] | undefined; } & { _creationTime: number; _id: string; order: number; status: "failed" | "pending" | "success"; stepOrder: number; threadId: string; tool: boolean; })[]; }>;
+            _fetchSearchMessages: (args: { beforeMessageId?: Id<"messages">; embeddingIds: Array<unknown>; limit: number; messageRange: { after: number; before: number }; searchAllMessagesForUserId?: string; textSearchMessages?: Array<{ _creationTime: number; _id: string; agentName?: string; createdAt?: number; embeddingId?: string; error?: string; fileIds?: Array<string>; finishReason?: "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other" | "unknown"; message?: { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { image: string | ArrayBuffer; mediaType?: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "user" } | { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" } | { providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { data: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "redacted-reasoning" } | { input?: unknown; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-call" } | { dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" } | { approvalId: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; type: "tool-approval-request" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "assistant" } | { content: Array<{ dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { approvalId: string; approved: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "tool-approval-response" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "tool" } | { content: string; providerOptions?: Record<string, Record<string, unknown>>; role: "system" }; model?: string; order: number; parentMessageId?: string; provider?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; reasoning?: string; reasoningDetails?: Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { signature?: string; text: string; type: "text" } | { data: string; type: "redacted" }>; retrievedMemories?: Array<{ memoryId: string; score: number }>; sources?: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }>; speakerSkillId?: string; status: "pending" | "success" | "failed"; stepOrder: number; text?: string; threadId: string; tool: boolean; usage?: { cachedInputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number; completionTokens: number; durationMs?: number; promptTokens: number; reasoningTokens?: number; totalTokens: number; ttftMs?: number }; userId?: string; warnings?: Array<{ details?: string; setting: string; type: "unsupported-setting" } | { details?: string; tool?: unknown; type: "unsupported-tool" } | { message: string; type: "other" }> }>; threadId?: Id<"threads">; unlockProof?: string }) => Promise<({ agentName?: string | undefined; createdAt?: number | undefined; embeddingId?: string | undefined; error?: string | undefined; fileIds?: string[] | undefined; finishReason?: "unknown" | "length" | "error" | "stop" | "content-filter" | "tool-calls" | "other" | undefined; message?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ mediaType?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { image: string | ArrayBuffer; type: "image"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }))[]; role: "user"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; type: "redacted-reasoning"; }) | ({ input?: unknown; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-call"; }) | ({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; } & { id: string; sourceType: "url"; type: "source"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { approvalId: string; toolCallId: string; type: "tool-approval-request"; }))[]; role: "assistant"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: (({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { approvalId: string; approved: boolean; type: "tool-approval-response"; }))[]; role: "tool"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string; role: "system"; }) | undefined; model?: string | undefined; parentMessageId?: string | undefined; provider?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reasoning?: string | undefined; reasoningDetails?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ signature?: string | undefined; } & { text: string; type: "text"; }) | ({} & { data: string; type: "redacted"; }))[] | undefined; retrievedMemories?: ({} & { memoryId: string; score: number; })[] | undefined; sources?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; type?: "source" | undefined; } & { id: string; sourceType: "url"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }))[] | undefined; speakerSkillId?: string | undefined; text?: string | undefined; usage?: ({ cachedInputTokens?: number | undefined; cacheReadTokens?: number | undefined; cacheWriteTokens?: number | undefined; durationMs?: number | undefined; reasoningTokens?: number | undefined; ttftMs?: number | undefined; } & { completionTokens: number; promptTokens: number; totalTokens: number; }) | undefined; userId?: string | undefined; warnings?: (({ details?: string | undefined; } & { setting: string; type: "unsupported-setting"; }) | ({ details?: string | undefined; tool?: unknown; } & { type: "unsupported-tool"; }) | ({} & { message: string; type: "other"; }))[] | undefined; } & { _creationTime: number; _id: string; order: number; status: "failed" | "pending" | "success"; stepOrder: number; threadId: string; tool: boolean; })[]>;
+            addMessages: (args: { agentName?: string; embeddings?: { dimension: unknown; model: string; vectors: Array<Array<number> | null> }; failPendingSteps?: boolean; fromUser?: boolean; hideFromUserIdSearch?: boolean; messages: Array<{ error?: string; fileIds?: Array<Id<"chatFiles">>; finishReason?: "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other" | "unknown"; message: { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { image: string | ArrayBuffer; mediaType?: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "user" } | { content: string | Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string | ArrayBuffer; filename?: string; mediaType?: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "file" } | { providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { data: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; type: "redacted-reasoning" } | { input?: unknown; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-call" } | { dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" } | { approvalId: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; type: "tool-approval-request" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "assistant" } | { content: Array<{ dynamic?: boolean; input?: unknown; output?: { providerOptions?: Record<string, Record<string, unknown>>; type: "text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-text"; value: string } | { providerOptions?: Record<string, Record<string, unknown>>; type: "error-json"; value?: unknown } | { providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "execution-denied" } | { type: "content"; value: Array<{ providerOptions?: Record<string, Record<string, unknown>>; text: string; type: "text" } | { data: string; filename?: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "file-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "file-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "file-id" } | { data: string; mediaType: string; providerOptions?: Record<string, Record<string, unknown>>; type: "image-data" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "image-url"; url: string } | { fileId: string | Record<string, string>; providerOptions?: Record<string, Record<string, unknown>>; type: "image-file-id" } | { providerOptions?: Record<string, Record<string, unknown>>; type: "custom" }> }; preliminary?: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; toolCallId: string; toolName: string; type: "tool-result" } | { approvalId: string; approved: boolean; providerExecuted?: boolean; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; reason?: string; type: "tool-approval-response" }>; providerOptions?: Record<string, Record<string, unknown>>; role: "tool" } | { content: string; providerOptions?: Record<string, Record<string, unknown>>; role: "system" }; model?: string; prompt?: string; provider?: string; providerMetadata?: Record<string, Record<string, unknown>>; reasoning?: string; reasoningDetails?: Array<{ providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; signature?: string; text: string; type: "reasoning" } | { signature?: string; text: string; type: "text" } | { data: string; type: "redacted" }>; sources?: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }>; status?: "pending" | "success" | "failed"; text?: string; usage?: { cachedInputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number; completionTokens: number; durationMs?: number; promptTokens: number; reasoningTokens?: number; totalTokens: number; ttftMs?: number }; warnings?: Array<{ details?: string; setting: string; type: "unsupported-setting" } | { details?: string; tool?: unknown; type: "unsupported-tool" } | { message: string; type: "other" }> }>; overrideOrder?: number; parentMessageId?: string; pendingMessageId?: Id<"messages">; promptMessageId?: Id<"messages">; threadId: Id<"threads">; userId?: string }) => Promise<{} & { messages: ({ agentName?: string | undefined; createdAt?: number | undefined; embeddingId?: string | undefined; error?: string | undefined; fileIds?: string[] | undefined; finishReason?: "unknown" | "length" | "error" | "stop" | "content-filter" | "tool-calls" | "other" | undefined; message?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ mediaType?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { image: string | ArrayBuffer; type: "image"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }))[]; role: "user"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string | (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; mediaType?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string | ArrayBuffer; type: "file"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; type: "redacted-reasoning"; }) | ({ input?: unknown; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-call"; }) | ({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; } & { id: string; sourceType: "url"; type: "source"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }) | ({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { approvalId: string; toolCallId: string; type: "tool-approval-request"; }))[]; role: "assistant"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: (({ dynamic?: boolean | undefined; input?: unknown; output?: ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "error-text"; value: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; value?: unknown; } & { type: "error-json"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { type: "execution-denied"; }) | ({} & { type: "content"; value: (({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { text: string; type: "text"; }) | ({ filename?: string | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "file-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "file-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { data: string; mediaType: string; type: "image-data"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "image-url"; url: string; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { fileId: string | Record<string, string>; type: "image-file-id"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { type: "custom"; }))[]; }) | undefined; preliminary?: boolean | undefined; providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { toolCallId: string; toolName: string; type: "tool-result"; }) | ({ providerExecuted?: boolean | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reason?: string | undefined; } & { approvalId: string; approved: boolean; type: "tool-approval-response"; }))[]; role: "tool"; }) | ({ providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { content: string; role: "system"; }) | undefined; model?: string | undefined; parentMessageId?: string | undefined; provider?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; reasoning?: string | undefined; reasoningDetails?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; signature?: string | undefined; } & { text: string; type: "reasoning"; }) | ({ signature?: string | undefined; } & { text: string; type: "text"; }) | ({} & { data: string; type: "redacted"; }))[] | undefined; retrievedMemories?: ({} & { memoryId: string; score: number; })[] | undefined; sources?: (({ providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; title?: string | undefined; type?: "source" | undefined; } & { id: string; sourceType: "url"; url: string; }) | ({ filename?: string | undefined; providerMetadata?: Record<string, Record<string, unknown>> | undefined; providerOptions?: Record<string, Record<string, unknown>> | undefined; } & { id: string; mediaType: string; sourceType: "document"; title: string; type: "source"; }))[] | undefined; speakerSkillId?: string | undefined; text?: string | undefined; usage?: ({ cachedInputTokens?: number | undefined; cacheReadTokens?: number | undefined; cacheWriteTokens?: number | undefined; durationMs?: number | undefined; reasoningTokens?: number | undefined; ttftMs?: number | undefined; } & { completionTokens: number; promptTokens: number; totalTokens: number; }) | undefined; userId?: string | undefined; warnings?: (({ details?: string | undefined; } & { setting: string; type: "unsupported-setting"; }) | ({ details?: string | undefined; tool?: unknown; } & { type: "unsupported-tool"; }) | ({} & { message: string; type: "other"; }))[] | undefined; } & { _creationTime: number; _id: string; order: number; status: "failed" | "pending" | "success"; stepOrder: number; threadId: string; tool: boolean; })[]; }>;
             cloneMessageBatch: (args: { copyUserIdForVectorSearch?: boolean; excludeToolMessages?: boolean; insertAtOrder?: number; paginationOpts: { cursor: unknown; endCursor?: unknown; id?: number; maximumRowsRead?: number; numItems: number }; sourceThreadId: Id<"threads">; statuses?: Array<"pending" | "success" | "failed">; targetThreadId: Id<"threads">; unlockProof?: string; upToAndIncludingMessageId?: Id<"messages"> }) => Promise<{ continueCursor: string | null; isDone: boolean; numCopied: number }>;
             cloneThread: (args: { batchSize?: number; copyUserIdForVectorSearch?: boolean; excludeToolMessages?: boolean; insertAtOrder?: number; limit?: number; sourceThreadId: Id<"threads">; statuses?: Array<"pending" | "success" | "failed">; targetThreadId: Id<"threads">; unlockProof?: string; upToAndIncludingMessageId?: Id<"messages"> }) => Promise<number>;
             deleteByIds: (args: { messageIds: Array<Id<"messages">> }) => Promise<Array<Id<"messages">>>;
@@ -8694,7 +8724,7 @@ export interface Caller {
         aside: {
             addAsideToThread: (args: { answer: string; entryId: string; question: string; threadId: Id<"threads">; token: string; unlockProof?: string }) => Promise<{ messageId: string }>;
             askAside: (args: { entryId: string; question: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ answer: string; token: string; withThread: boolean }>;
-            readAsideSnapshot: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<{ liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
+            readAsideSnapshot: (args: { threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
         };
         ask_user: {
             answerAskUser: (args: { answer: string | null; approvalId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
@@ -8979,10 +9009,11 @@ export interface Caller {
         };
         tool_permissions: {
             consumeLowRiskCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
-            getLowRiskApprovalContext: (args: { permissionKey?: string; threadId: Id<"threads">; userId: string }) => Promise<boolean>;
+            getLowRiskApprovalContext: (args: { permissionKey?: string; threadId: Id<"threads">; trustId?: string; userId: string }) => Promise<boolean>;
+            getLowRiskTrustedServers: (args: { userId: string }) => Promise<Array<string>>;
             getPendingToolApproval: (args: { approvalId: string; threadId: string; userId: string }) => Promise<{ toolName: string | null } | null>;
             getToolPermissionGrantsQuery: (args: { userId: string }) => Promise<Record<string, number>>;
-            getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; overrides: Record<string, "auto" | "ask" | "off"> }>;
+            getToolPermissionSettings: (args?: {}) => Promise<{ autoApproveLowRisk: boolean; builtIn: Array<{ available: boolean; category: string; defaultMode: "auto" | "ask" | "off"; key: string; name: string }>; grants: Record<string, number>; lowRiskTrustedServers: Array<string>; overrides: Record<string, "auto" | "ask" | "off"> }>;
             getToolPermissionsQuery: (args: { userId: string }) => Promise<Record<string, "auto" | "ask" | "off">>;
             listMcpToolPermissions: (args?: {}) => Promise<{ servers: Array<{ error: string | null; name: string; tools: Array<{ defaultMode: "auto" | "ask" | "off"; description?: string; destructive: boolean; key: string; name: string; readOnly: boolean }> }> }>;
             pruneExpiredToolPermissionGrants: (args?: {}) => Promise<null>;
@@ -8990,6 +9021,7 @@ export interface Caller {
             respondToToolApproval: (args: { approvalId: string; decision: "approve" | "deny" | "always" | "hour" | "today"; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
             revokeToolPermissionGrant: (args: { key: string }) => Promise<null>;
             setAutoApproveLowRisk: (args: { enabled: boolean }) => Promise<null>;
+            setLowRiskTrustedServer: (args: { server: { kind: "mcp"; name: string; url: string } | { kind: "connector"; slug: string }; trusted: boolean }) => Promise<null>;
             setToolPermission: (args: { key: string; mode: "auto" | "ask" | "off" | null }) => Promise<null>;
         };
         tools: {
@@ -9146,7 +9178,7 @@ export interface Caller {
             createDeviceCall: (args: { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }) => Promise<{ callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "rate_limited" }>;
             expireDeviceCall: (args: { callId: Id<"deviceCalls">; reason: string }) => Promise<null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: (args: { callId: Id<"deviceCalls"> }) => Promise<null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
-            getDeviceToolContext: (args: { now: number; threadId: Id<"threads">; userId: string }) => Promise<null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }> }>;
+            getDeviceToolContext: (args: { now: number; threadId: Id<"threads">; userId: string }) => Promise<null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }>; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files"> }>;
             sweepDeviceCalls: (args?: {}) => Promise<null>;
         };
     };
@@ -9241,7 +9273,7 @@ export interface Caller {
             collectPrompts: (args: { userId: string }) => Promise<{ promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: (args: { userId: string }) => Promise<{ aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: (args: { userId: string }) => Promise<Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: (args: { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }) => Promise<string>;
+            generateExportFile: (args: { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }) => Promise<string>;
             sendExportReadyEmail: (args: { requestId: Id<"gdprRequests">; userEmail: string }) => Promise<null>;
             deletion_steps: {
                 deleteAuthRecords: (args: { userId: string }) => Promise<null>;
@@ -9375,7 +9407,7 @@ export interface Caller {
     };
     lib: {
         account_merge: {
-            deleteShardRows: (args: { ids: Array<string> }) => Promise<null>;
+            deleteShardRows: (args: { ids: Array<string>; table: string }) => Promise<null>;
             importShardRows: (args: { from: string; rows: Array<unknown>; table: string; to: string }) => Promise<{ imported: number }>;
             listShardRowIds: (args: { table: string }) => Promise<Array<string>>;
             listShardRowsPage: (args: { cursor: string | null; table: string }) => Promise<{ continueCursor: string | null; isDone: boolean; page: Array<unknown> }>;
@@ -9621,7 +9653,8 @@ export interface Caller {
         functions: {
             createProject: (args: { color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; icon?: string; organizationId?: string; title: string }) => Promise<string>;
             deleteProject: (args: { moveThreadsToProjectId?: string; projectId: Id<"projects"> }) => Promise<{ success: boolean }>;
-            getProject: (args: { projectId: Id<"projects"> }) => Promise<import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "projects", {}, undefined> | null>;
+            getProject: (args: { projectId: Id<"projects"> }) => Promise<import("./dataModel.js").Doc_projects | null>;
+            getProjectContextForRun: (args: { projectId: Id<"projects">; userId: string }) => Promise<string | null>;
             listPinnedProjects: (args: { organizationId?: string }) => Promise<Array<{ color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; forkedFromId?: string; galleryCategory?: string; galleryFeatured?: boolean; galleryForkCount?: number; galleryPublishedAt?: number; galleryTags?: Array<string>; galleryViewCount?: number; icon?: string; isPublic?: boolean; order?: number; organizationId?: string; pinnedAt?: number; projectType?: "chat" | "workflow"; publicAccessToken?: string; title: string; userId?: string; workflowContent?: { edges: Array<{ id: string; source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null; type?: string }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number }; type: string }>; viewport?: { x: number; y: number; zoom: number } }; _creationTime: number; _id: string; createdAt: number; updatedAt?: number }>>;
             listProjects: (args: { organizationId?: string; paginationOpts: { cursor: string | null; endCursor?: string | null; id?: number; numItems: number } }) => Promise<{ continueCursor: string | null; isDone: boolean; page: Array<{ color?: string; context?: string; defaultEnabledFeatures?: Array<string>; defaultModel?: string; defaultReasoningEffort?: number; description?: string; forkedFromId?: string; galleryCategory?: string; galleryFeatured?: boolean; galleryForkCount?: number; galleryPublishedAt?: number; galleryTags?: Array<string>; galleryViewCount?: number; icon?: string; isPublic?: boolean; order?: number; organizationId?: string; pinnedAt?: number; projectType?: "chat" | "workflow"; publicAccessToken?: string; title: string; userId?: string; workflowContent?: { edges: Array<{ id: string; source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null; type?: string }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number }; type: string }>; viewport?: { x: number; y: number; zoom: number } }; _creationTime: number; _id: string; createdAt: number; updatedAt?: number }>; pageStatus?: "SplitRecommended" | "SplitRequired" | null; splitCursor?: string | null }>;
             listThreadsByProject: (args: { paginationOpts: { cursor: string | null; endCursor?: string | null; id?: number; numItems: number }; projectId: Id<"projects"> }) => Promise<{ pageStatus?: "SplitRecommended" | "SplitRequired" | null | undefined; splitCursor?: string | null | undefined; } & { continueCursor: string | null; isDone: boolean; page: ({ activeAgent?: ({} & { kind: "model"; model: string; }) | undefined; activeLeafMessageId?: string | undefined; awaitingInput?: "approval" | "question" | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; hasHandoff?: boolean | undefined; lastReplyAt?: number | undefined; lastUserMessageAt?: number | undefined; lastViewedAt?: number | undefined; lockedAt?: number | undefined; order?: number | undefined; runner?: "host" | undefined; snoozedUntil?: number | undefined; summaryEpoch?: number | undefined; summaryPathTooLongAt?: number | undefined; tagIds?: string[] | undefined; workerPolicy?: ({ maxDispatchesPerHour?: number | undefined; } & { allowedSources: ("user" | "lead" | "outside_agent" | "trigger" | "messenger")[]; hostDispatch: "ask"; }) | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "text" | "image" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "running" | "error" | "active" | "archived" | "abort" | "finish"; })[]; }>;
@@ -9733,8 +9766,8 @@ export interface Caller {
             listBundleCandidates: (args?: {}) => Promise<{ groupChats: Array<{ exportable: boolean; id: Id<"threads">; mode: string; participantSkillIds: Array<string>; reason?: string; title: string }>; limits: { groupChats: number; skills: number; triggers: number }; skills: Array<{ description: string; id: Id<"skills">; name: string; slug: string }>; triggers: Array<{ exportable: boolean; id: Id<"triggers">; name: string; reason?: string; schedule?: string; type: "schedule" | "webhook" }> }>;
             loadBundleSources: (args: { groupChatIds: Array<Id<"threads">>; skillIds: Array<Id<"skills">>; triggerIds: Array<Id<"triggers">>; userId: string }) => Promise<{ groupChats: Array<{ groupChat: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ skillId: string }>; synthesizerSkillId?: string }; id: string; model?: string; title?: string }>; skills: Array<{ category?: string; config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string }; description: string; icon?: string; id: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: Array<{ description?: string; name: string; required?: boolean }>; version?: string }>; triggers: Array<{ cronExpression?: string; description?: string; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; id: string; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: string; webhookSignatureScheme?: string }> }>;
             loadImportContext: (args: { userId: string }) => Promise<{ skillCount: number; slugs: Array<string> }>;
-            previewBundle: (args: { markdown: string }) => Promise<{ description: string; entries: Array<{ group?: { debateRounds?: number; mode: string; model: string; participants: Array<string>; synthesizer?: string }; key: string; kind: "skill" | "trigger" | "group"; problems: Array<string>; requires: Array<string>; skill?: { description: string; disabledTools: Array<string>; droppedTools: Array<string>; instructions: string; model?: string; name: string; reasoningEffort?: number; searchMode?: string; slug: string; tools: Array<string> }; title: string; trigger?: { description?: string; filters: Array<string>; model: string; nextRunAt?: number; schedule?: string; systemPrompt?: string; task?: string; timezone?: string; type: "schedule" | "webhook" }; warnings: Array<string> }>; name: string; skillSlotsLeft: number | null }>;
-            removeImportedItem: (args: { id: string; kind: "skill" | "trigger" | "group"; userId: string }) => Promise<null>;
+            previewBundle: (args: { markdown: string }) => Promise<{ description: string; entries: Array<{ group?: { debateRounds?: number; mode: string; model: string; participants: Array<string>; synthesizer?: string }; key: string; kind: "skill" | "trigger" | "group"; problems: Array<string>; requires: Array<string>; skill?: { baseSlug: string; description: string; disabledTools: Array<string>; droppedTools: Array<string>; instructions: string; model?: string; name: string; reasoningEffort?: number; searchMode?: string; slug: string; tools: Array<string> }; title: string; trigger?: { description?: string; filters: Array<string>; model: string; nextRunAt?: number; schedule?: string; systemPrompt?: string; task?: string; timezone?: string; type: "schedule" | "webhook" }; warnings: Array<string> }>; existingSlugs: Array<string>; name: string; skillSlotsLeft: number | null }>;
+            removeImportedItem: (args: { id: string; kind: "skill" | "trigger" | "group"; userId: string }) => Promise<{ kept: boolean }>;
         };
         executor: {
             getEnabledSkillsForSystemPromptQuery: (args: { organizationId?: string; userId: string }) => Promise<Array<{ description: string; name: string; slug: string }>>;
@@ -9815,9 +9848,11 @@ export interface Caller {
         };
         gdpr: {
             collectGuidesForExport: (args: { cursor?: string | null; userId: string }) => Promise<{ cursor: string | null; guides: Array<{ createdAt: number; generatedAt: number; headSha: string; hostOrigin: string; instructions: string; number: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; repository: string; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string }> }>;
+            collectPullRequestThreadsForExport: (args: { cursor?: string | null; userId: string }) => Promise<{ cursor: string | null; links: Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }> }>;
             collectReviewDraftsForExport: (args: { cursor?: string | null; userId: string }) => Promise<{ cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             collectWatchedRepositoriesForExport: (args: { userId: string }) => Promise<{ watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
             deleteUserGuides: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
+            deleteUserPullRequestThreads: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
             deleteUserReviewDrafts: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
             deleteUserWatchedRepositories: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
         };
@@ -9849,6 +9884,12 @@ export interface Caller {
             mergePullRequest: (args: { number: number; repository: string; headSha: string; method: "merge" | "rebase" | "squash" }) => Promise<{ sha: string | null; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
             rerunCheck: (args: { number: number; repository: string; checkId: string }) => Promise<{ status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
             setAutoMerge: (args: { number: number; repository: string; enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }) => Promise<{ status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+        };
+        pr_threads: {
+            getForThread: (args: { threadId: string }) => Promise<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
+            listForPullRequest: (args: { number: number; repository: string }) => Promise<Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+            recordOpenedPullRequest: (args: { prUrl: string; threadId: string; userId: string }) => Promise<{ created: boolean; threadId: string }>;
+            startWorkOnPullRequest: (args: { baseBranch?: string; headBranch?: string; number: number; repository: string }) => Promise<{ created: boolean; threadId: string }>;
         };
         review_drafts: {
             deleteDraftComment: (args: { commentId: string; number: number; repository: string }) => Promise<({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
@@ -10856,6 +10897,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         tool_permissions: {
             consumeLowRiskCheck: (args) => callRegistered(context, "chat_tool_permissions:consumeLowRiskCheck", args),
             getLowRiskApprovalContext: (args) => callRegistered(context, "chat_tool_permissions:getLowRiskApprovalContext", args),
+            getLowRiskTrustedServers: (args) => callRegistered(context, "chat_tool_permissions:getLowRiskTrustedServers", args),
             getPendingToolApproval: (args) => callRegistered(context, "chat_tool_permissions:getPendingToolApproval", args),
             getToolPermissionGrantsQuery: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionGrantsQuery", args),
             getToolPermissionSettings: (args) => callRegistered(context, "chat_tool_permissions:getToolPermissionSettings", args),
@@ -10866,6 +10908,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             respondToToolApproval: (args) => callRegistered(context, "chat_tool_permissions:respondToToolApproval", args),
             revokeToolPermissionGrant: (args) => callRegistered(context, "chat_tool_permissions:revokeToolPermissionGrant", args),
             setAutoApproveLowRisk: (args) => callRegistered(context, "chat_tool_permissions:setAutoApproveLowRisk", args),
+            setLowRiskTrustedServer: (args) => callRegistered(context, "chat_tool_permissions:setLowRiskTrustedServer", args),
             setToolPermission: (args) => callRegistered(context, "chat_tool_permissions:setToolPermission", args),
         },
         tools: {
@@ -11498,6 +11541,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             createProject: (args) => callRegistered(context, "projects_functions:createProject", args),
             deleteProject: (args) => callRegistered(context, "projects_functions:deleteProject", args),
             getProject: (args) => callRegistered(context, "projects_functions:getProject", args),
+            getProjectContextForRun: (args) => callRegistered(context, "projects_functions:getProjectContextForRun", args),
             listPinnedProjects: (args) => callRegistered(context, "projects_functions:listPinnedProjects", args),
             listProjects: (args) => callRegistered(context, "projects_functions:listProjects", args),
             listThreadsByProject: (args) => callRegistered(context, "projects_functions:listThreadsByProject", args),
@@ -11691,9 +11735,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         gdpr: {
             collectGuidesForExport: (args) => callRegistered(context, "source_control_gdpr:collectGuidesForExport", args),
+            collectPullRequestThreadsForExport: (args) => callRegistered(context, "source_control_gdpr:collectPullRequestThreadsForExport", args),
             collectReviewDraftsForExport: (args) => callRegistered(context, "source_control_gdpr:collectReviewDraftsForExport", args),
             collectWatchedRepositoriesForExport: (args) => callRegistered(context, "source_control_gdpr:collectWatchedRepositoriesForExport", args),
             deleteUserGuides: (args) => callRegistered(context, "source_control_gdpr:deleteUserGuides", args),
+            deleteUserPullRequestThreads: (args) => callRegistered(context, "source_control_gdpr:deleteUserPullRequestThreads", args),
             deleteUserReviewDrafts: (args) => callRegistered(context, "source_control_gdpr:deleteUserReviewDrafts", args),
             deleteUserWatchedRepositories: (args) => callRegistered(context, "source_control_gdpr:deleteUserWatchedRepositories", args),
         },
@@ -11725,6 +11771,12 @@ export const createCaller = (context: CallerCtx): Caller => ({
             mergePullRequest: (args) => callRegistered(context, "source_control_merge_functions:mergePullRequest", args),
             rerunCheck: (args) => callRegistered(context, "source_control_merge_functions:rerunCheck", args),
             setAutoMerge: (args) => callRegistered(context, "source_control_merge_functions:setAutoMerge", args),
+        },
+        pr_threads: {
+            getForThread: (args) => callRegistered(context, "source_control_pr_threads:getForThread", args),
+            listForPullRequest: (args) => callRegistered(context, "source_control_pr_threads:listForPullRequest", args),
+            recordOpenedPullRequest: (args) => callRegistered(context, "source_control_pr_threads:recordOpenedPullRequest", args),
+            startWorkOnPullRequest: (args) => callRegistered(context, "source_control_pr_threads:startWorkOnPullRequest", args),
         },
         review_drafts: {
             deleteDraftComment: (args) => callRegistered(context, "source_control_review_drafts:deleteDraftComment", args),

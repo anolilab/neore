@@ -29,9 +29,9 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
     ]);
 
     await Promise.all([
-        ...pins.map((p) => ctx.db.delete(p._id)),
-        ...threadTags.map((tag) => ctx.db.delete(tag._id)),
-        ...passcodes.map((row) => ctx.db.delete(row._id)),
+        ...pins.map((p) => ctx.db.delete("threadPins", p._id)),
+        ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id)),
+        ...passcodes.map((row) => ctx.db.delete("threadPasscodes", row._id)),
     ]);
 };
 
@@ -62,10 +62,15 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .take(BATCH),
     ]);
 
-    await Promise.all([...approvalRuns, ...secrets, ...goals].map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all([
+        ...approvalRuns.map(async (row) => await ctx.db.delete("toolApprovalRuns", row._id)),
+        ...secrets.map(async (row) => await ctx.db.delete("requestedSecrets", row._id)),
+        ...goals.map(async (row) => await ctx.db.delete("threadGoals", row._id)),
+    ]);
 
     const streamsLeft = await deleteParentsWithChildren(
         ctx,
+        { child: "persistentChunks", parent: "persistentStreams" },
         streams,
         async (stream) =>
             await ctx.db
@@ -86,6 +91,7 @@ export const erasePresentationsForUser = async (ctx: MutationCtx, userId: string
 
     const hasMore = await deleteParentsWithChildren(
         ctx,
+        { child: "presentationSlides", parent: "presentations" },
         presentations,
         async (presentation) =>
             await ctx.db

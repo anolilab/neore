@@ -81,7 +81,7 @@ describe("pull request reaper", () => {
                 }),
         );
 
-    const getRun = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+    const getRun = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("codingAgentRuns", id));
 
     const mutate = async (reference: unknown, args: Record<string, unknown>): Promise<any> =>
         await harness.run(async (ctx: any) => await ctx.runMutation(reference, args));

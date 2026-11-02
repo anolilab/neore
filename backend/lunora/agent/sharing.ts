@@ -18,7 +18,7 @@ import { meetsThreadPermission, resolveThreadReadAccess, type ThreadPermission }
  * Read through `ctx.db`: these are internal mutations, which see every row.
  */
 const refuseGrantOnLockedThread = async (ctx: Pick<QueryContext, "db">, threadId: Id<"threads">): Promise<void> => {
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
 
     if (thread && isThreadLocked(thread)) {
         throw new LunoraError("BAD_REQUEST", "A locked chat cannot be shared. Unlock it first.");
@@ -159,7 +159,7 @@ export const updateThreadAccess = internalMutation
             patch.expiresAt = args.expiresAt;
         }
 
-        await ctx.db.patch(args.accessId, withoutUndefined(patch));
+        await ctx.db.patch("threadAccess", args.accessId, withoutUndefined(patch));
 
         return null;
     });
@@ -170,7 +170,7 @@ export const deleteThreadAccess = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.delete(args.accessId);
+        await ctx.db.delete("threadAccess", args.accessId);
 
         return null;
     });
@@ -353,7 +353,7 @@ export const updateThreadInvite = internalMutation
             patch.acceptedBy = args.acceptedBy;
         }
 
-        await ctx.db.patch(args.inviteId, withoutUndefined(patch));
+        await ctx.db.patch("threadInvites", args.inviteId, withoutUndefined(patch));
 
         return null;
     });
@@ -364,7 +364,7 @@ export const deleteThreadInvite = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.delete(args.inviteId);
+        await ctx.db.delete("threadInvites", args.inviteId);
 
         return null;
     });

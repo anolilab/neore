@@ -621,7 +621,7 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
         });
 
         if (current.session && current.session.status !== "ended") {
-            await ctx.db.patch(current.session._id, { status: "ended", updatedAt: now });
+            await ctx.db.patch("acpSessions", current.session._id, { status: "ended", updatedAt: now });
         }
 
         const last = await getMaxMessage(ctx, thread._id);

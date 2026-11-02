@@ -91,10 +91,10 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
 
     if (existing) {
         // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.
-        const thread = await ctx.db.get(existing.threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", existing.threadId as Id<"threads">);
 
         if ((!thread || thread.deleted) && existing.status !== "ended") {
-            await ctx.db.patch(existing._id, { status: "ended", updatedAt: now });
+            await ctx.db.patch("acpSessions", existing._id, { status: "ended", updatedAt: now });
 
             return { ended: true, next: 0, outcome: "applied", threadId: existing.threadId as string };
         }
@@ -135,7 +135,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             })) !== null;
 
         if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("acpSessions", existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
@@ -191,7 +191,7 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
     }
 
     // Ended first: a worker run that finishes with its turn starts the next queued message, and must find the session gone.
-    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
     await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
 
     return { ended: true, next: 0, outcome: "applied", threadId: session.threadId as string };
@@ -320,7 +320,7 @@ const applyTurnPost = async (
         // A restart that comes after the reaper: the turn was cut off, not merely silent. The reply stays as it
         // was saved; only the reason moves on, so Continue (plans/acp-agent-host.md §4.5) is offered all the same.
         if (stream.hostEndReason === "timeout" && events.some((event) => event.kind === "turn_end" && event.reason === "interrupted")) {
-            await ctx.db.patch(stream._id, { hostEndReason: "interrupted" });
+            await ctx.db.patch("persistentStreams", stream._id, { hostEndReason: "interrupted" });
         }
 
         return { ended: true, next, outcome: "applied" };

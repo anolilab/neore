@@ -259,7 +259,7 @@ export const updateProject = internalMutation
             }
         }
 
-        await patchRow(ctx.db, project, changes);
+        await patchRow(ctx.db, "projects", project, changes);
 
         if (args.patch.workflowContent !== undefined) {
             await recountWorkflowImages(ctx, project.userId, project.workflowContent, args.patch.workflowContent);
@@ -295,13 +295,13 @@ export const deleteProject = internalMutation
             .collect();
 
         for (const thread of projectThreads) {
-            await patchRow(ctx.db, thread, {
+            await patchRow(ctx.db, "threads", thread, {
                 projectId: args.moveThreadsToProjectId,
                 updatedAt: ctx.now,
             });
         }
 
-        await ctx.db.delete(args.projectId);
+        await ctx.db.delete("projects", args.projectId);
         await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 
         return null;
@@ -314,7 +314,7 @@ export const pinProject = internalMutation
         const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
-        await ctx.db.patch(args.projectId, {
+        await ctx.db.patch("projects", args.projectId, {
             pinnedAt: ctx.now,
             updatedAt: ctx.now,
         });
@@ -330,7 +330,7 @@ export const unpinProject = internalMutation
         const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
-        await patchRow(ctx.db, project, {
+        await patchRow(ctx.db, "projects", project, {
             pinnedAt: undefined,
             updatedAt: ctx.now,
         });
@@ -352,7 +352,7 @@ export const updateProjectOrder = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const updatePromises = args.projectOrders.map(({ order, projectId }) =>
-            ctx.db.patch(projectId, {
+            ctx.db.patch("projects", projectId, {
                 order,
                 updatedAt: ctx.now,
             }),
@@ -413,7 +413,7 @@ export const incrementViewCount = internalMutation
         const project = await context.db.projects.findFirst({ where: { _id: projectId } });
 
         if (project && project.isPublic) {
-            await context.db.patch(projectId, {
+            await context.db.patch("projects", projectId, {
                 galleryViewCount: (project.galleryViewCount ?? 0) + 1,
             });
         }

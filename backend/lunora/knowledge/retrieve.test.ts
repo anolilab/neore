@@ -175,7 +175,7 @@ describe("knowledge search pages", () => {
             });
         });
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(messageId));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("messages", messageId));
 
         expect(readKnowledgeCitation(row.sources[0].providerMetadata)).toMatchObject({ chunkId: "c9", pageNumber: 7 });
     });

@@ -61,6 +61,7 @@ import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGr
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
+import { readableProject } from "../projects/functions";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { headersForConnectionTest } from "../auth/lib/mcp-secret-headers";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -508,21 +509,18 @@ export const createThread = authMutation
             } = {};
 
             if (projectId) {
-                const project = await context.runQuery(api.agent.projects.getProject, {
-                    projectId: projectId as Id<"projects">,
-                });
+                // A project id from the client is stored on the thread: refuse one the caller cannot read, a missing one alike.
+                const project = await readableProject(context, projectId as Id<"projects">, userId);
 
-                if (project) {
-                    if (project.userId && project.userId !== userId) {
-                        throw new LunoraError("FORBIDDEN", "Project not found or access denied");
-                    }
-
-                    projectDefaults = {
-                        defaultEnabledFeatures: project.defaultEnabledFeatures,
-                        defaultModel: project.defaultModel,
-                        defaultReasoningEffort: project.defaultReasoningEffort,
-                    };
+                if (!project) {
+                    throw new LunoraError("FORBIDDEN", "Project not found or access denied");
                 }
+
+                projectDefaults = {
+                    defaultEnabledFeatures: project.defaultEnabledFeatures,
+                    defaultModel: project.defaultModel,
+                    defaultReasoningEffort: project.defaultReasoningEffort,
+                };
             }
 
             // A bot chat runs on the bot's model. A bot the caller does not own is a
@@ -741,7 +739,7 @@ export const gateThreadActionHandler = async (
     // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
     // runs on a paired device, never on a cloud model: `runChatStart` refuses it. A switched thread runs on its
     // path's agent (`agent/agent-switch.ts`); the send only looks that up for one that was.
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
     return {
@@ -781,7 +779,7 @@ export const getThreadTemporaryStatus = liteAuthQuery
 
         // Direct DB access - bypasses runQuery validator overhead (200ms+ savings)
         const [thread, temporaryThread] = await Promise.all([
-            context.db.get(threadId as Id<"threads">),
+            context.db.get("threads", threadId as Id<"threads">),
             context.db
                 .query("temporaryThreads")
                 .withIndex("by_thread", (q: any) => q.eq("threadId", threadId as Id<"threads">))
@@ -933,7 +931,7 @@ export const getThreadUIMessages = liteAuthQuery
 
         if (!access) {
             // Existence only — past row-level security, which hides it either way.
-            const exists = await systemDb(context).get(threadId);
+            const exists = await systemDb(context).get("threads", threadId);
 
             return exists ? throwUnauthorized("Access denied to this thread") : throwThreadNotFound(threadId);
         }
@@ -3173,7 +3171,7 @@ export const getBrowserActions = authQuery
     )
     .query(async ({ args: { sessionId }, ctx: context }) => {
         // Verify session ownership
-        const session = await context.db.get(sessionId as Id<"browserSessions">);
+        const session = await context.db.get("browserSessions", sessionId as Id<"browserSessions">);
 
         if (!session || session.userId !== context.user.userId) {
             return [];
@@ -3209,7 +3207,7 @@ export const terminateBrowserSession = authMutation
         sessionId: v.string().max(MAX_LENGTH.id),
     })
     .mutation(async ({ args: { sessionId }, ctx: context }) => {
-        const session = await context.db.get(sessionId as Id<"browserSessions">);
+        const session = await context.db.get("browserSessions", sessionId as Id<"browserSessions">);
 
         if (!session || session.userId !== context.user.userId) {
             throw new LunoraError("FORBIDDEN", "Not allowed");
@@ -3859,11 +3857,12 @@ export const streamAsync = internalAction
         let projectContext: string | undefined;
 
         if (appThread?.projectId) {
-            const project = await context.runQuery(api.agent.projects.getProject, {
-                projectId: appThread.projectId as Id<"projects">,
-            });
-
-            projectContext = project?.context;
+            // The access `createThread` applied (owner or organization member), not the owner-only read.
+            projectContext =
+                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                    projectId: appThread.projectId as Id<"projects">,
+                    userId,
+                })) ?? undefined;
         }
 
         // Get model definition

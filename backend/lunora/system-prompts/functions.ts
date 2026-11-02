@@ -116,7 +116,7 @@ export const updatePreset = authMutation
     .mutation(async ({ args: input, ctx: context }) => {
         const { userId } = context.user;
 
-        const existing = await context.db.get(input.presetId as Id<"systemPromptPresets">);
+        const existing = await context.db.get("systemPromptPresets", input.presetId as Id<"systemPromptPresets">);
 
         if (!existing || (existing as { userId: string }).userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Preset not found");
@@ -133,7 +133,7 @@ export const updatePreset = authMutation
         // `modelId: null` means "any model": `undefined` makes `patchRow` remove it.
         if (input.modelId !== undefined) patch.modelId = input.modelId ?? undefined;
 
-        await patchRow(context.db, existing, patch);
+        await patchRow(context.db, "systemPromptPresets", existing, patch);
 
         context.log.event("system_prompts.update_preset", { presetId: input.presetId, updatedFieldCount: Object.keys(patch).length - 1 });
 
@@ -150,13 +150,13 @@ export const deletePreset = authMutation
     .mutation(async ({ args: input, ctx: context }) => {
         const { userId } = context.user;
 
-        const existing = await context.db.get(input.presetId as Id<"systemPromptPresets">);
+        const existing = await context.db.get("systemPromptPresets", input.presetId as Id<"systemPromptPresets">);
 
         if (!existing || (existing as { userId: string }).userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Preset not found");
         }
 
-        await context.db.delete(input.presetId as Id<"systemPromptPresets">);
+        await context.db.delete("systemPromptPresets", input.presetId as Id<"systemPromptPresets">);
 
         context.log.event("system_prompts.delete_preset", { presetId: input.presetId });
 

@@ -89,7 +89,13 @@ const table = async (name: string, where: Row = {}): Promise<Row[]> =>
 
         return page as Row[];
     });
-const get = async (id: string): Promise<Row> => (await run(async (context) => await context.db.get(id))) as Row;
+const get = async (id: string): Promise<Row> =>
+    (await run(
+        async (context) =>
+            (await context.db.get("threads", id as never)) ??
+            (await context.db.get("subAgentRuns", id as never)) ??
+            (await context.db.get("persistentStreams", id as never)),
+    )) as Row;
 
 const newThread = async (extra: Row = {}): Promise<string> =>
     await run(async (context) => await context.db.insert("threads", { status: "active", title: "Lead", userId: OWNER, ...extra }));
@@ -219,7 +225,7 @@ const closeSession = async (device: Device, workerId: string) => {
 
 const leadMessages = async (): Promise<string[]> => (await table("messages", { threadId: leadId })).map((message) => JSON.stringify(message.message.content));
 
-const makeDeviceOffline = async (device: Device) => await run(async (context) => await context.db.patch(device.deviceId, { lastSeenAt: 0 }));
+const makeDeviceOffline = async (device: Device) => await run(async (context) => await context.db.patch("devices", device.deviceId, { lastSeenAt: 0 }));
 
 beforeEach(async () => {
     jobsQueueMessages.length = 0;
@@ -285,7 +291,7 @@ describe("creating a worker on a computer", () => {
         await run(async (context) => {
             const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: OWNER });
 
-            await context.db.patch(device.deviceId, { projectIds: [project] });
+            await context.db.patch("devices", device.deviceId, { projectIds: [project] });
         });
 
         await expect(createHostWorker(device)).rejects.toMatchObject({ message: expect.stringMatching(HOST_OUT_OF_SCOPE) });
@@ -537,7 +543,7 @@ const dispatchWithLead = async (device: Device) => {
     const receipt = await createHostWorker(device, { clientId: "make-lead" });
 
     // The lead asked for this run: it has a tool call, so its result is posted back.
-    await run(async (context) => await context.db.patch(receipt.runId, { toolCallId: "call-lead" }));
+    await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId, { toolCallId: "call-lead" }));
 
     return receipt;
 };
@@ -684,7 +690,7 @@ describe("activity and waiting on a person", () => {
         // Quiet since before the window, but the agent has just written: not stale.
         const started = await runRow(receipt.runId);
 
-        await run(async (context) => await context.db.patch(receipt.runId, { startedAt: Date.now() - SUB_AGENT_STALE_MS - 1 }));
+        await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId, { startedAt: Date.now() - SUB_AGENT_STALE_MS - 1 }));
         await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, Date.now()));
         expect(await runRow(receipt.runId)).toMatchObject({ status: "running" });
         expect(started.status).toBe("running");
@@ -692,7 +698,7 @@ describe("activity and waiting on a person", () => {
         // It then waits on a person: no notice, and not reaped however long it is quiet.
         const stream = await liveStream(receipt.workerId);
 
-        await run(async (context) => await context.db.patch(stream._id, { hostPendingPermissions: ["req-1"] }));
+        await run(async (context) => await context.db.patch("persistentStreams", stream._id, { hostPendingPermissions: ["req-1"] }));
 
         const waiting = (await as(OWNER).query(functions.getWorker as never, { workerId: receipt.workerId } as never)) as Row;
 
@@ -716,6 +722,57 @@ describe("activity and waiting on a person", () => {
 
         await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, late, startedAt as number));
         expect(await runRow(receipt.runId)).toMatchObject({ status: "failed" });
+    });
+
+    it("keeps a turn alive whose host is only sending keepalives, and fails one silent on both clocks", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const session = await sessionOf(receipt.workerId);
+
+        // No chunk since the turn began (one long tool call), but the desktop's keepalive moved the session's clock.
+        await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId as never, { startedAt: Date.now() - SUB_AGENT_STALE_MS - 1 }));
+        await run(async (context) => await context.db.patch("acpSessions", session._id as never, { lastEventAt: Date.now() - 60_000 }));
+        await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, Date.now()));
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "running" });
+
+        // The same turn with both clocks past the window is stuck.
+        await run(async (context) => await context.db.patch("acpSessions", session._id as never, { lastEventAt: Date.now() - SUB_AGENT_STALE_MS - 60_000 }));
+        await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, Date.now()));
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "failed" });
+    });
+
+    it("reads the activity of the thread's current session, not of an ended one from before a switch", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        await sessionOpen(device, receipt.workerId);
+
+        const { _id, ...old } = await sessionOf(receipt.workerId);
+
+        delete old._creationTime;
+
+        // The earlier session ended just now; the current one (made after it) was last heard from earlier.
+        const currentAt = Date.now() - 600_000;
+
+        // The view shows the later of the run's start and its host's last event.
+        await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId as never, { startedAt: currentAt - 600_000 }));
+        await run(async (context) => await context.db.patch("acpSessions", _id as never, { lastEventAt: Date.now() - 1000, status: "ended" }));
+        await run(
+            async (context) =>
+                await context.db.insert("acpSessions", {
+                    ...old,
+                    hostSessionId: `${String(old.hostSessionId)}-next`,
+                    lastEventAt: currentAt,
+                    status: "idle",
+                }),
+        );
+
+        const view = (await as(OWNER).query(functions.getWorker as never, { workerId: receipt.workerId } as never)) as Row;
+
+        expect(view.lastActivityAt).toBe(currentAt);
     });
 
     it("fails a host run that has been silent for the whole window", async () => {
@@ -792,7 +849,7 @@ describe("a worker's thread that is deleted", () => {
         const queued = await dispatchFromUser(receipt.workerId, "second");
         const { endHostThread } = await import("../acp/lib/thread-removed");
 
-        await run(async (context) => await endHostThread(context, await context.db.get(receipt.workerId), Date.now()));
+        await run(async (context) => await endHostThread(context, await context.db.get("threads", receipt.workerId), Date.now()));
 
         expect(await runRow(receipt.runId)).toMatchObject({ status: "cancelled" });
         // The message behind it is not started on a thread that is going: no second send, no new stream.
@@ -800,6 +857,34 @@ describe("a worker's thread that is deleted", () => {
         expect(await sendCalls()).toHaveLength(1);
         expect(await table("persistentStreams", { threadId: receipt.workerId })).toHaveLength(1);
         expect((await table("persistentStreams", { threadId: receipt.workerId }))[0]).toMatchObject({ hostState: "ended" });
+    });
+});
+
+describe("an account that is deleted with host workers", () => {
+    it("ends the running and the queued run and withdraws the send the computer has not taken", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+        const { deleteUserThreadCascade } = await import("../gdpr/steps/deletion-steps");
+
+        // The first message is still undelivered (no `session_open` yet), and a second waits behind the turn.
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        for (let round = 0; round < 10; round += 1) {
+            const { hasMore } = (await run(async (context) => await context.runMutation(deleteUserThreadCascade, { userId: OWNER }))) as { hasMore: boolean };
+
+            if (!hasMore) {
+                break;
+            }
+        }
+
+        const runs = await table("subAgentRuns");
+
+        expect(runs.filter((row) => row.status === "queued" || row.status === "running")).toHaveLength(0);
+        expect(await runRow(receipt.runId)).toMatchObject({ status: "cancelled" });
+        expect(await runRow(queued.runId)).toMatchObject({ status: "cancelled" });
+        expect((await sendCalls()).filter((call) => call.status === "pending")).toHaveLength(0);
+        expect((await table("persistentStreams", { threadId: receipt.workerId }))[0]).toMatchObject({ hostState: "ended" });
+        expect(await sessionOf(receipt.workerId)).toMatchObject({ status: "ended" });
     });
 });
 
@@ -873,7 +958,7 @@ const fillOpenCalls = async (device: Device): Promise<string[]> =>
 const freeOpenCalls = async (ids: string[]) =>
     await run(async (context) => {
         for (const id of ids) {
-            await context.db.patch(id, { status: "completed" });
+            await context.db.patch("deviceCalls", id, { status: "completed" });
         }
     });
 
@@ -983,7 +1068,7 @@ describe("a queued message that meets a busy computer", () => {
         expect((await runRow(runId)).error).toBeUndefined();
         expect(await sentCalls()).toHaveLength(1);
 
-        await run(async (context) => await context.db.patch(holder, { hostState: "ended", status: "done" }));
+        await run(async (context) => await context.db.patch("persistentStreams", holder, { hostState: "ended", status: "done" }));
         await retryStart(runId);
 
         expect(await runRow(runId)).toMatchObject({ status: "running" });
@@ -1116,7 +1201,7 @@ describe("a turn that ends from this side with a message waiting behind it", () 
         const { stream } = await runningWithOneBehind();
         const { stopHostTurn } = await import("../acp/lib/finish");
 
-        await run(async (context) => await stopHostTurn(context, await context.db.get(stream._id), Date.now()));
+        await run(async (context) => await stopHostTurn(context, await context.db.get("persistentStreams", stream._id), Date.now()));
 
         expect(await callOrder()).toEqual(["acp_send", "acp_cancel", "acp_send"]);
     });
@@ -1133,7 +1218,7 @@ describe("a turn that ends from this side with a message waiting behind it", () 
         const stream = await liveStream(receipt.workerId);
         const { expireHostStream } = await import("../acp/lib/reap");
 
-        await run(async (context) => await expireHostStream(context, await context.db.get(stream._id), Date.now()));
+        await run(async (context) => await expireHostStream(context, await context.db.get("persistentStreams", stream._id), Date.now()));
 
         expect(await callOrder()).toEqual(["acp_send", "acp_cancel", "acp_send"]);
     });
@@ -1178,7 +1263,7 @@ describe("a host run that waits while the lead changes", () => {
         await run(async (context) => {
             const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: OWNER });
 
-            await context.db.patch(device.deviceId, { projectIds: [project] });
+            await context.db.patch("devices", device.deviceId, { projectIds: [project] });
         });
         await finishTurn(device, receipt.workerId);
 
@@ -1205,7 +1290,7 @@ describe("a worker that is deleted or loses its prompt", () => {
         const receipt = await createHostWorker(device);
         const { endHostThread } = await import("../acp/lib/thread-removed");
 
-        await run(async (context) => await endHostThread(context, await context.db.get(receipt.workerId), Date.now()));
+        await run(async (context) => await endHostThread(context, await context.db.get("threads", receipt.workerId), Date.now()));
 
         const [call] = await sendCalls();
 
@@ -1220,7 +1305,7 @@ describe("a worker that is deleted or loses its prompt", () => {
 
         const stream = await liveStream(receipt.workerId);
 
-        await run(async (context) => await context.db.delete(stream.messageId));
+        await run(async (context) => await context.db.delete("messages", stream.messageId));
         await finishTurn(device, receipt.workerId, "Fixed it anyway.");
 
         expect(await runRow(receipt.runId)).toMatchObject({ result: expect.stringContaining("Fixed it anyway."), status: "succeeded" });

@@ -245,6 +245,15 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain("delete-user-acp-sessions", async () => await context.run(internal.acp.gdpr.deleteUserAcpSessions, { userId: args.userId }));
         await drain("delete-user-review-drafts", async () => await context.run(internal.source_control.gdpr.deleteUserReviewDrafts, { userId: args.userId }));
         await drain(
+            "delete-user-pull-request-threads",
+            async (round) =>
+                await context.run(
+                    internal.source_control.gdpr.deleteUserPullRequestThreads,
+                    { userId: args.userId },
+                    { dedupId: `delete-pull-request-threads:${args.requestId}:${String(round)}` },
+                ),
+        );
+        await drain(
             "delete-user-pull-request-guides",
             async (round) =>
                 await context.run(

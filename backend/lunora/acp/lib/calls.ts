@@ -65,7 +65,7 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
         return;
     }
 
-    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
 
     // A session that was to load its saved one never did: the divider that asked is no longer a resumed session.
     if (session.nativeSessionId !== undefined) {

@@ -90,7 +90,7 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
     const runId = `${String(now)}:${state ? String(state.replies) : "0"}`;
 
     if (state) {
-        await ctx.db.patch(state._id, { leaseUntil: now + BACKFILL_LEASE_MS, runId, updatedAt: now });
+        await ctx.db.patch("usageBackfill", state._id, { leaseUntil: now + BACKFILL_LEASE_MS, runId, updatedAt: now });
     } else {
         await ctx.db.insert("usageBackfill", {
             leaseUntil: now + BACKFILL_LEASE_MS,
@@ -261,7 +261,7 @@ export const runUsageBackfillStep = internalMutation
         }
 
         await addToRollup(ctx, userId, step.increments, now, false);
-        await patchRow(ctx.db, state, {
+        await patchRow(ctx.db, "usageBackfill", state, {
             lastOrder: step.position.lastOrder,
             leaseUntil: now + BACKFILL_LEASE_MS,
             replies: state.replies + step.increments.length,
@@ -335,7 +335,7 @@ export const sweepUsageRollup = internalMutation
             where: { recordedAt: { lt: now - REPLY_KEY_KEEP_MS } },
         });
 
-        await Promise.all(page.map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all(page.map(async (row) => await ctx.db.delete("usageReplies", row._id)));
 
         return { pruned: page.length, status };
     });

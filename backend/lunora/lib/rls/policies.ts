@@ -209,6 +209,7 @@ const OWNER_TABLES = [
     "passkey",
     "presentations",
     "pullRequestGuides",
+    "pullRequestThreads",
     "requestedSecrets",
     "reviewDrafts",
     "sandboxSessions",

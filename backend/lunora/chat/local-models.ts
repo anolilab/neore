@@ -92,7 +92,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
     let threadId: Id<"threads">;
 
     if (args.threadId) {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.deleted) {
             throw new LunoraError("NOT_FOUND", "Thread not found");

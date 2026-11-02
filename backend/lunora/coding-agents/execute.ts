@@ -15,15 +15,27 @@ import { internalAction } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { E2B_API_KEY } from "../env";
 import { authAction, rateLimit } from "../lib/crpc";
-import { fetchOk, FETCH_TIMEOUT_MS, HttpError } from "../lib/fetch-timeout";
+import { isHostCapabilityAvailable } from "../source-control/capabilities";
+import { DEVELOP_DRIVER } from "../source-control/develop-driver";
 import type { CodingAgentId } from "./commands";
 import { CODING_AGENTS, missingKeyMessage, parseRepoUrl, RUN_TIMEOUT_MS } from "./commands";
 import { buildRunResultMessage } from "./result-message";
 import { createE2BSandboxProvider, killE2BSandbox } from "./sandbox-provider";
 import { enqueueJob } from "../lib/job-queue";
-import { expandSecrets, redactSecrets } from "./redact";
-import type { PullRequestApi, SandboxHandle } from "./runner";
-import { checkPullRequest, finalizeRun, openPullRequestForBranch, pollRun, PR_BUDGET_MS, pullRequestProblem, startPullRequest, startRun } from "./runner";
+import { expandSecrets } from "./redact";
+import type { SandboxHandle } from "./runner";
+import {
+    checkPullRequest,
+    finalizeRun,
+    openPullRequestForBranch,
+    pollRun,
+    PR_BUDGET_MS,
+    describePullRequestFailure,
+    pullRequestApiFromDriver,
+    pullRequestProblem,
+    startPullRequest,
+    startRun,
+} from "./runner";
 
 const NOT_CONFIGURED = "Coding agents are not available on this server (no sandbox provider is configured).";
 
@@ -33,49 +45,6 @@ const getGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, 
 
     return "accessToken" in outcome ? outcome.accessToken : undefined;
 };
-
-/** The GitHub REST call that opens the PR — from the backend, never from a sandbox. */
-const githubPullRequestCreator =
-    (token: string): PullRequestApi["createPullRequest"] =>
-    async ({ base, body, head, owner, repo, title }) => {
-        try {
-            const response = await fetchOk(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`, {
-                body: JSON.stringify({ base, body, head, title }),
-                errorPrefix: "GitHub API error",
-                headers: {
-                    Accept: "application/vnd.github+json",
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "User-Agent": "neore-chat",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                includeBody: true,
-                method: "POST",
-                timeoutMs: FETCH_TIMEOUT_MS,
-            });
-            const json = (await response.json()) as { html_url?: unknown };
-
-            if (typeof json.html_url !== "string" || !json.html_url.startsWith("https://github.com/")) {
-                throw new TypeError("GitHub did not return a pull request URL");
-            }
-
-            return json.html_url;
-        } catch (error) {
-            if (error instanceof HttpError && error.body) {
-                const detail = (() => {
-                    try {
-                        return (JSON.parse(error.body) as { message?: string }).message;
-                    } catch {
-                        return undefined;
-                    }
-                })();
-
-                throw new Error(detail ? `${error.message} — ${detail}` : error.message, { cause: error });
-            }
-
-            throw error;
-        }
-    };
 
 const pullRequestTitle = (prompt: string): string => {
     const firstLine = prompt.split("\n", 1)[0]?.trim() ?? "";
@@ -272,6 +241,27 @@ export const pollCodingAgentRun = internalAction
     });
 
 /**
+ * Both ways: the thread that opened the PR names it, so the pull request lists the thread that worked on it. Best
+ * effort, so a link that cannot be recorded never fails the result the user is waiting for, but a failure is logged:
+ * nothing retries it. Idempotent, so a run reaching it from two paths records one link.
+ */
+const linkOpenedPullRequest = async (ctx: RunnerCtx, run: { prUrl?: string; threadId?: string; userId: string }): Promise<void> => {
+    if (run.prUrl === undefined || run.threadId === undefined) {
+        return;
+    }
+
+    try {
+        await ctx.runMutation(internal.source_control.pr_threads.recordOpenedPullRequest, {
+            prUrl: run.prUrl,
+            threadId: run.threadId,
+            userId: run.userId,
+        });
+    } catch (error) {
+        console.error(`[coding-agents] could not link the opened pull request to its thread ${run.threadId}:`, error);
+    }
+};
+
+/**
  * The follow-ups of a finished run: the result message in its thread and a
  * waiting task round's answer. Runs once — after the PR, when one was asked for.
  */
@@ -292,6 +282,8 @@ const postFollowUps = async (ctx: RunnerCtx, runId: Id<"codingAgentRuns">): Prom
         });
     }
 
+    await linkOpenedPullRequest(ctx, run);
+
     if (run.taskRunId) {
         // A verifier call: on the jobs queue; it skips a round that is already complete.
         await enqueueJob(internal.tasks.execute.finishCodingAgentRound, { codingRunId: runId });
@@ -309,6 +301,11 @@ const startPullRequestForRun = async (
 ): Promise<{ error: string; followUpsPosted?: boolean } | { started: true }> => {
     if (!E2B_API_KEY) {
         return { error: NOT_CONFIGURED };
+    }
+
+    // The host adapter declares whether it can open one at all; a host that cannot is told so, not worked around.
+    if (!isHostCapabilityAvailable(DEVELOP_DRIVER.view.capabilities, "pullRequest.create")) {
+        return { error: "This host cannot open a pull request from here." };
     }
 
     const claim = await ctx.runMutation(internal.coding_agents.functions.beginPullRequest, input);
@@ -433,6 +430,13 @@ export const pollPullRequest = internalAction
 
             if (followUp) {
                 await postFollowUps(ctx, runId);
+            } else if (prUrl !== undefined) {
+                // The button-made PR has no follow-ups to post, but it is still the thread's pull request.
+                const run = await ctx.runQuery(internal.coding_agents.functions.getRunForFollowUp, { runId });
+
+                if (run) {
+                    await linkOpenedPullRequest(ctx, run);
+                }
             }
         };
 
@@ -487,7 +491,7 @@ export const pollPullRequest = internalAction
         }
 
         try {
-            const url = await openPullRequestForBranch(
+            const { url } = await openPullRequestForBranch(
                 {
                     baseBranch: pr.baseBranch,
                     body: pullRequestBody(pr.summary),
@@ -495,14 +499,12 @@ export const pollPullRequest = internalAction
                     repo: parseRepoUrl(pr.repoUrl),
                     title: pullRequestTitle(pr.prompt),
                 },
-                { createPullRequest: githubPullRequestCreator(githubToken) },
+                pullRequestApiFromDriver(DEVELOP_DRIVER, githubToken),
             );
 
             await complete(`${check.log}\nOpened pull request ${url}\n`, url);
         } catch (error) {
-            const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets).slice(0, 1000);
-
-            await complete(`${check.log}\nCould not open the pull request: ${message}\n`);
+            await complete(`${check.log}\n${describePullRequestFailure(error, secrets)}\n`);
         }
 
         return null;

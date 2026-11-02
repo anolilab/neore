@@ -9,6 +9,7 @@ import type { Infer } from "lunorash/server";
  * credits, models) that tier drives.
  */
 import { LunoraError } from "lunorash/server";
+import type { Id } from "../_generated/dataModel";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -215,7 +216,7 @@ export const updateBillingSettings = authMutation
         }
 
         if (Object.keys(updates).length > 0) {
-            await context.db.patch(organizationId, withoutUndefined(updates));
+            await context.db.patch("organization", organizationId, withoutUndefined(updates));
         }
 
         context.log.event("billing.update_billing_settings", {
@@ -250,7 +251,7 @@ export const setOrganizationBillingTier = adminMutation
         const updates = withoutUndefined({ baseTier: args.baseTier, creditsPerUser: args.creditsPerUser });
 
         if (Object.keys(updates).length > 0) {
-            await context.db.patch(organizationId, updates);
+            await context.db.patch("organization", organizationId, updates);
         }
 
         context.log.event("billing.set_organization_billing_tier", {
@@ -291,7 +292,7 @@ export const applyCreemSubscription = internalMutation
         const patch = creemTierPatch(row, update);
 
         if (patch) {
-            await context.db.patch(row._id, patch);
+            await context.db.patch(subject === "user" ? "user" : "organization", row._id as Id<"user">, patch);
         }
 
         return null;
@@ -324,11 +325,11 @@ export const setMemberCreditOverride = adminMutation
             // Update existing record
             if (creditOverride === null) {
                 // Remove the override: `undefined` makes `patchRow` drop the field.
-                await patchRow(context.db, existingCredits, {
+                await patchRow(context.db, "memberCredits", existingCredits, {
                     creditOverride: undefined,
                 });
             } else {
-                await context.db.patch(existingCredits._id, {
+                await context.db.patch("memberCredits", existingCredits._id, {
                     creditOverride,
                 });
             }
@@ -520,10 +521,10 @@ export const releaseGatewayCredits = internalMutation
         const record = await context.db.memberCredits.findFirst({ where: { organizationId: row.orgId, userId: row.userId } });
 
         if (record) {
-            await context.db.patch(record._id, { usedCredits: Math.max((record.usedCredits ?? 0) - row.creditsDeducted, 0) });
+            await context.db.patch("memberCredits", record._id, { usedCredits: Math.max((record.usedCredits ?? 0) - row.creditsDeducted, 0) });
         }
 
-        await context.db.delete(row._id);
+        await context.db.delete("gatewayUsageDeductions", row._id);
 
         return null;
     });

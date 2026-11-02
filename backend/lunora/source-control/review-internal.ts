@@ -45,7 +45,7 @@ export const claimDraftForSubmit = internalMutation
             return { status: "in_progress" as const };
         }
 
-        await ctx.db.patch(draft._id, { submittingAt: now });
+        await ctx.db.patch("reviewDrafts", draft._id, { submittingAt: now });
 
         return {
             draft: { body: draft.body, comments: draft.comments, commitId: draft.commitId, revision: draft.revision, verdict: draft.verdict },
@@ -79,14 +79,14 @@ export const finishDraftSubmit = internalMutation
         }
 
         if (draft.revision === args.revision) {
-            await ctx.db.delete(draft._id);
+            await ctx.db.delete("reviewDrafts", draft._id);
 
             return null;
         }
 
         // The summary and verdict went out with the review too, unless they were changed since: a submit that
         // finishes after its lease ran out must not erase what the person wrote meanwhile.
-        await ctx.db.patch(draft._id, {
+        await ctx.db.patch("reviewDrafts", draft._id, {
             body: draft.body === args.sent.body ? "" : draft.body,
             comments: withoutSent(draft.comments, args.sent.comments),
             submittingAt: 0,
@@ -104,7 +104,7 @@ export const releaseDraftSubmit = internalMutation
         const draft = await draftFor(ctx, args.userId, args.repository, args.number);
 
         if (draft !== null && draft.submittingAt === args.lease) {
-            await ctx.db.patch(draft._id, { submittingAt: 0 });
+            await ctx.db.patch("reviewDrafts", draft._id, { submittingAt: 0 });
         }
 
         return null;

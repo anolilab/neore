@@ -89,7 +89,11 @@ const rows = async (table: string, where: Row = {}): Promise<Row[]> =>
         return page as Row[];
     });
 
-const row = async (id: string): Promise<Row | null> => await run(async (ctx) => await ctx.db.get(id));
+const row = async (id: string): Promise<Row | null> =>
+    await run(
+        async (ctx) =>
+            (await ctx.db.get("threads", id as never)) ?? (await ctx.db.get("devices", id as never)) ?? (await ctx.db.get("acpSessions", id as never)),
+    );
 
 const insertUser = async () =>
     (await run(
@@ -622,7 +626,7 @@ describe("what a takeover carries into a command on the computer", () => {
         await run(async (ctx) => {
             const [prompt] = (await ctx.db.messages.findMany({ where: { order: 0, stepOrder: 0, threadId: source } })).page;
 
-            await ctx.db.patch(prompt._id, { fileIds: [fileId] });
+            await ctx.db.patch("messages", prompt._id, { fileIds: [fileId] });
         });
 
         const { forkedThreadId } = await switchTo(source, hostTarget(device));
@@ -666,7 +670,7 @@ describe("what a takeover carries into a command on the computer", () => {
 describe("the organisation of a switched thread", () => {
     const inOrganisation = async (threadId: string) =>
         await run(async (ctx) => {
-            await ctx.db.patch(threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
+            await ctx.db.patch("threads", threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
         });
 
     it("is carried to the continuation that opens on a computer", async () => {
@@ -728,7 +732,7 @@ describe("a click id that comes back after its claim expired", () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(Date.now() + 11 * 60_000);
         await run(async (ctx) => {
-            await ctx.db.patch(device.deviceId as never, { lastSeenAt: Date.now() } as never);
+            await ctx.db.patch("devices", device.deviceId as never, { lastSeenAt: Date.now() } as never);
         });
 
         await expect(switchTo(source, hostTarget(device), ownerId, "old-click")).rejects.toThrow(ALREADY_MADE);
@@ -742,7 +746,7 @@ describe("a click id that comes back after its claim expired", () => {
 describe("a repeated click", () => {
     const takeOffline = async (device: Device) => {
         await run(async (ctx) => {
-            await ctx.db.patch(device.deviceId as never, { lastSeenAt: 1 } as never);
+            await ctx.db.patch("devices", device.deviceId as never, { lastSeenAt: 1 } as never);
         });
     };
 
@@ -861,7 +865,7 @@ describe("what a switch may target", () => {
         await harness.run(async (context: any) => {
             const project = await context.db.insert("projects", { createdAt: 0, title: "Other", userId: ownerId });
 
-            await context.db.patch(device.deviceId, { projectIds: [project] });
+            await context.db.patch("devices", device.deviceId, { projectIds: [project] });
         });
 
         await expect(switchTo(source, hostTarget(device, CLAUDE))).rejects.toThrow(NOT_IN_PROJECT);
@@ -1213,7 +1217,7 @@ describe("what a chat must be to be handed to a computer", () => {
             async (ctx) =>
                 await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: ownerId, ownerId, permission: "read", threadId: shared, userId: collaborator }),
         );
-        await run(async (ctx) => await ctx.db.patch(published as never, { isPublic: true }));
+        await run(async (ctx) => await ctx.db.patch("threads", published as never, { isPublic: true }));
 
         await expect(switchTo(shared, hostTarget(device))).rejects.toThrow(SHARED_OR_PUBLIC);
         await expect(switchTo(published, hostTarget(device))).rejects.toThrow(SHARED_OR_PUBLIC);
@@ -1257,7 +1261,7 @@ describe("a temporary chat", () => {
         const device = await pairedDevice(ownerId);
         const temporary = await cloudThread();
 
-        await run(async (ctx) => await ctx.db.patch(temporary as never, { isTemporary: true }));
+        await run(async (ctx) => await ctx.db.patch("threads", temporary as never, { isTemporary: true }));
 
         await expect(switchTo(temporary, hostTarget(device))).rejects.toThrow(TEMPORARY_CHAT);
         expect(await rows("threads")).toHaveLength(1);
@@ -1306,7 +1310,7 @@ describe("what a continuation keeps of its source", () => {
         const threadId = await cloudThread();
 
         await run(async (ctx) => {
-            await ctx.db.patch(threadId as never, { lockedAt: 1, projectId });
+            await ctx.db.patch("threads", threadId as never, { lockedAt: 1, projectId });
             await ctx.db.insert("threadPasscodes", {
                 createdAt: 1,
                 epoch,
@@ -1342,7 +1346,7 @@ describe("what a continuation keeps of its source", () => {
             await run(async (ctx) => {
                 const passcode = await readPasscodeRow(ctx.db, locked.threadId as never);
 
-                await ctx.db.patch(source as never, { lockedAt: 1, projectId: locked.projectId });
+                await ctx.db.patch("threads", source as never, { lockedAt: 1, projectId: locked.projectId });
                 await ctx.db.insert("threadPasscodes", { ...passcode!, _creationTime: undefined, _id: undefined, threadId: source } as never);
             });
         }

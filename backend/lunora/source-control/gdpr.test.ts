@@ -11,12 +11,14 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllGuides, collectAllReviewDrafts } from "./export-pages";
+import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "./export-pages";
 import {
     collectGuidesForExport,
+    collectPullRequestThreadsForExport,
     collectReviewDraftsForExport,
     collectWatchedRepositoriesForExport,
     deleteUserGuides,
+    deleteUserPullRequestThreads,
     deleteUserReviewDrafts,
     deleteUserWatchedRepositories,
 } from "./gdpr";
@@ -25,6 +27,7 @@ const A = "user-a";
 const B = "user-b";
 const MANY = 130;
 const WATCHED_EXPORT_ARGS = /generateExportFile[\s\S]*watchedRepositories,/u;
+const EXPORT_THREADS_ARGS = /generateExportFile[\s\S]*pullRequestThreads,/u;
 const EXPORT_FILE_ARGS = /generateExportFile[\s\S]*reviewDrafts,/u;
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -268,5 +271,64 @@ describe("guides in GDPR flows", () => {
         expect(pages).toBeGreaterThan(1);
         expect(guides).toHaveLength(7);
         expect(JSON.stringify(guides)).not.toContain(B);
+    });
+});
+
+describe("pull request / thread links in GDPR flows", () => {
+    const link = async (userId: string, count: number): Promise<void> => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { createdBy: userId, mode: "text", status: "active", title: "mine", updatedAt: 1, userId });
+
+            for (let index = 0; index < count; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 1,
+                    kind: "opened",
+                    number: index + 1,
+                    repository: "o/r",
+                    threadId,
+                    title: "mine",
+                    url: `https://github.com/o/r/pull/${String(index + 1)}`,
+                    userId,
+                });
+            }
+        });
+    };
+    const count = async (userId: string): Promise<number> =>
+        await harness.run(
+            async (ctx: any) => (await ctx.db.query("pullRequestThreads").collect()).filter((row: { userId: string }) => row.userId === userId).length,
+        );
+
+    it("exports the user's own links across pages, with the stored title", async () => {
+        await link(A, MANY);
+        await link(B, 3);
+
+        const { links } = await collectAllPullRequestThreads(
+            async (cursor) =>
+                await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { cursor, userId: A } as never)),
+        );
+
+        expect(links).toHaveLength(MANY);
+        expect(links[0]).toMatchObject({ kind: "opened", repository: "o/r", title: "mine" });
+    });
+
+    it("erases them in batches, only the user's own", async () => {
+        await link(A, MANY);
+        await link(B, 3);
+
+        const run = async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserPullRequestThreads as never, { userId: A } as never));
+
+        expect(await run()).toEqual({ hasMore: true });
+        expect(await run()).toEqual({ hasMore: false });
+        expect(await count(A)).toBe(0);
+        expect(await count(B)).toBe(3);
+    });
+
+    it("is wired into both workflows under explicit ids", () => {
+        const workflow = (name: string): string => readFileSync(join(import.meta.dirname, "../gdpr/workflows", name), "utf8");
+        const exportSource = workflow("export-workflow.ts");
+
+        expect(exportSource).toContain("collect-pull-request-threads:");
+        expect(exportSource).toMatch(EXPORT_THREADS_ARGS);
+        expect(workflow("deletion-workflow.ts")).toContain("delete-pull-request-threads:");
     });
 });

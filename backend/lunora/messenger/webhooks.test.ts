@@ -435,7 +435,7 @@ describe("a paused connection", () => {
         const { context, replies } = httpContext(TELEGRAM_KEYS);
 
         expect(await statusOf(telegram(context, connectionId))).toBe(200);
-        await harness.run(async (ctx: any) => await ctx.db.patch(connectionId, { status: "active" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messengerConnections", connectionId, { status: "active" }));
         expect(await statusOf(telegram(context, connectionId))).toBe(200);
         expect(replies()).toHaveLength(1);
     });

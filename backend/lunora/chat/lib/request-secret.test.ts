@@ -686,7 +686,7 @@ describe("consuming as an MCP server header", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.query("aiUserPreferences").first();
 
-            await ctx.db.patch(row._id, { mcpServers: [server("Files"), server("Files")] });
+            await ctx.db.patch("aiUserPreferences", row._id, { mcpServers: [server("Files"), server("Files")] });
         });
 
         expect(await takeHeader(ref)).toMatchObject({ status: "destination_missing" });
@@ -755,11 +755,11 @@ describe("the audit history of the stored header secrets", () => {
 
         await harness.run(
             async (ctx: any) =>
-                await ctx.db.patch(id, {
+                await ctx.db.patch("aiUserPreferences", id, {
                     mcpSecretHeaders: [{ encryptedValue: "v1:CIPHERTEXT-TWO", header: "Authorization", server: "Files", url: FILES_URL }],
                 }),
         );
-        await harness.run(async (ctx: any) => await ctx.db.delete(id));
+        await harness.run(async (ctx: any) => await ctx.db.delete("aiUserPreferences", id));
 
         const history = JSON.stringify(await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect()));
 
@@ -895,7 +895,7 @@ describe("the audit history of the preferences row", () => {
 
         await harness.run(
             async (ctx: any) =>
-                await ctx.db.patch(id, {
+                await ctx.db.patch("aiUserPreferences", id, {
                     mcpServers: [
                         { enabled: false, headers: [{ key: "Authorization", value: "rotated-token-4567" }], name: "Files", protocol: "http", url: FILES_URL },
                     ],

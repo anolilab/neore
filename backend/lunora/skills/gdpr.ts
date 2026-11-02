@@ -68,14 +68,14 @@ export const eraseSkillsForUser = async (ctx: MutationCtx, userId: string): Prom
     // erasure for good. Ordered, a crash at any point leaves the parent behind
     // and the retry finds everything that is left.
     await Promise.all([
-        ...allHistory.flat().map((h) => ctx.db.delete(h._id)),
-        ...allStats.flat().map((s) => ctx.db.delete(s._id)),
-        ...flatFiles.map((f) => ctx.db.delete(f._id)),
+        ...allHistory.flat().map((h) => ctx.db.delete("skillHistory", h._id)),
+        ...allStats.flat().map((s) => ctx.db.delete("skillStats", s._id)),
+        ...flatFiles.map((f) => ctx.db.delete("skillFiles", f._id)),
     ]);
     await Promise.all([
-        ...skills.map((s) => ctx.db.delete(s._id)),
-        ...userSkills.map((us) => ctx.db.delete(us._id)),
-        ...invocations.map((inv) => ctx.db.delete(inv._id)),
+        ...skills.map((s) => ctx.db.delete("skills", s._id)),
+        ...userSkills.map((us) => ctx.db.delete("userSkills", us._id)),
+        ...invocations.map((inv) => ctx.db.delete("skillInvocations", inv._id)),
     ]);
 };
 
@@ -86,6 +86,6 @@ export const eraseSkillsForUser = async (ctx: MutationCtx, userId: string): Prom
  */
 export const eraseSkillRatingRows = async (ctx: MutationCtx, rows: ReadonlyArray<{ _id: Id<"skillRatings"> }>): Promise<void> => {
     for (const row of rows) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("skillRatings", row._id);
     }
 };

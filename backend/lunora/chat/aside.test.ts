@@ -86,7 +86,7 @@ import schema from "../schema";
 // eslint-disable-next-line import/first
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 // eslint-disable-next-line import/first
-import { addAsideToThread, askAside } from "./aside";
+import { addAsideToThread, askAside, readAsideSnapshot } from "./aside";
 
 type Harness = ReturnType<typeof lunoraTest>;
 type Asked = { answer: string; token: string; withThread: boolean };
@@ -169,7 +169,7 @@ const insertChunks = async (stream: string, texts: string[]): Promise<void> => {
     }
 };
 
-const patchThread = async (fields: Record<string, unknown>) => await harness.run(async (ctx: any) => await ctx.db.patch(threadId, fields));
+const patchThread = async (fields: Record<string, unknown>) => await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, fields));
 
 const customModel = "custom:my-endpoint/llama3";
 
@@ -275,7 +275,7 @@ describe("askAside", () => {
     });
 
     it("works with no reply running", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
         await expect(ask()).resolves.toMatchObject({ answer: "It means safe to repeat." });
     });
@@ -320,7 +320,7 @@ describe("askAside", () => {
                     userId: OWNER,
                 });
 
-                await ctx.db.patch(threadId, { activeLeafMessageId: leaf });
+                await ctx.db.patch("threads", threadId, { activeLeafMessageId: leaf });
             });
 
             await ask();
@@ -511,7 +511,7 @@ describe("askAside", () => {
             const hashed = await hashPasscode(PASSCODE, 1000);
 
             await harness.run(async (ctx: any) => {
-                await ctx.db.patch(threadId, { lockedAt: Date.now() - 60_000 });
+                await ctx.db.patch("threads", threadId, { lockedAt: Date.now() - 60_000 });
                 await ctx.db.insert("threadPasscodes", {
                     createdAt: 1,
                     epoch,
@@ -555,6 +555,17 @@ describe("askAside", () => {
         expect(await remainingText(OTHER)).toBe(before);
     });
 
+    it("re-checks access where it reads the snapshot: a grant gone since the action's check yields no rows", async () => {
+        const snapshotFor = async (userId: string) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(readAsideSnapshot as never, { threadId, userId } as never));
+
+        await expect(snapshotFor(OWNER)).resolves.toHaveProperty("rows");
+        await expect(snapshotFor(OTHER)).rejects.toThrow();
+
+        await grantRead(OTHER);
+        await expect(snapshotFor(OTHER)).resolves.toHaveProperty("rows");
+    });
+
     it("refuses an empty question", async () => {
         await expect(ask(" ".repeat(3))).rejects.toThrow("Ask a question first");
         expect(generateText).not.toHaveBeenCalled();
@@ -569,7 +580,7 @@ describe("askAside", () => {
 });
 
 describe("addAsideToThread", () => {
-    const finishReply = async () => await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+    const finishReply = async () => await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
     it("is refused while a reply is running, and writes nothing", async () => {
         const before = await rows("messages");
@@ -582,13 +593,13 @@ describe("addAsideToThread", () => {
     it("is refused on a coding agent's thread while its turn runs past the stream's expiry", async () => {
         // A host turn waiting on a permission prompt outlives `expiresAt`; the reaper extends it rather than ending it.
         await patchThread({ runner: "host" });
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { expiresAt: Date.now() - 1000 }));
 
         await expect(addToThread()).rejects.toThrow("Wait for the reply");
     });
 
     it("is not blocked by a dead stream the reaper has not reached", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { expiresAt: Date.now() - 1000 }));
 
         await expect(addToThread()).resolves.toHaveProperty("messageId");
     });

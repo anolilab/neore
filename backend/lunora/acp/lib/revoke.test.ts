@@ -17,7 +17,7 @@ describe("endHostSessionsOfDevice", () => {
                     return { continueCursor: "more", isDone: true, page: [{ _id: "s1", status: "idle", threadId: "t1" }] };
                 },
             },
-            patch: async (id: unknown, value: unknown) => {
+            patch: async (_table: unknown, id: unknown, value: unknown) => {
                 patched.push([id, value]);
             },
             persistentStreams: {

@@ -65,9 +65,9 @@ describe("getMCPTools", () => {
 
         expect(Object.keys(result.tools)).toStrictEqual(["mcp_my_server__delete", "mcp_my_server__delete_2", "mcp_my_server__list"]);
         expect(Object.fromEntries(result.descriptors)).toStrictEqual({
-            mcp_my_server__delete: { annotations: { destructiveHint: true }, serverName: "my server", toolName: "delete" },
-            mcp_my_server__delete_2: { annotations: { readOnlyHint: true }, serverName: "my_server", toolName: "delete" },
-            mcp_my_server__list: { serverName: "my_server", toolName: "list" },
+            mcp_my_server__delete: { annotations: { destructiveHint: true }, serverName: "my server", toolName: "delete", url: "https://a.example/mcp" },
+            mcp_my_server__delete_2: { annotations: { readOnlyHint: true }, serverName: "my_server", toolName: "delete", url: "https://b.example/mcp" },
+            mcp_my_server__list: { serverName: "my_server", toolName: "list", url: "https://b.example/mcp" },
         });
         expect((result.tools["mcp_my_server__delete_2"] as { description?: string }).description).toBe("b delete");
     });

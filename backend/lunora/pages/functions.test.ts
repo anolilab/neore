@@ -86,7 +86,8 @@ const newPage = async (userId = OWNER, args: Record<string, unknown> = {}): Prom
 };
 
 /** The page's current revision — what a fresh editor would base its save on. */
-const rev = async (pageId: string): Promise<number> => await harness.run(async (ctx: any) => ((await ctx.db.get(pageId)) as { revision: number }).revision);
+const rev = async (pageId: string): Promise<number> =>
+    await harness.run(async (ctx: any) => ((await ctx.db.get("pages", pageId)) as { revision: number }).revision);
 
 const grant = async (pageId: string, userId: string, permission: string): Promise<void> => {
     const { token } = (await as(OWNER).mutation(createPageInvite as never, { expiresInDays: 7, pageId, permission } as never)) as { token: string };

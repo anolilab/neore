@@ -36,7 +36,7 @@ export const addDelta = internalMutation
     .input(streamDeltasFields)
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const innerStream = (await ctx.db.get(args.streamId)) as { state: { kind: string } } | null;
+        const innerStream = (await ctx.db.get("streamingMessages", args.streamId)) as { state: { kind: string } } | null;
 
         if (!innerStream) {
             console.warn("Stream not found", args.streamId);
@@ -104,7 +104,7 @@ export const listDeltasHandler = async (
         // Bind each streamId to args.threadId. Without this, an authenticated
         // caller with access to a public thread can pass cursors for streamIds
         // belonging to private threads and read the streaming output.
-        const innerStream = await context.db.get(cursor.streamId);
+        const innerStream = await context.db.get("streamingMessages", cursor.streamId);
 
         if (!innerStream || innerStream.threadId !== args.threadId) {
             continue;
@@ -141,10 +141,10 @@ export const create = internalMutation
         });
         const timeoutFunctionId = await ctx.scheduler.runAfter(TIMEOUT_INTERVAL, internal.agent.streams.timeoutStream, { streamId });
 
-        await ctx.db.patch(streamId, { state: { ...state, timeoutFnId: timeoutFunctionId }, stateKind: state.kind });
+        await ctx.db.patch("streamingMessages", streamId, { state: { ...state, timeoutFnId: timeoutFunctionId }, stateKind: state.kind });
 
         // Update thread status to "running" when stream starts
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (thread && thread.status === "active") {
             await patchThread(ctx.db, args.threadId, { status: "running", updatedAt: ctx.now });
@@ -274,7 +274,7 @@ async function abortById(
         streamId: Id<"streamingMessages">;
     },
 ) {
-    const innerStream = await context.db.get(args.streamId);
+    const innerStream = await context.db.get("streamingMessages", args.streamId);
 
     if (!innerStream) {
         throw new Error(`Stream not found: ${args.streamId}`);
@@ -289,7 +289,7 @@ async function abortById(
     }
 
     await cleanupTimeoutFunction(context, innerStream);
-    await context.db.patch(args.streamId, {
+    await context.db.patch("streamingMessages", args.streamId, {
         state: { kind: "aborted", reason: args.reason },
         stateKind: "aborted",
     });
@@ -316,10 +316,10 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
         .first();
 
     if (!hasActiveStream) {
-        const thread = await context.db.get(threadId);
+        const thread = await context.db.get("threads", threadId);
 
         if (thread) {
-            await context.db.patch(threadId, { status: endStatus, updatedAt: Date.now() });
+            await context.db.patch("threads", threadId, { status: endStatus, updatedAt: Date.now() });
             await context.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }
     }
@@ -344,7 +344,7 @@ export async function finishHandler(
         await context.db.insert("streamDeltas", args.finalDelta);
     }
 
-    const innerStream = await context.db.get(args.streamId);
+    const innerStream = await context.db.get("streamingMessages", args.streamId);
 
     if (!innerStream) {
         throw new Error(`Stream not found: ${args.streamId}`);
@@ -359,7 +359,7 @@ export async function finishHandler(
     await cleanupTimeoutFunction(context, innerStream);
     const cleanupFunctionId = await context.scheduler.runAfter(DELETE_STREAM_DELAY, internal.agent.streams.deleteStreamAsync, { streamId: args.streamId });
 
-    await context.db.patch(args.streamId, {
+    await context.db.patch("streamingMessages", args.streamId, {
         state: { cleanupFnId: cleanupFunctionId, endedAt: Date.now(), kind: "finished" },
         stateKind: "finished",
     });
@@ -375,7 +375,7 @@ export const heartbeat = internalMutation
     .mutation(async ({ args, ctx }) => await heartbeatStream(ctx, args));
 
 async function heartbeatStream(context: MutationContext, args: { streamId: Id<"streamingMessages"> }): Promise<null> {
-    const innerStream = await context.db.get(args.streamId);
+    const innerStream = await context.db.get("streamingMessages", args.streamId);
 
     if (!innerStream) {
         console.warn("Stream not found", args.streamId);
@@ -402,7 +402,7 @@ async function heartbeatStream(context: MutationContext, args: { streamId: Id<"s
     await context.scheduler.cancel(innerStream.state.timeoutFnId);
     const timeoutFunctionId = await context.scheduler.runAfter(TIMEOUT_INTERVAL, internal.agent.streams.timeoutStream, { streamId: args.streamId });
 
-    await context.db.patch(args.streamId, {
+    await context.db.patch("streamingMessages", args.streamId, {
         state: { kind: "streaming", lastHeartbeat: Date.now(), timeoutFnId: timeoutFunctionId },
         stateKind: "streaming",
     });
@@ -414,7 +414,7 @@ export const timeoutStream = internalMutation
     .input({ streamId: v.id("streamingMessages") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const innerStream = await ctx.db.get(args.streamId);
+        const innerStream = await ctx.db.get("streamingMessages", args.streamId);
 
         if (!innerStream || innerStream.state.kind !== "streaming") {
             console.warn("Stream not found", args.streamId);
@@ -422,7 +422,7 @@ export const timeoutStream = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.streamId, {
+        await ctx.db.patch("streamingMessages", args.streamId, {
             state: { kind: "aborted", reason: "timeout" },
             stateKind: "aborted",
         });
@@ -441,10 +441,10 @@ const deletePageForStreamId = async (context: MutationContext, args: { cursor?: 
             numItems: MAX_DELTAS_PER_REQUEST,
         });
 
-    await Promise.all(deltas.page.map((d) => context.db.delete(d._id)));
+    await Promise.all(deltas.page.map((d) => context.db.delete("streamDeltas", d._id)));
 
     if (deltas.isDone) {
-        const innerStream = await context.db.get(args.streamId);
+        const innerStream = await context.db.get("streamingMessages", args.streamId);
 
         if (innerStream) {
             await cleanupTimeoutFunction(context, innerStream);
@@ -453,7 +453,7 @@ const deletePageForStreamId = async (context: MutationContext, args: { cursor?: 
                 await context.scheduler.cancel(innerStream.state.cleanupFnId);
             }
 
-            await context.db.delete(args.streamId);
+            await context.db.delete("streamingMessages", args.streamId);
         }
     }
 
@@ -526,7 +526,7 @@ export const deleteAllStreamsForThreadIdAsync = internalMutation
         const result = await deleteStreamsPageForThreadId(ctx, args);
 
         if (result.isDone) {
-            await ctx.db.delete(args.threadId);
+            await ctx.db.delete("threads", args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.streams.deleteAllStreamsForThreadIdAsync, {
                 deltaCursor: result.deltaCursor,
@@ -558,10 +558,10 @@ export const resetThreadStatusToActive = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (thread && ["abort", "error", "finish"].includes(thread.status)) {
-            await ctx.db.patch(args.threadId, { status: "active", updatedAt: ctx.now });
+            await ctx.db.patch("threads", args.threadId, { status: "active", updatedAt: ctx.now });
         }
 
         return null;

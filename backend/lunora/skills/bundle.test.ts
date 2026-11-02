@@ -6,12 +6,14 @@
  */
 import { MODEL_LOOKUP } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
+import { LunoraError } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 import { schemaWithShardedTables } from "../lib/test-schema";
 import type { Bundle, BundleItem } from "./bundle-format";
 import { buildBundleMarkdown } from "./bundle-format";
+import { isSkillUnavailable } from "./bundle";
 import { isSelectableTextModel } from "./builder-logic";
 import { getEnabledSkillsForSystemPrompt } from "./executor";
 
@@ -26,6 +28,7 @@ const RE_8 = /schedules and webhooks/;
 const RE_9 = /custom endpoint/;
 const RE_10 = /already imported/i;
 const RE_11 = /Weekly.*could not be imported/;
+const RE_NOT_AVAILABLE = /not available to you/;
 const RE_12 = /no longer available/;
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
@@ -329,9 +332,17 @@ describe("importBundle", () => {
             });
         });
 
+        const outcomes: unknown[] = [];
+
         for (const id of [used, untouched]) {
-            await run(async (context) => await context.runMutation(procedureAt("skills_bundle", "removeImportedItem"), { id, kind: "group", userId: OWNER }));
+            outcomes.push(
+                await run(
+                    async (context) => await context.runMutation(procedureAt("skills_bundle", "removeImportedItem"), { id, kind: "group", userId: OWNER }),
+                ),
+            );
         }
+
+        expect(outcomes).toStrictEqual([{ kept: true }, { kept: false }]);
 
         const threads = await rows("threads");
         const left = threads.filter((thread) => thread.deleted !== true).map((thread) => thread._id);
@@ -398,6 +409,22 @@ describe("exportBundle", () => {
         await expect(exportBundle(OTHER, { skillIds: [skillId] })).resolves.toHaveProperty("markdown");
     });
 
+    it("says a participant is not available only for a skill it may not read, and rethrows any other failure", async () => {
+        expect(isSkillUnavailable(new LunoraError("FORBIDDEN", "no"))).toBe(true);
+        expect(isSkillUnavailable(new LunoraError("NOT_FOUND", "gone"))).toBe(true);
+        expect(isSkillUnavailable(new LunoraError("INTERNAL_ERROR", "shard down"))).toBe(false);
+        expect(isSkillUnavailable(new Error("boom"))).toBe(false);
+
+        const first = await createSkill(OWNER, "alpha");
+        const second = await createSkill(OWNER, "beta");
+        const threadId = await createGroup(OWNER, [first, second]);
+
+        await run(async (context) => {
+            await context.db.patch("skills", second as never, { userId: OTHER } as never);
+        });
+        await expect(exportBundle(OWNER, { groupChatIds: [threadId] })).rejects.toThrow(RE_NOT_AVAILABLE);
+    });
+
     it("writes no secret, owner, bot or organization, however the rows were filled", async () => {
         const skillId = await createSkill(OWNER, "alpha", {
             config: { additionalTools: ["connector:github:create_issue"], voice: "Secret Voice" },
@@ -410,9 +437,9 @@ describe("exportBundle", () => {
         const threadId = await createGroup(OWNER, [skillId, second]);
 
         await run(async (context) => {
-            await context.db.patch(hookId, { organizationId: "org_secret_42", webhookSecret: SECRET_CIPHERTEXT });
-            await context.db.patch(scheduleId, { botId: "bot_secret_9", organizationId: "org_secret_42" });
-            await context.db.patch(threadId, { organizationId: "org_secret_42" });
+            await context.db.patch("triggers", hookId, { organizationId: "org_secret_42", webhookSecret: SECRET_CIPHERTEXT });
+            await context.db.patch("triggers", scheduleId, { botId: "bot_secret_9", organizationId: "org_secret_42" });
+            await context.db.patch("threads", threadId, { organizationId: "org_secret_42" });
         });
 
         const { markdown } = await exportBundle(OWNER, { groupChatIds: [threadId], skillIds: [skillId, second], triggerIds: [hookId, scheduleId] });
@@ -545,7 +572,7 @@ describe("listBundleCandidates", () => {
         expect(before.groupChats[0]?.exportable).toBe(true);
 
         await run(async (context) => {
-            await context.db.delete(second);
+            await context.db.delete("skills", second);
         });
 
         const after = await pickCandidates(OWNER);
