@@ -42,6 +42,7 @@ const { readPasscodeRow } = await import("../agent/thread-passcode");
 const { listMessagesByThreadId } = await import("../agent/messages");
 const { agentKeyOf, sameAgent } = await import("../agent/agent-switch-logic");
 const { reattachFailureOf } = await import("./lib/reattach");
+const { stopHostTurn } = await import("./lib/finish");
 const calls = await import("./calls");
 const send = await import("./send");
 const switchModule = await import("./switch");
@@ -388,6 +389,45 @@ describe("cloud to host", () => {
         const thread = (await row(forked)) as never;
 
         expect(await run(async (ctx) => await pendingHandoffOf(ctx, thread))).toBeUndefined();
+    });
+
+    it("keeps the handoff for the next prompt when the send that carried it was stopped before the computer took it", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+
+        expect((await sendText(forked, "first try")).outcome).toBe("sent");
+
+        // Stop before the computer acknowledged the prompt: the call is withdrawn, the saved prompt stays.
+        const [stream] = await rows("persistentStreams", { threadId: forked });
+
+        await run(async (ctx) => await stopHostTurn(ctx, stream as never, Date.now()));
+
+        const thread = (await row(forked)) as never;
+
+        expect(await run(async (ctx) => await pendingHandoffOf(ctx, thread))).toContain("question 0");
+
+        expect((await sendText(forked, "second try")).outcome).toBe("sent");
+
+        // The withdrawn call keeps no input; the new one carries the handoff in front of the prompt.
+        const delivered = (await rows("deviceCalls", { toolName: "acp_send" })).filter((call) => call.status !== "expired");
+        const { text } = JSON.parse(delivered.at(-1)?.input as string) as { text: string };
+
+        expect(text).toContain("question 0");
+        expect(text.endsWith("second try")).toBe(true);
+    });
+
+    it("is refused while the cloud thread's newest prompt has no stream yet", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await addRow(source, 3, "user", "and now?");
+
+        await expect(switchTo(source, hostTarget(device))).rejects.toMatchObject({ data: { code: "AGENT_SWITCH_STREAMING" } });
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
     });
 
     it("fits a long thread inside the signed call, with a note of what was left out, and never cuts the prompt", async () => {

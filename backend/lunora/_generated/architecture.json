@@ -18259,7 +18259,7 @@
     {
       "file": "acp/switch",
       "kind": "write",
-      "line": 624,
+      "line": 626,
       "reason": "\"commitHostSwitchHandler\" is not a registered function"
     },
     {
@@ -19441,49 +19441,49 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 556,
+      "line": 561,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 575,
+      "line": 580,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 576,
+      "line": 581,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 585,
+      "line": 590,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 596,
+      "line": 601,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 615,
+      "line": 620,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 638,
+      "line": 643,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 639,
+      "line": 644,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

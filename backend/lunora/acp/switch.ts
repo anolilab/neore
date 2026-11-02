@@ -43,6 +43,7 @@ import {
     AGENT_SWITCH_STREAMING,
     AGENT_SWITCH_UNSUPPORTED,
     assertNotStreaming,
+    assertReplyStarted,
     claimKeyOf,
     hasFixedAgent,
     refuse,
@@ -490,6 +491,7 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         }
     } else {
         await assertNotStreaming(ctx, thread);
+        await assertReplyStarted(ctx, thread, leaf);
     }
 
     // The same agent in the same folder on the same computer, while its session is alive: nothing to switch.
