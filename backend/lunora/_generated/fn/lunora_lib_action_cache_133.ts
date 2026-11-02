@@ -54,4 +54,11 @@ if (typeof source["args"] !== "string") return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
 return { "args": source["args"], "name": source["name"] };
 });
+installCompiledValidatorMap(lunora_lib_action_cache_133.removeIfAttempt.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["attempt"] !== "string") return DEFER;
+if (typeof source["key"] !== "string") return DEFER;
+return { "attempt": source["attempt"], "key": source["key"] };
+});
 export * from "../../lib/action-cache.js";

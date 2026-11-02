@@ -2,13 +2,14 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_sub_agents_execute_196 from "../../sub-agents/execute.js";
+import * as lunora_usage_backfill_210 from "../../usage/backfill.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_sub_agents_execute_196.runSubAgent.args, (source) => {
+installCompiledValidatorMap(lunora_usage_backfill_210.runUsageBackfillStep.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
-return { "runId": source["runId"] };
+if (typeof source["userId"] !== "string") return DEFER;
+return { "runId": source["runId"], "userId": source["userId"] };
 });
-export * from "../../sub-agents/execute.js";
+export * from "../../usage/backfill.js";
