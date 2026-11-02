@@ -10,8 +10,8 @@
  */
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { setPriority } from "node:os";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { getPriority, setPriority } from "node:os";
 import type { Readable, Writable } from "node:stream";
 
 import type { SpawnPlan } from "./types";
@@ -63,28 +63,104 @@ export const scrub = (text: string, plan: SpawnPlan): string => {
     return result;
 };
 
-/** The niceness an agent starts with: lower than the app's own, so its work yields to the desktop. */
-export const AGENT_NICE = 10;
+/** How much nicer than the app an agent runs: its niceness is the app's plus this, capped at {@link MAX_NICE}. */
+export const AGENT_NICE_DELTA = 10;
+export const MAX_NICE = 19;
 
-/** The out-of-memory score added to an agent (Linux, -1000 to 1000): the kernel picks it before the app, which keeps 0. Raising one's own score needs no privilege. */
-export const AGENT_OOM_SCORE_ADJ = 500;
+/** How much the out-of-memory score (Linux, -1000 to 1000) of an agent is raised above the app's, which is never taken below 0. */
+export const AGENT_OOM_SCORE_DELTA = 500;
+export const MAX_OOM_SCORE_ADJ = 1000;
+
+const NICE_PATH = "/usr/bin/nice";
+const SH_PATH = "/bin/sh";
+const OOM_SCORE_FILE = "/proc/self/oom_score_adj";
+
+/** The niceness an agent gets when the app runs at `host`: lower than the app's, and never below it. */
+export const agentNiceness = (host: number): number => Math.min(host + AGENT_NICE_DELTA, MAX_NICE);
+
+/** The out-of-memory score an agent gets when the app has `host`: higher than the app's, and never below it. */
+export const agentOomScoreAdj = (host: number): number => Math.min(Math.max(host, 0) + AGENT_OOM_SCORE_DELTA, MAX_OOM_SCORE_ADJ);
+
+/** What the app itself runs with, and what the machine offers to start an agent already lowered. */
+export interface HostPriority {
+    readonly hasNice: boolean;
+    readonly hasSh: boolean;
+    readonly nice: number;
+    readonly oomScoreAdj: number;
+    readonly platform: NodeJS.Platform;
+}
+
+export interface AgentLaunch {
+    readonly args: string[];
+    readonly command: string;
+    /** Still to do after the spawn because no wrapper could do it before: the agent is then unlowered for its first instants. */
+    readonly lowerAfterSpawn: { readonly nice: boolean; readonly oomScoreAdj: boolean };
+}
 
 /**
- * Lowers the priority of the agent `pid`, which is the leader of its group: what it starts afterwards inherits both
- * values. Best effort — an agent that runs at the normal priority is better than one that does not start, and
- * `/proc` may be read-only in a container. Set right after the spawn, so the first instants of the agent's start-up
- * run unlowered; nothing it forks that early has done any work.
+ * The command that starts the agent already lowered, so nothing it forks in its first instants keeps full priority.
+ * `nice -n DELTA` sets the niceness, and on Linux a `sh` writes the score into `/proc/self` and `exec`s on (same pid,
+ * so the agent inherits it). The plan's command and arguments travel as separate argv entries, never through a shell
+ * string. Without `nice` or `sh` the matching value is set after the spawn instead.
  */
-export const lowerAgentPriority = (pid: number): void => {
-    try {
-        setPriority(pid, AGENT_NICE);
-    } catch {
-        // The process is already gone, or the platform has no such call.
+export const agentLaunch = (plan: Pick<SpawnPlan, "args" | "command">, host: HostPriority): AgentLaunch => {
+    let { args, command } = plan;
+    const delta = agentNiceness(host.nice) - host.nice;
+    const niceInline = host.hasNice && host.platform !== "win32";
+
+    if (niceInline) {
+        args = ["-n", String(delta), command, ...args];
+        command = NICE_PATH;
     }
 
-    if (process.platform === "linux") {
+    const oomInline = host.platform === "linux" && host.hasSh;
+
+    if (oomInline) {
+        // A refused write (a read-only /proc) must not stop the agent: the score is only a preference.
+        args = ["-c", `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null; exec "$@"`, "sh", command, ...args];
+        command = SH_PATH;
+    }
+
+    return { args, command, lowerAfterSpawn: { nice: !niceInline, oomScoreAdj: host.platform === "linux" && !oomInline } };
+};
+
+const readHostOomScoreAdj = (): number => {
+    try {
+        const value = Number(readFileSync(OOM_SCORE_FILE, "utf8").trim());
+
+        return Number.isNaN(value) ? 0 : value;
+    } catch {
+        return 0;
+    }
+};
+
+const hostPriority = (): HostPriority => {
+    return {
+        hasNice: existsSync(NICE_PATH),
+        hasSh: existsSync(SH_PATH),
+        nice: getPriority(0),
+        oomScoreAdj: process.platform === "linux" ? readHostOomScoreAdj() : 0,
+        platform: process.platform,
+    };
+};
+
+/**
+ * Lowers the priority of the agent `pid`, the leader of its group, for the parts {@link agentLaunch} could not do before
+ * the start. Best effort — an agent at the normal priority is better than none, and `/proc` may be read-only in a
+ * container. What it starts afterwards inherits both values.
+ */
+export const lowerAgentPriority = (pid: number, host: HostPriority, remaining: AgentLaunch["lowerAfterSpawn"]): void => {
+    if (remaining.nice) {
         try {
-            writeFileSync(`/proc/${String(pid)}/oom_score_adj`, String(AGENT_OOM_SCORE_ADJ));
+            setPriority(pid, agentNiceness(host.nice));
+        } catch {
+            // The process is already gone, or the platform has no such call.
+        }
+    }
+
+    if (remaining.oomScoreAdj) {
+        try {
+            writeFileSync(`/proc/${String(pid)}/oom_score_adj`, String(agentOomScoreAdj(host.oomScoreAdj)));
         } catch {
             // No /proc, or the agent ended in between.
         }
@@ -96,7 +172,11 @@ const signalGroup = (pid: number, signal: NodeJS.Signals): void => {
     try {
         process.kill(-pid, signal);
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+        // macOS answers EPERM for a group whose only member is an exited leader not yet reaped: also gone, and the
+        // agent now starts through `nice`, which makes a command that cannot run end that way within milliseconds.
+        const { code } = error as NodeJS.ErrnoException;
+
+        if (code !== "ESRCH" && code !== "EPERM") {
             throw error;
         }
     }
@@ -108,9 +188,11 @@ export const spawnAgent: Spawner = (plan) => {
     }
 
     let child: ChildProcess;
+    const host = hostPriority();
+    const launch = agentLaunch(plan, host);
 
     try {
-        child = spawn(plan.command, plan.args, {
+        child = spawn(launch.command, launch.args, {
             cwd: plan.cwd,
             detached: true,
             // Not inherited: the plan's environment is the whole environment.
@@ -124,8 +206,8 @@ export const spawnAgent: Spawner = (plan) => {
         throw new Error(`could not start ${plan.command}: ${scrub((error as Error).message, plan)}`);
     }
 
-    if (child.pid !== undefined) {
-        lowerAgentPriority(child.pid);
+    if (child.pid !== undefined && (launch.lowerAfterSpawn.nice || launch.lowerAfterSpawn.oomScoreAdj)) {
+        lowerAgentPriority(child.pid, host, launch.lowerAfterSpawn);
     }
 
     let stderr = "";

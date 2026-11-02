@@ -15,7 +15,8 @@
 //!   period), and the group is killed again when the agent exits, so the shells and tools it left die with it. A host
 //!   that loses its desktop (the pipe ends) or is told to stop kills every agent group the same way.
 //! - The agent starts at a lower priority than the host and, on Linux, with an out-of-memory score that makes the kernel
-//!   take it before the host or the session around it ([`lower_priority`]). What it starts inherits both.
+//!   take it before the host or the session around it ([`AgentPriority`]), both relative to the host's own so an agent is
+//!   never above it. What it starts inherits both.
 
 // Everything below `run_agent` is for Unix; a Windows server refuses the request, and what only it uses is unused there.
 #![cfg_attr(not(unix), allow(dead_code, unused_imports))]
@@ -55,43 +56,99 @@ const POLL_SLICE: Duration = Duration::from_millis(100);
 /// must not make the host keep what the desktop keeps sending.
 pub const INPUT_BUDGET: usize = 8 * 1024 * 1024;
 
-/// The niceness an agent starts with. The host and the person's own session keep theirs, so a build or a test run an
-/// agent starts yields to them.
+/// How much nicer than the host an agent runs, and the highest niceness there is.
 #[cfg(unix)]
-pub const AGENT_NICE: libc::c_int = 10;
+const AGENT_NICE_DELTA: libc::c_int = 10;
+#[cfg(unix)]
+const MAX_NICE: libc::c_int = 19;
 
-/// What an agent's `oom_score_adj` is raised to (Linux): the OOM killer takes the agent before the host, which keeps the
-/// score it was started with. Raising one's own score needs no privilege; lowering it does, so it is only ever raised.
+/// How far an agent's `oom_score_adj` (Linux, -1000 to 1000) is raised above the host's, and its ceiling.
 #[cfg(target_os = "linux")]
-const AGENT_OOM_SCORE_ADJ: &[u8] = b"500";
+const AGENT_OOM_SCORE_DELTA: i32 = 500;
+#[cfg(target_os = "linux")]
+const MAX_OOM_SCORE_ADJ: i32 = 1000;
 
-/// Lowers the calling process's priority and raises its out-of-memory score. Runs in the child between `fork` and `exec`
-/// (so the agent never runs a moment unlowered), which allows only async-signal-safe calls: plain syscalls, no
-/// allocation, no locks. Best effort by design: an agent at the normal priority is better than one that cannot start (a
-/// container may refuse `setpriority` or have no writable `/proc`), so a failure is not reported.
+/// The niceness an agent gets when the host runs at `host`: below the host's, never above it.
 #[cfg(unix)]
-pub fn lower_priority() {
-    // SAFETY: `setpriority` takes no pointers.
-    unsafe {
-        libc::setpriority(libc::PRIO_PROCESS, 0, AGENT_NICE);
+pub fn agent_niceness(host: libc::c_int) -> libc::c_int {
+    host.saturating_add(AGENT_NICE_DELTA).min(MAX_NICE)
+}
+
+/// The `oom_score_adj` an agent gets when the host has `host`: the OOM killer takes the agent before the host, and the
+/// host's own score is never lowered for it (a host below 0 counts as 0). Raising one's own score needs no privilege.
+#[cfg(target_os = "linux")]
+pub fn agent_oom_score_adj(host: i32) -> i32 {
+    host.max(0)
+        .saturating_add(AGENT_OOM_SCORE_DELTA)
+        .min(MAX_OOM_SCORE_ADJ)
+}
+
+/// What an agent's priority is, worked out in the host before the fork (allocating is fine there) so the child only
+/// makes plain syscalls.
+#[cfg(unix)]
+pub struct AgentPriority {
+    nice: libc::c_int,
+    #[cfg(target_os = "linux")]
+    oom_score_adj: String,
+}
+
+#[cfg(unix)]
+impl AgentPriority {
+    /// Relative to the host's own niceness and (Linux) `oom_score_adj`, so an agent is never above the host.
+    pub fn relative_to_host() -> Self {
+        // SAFETY: `getpriority` takes no pointers.
+        let nice = unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
+
+        #[cfg(target_os = "linux")]
+        let score = std::fs::read_to_string("/proc/self/oom_score_adj")
+            .ok()
+            .and_then(|text| text.trim().parse::<i32>().ok())
+            .unwrap_or(0);
+        #[cfg(not(target_os = "linux"))]
+        let score = 0;
+
+        Self::from_host(nice, score)
     }
 
-    #[cfg(target_os = "linux")]
-    // SAFETY: the path is NUL-terminated and the buffer is the static score; `open`, `write` and `close` are
-    // async-signal-safe.
-    unsafe {
-        let fd = libc::open(
-            c"/proc/self/oom_score_adj".as_ptr(),
-            libc::O_WRONLY | libc::O_CLOEXEC,
-        );
+    /// The priority for a host at `nice` and `oom_score_adj` (ignored off Linux).
+    pub fn from_host(nice: libc::c_int, oom_score_adj: i32) -> Self {
+        #[cfg(not(target_os = "linux"))]
+        let _ = oom_score_adj;
 
-        if fd >= 0 {
-            libc::write(
-                fd,
-                AGENT_OOM_SCORE_ADJ.as_ptr().cast(),
-                AGENT_OOM_SCORE_ADJ.len(),
+        Self {
+            nice: agent_niceness(nice),
+            #[cfg(target_os = "linux")]
+            oom_score_adj: agent_oom_score_adj(oom_score_adj).to_string(),
+        }
+    }
+
+    /// Lowers the calling process's priority and raises its out-of-memory score. Runs in the child between `fork` and
+    /// `exec` (so the agent never runs a moment unlowered), which allows only async-signal-safe calls: plain syscalls,
+    /// no allocation, no locks. Best effort by design: an agent at the normal priority is better than one that cannot
+    /// start (a container may refuse `setpriority` or have no writable `/proc`), so a failure is not reported.
+    pub fn apply(&self) {
+        // SAFETY: `setpriority` takes no pointers.
+        unsafe {
+            libc::setpriority(libc::PRIO_PROCESS, 0, self.nice);
+        }
+
+        #[cfg(target_os = "linux")]
+        // SAFETY: the path is NUL-terminated and the buffer is the score formatted before the fork; `open`, `write`
+        // and `close` are async-signal-safe.
+        unsafe {
+            let fd = libc::open(
+                c"/proc/self/oom_score_adj".as_ptr(),
+                libc::O_WRONLY | libc::O_CLOEXEC,
             );
-            libc::close(fd);
+
+            if fd >= 0 {
+                libc::write(
+                    fd,
+                    self.oom_score_adj.as_ptr().cast(),
+                    self.oom_score_adj.len(),
+                );
+                libc::close(fd);
+            }
         }
     }
 }
@@ -246,10 +303,12 @@ pub fn run_agent(
         .stderr(Stdio::piped())
         .process_group(0);
 
-    // SAFETY: `lower_priority` makes only async-signal-safe syscalls, which is all that may run between fork and exec.
+    let priority = AgentPriority::relative_to_host();
+
+    // SAFETY: `apply` makes only async-signal-safe syscalls, which is all that may run between fork and exec.
     unsafe {
-        command.pre_exec(|| {
-            lower_priority();
+        command.pre_exec(move || {
+            priority.apply();
 
             Ok(())
         });
@@ -783,14 +842,63 @@ mod tests {
             .map(|line| line.trim().parse().unwrap())
             .collect();
 
-        assert_eq!(seen, vec![host.max(AGENT_NICE); 2]);
+        assert_eq!(seen, vec![agent_niceness(host); 2]);
         assert!(seen[0] > host, "the agent is below the host");
         assert_eq!(own_niceness(), host, "the host keeps its own priority");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn niceness_is_relative_to_the_host_and_capped() {
+        assert_eq!(agent_niceness(0), 10);
+        assert_eq!(agent_niceness(8), 18);
+        assert_eq!(agent_niceness(15), 19, "capped");
+        assert_eq!(
+            agent_niceness(19),
+            19,
+            "a host at the cap keeps the agent at it"
+        );
+        assert_eq!(agent_niceness(libc::c_int::MAX), 19);
+
+        for host in 0..=19 {
+            assert!(agent_niceness(host) >= host, "never above the host");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_oom_score_is_raised_over_the_hosts_never_below_it() {
+        assert_eq!(agent_oom_score_adj(0), 500);
+        assert_eq!(
+            agent_oom_score_adj(-300),
+            500,
+            "a negative host counts as 0"
+        );
+        assert_eq!(agent_oom_score_adj(400), 900);
+        assert_eq!(agent_oom_score_adj(800), 1000, "capped");
+        assert_eq!(agent_oom_score_adj(1000), 1000);
+
+        for host in -1000..=1000 {
+            assert!(agent_oom_score_adj(host) >= host, "never below the host");
+        }
+    }
+
+    /// Whether this environment lets the process write its own score (a container may mount /proc read-only).
+    #[cfg(target_os = "linux")]
+    fn oom_score_writable() -> bool {
+        std::fs::read_to_string("/proc/self/oom_score_adj")
+            .and_then(|own| std::fs::write("/proc/self/oom_score_adj", own.trim()))
+            .is_ok()
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn an_agent_is_the_first_the_kernel_takes_when_memory_runs_out() {
+        if !oom_score_writable() {
+            eprintln!("skipped: /proc/self/oom_score_adj is not writable here");
+            return;
+        }
+
         let host: i32 = std::fs::read_to_string("/proc/self/oom_score_adj")
             .unwrap()
             .trim()
@@ -800,7 +908,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        assert_eq!(agent, host.max(500));
+        assert_eq!(agent, agent_oom_score_adj(host));
         assert_eq!(
             std::fs::read_to_string("/proc/self/oom_score_adj")
                 .unwrap()
