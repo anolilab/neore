@@ -218,7 +218,11 @@ export const pathTokens = async (
     threadId: Id<"threads">,
     from: Row | null,
     options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
-): Promise<number> => (await pathWindow(context, threadId, from, options)).tokens;
+): Promise<number> => {
+    const { tokens } = await pathWindow(context, threadId, from, options);
+
+    return tokens;
+};
 
 /** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */
 export const rowsSince = async (context: Reader, threadId: Id<"threads">, from: Row, stopAtId: string, cap: number): Promise<number> => {

@@ -356,7 +356,11 @@ const modeFor = async (
 
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
-    if (fits && earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+    if (
+        fits &&
+        earlier &&
+        (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES
+    ) {
         return { boundaryId: earlier.part.startMessageId, mode: "delta" };
     }
 
@@ -734,11 +738,11 @@ export const previewAgentSwitchHandler = async (ctx: QueryCtx, args: Omit<Switch
     const contextTokens = await pathTokens(ctx, checked.thread._id, checked.leaf, window);
     const sinceTokens = boundaryId ? await pathTokens(ctx, checked.thread._id, checked.leaf, { ...window, stopAtId: boundaryId }) : contextTokens;
     // A switch back keeps what the model saw and hands over only what came since; a first handoff is the whole of it.
-    const handoffTokens = contextTokens - sinceTokens + Math.min(sinceTokens, limits.budgetTokens);
+    const handedTokens = contextTokens - sinceTokens + Math.min(sinceTokens, limits.budgetTokens);
     const coldStartCostly = await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf);
     const defaultMode = coldStartCostly || !(await historyFits(ctx, checked)) ? "portable" : "full";
 
-    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode, handoffTokens };
+    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode, handoffTokens: handedTokens };
 };
 
 export const previewAgentSwitch = authQuery

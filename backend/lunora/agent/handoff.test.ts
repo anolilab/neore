@@ -26,6 +26,8 @@ const tokensOfThread = (turns: HandoffTurn[]): number => handoffTokens(composeHa
 
 const TIMESTAMP = /\d{4}-\d{2}-\d{2}|\d{2}:\d{2}/;
 const TOO_LONG = /too long to hand over/;
+const LARGER_WINDOW = /larger context window/;
+const FULL_HISTORY = /full history/i;
 
 describe("quoteTranscript", () => {
     it("starts every line with a quote mark, so no agent command and no forged marker begins a line", () => {
@@ -108,8 +110,8 @@ describe("planHandoff", () => {
         const over = () => assertWithinBudget(composeHandoff({ kind: "portable", summary: "x".repeat(HANDOFF_BUDGET_TOKENS * 4), tail: [] }));
 
         for (const refuse of [() => planHandoff([huge]), over]) {
-            expect(refuse).toThrow(/larger context window/);
-            expect(refuse).not.toThrow(/full history/i);
+            expect(refuse).toThrow(LARGER_WINDOW);
+            expect(refuse).not.toThrow(FULL_HISTORY);
         }
     });
 

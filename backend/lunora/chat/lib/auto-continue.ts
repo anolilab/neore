@@ -19,6 +19,7 @@ import { DROPPED_SUMMARY_NOTE, formatTaintLine, SUMMARY_HEADER } from "./compres
 
 /** Approximate characters per token for English text */
 const CHARS_PER_TOKEN = 4;
+
 /** Estimated token cost for image content parts (~1000 tokens) */
 export const IMAGE_TOKEN_ESTIMATE_CHARS = 4000;
 /** Estimated token cost for file content parts (~500 tokens) */

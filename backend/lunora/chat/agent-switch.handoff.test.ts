@@ -664,7 +664,6 @@ describe("whether the target is sent the history whole", () => {
     const addImageRow = async (): Promise<void> => {
         const index = order;
 
-        order += 0;
         await run(
             async (ctx) =>
                 await ctx.db.insert("messages", {
