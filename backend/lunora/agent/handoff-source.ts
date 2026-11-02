@@ -185,16 +185,20 @@ export interface DividerRow {
     row: Row;
 }
 
+/** The outcome of a divider search: the divider, or whether the search read the whole path (`exhausted: false`) or gave up at its bound. */
+export type DividerSearch = { divider: DividerRow; exhausted: false } | { divider?: undefined; exhausted: boolean };
+
 /**
  * The newest divider on the path ending at `from` (inclusive) that satisfies `accept`, a page at a time.
- * Gives up after {@link MAX_SEARCH_PAGES} pages.
+ * Gives up after {@link MAX_SEARCH_PAGES} pages, and says so: no divider after a complete search is not no divider
+ * within the bound.
  */
-const findDivider = async (
+const searchDivider = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row | null,
     accept: (part: AgentSwitchPart) => boolean,
-): Promise<DividerRow | undefined> => {
+): Promise<DividerSearch> => {
     let cursor = from;
 
     for (let page = 0; cursor && page < MAX_SEARCH_PAGES; page += 1) {
@@ -204,14 +208,25 @@ const findDivider = async (
             const part = agentSwitchOf(row);
 
             if (part && accept(part)) {
-                return { part, row };
+                return { divider: { part, row }, exhausted: false };
             }
         }
 
         cursor = next;
     }
 
-    return undefined;
+    return { exhausted: cursor !== null };
+};
+
+const findDivider = async (
+    context: Reader,
+    threadId: Id<"threads">,
+    from: Row | null,
+    accept: (part: AgentSwitchPart) => boolean,
+): Promise<DividerRow | undefined> => {
+    const { divider } = await searchDivider(context, threadId, from, accept);
+
+    return divider;
 };
 
 /** The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread through its `startMessageId`. */
@@ -219,8 +234,8 @@ export const findDividerLeaving = async (context: Reader, threadId: Id<"threads"
     await findDivider(context, threadId, from, (part) => agentKeyOf(part.from) === model);
 
 /** The newest divider on the path ending at `from` that moved on TO `model`: where the agent came into the thread. */
-export const findDividerEntering = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => agentKeyOf(part.to) === model);
+export const findDividerEntering = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerSearch> =>
+    await searchDivider(context, threadId, from, (part) => agentKeyOf(part.to) === model);
 
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>
