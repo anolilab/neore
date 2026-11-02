@@ -26,7 +26,7 @@ export interface InternalApiTypes {
             verifyHostPost: FunctionReference<"query", { deviceId: string; now: number; payload: string; signature: string }, null | { userId: string }>;
         };
         send: {
-            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "rate_limited" | "session_ended" | "session_starting" | "too_large" | "turn_running" | "worker_thread" }>;
+            sendToHost: FunctionReference<"mutation", { plan: "free" | "premium"; requestId: string; text: string; threadId: string; unlockProof?: string; userId: string }, { messageId: string; outcome: "sent"; streamId: string } | { messageId?: string; outcome: "duplicate"; streamId?: string } | { outcome: "busy" | "locked" | "not_found" | "offline" | "outdated" | "rate_limited" | "session_ended" | "session_starting" | "too_large" | "turn_running" | "worker_thread" }>;
         };
         switch: {
             commitHostSwitch: FunctionReference<"mutation", { clientId: string; target: { kind: "model"; model: string } | { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" }; threadId: Id<"threads">; unlockProof?: string; userId: string }, { agent: { kind: "model"; model: string } | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; hostId: string; kind: "host" }; coldStartCostly: boolean; forkedThreadId?: string; messageId: string | null; switched: boolean }>;
@@ -594,7 +594,7 @@ export interface InternalApiTypes {
             deleteUserDevices: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         internal: {
-            createDeviceCall: FunctionReference<"mutation", { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }, { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "rate_limited" }>;
+            createDeviceCall: FunctionReference<"mutation", { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }, { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" | "rate_limited" }>;
             expireDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; reason: string }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: FunctionReference<"query", { callId: Id<"deviceCalls"> }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceToolContext: FunctionReference<"query", { now: number; threadId: Id<"threads">; userId: string }, null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }>; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files"> }>;
@@ -1062,7 +1062,7 @@ export interface InternalApiTypes {
             deleteUserWatchedRepositories: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         guide_host: {
-            beginHostGuide: FunctionReference<"mutation", { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
+            beginHostGuide: FunctionReference<"mutation", { agentKey: string; deviceId: Id<"devices">; folderId: string; headSha: string; instructions: string; number: number; plan: "free" | "premium"; repository: string; text: string; userId: string }, { status: "started"; threadId: string } | { status: "folder_mismatch" | "running" } | { reason: "busy" | "offline" | "outdated" | "rate_limited" | "session_ended" | "too_large"; status: "unavailable" }>;
             finalizeHostGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
             queueHostGuideFinalize: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null>;
             readHostGuideAnswer: FunctionReference<"query", { guideId: Id<"pullRequestGuides">; streamId: Id<"persistentStreams">; userId: string }, null | { answer: string | null; headSha: string; number: number; repository: string }>;

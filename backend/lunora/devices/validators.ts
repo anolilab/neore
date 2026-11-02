@@ -68,6 +68,8 @@ export const vDeviceView = v.object({
     projectIds: v.optional(v.array(v.string())),
     toolNames: v.array(v.string()),
     transport: v.optional(vDeviceTransport),
+    /** The computer reported a protocol older than the backend serves: it gets no calls until the app is updated. */
+    updateRequired: v.boolean(),
     viaDeviceId: v.optional(v.string()),
 });
 

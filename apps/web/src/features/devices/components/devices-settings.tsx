@@ -45,6 +45,8 @@ interface DeviceView {
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
     transport?: "ssh";
+    /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
+    updateRequired?: boolean;
     viaDeviceId?: string;
 }
 
@@ -61,11 +63,14 @@ const useNow = (): number => {
     return now;
 };
 
+/** The id of the update notice of a row, which the disabled Start buttons point at as their reason. */
+const updateNoticeId = (deviceId: string): string => `device-update-${deviceId}`;
+
 /**
  * Starts a coding agent on the computer, for a pair the user approved in the desktop app's own window. Only a pair
  * the computer offered is listed, and the computer checks again before it starts anything.
  */
-const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ device, online }) => {
+export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ device, online }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
@@ -76,12 +81,15 @@ const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ device, onli
         return null;
     }
 
+    const outdated = device.updateRequired === true;
+
     return (
         <ul aria-label={t`Coding agents you can start on ${device.name}`} className="flex basis-full flex-wrap gap-2">
             {offers.map((offer) => (
                 <li key={`${offer.agentKey}:${offer.folderId}`}>
                     <Button
-                        disabled={!online || start.isPending}
+                        aria-describedby={outdated ? updateNoticeId(device._id) : undefined}
+                        disabled={!online || outdated || start.isPending}
                         onClick={() => {
                             start.mutate(
                                 { agentKey: offer.agentKey, clientId: crypto.randomUUID(), deviceId: device._id as Id<"devices">, folderId: offer.folderId },
@@ -168,6 +176,11 @@ const DeviceRow: FC<{
                 <p className="text-muted-foreground text-xs">
                     {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                 </p>
+                {device.updateRequired === true && (
+                    <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
+                        {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                    </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}

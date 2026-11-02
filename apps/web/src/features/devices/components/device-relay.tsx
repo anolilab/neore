@@ -1,7 +1,9 @@
+import { t } from "@lingui/core/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDeviceStatus } from "@/lib/native/bridge";
@@ -19,6 +21,32 @@ import type { DeviceRelayPorts } from "../lib/device-relay";
 import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/device-relay";
 
 const idsOf = (key: string): string[] => (key === "" ? [] : key.split(","));
+
+/** The sentence for a refused clock, worded here from the error's data so it is translated; the backend's English is the fallback when the data is missing. */
+const clockSkewText = (error: Error & { data?: { direction?: unknown; minutes?: unknown } }): string => {
+    const { direction, minutes } = error.data ?? {};
+
+    if (typeof minutes !== "number") {
+        return error.message;
+    }
+
+    if (direction === "ahead") {
+        return t`This computer's clock is about ${minutes} minutes ahead of the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
+    }
+
+    if (direction === "behind") {
+        return t`This computer's clock is about ${minutes} minutes behind the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
+    }
+
+    return error.message;
+};
+
+/** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
+const toastClockSkew = (error: unknown): void => {
+    if ((error as { data?: { code?: unknown } } | null)?.data?.code === "DEVICE_CLOCK_SKEW") {
+        toast.error(clockSkewText(error as Error), { id: "device-clock-skew" });
+    }
+};
 
 /**
  * Mounted only inside the desktop shell, for a signed-in account, after first
@@ -158,9 +186,9 @@ const DeviceRelay: FC = () => {
         };
 
         return onNativeDeviceChanged(() => {
-            // A refused manifest leaves the previous tool set in place.
+            // A refused manifest leaves the previous tool set in place. A wrong clock is the one cause a person can fix, so it is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
-                send(id).catch(() => {});
+                send(id).catch(toastClockSkew);
             }
         });
     }, [deviceId, hostKey, paired]);
@@ -179,9 +207,8 @@ const DeviceRelay: FC = () => {
                     deviceId: reportedFor as Id<"devices">,
                     viaDeviceId: viaDeviceFor(deviceId, reportedFor) as Id<"devices"> | undefined,
                 })
-                .catch(() => {
-                    // Display only: a lost report leaves the chat saying "sent to the device".
-                });
+                .catch(toastClockSkew);
+            // Display only: any other lost report leaves the chat saying "sent to the device".
         });
     }, [deviceId, paired]);
 

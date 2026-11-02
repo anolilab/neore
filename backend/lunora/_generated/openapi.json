@@ -5244,6 +5244,10 @@
                         {
                           "const": "offline",
                           "type": "string"
+                        },
+                        {
+                          "const": "outdated",
+                          "type": "string"
                         }
                       ]
                     },
@@ -28373,6 +28377,9 @@
                         "const": "ssh",
                         "type": "string"
                       },
+                      "updateRequired": {
+                        "type": "boolean"
+                      },
                       "viaDeviceId": {
                         "type": "string"
                       }
@@ -28382,7 +28389,8 @@
                       "createdAt",
                       "name",
                       "platform",
-                      "toolNames"
+                      "toolNames",
+                      "updateRequired"
                     ],
                     "type": "object"
                   },
@@ -48305,6 +48313,10 @@
                             },
                             {
                               "const": "offline",
+                              "type": "string"
+                            },
+                            {
+                              "const": "outdated",
                               "type": "string"
                             },
                             {
