@@ -26,12 +26,14 @@ import { scriptedModel, textStep } from "./group/test-models";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const { groupState, modelState, registry, skillState, toolsState } = vi.hoisted(() => {
+const { groupState, modelState, prefsState, registry, skillState, toolsState } = vi.hoisted(() => {
     return {
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
         /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
         modelState: { builtAgents: 0, model: undefined as unknown },
+        /** Whether the agent-module preference read reports a failure. */
+        prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
@@ -149,7 +151,14 @@ beforeAll(async () => {
     registry.set(
         "auth_functions:getAgentModulePreferencesQuery",
         internalQuery.input({ userId: v.string() }).query(async () => {
-            return { autoDetectComplexity: false, autoMediaEnrichment: false, enableDatasource: false, enableKnowledge: false, enablePlanner: false };
+            return {
+                autoDetectComplexity: false,
+                autoMediaEnrichment: false,
+                enableDatasource: false,
+                enableKnowledge: false,
+                enablePlanner: false,
+                ...(prefsState.readFailed && { readFailed: true }),
+            };
         }),
     );
     registry.set(
@@ -181,6 +190,7 @@ beforeEach(async () => {
     vi.mocked(runGroupTurn).mockClear();
     groupState.calls = 0;
     groupState.config = null;
+    prefsState.readFailed = false;
     modelState.builtAgents = 0;
     modelState.model = scriptedModel([textStep("Hello there.")]);
     skillState.calls = [];
@@ -341,6 +351,21 @@ describe("runStreamingAgent: a failed run", () => {
         expect(state.chunkText).toContain("Error:");
         // The raw provider text is for the log, not for the user.
         expect(state.chunkText).not.toContain("provider exploded");
+        expect(state.threadStatus).toBe("error");
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+
+    it("refuses the run, with a readable error and no model call, when the model settings could not be read", async () => {
+        prefsState.readFailed = true;
+
+        await run();
+
+        const state = await readState();
+
+        // The defaults a failed read answers carry no ZDR, region or provider rule: nothing may go out under them.
+        expect(modelState.builtAgents).toBe(0);
+        expect(state.chunkText).toContain("Your model settings could not be read; try again.");
+        expect(state.streamStatus).toBe("done");
         expect(state.threadStatus).toBe("error");
         expect(scheduleReplyUsage).not.toHaveBeenCalled();
     });

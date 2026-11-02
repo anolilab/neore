@@ -96,6 +96,25 @@ export const remove = internalMutation
     });
 
 /**
+ * Drop an entry only while it is still the one `attempt` wrote: a marker stored as `{ attempt, ... }`. A concurrent
+ * attempt that refreshed the entry owns it now, and this attempt's cleanup must leave it. One mutation, so the
+ * comparison and the delete cannot interleave with that refresh.
+ */
+export const removeIfAttempt = internalMutation
+    .input({ attempt: v.string(), key: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.actionCache.findFirst({ where: { key: args.key } });
+        const owner = (row?.value as { attempt?: unknown } | null | undefined)?.attempt;
+
+        if (row && owner === args.attempt) {
+            await ctx.db.delete("actionCache", row._id);
+        }
+
+        return null;
+    });
+
+/**
  * Invalidate ONE entry, addressed the way a caller thinks of it.
  *
  * `remove` takes the hashed key, which a caller does not have — the cache

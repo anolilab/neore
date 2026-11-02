@@ -43,7 +43,7 @@ import { isLockedWithoutProof, isUnlockProofValid } from "./thread-passcode";
 import { getStreamingMessagesWithMetadata } from "./streams";
 import { insertVector, searchVectors } from "./vector/index";
 import { deleteVectorRow } from "./table-writes";
-import { findVectorTable, validateVectorDimension, type VectorTableId, type VectorTableName, vVectorId } from "./vector/tables";
+import { findVectorRow, validateVectorDimension, type VectorTableId, type VectorTableName, vVectorId } from "./vector/tables";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { ownedChatFileIdsIn } from "../lib/storage-ownership";
@@ -717,15 +717,15 @@ export const cloneMessageBatch = internalMutation
                     let embeddingId: VectorTableId | undefined;
 
                     if (m.embeddingId) {
-                        const vector = (await ctx.db.get(
-                            (await findVectorTable(ctx.db, m.embeddingId)) ?? "embeddings_768",
-                            m.embeddingId as unknown as VectorTableId,
-                        )) as unknown as {
-                            model: string;
-                            table: string;
-                            userId?: string;
-                            vector: number[];
-                        } | null;
+                        const found = await findVectorRow(ctx.db, m.embeddingId);
+                        const vector = found?.row as
+                            | {
+                                  model: string;
+                                  table: string;
+                                  userId?: string;
+                                  vector: number[];
+                              }
+                            | undefined;
 
                         assert(vector, `Vector ${m.embeddingId} not found`);
                         const dimension = vector.vector.length;
@@ -1312,10 +1312,8 @@ export const getMessageSearchFields = internalQuery
         let embeddingModel;
 
         if (message?.embeddingId) {
-            const target = (await ctx.db.get(
-                (await findVectorTable(ctx.db, message.embeddingId)) ?? "embeddings_768",
-                message.embeddingId as unknown as VectorTableId,
-            )) as unknown as { model: string; vector: number[] } | null;
+            const found = await findVectorRow(ctx.db, message.embeddingId);
+            const target = found?.row as { model: string; vector: number[] } | undefined;
 
             embedding = target?.vector;
             embeddingModel = target?.model;

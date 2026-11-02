@@ -1,3 +1,4 @@
+import type { ModelFilterRules } from "@neore/ai/models";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 
 /**
@@ -38,8 +39,9 @@ import {
     processedExchangeFingerprint,
     truncateUserMessage,
 } from "./gate";
+import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
 
 const WHITESPACE_RE = /\s+/;
@@ -133,7 +135,12 @@ const PROCESSED_EXCHANGE_CACHE_NAME = "memory.processedExchange";
 /** Structured event name — one per extraction attempt, so skip rate = skip / total. */
 const GATE_EVENT = "memory.extraction_gate";
 
-type GateOutcome = GateDecision | { reason: "opt_out"; verdict: "skip" };
+type GateOutcome = (GateDecision | { reason: "opt_out"; verdict: "skip" }) & {
+    /** Identifies the marker this attempt wrote, so cleanup never deletes a concurrent attempt's refreshed one. */
+    processedAttempt?: string;
+    /** The cache entry that marks this exchange processed, when the gate wrote one: cleared if the extraction cannot run for a transient reason. */
+    processedKey?: string;
+};
 
 interface GateArgs {
     assistantResponse: string;
@@ -148,9 +155,14 @@ interface GateArgs {
  * Stage 2: one small structured yes/no call. Fails OPEN — a classifier outage
  * must degrade to "extract everything", never to "remember nothing".
  */
-const classifyExtractionWorthiness = async (gateway: ServiceFetch, args: GateArgs, assistantQuestion: string | undefined): Promise<GateDecision> => {
+const classifyExtractionWorthiness = async (
+    gateway: ServiceFetch,
+    args: GateArgs,
+    assistantQuestion: string | undefined,
+    loadRules: () => Promise<ModelFilterRules>,
+): Promise<GateDecision> => {
     try {
-        const model = await getUtilityModel(gateway, { threadId: args.threadId, userId: args.userId });
+        const model = await getUtilityModel(gateway, { rules: await loadRules(), threadId: args.threadId, userId: args.userId });
         const result = await generateText({
             model,
             output: Output.object({ schema: z.object({ remember: z.boolean() }) }),
@@ -211,23 +223,25 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
 
     const decision =
         heuristic.verdict === "uncertain" && MEMORY_GATE_CLASSIFIER_ENABLED
-            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion)
+            ? await classifyExtractionWorthiness(gatewayFetch(ctx), args, heuristic.assistantQuestion, async () => await loadModelFilterRules(ctx, args.userId))
             : heuristic;
 
     // Marked whichever way the classifier answered — asking it again about the
     // same words would get the same answer. A failed write only costs a repeat.
+    const processedAttempt = crypto.randomUUID();
+
     try {
         await ctx.runMutation(internal.lib.action_cache.put, {
             key: processedKey,
             name: PROCESSED_EXCHANGE_CACHE_NAME,
             ttl: PROCESSED_EXCHANGE_TTL_MS,
-            value: decision.reason,
+            value: { attempt: processedAttempt, reason: decision.reason },
         });
     } catch (error) {
         console.warn("[memory/extract] Could not mark exchange as processed:", error);
     }
 
-    return decision;
+    return { ...decision, processedAttempt, processedKey };
 };
 
 // ============================================================================
@@ -259,15 +273,13 @@ export const extractMemories = internalAction
         //    and — only when unsure — a cheap classifier.
         const gate = await runExtractionGate(ctx, args);
 
-        ctx.log.event(GATE_EVENT, {
-            reason: gate.reason,
-            threadId: args.threadId,
-            userId: args.userId,
-            userMessageLength: args.userMessage.length,
-            verdict: gate.verdict,
-        });
+        // One event per attempt, carrying its final outcome.
+        const logGate = (reason: string, verdict: "extract" | "skip") =>
+            ctx.log.event(GATE_EVENT, { reason, threadId: args.threadId, userId: args.userId, userMessageLength: args.userMessage.length, verdict });
 
         if (gate.verdict === "skip") {
+            logGate(gate.reason, "skip");
+
             return;
         }
 
@@ -300,7 +312,33 @@ export const extractMemories = internalAction
             toolResultsSection = `\n\nTOOL RESULTS FROM THIS TURN:\n${toolLines}`;
         }
 
-        const model = await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: args.userId });
+        let model: Awaited<ReturnType<typeof getUtilityModel>>;
+
+        try {
+            model = await getUtilityModel(gatewayFetch(ctx), {
+                rules: await loadModelFilterRules(ctx, args.userId),
+                threadId: args.threadId,
+                userId: args.userId,
+            });
+        } catch (error) {
+            // The user's model filters leave no background model to read the turn with: nothing is extracted.
+            if (error instanceof NoAllowedUtilityModelError) {
+                // An unreadable rules read is transient: the turn must stay extractable on a retry, so it is not left marked processed.
+                if (error instanceof ModelFilterRulesUnavailableError && gate.processedKey !== undefined && gate.processedAttempt !== undefined) {
+                    await ctx
+                        .runMutation(internal.lib.action_cache.removeIfAttempt, { attempt: gate.processedAttempt, key: gate.processedKey })
+                        .catch(() => null);
+                }
+
+                logGate("no-allowed-utility-model", "skip");
+
+                return;
+            }
+
+            throw error;
+        }
+
+        logGate(gate.reason, "extract");
 
         let extractedFacts: z.infer<typeof extractedFactSchema>[] = [];
 

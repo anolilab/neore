@@ -3,6 +3,7 @@
  * Shared by the interactive review job (`execute.ts`) and a headless run
  * (`headless.ts`) so both read the verdict the same way.
  */
+import type { ModelFilterRules } from "@neore/ai/models";
 import { generateText } from "ai";
 
 import { readMessageCost } from "../../agent/message-cost";
@@ -16,12 +17,14 @@ export const reviewRound = async (input: {
     gateway: ServiceFetch;
     goal: string;
     round: number;
+    /** The user's model filter rules, which the reviewer model must satisfy. */
+    rules: ModelFilterRules;
     threadId: string;
     transcript: string;
     userId: string;
 }): Promise<GoalVerdict & { costMicrodollars: number }> => {
     const { getUtilityModel } = await import("../../lib/utility-model");
-    const model = await getUtilityModel(input.gateway, { threadId: input.threadId, userId: input.userId });
+    const model = await getUtilityModel(input.gateway, { rules: input.rules, threadId: input.threadId, userId: input.userId });
     const result = await generateText({
         abortSignal: AbortSignal.timeout(REVIEWER_TIMEOUT_MS),
         model,
