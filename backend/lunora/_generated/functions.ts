@@ -1541,6 +1541,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "triggers_functions:recordFilteredExecution": lunora_triggers_functions_208.recordFilteredExecution as unknown as RegisteredLunoraFunction,
     "triggers_functions:releaseQuietWindow": lunora_triggers_functions_208.releaseQuietWindow as unknown as RegisteredLunoraFunction,
     "triggers_functions:reserveQuietWindow": lunora_triggers_functions_208.reserveQuietWindow as unknown as RegisteredLunoraFunction,
+    "triggers_functions:rotateWebhookSecret": lunora_triggers_functions_208.rotateWebhookSecret as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabled": lunora_triggers_functions_208.setTriggerEnabled as unknown as RegisteredLunoraFunction,
     "triggers_functions:setTriggerEnabledInternal": lunora_triggers_functions_208.setTriggerEnabledInternal as unknown as RegisteredLunoraFunction,
     "triggers_functions:switchOffConsumedMoment": lunora_triggers_functions_208.switchOffConsumedMoment as unknown as RegisteredLunoraFunction,
@@ -7999,6 +8000,19 @@ if (typeof source["triggerId"] !== "string") return DEFER;
 if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
 });
+installCompiledValidatorMap(lunora_triggers_functions_208.rotateWebhookSecret.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["keepOldFor24h"] !== undefined) {
+if (typeof source["keepOldFor24h"] !== "boolean") return DEFER;
+__val1 = source["keepOldFor24h"];
+__has1 = true;
+}
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { ...(__has1 ? { "keepOldFor24h": __val1 } : {}), "triggerId": source["triggerId"] };
+});
 installCompiledValidatorMap(lunora_triggers_functions_208.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -10067,10 +10081,11 @@ export interface Caller {
             getDueScheduleTriggers: (args: { now: number }) => Promise<import("./dataModel.js").Doc_triggers[]>;
             getTriggerExecutions: (args: { limit?: number; triggerId: Id<"triggers"> }) => Promise<({} & { _id: string; completedAt: number | null; error: string | null; startedAt: number; status: string; threadId: string | null; })[]>;
             getTriggerInternal: (args: { triggerId: Id<"triggers"> }) => Promise<import("./dataModel.js").Doc_triggers | null>;
-            getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; eventSource: ({ contains?: string | undefined; cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; selector?: string | undefined; } & { kind: "page"; url: string; }) | ({} & { at: number; kind: "time"; }) | ({ cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; } & { kind: "thread"; threadId: string; }) | null; eventStatus: ({} & { checkedAt: number | null; checkFailures: number; firedAt: number | null; }) | null; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; quietWhenEmpty: boolean; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
+            getTriggers: (args?: {}) => Promise<({} & { _creationTime: number; _id: string; botComputer: boolean; botId: string | null; createdAt: number; cronExpression: string | null; description: string | null; enabled: boolean; eventSource: ({ contains?: string | undefined; cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; selector?: string | undefined; } & { kind: "page"; url: string; }) | ({} & { at: number; kind: "time"; }) | ({ cooldownMinutes?: number | undefined; intervalMinutes?: number | undefined; } & { kind: "thread"; threadId: string; }) | null; eventStatus: ({} & { checkedAt: number | null; checkFailures: number; firedAt: number | null; }) | null; filters: ({} & { op: "contains" | "equals" | "not_equals" | "starts_with" | "exists" | "not_exists"; path: string; value: string | null; })[]; inputTemplate: string | null; lastError: string | null; lastTriggeredAt: number | null; model: string; name: string; nextTriggerAt: number | null; quietWhenEmpty: boolean; searchMode: string | null; systemPrompt: string | null; timezone: string | null; triggerCount: number; type: string; updatedAt: number; webhookPreviousSecretExpiresAt: number | null; webhookSignatureScheme: "native" | "timestamped" | "gitlab-token" | null; })[]>;
             recordFilteredExecution: (args: { firing?: number; reason: string; triggerId: Id<"triggers"> }) => Promise<null>;
             releaseQuietWindow: (args: { expected?: number; triggerId: Id<"triggers"> }) => Promise<null>;
             reserveQuietWindow: (args: { expected?: number; triggerId: Id<"triggers">; windowStart: number }) => Promise<boolean>;
+            rotateWebhookSecret: (args: { keepOldFor24h?: boolean; triggerId: Id<"triggers"> }) => Promise<{ previousSecretExpiresAt: number | null; webhookSecret: string }>;
             setTriggerEnabled: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
             setTriggerEnabledInternal: (args: { enabled: boolean; triggerId: Id<"triggers"> }) => Promise<null>;
             switchOffConsumedMoment: (args: { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }) => Promise<null>;
@@ -11972,6 +11987,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             recordFilteredExecution: (args) => callRegistered(context, "triggers_functions:recordFilteredExecution", args),
             releaseQuietWindow: (args) => callRegistered(context, "triggers_functions:releaseQuietWindow", args),
             reserveQuietWindow: (args) => callRegistered(context, "triggers_functions:reserveQuietWindow", args),
+            rotateWebhookSecret: (args) => callRegistered(context, "triggers_functions:rotateWebhookSecret", args),
             setTriggerEnabled: (args) => callRegistered(context, "triggers_functions:setTriggerEnabled", args),
             setTriggerEnabledInternal: (args) => callRegistered(context, "triggers_functions:setTriggerEnabledInternal", args),
             switchOffConsumedMoment: (args) => callRegistered(context, "triggers_functions:switchOffConsumedMoment", args),
