@@ -1,7 +1,8 @@
 /**
  * The text "Copy diagnostics" puts on the clipboard, for this computer or for one server. It is meant to be
  * pasted into a support request, so it is built from an allow-list of fields (never a whole view object) and
- * every free-text value — an ssh or sandbox message the server wrote — goes through `redact`.
+ * every free-text value — a sandbox message the server wrote — goes through `redact`, and a connection's last error is
+ * reduced to a category (`reasonCategory`) because no pattern can recognise every secret in ssh's own text.
  * It holds no pairing or host secret, no key material, no token, and no path under the home folder.
  */
 import type { HostView, SettingsView } from "./types";
@@ -19,7 +20,10 @@ export interface DiagnosticsContext {
 
 const MAX_TEXT = 500;
 
-const SECRET_ASSIGNMENT = /\b(?<name>\w*(?:secret|token|passphrase|passw(?:or)?d|apikey|api_key|authorization)\w*)\s*[:=]\s*(?:bearer\s+)?\S+/giu;
+const AUTHORIZATION_HEADER = /\b(?<name>(?:proxy-)?authorization)\s*[:=][^\n\r]*/giu;
+const SECRET_NAME = String.raw`\b(?<name>\w*(?:secret|token|passphrase|passw(?:or)?d|apikey|api_key)\w*)\s*[:=]\s*`;
+const SECRET_VALUE = String.raw`(?:"[^"]*"|'[^']*'|(?:bearer\s+)?\S+)`;
+const SECRET_ASSIGNMENT = new RegExp(SECRET_NAME + SECRET_VALUE, "giu");
 const BEARER = /\b(?:bearer|basic)\s+[\w.~+/=-]{8,}/giu;
 const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/gu;
 const KNOWN_TOKEN = /\b(?:sk|pk|ghp|gho|ghs|github_pat|xox[a-z]|AKIA|eyJ)[\w.-]{12,}/gu;
@@ -32,7 +36,10 @@ const TRAILING_SEPARATORS = /[/\\]$/u;
 
 /** Free text made safe to paste: secrets and keys blanked, the home folder shortened to `~`, length capped. */
 export const redact = (value: string, home: string): string => {
-    let result = value.replaceAll(PRIVATE_KEY, "[key removed]").replaceAll(SECRET_ASSIGNMENT, (_match, name: string) => `${name}=[removed]`);
+    let result = value
+        .replaceAll(PRIVATE_KEY, "[key removed]")
+        .replaceAll(AUTHORIZATION_HEADER, (_match, name: string) => `${name}=[removed]`)
+        .replaceAll(SECRET_ASSIGNMENT, (_match, name: string) => `${name}=[removed]`);
 
     result = result.replaceAll(BEARER, "[token removed]");
     result = result.replaceAll(KNOWN_TOKEN, "[token removed]").replaceAll(LONG_BLOB, "[removed]");
@@ -46,6 +53,36 @@ export const redact = (value: string, home: string): string => {
     result = result.replaceAll(USER_FOLDER, "~").replaceAll(WINDOWS_USER_FOLDER, "~").replaceAll(WHITESPACE, " ").trim();
 
     return result.length > MAX_TEXT ? `${result.slice(0, MAX_TEXT)}…` : result;
+};
+
+const REASON_CATEGORIES: ReadonlyArray<readonly [RegExp, string]> = [
+    [/host key|remote host identification/iu, "the host key changed"],
+    [/permission denied|authentication|passphrase|publickey|login/iu, "login refused"],
+    [/timed out|timeout/iu, "timed out"],
+    [/refused|unreachable|resolve|no route|lost|closed|reset/iu, "server not reachable"],
+    [/255/u, "ssh exited with 255"],
+];
+
+/**
+ * Why a connection gave up, as one of a few fixed phrases. The engine's reason is the ssh client's or the server's own
+ * text, which can carry anything (a password typed into a prompt, a banner), and no pattern recognises every secret, so
+ * the free text is never copied: only the category it falls into.
+ */
+export const reasonCategory = (reason: string): string => {
+    const found = REASON_CATEGORIES.find(([pattern]) => pattern.test(reason));
+
+    return found === undefined ? "connection failed" : found[1];
+};
+
+/** A platform string the server reported, cut down to harmless characters. */
+const platformText = (platform: string | null, home: string): string => {
+    if (platform === null) {
+        return "unknown";
+    }
+
+    const clean = redact(platform, home).replaceAll(/[^\w .-]/gu, "").slice(0, 64).trim();
+
+    return clean === "" ? "unknown" : clean;
 };
 
 /** The clock as a person comparing two computers can read it: UTC time and this computer's offset from UTC. */
@@ -87,7 +124,7 @@ const hostLines = (host: HostView, context: DiagnosticsContext): string[] => {
         `Server: ${redact(host.name, home)} (${host.deviceId})`,
         routeLine(host),
         `Connection: ${host.connected ? "connected" : "not connected"}`,
-        `Server platform: ${host.platform ?? "unknown"}`,
+        `Server platform: ${platformText(host.platform, home)}`,
         `Coding agents: ${agentsLine(host.agentsSupported)}`,
         `Shell sandbox: ${host.sandboxDetail === null ? "not known" : redact(host.sandboxDetail, home)}`,
         `Shell policy: sandbox ${host.requireShellSandbox ? "required" : "optional"}, network ${host.allowShellNetwork ? "allowed" : "blocked"}`,
@@ -103,7 +140,7 @@ const hostLines = (host: HostView, context: DiagnosticsContext): string[] => {
         lines.push(`Reconnect: ${reconnect.phase}${attempt}${next}`);
 
         if (reconnect.reason !== null) {
-            lines.push(`Last error: ${redact(reconnect.reason, home)}`);
+            lines.push(`Last error: ${reasonCategory(reconnect.reason)}`);
         }
     }
 
@@ -123,7 +160,7 @@ export const deviceDiagnostics = (view: SettingsView, context: DiagnosticsContex
     const servers = view.hosts.map((host) => {
         const state = host.connected ? "connected" : host.reconnect?.phase ?? "not connected";
 
-        return `- ${redact(host.name, home)}: ${state}${host.reconnect?.reason ? `, last error: ${redact(host.reconnect.reason, home)}` : ""}`;
+        return `- ${redact(host.name, home)}: ${state}${host.reconnect?.reason ? `, last error: ${reasonCategory(host.reconnect.reason)}` : ""}`;
     });
 
     return [

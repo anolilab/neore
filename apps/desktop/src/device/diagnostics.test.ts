@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deviceDiagnostics, redact, serverDiagnostics } from "./diagnostics";
+import { deviceDiagnostics, reasonCategory, redact, serverDiagnostics } from "./diagnostics";
 import type { HostView, SettingsView } from "./types";
 
 const HOME = "/Users/ada";
@@ -97,7 +97,7 @@ describe("serverDiagnostics", () => {
 
         expect(text).toContain("Neore: 1.2.3 (Electron 44.0.0)");
         expect(text).toContain("Route: ada@build.example.com:22");
-        expect(text).toContain("Last error: ssh: Permission denied (publickey) using ~/.ssh/id_ed25519");
+        expect(text).toContain("Last error: login refused");
         expect(text).toContain("Clock: 2026-11-02T10:00:00.000Z");
         expectClean(text);
     });
@@ -124,5 +124,63 @@ describe("redact", () => {
 
     it("caps a long message", () => {
         expect(redact("word ".repeat(400), HOME).length).toBeLessThanOrEqual(501);
+    });
+});
+
+describe("the last error", () => {
+    const withReason = (reason: string): SettingsView => {
+        return {
+            ...view,
+            hosts: [{ ...host, reconnect: { attempt: null, maxAttempts: 5, nextAttemptAt: null, phase: "gaveUp", reason } }],
+        };
+    };
+
+    it("is a category, so a short unlabelled password never reaches the text", () => {
+        const reason = "ssh: Permission denied, please try again. hunter2";
+
+        expect(serverDiagnostics(withReason(reason), "dev_123", context)).not.toContain("hunter2");
+        expect(deviceDiagnostics(withReason(reason), context)).not.toContain("hunter2");
+        expect(serverDiagnostics(withReason(reason), "dev_123", context)).toContain("Last error: login refused");
+    });
+
+    it("names the common causes", () => {
+        expect(reasonCategory("The host key of x changed")).toBe("the host key changed");
+        expect(reasonCategory("Connection timed out")).toBe("timed out");
+        expect(reasonCategory("Connection refused")).toBe("server not reachable");
+        expect(reasonCategory("exit status 255")).toBe("ssh exited with 255");
+        expect(reasonCategory("???")).toBe("connection failed");
+    });
+});
+
+const CRED = ["dXNlcjpw", "YXNz"].join("");
+
+describe("redact values", () => {
+    it("removes a whole Authorization header value", () => {
+        const out = redact(`Authorization: Basic ${CRED}\nnext line`, HOME);
+
+        expect(out).not.toContain(CRED);
+        expect(out).toContain("next line");
+        expect(redact(`Proxy-Authorization: Basic ${CRED}`, HOME)).not.toContain(CRED);
+    });
+
+    it("removes a quoted value up to its closing quote", () => {
+        const out = redact("password=\"open sesame\" host=x", HOME);
+
+        expect(out).not.toContain("sesame");
+        expect(out).not.toContain("open");
+        expect(out).toContain("host=x");
+        expect(redact("token: 'two words' end", HOME)).toBe("token=[removed] end");
+    });
+});
+
+describe("the server platform", () => {
+    it("is cut to harmless characters and redacted", () => {
+        const odd: SettingsView = { ...view, hosts: [{ ...host, platform: `linux\nPassword=hunter2 <script>${"x".repeat(200)}` }] };
+        const text = serverDiagnostics(odd, "dev_123", context) ?? "";
+        const line = text.split("\n").find((l) => l.startsWith("Server platform:")) ?? "";
+
+        expect(line).not.toContain("hunter2");
+        expect(line).not.toContain("<");
+        expect(line.length).toBeLessThanOrEqual("Server platform: ".length + 64);
     });
 });

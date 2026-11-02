@@ -856,8 +856,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         await options.terminal.open(folder);
     });
 
-    // A shell on a paired server: connecting it first is what asks to trust its key, so a server that is not trusted
-    // gets no window. The shell itself is the terminal module's, and rides the connection this opens.
+    // The text goes to the clipboard only from this window, built from an allow-list (see diagnostics.ts).
     local(LOCAL_CHANNEL.copyDiagnostics, (deviceId) => {
         const view = requireTransport().settingsGet();
         const context = { appVersion: app.getVersion(), arch: arch(), electronVersion: process.versions.electron, home: homedir(), now: new Date(), osRelease: release(), platform: platform() };
@@ -870,6 +869,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         clipboard.writeText(text);
     });
 
+    // A shell on a paired server: connecting it first is what asks to trust its key, so a server that is not trusted
+    // gets no window. The shell itself is the terminal module's, and rides the connection this opens.
     local(LOCAL_CHANNEL.openHostTerminal, async (deviceId) => {
         if (options.terminal === undefined) {
             throw new Error("The terminal is not available.");
