@@ -509,6 +509,7 @@ export const runStreamingAgent = internalAction
                         return false;
                     },
                 ];
+
                 // Replaced while it set up (a long MCP connect, retrieval): it never starts the model call.
                 if (replaced) {
                     return;

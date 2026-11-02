@@ -146,7 +146,7 @@ const replyEndOf = async (ctx: { db: Record<string, any> }, stream: Doc<"persist
     const newer = page.filter((other) => other._id !== stream._id && other._creationTime >= stream._creationTime);
 
     if (newer.length === 0) {
-        return Number.POSITIVE_INFINITY;
+        return Infinity;
     }
 
     return page.some((other) => other._id === stream._id) ? Math.min(...newer.map((other) => other._creationTime)) : 0;

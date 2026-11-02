@@ -571,7 +571,9 @@ describe("a run the watchdog reads wrongly", () => {
         await patchStream({ beatAt: 1, expiresAt: Date.now() + 1000, runClaimedAt: 1 });
         await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
 
-        expect((await readStream()).expiresAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000);
+        const beaten = await readStream();
+
+        expect(beaten.expiresAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000);
     });
 
     it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
@@ -596,7 +598,9 @@ describe("a run the watchdog reads wrongly", () => {
 
         expect(await inspect()).toStrictEqual({ kind: "finished" });
         expect(enqueued).toHaveLength(0);
-        expect((await readState()).streamStatus).toBe("done");
+        const state230 = await readState();
+
+        expect(state230.streamStatus).toBe("done");
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 
@@ -617,8 +621,12 @@ describe("a run the watchdog reads wrongly", () => {
         await insertRow({ message: { content: [], role: "assistant" }, order: 1, status: "pending", stepOrder: 5 });
 
         expect(await inspect()).toStrictEqual({ kind: "gone" });
-        expect((await readState()).threadStatus).not.toBe("error");
-        expect((await readState()).streamStatus).toBe("done");
+        const state621 = await readState();
+
+        expect(state621.threadStatus).not.toBe("error");
+        const state230 = await readState();
+
+        expect(state230.streamStatus).toBe("done");
     });
 
     it("records the rows a refused run saved", async () => {
@@ -629,9 +637,9 @@ describe("a run the watchdog reads wrongly", () => {
                 .query("messages")
                 .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
                 .collect();
-            const tool = rows.find((row: any) => row.message?.role === "tool");
+            const toolRow = rows.find((row: any) => row.message?.role === "tool");
 
-            await ctx.db.delete("messages", tool._id);
+            await ctx.db.delete("messages", toolRow._id);
         });
         await patchStream({ beatAt: deadBeat() });
         vi.mocked(scheduleReplyUsage).mockClear();
@@ -655,7 +663,7 @@ describe("a run a newer one replaced", () => {
 
         expect(claim.epoch).toBe(1);
 
-        const stale = async (fn: () => Promise<unknown>) => await expect(fn()).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        const stale = async (function_: () => Promise<unknown>) => await expect(function_()).rejects.toMatchObject({ code: "RUN_REPLACED" });
         const mutate = async (ref: any, args: Record<string, unknown>) =>
             await harness.run(async (ctx: any) => await ctx.runMutation(ref, { streamId: ids.streamId as never, ...args }));
         const before = await readStream();
@@ -671,12 +679,16 @@ describe("a run a newer one replaced", () => {
 
         expect(after.status).toBe(before.status);
         expect(after.toolsInFlight).toBeUndefined();
-        expect((await readState()).chunkText).not.toContain("stale");
+        const state961 = await readState();
+
+        expect(state961.chunkText).not.toContain("stale");
 
         // The current run writes as usual.
         await mutate(addChunk, { final: false, runEpoch: 1, text: "fresh" });
         await mutate(beatRun, { epoch: 1 });
         await mutate(assertRunEpoch, { epoch: 1 });
-        expect((await readState()).chunkText).toContain("fresh");
+        const state658 = await readState();
+
+        expect(state658.chunkText).toContain("fresh");
     });
 });
