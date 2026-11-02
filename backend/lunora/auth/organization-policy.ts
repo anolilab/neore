@@ -8,6 +8,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { claimOnce, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLICY_CREATE_SCOPE } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
@@ -41,7 +42,19 @@ export const setOrganizationPolicy = authMutation
             throw new LunoraError("BAD_REQUEST", parsed.error);
         }
 
-        const existing = await context.db.organizationPolicies.findFirst({ where: { organizationId } });
+        const findRow = async () => await context.db.organizationPolicies.findFirst({ where: { organizationId } });
+        let existing = await findRow();
+
+        // The organizationId index is not unique and global-table operations are not one transaction, so two first
+        // writes through different shards could both insert revision 1. Only the writer that wins the claim creates.
+        if (!existing && !(await claimOnce(context, ORGANIZATION_POLICY_CREATE_SCOPE, organizationId, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS))) {
+            existing = await findRow();
+
+            if (!existing) {
+                throw new LunoraError("CONFLICT", "The organization's policy is being created; try again.");
+            }
+        }
+
         const revision = (existing?.revision ?? 0) + 1;
         const row = {
             document: serializeOrganizationPolicy(parsed.policy),

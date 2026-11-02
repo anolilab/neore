@@ -10,6 +10,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
+import { claimOnce, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLICY_CREATE_SCOPE } from "../lib/claim-once";
 import schema from "../schema";
 
 const OWNER = "user-owner";
@@ -134,6 +135,46 @@ describe("setOrganizationPolicy", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]!.revision).toBe(2);
         expect(JSON.parse(rows[0]!.document)).toEqual({ schemaVersion: 1 });
+    });
+
+    // The harness runs each mutation in its own transaction, so it cannot interleave two writers the way two shards do;
+    // the interleaving itself is covered by the held-claim test below.
+    it("leaves one row when two first writes run at once, the loser updating or being told to retry", async () => {
+        const results = await Promise.allSettled([write(OWNER, POLICY), write(OWNER, { permissionCap: "off", schemaVersion: 1 })]);
+
+        expect(results.some((result) => result.status === "fulfilled")).toBe(true);
+
+        for (const result of results) {
+            if (result.status === "rejected") {
+                expect(result.reason).toMatchObject({ code: "CONFLICT" });
+            }
+        }
+
+        expect(await rowsOf(ORG)).toHaveLength(1);
+    });
+
+    it("answers CONFLICT, and inserts nothing, when another writer holds the create claim and no row exists yet", async () => {
+        await harness.run(async (ctx: any) => {
+            await claimOnce(ctx, ORGANIZATION_POLICY_CREATE_SCOPE, ORG, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS);
+        });
+
+        await expect(write(OWNER, POLICY)).rejects.toMatchObject({ code: "CONFLICT" });
+
+        expect(await rowsOf(ORG)).toHaveLength(0);
+    });
+
+    it("patches an existing row even while the create claim is still held", async () => {
+        await write(OWNER, POLICY);
+
+        await expect(write(OWNER, { schemaVersion: 1 })).resolves.toEqual({ revision: 2 });
+
+        expect(await rowsOf(ORG)).toHaveLength(1);
+    });
+
+    it("takes no create claim for a document that is rejected", async () => {
+        await expect(write(OWNER, { schemaVersion: 2 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        await expect(write(OWNER, POLICY)).resolves.toEqual({ revision: 1 });
     });
 
     it("stores canonical text, whatever the input key order or spacing", async () => {

@@ -27,6 +27,7 @@
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
+ * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
@@ -111,6 +112,12 @@ export const WORKER_DISPATCH_SCOPE = "worker-dispatch";
 
 /** The scope of a Stop on a worker (`sub-agents/functions.ts:stopWorker`): one click, retried or redelivered. */
 export const WORKER_STOP_SCOPE = "worker-stop";
+
+/** An organization's first policy write (`auth/organization-policy.ts`): the creator inserts within the same mutation; a second creator inside this window is refused. */
+export const ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS = 60 * 1000;
+
+/** The scope of those claims. */
+export const ORGANIZATION_POLICY_CREATE_SCOPE = "organization-policy-create";
 
 /** Rows deleted per purge call; a full batch reschedules the purge at once. */
 export const CLAIM_PURGE_BATCH = 500;
