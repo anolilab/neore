@@ -1,12 +1,12 @@
 import { lunoraTest } from "@lunora/testing";
 import { MockLanguageModelV3 } from "ai/test";
 import { tool } from "ai";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { runGroupTurn } from "./group/run";
 import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
@@ -147,7 +147,8 @@ vi.mock("./lib/get-agent", () => {
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runStreamingAgent } = await import("./execute");
 const { addChunk, claimRunResume } = await import("./streaming/persistent/library");
-const { assertRunEpoch, beatRun, inspectRun, markToolRun } = await import("./streaming/persistent/interrupted");
+const { addMessages } = await import("../agent/messages");
+const { beatRun, inspectRun, markToolRun } = await import("./streaming/persistent/interrupted");
 const { watchRun } = await import("./streaming/persistent/interrupted-watch");
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -589,13 +590,25 @@ describe("a run the watchdog reads wrongly", () => {
         expect(stream.replyContext).toMatchObject({ timeZone: "Europe/Berlin" });
     });
 
-    it("moves the stream's expiry with the beat", async () => {
-        await patchStream({ beatAt: 1, expiresAt: Date.now() + 1000, runClaimedAt: 1 });
-        await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
+    it("moves the stream's expiry with the beat, but never past the invocation's ceiling", async () => {
+        const margin = 3 * 60 * 1000 + 2 * 60 * 1000;
+        const beat = async () => await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
 
-        const beaten = await readStream();
+        await patchStream({ beatAt: 1, expiresAt: Date.now() + 1000, runClaimedAt: Date.now() });
+        await beat();
+        expect((await readStream()).expiresAt).toBeGreaterThan(Date.now() + margin - 5000);
 
-        expect(beaten.expiresAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000);
+        // A run that is alive but stuck keeps beating: past the ceiling (its claim + the stream's life + the margin) the
+        // expiry stays where it was, so the sweep still times the stream out.
+        const stuck = Date.now() - 30 * 60 * 1000;
+
+        await patchStream({ expiresAt: Date.now() - 1000, runClaimedAt: stuck });
+        await beat();
+        await beat();
+
+        const afterStuck = await readStream();
+
+        expect(afterStuck.expiresAt).toBeLessThan(Date.now());
     });
 
     it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
@@ -724,7 +737,6 @@ describe("a run judged dead but still alive", () => {
 
         await expect(mutate(markToolRun, { delta: 1, epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
         await expect(mutate(addChunk, { final: false, runEpoch: 0, text: "late" })).rejects.toMatchObject({ code: "RUN_REPLACED" });
-        await expect(mutate(assertRunEpoch, { epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
     });
 
     it("refuses a tool start and a chunk of the current epoch while the stream is paused", async () => {
@@ -751,6 +763,29 @@ describe("a run judged dead but still alive", () => {
 
         await expect(mutate(markToolRun, { delta: 1, epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
         await expect(mutate(addChunk, { final: false, runEpoch: 0, text: "late" })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+    });
+
+    it("writes nothing when the epoch changes between a run's last check and its save: the check is in the saving mutation", async () => {
+        await patchStream({ runEpoch: 1 });
+
+        const save = async (epoch: number) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(addMessages, {
+                        messages: [{ message: { content: [{ text: "Too late.", type: "text" }], role: "assistant" }, status: "success" }],
+                        promptMessageId: ids.messageId,
+                        runHold: { epoch, streamId: ids.streamId },
+                        threadId: ids.threadId,
+                        userId: OWNER,
+                    }),
+            );
+        const before = await readState();
+
+        await expect(save(0)).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        expect((await readState()).rows).toHaveLength(before.rows.length);
+
+        await save(1);
+        expect((await readState()).rows).toHaveLength(before.rows.length + 1);
     });
 
     it("lands no step beside the resume's when its epoch changes before the step is saved", async () => {
@@ -802,5 +837,53 @@ describe("a run judged dead but still alive", () => {
         expect(state.chunkText).not.toContain("provider exploded");
         expect(state.streamStatus).not.toBe("error");
         expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+});
+
+describe("a run whose registration for resuming fails", () => {
+    const KEY = "chat_streaming_persistent_interrupted:registerResumableRun";
+    const failWith = (error: Error) => {
+        registry.set(
+            KEY,
+            internalMutation
+                .input({ epoch: v.number(), reply: v.any(), resumable: v.boolean(), run: v.any(), streamId: v.string() })
+                .output(v.boolean())
+                .mutation(async () => {
+                    throw error;
+                }),
+        );
+    };
+
+    afterEach(async () => {
+        registerModule(registry, "chat_streaming_persistent_interrupted", await import("./streaming/persistent/interrupted"));
+    });
+
+    it("still runs the model and finishes the reply, unprotected and unbeaten", async () => {
+        failWith(new Error("shard blip"));
+
+        await run();
+
+        const state = await readState();
+        const stream = await readStream();
+
+        expect(state.chunkText).toContain("Hello there.");
+        expect(state.chunkText).not.toContain("Error:");
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+        expect(stream.runArgs).toBeUndefined();
+        expect(stream.beatAt).toBeUndefined();
+    });
+
+    it("stops quietly when a newer run holds the stream", async () => {
+        failWith(new LunoraError("RUN_REPLACED", "A newer run holds this stream"));
+
+        await run();
+
+        const state = await readState();
+
+        expect(modelState.builtAgents).toBe(1);
+        expect(state.rows.filter((row) => row.role === "assistant")).toHaveLength(0);
+        expect(state.chunkText).not.toContain("Error:");
+        expect(state.streamStatus).not.toBe("error");
     });
 });

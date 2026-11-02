@@ -14,12 +14,26 @@ import type { Doc, Id } from "../../../_generated/dataModel";
 import { internal } from "../../../_generated/internal";
 import { internalMutation } from "../../../_generated/server";
 import { patchRow } from "../../../lib/patch";
-import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
+import { runAfterWithRetry } from "../../../lib/shard-scheduler";
+import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, RUN_WATCH_RETRY, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
-import { assertCurrentRun, assertRunHeld, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
+import { assertCurrentRun, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { endPausedRun, enqueueRunResume, isEmptyPlaceholder, isLiveStream, isSuperseded, removeEmptyPending, STREAM_TTL_MS } from "./library";
+
+/**
+ * Where a beat moves the stream's expiry: far enough that the watchdog sees a death (a stale beat plus its two looks) before
+ * the sweep expires the stream, and never past the invocation's own ceiling (its claim plus the stream's life plus that same
+ * margin). A beat is time-driven, so a run that is alive but stuck (a stalled model stream, a tool that never answers) beats
+ * on; without the ceiling it would never expire. The expiry never moves back.
+ */
+const beatExpiry = (stream: Doc<"persistentStreams">, now: number): number => {
+    const margin = RUN_STALE_MS + 2 * RUN_WATCH_MS;
+    const ceiling = (stream.runClaimedAt ?? now) + STREAM_TTL_MS + margin;
+
+    return Math.max(stream.expiresAt, Math.min(now + margin, ceiling));
+};
 
 /**
  * The run that holds a stream registers it for resuming: the job's own arguments are stored (a resume re-enters the same
@@ -50,14 +64,20 @@ export const registerResumableRun = internalMutation
 
         await ctx.db.patch("persistentStreams", stream._id, {
             beatAt: ctx.now,
-            expiresAt: Math.max(stream.expiresAt, ctx.now + STREAM_TTL_MS),
+            expiresAt: beatExpiry(stream, ctx.now),
             replyContext: args.reply,
             resumable: args.resumable,
             runArgs: run,
         });
 
         if (stream.runArgs === undefined) {
-            await ctx.scheduler.runAfter(RUN_WATCH_MS, internal.chat.streaming.persistent.interrupted_watch.watchRun, { streamId: stream._id });
+            await runAfterWithRetry(
+                ctx.scheduler,
+                RUN_WATCH_MS,
+                internal.chat.streaming.persistent.interrupted_watch.watchRun,
+                { streamId: stream._id },
+                RUN_WATCH_RETRY,
+            );
         }
 
         return true;
@@ -80,7 +100,7 @@ export const beatRun = internalMutation
 
         if (stream && isLiveStream(stream) && stream.pause === undefined) {
             // The stream's expiry moves with the beat (the same write), so a death late in its window is the watchdog's to see, not the sweep's.
-            await ctx.db.patch("persistentStreams", stream._id, { beatAt: ctx.now, expiresAt: Math.max(stream.expiresAt, ctx.now + STREAM_TTL_MS) });
+            await ctx.db.patch("persistentStreams", stream._id, { beatAt: ctx.now, expiresAt: beatExpiry(stream, ctx.now) });
         }
 
         return null;
@@ -116,19 +136,6 @@ export const markToolRun = internalMutation
         const next = Math.max(0, (stream.toolsInFlight ?? 0) + args.delta);
 
         await patchRow(ctx.db, "persistentStreams", stream, { toolsInFlight: next === 0 ? undefined : next });
-
-        return null;
-    });
-
-/**
- * A step is about to be saved: refused if a newer run holds the stream, so a slow old run lands no rows beside the
- * resume's. Checked right before the save (`beforeStepSave`).
- */
-export const assertRunEpoch = internalMutation
-    .input({ epoch: v.number(), streamId: v.id("persistentStreams") })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await assertRunHeld(ctx, { epoch: args.epoch, streamId: args.streamId });
 
         return null;
     });

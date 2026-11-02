@@ -20,6 +20,13 @@ export const RUN_STALE_MS = 3 * 60 * 1000;
 /** How often the watchdog looks at a run. */
 export const RUN_WATCH_MS = 60 * 1000;
 
+/**
+ * The retry policy of a watchdog look: when its job itself fails (a scheduler or shard outage), the scheduler tries again
+ * every 15 s, for about as long as a stream lives (20 minutes), instead of its default five tries over ~15 minutes. The
+ * chain cannot be restarted by a later registration, so a look that gave up would leave the run unwatched.
+ */
+export const RUN_WATCH_RETRY = { backoff: "linear", baseMs: 15_000, maxAttempts: 90, maxMs: 15_000 } as const;
+
 /** A row of the thread that the run saved since its stream began, as far as this decision reads it. */
 export interface SavedRow {
     /** The row holds an assistant tool call. */

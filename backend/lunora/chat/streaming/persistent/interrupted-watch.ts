@@ -9,7 +9,8 @@ import { internal } from "../../../_generated/internal";
 import { internalAction } from "../../../_generated/server";
 import { streamLogger } from "../../../lib/logger";
 import { failRun } from "../../lib/agent-run";
-import { RUN_WATCH_MS } from "../../lib/interrupted-run";
+import { RUN_WATCH_MS, RUN_WATCH_RETRY } from "../../lib/interrupted-run";
+import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 
 export const watchRun = internalAction
     .input({ streamId: v.id("persistentStreams") })
@@ -44,7 +45,13 @@ export const watchRun = internalAction
             streamLogger.error(`[BgAgent] Looking at stream ${args.streamId} failed; looking again:`, error);
         }
 
-        await ctx.scheduler.runAfter(RUN_WATCH_MS, internal.chat.streaming.persistent.interrupted_watch.watchRun, { streamId: args.streamId });
+        await runAfterWithRetry(
+            ctx.scheduler,
+            RUN_WATCH_MS,
+            internal.chat.streaming.persistent.interrupted_watch.watchRun,
+            { streamId: args.streamId },
+            RUN_WATCH_RETRY,
+        );
 
         return null;
     });

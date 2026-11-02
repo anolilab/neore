@@ -302,6 +302,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
                 // branch, so its first row names the tool result it continues.
                 parentMessageId: useForceNewOrder ? promptMessageId : undefined,
                 pendingMessageId: pendingMessageId as Id<"messages"> | undefined,
+                ...(options.runHold && { runHold: options.runHold as { epoch: number; streamId: Id<"persistentStreams"> } }),
                 // When forceNewOrder is true, don't pass promptMessageId and use overrideOrder
                 // to ensure the continuation message gets a fresh order (N+1)
                 promptMessageId: (useForceNewOrder ? undefined : savePromptMessageId) as Id<"messages"> | undefined,

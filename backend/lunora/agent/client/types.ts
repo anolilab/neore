@@ -617,12 +617,6 @@ export type Options = {
     admittedRun?: boolean;
 
     /**
-     * Called at a streamed step's end, right BEFORE its rows are saved. A throw stops the save: the run that was replaced
-     * by a newer one lands nothing beside it (`chat/lib/run-epoch.ts`).
-     */
-    beforeStepSave?: () => Promise<void>;
-
-    /**
      * By default, messages are ordered with context in `fetchContextWithPrompt`,
      * but you can override this by providing a context handler. Here you can
      * filter, modify, or enrich the context messages. If provided, the default
@@ -634,6 +628,12 @@ export type Options = {
      * The context options to use for passing in message history to the LLM.
      */
     contextOptions?: ContextOptions;
+
+    /**
+     * The run that saves (`chat/lib/run-epoch.ts`). Each step's rows are written by `addMessages`, which refuses the
+     * write inside its own transaction once a newer run holds the stream, so a replaced run lands nothing beside it.
+     */
+    runHold?: { epoch: number; streamId: string };
 
     /**
      * If true, skip all context fetching (search, recent messages, existing responses).

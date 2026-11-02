@@ -49,4 +49,17 @@ export const errorCodeOf = (error: unknown): string | undefined => {
     return typeof found === "string" ? found : undefined;
 };
 
-export const isRunReplaced = (error: unknown): boolean => errorCodeOf(error) === RUN_REPLACED;
+/** Whether `error`, or anything it was wrapped in (a stream error carries the step save's error as its `cause`), is `RUN_REPLACED`. */
+export const isRunReplaced = (error: unknown): boolean => {
+    let current: unknown = error;
+
+    for (let depth = 0; depth < 5 && current !== undefined && current !== null; depth += 1) {
+        if (errorCodeOf(current) === RUN_REPLACED) {
+            return true;
+        }
+
+        current = (current as { cause?: unknown }).cause;
+    }
+
+    return false;
+};

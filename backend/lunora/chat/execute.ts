@@ -480,15 +480,28 @@ export const runStreamingAgent = internalAction
                 // A run with rows to continue from can be resumed when its worker dies: it registers and beats while it lives.
                 // A stateless run keeps no rows, so it is not.
                 if (!threadStatelessMode) {
-                    await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
-                        epoch: runEpoch,
-                        reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                        // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
-                        resumable: await readResumeInterruptedRuns(userId),
-                        run: runArgs,
-                        streamId: streamId as Id<"persistentStreams">,
-                    });
-                    startBeat();
+                    try {
+                        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
+                            epoch: runEpoch,
+                            reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
+                            // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
+                            resumable: await readResumeInterruptedRuns(userId),
+                            run: runArgs,
+                            streamId: streamId as Id<"persistentStreams">,
+                        });
+                        startBeat();
+                    } catch (error) {
+                        // A newer run holds the stream: this one stops.
+                        if (isRunReplaced(error)) {
+                            onReplaced();
+
+                            return;
+                        }
+
+                        // Any other failure (a busy shard, a timeout) costs this run its resume protection, not its reply. It does
+                        // not beat: nothing watches it (a resume's watchdog chain already exists and its beat already runs).
+                        streamLogger.warn(`[BgAgent] Stream ${streamId} could not be registered for resuming; running without it:`, error);
+                    }
                 }
 
                 // Stream text
@@ -518,21 +531,8 @@ export const runStreamingAgent = internalAction
 
                 const result = await threadObject.streamText(streamTextArgs, {
                     admittedRun: true,
-                    // The step's rows land only while this run holds the stream.
-                    beforeStepSave: async () => {
-                        try {
-                            await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
-                                epoch: runEpoch,
-                                streamId: streamId as Id<"persistentStreams">,
-                            });
-                        } catch (error) {
-                            if (isRunReplaced(error)) {
-                                onReplaced();
-                            }
-
-                            throw error;
-                        }
-                    },
+                    // The step's rows land only while this run holds the stream: `addMessages` checks it in its own transaction.
+                    runHold: { epoch: runEpoch, streamId },
                     statelessMode: threadStatelessMode,
                     takeSteer: steering.takeSteer,
                 });

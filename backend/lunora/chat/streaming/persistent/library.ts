@@ -986,6 +986,8 @@ export const claimRunResume = internalMutation
             expiresAt: ctx.now + STREAM_TTL_MS,
             pause: undefined,
             pauseCause: undefined,
+            // This invocation's own claim: the ceiling its beats may extend the expiry to counts from here (`beatExpiry`).
+            runClaimedAt: ctx.now,
             runEpoch: epoch,
             toolsInFlight: undefined,
         });
