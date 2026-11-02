@@ -4,7 +4,11 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { ACP_CLAIM_WINDOW_MS, ACP_TOOLS, DEVICE_CLAIM_WINDOW_MS, DEVICE_ONLINE_WINDOW_MS } from "./constants";
+import { ACP_CLAIM_WINDOW_MS, ACP_TOOLS, DEVICE_CLAIM_WINDOW_MS, DEVICE_ONLINE_WINDOW_MS, MIN_DEVICE_PROTOCOL } from "./constants";
+
+/** Whether the computer reported (in its signed manifest) a protocol older than the backend still serves. Unreported is not outdated. */
+export const isDeviceOutdated = (device: Pick<Doc<"devices">, "hostProtocol">): boolean =>
+    device.hostProtocol !== undefined && device.hostProtocol < MIN_DEVICE_PROTOCOL;
 
 export const isDeviceOnline = (device: Pick<Doc<"devices">, "lastSeenAt">, now: number): boolean =>
     device.lastSeenAt !== undefined && now - device.lastSeenAt <= DEVICE_ONLINE_WINDOW_MS;

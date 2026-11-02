@@ -61,7 +61,7 @@ const send = await import("../acp/send");
 const functions = await import("./functions");
 const { SUB_AGENT_STALE_MS } = await import("./logic");
 const { HOST_START_MAX_ATTEMPTS } = await import("./host-runs");
-const { MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("../devices/lib/constants");
+const { MAX_OPEN_ACP_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } = await import("../devices/lib/constants");
 
 type Row = Record<string, any>;
 
@@ -70,6 +70,7 @@ const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", f
 
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/iu;
+const OUT_OF_DATE = /out of date/iu;
 const NOT_ANSWERED = /host did not answer/iu;
 const NEEDS_A_PERSON = /needs a person/iu;
 const SESSION_ENDED = /session has ended/iu;
@@ -338,6 +339,14 @@ describe("creating a worker on a computer", () => {
         expect(created).toMatchObject({ error: expect.stringMatching(NO_OUTSIDE_AGENT) });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("deviceCalls")).toHaveLength(0);
+    });
+
+    it("tells the person to update a computer that went outdated, not that it cannot start an agent", async () => {
+        const device = await pairedDevice();
+
+        await run(async (context) => await context.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(createHostWorker(device)).rejects.toMatchObject({ message: expect.stringMatching(OUT_OF_DATE) });
+        expect(await table("subAgentRuns")).toHaveLength(0);
     });
 
     it("refuses a computer that is offline when the worker would be created", async () => {

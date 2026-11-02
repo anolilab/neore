@@ -616,7 +616,7 @@ msgstr "{0} / {maxReferences} 個を選択中"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:179
+#: src/features/develop/components/guide-tab.tsx:180
 msgid "{0} on {1}, in {2}"
 msgstr ""
 
@@ -667,7 +667,7 @@ msgstr "{0} 個のツールを検出しました"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:177
 msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
@@ -960,7 +960,7 @@ msgid "{hostLabel} is not connected."
 msgstr ""
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:222
+#: src/features/develop/components/guide-tab.tsx:223
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr ""
 
@@ -1389,11 +1389,11 @@ msgstr "<0>Enter</0> 作成"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> 閉じる"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1037
+#: src/features/settings/components/chat/trigger-settings.tsx:1039
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>スケジュール</0> — cron スケジュールで実行します（例：毎日午前 8 時）。標準的な 5 フィールドの cron 式を使用します。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1046
+#: src/features/settings/components/chat/trigger-settings.tsx:1048
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — 外部サービス（Stripe、GitHub、Zapier）から HTTP POST リクエストを受信します。リクエストはタイムスタンプ付きの HMAC で署名され、リプレイは拒否されます。"
 
@@ -1690,7 +1690,7 @@ msgstr ""
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "選択したメッセージを引用した新しいチャットが開きます。確認してから送信してください。"
 
-#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:43
+#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:49
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
 msgstr ""
 
@@ -1775,7 +1775,7 @@ msgstr "ツールの呼び出しに承認が必要です"
 msgid "A tool cannot be both added and disabled"
 msgstr "同じツールを追加と無効化の両方に指定することはできません"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:334
+#: src/features/settings/components/chat/trigger-settings.tsx:335
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "このトリガーを作成すると、固有の Webhook URL とシークレットが生成されます。この URL を外部サービス（Zapier、n8n、独自のコードなど）の送信先として使用してください。"
 
@@ -1972,7 +1972,7 @@ msgstr "アクティブ"
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:178
 #: src/features/settings/components/chat/model-filter-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:809
+#: src/features/settings/components/chat/trigger-settings.tsx:811
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
 msgid "Active"
@@ -2040,7 +2040,7 @@ msgstr "メモを追加..."
 msgid "Add a note…"
 msgstr "メモを追加…"
 
-#: src/features/devices/components/devices-settings.tsx:329
+#: src/features/devices/components/devices-settings.tsx:342
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2354,7 +2354,7 @@ msgstr ""
 msgid "Added to your review"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:128
+#: src/features/develop/components/guide-tab.tsx:129
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr ""
 
@@ -2368,7 +2368,7 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:311
+#: src/features/devices/components/devices-settings.tsx:324
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2380,7 +2380,7 @@ msgstr "以前の返信を追加しています…"
 msgid "Adding…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:342
+#: src/features/devices/components/devices-settings.tsx:355
 msgid "Address"
 msgstr ""
 
@@ -2619,7 +2619,7 @@ msgstr "ここで接続を有効化すると、Discord アプリ設定の Intera
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "ここで接続を有効化すると、Slack アプリの Event Subscriptions の Request URL に設定する Webhook URL が発行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:258
+#: src/features/devices/components/devices-settings.tsx:271
 msgid "After outside content"
 msgstr "外部コンテンツ参照後"
 
@@ -4027,7 +4027,7 @@ msgstr "入力中のオートコンプリート"
 #~ msgid "Automate agent execution on schedules or webhooks"
 #~ msgstr "スケジュールまたはWebhookでエージェントの実行を自動化します"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:716
+#: src/features/settings/components/chat/trigger-settings.tsx:718
 msgid "Automate agent execution on schedules, webhooks or events"
 msgstr ""
 
@@ -5176,9 +5176,9 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:637
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:708
-#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:51
+#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:374
+#: src/features/settings/components/chat/trigger-settings.tsx:375
 #: src/features/settings/components/chat/usage-settings.tsx:569
 #: src/features/settings/components/chat/usage-settings.tsx:577
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:417
@@ -5659,7 +5659,7 @@ msgid "Checked integrations are offered for setup after you save. Nothing connec
 msgstr "チェックした連携は、保存後にセットアップの候補として表示されます。そこで確認するまで何も接続されません。"
 
 #. placeholder {0}: formatDateTime(trigger.eventStatus.checkedAt, i18n.locale)
-#: src/features/settings/components/chat/trigger-settings.tsx:833
+#: src/features/settings/components/chat/trigger-settings.tsx:835
 msgid "Checked: {0}"
 msgstr ""
 
@@ -6286,7 +6286,7 @@ msgid "Coding agent runs"
 msgstr ""
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:80
+#: src/features/devices/components/devices-settings.tsx:87
 msgid "Coding agents you can start on {0}"
 msgstr ""
 
@@ -6657,7 +6657,7 @@ msgid "completed"
 msgstr "完了"
 
 #: src/features/evals/components/run-status.tsx:13
-#: src/features/settings/components/chat/trigger-settings.tsx:173
+#: src/features/settings/components/chat/trigger-settings.tsx:174
 #: src/features/tasks/components/goal-form-dialog.tsx:48
 #: src/features/tasks/components/goal-list.tsx:27
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:63
@@ -6884,7 +6884,7 @@ msgstr "確認用パスワードは必須です"
 msgid "Confirm your password"
 msgstr "パスワードを再入力してください"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:135
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6928,7 +6928,7 @@ msgstr "音声/ファイルノードを入力として接続してください"
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:373
 msgid "Connect and add"
 msgstr ""
 
@@ -7081,7 +7081,7 @@ msgstr "接続エラーです。インターネット接続を確認して、も
 msgid "Connection failed"
 msgstr "接続に失敗しました"
 
-#: src/features/devices/components/devices-settings.tsx:176
+#: src/features/devices/components/devices-settings.tsx:189
 msgid "Connection lost"
 msgstr ""
 
@@ -7473,7 +7473,7 @@ msgstr "コピーしました！"
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:354
 #: src/features/chat/thread/text-selection-menu.tsx:526
-#: src/features/settings/components/chat/trigger-settings.tsx:764
+#: src/features/settings/components/chat/trigger-settings.tsx:766
 #: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
 msgstr "コピー"
@@ -7567,7 +7567,7 @@ msgstr ""
 msgid "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 msgstr "Phone number ID、永続的な（System User）アクセストークン、App Secret（App settings > Basic）をコピーしてください。Verify token は任意の値を指定できます。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:747
+#: src/features/settings/components/chat/trigger-settings.tsx:749
 #: src/features/skills/components/bundle-import-dialog.tsx:195
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "このシークレットは今すぐコピーして、Webhook の送信元に保存してください。再表示はされません。"
@@ -7589,7 +7589,7 @@ msgstr "クリップボードにコピー"
 msgid "Copy value"
 msgstr "値をコピー"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:852
+#: src/features/settings/components/chat/trigger-settings.tsx:854
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:219
 msgid "Copy webhook URL"
 msgstr "Webhook URL をコピー"
@@ -7665,7 +7665,7 @@ msgstr "Gemini 2.5 の最下位ティアで信頼性の高い Google AI を必�
 msgid "Costa Rica"
 msgstr "コスタリカ"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:334
 msgid "Could not add the server."
 msgstr ""
 
@@ -7726,7 +7726,7 @@ msgstr ""
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:140
+#: src/features/devices/components/devices-settings.tsx:148
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7853,7 +7853,7 @@ msgstr "ページとして開けませんでした"
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:425
+#: src/features/devices/components/devices-settings.tsx:438
 msgid "Could not pair this computer. Try again."
 msgstr "このコンピューターをペアリングできませんでした。もう一度お試しください。"
 
@@ -7880,7 +7880,7 @@ msgstr "{0} を取得できませんでした：{1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:22
+#: src/features/chat/host/host-send-errors.ts:23
 msgid "Could not reach the server. Try again."
 msgstr ""
 
@@ -7896,7 +7896,7 @@ msgstr "そのチャットを読み込めませんでした。ロックされて
 msgid "Could not refine the draft. Try again."
 msgstr "下書きを改善できませんでした。もう一度お試しください。"
 
-#: src/features/devices/components/devices-settings.tsx:206
+#: src/features/devices/components/devices-settings.tsx:219
 msgid "Could not remove the device."
 msgstr "デバイスを削除できませんでした。"
 
@@ -7904,7 +7904,7 @@ msgstr "デバイスを削除できませんでした。"
 msgid "Could not remove the participant"
 msgstr "参加者を削除できませんでした"
 
-#: src/features/devices/components/devices-settings.tsx:161
+#: src/features/devices/components/devices-settings.tsx:169
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
@@ -8266,8 +8266,8 @@ msgstr "チームを作成"
 msgid "Create teams to organize members into groups"
 msgstr "チームを作成して、メンバーをグループに整理します"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:736
-#: src/features/settings/components/chat/trigger-settings.tsx:1021
+#: src/features/settings/components/chat/trigger-settings.tsx:738
+#: src/features/settings/components/chat/trigger-settings.tsx:1023
 msgid "Create Trigger"
 msgstr "トリガーを作成"
 
@@ -8287,7 +8287,7 @@ msgstr "最初のプロンプトを作成して、スレッドのシステムプ
 msgid "Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog."
 msgstr "最初のスキルを作成してワークフローを自動化しましょう。GitHub からインポートしたり、SKILL.md ファイルをアップロードしたり、公式カタログからインストールしたりできます。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1017
+#: src/features/settings/components/chat/trigger-settings.tsx:1019
 msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
 msgstr "最初のトリガーを作成して、スケジュールまたはWebhook経由でエージェントの実行を自動化しましょう。"
 
@@ -8418,7 +8418,7 @@ msgstr "クロアチア語"
 msgid "Croatian (Croatia)"
 msgstr "クロアチア語（クロアチア）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:298
+#: src/features/settings/components/chat/trigger-settings.tsx:299
 msgid "Cron Expression"
 msgstr "Cron 式"
 
@@ -8426,7 +8426,7 @@ msgstr "Cron 式"
 msgid "Cron expression (UTC)"
 msgstr "Cron 式（UTC）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:305
+#: src/features/settings/components/chat/trigger-settings.tsx:306
 msgid "Cron presets"
 msgstr "cron のプリセット"
 
@@ -8667,7 +8667,7 @@ msgstr "1 日あたりのコスト（マイクロドル）"
 msgid "Daily Cost Trend"
 msgstr "日別コストの推移"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:218
+#: src/features/settings/components/chat/trigger-settings.tsx:219
 msgid "Daily inbox summary"
 msgstr "毎日の受信トレイの要約"
 
@@ -9057,7 +9057,7 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/settings/components/chat/bots-settings.tsx:181
 #: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
-#: src/features/settings/components/chat/trigger-settings.tsx:1071
+#: src/features/settings/components/chat/trigger-settings.tsx:1073
 #: src/features/skills/components/skill-list.tsx:308
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
@@ -9069,7 +9069,7 @@ msgstr "削除"
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
-#: src/features/settings/components/chat/trigger-settings.tsx:1077
+#: src/features/settings/components/chat/trigger-settings.tsx:1079
 #: src/features/skills/components/skill-list.tsx:314
 msgid "Delete \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
@@ -9297,11 +9297,11 @@ msgstr "スレッドを削除"
 msgid "Delete Threads"
 msgstr "スレッドを削除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:926
+#: src/features/settings/components/chat/trigger-settings.tsx:928
 msgid "Delete trigger"
 msgstr "トリガーを削除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1077
+#: src/features/settings/components/chat/trigger-settings.tsx:1079
 msgid "Delete trigger?"
 msgstr "トリガーを削除しますか？"
 
@@ -9362,7 +9362,7 @@ msgstr "Z.AI で最も強力かつ高性能なフロンティア GLM モデル�
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最大限の AI 性能と洗練された推論が最も重要となる高負荷なタスク"
 
-#: src/features/devices/components/devices-settings.tsx:243
+#: src/features/devices/components/devices-settings.tsx:256
 msgid "Denied"
 msgstr "拒否"
 
@@ -9529,7 +9529,7 @@ msgid "Description"
 msgstr "説明"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
-#: src/features/settings/components/chat/trigger-settings.tsx:276
+#: src/features/settings/components/chat/trigger-settings.tsx:277
 #: src/features/skills/components/bundle-export-dialog.tsx:160
 msgid "Description (optional)"
 msgstr "説明（任意）"
@@ -9652,19 +9652,19 @@ msgstr "オープンソースモデルで強力なコーディング能力と汎
 msgid "Development"
 msgstr "開発"
 
-#: src/features/devices/components/devices-settings.tsx:500
+#: src/features/devices/components/devices-settings.tsx:513
 msgid "Device activity"
 msgstr "デバイスのアクティビティ"
 
-#: src/features/devices/components/devices-settings.tsx:150
+#: src/features/devices/components/devices-settings.tsx:158
 msgid "Device name"
 msgstr "デバイス名"
 
-#: src/features/devices/components/devices-settings.tsx:209
+#: src/features/devices/components/devices-settings.tsx:222
 msgid "Device removed"
 msgstr "デバイスを削除しました"
 
-#: src/features/devices/components/devices-settings.tsx:435
+#: src/features/devices/components/devices-settings.tsx:448
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "デバイス"
@@ -9734,7 +9734,7 @@ msgstr "ディープワークモードを無効にする"
 msgid "Disable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を無効化"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:905
+#: src/features/settings/components/chat/trigger-settings.tsx:907
 msgid "Disable trigger"
 msgstr "トリガーを無効にする"
 
@@ -9743,7 +9743,7 @@ msgid "Disable Two-Factor"
 msgstr "二要素認証を無効化"
 
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
-#: src/features/settings/components/chat/trigger-settings.tsx:811
+#: src/features/settings/components/chat/trigger-settings.tsx:813
 msgid "Disabled"
 msgstr "無効"
 
@@ -9771,7 +9771,7 @@ msgstr ""
 msgid "Discard the review"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:130
+#: src/features/devices/components/devices-settings.tsx:138
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -9808,7 +9808,7 @@ msgstr "Discord 公開鍵"
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:189
+#: src/features/devices/components/devices-settings.tsx:202
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
@@ -9833,7 +9833,7 @@ msgstr "セットアップの提案を閉じる"
 msgid "Dismiss this side question"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:750
+#: src/features/settings/components/chat/trigger-settings.tsx:752
 msgid "Dismiss webhook secret"
 msgstr "Webhook シークレットを閉じる"
 
@@ -9955,7 +9955,7 @@ msgstr "アカウントをお持ちでないですか？"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:242
+#: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -10362,7 +10362,7 @@ msgstr "各コードは 1 回しか使えません。パスワードと同様に
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Discord の各チャンネルごとに、Neore Chat に別々のスレッドが作成されます。AI はチャンネル内で自動的に応答します。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1053
+#: src/features/settings/components/chat/trigger-settings.tsx:1055
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
 msgstr "各トリガーは新しいスレッドを作成し、最大 25 回の反復（ディープワークモード）でエージェントを実行します。結果はスレッド一覧で確認できます。"
 
@@ -10559,11 +10559,11 @@ msgstr "タスクを編集"
 msgid "Edit the reply..."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:899
+#: src/features/settings/components/chat/trigger-settings.tsx:901
 msgid "Edit trigger"
 msgstr "トリガーを編集"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:791
+#: src/features/settings/components/chat/trigger-settings.tsx:793
 msgid "Edit Trigger"
 msgstr "トリガーを編集"
 
@@ -10893,7 +10893,7 @@ msgstr "専用モジュールを有効にして AI の機能を強化"
 msgid "Enable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を有効化"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:905
+#: src/features/settings/components/chat/trigger-settings.tsx:907
 msgid "Enable trigger"
 msgstr "トリガーを有効にする"
 
@@ -11450,7 +11450,7 @@ msgstr "評価する"
 msgid "Evaluate JS"
 msgstr "JS を評価"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:424
+#: src/features/settings/components/chat/trigger-settings.tsx:425
 #: src/features/settings/components/chat/trigger-type-picker.tsx:15
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:297
 msgid "Event"
@@ -11460,7 +11460,7 @@ msgstr "イベント"
 #~ msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
 #~ msgstr "イベントトリガーはサポートされていません。このトリガーを自動的に開始するものはなく、編集もできません。削除して、代わりにスケジュールまたはWebhookトリガーを作成してください。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:167
+#: src/features/settings/components/chat/trigger-settings.tsx:168
 msgid "Every 6 hours"
 msgstr "6 時間ごと"
 
@@ -11468,7 +11468,7 @@ msgstr "6 時間ごと"
 msgid "Every day at 09:00 UTC"
 msgstr "毎日 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:165
+#: src/features/settings/components/chat/trigger-settings.tsx:166
 msgid "Every day at 8 AM"
 msgstr "毎日午前 8 時"
 
@@ -11508,7 +11508,7 @@ msgstr "すべてのプロバイダーを。<0>1 つの SDK で。</0>"
 msgid "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current Unix time in seconds) and <1>X-Signature-256: sha256=<hex></1>, the HMAC-SHA256 of <2><timestamp>.<raw body></2> keyed with the secret. Requests more than 5 minutes old, unsigned, or replayed are rejected, as is <3>X-Hub-Signature-256</3>."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:168
+#: src/features/settings/components/chat/trigger-settings.tsx:169
 msgid "Every Sunday at midnight"
 msgstr "毎週日曜日の午前 0 時"
 
@@ -11651,7 +11651,7 @@ msgstr "実行に失敗しました"
 msgid "Execution history"
 msgstr "実行履歴"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:948
+#: src/features/settings/components/chat/trigger-settings.tsx:950
 msgid "Execution History"
 msgstr "実行履歴"
 
@@ -11786,7 +11786,7 @@ msgid "expired"
 msgstr "期限切れ"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
-#: src/features/devices/components/devices-settings.tsx:244
+#: src/features/devices/components/devices-settings.tsx:257
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "期限切れ"
@@ -12043,10 +12043,10 @@ msgstr "不合格"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:258
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
-#: src/features/settings/components/chat/trigger-settings.tsx:174
+#: src/features/settings/components/chat/trigger-settings.tsx:175
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:17
@@ -12175,7 +12175,7 @@ msgstr "プリセットを作成できませんでした"
 msgid "Failed to create tag"
 msgstr "タグを作成できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:523
+#: src/features/settings/components/chat/trigger-settings.tsx:524
 msgid "Failed to create trigger"
 msgstr "トリガーを作成できませんでした"
 
@@ -12253,7 +12253,7 @@ msgstr "データセットを削除できませんでした"
 msgid "Failed to delete threads"
 msgstr "スレッドを削除できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:598
+#: src/features/settings/components/chat/trigger-settings.tsx:599
 msgid "Failed to delete trigger"
 msgstr "トリガーを削除できませんでした"
 
@@ -12515,7 +12515,7 @@ msgstr "セッションを取り消せませんでした"
 msgid "Failed to revoke the allow"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:620
+#: src/features/settings/components/chat/trigger-settings.tsx:621
 msgid "Failed to rotate the secret"
 msgstr ""
 
@@ -12613,7 +12613,7 @@ msgstr "なりすましを開始できませんでした"
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:653
+#: src/features/settings/components/chat/trigger-settings.tsx:655
 msgid "Failed to start test run"
 msgstr "テスト実行を開始できませんでした"
 
@@ -12764,8 +12764,8 @@ msgstr "スレッドの公開範囲を更新できませんでした"
 msgid "Failed to update tool permission"
 msgstr "ツールの権限を更新できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:564
-#: src/features/settings/components/chat/trigger-settings.tsx:579
+#: src/features/settings/components/chat/trigger-settings.tsx:565
+#: src/features/settings/components/chat/trigger-settings.tsx:580
 msgid "Failed to update trigger"
 msgstr "トリガーを更新できませんでした"
 
@@ -13468,7 +13468,7 @@ msgstr "Firefox でも動作し、同じ確認が表示される場合があり�
 msgid "Fires when a message lands in it from a sub-agent, a model or another person. Your own messages do not count."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:169
+#: src/features/settings/components/chat/trigger-settings.tsx:170
 msgid "First of each month at 9 AM"
 msgstr "毎月 1 日の午前 9 時"
 
@@ -13621,7 +13621,7 @@ msgstr "例：「Python のベストプラクティスを重視する」「プ�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:159
+#: src/features/develop/components/guide-tab.tsx:160
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr ""
 
@@ -15431,7 +15431,7 @@ msgstr ""
 msgid "How to merge"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1031
+#: src/features/settings/components/chat/trigger-settings.tsx:1033
 msgid "How Triggers Work"
 msgstr "トリガーの仕組み"
 
@@ -16157,7 +16157,7 @@ msgstr "画像を入力または生成"
 msgid "Input or transform text"
 msgstr "テキストを入力または変換"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:361
+#: src/features/settings/components/chat/trigger-settings.tsx:362
 msgid "Input Template"
 msgstr "入力テンプレート"
 
@@ -16686,7 +16686,7 @@ msgstr "カザフ語（カザフスタン）"
 msgid "Kazakhstan"
 msgstr "カザフスタン"
 
-#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:48
+#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:54
 msgid "Keep accepting the old secret for 24 hours"
 msgstr ""
 
@@ -16726,7 +16726,7 @@ msgstr ""
 msgid "Kenya"
 msgstr "ケニア"
 
-#: src/features/devices/components/devices-settings.tsx:354
+#: src/features/devices/components/devices-settings.tsx:367
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -17051,7 +17051,7 @@ msgstr "最終更新 <0>{0}</0>"
 msgid "Last used {date}"
 msgstr "最終使用 {date}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:840
+#: src/features/settings/components/chat/trigger-settings.tsx:842
 msgid "Last: {lastRunAt}"
 msgstr "前回: {lastRunAt}"
 
@@ -17318,15 +17318,15 @@ msgstr ""
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
-#: src/features/devices/components/devices-settings.tsx:434
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
 
-#: src/features/devices/components/devices-settings.tsx:492
+#: src/features/devices/components/devices-settings.tsx:505
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:247
+#: src/features/settings/components/chat/trigger-settings.tsx:248
 msgid "Let the bot use its computer"
 msgstr ""
 
@@ -17796,7 +17796,7 @@ msgstr "スレッドを読み込んでいます..."
 msgid "Loading threads…"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:705
+#: src/features/settings/components/chat/trigger-settings.tsx:707
 msgid "Loading triggers..."
 msgstr "トリガーを読み込んでいます..."
 
@@ -17829,7 +17829,7 @@ msgstr ""
 #: src/features/settings/components/chat/default-models-settings.tsx:185
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:289
-#: src/features/settings/components/chat/trigger-settings.tsx:956
+#: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
 #: src/routes/_shortcut.tsx:40
@@ -19553,11 +19553,11 @@ msgstr "ミュート"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Linux computer"
 msgstr "マイ Linux コンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Mac"
 msgstr "マイ Mac"
 
@@ -19569,7 +19569,7 @@ msgstr "マイ MCP サーバー"
 msgid "My skills"
 msgstr "マイスキル"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Windows PC"
 msgstr "マイ Windows PC"
 
@@ -19595,7 +19595,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:338
+#: src/features/devices/components/devices-settings.tsx:351
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -19606,7 +19606,7 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
-#: src/features/settings/components/chat/trigger-settings.tsx:213
+#: src/features/settings/components/chat/trigger-settings.tsx:214
 #: src/features/settings/components/chat/usage-settings.tsx:429
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
@@ -19873,7 +19873,15 @@ msgstr "Neore には 30 以上のモデルが含まれています。チャッ�
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:172
+#: src/features/devices/components/devices-settings.tsx:181
+msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
+msgstr ""
+
+#: src/features/chat/host/host-send-errors.ts:17
+msgid "Neore on your computer is out of date. Update it, then try again."
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:173
 msgid "Neore, from the diff"
 msgstr ""
 
@@ -20096,7 +20104,7 @@ msgstr "新しいスレッド"
 msgid "New Thread"
 msgstr "新しいスレッド"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:720
+#: src/features/settings/components/chat/trigger-settings.tsx:722
 msgid "New Trigger"
 msgstr "新しいトリガー"
 
@@ -20280,7 +20288,7 @@ msgstr "添付ファイルなし"
 msgid "No audit logs found"
 msgstr "監査ログが見つかりません"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:235
+#: src/features/settings/components/chat/trigger-settings.tsx:236
 msgid "No bot"
 msgstr ""
 
@@ -20399,7 +20407,7 @@ msgstr "説明なし"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:486
+#: src/features/devices/components/devices-settings.tsx:499
 msgid "No devices paired."
 msgstr "ペアリングされたデバイスはありません。"
 
@@ -20411,7 +20419,7 @@ msgstr "このバージョンの差分データはありません"
 msgid "No enabled MCP servers."
 msgstr "有効な MCP サーバーはありません。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1001
+#: src/features/settings/components/chat/trigger-settings.tsx:1003
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:236
 msgid "No executions yet"
 msgstr "まだ実行されていません"
@@ -20446,7 +20454,7 @@ msgstr "焦点距離が選択されていません"
 msgid "No goal"
 msgstr "目標なし"
 
-#: src/features/develop/components/guide-tab.tsx:208
+#: src/features/develop/components/guide-tab.tsx:209
 msgid "No guide"
 msgstr ""
 
@@ -20817,7 +20825,7 @@ msgstr "スレッドはまだありません"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "ティアデータはまだありません。ティア情報はゲートウェイのアップグレード後の新しいリクエストから記録されます。"
 
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:177
 msgid "No tools shared yet"
 msgstr "共有されているツールはまだありません"
 
@@ -20825,7 +20833,7 @@ msgstr "共有されているツールはまだありません"
 msgid "No tools."
 msgstr "ツールはありません。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1015
+#: src/features/settings/components/chat/trigger-settings.tsx:1017
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
@@ -21064,7 +21072,7 @@ msgstr "注: モジュールはメッセージ単位ではなく会話単位で�
 msgid "Nothing found"
 msgstr "見つかりません"
 
-#: src/features/devices/components/devices-settings.tsx:237
+#: src/features/devices/components/devices-settings.tsx:250
 msgid "Nothing has run on a device yet."
 msgstr "デバイスではまだ何も実行されていません。"
 
@@ -21209,7 +21217,7 @@ msgstr "公式"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:175
+#: src/features/devices/components/devices-settings.tsx:188
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "オフライン"
@@ -21412,7 +21420,7 @@ msgstr "ワンタイムパスワードは必須です"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:175
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Online"
 msgstr "オンライン"
 
@@ -21437,7 +21445,7 @@ msgstr "請求設定を管理できるのは組織のオーナーのみです"
 msgid "Only participants you @mention answer."
 msgstr "@メンションした参加者のみが回答します。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:262
+#: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
 msgstr ""
 
@@ -21631,7 +21639,7 @@ msgstr ""
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:439
+#: src/features/devices/components/devices-settings.tsx:452
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
 
@@ -21721,7 +21729,7 @@ msgstr "タスクを開く"
 msgid "Open terminal"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:200
+#: src/features/develop/components/guide-tab.tsx:201
 msgid "Open the agent's conversation"
 msgstr ""
 
@@ -22523,11 +22531,11 @@ msgstr ""
 msgid "Paired"
 msgstr "ペアリング済み"
 
-#: src/features/devices/components/devices-settings.tsx:472
+#: src/features/devices/components/devices-settings.tsx:485
 msgid "Paired devices"
 msgstr "ペアリング済みのデバイス"
 
-#: src/features/devices/components/devices-settings.tsx:415
+#: src/features/devices/components/devices-settings.tsx:428
 msgid "Pairing was cancelled on this computer."
 msgstr "このコンピューターでペアリングがキャンセルされました。"
 
@@ -22830,7 +22838,7 @@ msgid "Pen"
 msgstr "ペン"
 
 #: src/features/develop/components/checks-tab.tsx:79
-#: src/features/settings/components/chat/trigger-settings.tsx:176
+#: src/features/settings/components/chat/trigger-settings.tsx:177
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
 msgid "Pending"
@@ -23254,7 +23262,7 @@ msgstr "洗練されたハリウッド調"
 msgid "Popular"
 msgstr "人気"
 
-#: src/features/devices/components/devices-settings.tsx:350
+#: src/features/devices/components/devices-settings.tsx:363
 msgid "Port"
 msgstr ""
 
@@ -24797,7 +24805,7 @@ msgstr "再接続"
 msgid "Reconnect {0}"
 msgstr "{0} を再接続"
 
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Reconnecting"
 msgstr ""
 
@@ -25150,8 +25158,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/thread/composer-input.tsx:338
 #: src/features/chat/thread/composer-input.tsx:392
 #: src/features/chat/thread/composer-input.tsx:401
-#: src/features/devices/components/devices-settings.tsx:193
-#: src/features/devices/components/devices-settings.tsx:199
+#: src/features/devices/components/devices-settings.tsx:206
+#: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -25168,7 +25176,7 @@ msgid "Remove \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:216
+#: src/features/devices/components/devices-settings.tsx:229
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
@@ -25827,7 +25835,7 @@ msgstr ""
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:311
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:132
+#: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -26064,15 +26072,15 @@ msgstr "左に回転"
 msgid "Rotate Right"
 msgstr "右に回転"
 
-#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:53
+#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:59
 msgid "Rotate secret"
 msgstr ""
 
-#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:41
+#: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:47
 msgid "Rotate the secret of \"{name}\"?"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:915
+#: src/features/settings/components/chat/trigger-settings.tsx:917
 msgid "Rotate webhook secret"
 msgstr ""
 
@@ -26139,7 +26147,7 @@ msgstr "各ケースに対して、スキル、またはシステムプロンプ
 msgid "Run again"
 msgstr "もう一度実行"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:226
+#: src/features/settings/components/chat/trigger-settings.tsx:227
 msgid "Run as bot (optional)"
 msgstr ""
 
@@ -26211,7 +26219,7 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 #: src/features/home/components/home-page.tsx:176
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
-#: src/features/settings/components/chat/trigger-settings.tsx:177
+#: src/features/settings/components/chat/trigger-settings.tsx:178
 #: src/features/tasks/components/task-detail-dialog.tsx:136
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
@@ -26272,7 +26280,7 @@ msgstr ""
 msgid "Runs you start from a chat appear here."
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:836
+#: src/features/settings/components/chat/trigger-settings.tsx:838
 msgid "Runs: {runCount}"
 msgstr "実行回数: {runCount}"
 
@@ -26529,7 +26537,7 @@ msgstr "スキャンしています..."
 msgid "Scene Description"
 msgstr "シーンの説明"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:432
+#: src/features/settings/components/chat/trigger-settings.tsx:433
 #: src/features/settings/components/chat/trigger-type-picker.tsx:16
 msgid "Schedule"
 msgstr "スケジュール"
@@ -26555,7 +26563,7 @@ msgstr "定期クリーンアップ"
 msgid "Scheduled job"
 msgstr "スケジュールされたジョブ"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:249
+#: src/features/settings/components/chat/trigger-settings.tsx:250
 msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
 msgstr ""
 
@@ -26900,7 +26908,7 @@ msgstr ""
 msgid "Secret access key"
 msgstr "シークレットアクセスキー"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:622
+#: src/features/settings/components/chat/trigger-settings.tsx:623
 msgid "Secret rotated"
 msgstr ""
 
@@ -27281,7 +27289,7 @@ msgstr "メッセージを送信して返信を待っています"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:246
+#: src/features/devices/components/devices-settings.tsx:259
 msgid "Sent"
 msgstr "送信済み"
 
@@ -27333,7 +27341,7 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
-#: src/features/devices/components/devices-settings.tsx:318
+#: src/features/devices/components/devices-settings.tsx:331
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -27349,7 +27357,7 @@ msgstr "サーバーエラーです。しばらくしてからもう一度お試
 msgid "Server name is required"
 msgstr "サーバー名は必須です"
 
-#: src/features/devices/components/devices-settings.tsx:174
+#: src/features/devices/components/devices-settings.tsx:187
 msgid "Server over SSH"
 msgstr ""
 
@@ -27373,7 +27381,7 @@ msgstr "ブランチ機能付きのサーバーレス Postgres データベー�
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:493
+#: src/features/devices/components/devices-settings.tsx:506
 msgid "Servers over SSH"
 msgstr ""
 
@@ -27427,7 +27435,7 @@ msgstr "アプリケーションのテキストの方向を設定します。RTL
 msgid "Set up a local model server"
 msgstr "ローカルモデルサーバーをセットアップ"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:208
+#: src/features/settings/components/chat/trigger-settings.tsx:209
 msgid "Set up a new automated agent execution"
 msgstr "新しい自動エージェント実行を設定します"
 
@@ -27524,7 +27532,7 @@ msgstr "共有"
 msgid "Shared conversation"
 msgstr "共有された会話"
 
-#: src/features/devices/components/devices-settings.tsx:467
+#: src/features/devices/components/devices-settings.tsx:480
 msgid "Shared folders and local servers…"
 msgstr "共有フォルダーとローカルサーバー…"
 
@@ -28079,7 +28087,7 @@ msgstr "ツアーをスキップ"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/settings/components/chat/trigger-settings.tsx:175
+#: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "スキップ済み"
 
@@ -28088,7 +28096,7 @@ msgstr "スキップ済み"
 msgid "Skipped files that are not chat exports: {0}"
 msgstr "チャットのエクスポートではないファイルをスキップしました：{0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:264
+#: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification."
 msgstr ""
 
@@ -28692,7 +28700,7 @@ msgstr "開始"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:109
 msgid "Start {0} in {1}"
 msgstr ""
 
@@ -29544,7 +29552,7 @@ msgstr "候補があります。右矢印キーで確定します"
 msgid "suggestions"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:229
+#: src/features/develop/components/guide-tab.tsx:230
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr ""
@@ -29573,11 +29581,11 @@ msgstr "ドキュメントや URL を要約..."
 msgid "Summarize any webpage in seconds"
 msgstr "あらゆる Web ページを数秒で要約"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:281
+#: src/features/settings/components/chat/trigger-settings.tsx:282
 msgid "Summarize my email inbox every morning"
 msgstr "毎朝メールの受信トレイを要約して"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:365
+#: src/features/settings/components/chat/trigger-settings.tsx:366
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "受信トレイを要約して、緊急の項目を強調してください。Webhook データには {PAYLOAD_TOKEN} を使用します。"
 
@@ -29779,7 +29787,7 @@ msgstr ""
 msgid "System prompt"
 msgstr "システムプロンプト"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:350
+#: src/features/settings/components/chat/trigger-settings.tsx:351
 #: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "システムプロンプト（任意）"
@@ -30187,11 +30195,11 @@ msgstr "一時チャットで試用の準備ができました。自動的に削
 msgid "Test drive: {0}"
 msgstr "試用：{0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:650
+#: src/features/settings/components/chat/trigger-settings.tsx:652
 msgid "Test run scheduled — check your threads for the result"
 msgstr "テスト実行をスケジュールしました — 結果はスレッドで確認してください"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:883
+#: src/features/settings/components/chat/trigger-settings.tsx:885
 msgid "Test run trigger"
 msgstr "トリガーをテスト実行"
 
@@ -30365,7 +30373,7 @@ msgstr "タイ"
 msgid "Thanks for rating"
 msgstr "評価ありがとうございます"
 
-#: src/features/develop/components/guide-tab.tsx:108
+#: src/features/develop/components/guide-tab.tsx:109
 msgid "That agent session has ended."
 msgstr ""
 
@@ -30381,7 +30389,7 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:144
+#: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr ""
 
@@ -30405,7 +30413,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -30417,11 +30425,11 @@ msgstr ""
 msgid "That request is no longer waiting."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:131
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "That suggestion cannot be added any more."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "That suggestion is gone."
 msgstr ""
 
@@ -30429,7 +30437,7 @@ msgstr ""
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:129
+#: src/features/develop/components/guide-tab.tsx:130
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr ""
 
@@ -30437,7 +30445,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モードに設定する必要があります）"
 
-#: src/features/devices/components/devices-settings.tsx:200
+#: src/features/devices/components/devices-settings.tsx:213
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
@@ -30445,11 +30453,11 @@ msgstr "エージェントはこのデバイスに何も要求できなくなり
 msgid "The agent finished without giving a guide. Write it again."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "The agent is still opening its session. Try again in a moment."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "The agent is still working on the last message."
 msgstr ""
 
@@ -30465,7 +30473,7 @@ msgstr "エージェントループは体系的なタスク実行のため常に
 msgid "The agent made no file changes."
 msgstr "エージェントはファイルを変更しませんでした。"
 
-#: src/features/develop/components/guide-tab.tsx:195
+#: src/features/develop/components/guide-tab.tsx:196
 msgid "The agent on your computer is reading the change…"
 msgstr ""
 
@@ -30673,8 +30681,8 @@ msgstr "モデルに送信する完全なシステムプロンプト..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目標は削除されます。タスクは目標なしの状態で残ります。"
 
-#: src/features/develop/components/guide-tab.tsx:117
-#: src/features/develop/components/guide-tab.tsx:120
+#: src/features/develop/components/guide-tab.tsx:118
+#: src/features/develop/components/guide-tab.tsx:121
 msgid "The guide could not be started."
 msgstr ""
 
@@ -30828,6 +30836,10 @@ msgstr "Anthropic の最新フロンティアの推論と能力を必要とす�
 msgid "The most review rounds before it stops"
 msgstr ""
 
+#: src/features/develop/components/guide-tab.tsx:107
+msgid "The Neore app on that computer is out of date. Update it, then try again."
+msgstr ""
+
 #. placeholder {0}: data.user.email
 #: src/routes/auth/extension.tsx:135
 msgid "The Neore app on this device will be signed in as {0}. Only continue if you started signing in from the app just now."
@@ -30860,7 +30872,7 @@ msgid "The preview stops after {0} records and {1} problem lines. The rest of th
 msgstr ""
 
 #. placeholder {0}: formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)
-#: src/features/settings/components/chat/trigger-settings.tsx:863
+#: src/features/settings/components/chat/trigger-settings.tsx:865
 msgid "The previous secret is still accepted until {0}."
 msgstr ""
 
@@ -30944,7 +30956,7 @@ msgstr "トークン予算はトークン数の整数で指定してください
 msgid "The Token you entered in the server configuration"
 msgstr "サーバー設定で入力した Token"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:1072
+#: src/features/settings/components/chat/trigger-settings.tsx:1074
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr "トリガーは実行を停止し、実行履歴も削除されます。この操作は取り消せません。"
 
@@ -31183,7 +31195,7 @@ msgstr ""
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:23
+#: src/features/chat/host/host-send-errors.ts:24
 msgid "This chat belongs to a worker. Send it messages from its own message box."
 msgstr ""
 
@@ -31211,7 +31223,7 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:186
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
@@ -31220,22 +31232,30 @@ msgstr "このコンピューター"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:444
+#: src/features/devices/components/devices-settings.tsx:457
 msgid "This computer is not paired yet."
 msgstr "このコンピューターはまだペアリングされていません。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:460
+#: src/features/devices/components/devices-settings.tsx:473
 msgid "This computer is paired as “{0}”."
 msgstr "このコンピューターは「{0}」としてペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:444
+#: src/features/devices/components/devices-settings.tsx:457
 msgid "This computer is paired with another account."
 msgstr "このコンピューターは別のアカウントとペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:422
+#: src/features/devices/components/devices-settings.tsx:435
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
+
+#: src/features/devices/components/device-relay.tsx:34
+msgid "This computer's clock is about {minutes} minutes ahead of the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
+msgstr ""
+
+#: src/features/devices/components/device-relay.tsx:38
+msgid "This computer's clock is about {minutes} minutes behind the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
+msgstr ""
 
 #: src/features/settings/connectors/connector-card.tsx:131
 msgid "This connection needs to be renewed."
@@ -31317,7 +31337,7 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/develop/components/guide-tab.tsx:216
+#: src/features/develop/components/guide-tab.tsx:217
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr ""
 
@@ -31529,7 +31549,7 @@ msgid "This server's registry entry asks for the values below. They fill in the 
 msgstr "このサーバーのレジストリエントリでは、以下の値が求められます。URL とヘッダーに入力されます。"
 
 #: src/features/chat/host/host-composer.tsx:171
-#: src/features/chat/host/host-send-errors.ts:18
+#: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
 
@@ -31663,7 +31683,7 @@ msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:302
 #: src/features/settings/components/chat/event-trigger-fields.tsx:268
-#: src/features/settings/components/chat/trigger-settings.tsx:994
+#: src/features/settings/components/chat/trigger-settings.tsx:996
 msgid "Thread"
 msgstr "スレッド"
 
@@ -31803,7 +31823,7 @@ msgid "Timestamps enabled"
 msgstr "タイムスタンプを表示しました"
 
 #: src/features/settings/components/account/account-settings.tsx:288
-#: src/features/settings/components/chat/trigger-settings.tsx:319
+#: src/features/settings/components/chat/trigger-settings.tsx:320
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "Timezone"
 msgstr "タイムゾーン"
@@ -32248,23 +32268,23 @@ msgstr "三角形"
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "使用量の指標がしきい値を超えたときに通知またはブロックします"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:525
+#: src/features/settings/components/chat/trigger-settings.tsx:526
 msgid "Trigger created"
 msgstr "トリガーを作成しました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:600
+#: src/features/settings/components/chat/trigger-settings.tsx:601
 msgid "Trigger deleted"
 msgstr "トリガーを削除しました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:581
+#: src/features/settings/components/chat/trigger-settings.tsx:582
 msgid "Trigger disabled"
 msgstr "トリガーを無効にしました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:581
+#: src/features/settings/components/chat/trigger-settings.tsx:582
 msgid "Trigger enabled"
 msgstr "トリガーを有効にしました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:500
+#: src/features/settings/components/chat/trigger-settings.tsx:501
 msgid "Trigger name is required"
 msgstr "トリガー名は必須です"
 
@@ -32280,17 +32300,17 @@ msgstr "トリガーの実行が完了しました"
 msgid "Trigger type"
 msgstr "トリガーの種類"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:290
+#: src/features/settings/components/chat/trigger-settings.tsx:291
 msgid "Trigger Type"
 msgstr "トリガーの種類"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:566
+#: src/features/settings/components/chat/trigger-settings.tsx:567
 msgid "Trigger updated"
 msgstr "トリガーを更新しました"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:36
 #: src/features/layout/lib/dashboard-page-names.ts:40
-#: src/features/settings/components/chat/trigger-settings.tsx:715
+#: src/features/settings/components/chat/trigger-settings.tsx:717
 msgid "Triggers"
 msgstr "トリガー"
 
@@ -33345,7 +33365,7 @@ msgstr "組織で許可されたモデルを使用"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "これらのキーボードショートカットを使うと、データグリッドをより効率的に移動・操作できます。"
 
-#: src/features/devices/components/devices-settings.tsx:454
+#: src/features/devices/components/devices-settings.tsx:467
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
@@ -33385,7 +33405,7 @@ msgstr "ユーザー"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:346
+#: src/features/devices/components/devices-settings.tsx:359
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -34249,7 +34269,7 @@ msgstr ""
 msgid "Waiting for {device} to pick this up…"
 msgstr "{device} が受け取るのを待っています…"
 
-#: src/features/devices/components/devices-settings.tsx:241
+#: src/features/devices/components/devices-settings.tsx:254
 msgid "Waiting for approval"
 msgstr "承認待ち"
 
@@ -34380,7 +34400,7 @@ msgstr "最新の話題に対応する Web 検索連携"
 msgid "Web search via Parallel's search API"
 msgstr "Parallel の検索 API による Web 検索"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:440
+#: src/features/settings/components/chat/trigger-settings.tsx:441
 #: src/features/settings/components/chat/trigger-type-picker.tsx:17
 #: src/features/skills/components/bundle-export-dialog.tsx:185
 msgid "Webhook"
@@ -34391,13 +34411,18 @@ msgid "Webhook notifications"
 msgstr "Webhook 通知"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:745
-msgid "Webhook secret"
-msgstr "Webhook シークレット"
+#~ msgid "Webhook secret"
+#~ msgstr "Webhook シークレット"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:638
 #: src/features/skills/components/bundle-import-dialog.tsx:186
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook シークレットをクリップボードにコピーしました"
+
+#. placeholder {0}: shown.name
+#: src/features/settings/components/chat/trigger-settings.tsx:747
+msgid "Webhook secret for \"{0}\""
+msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:194
 msgid "Webhook secret for \"{title}\""
@@ -34411,7 +34436,7 @@ msgstr "Telegram からの更新を検証するための Webhook シークレッ
 msgid "Webhook URL"
 msgstr "Webhook URL"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:696
+#: src/features/settings/components/chat/trigger-settings.tsx:698
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:132
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL をクリップボードにコピーしました"
@@ -34452,7 +34477,7 @@ msgstr "WeChat Token"
 msgid "Weekdays at 09:00 UTC"
 msgstr "平日 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:166
+#: src/features/settings/components/chat/trigger-settings.tsx:167
 msgid "Weekdays at 8 AM"
 msgstr "平日の午前 8 時"
 
@@ -34562,11 +34587,11 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/develop/components/guide-tab.tsx:152
+#: src/features/develop/components/guide-tab.tsx:153
 msgid "What should the guide pay attention to?"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:500
+#: src/features/devices/components/devices-settings.tsx:513
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
@@ -34653,7 +34678,7 @@ msgstr "設定すると、これらのプロバイダーのみ使用されます
 msgid "When should the assistant use this skill?"
 msgstr "アシスタントはどんなときにこのスキルを使うべきですか？"
 
-#: src/features/develop/components/guide-tab.tsx:164
+#: src/features/develop/components/guide-tab.tsx:165
 msgid "Where the guide is written"
 msgstr ""
 
@@ -34728,7 +34753,7 @@ msgstr "メールアドレス/パスワード"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:369
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -34832,7 +34857,7 @@ msgstr "製品発表用の動画の説明文を書く"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "AI でコードを書き、サンドボックスで実行し、結果をドキュメント化 — すべて 1 つのスレッドで。"
 
-#: src/features/develop/components/guide-tab.tsx:185
+#: src/features/develop/components/guide-tab.tsx:186
 msgid "Write it again"
 msgstr ""
 
@@ -34852,7 +34877,7 @@ msgstr "コードを書いて..."
 msgid "Write something"
 msgstr "何か書いてください"
 
-#: src/features/develop/components/guide-tab.tsx:185
+#: src/features/develop/components/guide-tab.tsx:186
 msgid "Write the guide"
 msgstr ""
 
@@ -34866,7 +34891,7 @@ msgstr "入力するか、「/」でコマンドを表示…"
 msgid "Writing"
 msgstr "ライティング"
 
-#: src/features/develop/components/guide-tab.tsx:195
+#: src/features/develop/components/guide-tab.tsx:196
 msgid "Writing the guide…"
 msgstr ""
 
@@ -34995,7 +35020,7 @@ msgstr "あなた"
 msgid "You (another tab)"
 msgstr "あなた（別のタブ）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:354
+#: src/features/settings/components/chat/trigger-settings.tsx:355
 msgid "You are a helpful assistant that summarizes emails..."
 msgstr "あなたはメールを要約する有能なアシスタントです..."
 
@@ -35032,7 +35057,7 @@ msgstr "オフラインです。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "オフラインです。ネットワークが戻ると Neore が再接続します。"
 
-#: src/features/chat/host/host-send-errors.ts:17
+#: src/features/chat/host/host-send-errors.ts:18
 msgid "You are sending too fast. Wait a moment."
 msgstr ""
 
@@ -35275,7 +35300,6 @@ msgstr ""
 msgid "your computer"
 msgstr "このコンピューター"
 
-#: src/features/chat/host/host-composer.tsx:141
 #: src/features/chat/host/host-send-errors.ts:12
 msgid "Your computer is busy. Try again in a moment."
 msgstr ""
@@ -35409,11 +35433,11 @@ msgstr "あなたの評価"
 msgid "Your review"
 msgstr "あなたのレビュー"
 
-#: src/features/develop/components/guide-tab.tsx:133
+#: src/features/develop/components/guide-tab.tsx:134
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:132
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "Your review is being submitted. Try again when it is done."
 msgstr ""
 

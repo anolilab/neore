@@ -395,6 +395,7 @@ export interface Doc_devices {
     acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
     createdAt: number;
     encryptedSecret?: string;
+    hostProtocol?: number;
     lastSeenAt?: number;
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
@@ -3372,6 +3373,7 @@ export interface Insert_devices {
     acpOffers?: Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>;
     createdAt: number;
     encryptedSecret?: string;
+    hostProtocol?: number;
     lastSeenAt?: number;
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
