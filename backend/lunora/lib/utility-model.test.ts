@@ -60,6 +60,13 @@ describe("pickUtilityModelId", () => {
         expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
     });
 
+    it("refuses a multi-region OpenRouter model when a blocked region is among its regions, since the gateway does not route around it", () => {
+        // Every candidate is served in the US among other regions; "any region unblocked" would admit them all.
+        expect(pickUtilityModelId({ blockedRegions: ["US"] })).toBeUndefined();
+        expect(() => requireUtilityModelId({ blockedRegions: ["US"] })).toThrow(NoAllowedUtilityModelError);
+        expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+
     it("answers nothing when the rules exclude every candidate", () => {
         expect(pickUtilityModelId({ allowedModels: ["some/other-model"] })).toBeUndefined();
     });

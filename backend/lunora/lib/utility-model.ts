@@ -5,7 +5,7 @@
  */
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
-import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules, requiresPaidPlan } from "@neore/ai/models";
+import { deriveModelRegions, hasActiveFilters, MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, requiresPaidPlan } from "@neore/ai/models";
 import type { AgentConfig } from "@neore/ai/providers";
 
 import { backupFilterRejection } from "../chat/lib/backup-model.js";
@@ -54,6 +54,17 @@ export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): Mo
     granted ? ({ ...rules, [PAID_PLAN_GRANT]: true } as ModelFilterRules) : rules;
 
 /**
+ * Whether a candidate can honour the user's blocked regions. The gateway does not turn `blockedRegions` into a
+ * routing restriction, so a model reachable in a blocked region could be served from it: with any region blocked,
+ * only a model whose EVERY region is outside the list qualifies (the shared predicate refuses only when all are blocked).
+ */
+const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+    const blocked = rules?.blockedRegions;
+
+    return !blocked || blocked.length === 0 || !deriveModelRegions(definition).some((region) => blocked.includes(region));
+};
+
+/**
  * The first of `preferred` then the fallbacks (or `preferred` alone with `strict`) that the user's rules allow,
  * judged by the same predicate that vets a run's backup model, and by the paid-plan rule: a model outside the free
  * tier needs the plan grant (`withPaidPlanGrant`). `undefined` when none does.
@@ -74,6 +85,7 @@ export const pickUtilityModelId = (
             definition !== undefined &&
             definition.enabled !== false &&
             (paidPlan || !requiresPaidPlan(definition)) &&
+            avoidsBlockedRegions(definition, rules) &&
             backupFilterRejection(definition, rules) === null
         );
     });
