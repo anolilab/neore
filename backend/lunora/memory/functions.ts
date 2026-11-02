@@ -174,7 +174,7 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
     }
 
     try {
-        await deleteVectorRow(context.db, vectorId);
+        await deleteVectorRow(context.db, vectorId, vectorTable);
     } catch (error) {
         // Already gone (a retry of a delete that did land): nothing is orphaned.
         if ((await context.db.get(vectorTable, vectorId).catch(() => undefined)) === null) {

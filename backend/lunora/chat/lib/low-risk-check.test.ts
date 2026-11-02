@@ -1,51 +1,65 @@
 /**
- * One deadline covers the whole classifier call: a utility model that never resolves must leave the call
- * with the person, not hang the run.
+ * The quick check judges with the model it names, and never with a substitute: a user whose model filter rules
+ * refuse it is asked about every call (fail closed), and spends none of the quick-check budget on the attempt.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import type { ModelFilterRules } from "@neore/ai/models";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LOW_RISK_DEADLINE_MS } from "./low-risk-approval";
 import { createRunLowRiskCheck } from "./low-risk-check";
 
-vi.mock("../../lib/utility-model", () => {
-    return { getUtilityModel: vi.fn(async () => await new Promise(() => {})) };
+const state = vi.hoisted(() => {
+    return { rules: {} as ModelFilterRules };
+});
+const generateText = vi.hoisted(() => vi.fn());
+
+vi.mock("ai", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("ai")>()), generateText };
+});
+vi.mock("@neore/ai/providers", async () => {
+    const { MODEL_REGISTRY } = await import("@neore/ai/models");
+
+    return { buildAgents: () => Object.fromEntries(MODEL_REGISTRY.map((model) => [model.id, { chat: { modelId: model.id } }])) };
+});
+vi.mock("./model-filter-rules", () => {
+    return { loadModelFilterRules: async () => state.rules };
 });
 vi.mock("../../lib/services", () => {
-    return { gatewayFetch: () => async () => new Response() };
-});
-vi.mock("../../_generated/internal", () => {
-    return { internal: { chat: { tool_permissions: { consumeLowRiskCheck: "consume", getLowRiskApprovalContext: "allowed" } } } };
+    return { gatewayFetch: () => async () => new Response("{}") };
 });
 
-afterEach(() => {
-    vi.useRealTimers();
+const consumeLowRiskCheck = vi.fn(async () => true);
+const ctx = {
+    log: { event: vi.fn() },
+    runMutation: consumeLowRiskCheck,
+    runQuery: vi.fn(async () => null),
+} as never;
+
+const readCall = { input: { query: "weather" }, key: "mcp:Weather:get_forecast", messages: [], toolCallId: "call-1" };
+const newCheck = () => createRunLowRiskCheck(ctx, { threadId: "thread-1", untrustedContext: Promise.resolve(false), userId: "user-1" }).check;
+
+beforeEach(() => {
+    state.rules = {};
+    generateText.mockReset();
+    generateText.mockResolvedValue({ output: { lowRisk: false, reason: "needs a person" } });
+    consumeLowRiskCheck.mockClear();
 });
 
-describe("createRunLowRiskCheck", () => {
-    it("asks the person when resolving the utility model outlasts the deadline", async () => {
-        vi.useFakeTimers();
+describe("the quick check under the user's model filter rules", () => {
+    it("asks the model, and spends budget, when no rules are set", async () => {
+        await newCheck()(readCall);
 
-        const outcomes: string[] = [];
-        const ctx = {
-            log: {
-                event: (_name: string, data: { outcome: string }) => {
-                    outcomes.push(data.outcome);
-                },
-            },
-            runMutation: vi.fn(async () => true),
-            runQuery: vi.fn(async () => true),
-        };
-        const { check } = createRunLowRiskCheck(ctx as never, { threadId: "t", untrustedContext: Promise.resolve(false), userId: "u" });
-        const result = check({
-            input: { city: "Berlin" },
-            key: "mcp:Weather:get_forecast",
-            messages: [{ content: [{ text: "weather?", type: "text" }], role: "user" }],
-            toolCallId: "call-1",
-        });
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(consumeLowRiskCheck).toHaveBeenCalledOnce();
+    });
 
-        await vi.advanceTimersByTimeAsync(LOW_RISK_DEADLINE_MS + 1);
+    it("keeps the call for a person, with no model call and no budget spent, when the rules exclude its model", async () => {
+        state.rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL] };
 
-        await expect(result).resolves.toBe(false);
-        expect(outcomes).toEqual(["failed"]);
+        await expect(newCheck()(readCall)).resolves.toBe(false);
+        await expect(newCheck()(readCall)).resolves.toBe(false);
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(consumeLowRiskCheck).not.toHaveBeenCalled();
     });
 });
