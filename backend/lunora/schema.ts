@@ -3068,6 +3068,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
+        // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
+        // existed, which `discardPausedThreadSecrets` classifies from the saved messages instead.
+        secretRequest: v.optional(v.boolean()),
         status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
         streamId: v.optional(v.string()),
         threadId: v.string(),

@@ -207,13 +207,14 @@ export const discardThreadSecrets = async (ctx: Database, args: { abandon?: bool
     return live.length;
 };
 
-/** Rows per page of the walk that classifies a pause's requests. */
+/** Rows per page of the walk that classifies a pause's requests, and how many pages it reads at most. */
 const SECRET_SCAN_PAGE = 50;
+const SECRET_SCAN_MAX_PAGES = 4;
 
 /**
- * Which of `wanted` (approval ids of paused requests) are `requestSecret` calls. Read from the saved messages (the
- * snapshot does not name the tool), newest first and in pages, until every wanted id has been seen as a request, so an
- * old pause is reached however many rows followed it; an id that never shows ends the walk at the thread's first row.
+ * Which of `wanted` (approval ids of requests whose snapshot predates `secretRequest`) are `requestSecret` calls. Read
+ * from the saved messages, newest first and in pages, until every wanted id has been seen as a request or
+ * {@link SECRET_SCAN_MAX_PAGES} pages are read; a legacy pause older than that is left as it was (still answerable).
  */
 const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">, wanted: ReadonlySet<string>): Promise<Set<string>> => {
     const ids = new Set<string>();
@@ -224,8 +225,11 @@ const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">, wante
 
     const seen = new Set<string>();
     let cursor: string | null = null;
+    let pages = 0;
 
     do {
+        pages += 1;
+
         const page = await ctx.db
             .query("messages")
             .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
@@ -252,7 +256,7 @@ const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">, wante
             }
         }
 
-        cursor = page.isDone || seen.size >= wanted.size ? null : page.continueCursor;
+        cursor = page.isDone || seen.size >= wanted.size || pages >= SECRET_SCAN_MAX_PAGES ? null : page.continueCursor;
     } while (cursor !== null);
 
     return ids;
@@ -325,10 +329,15 @@ export const discardPausedThreadSecrets = async (
     // The secret requests of the reply are denied with it: nothing is waiting on them, and a late answer must not resume it.
     // Any other pending approval stays as it was, answerable.
     const abandoned = pending.filter((run) => keys.has(run.config.replyKey ?? run.streamId ?? ""));
-    const secretApprovals = await secretApprovalIdsOf(ctx, args.threadId, new Set(abandoned.map((run) => run.approvalId)));
+    // Only a snapshot from before `secretRequest` needs the messages to tell; a new plain approval never reads them.
+    const legacy = await secretApprovalIdsOf(
+        ctx,
+        args.threadId,
+        new Set(abandoned.filter((run) => run.secretRequest === undefined).map((run) => run.approvalId)),
+    );
 
     for (const run of abandoned) {
-        if (secretApprovals.has(run.approvalId)) {
+        if (run.secretRequest === true || legacy.has(run.approvalId)) {
             await patchRow(ctx.db, run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
         }
     }

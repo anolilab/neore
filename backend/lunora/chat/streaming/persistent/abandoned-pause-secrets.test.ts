@@ -64,7 +64,13 @@ const insertRequestMessage = async (approvalId: string, toolName = "requestSecre
             }),
     );
 
-const insertSnapshot = async (status: "approved" | "pending", replyKey: string, streamId?: string, approvalId = `appr-${replyKey}-${status}`) =>
+const insertSnapshot = async (
+    status: "approved" | "pending",
+    replyKey: string,
+    streamId?: string,
+    approvalId = `appr-${replyKey}-${status}`,
+    secretRequest?: boolean,
+) =>
     await run(
         async (ctx) =>
             await ctx.db.insert("toolApprovalRuns", {
@@ -72,6 +78,7 @@ const insertSnapshot = async (status: "approved" | "pending", replyKey: string, 
                 config: { ...CONFIG, replyKey },
                 createdAt: Date.now(),
                 status,
+                ...(secretRequest !== undefined && { secretRequest }),
                 ...(streamId !== undefined && { streamId }),
                 threadId,
                 userId: OWNER,
@@ -383,5 +390,64 @@ describe("a paused reply that is abandoned", () => {
         );
 
         expect(spend).toStrictEqual({ ok: false, status: "abandoned" });
+    });
+
+    it("denies a request the snapshot marks as a secret without reading any message", async () => {
+        const ref = await storeSecret("stream-A");
+
+        await insertSnapshot("pending", "stream-A", undefined, "marked", true);
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ resolvedBy: "abandoned", status: "denied" });
+        expect(await holdsValue(ref)).toBe(false);
+    });
+
+    it("does not page through the history because of a leftover plain approval", async () => {
+        await insertSnapshot("pending", "stream-A", undefined, "plain", false);
+
+        for (let index = 0; index < 120; index += 1) {
+            await insertRequestMessage(`newer-${index}`, "mcp_files__read");
+        }
+
+        const { discardPausedThreadSecrets } = await import("../../lib/secret-requests");
+        const reads: string[] = [];
+
+        await run(async (ctx) => {
+            const db = new Proxy(ctx.db, {
+                get: (target, property, receiver) =>
+                    property === "query"
+                        ? (table: string) => {
+                              reads.push(table);
+
+                              return target.query(table);
+                          }
+                        : Reflect.get(target, property, receiver),
+            });
+
+            await discardPausedThreadSecrets({ db } as never, { threadId: threadId as never });
+        });
+
+        expect(reads).not.toContain("messages");
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ status: "pending" });
+    });
+
+    it("reads at most a few pages of history to classify a snapshot that predates the marker", async () => {
+        await insertRequestMessage("legacy");
+        await insertSnapshot("pending", "stream-A", undefined, "legacy");
+
+        for (let index = 0; index < 400; index += 1) {
+            await insertRequestMessage(`newer-${index}`, "mcp_files__read");
+        }
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ status: "pending" });
     });
 });
