@@ -113,6 +113,21 @@ describe("a project of an organization the caller belongs to", () => {
         await expect(create(STRANGER, projectId)).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
+    it("treats a project without an owner like any organization project, and stops serving its context once the member is removed", async () => {
+        const projectId = (await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { context: "Ownerless notes", createdAt: 0, organizationId: ORG, title: "p" }),
+        )) as string;
+        const memberId = await join(MEMBER);
+        const read = async () => await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: MEMBER }));
+
+        await expect(create(MEMBER, projectId)).resolves.toBeDefined();
+        expect(await read()).toBe("Ownerless notes");
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(memberId));
+        expect(await read()).toBeNull();
+        await expect(create(MEMBER, projectId)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
     it("hands a member's run the project context, and a non-member none", async () => {
         const projectId = await orgProject();
 

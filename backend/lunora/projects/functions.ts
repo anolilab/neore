@@ -24,7 +24,8 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
         return null;
     }
 
-    if (found.userId && found.userId !== userId) {
+    // The owner, or a CURRENT member of the project's organization: a project without an owner is no exception.
+    if (found.userId !== userId) {
         if (!found.organizationId || !(await getMemberByOrganizationAndUser(context, found.organizationId, userId))) {
             return null;
         }
