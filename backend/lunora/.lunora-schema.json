@@ -26334,6 +26334,14 @@
           ],
           "unique": false
         },
+        "by_threadId_status_createdAt": {
+          "fields": [
+            "threadId",
+            "status",
+            "createdAt"
+          ],
+          "unique": false
+        },
         "by_userId_status_createdAt": {
           "fields": [
             "userId",
