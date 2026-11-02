@@ -9211,6 +9211,7 @@ export interface Caller {
             claimFinish: (args: { runId: Id<"codingAgentRuns"> }) => Promise<{ claimed: boolean; wantsPr: boolean }>;
             claimPoll: (args: { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }) => Promise<boolean>;
             claimRun: (args: { runId: Id<"codingAgentRuns"> }) => Promise<{ agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
+            commitAuthorFor: (args: { userId: string }) => Promise<null | { email: string; name: string }>;
             completePullRequest: (args: { log: string; prUrl?: string; runId: Id<"codingAgentRuns">; startedAt: number }) => Promise<{ followUp: boolean }>;
             completeRun: (args: { baseBranch?: string; baseSha?: string; diff?: string; diffStat?: string; diffTruncated?: boolean; error?: string; exitCode?: number; runId: Id<"codingAgentRuns">; status: "succeeded" | "failed" | "cancelled"; summary?: string }) => Promise<null>;
             createRun: (args: { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; taskId?: Id<"tasks">; taskRunId?: Id<"taskRuns">; threadId?: string; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"codingAgentRuns"> } | { error: string }>;
@@ -9226,6 +9227,7 @@ export interface Caller {
             hasProviderKey: (args: { provider: "anthropic" | "openai"; userId: string }) => Promise<boolean>;
             postRunResult: (args: { agentName: string; runId: Id<"codingAgentRuns">; text: string; threadId: string; userId: string }) => Promise<null>;
             recordPoll: (args: { offset: number; runId: Id<"codingAgentRuns">; summary?: string; text: string }) => Promise<{ cancelled: boolean }>;
+            setCodingAgentCommitIdentity: (args: { identity: "agent" | "user" }) => Promise<null>;
             setPullRequestSandbox: (args: { runId: Id<"codingAgentRuns">; sandboxId: string; startedAt: number }) => Promise<boolean>;
             setRunSandbox: (args: { runId: Id<"codingAgentRuns">; sandboxId: string }) => Promise<{ cancelled: boolean }>;
         };
@@ -11121,6 +11123,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             claimFinish: (args) => callRegistered(context, "coding_agents_functions:claimFinish", args),
             claimPoll: (args) => callRegistered(context, "coding_agents_functions:claimPoll", args),
             claimRun: (args) => callRegistered(context, "coding_agents_functions:claimRun", args),
+            commitAuthorFor: (args) => callRegistered(context, "coding_agents_functions:commitAuthorFor", args),
             completePullRequest: (args) => callRegistered(context, "coding_agents_functions:completePullRequest", args),
             completeRun: (args) => callRegistered(context, "coding_agents_functions:completeRun", args),
             createRun: (args) => callRegistered(context, "coding_agents_functions:createRun", args),
@@ -11136,6 +11139,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             hasProviderKey: (args) => callRegistered(context, "coding_agents_functions:hasProviderKey", args),
             postRunResult: (args) => callRegistered(context, "coding_agents_functions:postRunResult", args),
             recordPoll: (args) => callRegistered(context, "coding_agents_functions:recordPoll", args),
+            setCodingAgentCommitIdentity: (args) => callRegistered(context, "coding_agents_functions:setCodingAgentCommitIdentity", args),
             setPullRequestSandbox: (args) => callRegistered(context, "coding_agents_functions:setPullRequestSandbox", args),
             setRunSandbox: (args) => callRegistered(context, "coding_agents_functions:setRunSandbox", args),
         },

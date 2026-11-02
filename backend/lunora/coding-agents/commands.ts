@@ -411,18 +411,28 @@ export const prBranchName = (runId: string): string => `neore/agent-${runId.repl
 /** Hooks never run in a PR checkout: the patch is untrusted, and the push carries the token. */
 const NO_HOOKS = ["-c", "core.hooksPath=/dev/null"];
 
+/** The agent's own identity: the fixed bot author, and the co-author when a person is the author. */
+export const AGENT_IDENTITY = { email: "agent@users.noreply.neore.chat", name: "Neore Agent" } as const;
+
+/** The person a commit is made as (opt-in). Absent: the agent is the author, as before. */
+export type CommitAuthor = { email: string; name: string };
+
 /**
- * Commit the applied patch on {@link prBranchName}. The author is a fixed bot
- * identity; the message is quoted like any input.
+ * Commit the applied patch on {@link prBranchName}. By default the author is the
+ * fixed agent identity. With a `person`, the commit is made as them and the agent
+ * is named as co-author in the message trailer. The message is quoted like any input.
  */
-export const buildCommitCommand = (branch: string, message: string): string => {
+export const buildCommitCommand = (branch: string, message: string, person?: CommitAuthor): string => {
     if (!isValidBranchName(branch)) {
         throw new Error("Invalid branch name");
     }
 
+    const author = person ?? AGENT_IDENTITY;
+    const fullMessage = person ? `${message}\n\nCo-authored-by: ${AGENT_IDENTITY.name} <${AGENT_IDENTITY.email}>` : message;
+
     return [
         shellJoin(["git", "checkout", "-q", "-B", branch]),
-        shellJoin(["git", ...NO_HOOKS, "-c", "user.name=Neore Agent", "-c", "user.email=agent@users.noreply.neore.chat", "commit", "-q", "-m", message]),
+        shellJoin(["git", ...NO_HOOKS, "-c", `user.name=${author.name}`, "-c", `user.email=${author.email}`, "commit", "-q", "-m", fullMessage]),
     ].join(" && ");
 };
 
@@ -455,7 +465,7 @@ export const PR_STATUS_PATH = "/tmp/neore-pr.status";
  * that talk to GitHub (clone, push), hooks are disabled for commit and push,
  * and the file is deleted on every exit path.
  */
-export const buildPullRequestScript = (input: { baseBranch: string; branch: string; message: string; repo: ParsedRepo }): string => {
+export const buildPullRequestScript = (input: { baseBranch: string; branch: string; message: string; person?: CommitAuthor; repo: ParsedRepo }): string => {
     const withAuth = (command: string): string =>
         `( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=${shellQuote(extraheaderKey(input.repo.origin))} GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(cat ${GIT_AUTH_PATH})"; timeout ${String(CLONE_TIMEOUT_S)} ${command} )`;
 
@@ -471,7 +481,7 @@ export const buildPullRequestScript = (input: { baseBranch: string; branch: stri
         "echo '$ git apply'",
         `${buildApplyPatchCommand()} || finish failed:apply`,
         `echo ${shellQuote(`$ git commit on ${input.branch}`)}`,
-        `${buildCommitCommand(input.branch, input.message)} || finish failed:commit`,
+        `${buildCommitCommand(input.branch, input.message, input.person)} || finish failed:commit`,
         `echo ${shellQuote(`$ git push origin ${input.branch}`)}`,
         `${withAuth(buildPushCommand(input.branch))} || finish failed:push`,
         "finish pushed",

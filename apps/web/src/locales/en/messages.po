@@ -1346,15 +1346,15 @@ msgstr "#1 on OpenRouter by token usage"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorite} other {# favorites}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:187
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Data Source: ~2,700 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:186
+#: src/features/settings/components/chat/agent-settings.tsx:222
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Knowledge: ~2,600 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:185
+#: src/features/settings/components/chat/agent-settings.tsx:221
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Task Planning: ~2,500 tokens (+200)"
 
@@ -2646,11 +2646,11 @@ msgstr "Agent answers"
 msgid "Agent builder"
 msgstr "Agent builder"
 
-#: src/features/settings/components/chat/agent-settings.tsx:48
+#: src/features/settings/components/chat/agent-settings.tsx:59
 msgid "Agent Capabilities"
 msgstr "Agent Capabilities"
 
-#: src/features/settings/components/chat/agent-settings.tsx:65
+#: src/features/settings/components/chat/agent-settings.tsx:76
 #: src/features/settings/lib/settings-keywords.ts:56
 #: src/features/settings/lib/settings-keywords.ts:57
 #: src/features/settings/lib/settings-keywords.ts:58
@@ -2658,7 +2658,7 @@ msgstr "Agent Capabilities"
 msgid "Agent Modules"
 msgstr "Agent Modules"
 
-#: src/features/settings/components/chat/agent-settings.tsx:39
+#: src/features/settings/components/chat/agent-settings.tsx:50
 msgid "Agent settings updated"
 msgstr "Agent settings updated"
 
@@ -3500,7 +3500,7 @@ msgstr "Apply an artistic style to any image"
 msgid "Apply artistic style"
 msgstr "Apply artistic style"
 
-#: src/features/settings/components/chat/agent-settings.tsx:96
+#: src/features/settings/components/chat/agent-settings.tsx:107
 msgid "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 msgstr "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 
@@ -3950,7 +3950,7 @@ msgstr "auto"
 msgid "Auto"
 msgstr "Auto"
 
-#: src/features/settings/components/chat/agent-settings.tsx:133
+#: src/features/settings/components/chat/agent-settings.tsx:144
 #: src/features/settings/lib/settings-keywords.ts:59
 msgid "Auto Media Enrichment"
 msgstr "Auto Media Enrichment"
@@ -3976,7 +3976,7 @@ msgstr "Auto-Delete Active"
 msgid "Auto-detect"
 msgstr "Auto-detect"
 
-#: src/features/settings/components/chat/agent-settings.tsx:158
+#: src/features/settings/components/chat/agent-settings.tsx:169
 #: src/features/settings/lib/settings-keywords.ts:60
 msgid "Auto-Detect Task Complexity"
 msgstr "Auto-Detect Task Complexity"
@@ -4055,15 +4055,15 @@ msgstr "Automatic provider health tracking with circuit breaker pattern. Failed 
 msgid "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 msgstr "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 
-#: src/features/settings/components/chat/agent-settings.tsx:161
+#: src/features/settings/components/chat/agent-settings.tsx:172
 msgid "Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when needed."
 msgstr "Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when needed."
 
-#: src/features/settings/components/chat/agent-settings.tsx:152
+#: src/features/settings/components/chat/agent-settings.tsx:163
 msgid "Automatically enable modules based on task complexity"
 msgstr "Automatically enable modules based on task complexity"
 
-#: src/features/settings/components/chat/agent-settings.tsx:136
+#: src/features/settings/components/chat/agent-settings.tsx:147
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "Automatically include relevant images and videos alongside text responses when using search modes."
 
@@ -4075,7 +4075,7 @@ msgstr "Automatically run cleanup based on configuration"
 msgid "automation"
 msgstr "automation"
 
-#: src/features/settings/components/chat/agent-settings.tsx:151
+#: src/features/settings/components/chat/agent-settings.tsx:162
 #: src/features/settings/lib/settings-keywords.ts:60
 #: src/features/skills/components/skill-form-dialog.tsx:119
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
@@ -4307,7 +4307,7 @@ msgstr "Bans"
 msgid "Base"
 msgstr "Base"
 
-#: src/features/settings/components/chat/agent-settings.tsx:184
+#: src/features/settings/components/chat/agent-settings.tsx:220
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Base (agent loop only): ~2,300 tokens"
 
@@ -4740,7 +4740,7 @@ msgstr "Brave: if requests fail, lower Shields for this site."
 msgid "Brazil"
 msgstr "Brazil"
 
-#: src/features/settings/components/chat/agent-settings.tsx:76
+#: src/features/settings/components/chat/agent-settings.tsx:87
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 
@@ -6272,6 +6272,10 @@ msgstr "Coding"
 msgid "Coding agent log"
 msgstr "Coding agent log"
 
+#: src/features/settings/components/chat/agent-settings.tsx:190
+msgid "Coding Agent Pull Requests"
+msgstr "Coding Agent Pull Requests"
+
 #: src/features/notifications/lib/notification-labels.ts:45
 msgid "Coding agent run failed"
 msgstr "Coding agent run failed"
@@ -6528,9 +6532,17 @@ msgstr "commercial design"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 
+#: src/features/settings/components/chat/agent-settings.tsx:197
+msgid "Commit as me"
+msgstr "Commit as me"
+
 #: src/features/develop/components/pull-request-view.tsx:72
 msgid "Commits"
 msgstr "Commits"
+
+#: src/features/settings/components/chat/agent-settings.tsx:200
+msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author."
+msgstr "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author."
 
 #: src/features/settings/connectors/connector-category.ts:6
 #: src/features/skills/components/skill-form-dialog.tsx:121
@@ -6790,7 +6802,7 @@ msgstr "Condition (JavaScript expression)"
 msgid "Conditional branching"
 msgstr "Conditional branching"
 
-#: src/features/settings/components/chat/agent-settings.tsx:49
+#: src/features/settings/components/chat/agent-settings.tsx:60
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Configure advanced AI agent modules for enhanced task execution"
 
@@ -8746,7 +8758,7 @@ msgstr "Data grid"
 msgid "Data Protection Officer"
 msgstr "Data Protection Officer"
 
-#: src/features/settings/components/chat/agent-settings.tsx:113
+#: src/features/settings/components/chat/agent-settings.tsx:124
 #: src/features/settings/lib/settings-keywords.ts:58
 msgid "Data Source Module"
 msgstr "Data Source Module"
@@ -10891,7 +10903,7 @@ msgstr "Enable or disable models to control which ones appear in the model selec
 msgid "Enable skills in Settings to add them as participants."
 msgstr "Enable skills in Settings to add them as participants."
 
-#: src/features/settings/components/chat/agent-settings.tsx:66
+#: src/features/settings/components/chat/agent-settings.tsx:77
 msgid "Enable specialized modules to enhance AI capabilities"
 msgstr "Enable specialized modules to enhance AI capabilities"
 
@@ -11416,7 +11428,7 @@ msgstr "Estimated cost"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Estimated provider cost {display}, billed to your own API key"
 
-#: src/features/settings/components/chat/agent-settings.tsx:180
+#: src/features/settings/components/chat/agent-settings.tsx:216
 msgid "Estimated token cost per conversation"
 msgstr "Estimated token cost per conversation"
 
@@ -12662,7 +12674,7 @@ msgstr "Failed to unlink account"
 msgid "Failed to unpin thread"
 msgstr "Failed to unpin thread"
 
-#: src/features/settings/components/chat/agent-settings.tsx:36
+#: src/features/settings/components/chat/agent-settings.tsx:47
 msgid "Failed to update agent settings"
 msgstr "Failed to update agent settings"
 
@@ -12734,6 +12746,10 @@ msgstr "Failed to update prompt"
 #: src/features/settings/components/chat/native-providers-settings.tsx:310
 msgid "Failed to update provider"
 msgstr "Failed to update provider"
+
+#: src/features/settings/components/chat/agent-settings.tsx:30
+msgid "Failed to update pull request settings"
+msgstr "Failed to update pull request settings"
 
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
 msgid "Failed to update reply tools"
@@ -16828,7 +16844,7 @@ msgstr "Knowledge collections"
 msgid "Knowledge files to search"
 msgstr "Knowledge files to search"
 
-#: src/features/settings/components/chat/agent-settings.tsx:93
+#: src/features/settings/components/chat/agent-settings.tsx:104
 #: src/features/settings/lib/settings-keywords.ts:57
 msgid "Knowledge Module"
 msgstr "Knowledge Module"
@@ -17838,7 +17854,7 @@ msgstr "Loading your projects…"
 #: src/features/canvas/canvas-panel.tsx:731
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
-#: src/features/settings/components/chat/agent-settings.tsx:28
+#: src/features/settings/components/chat/agent-settings.tsx:39
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
@@ -21079,7 +21095,7 @@ msgstr "Note (optional)"
 msgid "Note for the next run (optional)"
 msgstr "Note for the next run (optional)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:190
+#: src/features/settings/components/chat/agent-settings.tsx:226
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 
@@ -24242,6 +24258,10 @@ msgstr "Pull request merged"
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:87
 msgid "Pull request opened"
 msgstr "Pull request opened"
+
+#: src/features/settings/components/chat/agent-settings.tsx:33
+msgid "Pull request settings updated"
+msgstr "Pull request settings updated"
 
 #: src/features/code/components/code-shell.tsx:95
 msgid "Pull requests"
@@ -29953,7 +29973,7 @@ msgstr "Task finished"
 msgid "Task needs your review: {title}"
 msgstr "Task needs your review: {title}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:73
+#: src/features/settings/components/chat/agent-settings.tsx:84
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "Task Planning Module"
 msgstr "Task Planning Module"
@@ -30484,7 +30504,7 @@ msgstr "The agent is still working on the last message."
 msgid "The agent is working. You can send these when it is done."
 msgstr "The agent is working. You can send these when it is done."
 
-#: src/features/settings/components/chat/agent-settings.tsx:56
+#: src/features/settings/components/chat/agent-settings.tsx:67
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 
@@ -31979,7 +31999,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "Token budget"
 
-#: src/features/settings/components/chat/agent-settings.tsx:179
+#: src/features/settings/components/chat/agent-settings.tsx:215
 msgid "Token Cost Impact"
 msgstr "Token Cost Impact"
 
@@ -33568,7 +33588,7 @@ msgstr "Uzbekistan"
 msgid "Valid JSON"
 msgstr "Valid JSON"
 
-#: src/features/settings/components/chat/agent-settings.tsx:116
+#: src/features/settings/components/chat/agent-settings.tsx:127
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 
@@ -34720,6 +34740,10 @@ msgstr "Which AI models are included?"
 #: src/features/marketing/components/gateway-landing-page.tsx:182
 msgid "Which providers are supported?"
 msgstr "Which providers are supported?"
+
+#: src/features/settings/components/chat/agent-settings.tsx:191
+msgid "Who a pull request's commits are made as"
+msgstr "Who a pull request's commits are made as"
 
 #: src/features/chat/group/create-group-chat-button.tsx:212
 #: src/features/chat/group/group-participant-bar.tsx:100

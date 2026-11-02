@@ -257,6 +257,23 @@ describe("git credentials", () => {
     it("quotes the commit message", () => {
         expect(buildCommitCommand("neore/agent-x", "fix'; rm -rf /; '")).toContain(String.raw`'fix'\''; rm -rf /; '\'''`);
     });
+
+    it("keeps the agent as author by default", () => {
+        const command = buildCommitCommand("neore/agent-x", "msg");
+
+        expect(command).toContain("user.name=Neore Agent");
+        expect(command).toContain("user.email=agent@users.noreply.neore.chat");
+        expect(command).not.toContain("Co-authored-by");
+    });
+
+    it("makes the commit as the person and names the agent as co-author", () => {
+        const command = buildCommitCommand("neore/agent-x", "msg", { email: "dana@example.com", name: "Dana Tester" });
+
+        expect(command).toContain("user.name=Dana Tester");
+        expect(command).toContain("user.email=dana@example.com");
+        expect(command).toContain("Co-authored-by: Neore Agent <agent@users.noreply.neore.chat>");
+        expect(command).not.toContain("user.name=Neore Agent");
+    });
 });
 
 describe("origin-scoped credentials", () => {

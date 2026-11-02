@@ -23,6 +23,17 @@ const AgentSettings: FC = () => {
     const crpc = useCRPC();
     const { data: aiPreferences, isLoading } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const updateAIUserPreferencesMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+    // Server-written (not in the generic settings save): the commit identity has its own setter.
+    const setCommitIdentityMutation = useMutation(
+        crpc.coding_agents.functions.setCodingAgentCommitIdentity.mutationOptions({
+            onError: () => {
+                toast.error(t`Failed to update pull request settings`);
+            },
+            onSuccess: () => {
+                toast.success(t`Pull request settings updated`);
+            },
+        }),
+    );
 
     if (isLoading) {
         return <div className="text-muted-foreground text-sm">{t`Loading...`}</div>;
@@ -169,6 +180,31 @@ const AgentSettings: FC = () => {
                                 disabled={updateAIUserPreferencesMutation.isPending}
                                 id="autoDetectComplexity"
                                 onCheckedChange={(checked: boolean) => handleToggle("autoDetectComplexity", checked)}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t`Coding Agent Pull Requests`}</CardTitle>
+                        <CardDescription>{t`Who a pull request's commits are made as`}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-1">
+                                <Label className="text-base font-medium" htmlFor="commitAsMe">
+                                    {t`Commit as me`}
+                                </Label>
+                                <p className="text-muted-foreground text-sm">
+                                    {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author.`}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={aiPreferences?.codingAgentCommitIdentity === "user"}
+                                disabled={setCommitIdentityMutation.isPending}
+                                id="commitAsMe"
+                                onCheckedChange={(checked: boolean) => setCommitIdentityMutation.mutate({ identity: checked ? "user" : "agent" })}
                             />
                         </div>
                     </CardContent>

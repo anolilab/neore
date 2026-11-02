@@ -21,6 +21,7 @@ import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchById, patchRow } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
@@ -643,6 +644,51 @@ export const getRunForFollowUp = internalQuery
  * diff, not already opened or in flight. Marks it `pending`, which is also what
  * makes a double click (or the auto-PR racing the button) start only one.
  */
+/**
+ * The person a pull request's commits are made as, when they opted in (`codingAgentCommitIdentity`).
+ * `null` keeps the agent as author. A missing or incomplete account also gives `null`: the commit never
+ * carries an empty or guessed identity.
+ */
+export const commitAuthorFor = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.null(), v.object({ email: v.string(), name: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        if (prefs?.codingAgentCommitIdentity !== "user") {
+            return null;
+        }
+
+        const user = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } });
+
+        if (!user?.email || !user.name) {
+            return null;
+        }
+
+        return { email: user.email, name: user.name };
+    });
+
+/** Choose who a coding agent's pull request commits are made as. Off (`agent`) is the default. */
+export const setCodingAgentCommitIdentity = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ identity: v.union(v.literal("agent"), v.literal("user")) })
+    .output(v.null())
+    .mutation(async ({ args: { identity }, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { codingAgentCommitIdentity: identity });
+
+        ctx.log.event("coding_agents.set_commit_identity", { identity });
+
+        return null;
+    });
+
 export const beginPullRequest = internalMutation
     .input({ followUp: v.boolean(), runId: v.id("codingAgentRuns"), userId: v.string() })
     .output(

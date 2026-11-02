@@ -76,6 +76,7 @@ export interface Doc_aiUserPreferences {
     _id: Id<"aiUserPreferences">;
     _creationTime: number;
     autoApproveLowRisk?: boolean;
+    codingAgentCommitIdentity?: "agent" | "user";
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };
@@ -3079,6 +3080,7 @@ export interface Insert_aiUserPreferences {
     _id?: Id<"aiUserPreferences">;
     _creationTime?: number;
     autoApproveLowRisk?: boolean;
+    codingAgentCommitIdentity?: "agent" | "user";
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };

@@ -331,8 +331,11 @@ const startPullRequestForRun = async (
         return await fail(problem ?? "not available");
     }
 
+    // Read here, not in the sandbox: the person's details reach the commit only when they opted in.
+    const person = (await ctx.runQuery(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId })) ?? undefined;
+
     const started = await startPullRequest(
-        { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, repo, runId, title: pullRequestTitle(claim.prompt) },
+        { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, person, repo, runId, title: pullRequestTitle(claim.prompt) },
         { sandboxes: createE2BSandboxProvider(E2B_API_KEY) },
     );
 
