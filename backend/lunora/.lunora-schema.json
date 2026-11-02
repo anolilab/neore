@@ -20942,6 +20942,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"abandoned\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"saved\""
             },
             {
@@ -26242,6 +26249,12 @@
         },
         "resolvedBy": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "secretRequest": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

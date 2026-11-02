@@ -22,6 +22,7 @@ import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-paus
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
+import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -247,6 +248,22 @@ export const stopActiveForThread = internalMutation
         // placeholder key, or a reply started from another row), it falls back to the whole thread.
         const named = args.messageId === undefined ? [] : live.filter((stream) => stream.messageId === args.messageId);
         const streams = named.length > 0 ? named : live;
+        const stoppedWholeThread = args.messageId !== undefined && named.length === 0 && live.length > 0;
+
+        // Replies that stay live share a reply key with a stopped continuation when one pause started several: its
+        // references are theirs too, so they are not discarded under them.
+        const stopping = new Set(streams.map((stream) => stream._id));
+        // A selected stream that is claimed and executing keeps its key too: its run drops the references at its own end.
+        const keptKeys = new Set(
+            await Promise.all(
+                live
+                    .filter(
+                        (stream) =>
+                            !stopping.has(stream._id) || (stream.runClaimedAt !== undefined && stream.pausedRun === undefined && stream.producer !== "host"),
+                    )
+                    .map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId: stream.threadId as Id<"threads"> })),
+            ),
+        );
 
         for (const stream of streams) {
             // A coding agent's turn has no run here to notice the stop: end it now, keep the text written so
@@ -274,7 +291,29 @@ export const stopActiveForThread = internalMutation
                 ...(steers && { steers }),
                 ...(waiting && { pausedRun: undefined }),
             });
+
+            // No run is left to end this reply and drop what it was holding: one that never started, or one waiting out a limit.
+            if (waiting || stream.runClaimedAt === undefined) {
+                const threadId = stream.threadId as Id<"threads">;
+
+                const replyKey = await replyKeyOfStream(ctx, { streamId: stream._id, threadId });
+
+                if (!keptKeys.has(replyKey)) {
+                    // Nothing will spend them now: a late spend reads `abandoned`, not `used`.
+                    await discardThreadSecrets(ctx, { abandon: true, replyKey, threadId });
+                }
+            }
         }
+
+        // The person is stopping a reply that paused on a request (its stream is already closed), whether or not another reply
+        // is live: it is abandoned here, and the secret it kept through the pause goes with it. A reply that was live keeps its
+        // own (a stopped run drops them when it ends; one still running needs them).
+        const threadId = args.threadId as Id<"threads">;
+        const settling = live.filter((stream) => stream.runClaimedAt !== undefined);
+        const keep = new Set(await Promise.all(settling.map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId }))));
+
+        // A stale id that fell back to the whole thread must not narrow the cleanup to some older reply.
+        await discardPausedThreadSecrets(ctx, { keep, messageId: stoppedWholeThread ? undefined : args.messageId, threadId });
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
         const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
@@ -290,8 +329,6 @@ export const stopActiveForThread = internalMutation
 
         // The thread leaves `running` only when no live reply is left to keep running.
         if (!startedMeanwhile && ((streams.length > 0 && streams.length === live.length) || (goalEnded && live.length === 0))) {
-            const threadId = args.threadId as Id<"threads">;
-
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
             await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }

@@ -2186,7 +2186,7 @@ export const schema = defineSchema({
         ref: v.string(),
         // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
         replyKey: v.optional(v.string()),
-        status: v.union(v.literal("saved"), v.literal("used")),
+        status: v.union(v.literal("saved"), v.literal("used"), v.literal("abandoned")),
         threadId: v.string(),
         use: v.union(
             v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
@@ -3073,6 +3073,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
+        // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
+        // existed, which `discardPausedThreadSecrets` classifies from the saved messages instead.
+        secretRequest: v.optional(v.boolean()),
         status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
         streamId: v.optional(v.string()),
         threadId: v.string(),

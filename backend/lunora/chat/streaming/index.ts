@@ -14,6 +14,7 @@ import { optionalAuthQuery } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
+import { discardPausedThreadSecrets } from "../lib/secret-requests";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
 
 /**
@@ -148,6 +149,9 @@ export const createStreamWithMessage = internalMutation
         if (!goalId) {
             await endActiveGoals(context, threadId as Id<"threads">, "superseded");
         }
+
+        // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
+        await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
 
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,
