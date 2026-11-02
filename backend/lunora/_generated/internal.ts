@@ -784,6 +784,7 @@ export interface InternalApiTypes {
             remove: FunctionReference<"mutation", { key: string }, null>;
             removeAll: FunctionReference<"mutation", { name: string }, null>;
             removeByArgs: FunctionReference<"mutation", { args: string; name: string }, null>;
+            removeIfAttempt: FunctionReference<"mutation", { attempt: string; key: string }, null>;
         };
         claim_once: {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
@@ -1970,6 +1971,7 @@ export const internal: InternalApiTypes = {
             remove: { __lunoraRef: "lib_action_cache:remove" },
             removeAll: { __lunoraRef: "lib_action_cache:removeAll" },
             removeByArgs: { __lunoraRef: "lib_action_cache:removeByArgs" },
+            removeIfAttempt: { __lunoraRef: "lib_action_cache:removeIfAttempt" },
         },
         claim_once: {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },

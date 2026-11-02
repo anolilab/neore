@@ -4891,6 +4891,11 @@
       "to": "table:actionCache"
     },
     {
+      "from": "function:lib_action_cache:removeIfAttempt",
+      "kind": "write",
+      "to": "table:actionCache"
+    },
+    {
       "from": "function:lib_claim_once:purgeClaimsWithPrefix",
       "kind": "schedule",
       "to": "function:lib_claim_once:purgeClaimsWithPrefix"
@@ -5048,7 +5053,7 @@
     {
       "from": "function:memory_extract:extractMemories",
       "kind": "call",
-      "to": "function:lib_action_cache:remove"
+      "to": "function:lib_action_cache:removeIfAttempt"
     },
     {
       "from": "function:memory_extract:extractMemories",
@@ -13611,6 +13616,12 @@
     },
     {
       "detail": "mutation",
+      "id": "function:lib_action_cache:removeIfAttempt",
+      "kind": "function",
+      "name": "lib.action_cache.removeIfAttempt"
+    },
+    {
+      "detail": "mutation",
       "id": "function:lib_claim_once:claimKey",
       "kind": "function",
       "name": "lib.claim_once.claimKey"
@@ -20414,7 +20425,7 @@
     {
       "file": "chat/lib/thread-helpers",
       "kind": "call",
-      "line": 106,
+      "line": 108,
       "reason": "\"getAgentForUser\" is not a registered function"
     },
     {
@@ -21932,25 +21943,25 @@
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 245,
+      "line": 264,
       "reason": "at module scope"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 251,
+      "line": 270,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 261,
+      "line": 280,
       "reason": "at module scope"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 273,
+      "line": 292,
       "reason": "at module scope"
     },
     {

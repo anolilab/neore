@@ -108,6 +108,27 @@ describe("extractMemories when the model filter rules cannot be read", () => {
         expect(generateText).toHaveBeenCalled();
     });
 
+    it("leaves a marker a concurrent attempt refreshed, when this attempt's rules read fails", async () => {
+        loadModelFilterRules.mockImplementation(async () => {
+            // Another attempt for the same exchange refreshes the marker while this one is still reading the rules.
+            await harness.run(async (ctx: any) => {
+                const { page } = await ctx.db.actionCache.findMany({});
+
+                for (const row of page.filter((entry: any) => entry.name === "memory.processedExchange")) {
+                    await ctx.db.patch(row._id, { value: { attempt: "another-attempt", reason: "heuristic" } });
+                }
+            });
+
+            throw new ModelFilterRulesUnavailableError();
+        });
+        await run();
+
+        const rows = await processedRows();
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].value.attempt).toBe("another-attempt");
+    });
+
     it("keeps the exchange processed when the rules allow no model", async () => {
         loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
         await run();

@@ -1122,6 +1122,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_action_cache:remove": lunora_lib_action_cache_133.remove as unknown as RegisteredLunoraFunction,
     "lib_action_cache:removeAll": lunora_lib_action_cache_133.removeAll as unknown as RegisteredLunoraFunction,
     "lib_action_cache:removeByArgs": lunora_lib_action_cache_133.removeByArgs as unknown as RegisteredLunoraFunction,
+    "lib_action_cache:removeIfAttempt": lunora_lib_action_cache_133.removeIfAttempt as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKey": lunora_lib_claim_once_134.claimKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_134.claimKeyFenced as unknown as RegisteredLunoraFunction,
     "lib_claim_once:completeKey": lunora_lib_claim_once_134.completeKey as unknown as RegisteredLunoraFunction,
@@ -5952,6 +5953,13 @@ if (typeof source["args"] !== "string") return DEFER;
 if (typeof source["name"] !== "string") return DEFER;
 return { "args": source["args"], "name": source["name"] };
 });
+installCompiledValidatorMap(lunora_lib_action_cache_133.removeIfAttempt.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["attempt"] !== "string") return DEFER;
+if (typeof source["key"] !== "string") return DEFER;
+return { "attempt": source["attempt"], "key": source["key"] };
+});
 installCompiledValidatorMap(lunora_lib_claim_once_134.claimKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9414,6 +9422,7 @@ export interface Caller {
             remove: (args: { key: string }) => Promise<null>;
             removeAll: (args: { name: string }) => Promise<null>;
             removeByArgs: (args: { args: string; name: string }) => Promise<null>;
+            removeIfAttempt: (args: { attempt: string; key: string }) => Promise<null>;
         };
         claim_once: {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
@@ -11300,6 +11309,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             remove: (args) => callRegistered(context, "lib_action_cache:remove", args),
             removeAll: (args) => callRegistered(context, "lib_action_cache:removeAll", args),
             removeByArgs: (args) => callRegistered(context, "lib_action_cache:removeByArgs", args),
+            removeIfAttempt: (args) => callRegistered(context, "lib_action_cache:removeIfAttempt", args),
         },
         claim_once: {
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
