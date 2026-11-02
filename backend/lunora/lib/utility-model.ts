@@ -61,7 +61,7 @@ export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): Mo
 const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
     const blocked = rules?.blockedRegions;
 
-    return !blocked || blocked.length === 0 || !deriveModelRegions(definition).some((region) => blocked.includes(region));
+    return !blocked || blocked.length === 0 || deriveModelRegions(definition).every((region) => !blocked.includes(region));
 };
 
 /**

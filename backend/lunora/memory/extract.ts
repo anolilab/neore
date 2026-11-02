@@ -136,10 +136,10 @@ const PROCESSED_EXCHANGE_CACHE_NAME = "memory.processedExchange";
 const GATE_EVENT = "memory.extraction_gate";
 
 type GateOutcome = (GateDecision | { reason: "opt_out"; verdict: "skip" }) & {
-    /** The cache entry that marks this exchange processed, when the gate wrote one: cleared if the extraction cannot run for a transient reason. */
-    processedKey?: string;
     /** Identifies the marker this attempt wrote, so cleanup never deletes a concurrent attempt's refreshed one. */
     processedAttempt?: string;
+    /** The cache entry that marks this exchange processed, when the gate wrote one: cleared if the extraction cannot run for a transient reason. */
+    processedKey?: string;
 };
 
 interface GateArgs {
@@ -325,7 +325,9 @@ export const extractMemories = internalAction
             if (error instanceof NoAllowedUtilityModelError) {
                 // An unreadable rules read is transient: the turn must stay extractable on a retry, so it is not left marked processed.
                 if (error instanceof ModelFilterRulesUnavailableError && gate.processedKey !== undefined && gate.processedAttempt !== undefined) {
-                    await ctx.runMutation(internal.lib.action_cache.removeIfAttempt, { attempt: gate.processedAttempt, key: gate.processedKey }).catch(() => null);
+                    await ctx
+                        .runMutation(internal.lib.action_cache.removeIfAttempt, { attempt: gate.processedAttempt, key: gate.processedKey })
+                        .catch(() => null);
                 }
 
                 logGate("no-allowed-utility-model", "skip");

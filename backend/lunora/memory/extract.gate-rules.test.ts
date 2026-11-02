@@ -114,8 +114,10 @@ describe("extractMemories when the model filter rules cannot be read", () => {
             await harness.run(async (ctx: any) => {
                 const { page } = await ctx.db.actionCache.findMany({});
 
-                for (const row of page.filter((entry: any) => entry.name === "memory.processedExchange")) {
-                    await ctx.db.patch(row._id, { value: { attempt: "another-attempt", reason: "heuristic" } });
+                for (const row of page) {
+                    if (row.name === "memory.processedExchange") {
+                        await ctx.db.patch(row._id, { value: { attempt: "another-attempt", reason: "heuristic" } });
+                    }
                 }
             });
 
