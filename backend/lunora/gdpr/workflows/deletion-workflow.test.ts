@@ -371,3 +371,60 @@ describe("account deletion workflow: watched repositories", () => {
         ).toEqual(first);
     });
 });
+
+/** A context whose `run` honours `dedupId` the way the workflow runtime does: a seen id answers its cached result without running the effect. */
+const replayingContext = (effects: string[], cache: Map<string, unknown>, unkeyed: string[]) => {
+    let inStep = false;
+
+    return {
+        params: PARAMS,
+        run: async (reference: unknown, _args: Record<string, unknown>, options?: { dedupId?: string }) => {
+            const ref = refOf(reference);
+
+            if (options?.dedupId === undefined) {
+                if (inStep) {
+                    unkeyed.push(ref);
+                }
+
+                return { cursor: null, hasMore: false };
+            }
+
+            if (!cache.has(options.dedupId)) {
+                effects.push(`${ref}#${options.dedupId}`);
+                cache.set(options.dedupId, { cursor: null, hasMore: false });
+            }
+
+            return cache.get(options.dedupId);
+        },
+        step: {
+            do: async (_name: string, callback: () => Promise<unknown>) => {
+                inStep = true;
+
+                try {
+                    return await callback();
+                } finally {
+                    inStep = false;
+                }
+            },
+        },
+    };
+};
+
+describe("account deletion workflow: replay", () => {
+    it("gives every call made inside a step an id, and a replayed step does not run its effect again", async () => {
+        const effects: string[] = [];
+        const cache = new Map<string, unknown>();
+        const unkeyed: string[] = [];
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, unkeyed) as never);
+
+        expect(unkeyed).toEqual([]);
+        expect(effects.length).toBeGreaterThan(30);
+
+        const first = effects.length;
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, unkeyed) as never);
+
+        expect(effects).toHaveLength(first);
+    });
+});

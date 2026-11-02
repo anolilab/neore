@@ -128,3 +128,60 @@ describe("data export workflow: watched repositories", () => {
         expect(collect?.dedupId).toContain(PARAMS.requestId);
     });
 });
+
+describe("data export workflow: replay", () => {
+    it("gives every call made inside a step an id, and a replayed step does not run its effect again", async () => {
+        const effects: string[] = [];
+        const cache = new Map<string, unknown>();
+        const unkeyed: string[] = [];
+
+        const replay = async (): Promise<void> => {
+            let inStep = false;
+            const context = {
+                params: PARAMS,
+                run: async (reference: unknown, _args: Record<string, unknown>, options?: { dedupId?: string }) => {
+                    const ref = refOf(reference);
+
+                    if (options?.dedupId === undefined) {
+                        if (inStep) {
+                            unkeyed.push(ref);
+                        }
+
+                        return [];
+                    }
+
+                    if (!cache.has(options.dedupId)) {
+                        effects.push(`${ref}#${options.dedupId}`);
+                        cache.set(options.dedupId, ref === "gdpr_steps:generateExportFile" ? "storage-1" : []);
+                    }
+
+                    return cache.get(options.dedupId);
+                },
+                step: {
+                    do: async (_name: string, callback: () => Promise<unknown>) => {
+                        inStep = true;
+
+                        try {
+                            return await callback();
+                        } finally {
+                            inStep = false;
+                        }
+                    },
+                },
+            };
+
+            await dataExportWorkflowConfig.handler(context as never);
+        };
+
+        await replay();
+
+        expect(unkeyed).toEqual([]);
+        expect(effects.filter((effect) => effect.includes("sendExportReadyEmail"))).toHaveLength(1);
+
+        const first = effects.length;
+
+        await replay();
+
+        expect(effects).toHaveLength(first);
+    });
+});
