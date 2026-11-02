@@ -24,17 +24,22 @@ export const ComposerLengthNotice = ({ chars, id, onAttachAsFile, tooLongForFile
 
     const count = formatNumber(chars, i18n.locale);
     const limit = formatNumber(MAX_PROMPT_CHARS, i18n.locale);
-    let noticeText = t`This message has ${count} characters; the limit is ${limit}. Shorten it.`;
+    let noticeText = t`This message is over the limit of ${limit} characters. Shorten it.`;
 
     if (tooLongForFile) {
-        noticeText = t`This message has ${count} characters; the limit is ${limit}. It is too long to send even as a file. Shorten it.`;
+        noticeText = t`This message is over the limit of ${limit} characters. It is too long to send even as a file. Shorten it.`;
     } else if (onAttachAsFile) {
-        noticeText = t`This message has ${count} characters; the limit is ${limit}. Shorten it, or attach it as a file.`;
+        noticeText = t`This message is over the limit of ${limit} characters. Shorten it, or attach it as a file.`;
     }
 
+    // The alert holds only text that stays the same while the draft grows, so a screen reader announces it once, when the
+    // draft crosses the cap. The changing count sits beside it, outside any live region.
     return (
-        <div className="flex flex-wrap items-center gap-2 px-3 pb-2 text-sm text-red-600 dark:text-red-400" id={id} role="alert">
-            <span>{noticeText}</span>
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-2 text-sm text-red-600 dark:text-red-400">
+            <span id={id} role="alert">
+                {noticeText}
+            </span>
+            <span>{t`${count} characters now.`}</span>
             {onAttachAsFile && !tooLongForFile && (
                 <Button onClick={onAttachAsFile} size="sm" type="button" variant="outline">
                     {t`Attach as file`}

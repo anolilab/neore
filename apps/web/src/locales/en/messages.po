@@ -821,6 +821,10 @@ msgstr "{count, plural, one {Used # source, toggle to show} other {Used # source
 msgid "{count, plural, one {Used # source} other {Used # sources}}"
 msgstr "{count, plural, one {Used # source} other {Used # sources}}"
 
+#: src/features/chat/thread/composer-length-notice.tsx:42
+msgid "{count} characters now."
+msgstr "{count} characters now."
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:418
 msgid "{count} queued"
 msgstr "{count} queued"
@@ -3826,7 +3830,7 @@ msgstr "At {0}"
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 
-#: src/features/chat/thread/composer-length-notice.tsx:42
+#: src/features/chat/thread/composer-length-notice.tsx:45
 msgid "Attach as file"
 msgstr "Attach as file"
 
@@ -7375,7 +7379,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
 #: src/features/chat/thread/composer-input.tsx:745
-#: src/features/chat/thread/composer-input.tsx:1239
+#: src/features/chat/thread/composer-input.tsx:1240
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -7671,7 +7675,7 @@ msgstr "Could not answer. Please try again."
 msgid "Could not apply the changes"
 msgstr "Could not apply the changes"
 
-#: src/features/chat/thread/composer-input.tsx:1261
+#: src/features/chat/thread/composer-input.tsx:1262
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -7870,11 +7874,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1264
+#: src/features/chat/thread/composer-input.tsx:1265
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1265
+#: src/features/chat/thread/composer-input.tsx:1266
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -10163,7 +10167,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1446
+#: src/features/chat/thread/composer-input.tsx:1447
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -12072,7 +12076,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1101
+#: src/features/chat/thread/composer-input.tsx:1102
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -12469,7 +12473,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1133
+#: src/features/chat/thread/composer-input.tsx:1134
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -16258,7 +16262,7 @@ msgstr "Intelligent video model that thinks before generating"
 msgid "Intensity"
 msgstr "Intensity"
 
-#: src/features/chat/thread/composer-input-area.tsx:318
+#: src/features/chat/thread/composer-input-area.tsx:319
 msgid "Interrupt and restart"
 msgstr "Interrupt and restart"
 
@@ -17961,7 +17965,7 @@ msgstr "Long text detected"
 msgid "Long text generation in images"
 msgstr "Long text generation in images"
 
-#: src/features/chat/thread/composer-input.tsx:817
+#: src/features/chat/thread/composer-input.tsx:818
 msgid "Long text was attached as a file."
 msgstr "Long text was attached as a file."
 
@@ -24258,7 +24262,7 @@ msgstr "Query usage analytics and costs"
 msgid "Question"
 msgstr "Question"
 
-#: src/features/chat/thread/composer-input-area.tsx:345
+#: src/features/chat/thread/composer-input-area.tsx:346
 msgid "Queue message"
 msgstr "Queue message"
 
@@ -26528,7 +26532,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:1060
+#: src/features/chat/thread/composer-input.tsx:1061
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -27176,7 +27180,7 @@ msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
 #: src/features/chat/thread/composer-input-area.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:399
+#: src/features/chat/thread/composer-input-area.tsx:400
 msgid "Send message"
 msgstr "Send message"
 
@@ -28869,7 +28873,7 @@ msgstr "Status Page"
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steer — the current reply reads this at its next step"
 
-#: src/features/chat/thread/composer-input-area.tsx:318
+#: src/features/chat/thread/composer-input-area.tsx:319
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
@@ -31322,16 +31326,28 @@ msgstr "This merges the commit {0} into the base branch with “{1}” on {hostL
 #~ msgstr "This message has {0} characters; the limit is {1}. Shorten it."
 
 #: src/features/chat/thread/composer-length-notice.tsx:30
-msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
-msgstr "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgstr "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
 
 #: src/features/chat/thread/composer-length-notice.tsx:32
-msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
-msgstr "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+#~ msgstr "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
 
 #: src/features/chat/thread/composer-length-notice.tsx:27
-msgid "This message has {count} characters; the limit is {limit}. Shorten it."
-msgstr "This message has {count} characters; the limit is {limit}. Shorten it."
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it."
+#~ msgstr "This message has {count} characters; the limit is {limit}. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
+msgstr "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+msgid "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
+msgstr "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+msgid "This message is over the limit of {limit} characters. Shorten it."
+msgstr "This message is over the limit of {limit} characters. Shorten it."
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -32598,7 +32614,7 @@ msgstr "Under the Hood"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:819
+#: src/features/chat/thread/composer-input.tsx:820
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Undo"
@@ -32826,7 +32842,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1296
+#: src/features/chat/thread/composer-input.tsx:1297
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -33016,12 +33032,12 @@ msgstr "Upload documents to your knowledge base and group them into collections.
 
 #: src/features/chat/thread/composer-input.tsx:406
 #: src/features/chat/thread/composer-input.tsx:605
-#: src/features/chat/thread/composer-input.tsx:1217
+#: src/features/chat/thread/composer-input.tsx:1218
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1210
+#: src/features/chat/thread/composer-input.tsx:1211
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
@@ -34187,9 +34203,9 @@ msgstr "Waiting for the owner to answer"
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
-#: src/features/chat/thread/composer-input-area.tsx:345
+#: src/features/chat/thread/composer-input-area.tsx:346
 #: src/features/chat/thread/composer-input-area.tsx:365
-#: src/features/chat/thread/composer-input-area.tsx:399
+#: src/features/chat/thread/composer-input-area.tsx:400
 #: src/features/chat/thread/composer-input-area.tsx:414
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"

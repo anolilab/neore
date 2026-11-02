@@ -11,6 +11,8 @@ interface MoveDraftToFileOptions {
     clearDraft: () => void;
     /** Drops the attachment that failed. */
     discard: (attachmentId: string) => void;
+    /** Ids of the attachments in the composer right now. */
+    getAttachmentIds: () => string[];
     /** The text in the composer right now. */
     getDraft: () => string;
     /** Called with the reason when the upload failed; the draft is still in the composer. */
@@ -31,7 +33,7 @@ export const draftFitsAsFile = (draft: string, otherAttachmentChars: number, lim
  * Moves the draft into a file. The composer is emptied only once the upload succeeded, and only if the text is still the
  * draft that was uploaded: on a failure the text stays and the failed chip goes, so nothing is lost.
  */
-export const moveDraftToFile = async ({ attach, clearDraft, discard, getDraft, onFailure }: MoveDraftToFileOptions): Promise<boolean> => {
+export const moveDraftToFile = async ({ attach, clearDraft, discard, getAttachmentIds, getDraft, onFailure }: MoveDraftToFileOptions): Promise<boolean> => {
     const draft = getDraft();
     const { attachmentId, error } = await attach(draft);
 
@@ -42,8 +44,8 @@ export const moveDraftToFile = async ({ attach, clearDraft, discard, getDraft, o
         return false;
     }
 
-    // Typing during the upload is not in the file; leave it be.
-    if (getDraft() === draft) {
+    // Typing during the upload is not in the file, and a file removed meanwhile is gone: either way the text stays.
+    if (getDraft() === draft && getAttachmentIds().includes(attachmentId)) {
         clearDraft();
     }
 

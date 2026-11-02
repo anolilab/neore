@@ -4,13 +4,14 @@ import { draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draf
 
 describe("moveDraftToFile", () => {
     const setup = (result: { attachmentId: string; error?: string }, current = "draft") => {
-        const state = { text: current };
+        const state = { attachments: [result.attachmentId], text: current };
         const options = {
             attach: vi.fn(async () => result),
             clearDraft: vi.fn(() => {
                 state.text = "";
             }),
             discard: vi.fn(),
+            getAttachmentIds: () => state.attachments,
             getDraft: () => state.text,
             onFailure: vi.fn(),
         };
@@ -48,6 +49,31 @@ describe("moveDraftToFile", () => {
         await moveDraftToFile(options);
 
         expect(state.text).toBe("draft and more");
+    });
+});
+
+describe("moveDraftToFile when the file is removed during the upload", () => {
+    it("keeps the draft", async () => {
+        const state = { attachments: ["a1"], text: "draft" };
+        const clearDraft = vi.fn(() => {
+            state.text = "";
+        });
+
+        await moveDraftToFile({
+            attach: async () => {
+                state.attachments = [];
+
+                return { attachmentId: "a1" };
+            },
+            clearDraft,
+            discard: vi.fn(),
+            getAttachmentIds: () => state.attachments,
+            getDraft: () => state.text,
+            onFailure: vi.fn(),
+        });
+
+        expect(clearDraft).not.toHaveBeenCalled();
+        expect(state.text).toBe("draft");
     });
 });
 

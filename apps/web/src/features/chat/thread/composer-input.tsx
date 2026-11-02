@@ -766,6 +766,7 @@ const ComposerInput = ({
             attach: attachTextAsFile,
             clearDraft: () => setText(""),
             discard: removeAttachment,
+            getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
             getDraft: () => useChatUIStore.getState().composerText,
             // A recognised failure was toasted where it was worded; the draft is still in the composer.
             onFailure: (error) => {

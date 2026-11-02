@@ -822,6 +822,10 @@ msgstr "{count, plural, other {使用了 # 个来源，点击切换显示}}"
 msgid "{count, plural, one {Used # source} other {Used # sources}}"
 msgstr "{count, plural, other {使用了 # 个来源}}"
 
+#: src/features/chat/thread/composer-length-notice.tsx:42
+msgid "{count} characters now."
+msgstr ""
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:418
 msgid "{count} queued"
 msgstr "{count} 条排队中"
@@ -3827,7 +3831,7 @@ msgstr ""
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr ""
 
-#: src/features/chat/thread/composer-length-notice.tsx:42
+#: src/features/chat/thread/composer-length-notice.tsx:45
 msgid "Attach as file"
 msgstr ""
 
@@ -7376,7 +7380,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
 #: src/features/chat/thread/composer-input.tsx:745
-#: src/features/chat/thread/composer-input.tsx:1239
+#: src/features/chat/thread/composer-input.tsx:1240
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -7672,7 +7676,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "无法应用更改"
 
-#: src/features/chat/thread/composer-input.tsx:1261
+#: src/features/chat/thread/composer-input.tsx:1262
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -7871,11 +7875,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1264
+#: src/features/chat/thread/composer-input.tsx:1265
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1265
+#: src/features/chat/thread/composer-input.tsx:1266
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -10164,7 +10168,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1446
+#: src/features/chat/thread/composer-input.tsx:1447
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -12073,7 +12077,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1101
+#: src/features/chat/thread/composer-input.tsx:1102
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -12470,7 +12474,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1133
+#: src/features/chat/thread/composer-input.tsx:1134
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -16259,7 +16263,7 @@ msgstr "先思考再生成的智能视频模型"
 msgid "Intensity"
 msgstr "强度"
 
-#: src/features/chat/thread/composer-input-area.tsx:318
+#: src/features/chat/thread/composer-input-area.tsx:319
 msgid "Interrupt and restart"
 msgstr ""
 
@@ -17962,7 +17966,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:817
+#: src/features/chat/thread/composer-input.tsx:818
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -24259,7 +24263,7 @@ msgstr "查询用量分析和成本"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:345
+#: src/features/chat/thread/composer-input-area.tsx:346
 msgid "Queue message"
 msgstr "排队消息"
 
@@ -26529,7 +26533,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1060
+#: src/features/chat/thread/composer-input.tsx:1061
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -27177,7 +27181,7 @@ msgstr "发送魔法链接"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
 #: src/features/chat/thread/composer-input-area.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:399
+#: src/features/chat/thread/composer-input-area.tsx:400
 msgid "Send message"
 msgstr "发送消息"
 
@@ -28870,7 +28874,7 @@ msgstr "状态页"
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:318
+#: src/features/chat/thread/composer-input-area.tsx:319
 msgid "Steer the reply"
 msgstr ""
 
@@ -31323,15 +31327,27 @@ msgstr ""
 #~ msgstr ""
 
 #: src/features/chat/thread/composer-length-notice.tsx:30
-msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
 msgstr ""
 
 #: src/features/chat/thread/composer-length-notice.tsx:32
-msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+msgid "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
 msgstr ""
 
 #: src/features/chat/thread/composer-length-notice.tsx:27
-msgid "This message has {count} characters; the limit is {limit}. Shorten it."
+msgid "This message is over the limit of {limit} characters. Shorten it."
 msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
@@ -32599,7 +32615,7 @@ msgstr "技术内幕"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:819
+#: src/features/chat/thread/composer-input.tsx:820
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -32827,7 +32843,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1296
+#: src/features/chat/thread/composer-input.tsx:1297
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -33017,12 +33033,12 @@ msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关
 
 #: src/features/chat/thread/composer-input.tsx:406
 #: src/features/chat/thread/composer-input.tsx:605
-#: src/features/chat/thread/composer-input.tsx:1217
+#: src/features/chat/thread/composer-input.tsx:1218
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1210
+#: src/features/chat/thread/composer-input.tsx:1211
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -34188,9 +34204,9 @@ msgstr "正在等待所有者回答"
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
-#: src/features/chat/thread/composer-input-area.tsx:345
+#: src/features/chat/thread/composer-input-area.tsx:346
 #: src/features/chat/thread/composer-input-area.tsx:365
-#: src/features/chat/thread/composer-input-area.tsx:399
+#: src/features/chat/thread/composer-input-area.tsx:400
 #: src/features/chat/thread/composer-input-area.tsx:414
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"

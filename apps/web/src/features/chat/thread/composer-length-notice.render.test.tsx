@@ -50,6 +50,19 @@ describe("ComposerLengthNotice", () => {
     });
 });
 
+describe("ComposerLengthNotice live region", () => {
+    it("keeps the alert text the same while the count grows, and shows the count outside it", () => {
+        const { rerender } = render(<ComposerLengthNotice chars={MAX_PROMPT_CHARS + 1} onAttachAsFile={() => {}} />);
+        const before = screen.getByRole("alert").textContent;
+
+        rerender(<ComposerLengthNotice chars={MAX_PROMPT_CHARS + 2} onAttachAsFile={() => {}} />);
+
+        expect(screen.getByRole("alert").textContent).toBe(before);
+        expect(screen.getByRole("alert").textContent).not.toContain("100,002");
+        expect(screen.getByText("100,002 characters now.")).toBeTruthy();
+    });
+});
+
 describe("ComposerLengthNotice when the file would not fit either", () => {
     it("says so and offers no file", () => {
         render(<ComposerLengthNotice chars={MAX_PROMPT_CHARS + 1} onAttachAsFile={() => {}} tooLongForFile />);
