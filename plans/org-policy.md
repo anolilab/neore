@@ -85,9 +85,10 @@ Each slice is one PR with its own tests.
 
 ## 9. Open decisions
 
-1. **Which organization applies.** A user can be in more than one organization, and can switch the active
-   one. If the policy follows only the active organization, a member escapes it by switching.
-   Options: (a) the strictest policy across all of the user's organizations; (b) only the organization that
-   invited them; (c) the active organization only, which is the simplest and the weakest. Recommended: (a).
+1. **Which organization applies. Decided: the selected organization's policy.** Each organization is its own
+   space. The policy loads from the selected organization on every switch, and runs use the policy of the
+   space they run in. Known escape: switching to a space with no policy (another organization, or the
+   personal space) lifts the locks in that space. Accepted as a risk; the admin view says so. The strictest
+   policy across all organizations was the alternative and is not chosen.
 2. **Behaviour when a policy cannot be read.** Default proposed: a write to a locked key fails closed (the
    write is refused); a default that cannot be read keeps the user's own value. Confirm before slice 2.
