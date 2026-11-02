@@ -37,6 +37,8 @@ export const pauseOnRateLimit = async (
         /** What the run's usage record needs, so a pause that never resumes can still record it. */
         reply: { skill?: { id?: string; name: string }; timeZone?: string };
         run: RunStreamingArgs;
+        /** The run's epoch (`run-epoch.ts`): a run a newer one replaced pauses nothing and gets `RUN_REPLACED`. */
+        runEpoch?: number;
         settle: () => Promise<unknown>;
         streamId: string;
     },
@@ -57,6 +59,7 @@ export const pauseOnRateLimit = async (
         replyRowIds,
         ...(rateLimit.retryAt !== undefined && { retryAt: rateLimit.retryAt }),
         run: args.run,
+        ...(args.runEpoch !== undefined && { runEpoch: args.runEpoch }),
         ...(args.reply.skill && { skill: args.reply.skill }),
         status: rateLimit.status,
         stepsUsed,

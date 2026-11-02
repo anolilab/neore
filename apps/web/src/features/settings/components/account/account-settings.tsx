@@ -77,6 +77,8 @@ const AccountSettings: FC = () => {
     // OPT-IN: absent is off — every suggestion sends the draft to a model.
     const isComposerAutocompleteEnabled = userSettings?.composerAutocompleteEnabled === true;
     const isResumeLastChat = userSettings?.resumeLastChat === true;
+    // Absent means on: a reply interrupted by a deploy or crash continues by itself.
+    const isResumeInterruptedRuns = userSettings?.resumeInterruptedRuns !== false;
     // Opt-in: absent means off.
     const isComposerVimMode = userSettings?.composerVimMode === true;
 
@@ -456,6 +458,28 @@ const AccountSettings: FC = () => {
                             onCheckedChange={(checked) => {
                                 // The confirmation waits for the save: a failed save must not read as saved.
                                 handleUpdateSetting("resumeLastChat", checked, checked ? t`Resuming your latest chat` : t`Opening a blank chat`);
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="resume-interrupted-runs">
+                                {t`Continue interrupted replies`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="resume-interrupted-runs-description">
+                                {t`When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="resume-interrupted-runs-description"
+                            checked={isResumeInterruptedRuns}
+                            id="resume-interrupted-runs"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "resumeInterruptedRuns",
+                                    checked,
+                                    checked ? t`Interrupted replies will continue` : t`Interrupted replies will stop`,
+                                );
                             }}
                         />
                     </div>

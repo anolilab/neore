@@ -19,6 +19,7 @@ import { endActiveGoals } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
+import { assertCurrentRun, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
@@ -112,6 +113,8 @@ export const addChunk = internalMutation
         reasoning: v.optional(v.string()),
         /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
         restart: v.optional(v.boolean()),
+        /** The writing run's epoch (`run-epoch.ts`): a chunk from a run a newer one replaced is refused. */
+        runEpoch: v.optional(v.number()),
         /** Group chat: this chunk starts a new participant's reply. */
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
@@ -138,6 +141,14 @@ export const addChunk = internalMutation
 
         if (stream.status !== "pending" && stream.status !== "streaming") {
             throw new LunoraError("CONFLICT", "Stream is not streaming; did it timeout?");
+        }
+
+        assertCurrentRun(stream, args.runEpoch);
+
+        // A run that carries an epoch writes only while it holds the stream: a pause (a rate-limit wait, or the resume the
+        // watchdog queued for a run it judged dead) means the writer is, or may be, the old one.
+        if (args.runEpoch !== undefined && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
         }
 
         // The chunk's position: one past the stream's last chunk, read off
@@ -340,7 +351,7 @@ export const stopActiveForThread = internalMutation
  * Deletes an empty pending row and moves the thread's leaf off it onto the row before it, so no branch is left on a
  * deleted row. The parent is read first: an implicit parent cannot be found once its child is gone.
  */
-const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
+export const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
     const parent = await parentOf(ctx, threadId, pending);
     const thread = await ctx.db.get("threads", threadId);
 
@@ -738,13 +749,13 @@ export const getChunksAfter = internalQuery
 // Pausing a run on a provider rate limit (`chat/lib/rate-limit-pause.ts`)
 // ---------------------------------------------------------------------------
 
-const isLiveStream = (stream: { status: string }): boolean => stream.status === "pending" || stream.status === "streaming";
+export const isLiveStream = (stream: { status: string }): boolean => stream.status === "pending" || stream.status === "streaming";
 
 /** A pause this far past its retry time has lost its resume (a dead-lettered or dropped job): "Retry now" queues another. */
 const RESUME_OVERDUE_MS = 30 * 1000;
 
 /** A reply row the model never wrote into: the placeholder a step opens before its call, left behind when that call is rejected. */
-const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
+export const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
     const message = row.message as { content?: unknown; role?: string } | undefined;
 
     return (
@@ -756,7 +767,7 @@ const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
 };
 
 /** Queue the resume of a pause: the run's own job again, with the pause's id, which it must claim before it does anything. */
-const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pause"]>, delayMs: number): Promise<void> => {
+export const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pause"]>, delayMs: number): Promise<void> => {
     await enqueueJob(internal.chat.execute.runStreamingAgent, { ...pause.run, resume: pause.id }, { delayMs });
 };
 
@@ -765,7 +776,7 @@ const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pau
  * (a regenerate, an edit, a new message), which makes this reply a branch nobody is reading. Streams are created in order,
  * so a later one is the latest by creation time; ties fail closed.
  */
-const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, from: string): Promise<boolean> => {
+export const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, from: string): Promise<boolean> => {
     const threadId = stream.threadId as Id<"threads">;
     const anchor = await ctx.db.messages.findFirst({ where: { _id: from as Id<"messages">, threadId } });
 
@@ -801,7 +812,7 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
 };
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
-const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, options: { holdThread?: boolean } = {}): Promise<void> => {
     await recordPausedRunUsage(ctx, stream);
     // No run will take a follow-up typed during the pause: its text goes, as on every other end of a stream.
     const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
@@ -813,7 +824,8 @@ const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">):
         where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId },
     });
 
-    if (page.every((other) => other._id === stream._id) && !(await hasLiveEdit(ctx, stream.threadId as Id<"threads">))) {
+    // `holdThread`: a goal owns the thread's status until it ends, as after a run that finished itself.
+    if (!options.holdThread && page.every((other) => other._id === stream._id) && !(await hasLiveEdit(ctx, stream.threadId as Id<"threads">))) {
         await patchThread(ctx.db, stream.threadId as Id<"threads">, { status: "active", updatedAt: ctx.now });
     }
 };
@@ -845,6 +857,8 @@ export const pauseRunForRateLimit = internalMutation
         replyRowIds: v.array(v.string().max(MAX_LENGTH.id)),
         retryAt: v.optional(v.number()),
         run: v.object({ ...runStreamingAgentFields }),
+        /** The pausing run's epoch (`run-epoch.ts`): a run a newer one replaced pauses nothing. */
+        runEpoch: v.optional(v.number()),
         skill: v.optional(v.object({ id: v.optional(v.string().max(MAX_LENGTH.id)), name: v.string().max(MAX_LENGTH.short) })),
         status: v.number(),
         stepsUsed: v.number(),
@@ -855,7 +869,13 @@ export const pauseRunForRateLimit = internalMutation
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
-        if (!stream || !isLiveStream(stream) || stream.pause !== undefined) {
+        if (!stream || !isLiveStream(stream)) {
+            return { paused: false, reason: "not_live" as const };
+        }
+
+        assertCurrentRun(stream, args.runEpoch);
+
+        if (stream.pause !== undefined) {
             return { paused: false, reason: "not_live" as const };
         }
 
@@ -919,6 +939,8 @@ export const pauseRunForRateLimit = internalMutation
     });
 
 const vResumeClaim = v.object({
+    /** The run's epoch from here on (`run-epoch.ts`): its writes carry it, and an older run's are refused. */
+    epoch: v.number(),
     from: v.string(),
     /** The reply rows the run saved before this pause (all pauses): the resume records one reply covering them and its own. */
     replyRowIds: v.array(v.string()),
@@ -955,12 +977,26 @@ export const claimRunResume = internalMutation
             return null;
         }
 
+        // The run that held the stream until now, if it is alive after all, is replaced by this one.
+        // (The watchdog's resume decision already moved the epoch: `inspectRun` fences the run it judged dead.)
+        const epoch = stream.pauseCause === "interrupted" ? epochOf(stream) : epochOf(stream) + 1;
+
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
-        await patchRow(ctx.db, "persistentStreams", stream, { expiresAt: ctx.now + STREAM_TTL_MS, pause: undefined });
+        await patchRow(ctx.db, "persistentStreams", stream, {
+            beatAt: ctx.now,
+            expiresAt: ctx.now + STREAM_TTL_MS,
+            pause: undefined,
+            pauseCause: undefined,
+            // This invocation's own claim: the ceiling its beats may extend the expiry to counts from here (`beatExpiry`).
+            runClaimedAt: ctx.now,
+            runEpoch: epoch,
+            toolsInFlight: undefined,
+        });
 
         const done = stream.pausedRun;
 
         return {
+            epoch,
             from,
             replyRowIds: done?.replyRowIds ?? [],
             ...(done?.skill && { skill: done.skill }),
@@ -989,7 +1025,8 @@ export const retryPausedRunsNow = internalMutation
         for (const stream of live) {
             const { pause } = stream;
 
-            if (!pause) {
+            // An interrupted run's resume is the watchdog's (`interrupted.ts`): there is no wait to end early.
+            if (!pause || stream.pauseCause !== undefined) {
                 continue;
             }
 

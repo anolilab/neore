@@ -45,10 +45,14 @@ import {
     setResearchDepth,
     setRunStartedBy,
     setThreadStatus,
+    readResumeInterruptedRuns,
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
+import { RUN_BEAT_MS } from "./lib/interrupted-run";
+import { createToolRunMarker } from "./lib/mark-tool-runs";
+import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
@@ -100,6 +104,8 @@ export const runStreamingAgent = internalAction
             // resumes a run paused on a rate limit (`resume`) claims that pause
             // instead, and learns which row the run continues from.
             let resumedFrom: string | undefined;
+            // Which run holds the stream (`lib/run-epoch.ts`): 0 for the first claim, the claim's number for a resume.
+            let runEpoch = 0;
             // What the run did before its pauses: the reply rows it saved, the steps it ran, what its usage record needs.
             let before: { replyRowIds: string[]; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string } = {
                 replyRowIds: [],
@@ -125,6 +131,7 @@ export const runStreamingAgent = internalAction
                 }
 
                 resumedFrom = claim.from;
+                runEpoch = claim.epoch;
                 before = claim;
             }
 
@@ -147,6 +154,45 @@ export const runStreamingAgent = internalAction
             let model = requestedModel;
             // Set once the run has saved rows: a run that fails still leaves the record of the calls the quick check approved.
             let stampSavedCalls: (() => Promise<void>) | undefined;
+            // Aborted when a newer run took the stream (`onReplaced`) or a sidebar stop ends this one.
+            const stopping = new AbortController();
+            let beat: ReturnType<typeof setInterval> | undefined;
+            let replaced = false;
+            // A newer run holds the stream (this one was slow, not dead): it stops without writing anything more.
+            const onReplaced = () => {
+                if (!replaced) {
+                    streamLogger.warn(`[BgAgent] Stream ${streamId} was taken over by a newer run — stopping this one`);
+                }
+
+                replaced = true;
+                clearInterval(beat);
+                stopping.abort();
+            };
+            const wasReplaced = (error: unknown) => replaced || isRunReplaced(error);
+            // The beat of a run that may be resumed after its worker dies (`streaming/persistent/interrupted.ts`). Idempotent.
+            const beatOnce = () => {
+                ctx.runMutation(internal.chat.streaming.persistent.interrupted.beatRun, {
+                    epoch: runEpoch,
+                    streamId: streamId as Id<"persistentStreams">,
+                }).catch((error: unknown) => {
+                    if (isRunReplaced(error)) {
+                        onReplaced();
+
+                        return;
+                    }
+
+                    // A beat that does not land is not fatal (the next one may), but a run that stops beating is read as dead.
+                    streamLogger.warn(`[BgAgent] Stream ${streamId}: a heartbeat failed:`, error);
+                });
+            };
+            const startBeat = () => {
+                beat ??= setInterval(beatOnce, RUN_BEAT_MS);
+            };
+            // Every tool call is marked on the stream until its step is saved: a worker that dies inside one is not resumed.
+            // Whether a worker death would be answered by a resume: only then must a tool refuse to run without a confirmed mark.
+            // A resumed run is resumable by definition (its watchdog chain exists); a first run becomes so when it registers.
+            let resumableRun = resume !== undefined;
+            const toolRuns = createToolRunMarker(ctx, { epoch: runEpoch, isResumable: () => resumableRun, onReplaced, streamId });
 
             try {
                 streamLogger.debug(`[BgAgent] Starting background agent execution`, {
@@ -155,13 +201,19 @@ export const runStreamingAgent = internalAction
                     threadId,
                 });
 
+                // A resumed run beats from the claim on: its setup (MCP, retrieval, memory) can outlast the stale window, and a
+                // watchdog that read that silence as a death would resume the run beside itself.
+                if (resume !== undefined) {
+                    startBeat();
+                }
+
                 const [thread, groupConfig, sseMessages, agentModulePrefs] = await reads;
 
                 // The thread, read with the caller's access checked.
                 if (!thread) {
                     // Through `failRun`, not a bare chunk: the thread was set to `running` when the run started,
                     // and only `failRun` takes it back out.
-                    await failRun(ctx, { safeMessage: "Thread not found", streamId, threadId, threadStatus: "active" });
+                    await failRun(ctx, { runEpoch, safeMessage: "Thread not found", streamId, threadId, threadStatus: "active" });
 
                     return;
                 }
@@ -196,7 +248,7 @@ export const runStreamingAgent = internalAction
                 // A failed preference read answers defaults, not the user's choices: a ZDR, region or provider rule may be
                 // hiding behind them, so the run is refused rather than sent out unrestricted.
                 if (agentModulePrefs.readFailed === true) {
-                    await failRun(ctx, { safeMessage: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, streamId, threadId, threadStatus: "error" });
+                    await failRun(ctx, { runEpoch, safeMessage: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, streamId, threadId, threadStatus: "error" });
 
                     return;
                 }
@@ -310,7 +362,7 @@ export const runStreamingAgent = internalAction
                               autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                               // Interactive: the user's devices, if this thread may reach them.
                               deviceThreadId: threadId,
-                              mcpProgress: toolProgressSink(ctx, streamId),
+                              mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
                               ...(origin === "outside_agent" && { origin }),
@@ -329,7 +381,7 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
-                const { tools } = toolResult;
+                const tools = toolRuns.wrap(toolResult.tools);
                 const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
@@ -380,7 +432,9 @@ export const runStreamingAgent = internalAction
                     skillEffort: invokedSkill?.config?.reasoningEffort,
                     threadEffort: appThread?.reasoningEffort,
                 });
-                const threadStatelessMode = appThread?.statelessMode ?? statelessMode;
+                // A resumed run continues stored rows, so it keeps the stateful mode it registered with: a thread switched to
+                // stateless meanwhile would otherwise send the original prompt alone and restart the reply.
+                const threadStatelessMode = resumedFrom === undefined ? (appThread?.statelessMode ?? statelessMode) : false;
 
                 // Reasoning provider options and, for auto-continue, step compression.
                 const streamTextArgs: any = buildRunStreamArgs({
@@ -418,12 +472,66 @@ export const runStreamingAgent = internalAction
                 // Messages the user sends into the reply while it streams (`chat/steering.ts`).
                 const steering = createRunSteering(ctx, { streamId, threadId, userId });
 
+                // The job's own arguments: what a pause or an interrupted run's resume re-enters the job with.
+                const runArgs = {
+                    isAnonymous,
+                    messageId,
+                    organizationId,
+                    origin,
+                    ...(goalSkill && { skill: goalSkill }),
+                    streamId,
+                    streamingConfig,
+                    threadId,
+                    userId,
+                    userPrompt,
+                };
+
+                const skill = invokedSkill ? { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } : undefined;
+
+                // A run with rows to continue from can be resumed when its worker dies: it registers and beats while it lives.
+                // A stateless run keeps no rows, so it is not.
+                if (!threadStatelessMode) {
+                    try {
+                        // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
+                        const resumable = await readResumeInterruptedRuns(userId);
+
+                        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
+                            epoch: runEpoch,
+                            labels: toolResult.mcpLabels,
+                            reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
+                            resumable,
+                            run: runArgs,
+                            streamId: streamId as Id<"persistentStreams">,
+                        });
+                        resumableRun = resumable || resume !== undefined;
+                        startBeat();
+                    } catch (error) {
+                        // A newer run holds the stream: this one stops.
+                        if (isRunReplaced(error)) {
+                            onReplaced();
+
+                            return;
+                        }
+
+                        // Any other failure (a busy shard, a timeout) must not cost the reply. But the answer may have been lost AFTER the
+                        // registration committed, and then a watchdog is already looking at this run: it must keep beating (or it
+                        // would be read as dead while it runs), and its tools must keep refusing to run unmarked. Beating a run that
+                        // was not registered is harmless.
+                        streamLogger.warn(`[BgAgent] Stream ${streamId} may not be registered for resuming; treating it as registered:`, error);
+                        resumableRun = true;
+                        beatOnce();
+                        startBeat();
+                    }
+                }
+
                 // Stream text
                 // Admitted by `streamRunThread` above: the run reads its context without a proof.
                 // Aborted only after a sidebar stop's reply is saved (see the catch below).
-                const stopping = new AbortController();
-
                 streamTextArgs.abortSignal = stopping.signal;
+                // The step's tool calls are accounted for once its rows are saved (the agent runs this after the save).
+                streamTextArgs.onStepFinish = async () => {
+                    await toolRuns.release();
+                };
                 // The steps this invocation finished: a pause carries the count to its resume.
                 const stepsFinished = { count: 0 };
 
@@ -435,8 +543,16 @@ export const runStreamingAgent = internalAction
                         return false;
                     },
                 ];
+
+                // Replaced while it set up (a long MCP connect, retrieval): it never starts the model call.
+                if (replaced) {
+                    return;
+                }
+
                 const result = await threadObject.streamText(streamTextArgs, {
                     admittedRun: true,
+                    // The step's rows land only while this run holds the stream: `addMessages` checks it in its own transaction.
+                    runHold: { epoch: runEpoch, streamId },
                     statelessMode: threadStatelessMode,
                     takeSteer: steering.takeSteer,
                 });
@@ -446,8 +562,6 @@ export const runStreamingAgent = internalAction
                 // Write chunks to persistent storage (DB only, no HTTP response)
                 const timingStart = Date.now();
                 let piped: PipedStream;
-
-                const skill = invokedSkill ? { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } : undefined;
 
                 stampSavedCalls = async () =>
                     await stampSavedToolCalls(ctx, {
@@ -459,6 +573,19 @@ export const runStreamingAgent = internalAction
 
                 // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
                 const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                    // The rows an earlier invocation of this reply saved (before a pause or a death) were never stamped with their
+                    // tool names: this run's labels are the same ones. Idempotent, and never masks how the run ended.
+                    if (priorRows.length > 0) {
+                        await stampSavedToolCalls(ctx, {
+                            autoApprovals: toolResult.autoApprovals,
+                            mcpLabels: toolResult.mcpLabels,
+                            savedMessages: priorRows,
+                            userId,
+                        }).catch((error: unknown) => {
+                            streamLogger.warn("[BgAgent] Could not stamp the tool calls of the reply's earlier rows:", error);
+                        });
+                    }
+
                     await afterRun(ctx, {
                         knowledgeSources: runContext.knowledgeSources,
                         retrievedMemories: runContext.retrievedMemories,
@@ -491,8 +618,15 @@ export const runStreamingAgent = internalAction
                 };
 
                 try {
-                    piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering.steeredBefore });
+                    piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { runEpoch, steeredBefore: steering.steeredBefore });
                 } catch (error) {
+                    // The model call was aborted because a newer run took the stream: nothing of this run's is saved or ended.
+                    if (wasReplaced(error)) {
+                        onReplaced();
+
+                        return;
+                    }
+
                     // A provider rate limit pauses the run and resumes it at the provider's retry time, as a queued job:
                     // nothing here waits. A stateless run keeps no rows to continue from, so it fails as before.
                     const paused =
@@ -510,18 +644,8 @@ export const runStreamingAgent = internalAction
                                 };
                             },
                             reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                            run: {
-                                isAnonymous,
-                                messageId,
-                                organizationId,
-                                origin,
-                                ...(goalSkill && { skill: goalSkill }),
-                                streamId,
-                                streamingConfig,
-                                threadId,
-                                userId,
-                                userPrompt,
-                            },
+                            run: runArgs,
+                            runEpoch,
                             settle: async () => await result.consumeStream(),
                             streamId,
                         }));
@@ -559,6 +683,7 @@ export const runStreamingAgent = internalAction
                         autoApprovals: toolResult.autoApprovals,
                         mcpLabels: toolResult.mcpLabels,
                         pending,
+                        runEpoch,
                         savedMessages: result.savedMessages,
                         snapshot: {
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
@@ -587,6 +712,12 @@ export const runStreamingAgent = internalAction
                         userId,
                     });
                 } catch (error) {
+                    if (wasReplaced(error)) {
+                        onReplaced();
+
+                        return;
+                    }
+
                     // A stop landed after the pipe ended: the final write is refused, the owed text is saved.
                     await stoppedAt(error);
 
@@ -624,6 +755,13 @@ export const runStreamingAgent = internalAction
                     threadId,
                 });
             } catch (error) {
+                // A newer run holds the stream: this one's failure is not the reply's, and it ends nothing of theirs.
+                if (wasReplaced(error)) {
+                    onReplaced();
+
+                    return;
+                }
+
                 streamLogger.error(`[BgAgent] Error:`, error);
 
                 // Our own validation text (skill disabled, required variable missing) is
@@ -639,7 +777,12 @@ export const runStreamingAgent = internalAction
                     safeMessage = "The custom endpoint for this model was removed or disabled. Pick another model or re-enable it in Settings → API Keys.";
                 }
 
-                await failRun(ctx, { safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
+                const failed = await failRun(ctx, { runEpoch, safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
+
+                // A newer run holds the stream: its reply is the one that gets recorded, not this run's partial one.
+                if (failed.replaced) {
+                    return;
+                }
 
                 // A run that failed after its pause still answered with the steps from before it, and with any it saved since: those are its reply.
                 if (priorRows.length > 0) {
@@ -651,6 +794,7 @@ export const runStreamingAgent = internalAction
                     });
                 }
             } finally {
+                clearInterval(beat);
                 await closeMCPClients(mcpClients);
             }
         },

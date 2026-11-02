@@ -630,6 +630,12 @@ export type Options = {
     contextOptions?: ContextOptions;
 
     /**
+     * The run that saves (`chat/lib/run-epoch.ts`). Each step's rows are written by `addMessages`, which refuses the
+     * write inside its own transaction once a newer run holds the stream, so a replaced run lands nothing beside it.
+     */
+    runHold?: { epoch: number; streamId: string };
+
+    /**
      * If true, skip all context fetching (search, recent messages, existing responses).
      * Only the current input messages will be sent to the LLM.
      * This overrides the agent-level statelessMode setting.

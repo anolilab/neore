@@ -12231,6 +12231,9 @@
                       "profession": {
                         "type": "string"
                       },
+                      "resumeInterruptedRuns": {
+                        "type": "boolean"
+                      },
                       "resumeLastChat": {
                         "type": "boolean"
                       },

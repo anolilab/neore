@@ -70,7 +70,7 @@ describe(failRun, () => {
                     throw new Error("label write failed");
                 },
             }),
-        ).resolves.toBeUndefined();
+        ).resolves.toStrictEqual({ replaced: false });
         expect(calls.find((call) => call.ref === internal.agent.threads.updateThread)?.args).toMatchObject({ patch: { status: "error" } });
     });
 

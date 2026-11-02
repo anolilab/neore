@@ -5,6 +5,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { query } from "../lib/crpc";
+import { assertRunHeld, vRunHold } from "../chat/lib/run-epoch";
 import { getAuthUserIdentity } from "../auth";
 import { omit } from "../lib/collections";
 
@@ -148,6 +149,8 @@ const addMessagesArgs = {
     parentMessageId: v.optional(v.string()),
     pendingMessageId: v.optional(v.id("messages")),
     promptMessageId: v.optional(v.id("messages")),
+    /** The streamed run that saves: refused here, in the same transaction as the rows, once a newer run holds its stream. */
+    runHold: v.optional(vRunHold),
     threadId: v.id("threads"),
     userId: v.optional(v.string()),
 };
@@ -178,8 +181,11 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         parentMessageId,
         pendingMessageId,
         promptMessageId,
+        runHold,
         ...rest
     } = args;
+
+    await assertRunHeld(context, runHold);
 
     const promptMessage = promptMessageId && (await context.db.get("messages", promptMessageId));
 
