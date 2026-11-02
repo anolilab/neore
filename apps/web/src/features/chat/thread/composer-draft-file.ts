@@ -84,11 +84,15 @@ export const insertPastedText = (draft: string, text: string, start: number, end
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
     discard: (attachmentId: string) => void;
+    /** The chat the composer belongs to right now; a paste is never written into a different one than it started in. */
+    getChatKey: () => string | undefined;
     getDraft: () => string;
     /** Called with the new attachment's id once the text is a file. */
     onAttached: (attachmentId: string) => void;
     /** Called with the reason when the text could not become a file; the text is already back in the composer. */
     onFailure: (error: string) => void;
+    /** Called instead of `onFailure` when the user left the chat meanwhile: the text went nowhere, the other chat's draft is untouched. */
+    onNotInserted: (error: string) => void;
     pastedText: string;
     /** Where the paste landed in the draft, read before the upload started. */
     selection: { end: number; start: number };
@@ -97,18 +101,24 @@ interface AttachLongPasteOptions {
 
 /**
  * Moves a pasted text (whose default paste was prevented) into a file. When that fails the text goes into the composer at
- * the paste position instead and the failed chip goes, so the paste is never in neither place.
+ * the paste position instead and the failed chip goes, so the paste is never in neither place. If the draft changed during
+ * the upload the text is appended, since the saved offsets no longer point at the same characters; if the chat changed,
+ * nothing is written at all.
  */
 export const attachLongPaste = async ({
     attach,
     discard,
+    getChatKey,
     getDraft,
     onAttached,
     onFailure,
+    onNotInserted,
     pastedText,
     selection,
     setDraft,
 }: AttachLongPasteOptions): Promise<boolean> => {
+    const chatKey = getChatKey();
+    const draftAtPaste = getDraft();
     const { attachmentId, error } = await attach(pastedText);
 
     if (error === undefined) {
@@ -118,7 +128,16 @@ export const attachLongPaste = async ({
     }
 
     discard(attachmentId);
-    setDraft(insertPastedText(getDraft(), pastedText, selection.start, selection.end));
+
+    if (getChatKey() !== chatKey) {
+        onNotInserted(error);
+
+        return false;
+    }
+
+    const draft = getDraft();
+
+    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
     onFailure(error);
 
     return false;

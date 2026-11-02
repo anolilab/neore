@@ -476,6 +476,12 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    const threadIdRef = useRef(threadId);
+
+    useEffect(() => {
+        threadIdRef.current = threadId;
+    }, [threadId]);
+
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
 
@@ -860,9 +866,13 @@ const ComposerInput = ({
                 await attachLongPaste({
                     attach: attachTextAsFile,
                     discard: removeAttachment,
+                    getChatKey: () => threadIdRef.current,
                     getDraft: () => useChatUIStore.getState().composerText,
                     onAttached: (attachmentId) => {
                         announcePasteAttached(attachmentId, pastedText);
+                    },
+                    onNotInserted: () => {
+                        showError(t`The pasted text could not be attached and was not inserted.`);
                     },
                     // A recognised failure was toasted where it was worded; the text is back in the composer.
                     onFailure: (error) => {
@@ -876,7 +886,7 @@ const ComposerInput = ({
                 });
             }
         },
-        [handleFileSelect, announcePasteAttached, attachTextAsFile, pasteSelection, removeAttachment, setText],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.

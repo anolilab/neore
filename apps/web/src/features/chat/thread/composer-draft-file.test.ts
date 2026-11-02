@@ -4,13 +4,15 @@ import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, un
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
-        const state = { text: draft };
+        const state = { chat: "chat-1", text: draft };
         const options = {
             attach: vi.fn(async () => result),
             discard: vi.fn(),
+            getChatKey: () => state.chat,
             getDraft: () => state.text,
             onAttached: vi.fn(),
             onFailure: vi.fn(),
+            onNotInserted: vi.fn(),
             pastedText: "PASTED",
             selection: { end: 6, start: 6 },
             setDraft: vi.fn((text: string) => {
@@ -38,6 +40,38 @@ describe("attachLongPaste", () => {
         expect(options.discard).toHaveBeenCalledWith("a1");
         expect(options.onFailure).toHaveBeenCalledWith("Too big");
         expect(options.onAttached).not.toHaveBeenCalled();
+    });
+
+    it("appends the text when the draft changed during the upload, instead of splitting what was typed", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
+
+        options.attach.mockImplementation(async () => {
+            state.text = "beforeTYPED after";
+
+            return { attachmentId: "a1", error: "Too big" };
+        });
+
+        expect(await attachLongPaste(options)).toBe(false);
+        expect(state.text).toBe("beforeTYPED afterPASTED");
+        expect(options.onFailure).toHaveBeenCalledWith("Too big");
+    });
+
+    it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
+
+        options.attach.mockImplementation(async () => {
+            state.chat = "chat-2";
+            state.text = "other chat";
+
+            return { attachmentId: "a1", error: "Too big" };
+        });
+
+        expect(await attachLongPaste(options)).toBe(false);
+        expect(state.text).toBe("other chat");
+        expect(options.setDraft).not.toHaveBeenCalled();
+        expect(options.discard).toHaveBeenCalledWith("a1");
+        expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
+        expect(options.onFailure).not.toHaveBeenCalled();
     });
 
     it("replaces a selection and clamps an offset past the end", () => {
