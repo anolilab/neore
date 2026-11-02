@@ -456,6 +456,15 @@ export interface InternalApiTypes {
                 crons: {
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                 };
+                interrupted: {
+                    beatRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, null>;
+                    inspectRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, { kind: "gone" } | { kind: "fresh" } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
+                    markToolRun: FunctionReference<"mutation", { delta: 1 | -1; streamId: Id<"persistentStreams"> }, null>;
+                    registerResumableRun: FunctionReference<"mutation", { run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; streamId: Id<"persistentStreams"> }, boolean>;
+                };
+                interrupted_watch: {
+                    watchRun: FunctionReference<"action", { streamId: Id<"persistentStreams"> }, null>;
+                };
                 library: {
                     addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }, void>;
                     claimRunResume: FunctionReference<"mutation", { pauseId: string; streamId: Id<"persistentStreams"> }, { from: string; replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string } | null>;
@@ -1650,6 +1659,15 @@ export const internal: InternalApiTypes = {
             persistent: {
                 crons: {
                     cleanupExpiredStreams: { __lunoraRef: "chat_streaming_persistent_crons:cleanupExpiredStreams" },
+                },
+                interrupted: {
+                    beatRun: { __lunoraRef: "chat_streaming_persistent_interrupted:beatRun" },
+                    inspectRun: { __lunoraRef: "chat_streaming_persistent_interrupted:inspectRun" },
+                    markToolRun: { __lunoraRef: "chat_streaming_persistent_interrupted:markToolRun" },
+                    registerResumableRun: { __lunoraRef: "chat_streaming_persistent_interrupted:registerResumableRun" },
+                },
+                interrupted_watch: {
+                    watchRun: { __lunoraRef: "chat_streaming_persistent_interrupted_watch:watchRun" },
                 },
                 library: {
                     addChunk: { __lunoraRef: "chat_streaming_persistent_library:addChunk" },

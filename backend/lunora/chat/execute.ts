@@ -49,6 +49,8 @@ import {
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
+import { RUN_BEAT_MS } from "./lib/interrupted-run";
+import { markToolRuns } from "./lib/mark-tool-runs";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
@@ -147,6 +149,8 @@ export const runStreamingAgent = internalAction
             let model = requestedModel;
             // Set once the run has saved rows: a run that fails still leaves the record of the calls the quick check approved.
             let stampSavedCalls: (() => Promise<void>) | undefined;
+            // Stops the beat of a run that may be resumed after its worker dies (`streaming/persistent/interrupted.ts`).
+            let stopBeat: (() => void) | undefined;
 
             try {
                 streamLogger.debug(`[BgAgent] Starting background agent execution`, {
@@ -329,7 +333,8 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
-                const { tools } = toolResult;
+                // Every tool call is marked on the stream while it runs: a worker that dies inside one is not resumed.
+                const tools = markToolRuns(ctx, streamId, toolResult.tools);
                 const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
@@ -417,6 +422,37 @@ export const runStreamingAgent = internalAction
 
                 // Messages the user sends into the reply while it streams (`chat/steering.ts`).
                 const steering = createRunSteering(ctx, { streamId, threadId, userId });
+
+                // The job's own arguments: what a pause or an interrupted run's resume re-enters the job with.
+                const runArgs = {
+                    isAnonymous,
+                    messageId,
+                    organizationId,
+                    origin,
+                    ...(goalSkill && { skill: goalSkill }),
+                    streamId,
+                    streamingConfig,
+                    threadId,
+                    userId,
+                    userPrompt,
+                };
+
+                // A run with rows to continue from can be resumed when its worker dies: it registers and beats while it lives.
+                // A stateless run keeps no rows, so it is not.
+                if (!threadStatelessMode) {
+                    await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
+                        run: runArgs,
+                        streamId: streamId as Id<"persistentStreams">,
+                    });
+
+                    const beat = setInterval(() => {
+                        ctx.runMutation(internal.chat.streaming.persistent.interrupted.beatRun, { streamId: streamId as Id<"persistentStreams"> }).catch(
+                            () => undefined,
+                        );
+                    }, RUN_BEAT_MS);
+
+                    stopBeat = () => clearInterval(beat);
+                }
 
                 // Stream text
                 // Admitted by `streamRunThread` above: the run reads its context without a proof.
@@ -510,18 +546,7 @@ export const runStreamingAgent = internalAction
                                 };
                             },
                             reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                            run: {
-                                isAnonymous,
-                                messageId,
-                                organizationId,
-                                origin,
-                                ...(goalSkill && { skill: goalSkill }),
-                                streamId,
-                                streamingConfig,
-                                threadId,
-                                userId,
-                                userPrompt,
-                            },
+                            run: runArgs,
                             settle: async () => await result.consumeStream(),
                             streamId,
                         }));
@@ -651,6 +676,7 @@ export const runStreamingAgent = internalAction
                     });
                 }
             } finally {
+                stopBeat?.();
                 await closeMCPClients(mcpClients);
             }
         },

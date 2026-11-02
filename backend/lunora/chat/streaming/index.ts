@@ -247,14 +247,16 @@ export const getActiveStreamForThread = optionalAuthQuery
             streamId: stream._id,
             ...(delivered.length > 0 && { deliveredSteerIds: delivered }),
             ...(stream.hostState !== undefined && { hostState: stream.hostState }),
-            ...(stream.pause && {
-                pause: {
-                    ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
-                    reason: stream.pause.reason,
-                    retryAt: stream.pause.retryAt,
-                    status: stream.pause.status,
-                },
-            }),
+            // Only a rate-limit wait is shown (and offers "Retry now"); an interrupted run's resume is queued at once.
+            ...(stream.pause &&
+                stream.pauseCause === undefined && {
+                    pause: {
+                        ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
+                        reason: stream.pause.reason,
+                        retryAt: stream.pause.retryAt,
+                        status: stream.pause.status,
+                    },
+                }),
         };
     });
 

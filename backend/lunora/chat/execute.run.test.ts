@@ -138,6 +138,8 @@ beforeAll(async () => {
     registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
+    registerModule(registry, "chat_streaming_persistent_interrupted", await import("./streaming/persistent/interrupted"));
+    registerModule(registry, "chat_streaming_persistent_interrupted_watch", await import("./streaming/persistent/interrupted-watch"));
 
     // The reads whose tables the harness cannot hold, or that touch encrypted keys.
     registry.set(

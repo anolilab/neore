@@ -340,7 +340,7 @@ export const stopActiveForThread = internalMutation
  * Deletes an empty pending row and moves the thread's leaf off it onto the row before it, so no branch is left on a
  * deleted row. The parent is read first: an implicit parent cannot be found once its child is gone.
  */
-const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
+export const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
     const parent = await parentOf(ctx, threadId, pending);
     const thread = await ctx.db.get("threads", threadId);
 
@@ -738,13 +738,13 @@ export const getChunksAfter = internalQuery
 // Pausing a run on a provider rate limit (`chat/lib/rate-limit-pause.ts`)
 // ---------------------------------------------------------------------------
 
-const isLiveStream = (stream: { status: string }): boolean => stream.status === "pending" || stream.status === "streaming";
+export const isLiveStream = (stream: { status: string }): boolean => stream.status === "pending" || stream.status === "streaming";
 
 /** A pause this far past its retry time has lost its resume (a dead-lettered or dropped job): "Retry now" queues another. */
 const RESUME_OVERDUE_MS = 30 * 1000;
 
 /** A reply row the model never wrote into: the placeholder a step opens before its call, left behind when that call is rejected. */
-const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
+export const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
     const message = row.message as { content?: unknown; role?: string } | undefined;
 
     return (
@@ -756,7 +756,7 @@ const isEmptyPlaceholder = (row: Doc<"messages">): boolean => {
 };
 
 /** Queue the resume of a pause: the run's own job again, with the pause's id, which it must claim before it does anything. */
-const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pause"]>, delayMs: number): Promise<void> => {
+export const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pause"]>, delayMs: number): Promise<void> => {
     await enqueueJob(internal.chat.execute.runStreamingAgent, { ...pause.run, resume: pause.id }, { delayMs });
 };
 
@@ -765,7 +765,7 @@ const enqueueRunResume = async (pause: NonNullable<Doc<"persistentStreams">["pau
  * (a regenerate, an edit, a new message), which makes this reply a branch nobody is reading. Streams are created in order,
  * so a later one is the latest by creation time; ties fail closed.
  */
-const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, from: string): Promise<boolean> => {
+export const isSuperseded = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, from: string): Promise<boolean> => {
     const threadId = stream.threadId as Id<"threads">;
     const anchor = await ctx.db.messages.findFirst({ where: { _id: from as Id<"messages">, threadId } });
 
@@ -801,7 +801,7 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
 };
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
-const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
     await recordPausedRunUsage(ctx, stream);
     // No run will take a follow-up typed during the pause: its text goes, as on every other end of a stream.
     const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
@@ -956,7 +956,13 @@ export const claimRunResume = internalMutation
         }
 
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
-        await patchRow(ctx.db, "persistentStreams", stream, { expiresAt: ctx.now + STREAM_TTL_MS, pause: undefined });
+        await patchRow(ctx.db, "persistentStreams", stream, {
+            beatAt: ctx.now,
+            expiresAt: ctx.now + STREAM_TTL_MS,
+            pause: undefined,
+            pauseCause: undefined,
+            toolsInFlight: undefined,
+        });
 
         const done = stream.pausedRun;
 
@@ -989,7 +995,8 @@ export const retryPausedRunsNow = internalMutation
         for (const stream of live) {
             const { pause } = stream;
 
-            if (!pause) {
+            // An interrupted run's resume is the watchdog's (`interrupted.ts`): there is no wait to end early.
+            if (!pause || stream.pauseCause !== undefined) {
                 continue;
             }
 

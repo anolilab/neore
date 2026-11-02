@@ -1167,6 +1167,7 @@ export interface Doc_persistentChunks {
 export interface Doc_persistentStreams {
     _id: Id<"persistentStreams">;
     _creationTime: number;
+    beatAt?: number;
     carriesHandoff?: boolean;
     earlySteps?: Array<string>;
     expiresAt: number;
@@ -1175,17 +1176,21 @@ export interface Doc_persistentStreams {
     hostRegenerate?: boolean;
     hostState?: "accepted" | "received" | "running" | "ended";
     hostTurnId?: string;
+    interruptions?: number;
     messageId: string;
     pause?: { from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number };
+    pauseCause?: "interrupted";
     pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
     pausedSteps?: Array<string>;
     producer?: "host";
+    runArgs?: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string };
     runClaimedAt?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
+    toolsInFlight?: number;
     userId: string;
 }
 
@@ -2071,6 +2076,7 @@ export interface Doc_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    resumeInterruptedRuns?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;
@@ -4142,6 +4148,7 @@ export interface Insert_persistentChunks {
 export interface Insert_persistentStreams {
     _id?: Id<"persistentStreams">;
     _creationTime?: number;
+    beatAt?: number;
     carriesHandoff?: boolean;
     earlySteps?: Array<string>;
     expiresAt: number;
@@ -4150,17 +4157,21 @@ export interface Insert_persistentStreams {
     hostRegenerate?: boolean;
     hostState?: "accepted" | "received" | "running" | "ended";
     hostTurnId?: string;
+    interruptions?: number;
     messageId: string;
     pause?: { from: string; id: string; provider?: string; reason: "rate_limit"; retryAt: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; status: number };
+    pauseCause?: "interrupted";
     pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
     pausedSteps?: Array<string>;
     producer?: "host";
+    runArgs?: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string };
     runClaimedAt?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
+    toolsInFlight?: number;
     userId: string;
 }
 
@@ -5046,6 +5057,7 @@ export interface Insert_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    resumeInterruptedRuns?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;

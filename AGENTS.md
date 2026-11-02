@@ -273,6 +273,24 @@ written here is what is not.
   `persistentChunks`; the client streams from the gateway, which polls
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
+  **Interrupted runs** (`chat/streaming/persistent/interrupted*.ts`,
+  `chat/lib/interrupted-run.ts`): a run about to generate registers its job args on the
+  stream (`registerResumableRun`), beats every minute (`beatRun`; the beat patches the
+  stream row, so never faster) and marks each tool call while it executes
+  (`markToolRun`, via `markToolRuns`). One watchdog chain per stream (`watchRun`, a
+  scheduler action, every minute) sees a claimed, unpaused stream with a beat older
+  than 3 minutes as dead and queues the SAME resume a rate-limit pause queues: a
+  `pause` marked `pauseCause: "interrupted"`, claimed by `claimRunResume` (so redelivery
+  still resumes once). `from`, the reply rows and the step count are DERIVED from the
+  saved rows, never from the dead run's memory (`settleSavedRows`); anything that is
+  not a finished row or an empty placeholder, a trailing tool call without its result,
+  a delivered steer or an open tool mark fails the run visibly instead. At most 3
+  resumes per reply (`interruptions`), independent of the 3 rate-limit pauses; the
+  4th interruption fails with an error line. Opt out with
+  `userSettings.resumeInterruptedRuns === false` (absent = on): the stream then
+  expires into `timeout` as before. An interrupted pause is not shown as a rate-limit
+  wait and "Retry now" skips it. Not covered: tool-approval continuations, group
+  turns and stateless runs register nothing, so they still time out.
 
 - **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
   a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
@@ -1808,8 +1826,13 @@ first real request. They were found by driving the app in a browser
   mid-run is NEVER re-run (it may already have paid); when its deadline lapses
   the cron tick (`reapLapsedClaims`) runs its `onLapse` — for media,
   `chat/media-abandon.ts` fails the pending row stamped with that `jobId`
-  (`providerMetadata.neoreJob`), so the user can retry. A redelivered run is dropped, not
-  resumed: a run killed mid-way leaves its stream for the timeout cron.
+  (`providerMetadata.neoreJob`), so the user can retry. A redelivered
+  `runStreamingAgent` is dropped (the claim is taken), but a run whose worker DIED is
+  resumed by the interrupted-run watchdog (see "Edge streaming"): from its last SAVED
+  row, so a step that finished is never run again. The step in flight was lost; its
+  model call may have been billed (the gateway records usage per call) and the re-run
+  is a new call charged on its own, so the guarantee is "no completed step charged
+  twice", not "one model call". A run that died inside a TOOL is never resumed.
   **Local dev:** Miniflare's broker ignores `max_concurrency` and runs one
   batch at a time, so wrangler.jsonc batches 10 per second
   (`JOBS_QUEUE_DEV_CONSUMER_OVERRIDES`) — a batch's messages dispatch
