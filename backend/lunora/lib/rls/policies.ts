@@ -431,6 +431,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     memberCredits: "org billing rows managed by org and platform admins",
     nodeExecutions: "no owner column; internal only",
     organization: "better-auth organizations; org-scoped",
+    organizationPolicies: "an organization's policy document; the owner writes and any member reads, both decided by the caller's active-organization role",
     payment_customers: "`@lunora/payment` store (Creem customers); read and written only through `ctx.payments` on `__root__`",
     payment_events: "`@lunora/payment` webhook claim log; system only",
     payment_sessions: "`@lunora/payment` store (Creem checkouts); system only",

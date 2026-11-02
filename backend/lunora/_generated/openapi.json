@@ -12621,6 +12621,212 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#auth_organization_policy:getOrganizationPolicy": {
+      "post": {
+        "description": "Invoke the `query` `auth_organization_policy:getOrganizationPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_organization_policy:getOrganizationPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_organization_policy:getOrganizationPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "policy": {
+                          "properties": {
+                            "models": {
+                              "properties": {
+                                "allowed": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "allowed"
+                              ],
+                              "type": "object"
+                            },
+                            "permissionCap": {
+                              "anyOf": [
+                                {
+                                  "const": "off",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ask",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "auto",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "schemaVersion": {
+                              "const": 1
+                            },
+                            "settings": {
+                              "additionalProperties": {
+                                "properties": {
+                                  "locked": {
+                                    "type": "boolean"
+                                  },
+                                  "value": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "locked",
+                                  "value"
+                                ],
+                                "type": "object"
+                              },
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "schemaVersion"
+                          ],
+                          "type": "object"
+                        },
+                        "revision": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "revision",
+                        "updatedAt"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: auth_organization_policy:getOrganizationPolicy",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#auth_organization_policy:setOrganizationPolicy": {
+      "post": {
+        "description": "Invoke the `mutation` `auth_organization_policy:setOrganizationPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_organization_policy:setOrganizationPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "document": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "document"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_organization_policy:setOrganizationPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "revision"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: auth_organization_policy:setOrganizationPolicy",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#auth_organization:checkSlug": {
       "post": {
         "description": "Invoke the `query` `auth_organization:checkSlug` over the Lunora RPC envelope (POST /_lunora/rpc).",

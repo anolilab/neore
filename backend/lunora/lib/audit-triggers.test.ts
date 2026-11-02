@@ -4,7 +4,7 @@
  * The list here names which tables write an audit row and which column
  * attributes it; `schema.ts` names each table a second time,
  * `.triggers((t) => auditTriggersFor(t, "<table>", AUDIT_TABLES["<table>"]!))`,
- * 19 times. The generator that used to emit those lines from the list is
+ * 20 times. The generator that used to emit those lines from the list is
  * deleted, so nothing keeps them in step.
  *
  * Every way they can drift fails SILENTLY, which is why this is a test and not a
