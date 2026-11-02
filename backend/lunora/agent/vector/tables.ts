@@ -62,21 +62,36 @@ export const getVectorTableName = (dimension: VectorDimension) => `embeddings_${
  */
 export const getVectorIndexName = (dimension: VectorDimension) => `embeddings-${dimension}`;
 
-/**
- * The `embeddings_*` table holding the row `id`, or `null` when none does. An id carries no table of its
- * own (`db.normalizeId` only checks its shape), and `ctx.db` by-id calls take the table first, so it is found
- * by reading each dimension's table in turn.
- */
-export const findVectorTable = async (db: { get: (table: never, id: never) => Promise<unknown> }, id: string): Promise<VectorTableName | null> => {
-    for (const dimension of VectorDimensions) {
-        const tableName = getVectorTableName(dimension);
+/** The dimensions in probe order: 768 first, the usual one, so most lookups cost a single read. */
+const PROBE_ORDER = [768, ...VectorDimensions.filter((dimension) => dimension !== 768)] as const;
 
-        if ((await db.get(tableName as never, id as never)) !== null) {
-            return tableName;
+/**
+ * The `embeddings_*` table holding the row `id` and the row itself, or `null` when none does. An id carries
+ * no table of its own (`db.normalizeId` only checks its shape), and `ctx.db` by-id calls take the table first,
+ * so it is found by reading each dimension's table in turn. Callers that need the row take it from here
+ * instead of reading it again.
+ */
+export const findVectorRow = async (
+    db: { get: (table: never, id: never) => Promise<unknown> },
+    id: string,
+): Promise<{ row: Record<string, unknown>; table: VectorTableName } | null> => {
+    for (const dimension of PROBE_ORDER) {
+        const table = getVectorTableName(dimension);
+        const row = await db.get(table as never, id as never);
+
+        if (row !== null && row !== undefined) {
+            return { row: row as Record<string, unknown>, table };
         }
     }
 
     return null;
+};
+
+/** The `embeddings_*` table holding the row `id`, or `null` when none does. */
+export const findVectorTable = async (db: { get: (table: never, id: never) => Promise<unknown> }, id: string): Promise<VectorTableName | null> => {
+    const found = await findVectorRow(db, id);
+
+    return found?.table ?? null;
 };
 
 /** The table and dimension of vector row `id`, or `null` when no `embeddings_*` table holds it (already deleted). */
