@@ -104,6 +104,8 @@ describe("how an agent is started", () => {
         expect(launch.args[1]).toContain("echo 700 > /proc/self/oom_score_adj");
         expect(launch.args[1]).toContain("exec \"$@\"");
         expect(launch.args[1]).not.toContain("claude");
+        // sh would otherwise add PWD to an environment that is exactly the plan's.
+        expect(launch.args[1]).toContain("unset PWD; exec");
         expect(launch.lowerAfterSpawn).toEqual({ nice: false, oomScoreAdj: false });
     });
 

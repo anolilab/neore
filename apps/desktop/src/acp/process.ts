@@ -13,11 +13,15 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { getPriority, setPriority } from "node:os";
 import type { Readable, Writable } from "node:stream";
+import { setTimeout as delay } from "node:timers/promises";
 
 import type { SpawnPlan } from "./types";
 
 /** How long a polite stop waits before the group is killed. */
 const TERM_GRACE_MS = 2000;
+
+/** How long a denied signal waits to learn whether its leader was in fact already exiting. */
+const DENIAL_SETTLE_MS = 500;
 
 /** What is kept of an agent's stderr, for an error message. */
 export const STDERR_KEEP_BYTES = 4096;
@@ -100,7 +104,7 @@ export interface AgentLaunch {
 /**
  * The command that starts the agent already lowered, so nothing it forks in its first instants keeps full priority.
  * `nice -n DELTA` sets the niceness, and on Linux a `sh` writes the score into `/proc/self` and `exec`s on (same pid,
- * so the agent inherits it). The plan's command and arguments travel as separate argv entries, never through a shell
+ * so the agent inherits it; `PWD`, which `sh` adds to the environment, is dropped again). The plan's command and arguments travel as separate argv entries, never through a shell
  * string. Without `nice` or `sh` the matching value is set after the spawn instead.
  */
 export const agentLaunch = (plan: Pick<SpawnPlan, "args" | "command">, host: HostPriority): AgentLaunch => {
@@ -117,7 +121,7 @@ export const agentLaunch = (plan: Pick<SpawnPlan, "args" | "command">, host: Hos
 
     if (oomInline) {
         // A refused write (a read-only /proc) must not stop the agent: the score is only a preference.
-        args = ["-c", `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null; exec "$@"`, "sh", command, ...args];
+        args = ["-c", `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null; unset PWD; exec "$@"`, "sh", command, ...args];
         command = SH_PATH;
     }
 
@@ -134,11 +138,30 @@ const readHostOomScoreAdj = (): number => {
     }
 };
 
+const warned = new Set<string>();
+
+/** The app's own niceness, or undefined where the machine will not tell (a container may deny the query). */
+const readHostNice = (): number | undefined => {
+    try {
+        return getPriority(0);
+    } catch (error) {
+        if (!warned.has("priority")) {
+            warned.add("priority");
+            console.warn(`[neore-desktop] cannot read the app's priority, starting agents without lowering it: ${(error as Error).message}`);
+        }
+
+        return undefined;
+    }
+};
+
 const hostPriority = (): HostPriority => {
+    const nice = readHostNice();
+
     return {
-        hasNice: existsSync(NICE_PATH),
+        // Lowering is best effort: without a reading there is nothing to lower relative to, so no wrapper.
+        hasNice: nice !== undefined && existsSync(NICE_PATH),
         hasSh: existsSync(SH_PATH),
-        nice: getPriority(0),
+        nice: nice ?? 0,
         oomScoreAdj: process.platform === "linux" ? readHostOomScoreAdj() : 0,
         platform: process.platform,
     };
@@ -167,18 +190,43 @@ export const lowerAgentPriority = (pid: number, host: HostPriority, remaining: A
     }
 };
 
-/** Signals a whole process group. A group that is already gone (ESRCH) is the goal, not an error. */
-const signalGroup = (pid: number, signal: NodeJS.Signals): void => {
+/** Whether the leader `pid` is known to be gone: its exit was seen, or the system no longer has the pid. */
+const leaderGone = (child: ChildProcess, pid: number): boolean => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+        return true;
+    }
+
+    try {
+        process.kill(pid, 0);
+
+        return false;
+    } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "ESRCH";
+    }
+};
+
+/**
+ * Signals a whole process group. A group that is already gone (ESRCH) is the goal, not an error. EPERM is the same
+ * only once the leader has exited: macOS answers it for a group whose only member is an exited leader not yet reaped
+ * (a command `nice` cannot run ends that way). While the leader lives it is a real denial and surfaces.
+ */
+const signalGroup = (child: ChildProcess, signal: NodeJS.Signals): void => {
+    const { pid } = child;
+
+    if (pid === undefined) {
+        return;
+    }
+
     try {
         process.kill(-pid, signal);
     } catch (error) {
-        // macOS answers EPERM for a group whose only member is an exited leader not yet reaped: also gone, and the
-        // agent now starts through `nice`, which makes a command that cannot run end that way within milliseconds.
         const { code } = error as NodeJS.ErrnoException;
 
-        if (code !== "ESRCH" && code !== "EPERM") {
-            throw error;
+        if (code === "ESRCH" || (code === "EPERM" && leaderGone(child, pid))) {
+            return;
         }
+
+        throw error;
     }
 };
 
@@ -226,12 +274,10 @@ export const spawnAgent: Spawner = (plan) => {
         });
         child.once("exit", (code, signal) => {
             // The leader is gone, and a crash leaves its shells and tools running in the group. They go with it.
-            if (child.pid !== undefined) {
-                try {
-                    signalGroup(child.pid, "SIGKILL");
-                } catch {
-                    // Nothing more can be done for a group we may not signal.
-                }
+            try {
+                signalGroup(child, "SIGKILL");
+            } catch {
+                // Nothing more can be done for a group we may not signal.
             }
 
             resolve({ code, signal });
@@ -249,11 +295,24 @@ export const spawnAgent: Spawner = (plan) => {
             return;
         }
 
-        signalGroup(pid, "SIGTERM");
+        try {
+            signalGroup(child, "SIGTERM");
+        } catch (error) {
+            // An exited leader that is not yet reaped answers EPERM on macOS, and its exit follows within moments.
+            // If it does not exit, the denial is real: report it rather than wait for a process we cannot signal.
+            const cancelDelay = new AbortController();
+            const settled = await Promise.race([exited, delay(DENIAL_SETTLE_MS, undefined, { signal: cancelDelay.signal })]);
+
+            cancelDelay.abort();
+
+            if (settled === undefined) {
+                throw error;
+            }
+        }
 
         const timer = setTimeout(() => {
             try {
-                signalGroup(pid, "SIGKILL");
+                signalGroup(child, "SIGKILL");
             } catch {
                 // A group we may not signal cannot be helped from a timer; the exit below still ends the wait.
             }
@@ -262,14 +321,17 @@ export const spawnAgent: Spawner = (plan) => {
         await exited;
         clearTimeout(timer);
         // The leader is gone; anything it left behind in the group goes too.
-        signalGroup(pid, "SIGKILL");
+        signalGroup(child, "SIGKILL");
     };
 
     return {
         exited,
         killNow: () => {
-            if (child.pid !== undefined) {
-                signalGroup(child.pid, "SIGKILL");
+            try {
+                signalGroup(child, "SIGKILL");
+            } catch (error) {
+                // The app is quitting and cannot wait or retry; say that something may be left running.
+                console.warn(`[neore-desktop] could not kill the agent's process group; a descendant may remain: ${(error as Error).message}`);
             }
         },
         pid: child.pid,
