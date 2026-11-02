@@ -19025,7 +19025,7 @@
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 198,
+      "line": 201,
       "reason": "the written table is not a string literal"
     },
     {
