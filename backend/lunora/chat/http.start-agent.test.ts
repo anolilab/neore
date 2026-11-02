@@ -215,4 +215,51 @@ describe("/chat/start hidden characters", () => {
         expect(response.status).toBe(200);
         expect(JSON.stringify(savedPrompts)).toContain(String.raw`hello world\nsecond`);
     });
+
+    it("refuses a prompt that is only hidden characters, instead of reading it as an omitted prompt", async () => {
+        const response = await start({ prompt: "\u{E0041}\u{202E}\u{200B}" });
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "The prompt is empty after removing hidden characters" });
+        expect(savedPrompts).toStrictEqual([]);
+        expect(streamingConfigs).toStrictEqual([]);
+    });
+
+    it("still reads a missing prompt as a continuation", async () => {
+        const response = await start({ prompt: undefined });
+
+        expect(response.status).toBe(200);
+    });
+
+    it("answers a malformed goal with a 400, not a 500", async () => {
+        for (const goal of [null, { text: 5 }, { text: null }, "go", 7]) {
+            const response = await start({ goal });
+
+            expect(response.status).toBe(400);
+        }
+    });
+
+    it("strips the system prompt, the negative prompt and the page context that reach the model", async () => {
+        const hidden = "\u{E0041}\u{202E}";
+        const response = await start({
+            customSystemPrompt: `be${hidden} brief`,
+            negativePrompt: `no${hidden} blur`,
+            pageContext: { selection: `sel${hidden}`, text: `body${hidden} text`, title: `ti${hidden}tle`, url: "https://example.com/a" },
+        });
+
+        expect(response.status).toBe(200);
+
+        const config = streamingConfigs.at(-1) as { customSystemPrompt?: string; negativePrompt?: string };
+
+        expect(config.customSystemPrompt).toBe("be brief");
+        expect(config.negativePrompt).toBe("no blur");
+
+        const saved = JSON.stringify(savedPrompts);
+
+        expect(saved).toContain("body text");
+        expect(saved).toContain("title");
+        expect(saved).not.toMatch(/\\u(?:db40|202e)/iu);
+        expect(saved).not.toContain("\u{E0041}");
+        expect(saved).not.toContain("\u{202E}");
+    });
 });

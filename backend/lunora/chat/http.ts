@@ -407,11 +407,39 @@ const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED
  * runs the SAME path — same limits, same thread creation, same stream — with
  * an API-key identity instead of the gateway's HMAC plus forwarded JWT.
  */
-const withoutHiddenText = (body: ChatStartBody): ChatStartBody => {
-    const prompt = body.prompt === undefined ? undefined : stripHiddenText(body.prompt).text;
-    const goal = body.goal === undefined ? undefined : { ...body.goal, text: stripHiddenText(body.goal.text).text };
+const cleaned = (value: unknown): unknown => (typeof value === "string" ? stripHiddenText(value).text : value);
 
-    return { ...body, ...(prompt !== undefined && { prompt }), ...(goal !== undefined && { goal }) };
+/**
+ * Every text field that reaches the model, with the hidden characters removed. The body is untrusted JSON, so each
+ * field is cleaned only when it is a string; a malformed one is left for its own validation to refuse.
+ */
+const withoutHiddenText = (body: ChatStartBody): ChatStartBody => {
+    const { goal, pageContext } = body;
+    const cleanGoal = goal !== null && typeof goal === "object" && typeof goal.text === "string" ? { ...goal, text: cleaned(goal.text) as string } : goal;
+    const cleanPageContext =
+        pageContext !== null && typeof pageContext === "object" && !Array.isArray(pageContext)
+            ? Object.fromEntries(Object.entries(pageContext).map(([key, value]) => [key, cleaned(value)]))
+            : pageContext;
+
+    return {
+        ...body,
+        ...(body.prompt !== undefined && { prompt: cleaned(body.prompt) as string }),
+        ...(body.customSystemPrompt !== undefined && { customSystemPrompt: cleaned(body.customSystemPrompt) as string }),
+        ...(body.negativePrompt !== undefined && { negativePrompt: cleaned(body.negativePrompt) as string }),
+        ...(goal !== undefined && { goal: cleanGoal }),
+        ...(pageContext !== undefined && { pageContext: cleanPageContext }),
+    };
+};
+
+/** A prompt that was only hidden characters is not an omitted prompt (which means "continue"): it is refused. */
+const emptyAfterStripping = (prompt: unknown): boolean => {
+    if (typeof prompt !== "string") {
+        return false;
+    }
+
+    const { removed, text } = stripHiddenText(prompt);
+
+    return removed > 0 && text.trim() === "";
 };
 
 const hostRunThreadResponse = (): Response =>
@@ -426,6 +454,10 @@ export const runChatStart = async (
 ): Promise<Response> => {
     // Characters that render as nothing (tag block, bidi controls) can carry instructions the person never sees. The
     // composer removes them too; this is the check no client can skip, and it covers the public API.
+    if (emptyAfterStripping(rawBody.prompt)) {
+        return Response.json({ error: "The prompt is empty after removing hidden characters" }, { status: 400 });
+    }
+
     const body = withoutHiddenText(rawBody);
 
     // The gateway forwards this field without looking at it, so this is the
@@ -1173,7 +1205,17 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     break;
                 }
                 case "text": {
-                    messageContent.push({ text: part.text, type: "text" });
+                    // The edit is a prompt like any other: the composer strips, and this is the check no client can skip.
+                    const { removed, text } = stripHiddenText(String(part.text ?? ""));
+
+                    if (removed > 0 && text.trim() === "") {
+                        return Response.json(
+                            { error: "The prompt is empty after removing hidden characters" },
+                            { headers: { "Content-Type": "application/json" }, status: 400 },
+                        );
+                    }
+
+                    messageContent.push({ text, type: "text" });
 
                     break;
                 }
