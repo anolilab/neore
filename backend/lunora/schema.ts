@@ -3167,6 +3167,9 @@ export const schema = defineSchema({
         type: v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event")),
         updatedAt: v.number(),
         userId: v.string(),
+        // The secret a rotation replaced, still accepted until `webhookPreviousSecretExpiresAt` (an opt-in overlap; `triggers/http.ts`).
+        webhookPreviousSecret: v.optional(v.string()),
+        webhookPreviousSecretExpiresAt: v.optional(v.number()),
         webhookSecret: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
         // A trigger accepts only its own scheme's headers. Widening this union is additive.

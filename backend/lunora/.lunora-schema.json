@@ -26942,6 +26942,18 @@
           "optional": false,
           "unique": false
         },
+        "webhookPreviousSecret": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "webhookPreviousSecretExpiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "webhookSecret": {
           "kind": "string",
           "nullable": false,

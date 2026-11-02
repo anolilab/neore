@@ -1726,6 +1726,8 @@ export const triggers = sqliteTable("triggers", {
     type: text("type", { mode: "json" }).$type<"schedule" | "webhook" | "event">().notNull(),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
+    webhookPreviousSecret: text("webhookPreviousSecret"),
+    webhookPreviousSecretExpiresAt: real("webhookPreviousSecretExpiresAt"),
     webhookSecret: text("webhookSecret"),
     webhookSignatureScheme: text("webhookSignatureScheme", { mode: "json" }).$type<"timestamped" | "native" | "gitlab-token">(),
 }, (t) => ({

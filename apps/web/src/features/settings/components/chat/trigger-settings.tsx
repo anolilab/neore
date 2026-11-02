@@ -30,6 +30,7 @@ import {
     ExternalLink,
     Filter,
     Globe,
+    KeyRound,
     Loader2,
     Pencil,
     Play,
@@ -49,6 +50,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import type { EventFormState, EventSource } from "./event-trigger-fields";
 import EventTriggerFields, { EMPTY_EVENT, eventFormFromSource, eventIsIncomplete, eventSourceFromForm, useDescribeEventSource } from "./event-trigger-fields";
+import RotateWebhookSecretDialog from "./rotate-webhook-secret-dialog";
 import TriggerTypePicker from "./trigger-type-picker";
 import type { WebhookFormState } from "./webhook-trigger-fields";
 import {
@@ -120,6 +122,7 @@ interface TriggerRow {
     triggerCount: number;
     type: string;
     updatedAt: number;
+    webhookPreviousSecretExpiresAt: number | null;
     webhookSignatureScheme: WebhookSignatureScheme | null;
 }
 
@@ -463,6 +466,7 @@ const TriggerSettings: FC = () => {
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
     const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
     const [deletingTrigger, setDeletingTrigger] = useState<TriggerRow | null>(null);
+    const [rotatingTrigger, setRotatingTrigger] = useState<TriggerRow | null>(null);
 
     // Queries
     const { data: triggers, isLoading, refetch } = useQuery(crpc.triggers.functions.getTriggers.queryOptions({}));
@@ -480,10 +484,12 @@ const TriggerSettings: FC = () => {
     const updateMutation = useMutation(crpc.triggers.functions.updateTrigger.mutationOptions());
     const deleteMutation = useMutation(crpc.triggers.functions.deleteTrigger.mutationOptions());
     const enableMutation = useMutation(crpc.triggers.functions.setTriggerEnabled.mutationOptions());
+    const rotateMutation = useMutation(crpc.triggers.functions.rotateWebhookSecret.mutationOptions());
     const { mutate: createTrigger } = createMutation;
     const { mutate: updateTrigger } = updateMutation;
     const { mutate: deleteTrigger } = deleteMutation;
     const { mutate: setTriggerEnabled } = enableMutation;
+    const { mutate: rotateSecret } = rotateMutation;
 
     // Test run action (uses useAction since it's a Lunora action, not a mutation)
     const testRunAction = useAction(api.triggers.functions.testRunTrigger);
@@ -603,6 +609,26 @@ const TriggerSettings: FC = () => {
             },
         );
     }, [deleteTrigger, deletingTrigger, refetch, expandedTriggerId, editingTriggerId, t]);
+
+    const handleConfirmRotate = useCallback(
+        (keepOldFor24h: boolean) => {
+            if (!rotatingTrigger) return;
+
+            rotateSecret(
+                { keepOldFor24h, triggerId: rotatingTrigger._id },
+                {
+                    onError: () => toast.error(t`Failed to rotate the secret`),
+                    onSuccess: (data) => {
+                        toast.success(t`Secret rotated`);
+                        setRotatingTrigger(null);
+                        setNewWebhookSecret(data.webhookSecret);
+                        void refetch();
+                    },
+                },
+            );
+        },
+        [rotateSecret, rotatingTrigger, refetch, t],
+    );
 
     const handleCopyWebhookSecret = useCallback(async () => {
         if (!newWebhookSecret) return;
@@ -832,6 +858,11 @@ const TriggerSettings: FC = () => {
                                                         </button>
                                                     </div>
                                                 )}
+                                                {trigger.type === "webhook" && trigger.webhookPreviousSecretExpiresAt !== null && (
+                                                    <p className="text-muted-foreground mt-1 text-xs">
+                                                        {t`The previous secret is still accepted until ${formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)}.`}
+                                                    </p>
+                                                )}
                                                 {trigger.type === "webhook" && (
                                                     <div className="text-xs">
                                                         <WebhookSigningInstructions scheme={trigger.webhookSignatureScheme ?? "timestamped"} />
@@ -877,6 +908,18 @@ const TriggerSettings: FC = () => {
                                                     onCheckedChange={(checked: boolean) => handleToggleEnabled(trigger._id, checked)}
                                                     size="sm"
                                                 />
+
+                                                {/* Rotate the webhook secret */}
+                                                {trigger.type === "webhook" && (
+                                                    <Button
+                                                        aria-label={t`Rotate webhook secret`}
+                                                        onClick={() => setRotatingTrigger(trigger)}
+                                                        size="sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <KeyRound aria-hidden="true" className="size-4" />
+                                                    </Button>
+                                                )}
 
                                                 {/* Delete */}
                                                 <Button
@@ -1015,6 +1058,14 @@ const TriggerSettings: FC = () => {
                     </CardContent>
                 </Card>
             </HeadingSection>
+
+            <RotateWebhookSecretDialog
+                loading={rotateMutation.isPending}
+                name={rotatingTrigger?.name ?? ""}
+                onConfirm={handleConfirmRotate}
+                onOpenChange={(open) => !open && !rotateMutation.isPending && setRotatingTrigger(null)}
+                open={rotatingTrigger !== null}
+            />
 
             <ConfirmDialog
                 confirmLabel={t`Delete`}

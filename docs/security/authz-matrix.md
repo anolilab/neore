@@ -653,6 +653,7 @@ for a schema table that is neither policed nor listed:
 | `triggers_functions.deleteTrigger` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggerExecutions` | query | authQuery | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggers` | query | authQuery | — | caller-scoped (ctx.user) | ok |
+| `triggers_functions.rotateWebhookSecret` | mutation | authMutation + RL | triggers | row.userId == caller; webhook triggers only; the new secret is returned once and the previous one is kept only on an opt-in 24 h overlap | ok |
 | `triggers_functions.setTriggerEnabled` | mutation | authMutation + RL | triggers | row.userId == caller; at most 10 event triggers switched on per caller | ok |
 | `triggers_functions.testRunTrigger` | action | authAction + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller; a new botId must be a bot the caller owns; a new event source is checked as on create | ok |

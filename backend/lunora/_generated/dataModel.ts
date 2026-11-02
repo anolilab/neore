@@ -1942,6 +1942,8 @@ export interface Doc_triggers {
     type: "schedule" | "webhook" | "event";
     updatedAt: number;
     userId: string;
+    webhookPreviousSecret?: string;
+    webhookPreviousSecretExpiresAt?: number;
     webhookSecret?: string;
     webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
@@ -4917,6 +4919,8 @@ export interface Insert_triggers {
     type: "schedule" | "webhook" | "event";
     updatedAt: number;
     userId: string;
+    webhookPreviousSecret?: string;
+    webhookPreviousSecretExpiresAt?: number;
     webhookSecret?: string;
     webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token";
 }
