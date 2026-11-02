@@ -10,8 +10,17 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { extractMemories } from "./extract";
 
-const { generateText, loadModelFilterRules, registry } = vi.hoisted(() => {
-    return { generateText: vi.fn(), loadModelFilterRules: vi.fn(), registry: new Map<string, unknown>() };
+const { generateText, loadModelFilterRules, ModelFilterRulesUnavailableError, NoAllowedUtilityModelError, registry } = vi.hoisted(() => {
+    class NoAllowedUtilityModelError extends Error {}
+    class ModelFilterRulesUnavailableError extends NoAllowedUtilityModelError {}
+
+    return {
+        generateText: vi.fn(),
+        loadModelFilterRules: vi.fn(),
+        ModelFilterRulesUnavailableError,
+        NoAllowedUtilityModelError,
+        registry: new Map<string, unknown>(),
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -20,11 +29,9 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
-    return { loadModelFilterRules };
+    return { loadModelFilterRules, ModelFilterRulesUnavailableError };
 });
 vi.mock("../lib/utility-model", () => {
-    class NoAllowedUtilityModelError extends Error {}
-
     return {
         getUtilityModel: async () => {
             return {};
@@ -65,8 +72,6 @@ afterEach(() => {
 
 describe("extractMemories when the model filter rules cannot be read", () => {
     it("does not crash: the classifier fails open and the extraction skips quietly", async () => {
-        const { NoAllowedUtilityModelError } = await import("../lib/utility-model");
-
         loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
 
         await expect(
@@ -78,5 +83,28 @@ describe("extractMemories when the model filter rules cannot be read", () => {
 
         expect(loadModelFilterRules).toHaveBeenCalled();
         expect(generateText).not.toHaveBeenCalled();
+    });
+
+    const run = async () =>
+        await harness.action(
+            async (ctx: any) => await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+        );
+    const processedRows = async () => await harness.run(async (ctx: any) => (await ctx.db.actionCache.findMany({})).page.filter((row: any) => row.name === "memory.processedExchange"));
+
+    it("leaves the exchange unmarked when the rules were unreadable, so a retry can extract it", async () => {
+        loadModelFilterRules.mockRejectedValue(new ModelFilterRulesUnavailableError());
+        await run();
+        expect(await processedRows()).toHaveLength(0);
+
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [], remember: true } });
+        await run();
+        expect(generateText).toHaveBeenCalled();
+    });
+
+    it("keeps the exchange processed when the rules allow no model", async () => {
+        loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
+        await run();
+        expect(await processedRows()).toHaveLength(1);
     });
 });

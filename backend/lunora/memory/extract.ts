@@ -39,7 +39,7 @@ import {
     processedExchangeFingerprint,
     truncateUserMessage,
 } from "./gate";
-import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
@@ -135,7 +135,10 @@ const PROCESSED_EXCHANGE_CACHE_NAME = "memory.processedExchange";
 /** Structured event name — one per extraction attempt, so skip rate = skip / total. */
 const GATE_EVENT = "memory.extraction_gate";
 
-type GateOutcome = GateDecision | { reason: "opt_out"; verdict: "skip" };
+type GateOutcome = (GateDecision | { reason: "opt_out"; verdict: "skip" }) & {
+    /** The cache entry that marks this exchange processed, when the gate wrote one: cleared if the extraction cannot run for a transient reason. */
+    processedKey?: string;
+};
 
 interface GateArgs {
     assistantResponse: string;
@@ -234,7 +237,7 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
         console.warn("[memory/extract] Could not mark exchange as processed:", error);
     }
 
-    return decision;
+    return { ...decision, processedKey };
 };
 
 // ============================================================================
@@ -266,15 +269,13 @@ export const extractMemories = internalAction
         //    and — only when unsure — a cheap classifier.
         const gate = await runExtractionGate(ctx, args);
 
-        ctx.log.event(GATE_EVENT, {
-            reason: gate.reason,
-            threadId: args.threadId,
-            userId: args.userId,
-            userMessageLength: args.userMessage.length,
-            verdict: gate.verdict,
-        });
+        // One event per attempt, carrying its final outcome.
+        const logGate = (reason: string, verdict: "extract" | "skip") =>
+            ctx.log.event(GATE_EVENT, { reason, threadId: args.threadId, userId: args.userId, userMessageLength: args.userMessage.length, verdict });
 
         if (gate.verdict === "skip") {
+            logGate(gate.reason, "skip");
+
             return;
         }
 
@@ -318,13 +319,20 @@ export const extractMemories = internalAction
         } catch (error) {
             // The user's model filters leave no background model to read the turn with: nothing is extracted.
             if (error instanceof NoAllowedUtilityModelError) {
-                ctx.log.event(GATE_EVENT, { reason: "no-allowed-utility-model", threadId: args.threadId, userId: args.userId, verdict: "skip" });
+                // An unreadable rules read is transient: the turn must stay extractable on a retry, so it is not left marked processed.
+                if (error instanceof ModelFilterRulesUnavailableError && gate.processedKey !== undefined) {
+                    await ctx.runMutation(internal.lib.action_cache.remove, { key: gate.processedKey }).catch(() => null);
+                }
+
+                logGate("no-allowed-utility-model", "skip");
 
                 return;
             }
 
             throw error;
         }
+
+        logGate(gate.reason, "extract");
 
         let extractedFacts: z.infer<typeof extractedFactSchema>[] = [];
 
