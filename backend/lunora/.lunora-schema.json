@@ -5636,6 +5636,12 @@
           "optional": true,
           "unique": false
         },
+        "hostProtocol": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastSeenAt": {
           "kind": "number",
           "nullable": false,
@@ -26940,6 +26946,18 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "webhookPreviousSecret": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "webhookPreviousSecretExpiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "webhookSecret": {

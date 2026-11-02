@@ -5244,6 +5244,10 @@
                         {
                           "const": "offline",
                           "type": "string"
+                        },
+                        {
+                          "const": "outdated",
+                          "type": "string"
                         }
                       ]
                     },
@@ -28373,6 +28377,9 @@
                         "const": "ssh",
                         "type": "string"
                       },
+                      "updateRequired": {
+                        "type": "boolean"
+                      },
                       "viaDeviceId": {
                         "type": "string"
                       }
@@ -28382,7 +28389,8 @@
                       "createdAt",
                       "name",
                       "platform",
-                      "toolNames"
+                      "toolNames",
+                      "updateRequired"
                     ],
                     "type": "object"
                   },
@@ -48308,6 +48316,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "outdated",
+                              "type": "string"
+                            },
+                            {
                               "const": "rate_limited",
                               "type": "string"
                             },
@@ -54000,6 +54012,91 @@
           "triggers"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#triggers_functions:rotateWebhookSecret": {
+      "post": {
+        "description": "Invoke the `mutation` `triggers_functions:rotateWebhookSecret` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "triggers_functions:rotateWebhookSecret",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "keepOldFor24h": {
+                        "type": "boolean"
+                      },
+                      "triggerId": {
+                        "description": "Id<\"triggers\">",
+                        "type": "string",
+                        "x-lunora-table": "triggers"
+                      }
+                    },
+                    "required": [
+                      "triggerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "triggers_functions:rotateWebhookSecret",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "previousSecretExpiresAt": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "webhookSecret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "previousSecretExpiresAt",
+                    "webhookSecret"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: triggers_functions:rotateWebhookSecret",
+        "tags": [
+          "triggers"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#triggers_functions:setTriggerEnabled": {

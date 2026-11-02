@@ -14,6 +14,7 @@ const useHostSendErrorMessages = (): Record<HostSendError, string> => {
         not_authenticated: t`Sign in again to send.`,
         not_found: t`This chat could not be found.`,
         offline: t`Your computer is offline. Open Neore on it and try again.`,
+        outdated: t`Neore on your computer is out of date. Update it, then try again.`,
         rate_limited: t`You are sending too fast. Wait a moment.`,
         session_ended: t`This session has ended. Start a new one from the desktop app.`,
         session_starting: t`The agent is still opening its session. Try again in a moment.`,

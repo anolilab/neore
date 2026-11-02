@@ -16,6 +16,14 @@ export const offerOf = (device: Pick<Doc<"devices">, "acpOffers"> | null, agentK
 export const webSessionId = async (userId: string, clientId: string, scope: { kind: "start" } | { kind: "switch"; threadId: string }): Promise<string> =>
     scope.kind === "switch" ? `web-switch-${await sha256Hex(`${userId}:${scope.threadId}:${clientId}`)}` : `web-${await sha256Hex(`${userId}:${clientId}`)}`;
 
+/** What a person is told when their computer runs a Neore build older than this backend serves. */
+export const OUTDATED_NOTICE = "The Neore app on that computer is out of date. Update it, then try again.";
+
 /** What a refused `acp_start` call tells the person who asked. */
-export const startFailureMessage = (error: Extract<AcpCallResult, { error: string }>["error"]): string =>
-    error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.";
+export const startFailureMessage = (error: Extract<AcpCallResult, { error: string }>["error"]): string => {
+    if (error === "busy") {
+        return "That computer is busy. Try again in a moment.";
+    }
+
+    return error === "outdated" ? OUTDATED_NOTICE : "That computer cannot start an agent right now.";
+};
