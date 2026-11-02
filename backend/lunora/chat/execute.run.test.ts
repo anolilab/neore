@@ -244,8 +244,8 @@ const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPromp
 
 const readState = async () =>
     await harness.run(async (ctx: any) => {
-        const thread = await ctx.db.get(ids.threadId as never);
-        const stream = await ctx.db.get(ids.streamId as never);
+        const thread = await ctx.db.get("threads", ids.threadId as never);
+        const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
         const chunks = await ctx.db
             .query("persistentChunks")
             .withIndex("by_streamId_seq", (q: any) => q.eq("streamId", ids.streamId))
@@ -292,7 +292,7 @@ describe("runStreamingAgent: a successful turn", () => {
 
 describe("runStreamingAgent: a redelivered job", () => {
     it("returns quietly when the stream was already claimed, without reading the thread or touching the model", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { runClaimedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { runClaimedAt: Date.now() }));
 
         await run();
 
@@ -321,7 +321,7 @@ describe("runStreamingAgent: a redelivered job", () => {
 
 describe("runStreamingAgent: a goal's queued round", () => {
     it("does not run when its goal ended after the round was queued, and gives the thread back", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.messageId as never, { agentName: "neore:goal" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { agentName: "neore:goal" }));
 
         await run();
 
@@ -371,7 +371,7 @@ describe("runStreamingAgent: a failed run", () => {
     });
 
     it("finishes the stream and frees the thread when the chat is locked after the stream started", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
 
         await run();
 

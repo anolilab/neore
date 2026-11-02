@@ -69,13 +69,14 @@ const actions = async () => {
 
     return rows.map((row) => row.action).toSorted((a, b) => a.localeCompare(b));
 };
-const request = async () => (await run(async (ctx) => await ctx.db.get(requestId))) as { errorMessage?: string; status: string; userEmail: string };
+const request = async () =>
+    (await run(async (ctx) => await ctx.db.get("gdprRequests", requestId))) as { errorMessage?: string; status: string; userEmail: string };
 const emailOnRequest = async () => {
     const row = await request();
 
     return row.userEmail;
 };
-const setEmail = async (userEmail: string) => await run(async (ctx) => await ctx.db.patch(requestId, { userEmail }));
+const setEmail = async (userEmail: string) => await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { userEmail }));
 const statusOf = async () => {
     const row = await request();
 
@@ -147,7 +148,7 @@ describe("scheduling the first retry", () => {
 describe("a first retry scheduled by a workflow whose status writes failed", () => {
     it("moves a processing request to failed with the fixed reason, so the scheduled attempt can claim and erase", async () => {
         // Both of the workflow's best-effort writes failed: the request is still processing.
-        await run(async (ctx) => await ctx.db.patch(requestId, { errorMessage: "stale", status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { errorMessage: "stale", status: "processing" }));
         await schedule();
 
         expect(await statusOf()).toBe("failed");
@@ -164,7 +165,7 @@ describe("a first retry scheduled by a workflow whose status writes failed", () 
     });
 
     it("does not touch a request that finished meanwhile", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "cancelled" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "cancelled" }));
         await schedule();
 
         expect(await statusOf()).toBe("cancelled");
@@ -260,7 +261,7 @@ describe("a retry attempt", () => {
     });
 
     it("leaves a request that is no longer failed alone", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
 
         await attempt(1);
@@ -273,7 +274,7 @@ describe("a retry attempt", () => {
         vi.mocked(erasePostHogPerson).mockResolvedValueOnce("deleted").mockRejectedValueOnce(new Error("down"));
 
         await attempt(1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         await attempt(2);
 
         expect(deleteAuthRecordsSpy).not.toHaveBeenCalled();
@@ -400,7 +401,7 @@ describe("the address kept for the confirmation email", () => {
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
         await attempt(1);
 
-        const other = (await run(async (ctx) => await ctx.db.get(otherId))) as { userEmail: string };
+        const other = (await run(async (ctx) => await ctx.db.get("gdprRequests", otherId))) as { userEmail: string };
 
         expect(other.userEmail).toBe("");
     });
@@ -415,7 +416,7 @@ describe("chains", () => {
         let failures = 0;
         const failedRun = async () => {
             failures += 1;
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
             await schedule(`failure-${String(failures)}`);
         };
 
@@ -519,7 +520,7 @@ describe("the watchdog", () => {
     it("does nothing for an attempt that recorded an outcome", async () => {
         vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
         await attempt(1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
 
         await watchdog(1);
 
@@ -528,14 +529,14 @@ describe("the watchdog", () => {
     });
 
     it("does nothing for an attempt that never started, or a request that finished", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         await watchdog(1);
 
         expect(await statusOf()).toBe("processing");
 
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
         await watchdog(1);
 
         expect(await statusOf()).toBe("completed");
@@ -585,7 +586,7 @@ describe("a redelivered attempt", () => {
     it("does not run a succeeded attempt again even if the request is failed once more", async () => {
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
         await attempt(1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
 
         await attempt(1);
 
@@ -653,13 +654,13 @@ describe("a redelivered attempt", () => {
 
     it("leaves a processing request alone when no attempt of this number claimed it", async () => {
         // What a re-run workflow leaves: processing, with no retry row.
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
 
         await attempt(1);
 
         // Attempt 1's claim does not entitle attempt 2.
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         await claim(1);
         vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS + 1);
         await attempt(2);
@@ -673,7 +674,7 @@ describe("a request that finished meanwhile", () => {
     it("is not turned back into failed, and no further attempt is queued, when the erasure errors late", async () => {
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
             // A concurrent workflow re-run completes the request while this attempt is in flight.
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
 
             throw new Error("down");
         });
@@ -687,7 +688,7 @@ describe("a request that finished meanwhile", () => {
 
     it("is not completed again by a duplicate success, and a cancelled one stays cancelled", async () => {
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "cancelled" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "cancelled" }));
 
             return "deleted";
         });
@@ -744,7 +745,7 @@ describe("attempt deduplication", () => {
             const logRows = await ctx.db.query("gdprAuditLog").collect();
 
             for (const row of logRows) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("gdprAuditLog", row._id);
             }
         });
 
@@ -773,7 +774,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         await schedule("a");
         await start(1, 1);
         // A workflow re-run fails again: chain 2 starts and its attempt 1 is running.
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         await schedule("b");
         expect(await start(1, 2)).toBe("erase");
 
@@ -791,7 +792,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     it("completes and mails a request a re-run failed while the erasure was in flight, when no newer chain exists", async () => {
         await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
 
             return "deleted";
         });
@@ -807,13 +808,13 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     it("leaves a request alone that a re-run failed into a newer chain while the erasure was in flight", async () => {
         await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
             await schedule("newer", "a@example.com");
 
             return "deleted";
         });
         await schedule("older");
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         // Chain 1 is stale once chain 2 exists, so its attempt does not even start: this is chain 2's to run.
         await attempt(1, 1);
 
@@ -825,7 +826,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     it("finishes a recorded erasure on a request that was failed meanwhile, even while the lease is held", async () => {
         await start(1);
         await erased(1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
 
         await attempt(1);
 
@@ -836,7 +837,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     it("sends nothing when a re-run completed the request meanwhile, and the re-run's claim keeps a second mail out", async () => {
         await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+            await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
 
             return "deleted";
         });
@@ -849,7 +850,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         // The re-run's own mail holds the shared claim: a retry that completes later finds it taken.
         vi.mocked(erasePostHogPerson).mockReset();
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         await run(async (ctx) => {
             const now = Date.now();
 
@@ -968,7 +969,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
 
     it("numbers chains from the rows the scheduler writes itself: a swallowed `deletion_failed` audit write starts no duplicate chain", async () => {
         expect(await schedule("first")).toBe(true);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         expect(await schedule("second")).toBe(true);
 
         expect(jobs().map((job) => job.args)).toStrictEqual([
@@ -982,13 +983,13 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     });
 
     it("queues nothing, and says so, for a request that already completed or was cancelled", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
 
         expect(await schedule()).toBe(false);
         expect(jobs()).toHaveLength(0);
         expect(await audit()).toHaveLength(0);
 
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "cancelled" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "cancelled" }));
 
         expect(await schedule("again")).toBe(false);
         expect(jobs()).toHaveLength(0);
@@ -998,7 +999,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         await setEmail("a@example.com");
         await start(1);
         // A sweep or re-run flips the request to failed under the running attempt.
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
 
         await run(async (ctx) => await ctx.runMutation(failPostHogRetry, { attempt: 1, chain: 1, errorClass: "swept", requestId, userId: USER }));
 
@@ -1007,7 +1008,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         expect(await emailOnRequest()).toBe("a@example.com");
 
         await start(POSTHOG_RETRY_MAX_ATTEMPTS);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
         await run(
             async (ctx) =>
                 await ctx.runMutation(failPostHogRetry, { attempt: POSTHOG_RETRY_MAX_ATTEMPTS, chain: 1, errorClass: "swept", requestId, userId: USER }),
@@ -1021,7 +1022,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         await setEmail("a@example.com");
         await schedule("a");
         await start(POSTHOG_RETRY_MAX_ATTEMPTS, 1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         await schedule("b");
 
         await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: POSTHOG_RETRY_MAX_ATTEMPTS, chain: 1, requestId, userId: USER }));
@@ -1031,7 +1032,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
     });
 
     it("defers an attempt that finds a workflow re-run holding the request, audits it, and gives up after a bounded number of tries", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
 
         await attempt(1);
@@ -1061,7 +1062,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
 
     it("does not start an attempt twice: a started attempt whose request was failed under it is left to the watchdog", async () => {
         await start(1);
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "failed" }));
 
         expect(await start(1)).toBe("skip");
 
@@ -1132,7 +1133,7 @@ describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
         expect(await emailOnRequest()).toBe("");
 
         // A re-run fails again and schedules chain 2 with the address it holds in its own params.
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
         await schedule("b", "a@example.com");
         expect(await emailOnRequest()).toBe("a@example.com");
 
@@ -1149,7 +1150,7 @@ describe("updateRequestProgress with fromStatus", () => {
         await run(async (ctx) => await ctx.runMutation(updateRequestProgress, { errorMessage: FAILED_MESSAGE, fromStatus, requestId, status: "failed" }));
 
     it("does not turn a completed request back into failed", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
 
         await write(["processing", "failed"]);
 
@@ -1157,7 +1158,7 @@ describe("updateRequestProgress with fromStatus", () => {
     });
 
     it("moves a processing request to failed", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "processing" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "processing" }));
 
         await write(["processing", "failed"]);
 
@@ -1165,7 +1166,7 @@ describe("updateRequestProgress with fromStatus", () => {
     });
 
     it("writes unconditionally when no fromStatus is given", async () => {
-        await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+        await run(async (ctx) => await ctx.db.patch("gdprRequests", requestId, { status: "completed" }));
 
         await write();
 

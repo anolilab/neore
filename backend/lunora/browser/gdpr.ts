@@ -28,8 +28,8 @@ export const eraseBrowserDataForUser = async (ctx: MutationCtx, userId: string):
         .collect();
 
     await Promise.all([
-        ...allActions.flat().map((a) => ctx.db.delete(a._id)),
-        ...sessions.map((s) => ctx.db.delete(s._id)),
-        ...extensions.map((entry) => ctx.db.delete(entry._id)),
+        ...allActions.flat().map((a) => ctx.db.delete("browserActions", a._id)),
+        ...sessions.map((s) => ctx.db.delete("browserSessions", s._id)),
+        ...extensions.map((entry) => ctx.db.delete("browserExtensions", entry._id)),
     ]);
 };

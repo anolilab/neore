@@ -17,7 +17,7 @@ export const activeGoalsOf = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"thr
         .take(10);
 
 export const stopGoalRow = async (ctx: GoalCtx, goal: Doc<"threadGoals">, reason: GoalStopReason): Promise<void> => {
-    await ctx.db.patch(goal._id, { endedAt: ctx.now, status: "stopped", stopReason: reason, updatedAt: ctx.now });
+    await ctx.db.patch("threadGoals", goal._id, { endedAt: ctx.now, status: "stopped", stopReason: reason, updatedAt: ctx.now });
 };
 
 /**
@@ -58,7 +58,7 @@ export const hasLiveStream = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"thr
  * ends it, or the sweep that reaps many.
  */
 export const giveThreadBack = async (ctx: GoalCtx, threadId: Id<"threads">): Promise<void> => {
-    if (await ctx.db.get(threadId)) {
+    if (await ctx.db.get("threads", threadId)) {
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
     }
 };
@@ -71,6 +71,6 @@ export const deleteGoalsForThread = async (ctx: Pick<MutationCtx, "db">, threadI
         .collect();
 
     for (const goal of goals) {
-        await ctx.db.delete(goal._id);
+        await ctx.db.delete("threadGoals", goal._id);
     }
 };

@@ -337,7 +337,7 @@ describe("usage backfill while threads change under it", () => {
 
     const patchThread = async (threadId: string, patch: Record<string, unknown>) =>
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(threadId, patch);
+            await ctx.db.patch("threads", threadId, patch);
         });
 
     /** `THREADS` threads of one reply each (1 token, 10 µ$); the first is created with `firstStatus`. */
@@ -437,10 +437,10 @@ describe("usage backfill while threads change under it", () => {
                 .paginate({ cursor: null, numItems: 100 });
 
             for (const row of page) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("messages", row._id);
             }
 
-            await ctx.db.delete(current);
+            await ctx.db.delete("threads", current);
         });
         await drain();
 

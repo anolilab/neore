@@ -156,7 +156,7 @@ describe("a permanent delete of a chat with many linked files", () => {
 
         expect(first.isDone).toBe(false);
         expect(await linksOf({ threadId: gone })).toHaveLength(50);
-        await expect(run(async (ctx) => await ctx.db.get(gone))).resolves.not.toBeNull();
+        await expect(run(async (ctx) => await ctx.db.get("threads", gone))).resolves.not.toBeNull();
 
         // The continuation is the same call with the returned cursor, as the paged delete chains it.
         let result = first;
@@ -167,7 +167,7 @@ describe("a permanent delete of a chat with many linked files", () => {
 
         expect(result.isDone).toBe(true);
         await expect(linksOf({ threadId: gone })).resolves.toStrictEqual([]);
-        await expect(run(async (ctx) => await ctx.db.get(gone))).resolves.toBeNull();
+        await expect(run(async (ctx) => await ctx.db.get("threads", gone))).resolves.toBeNull();
     });
 });
 

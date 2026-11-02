@@ -39,3 +39,18 @@ export const env: { EMAIL?: unknown; MAIL_FROM: string; QUEUE_JOBS: unknown; RES
     },
     RESEND_API_KEY: "re_test",
 };
+
+/**
+ * `_generated/shardRegistry.ts` declares an RPC entrypoint class that extends this, so the module
+ * must export one for the Worker entry (`src/server.ts`) to load under Node.
+ */
+export class WorkerEntrypoint<Environment = unknown> {
+    public readonly ctx: unknown;
+
+    public readonly env: Environment;
+
+    public constructor(context: unknown, environment: Environment) {
+        this.ctx = context;
+        this.env = environment;
+    }
+}

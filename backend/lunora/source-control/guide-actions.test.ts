@@ -322,7 +322,7 @@ describe("runCloudGuide", () => {
         const guideId = await reserved();
 
         hostRead.mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(guideId, { failure: "quota", status: "failed" }));
+            await run(async (ctx) => await ctx.db.patch("pullRequestGuides", guideId, { failure: "quota", status: "failed" }));
 
             return pullRequest();
         });

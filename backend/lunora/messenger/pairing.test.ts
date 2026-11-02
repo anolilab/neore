@@ -58,7 +58,7 @@ const connection = async (fields: Record<string, unknown> = {}): Promise<string>
         async (ctx: any) => await ctx.db.insert("messengerConnections", { connectedAt: NOW, platform: "telegram", status: "active", userId: OWNER, ...fields }),
     );
 
-const row = async (id: string): Promise<Record<string, unknown>> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const row = async (id: string): Promise<Record<string, unknown>> => await harness.run(async (ctx: any) => await ctx.db.get("messengerConnections", id));
 
 /** An `HttpActionCtx` stand-in: the gate only runs `pairConnection` and schedules notices. */
 const httpContext = () => {

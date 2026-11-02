@@ -151,7 +151,7 @@ describe("persisted workflow rows", () => {
 
             return created._id;
         });
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(nodeExecutionId));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("nodeExecutions", nodeExecutionId));
 
         expect(row.output).toEqual({ assets: [{ imageUrl: toStorageRef(KEY) }], modelId: "fal:flux-dev" });
     });
@@ -164,7 +164,7 @@ describe("persisted workflow rows", () => {
         const content = { edges: [], nodes: [{ data: { imageUrl: SIGNED }, id: "n1", position: { x: 0, y: 0 }, type: "image" }] };
 
         const { versionId } = (await owner.mutation(saveVersion as never, { content, projectId } as never)) as { versionId: string };
-        const stored = await harness.run(async (ctx: any) => await ctx.db.get(versionId));
+        const stored = await harness.run(async (ctx: any) => await ctx.db.get("workflowVersions", versionId));
 
         expect(stored.content.nodes[0].data.imageUrl).toBe(toStorageRef(KEY));
 
@@ -194,7 +194,7 @@ describe("persisted workflow rows", () => {
                 { content: graph(toStorageRef(VICTIM_KEY), { maskUrl: forgedUrl }), projectId } as never,
             )) as { versionId: string };
 
-            const stored = await harness.run(async (ctx: any) => await ctx.db.get(versionId));
+            const stored = await harness.run(async (ctx: any) => await ctx.db.get("workflowVersions", versionId));
 
             expect(stored.content.nodes[0].data).toEqual({ imageUrl: UNAVAILABLE_STORAGE_URL, maskUrl: UNAVAILABLE_STORAGE_URL });
         });
@@ -210,7 +210,7 @@ describe("persisted workflow rows", () => {
                 { content: graph(SIGNED, { fileUrl: toStorageRef(VAULT_KEY) }), projectId } as never,
             )) as { versionId: string };
 
-            const stored = await harness.run(async (ctx: any) => await ctx.db.get(versionId));
+            const stored = await harness.run(async (ctx: any) => await ctx.db.get("workflowVersions", versionId));
 
             expect(stored.content.nodes[0].data).toEqual({ fileUrl: toStorageRef(VAULT_KEY), imageUrl: toStorageRef(KEY) });
         });

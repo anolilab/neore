@@ -13,5 +13,5 @@ import { withoutUndefined } from "../lib/patch";
 export type BrowserSessionPatch = Partial<Pick<Doc<"browserSessions">, "completedAt" | "lastActivityAt" | "status">>;
 
 export const patchBrowserSession = async (db: MutationCtx["db"], sessionId: Id<"browserSessions">, fields: BrowserSessionPatch): Promise<void> => {
-    await db.patch(sessionId, withoutUndefined(fields));
+    await db.patch("browserSessions", sessionId, withoutUndefined(fields));
 };

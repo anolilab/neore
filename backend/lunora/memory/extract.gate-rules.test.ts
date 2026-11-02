@@ -116,7 +116,7 @@ describe("extractMemories when the model filter rules cannot be read", () => {
 
                 for (const row of page) {
                     if (row.name === "memory.processedExchange") {
-                        await ctx.db.patch(row._id, { value: { attempt: "another-attempt", reason: "heuristic" } });
+                        await ctx.db.patch("actionCache", row._id, { value: { attempt: "another-attempt", reason: "heuristic" } });
                     }
                 }
             });

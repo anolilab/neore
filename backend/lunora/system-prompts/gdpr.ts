@@ -13,7 +13,7 @@ export const eraseSystemPromptPresetsForUser = async (ctx: MutationCtx, userId: 
         .withIndex("by_userId_modelId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(presets.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(presets.map((row) => ctx.db.delete("systemPromptPresets", row._id)));
 
     return { hasMore: full(presets) };
 };

@@ -34,7 +34,7 @@ const clip = (text: string): string => (text.length > TITLE_MAX ? `${text.slice(
 
 /** The ids in `threadIds` that name a locked chat. A missing or unreadable thread is not locked here. */
 const lockedThreadIds = async (ctx: Pick<QueryCtx, "db">, threadIds: string[]): Promise<Set<string>> => {
-    const threads = await Promise.all([...new Set(threadIds)].map(async (id) => [id, await ctx.db.get(id as Id<"threads">)] as const));
+    const threads = await Promise.all([...new Set(threadIds)].map(async (id) => [id, await ctx.db.get("threads", id as Id<"threads">)] as const));
 
     return new Set(threads.flatMap(([id, thread]) => (thread && isThreadLocked(thread) ? [id] : [])));
 };
@@ -112,7 +112,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
         }
     }
 
-    const approvalThreads = await Promise.all([...approvalsByThread.keys()].map(async (threadId) => await ctx.db.get(threadId as Id<"threads">)));
+    const approvalThreads = await Promise.all([...approvalsByThread.keys()].map(async (threadId) => await ctx.db.get("threads", threadId as Id<"threads">)));
     const threadTitle = new Map(
         approvalThreads.flatMap((thread) => (thread?.title && !isThreadLocked(thread) ? [[thread._id as string, thread.title] as const] : [])),
     );

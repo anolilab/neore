@@ -65,7 +65,7 @@ export const heartbeat = authMutation
         if (existing) {
             // `null` from the client means "deselected": `patchRow` removes the field
             // for an `undefined` value, which a plain patch would refuse.
-            await patchRow(context.db, existing, {
+            await patchRow(context.db, "workflowPresence", existing, {
                 lastHeartbeat: now,
                 ...(cursorPosition !== undefined && { cursorPosition }),
                 ...(viewportCenter !== undefined && { viewportCenter }),
@@ -126,7 +126,7 @@ export const disconnect = authMutation
             .first();
 
         if (existing && existing.userId === context.user.userId) {
-            await context.db.delete(existing._id);
+            await context.db.delete("workflowPresence", existing._id);
         }
 
         context.log.event("workflow.disconnect", { removed: existing !== null && existing.userId === context.user.userId });
@@ -231,7 +231,7 @@ export const cleanupStalePresence = internalMutation
             .withIndex("by_heartbeat", (q) => q.lt("lastHeartbeat", threshold))
             .take(500);
 
-        await Promise.all(staleRecords.map((record) => context.db.delete(record._id)));
+        await Promise.all(staleRecords.map((record) => context.db.delete("workflowPresence", record._id)));
 
         return { cleaned: staleRecords.length };
     });
@@ -327,7 +327,7 @@ export const restoreVersion = authQuery
         versionId: v.string().max(MAX_LENGTH.id),
     })
     .query(async ({ args: { versionId }, ctx: context }) => {
-        const version = await context.db.get(versionId as Id<"workflowVersions">);
+        const version = await context.db.get("workflowVersions", versionId as Id<"workflowVersions">);
 
         if (!version) {
             return null;

@@ -57,7 +57,7 @@ export const cacheFollowupSuggestions = internalMutation
             .first();
 
         if (existing) {
-            await context.db.patch(existing._id, {
+            await context.db.patch("followupSuggestions", existing._id, {
                 lastMessageId,
                 suggestions,
                 updatedAt: now,

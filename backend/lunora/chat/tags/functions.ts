@@ -64,7 +64,7 @@ const listUserTags = async (context: MutationContext, userId: string): Promise<D
 
 /** Loads a tag and asserts the caller owns it. */
 const requireOwnedTag = async (context: MutationContext, tagId: Id<"threadTags">, userId: string): Promise<Doc<"threadTags">> => {
-    const tag = await context.db.get(tagId);
+    const tag = await context.db.get("threadTags", tagId);
 
     if (!tag) {
         throw new LunoraError("NOT_FOUND", "Tag not found");
@@ -152,7 +152,7 @@ export const updateThreadTag = authMutation
             patch.color = color;
         }
 
-        await context.db.patch(tagId, withoutUndefined({ ...patch, updatedAt: context.now }));
+        await context.db.patch("threadTags", tagId, withoutUndefined({ ...patch, updatedAt: context.now }));
 
         context.log.event("chat.update_thread_tag", { colorChanged: color !== undefined, nameChanged: rawName !== undefined });
 
@@ -179,7 +179,7 @@ export const reorderThreadTags = authMutation
 
         const { now } = context;
 
-        await Promise.all(tagIds.map((tagId, order) => context.db.patch(tagId as Id<"threadTags">, { order, updatedAt: now })));
+        await Promise.all(tagIds.map((tagId, order) => context.db.patch("threadTags", tagId as Id<"threadTags">, { order, updatedAt: now })));
 
         context.log.event("chat.reorder_thread_tags", { requested: tagIds.length });
 
@@ -207,7 +207,7 @@ export const deleteThreadTag = authMutation
         const tagged = threads.filter((thread) => thread.tagIds?.includes(tagId));
 
         await Promise.all(tagged.map((thread) => patchThread(context.db, thread._id, { tagIds: withTagAssignment(thread.tagIds, tagId, false) })));
-        await context.db.delete(tagId);
+        await context.db.delete("threadTags", tagId);
 
         context.log.event("chat.delete_thread_tag", { updatedThreads: tagged.length });
 
@@ -224,7 +224,7 @@ export const setThreadTagAssigned = authMutation
     .output(v.object({ tagIds: v.array(v.string()) }))
     .mutation(async ({ args: { assigned, tagId, threadId }, ctx: context }) => {
         const { userId } = context.user;
-        const thread = await context.db.get(threadId);
+        const thread = await context.db.get("threads", threadId);
 
         if (!thread || thread.deleted) {
             throw new LunoraError("NOT_FOUND", "Thread not found");

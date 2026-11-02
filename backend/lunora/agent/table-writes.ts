@@ -24,7 +24,7 @@ import type { MutationCtx } from "../_generated/server";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { agentSwitchRowContent } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
-import type { VectorTableName } from "./vector/tables";
+import { findVectorTable, type VectorTableName } from "./vector/tables";
 
 type Database = MutationCtx["db"];
 type NewRow<T extends "messages" | "threadRelationships" | "threads"> = Omit<Doc<T>, "_creationTime" | "_id">;
@@ -72,24 +72,24 @@ export const patchesWithoutAwaitingInput = (
 
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
     if (fields.status === "running" || fields.lastReplyAt !== undefined) {
-        const row = await db.get(threadId);
+        const row = await db.get("threads", threadId);
 
         if (row && patchesWithoutAwaitingInput(row, fields)) {
-            await patchRow(db, row, { ...withoutUndefined(fields), awaitingInput: undefined });
+            await patchRow(db, "threads", row, { ...withoutUndefined(fields), awaitingInput: undefined });
 
             return;
         }
     }
 
-    await db.patch(threadId, withoutUndefined(fields));
+    await db.patch("threads", threadId, withoutUndefined(fields));
 };
 
 /** Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). */
 export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">): Promise<void> => {
-    const row = await db.get(threadId);
+    const row = await db.get("threads", threadId);
 
     if (row?.awaitingInput !== undefined) {
-        await patchRow(db, row, { awaitingInput: undefined });
+        await patchRow(db, "threads", row, { awaitingInput: undefined });
     }
 };
 
@@ -102,7 +102,7 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
         return false;
     }
 
-    await db.patch(thread._id, { lastViewedAt: now });
+    await db.patch("threads", thread._id, { lastViewedAt: now });
 
     return true;
 };
@@ -111,13 +111,13 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
 export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
     if (until === undefined) {
         if (thread.snoozedUntil !== undefined) {
-            await patchRow(db, thread, { snoozedUntil: undefined });
+            await patchRow(db, "threads", thread, { snoozedUntil: undefined });
         }
 
         return;
     }
 
-    await db.patch(thread._id, { snoozedUntil: until });
+    await db.patch("threads", thread._id, { snoozedUntil: until });
 };
 
 /**
@@ -157,15 +157,15 @@ export const insertAgentSwitchRow = async (
 
 /** Rewrites the part of a divider written by `insertAgentSwitchRow`, checked the same way. */
 export const patchAgentSwitchRow = async (db: Database, messageId: Id<"messages">, part: AgentSwitchPart): Promise<void> => {
-    await db.patch(messageId, { providerMetadata: agentSwitchRowContent(part).providerMetadata });
+    await db.patch("messages", messageId, { providerMetadata: agentSwitchRowContent(part).providerMetadata });
 };
 
 export const patchMessage = async (db: Database, messageId: Id<"messages">, fields: MessagePatch): Promise<void> => {
-    await db.patch(messageId, withoutUndefined(fields));
+    await db.patch("messages", messageId, withoutUndefined(fields));
 };
 
 export const patchTemporaryThread = async (db: Database, rowId: Id<"temporaryThreads">, fields: TemporaryThreadPatch): Promise<void> => {
-    await db.patch(rowId, withoutUndefined(fields));
+    await db.patch("temporaryThreads", rowId, withoutUndefined(fields));
 };
 
 export const insertThreadRelationship = async (db: Database, row: NewRow<"threadRelationships">): Promise<Id<"threadRelationships">> =>
@@ -183,7 +183,7 @@ export const leaseTemporaryThreadMarkers = async (db: Database, threadId: Id<"th
         .withIndex("by_thread", (q) => q.eq("threadId", threadId))
         .collect();
 
-    await Promise.all(markers.map((marker) => db.patch(marker._id, { expiresAt })));
+    await Promise.all(markers.map((marker) => db.patch("temporaryThreads", marker._id, { expiresAt })));
 };
 
 export const insertChatFileAccess = async (db: Database, fileId: Id<"chatFiles">, userId: string): Promise<void> => {
@@ -192,5 +192,9 @@ export const insertChatFileAccess = async (db: Database, fileId: Id<"chatFiles">
 
 /** Delete one vector row (`agent/vector`), e.g. a memory's embedding. */
 export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName>): Promise<void> => {
-    await db.delete(vectorId);
+    const table = await findVectorTable(db, vectorId);
+
+    if (table !== null) {
+        await db.delete(table, vectorId);
+    }
 };

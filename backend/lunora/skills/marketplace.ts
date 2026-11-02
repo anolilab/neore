@@ -224,7 +224,7 @@ export const installSkill = authMutation
         if (existing) {
             // Re-enable if disabled
             if (!existing.enabled) {
-                await ctx.db.patch(existing._id, { enabled: true });
+                await ctx.db.patch("userSkills", existing._id, { enabled: true });
                 await invalidateSkillsCache(ctx, ctx.user.userId);
             }
 
@@ -271,7 +271,7 @@ export const uninstallSkill = authMutation
             return { removed: false };
         }
 
-        await ctx.db.delete(existing._id);
+        await ctx.db.delete("userSkills", existing._id);
         await invalidateSkillsCache(ctx, ctx.user.userId);
 
         ctx.log.event("skills.uninstall", { removed: true, skillId: input.skillId });
@@ -391,7 +391,7 @@ export const rateSkill = authMutation
         const { now } = ctx;
 
         if (existingRating) {
-            await ctx.db.patch(existingRating._id, { rating: input.rating, updatedAt: now });
+            await ctx.db.patch("skillRatings", existingRating._id, { rating: input.rating, updatedAt: now });
         } else {
             await ctx.db.insert("skillRatings", { createdAt: now, rating: input.rating, skillId, userId });
         }
@@ -400,7 +400,7 @@ export const rateSkill = authMutation
         const next = summarizeRatings([...ratings.page.filter((entry) => entry.userId !== userId), { rating: input.rating, userId }]);
 
         if (stats) {
-            await ctx.db.patch(stats._id, next);
+            await ctx.db.patch("skillStats", stats._id, next);
         } else {
             await ctx.db.insert("skillStats", { ...next, skillId, usageCount: 0 });
         }

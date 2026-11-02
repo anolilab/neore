@@ -30,14 +30,14 @@ export const failAbandonedEditReply = internalMutation
     })
     .output(v.object({ added: v.boolean(), failed: v.number() }))
     .mutation(async ({ args: { promptMessageId, threadId }, ctx }) => {
-        const prompt = await ctx.db.get(promptMessageId);
+        const prompt = await ctx.db.get("messages", promptMessageId);
 
         if (!prompt || prompt.threadId !== threadId) {
             return { added: false, failed: 0 };
         }
 
         // A locked chat takes no placeholder: the lapse is left for the reaper to report.
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (thread && isThreadLocked(thread)) {
             return { added: false, failed: 0 };
@@ -53,7 +53,7 @@ export const failAbandonedEditReply = internalMutation
         const pending = pendingRows.filter((row) => row._creationTime >= prompt._creationTime);
 
         for (const row of pending) {
-            await patchRow(ctx.db, row, {
+            await patchRow(ctx.db, "messages", row, {
                 error: ABANDONED_REPLY_ERROR,
                 message: { content: [{ text: ABANDONED_REPLY_TEXT, type: "text" }], role: "assistant" },
                 status: "failed",

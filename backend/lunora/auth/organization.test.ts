@@ -169,7 +169,7 @@ describe("listUserInvitations", () => {
 
         await insertInvitation(`${ALICE}@example.com`, orphan);
         await seed(async (db) => {
-            await db.delete(orphan);
+            await db.delete("organization", orphan);
         });
 
         await expect(as(ALICE).query(listUserInvitations as never, {} as never)).resolves.toEqual([]);

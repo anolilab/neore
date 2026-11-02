@@ -49,7 +49,7 @@ export const updatePresentationStatus = internalMutation
         status: v.string(),
     })
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.patch(args.presentationId, {
+        await ctx.db.patch("presentations", args.presentationId, {
             status: args.status,
             updatedAt: ctx.now,
         });
@@ -74,7 +74,7 @@ export const createSlide = internalMutation
         let slideId: Id<"presentationSlides">;
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("presentationSlides", existing._id, {
                 htmlContent: args.htmlContent,
                 title: args.title,
                 updatedAt: now,
@@ -94,10 +94,10 @@ export const createSlide = internalMutation
         }
 
         // Update presentation timestamp and lastCompletedSlide
-        const presentation = await ctx.db.get(args.presentationId);
+        const presentation = await ctx.db.get("presentations", args.presentationId);
         const currentLast = presentation?.lastCompletedSlide ?? 0;
 
-        await ctx.db.patch(args.presentationId, {
+        await ctx.db.patch("presentations", args.presentationId, {
             lastCompletedSlide: Math.max(currentLast, args.slideNumber),
             updatedAt: now,
         });
@@ -146,7 +146,7 @@ export const updateSlide = internalMutation
     })
     .output(v.object({ slideId: v.id("presentationSlides") }))
     .mutation(async ({ args, ctx }) => {
-        const presentation = await ctx.db.get(args.presentationId);
+        const presentation = await ctx.db.get("presentations", args.presentationId);
 
         if (!presentation) {
             throw new LunoraError("NOT_FOUND", `Presentation ${args.presentationId} not found`);
@@ -180,8 +180,8 @@ export const updateSlide = internalMutation
             patch.htmlContent = args.htmlContent;
         }
 
-        await ctx.db.patch(existing._id, withoutUndefined(patch));
-        await ctx.db.patch(args.presentationId, { updatedAt: now });
+        await ctx.db.patch("presentationSlides", existing._id, withoutUndefined(patch));
+        await ctx.db.patch("presentations", args.presentationId, { updatedAt: now });
 
         return { slideId: existing._id };
     });

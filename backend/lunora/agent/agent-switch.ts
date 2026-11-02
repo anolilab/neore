@@ -135,7 +135,7 @@ const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSw
  * or switched only with its full history — at the cost of one thread read.
  */
 export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     if (!thread?.activeAgent || !thread.hasHandoff) {
         return [];
@@ -175,7 +175,7 @@ export const getHandoffBeforeDelta = internalQuery
  * A thread that was never switched has nothing to keep in step.
  */
 export const syncActiveAgent = async (context: MutationCtx, threadId: Id<"threads">, fromMessageId: string): Promise<void> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread?.activeAgent) {
         return;
@@ -221,7 +221,7 @@ export const runAgentModelOf = async (
     context: QueryCtx,
     args: { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> },
 ): Promise<string | null> => {
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     if (!thread?.activeAgent) {
         return null;
@@ -317,7 +317,7 @@ export const getRunAgentModel = internalQuery
  * before the first switch has neither to fix.
  */
 export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threads">): Promise<void> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread || thread.activeAgent) {
         return;

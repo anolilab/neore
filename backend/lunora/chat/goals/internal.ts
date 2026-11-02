@@ -56,7 +56,7 @@ const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string;
         return run.messageId;
     }
 
-    const stream = await ctx.db.get(run.streamId);
+    const stream = await ctx.db.get("persistentStreams", run.streamId);
 
     if (!stream) {
         return undefined;
@@ -139,7 +139,7 @@ export const startGoal = internalMutation
             return { error: problem, ok: false as const };
         }
 
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         // A goal keeps a chat running on the owner's budget: only the owner starts one.
         if (!thread || thread.userId !== args.userId) {
@@ -207,7 +207,7 @@ export const closeStaleGoalRound = internalMutation
     .input({ messageId: v.string().max(MAX_LENGTH.id), streamId: v.id("persistentStreams") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const stream = await ctx.db.get(args.streamId);
+        const stream = await ctx.db.get("persistentStreams", args.streamId);
 
         if (!stream) {
             return false;
@@ -221,7 +221,7 @@ export const closeStaleGoalRound = internalMutation
             return true;
         }
 
-        await ctx.db.patch(stream._id, { status: "done" });
+        await ctx.db.patch("persistentStreams", stream._id, { status: "done" });
 
         if (!(await hasLiveStream(ctx, threadId))) {
             await giveThreadBack(ctx, threadId);
@@ -239,13 +239,13 @@ export const claimGoalRound = internalMutation
     .input({ goalId: v.id("threadGoals"), round: v.number() })
     .output(v.union(v.object({ text: v.string(), threadId: v.id("threads"), userId: v.string() }), v.null()))
     .mutation(async ({ args, ctx }) => {
-        const goal = await ctx.db.get(args.goalId);
+        const goal = await ctx.db.get("threadGoals", args.goalId);
 
         if (!goal || goal.status !== "active" || goal.round !== args.round - 1 || (goal.claimedRound ?? 0) >= args.round) {
             return null;
         }
 
-        await ctx.db.patch(goal._id, { claimedRound: args.round, updatedAt: ctx.now });
+        await ctx.db.patch("threadGoals", goal._id, { claimedRound: args.round, updatedAt: ctx.now });
 
         return { text: goal.text, threadId: goal.threadId, userId: goal.userId };
     });
@@ -269,7 +269,7 @@ export const roundTranscript = internalQuery
         }),
     )
     .query(async ({ args, ctx }) => {
-        const goal = await ctx.db.get(args.goalId);
+        const goal = await ctx.db.get("threadGoals", args.goalId);
 
         if (!goal) {
             return { costMicrodollars: 0, transcript: "" };
@@ -284,7 +284,7 @@ export const roundTranscript = internalQuery
         // Newest first; the round is everything newer than its prompt (all of it, if the scan did not reach the prompt).
         const scanned = prompt === -1 ? recent : recent.slice(0, prompt);
         // Only the branch on display: a branch the user left must not reach the reviewer (or its taint, cost or last row).
-        const thread = await ctx.db.get(goal.threadId);
+        const thread = await ctx.db.get("threads", goal.threadId);
         const onPath = thread?.activeLeafMessageId ? await candidatesOnActivePath(ctx, goal.threadId, thread.activeLeafMessageId, scanned) : undefined;
         const round = onPath ? scanned.filter((row) => onPath.has(row._id as string)) : scanned;
         const rows = round.toReversed().filter((row) => (row.message as { role?: string } | undefined)?.role !== "user");
@@ -333,7 +333,7 @@ export const recordGoalVerdict = internalMutation
     })
     .output(v.object({ next: v.optional(vNext), outcome: v.union(v.literal("continue"), v.literal("ended"), v.literal("ignored")) }))
     .mutation(async ({ args, ctx }) => {
-        const goal = await ctx.db.get(args.goalId);
+        const goal = await ctx.db.get("threadGoals", args.goalId);
 
         if (!goal || goal.status !== "active" || goal.claimedRound !== args.round || goal.round !== args.round - 1) {
             return { outcome: "ignored" as const };
@@ -361,13 +361,13 @@ export const recordGoalVerdict = internalMutation
 
         // The run that just ended left the thread `running` for this hand-off; ending the goal gives it back.
         const end = async (status: "met" | "stopped", stopReason?: GoalStopReason) => {
-            await ctx.db.patch(goal._id, withoutUndefined({ ...progress, endedAt: now, status, stopReason }));
+            await ctx.db.patch("threadGoals", goal._id, withoutUndefined({ ...progress, endedAt: now, status, stopReason }));
             await giveThreadBack(ctx, goal.threadId);
 
             return { outcome: "ended" as const };
         };
 
-        const thread = await ctx.db.get(goal.threadId);
+        const thread = await ctx.db.get("threads", goal.threadId);
 
         // Locking a chat stops its goal: no further round reads it, writes into it or sends it to the reviewer.
         if (thread && isThreadLocked(thread)) {
@@ -379,7 +379,7 @@ export const recordGoalVerdict = internalMutation
         if (thread?.activeLeafMessageId) {
             // The round's prompt too: a branch the user switched to that never passes through it can hold no row of the round at
             // all, which leaves `lastMessage` unset.
-            const prompt = await ctx.db.get(goal.promptMessageId as Id<"messages">);
+            const prompt = await ctx.db.get("messages", goal.promptMessageId as Id<"messages">);
             const candidates = [
                 ...(prompt ? [{ _id: goal.promptMessageId, order: prompt.order }] : []),
                 ...(args.lastMessage ? [{ _id: args.lastMessage.id, order: args.lastMessage.order }] : []),
@@ -450,7 +450,7 @@ export const recordGoalVerdict = internalMutation
         });
 
         await patchThread(ctx.db, goal.threadId, { status: "running", updatedAt: now });
-        await ctx.db.patch(goal._id, { ...progress, promptMessageId: messageId });
+        await ctx.db.patch("threadGoals", goal._id, { ...progress, promptMessageId: messageId });
 
         return {
             next: { config, messageId, ...(goal.organizationId !== undefined && { organizationId: goal.organizationId }), streamId: streamId as string },
@@ -463,7 +463,7 @@ export const failGoalReview = internalMutation
     .input({ goalId: v.id("threadGoals"), reason: vGoalStopReason, round: v.number() })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const goal = await ctx.db.get(args.goalId);
+        const goal = await ctx.db.get("threadGoals", args.goalId);
 
         if (!goal || goal.status !== "active" || goal.claimedRound !== args.round) {
             return false;
@@ -508,7 +508,7 @@ export const touchGoal = internalMutation
         const goals = await activeGoalsOf(ctx, args.threadId);
 
         for (const goal of goals) {
-            await ctx.db.patch(goal._id, { updatedAt: ctx.now });
+            await ctx.db.patch("threadGoals", goal._id, { updatedAt: ctx.now });
         }
 
         return goals.length > 0;
@@ -533,7 +533,7 @@ export const reapStalledGoals = internalMutation
 
         for (const goal of stalled) {
             if (await isGoalWaiting(ctx, goal)) {
-                await ctx.db.patch(goal._id, { updatedAt: ctx.now });
+                await ctx.db.patch("threadGoals", goal._id, { updatedAt: ctx.now });
                 continue;
             }
 

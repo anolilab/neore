@@ -247,7 +247,7 @@ describe("a refused admission gives a gitlab-token claim back", () => {
         expect(await admit(first)).toMatch(NO_LONGER_AVAILABLE);
         expect(await claims()).toEqual([]);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { model: DEFAULT_CHAT_MODEL }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { model: DEFAULT_CHAT_MODEL }));
         expect(await deliver(triggerId)).toBeDefined();
     });
 
@@ -267,7 +267,7 @@ describe("a refused admission gives a gitlab-token claim back", () => {
         const triggerId = await insertTrigger();
         const first = (await deliver(triggerId))!;
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(triggerId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("triggers", triggerId));
 
         expect(await admit(first)).toBe("Trigger not found");
         expect(await claims()).toEqual([]);
@@ -298,13 +298,13 @@ describe("executeTrigger gives a gitlab-token claim back when the delivery never
         const triggerId = await insertTrigger();
         const first = (await deliver(triggerId))!;
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false }));
         await execute(first);
 
         expect(world.agentRuns).toBe(0);
         expect(await claims()).toEqual([]);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: true }));
 
         const redelivery = await deliver(triggerId);
 
@@ -339,7 +339,7 @@ describe("executeTrigger gives a gitlab-token claim back when the delivery never
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false }));
         await execute(first);
 
         expect(await claims()).toHaveLength(1);
@@ -353,7 +353,7 @@ describe("a release that fails is retried, not dropped", () => {
         const triggerId = await insertTrigger();
         const first = (await deliver(triggerId))!;
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false }));
         world.releaseFailures = 1;
         await execute(first);
 
@@ -373,7 +373,7 @@ describe("a release that fails is retried, not dropped", () => {
         // The next attempt succeeds; the redelivery then runs.
         await runRetry({ args: job!.args as Record<string, unknown>, delay: 0, reference: undefined });
         expect(await claims()).toEqual([]);
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: true }));
 
         const redelivery = await deliver(triggerId);
 
@@ -445,7 +445,7 @@ describe("a release that fails is retried, not dropped", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("idempotencyClaims").collect();
 
-            await ctx.db.patch(row._id, { claimedAt: NOW + 1 });
+            await ctx.db.patch("idempotencyClaims", row._id, { claimedAt: NOW + 1 });
         });
 
         // The retry names the old claim (`claimedAt` NOW): the newer holder keeps its row.

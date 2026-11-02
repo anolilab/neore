@@ -99,7 +99,7 @@ export const steerRun = authMutation
             throw new LunoraError("TOO_MANY_REQUESTS", "Wait for the reply to take the messages already sent");
         }
 
-        await patchRow(ctx.db, stream, { steers });
+        await patchRow(ctx.db, "persistentStreams", stream, { steers });
 
         ctx.log.event("chat.steer_run", { queued: steers.filter((entry) => entry.status === "queued").length });
 
@@ -135,7 +135,7 @@ export const withdrawSteer = authMutation
         const { changed, entries, outcome } = withdrawQueuedSteer(stream.steers ?? [], steerId, { live: isLive(stream.status) });
 
         if (changed) {
-            await patchRow(ctx.db, stream, { steers: entries });
+            await patchRow(ctx.db, "persistentStreams", stream, { steers: entries });
         }
 
         ctx.log.event("chat.withdraw_steer", { outcome });
@@ -184,7 +184,7 @@ export const deliverSteers = internalMutation
             return null;
         }
 
-        await patchRow(ctx.db, stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
+        await patchRow(ctx.db, "persistentStreams", stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
         return { messageId: row.messageId, text: taken.text };
     });

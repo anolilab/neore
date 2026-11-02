@@ -59,7 +59,7 @@ beforeEach(async () => {
 const insertNotification = (ctx: any, fields: Record<string, unknown>) =>
     ctx.db.insert("notifications", { createdAt: 1, title: "Salary", type: "task", userId: GRANTEE, ...fields });
 
-const rowsOf = (ids: string[]) => harness.run(async (ctx: any) => await Promise.all(ids.map(async (id) => await ctx.db.get(id))));
+const rowsOf = (ids: string[]) => harness.run(async (ctx: any) => await Promise.all(ids.map(async (id) => await ctx.db.get("notifications", id))));
 
 /**
  * The harness cannot dispatch a job scheduled by reference, so each queued
@@ -169,7 +169,10 @@ describe("the per-user redaction job", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(redactLockedLinks, { threadId, userId: GRANTEE }));
 
-        const [pending, sent] = await harness.run(async (ctx: any) => [await ctx.db.get(ids.pending), await ctx.db.get(ids.sent)]);
+        const [pending, sent] = await harness.run(async (ctx: any) => [
+            await ctx.db.get("outcomeEmails", ids.pending),
+            await ctx.db.get("outcomeEmails", ids.sent),
+        ]);
 
         expect(pending).toMatchObject({ title: LOCKED_THREAD_TITLE });
         expect(sent).toMatchObject({ title: "Salary" });
@@ -290,7 +293,7 @@ describe("locking a chat that had collaborators", () => {
 
 describe("a notification written after the lock", () => {
     it("is redacted on the owner's shard before it is handed to the recipient", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() }));
 
         await harness.run(
             async (ctx: any) =>
