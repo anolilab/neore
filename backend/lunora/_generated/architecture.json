@@ -3251,11 +3251,6 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
-      "from": "function:coding_agents_execute:createPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -3289,11 +3284,6 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:finishRun",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3356,11 +3346,6 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
-      "from": "function:coding_agents_execute:pollPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3374,11 +3359,6 @@
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:postRunResult"
-    },
-    {
-      "from": "function:coding_agents_execute:reapPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:reapRun",
@@ -15838,6 +15818,13 @@
       "module": "source-control"
     },
     {
+      "detail": "action",
+      "id": "function:source_control_pr_link_retry:retryOpenedPullRequestLink",
+      "kind": "function",
+      "name": "source_control.pr_link_retry.retryOpenedPullRequestLink",
+      "module": "source-control"
+    },
+    {
       "detail": "query",
       "id": "function:source_control_pr_threads:getForThread",
       "kind": "function",
@@ -22927,6 +22914,12 @@
       "kind": "write",
       "line": 151,
       "reason": "\"markGuideFailed\" is not a registered function"
+    },
+    {
+      "file": "source-control/pr-link-retry",
+      "kind": "call",
+      "line": 35,
+      "reason": "\"recordOpenedPullRequestWithRetry\" is not a registered function"
     },
     {
       "file": "source-control/pr-thread-links",
