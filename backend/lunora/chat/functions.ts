@@ -78,6 +78,7 @@ import { mediaJobStamp } from "./media-abandon";
 import type { FalAudioResponse } from "./lib/fal-media-parsing";
 import { extractFalAudioUrl, resolveFalVideoUrl } from "./lib/fal-media-parsing";
 import { canRunPaidModel, INTERNAL_PREFIX_RE, readRunPlan } from "./lib/agent-run";
+import { loadOptimizerModelRules } from "./lib/optimizer-model-rules";
 import { resolveBackgroundModel } from "./lib/background-model";
 import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
 import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
@@ -2674,11 +2675,18 @@ const runOptimizer = async (
     // messages into the prompt — whose rewrite goes back to the caller. So it must
     // be a thread the caller can read (owner or live grantee), else a stranger's
     // conversation leaks through the "improved prompt".
+    let ownerId: string | undefined;
+
     if (threadId) {
         await requireThreadPermissionInAction(context, threadId as Id<"threads">, userId, "read");
+        const continued = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+        ownerId = continued?.userId;
     }
 
-    const agent = await getAgent(modelId, { gateway: gatewayFetch(context) });
+    // A shared thread's messages are the owner's and go to the model with the caller's rewrite, so both users' filters apply.
+    const modelFilterRules = await loadOptimizerModelRules(context, userId, modelId, ownerId);
+    const agent = await getAgent(modelId, { gateway: gatewayFetch(context), modelFilterRules });
     const { thread } = threadId
         ? await agent.continueThread(context, { threadId })
         : await agent.createThread(context, { title: "Prompt Optimization", userId });
@@ -4864,10 +4872,8 @@ export const generateVideo = internalAction
         }
     });
 
-// ============================================================================
-// Music Generation Action (fal.ai)
-// ============================================================================
-
+// =====================================================================// Music Generation Action (fal.ai)
+// =====================================================================
 /**
  * Submit a music render to FAL's queue API and poll until completion.
  * Music endpoints take a flat input body (no `{ input: ... }` wrapper),
@@ -5073,10 +5079,8 @@ export const generateMusic = internalAction
         }
     });
 
-// ============================================================================
-// Image Transformation Actions (fal.ai)
-// ============================================================================
-
+// =====================================================================// Image Transformation Actions (fal.ai)
+// =====================================================================
 /**
  * Helper to call fal.ai REST API directly.
  */
@@ -5744,10 +5748,8 @@ export const generateParallelCompare = internalAction
         };
     });
 
-// ============================================================================
-// Outpaint, Background Removal, Object Edit, Image-to-Video, ControlNet, Transcription
-// ============================================================================
-
+// =====================================================================// Outpaint, Background Removal, Object Edit, Image-to-Video, ControlNet, Transcription
+// =====================================================================
 export const generateOutpaint = internalAction
     .input({
         expandDirection: v.string(),
