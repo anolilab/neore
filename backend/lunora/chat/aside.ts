@@ -455,8 +455,10 @@ export const addAsideToThread = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ messageId: v.string() }))
-    .mutation(async ({ args: { answer, entryId, question, threadId, token, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { answer, entryId, question: rawQuestion, threadId, token, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
+        // `askAside` signed and answered the question without hidden characters; what is written into the thread is that one.
+        const question = stripHiddenText(rawQuestion).text;
 
         if (!question.trim() || !answer.trim() || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "There is nothing to add");

@@ -708,6 +708,20 @@ describe("addAsideToThread", () => {
         expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
     });
 
+    it("writes the question without hidden characters, whatever the panel sends back", async () => {
+        await finishReply();
+
+        const asked = await ask(`${QUESTION}\u{E0069}\u{E0067}`);
+        const { messageId } = (await as(OWNER).mutation(
+            addAsideToThread as never,
+            { answer: asked.answer, entryId: lastEntryId(), question: `${QUESTION}\u{E0069}\u{E0067}`, threadId, token: asked.token } as never,
+        )) as { messageId: string };
+        const all = await rows("messages");
+        const added = all.find((row) => row._id === messageId);
+
+        expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
+    });
+
     it("writes one row for two calls with the same side question, one after the other or together", async () => {
         await finishReply();
 

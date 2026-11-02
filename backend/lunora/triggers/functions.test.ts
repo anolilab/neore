@@ -222,6 +222,19 @@ describe("trigger schedules", () => {
         return { cronExpression, model: "m", name: "Daily", type: "schedule" };
     };
 
+    it("stores the input and system prompt without hidden characters, and refuses ones that were only those", async () => {
+        const created = (await as().mutation(
+            createTrigger as never,
+            { ...schedule("0 9 * * 1"), inputTemplate: "Check\u{E0069}\u{E0067} the news\u{202E}", systemPrompt: "Be brief\u{E0041}" } as never,
+        )) as { triggerId: string };
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("triggers", created.triggerId));
+
+        expect(row).toMatchObject({ inputTemplate: "Check the news", systemPrompt: "Be brief" });
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), inputTemplate: "\u{E0069}\u{E0067}" } as never)).rejects.toThrow(
+            "empty after removing hidden characters",
+        );
+    });
+
     it("refuses a custom model without a runnable endpoint", async () => {
         await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), model: "custom:gone/model" } as never)).rejects.toThrow(
             "custom endpoint is missing",
