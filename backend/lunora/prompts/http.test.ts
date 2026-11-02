@@ -4,6 +4,7 @@
  * `resolveIdentity` never sets — so every call, signed in or not, answered
  * "must be logged in".
  */
+import { LunoraError } from "lunorash/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import optimizePromptHttpAction from "./http";
@@ -36,6 +37,16 @@ describe("/prompts/optimize", () => {
 
         expect(response.status).toBe(401);
         expect(runAction).not.toHaveBeenCalled();
+    });
+
+    it("answers a BAD_REQUEST refusal with a 400 and its message, not a retryable 500", async () => {
+        currentUser.value = { _id: "user-1" };
+        runAction.mockRejectedValue(new LunoraError("BAD_REQUEST", "Your model settings could not be read; try again."));
+
+        const response = await optimizePromptHttpAction({ runAction } as never, post({ content: "write a poem" }));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toStrictEqual({ error: "Your model settings could not be read; try again." });
     });
 
     it("runs the optimizer for a signed-in caller, as that caller", async () => {

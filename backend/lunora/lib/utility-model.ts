@@ -58,7 +58,7 @@ export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): Mo
  * routing restriction, so a model reachable in a blocked region could be served from it: with any region blocked,
  * only a model whose EVERY region is outside the list qualifies (the shared predicate refuses only when all are blocked).
  */
-const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+export const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
     const blocked = rules?.blockedRegions;
 
     return !blocked || blocked.length === 0 || deriveModelRegions(definition).every((region) => !blocked.includes(region));
