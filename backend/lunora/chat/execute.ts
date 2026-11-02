@@ -57,7 +57,7 @@ import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 import { injectsSkillText } from "./lib/low-risk-approval";
-import { closeMCPClients } from "./lib/mcp-tools";
+import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
@@ -798,8 +798,7 @@ export const runStreamingAgent = internalAction
                 }
             } finally {
                 clearInterval(beat);
-                await settleAbort();
-                await closeMCPClients(mcpClients);
+                await closeMCPClientsThenSettle(mcpClients, settleAbort);
             }
         },
     );

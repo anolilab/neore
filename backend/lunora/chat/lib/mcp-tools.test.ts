@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { getMCPTools, mcpRuntimeToolName, PROGRESS_FINISH_DEADLINE_MS } from "./mcp-tools";
+import { closeMCPClientsThenSettle, getMCPTools, mcpRuntimeToolName, PROGRESS_FINISH_DEADLINE_MS } from "./mcp-tools";
 import type { MCPServerConfig } from "./mcp-tools";
 
 // One fake client per server URL; `tools()` returns that server's tools.
@@ -163,5 +163,49 @@ describe("getMCPTools progress", () => {
         const result = await getMCPTools([server("c", "https://c.example/mcp")]);
 
         await expect((result.tools["mcp_c__run"]!.execute as any)({}, { messages: [], toolCallId: "call_1" })).resolves.toBe("ok");
+    });
+});
+
+describe("closeMCPClientsThenSettle", () => {
+    it("closes the clients while the settlement is still stalled, and returns only once it has landed", async () => {
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const close = vi.fn(async () => {});
+        const settle = vi.fn(async () => await gate);
+        let returned = false;
+
+        const running = (async () => {
+            await closeMCPClientsThenSettle([{ close }] as never, settle);
+            returned = true;
+        })();
+
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 20);
+        });
+
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(returned).toBe(false);
+
+        release();
+        await running;
+
+        expect(settle).toHaveBeenCalledTimes(1);
+        expect(returned).toBe(true);
+    });
+
+    it("closes the clients and rethrows the settlement's failure when the settlement rejects", async () => {
+        const close = vi.fn(async () => {
+            throw new Error("close failed");
+        });
+        const settle = vi.fn(async () => {
+            throw new Error("write failed");
+        });
+
+        await expect(closeMCPClientsThenSettle([{ close }] as never, settle)).rejects.toThrow("write failed");
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(settle).toHaveBeenCalledTimes(1);
     });
 });
