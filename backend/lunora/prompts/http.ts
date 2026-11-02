@@ -67,11 +67,12 @@ const optimizePromptHttpAction = async (context: HttpActionCtx, request: Request
                 );
             }
 
+            // A 4xx refusal (model filters allow no model, unreadable settings) keeps its status: a 500 reads as transient and is retried.
             return Response.json(
                 { error: error.message },
                 {
                     headers: { "Content-Type": "application/json" },
-                    status: 500,
+                    status: Math.min(error.status, 500),
                 },
             );
         }
