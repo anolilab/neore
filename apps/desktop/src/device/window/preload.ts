@@ -35,6 +35,7 @@ const api: DeviceWindowApi = {
     acpView: () => ipcRenderer.invoke(LOCAL_CHANNEL.acpView),
     auditTail: () => ipcRenderer.invoke(LOCAL_CHANNEL.auditTail),
     confirm: (message) => ipcRenderer.invoke(LOCAL_CHANNEL.confirm, message),
+    copyDiagnostics: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.copyDiagnostics, deviceId),
     hostAcpUpdate: (deviceId, update) => ipcRenderer.invoke(LOCAL_CHANNEL.hostAcpUpdate, deviceId, update),
     hostConnect: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostConnect, deviceId),
     hostDisconnect: (deviceId) => ipcRenderer.invoke(LOCAL_CHANNEL.hostDisconnect, deviceId),
