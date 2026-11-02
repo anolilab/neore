@@ -13,21 +13,26 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { releaseClaim, retryReleaseKey, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { DAILY_LIMIT_MESSAGE } from "../tasks/account";
 import { executeTrigger } from "./execute";
-import { admitTriggerRun } from "./functions";
+import { admitTriggerRun, TRIGGER_ADMISSION_SCOPE } from "./functions";
 import handleTriggerWebhook from "./http";
 
 const world = vi.hoisted(() => {
     return {
         agentRuns: 0,
         chargeOk: true,
+        charges: 0,
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        headlessCalls: 0,
         registry: new Map<string, unknown>(),
         releaseFailures: 0,
+        retriesUnschedulable: false,
+        threadsCreated: 0,
         userExists: true,
+        userLookupFailures: 0,
         userLookupThrows: false,
     };
 });
@@ -38,6 +43,8 @@ vi.mock("../chat/lib/headless-run", () => {
     return {
         // The stages of the real run (`headless-run.ts`) in order: provider keys, thread, then the model call, announced by `onGenerationStart`.
         runHeadlessAgent: async (_ctx: unknown, options: { onGenerationStart?: () => Promise<void> | void }) => {
+            world.headlessCalls += 1;
+
             if (world.failAt === "keys") {
                 throw new Error("provider keys unavailable");
             }
@@ -45,6 +52,9 @@ vi.mock("../chat/lib/headless-run", () => {
             if (world.failAt === "thread") {
                 throw new Error("thread creation failed");
             }
+
+            // The real run creates the thread here, before the model call.
+            world.threadsCreated += 1;
 
             await options.onGenerationStart?.();
 
@@ -64,7 +74,9 @@ vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
         getUser: async (_ctx: unknown, userId: string) => {
-            if (world.userLookupThrows) {
+            if (world.userLookupThrows || world.userLookupFailures > 0) {
+                world.userLookupFailures -= 1;
+
                 throw new Error("user lookup failed");
             }
 
@@ -76,7 +88,11 @@ vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
 vi.mock("../tasks/account", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../tasks/account")>()),
-        chargeRound: async () => world.chargeOk,
+        chargeRound: async () => {
+            world.charges += 1;
+
+            return world.chargeOk;
+        },
     };
 });
 
@@ -132,6 +148,11 @@ beforeEach(() => {
     world.userLookupThrows = false;
     world.failAt = undefined;
     world.releaseFailures = 0;
+    world.charges = 0;
+    world.headlessCalls = 0;
+    world.threadsCreated = 0;
+    world.userLookupFailures = 0;
+    world.retriesUnschedulable = false;
     harness = lunoraTest(schema as never);
 });
 
@@ -182,6 +203,10 @@ const deliver = async (
         },
         scheduler: {
             runAfter: async (delay: number, reference: unknown, args: Record<string, unknown>) => {
+                if (world.retriesUnschedulable && reference !== internal.triggers.execute.executeTrigger) {
+                    throw new Error("scheduler unavailable");
+                }
+
                 if (reference === internal.triggers.execute.executeTrigger) {
                     scheduled.push(args as Scheduled);
                 } else {
@@ -203,7 +228,12 @@ const deliver = async (
     return scheduled[0];
 };
 
-const claims = async (): Promise<{ scope: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+/** The delivery claims (the per-execution admission record sits beside them and is not what these tests are about). */
+const claims = async (): Promise<{ scope: string }[]> => {
+    const rows: { scope: string }[] = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+    return rows.filter((row) => !row.scope.startsWith(TRIGGER_ADMISSION_SCOPE));
+};
 
 /** What `executeTrigger` does first with a scheduled delivery. */
 const admit = async (delivery: Scheduled) =>
@@ -282,14 +312,15 @@ describe("a refused admission gives a gitlab-token claim back", () => {
         expect(await deliver(triggerId)).toBeUndefined();
     });
 
-    it("and leaves another scheme's claim to lapse, as before", async () => {
+    it("and gives a native claim back too, since it never lapses", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
+        expect(first.releaseUnlessRun).toBe(true);
         world.chargeOk = false;
         expect(await admit(first)).toBe(DAILY_LIMIT_MESSAGE);
-        expect(await claims()).toHaveLength(1);
-        expect(await deliver(triggerId, "native")).toBeUndefined();
+        expect(await claims()).toEqual([]);
+        expect(await deliver(triggerId, "native")).toBeDefined();
     });
 });
 
@@ -324,25 +355,26 @@ describe("executeTrigger gives a gitlab-token claim back when the delivery never
         expect(await claims()).toEqual([]);
     });
 
-    it("but keeps it once the agent ran", async () => {
+    it("but keeps it once the agent ran, for the long TTL instead of the retry window it was taken for", async () => {
         const triggerId = await insertTrigger();
         const first = (await deliver(triggerId))!;
 
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_CLAIM_TTL_MS })]);
         await execute(first);
 
         expect(world.agentRuns).toBe(1);
-        expect(await claims()).toEqual([expect.objectContaining({ scope: TRIGGER_DELIVERY_SCOPE })]);
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS, scope: TRIGGER_DELIVERY_SCOPE })]);
         expect(await deliver(triggerId)).toBeUndefined();
     });
 
-    it("and does not release the claim of another scheme", async () => {
+    it("and releases a native claim the same way", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
         await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false }));
         await execute(first);
 
-        expect(await claims()).toHaveLength(1);
+        expect(await claims()).toEqual([]);
     });
 });
 
@@ -419,13 +451,33 @@ describe("a release that fails is retried, not dropped", () => {
         expect(await deliver(triggerId, "gitlab-token", { filters: [{ op: "equals", path: "object_kind", value: "merge_request" }] })).toBeDefined();
     });
 
-    it("in the webhook handler: a native trigger's failed release is not retried in the background", async () => {
+    it("in the webhook handler: a native trigger's failed release is retried in the background too", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const filters = [{ op: "equals", path: "object_kind", value: "push" }];
 
         world.releaseFailures = 1;
         expect(await deliver(triggerId, "native", { filters, status: 500 })).toBeUndefined();
-        expect(lastDelivery.jobs).toEqual([]);
+        expect(lastDelivery.jobs).toHaveLength(1);
+        expect(lastDelivery.jobs[0]!.args).toMatchObject({ attempt: 1, scope: TRIGGER_DELIVERY_SCOPE });
+    });
+
+    it("a delivery whose release failed and whose retry cannot be scheduled blocks its redelivery only for the retry window", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const filters = [{ op: "equals", path: "object_kind", value: "push" }];
+
+        // A filtered delivery gives its claim back before answering; the release fails and so does the job that would retry it.
+        world.releaseFailures = 1;
+        world.retriesUnschedulable = true;
+        expect(await deliver(triggerId, "native", { filters, status: 500 })).toBeUndefined();
+        expect(lastDelivery.jobs).toHaveLength(0);
+
+        // Still held: it ran nothing, but nobody released it.
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_CLAIM_TTL_MS })]);
+        expect(await deliver(triggerId, "native")).toBeUndefined();
+
+        // No hand needed: the retry window ends and the sender's redelivery runs.
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+        expect(await deliver(triggerId, "native")).toBeDefined();
     });
 
     it("is idempotent: a second attempt, or one for a claim a newer holder replaced, deletes nothing", async () => {
@@ -494,5 +546,142 @@ describe("a gitlab-token claim is kept only for a run that reached the model", (
 
         expect(await claims()).toEqual([expect.objectContaining({ scope: TRIGGER_DELIVERY_SCOPE })]);
         expect(await deliver(triggerId)).toBeUndefined();
+    });
+});
+
+describe("a retried admission", () => {
+    it("charges the daily run once when the first try committed and only its answer was lost", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: first.releaseUnlessRun,
+            triggerId: first.triggerId,
+        };
+        const admitOnce = async () => await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args));
+
+        expect(await admitOnce()).toBeNull();
+        // The caller saw an error and asks again with the same execution.
+        expect(await admitOnce()).toBeNull();
+        expect(world.charges).toBe(1);
+    });
+
+    it("still reports a refusal each time, and a refused charge is not recorded as one", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: first.releaseUnlessRun,
+            triggerId: first.triggerId,
+        };
+
+        world.chargeOk = false;
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).toBe(DAILY_LIMIT_MESSAGE);
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).not.toBeNull();
+    });
+});
+
+describe("a retried admission that had already refused", () => {
+    /** An execution admitted twice with the same id: the first try refused and committed, the second is the retry after its answer was lost. */
+    const admission = async (triggerPatch: Record<string, unknown>) => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native", ...triggerPatch });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: true,
+            requireEnabled: true,
+            triggerId: first.triggerId,
+        };
+
+        return { again: async () => await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args)), triggerId };
+    };
+    const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
+
+    it("stays filtered after the filters change, running and charging nothing", async () => {
+        const { again, triggerId } = await admission({ filters: [{ op: "equals", path: "object_kind", value: "push" }] });
+
+        expect(await again()).toMatchObject({ filtered: expect.any(String) });
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: [] }));
+        expect(await again()).toMatchObject({ filtered: expect.any(String) });
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([expect.objectContaining({ status: "filtered" })]);
+    });
+
+    it("stays skipped after the trigger is enabled again, running and charging nothing", async () => {
+        const { again, triggerId } = await admission({ enabled: false });
+
+        expect(await again()).toEqual({ skipped: "disabled" });
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: true }));
+        expect(await again()).toEqual({ skipped: "disabled" });
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([]);
+    });
+});
+
+describe("a delivery whose claim lapsed before it was admitted", () => {
+    const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
+
+    it("is not dropped when nobody took the key: it runs and keeps the key for good", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        // It waited in the queue past the retry window.
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+        await execute(first);
+
+        expect(world.agentRuns).toBe(1);
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt: first.claim!.claimedAt, expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS })]);
+        expect(await deliver(triggerId, "native")).toBeUndefined();
+    });
+
+    it("does not run when a redelivery took the key, and leaves no thread, charge or execution row behind", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+
+        const redelivery = (await deliver(triggerId, "native"))!;
+
+        expect(redelivery.claim!.claimedAt).not.toBe(first.claim!.claimedAt);
+
+        await execute(first);
+        // No model call (so no thread), no daily run used, no row, and the redelivery's claim untouched.
+        expect(world.agentRuns).toBe(0);
+        expect(world.headlessCalls).toBe(0);
+        expect(world.threadsCreated).toBe(0);
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([]);
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt: redelivery.claim!.claimedAt })]);
+
+        await execute(redelivery);
+        expect(world.agentRuns).toBe(1);
+        expect(world.charges).toBe(1);
+    });
+
+    it("tries the admission again after a transient failure, and runs once", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        world.userLookupFailures = 2;
+        await execute(first);
+
+        expect(world.agentRuns).toBe(1);
+        expect(world.charges).toBe(1);
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS })]);
     });
 });

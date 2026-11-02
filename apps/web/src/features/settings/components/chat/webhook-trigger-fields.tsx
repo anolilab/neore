@@ -191,8 +191,8 @@ export const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> 
                 <p className="text-muted-foreground mt-2">
                     <Trans>
                         Send <code className="font-mono">X-Hub-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of the raw request body keyed with the
-                        secret (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute
-                        duplicate window has passed. Requests with the neore headers are rejected.
+                        secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger
+                        exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected.
                     </Trans>
                 </p>
             );

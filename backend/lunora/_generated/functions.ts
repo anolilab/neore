@@ -6034,14 +6034,25 @@ __has4 = true;
 }
 if (typeof source["scope"] !== "string") return DEFER;
 if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
-let __has5 = false;
-let __val5;
+let __has6 = false;
+let __val6;
+if (source["unlessHeld"] !== undefined) {
+if (typeof source["unlessHeld"] !== "object" || source["unlessHeld"] === null || Array.isArray(source["unlessHeld"])) return DEFER;
+if (Object.getPrototypeOf(source["unlessHeld"]) !== Object.prototype && Object.getPrototypeOf(source["unlessHeld"]) !== null) return DEFER;
+if (typeof source["unlessHeld"]["key"] !== "string") return DEFER;
+if (typeof source["unlessHeld"]["scope"] !== "string") return DEFER;
+const __obj5 = { "key": source["unlessHeld"]["key"], "scope": source["unlessHeld"]["scope"] };
+__val6 = __obj5;
+__has6 = true;
+}
+let __has7 = false;
+let __val7;
 if (source["userId"] !== undefined) {
 if (typeof source["userId"] !== "string") return DEFER;
-__val5 = source["userId"];
-__has5 = true;
+__val7 = source["userId"];
+__has7 = true;
 }
-return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
+return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has6 ? { "unlessHeld": __val6 } : {}), ...(__has7 ? { "userId": __val7 } : {}) };
 });
 installCompiledValidatorMap(lunora_lib_claim_once_134.completeKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9451,7 +9462,7 @@ export interface Caller {
         };
         claim_once: {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
-            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<null | number>;
+            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; unlessHeld?: { key: string; scope: string }; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
             purgeClaimsWithPrefix: (args: { prefix: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
@@ -10022,7 +10033,7 @@ export interface Caller {
             executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" }>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
             createExecution: (args: { firing?: number; payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "event" | "schedule" | "webhook"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
