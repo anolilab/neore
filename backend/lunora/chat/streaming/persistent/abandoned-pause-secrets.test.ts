@@ -23,6 +23,7 @@ vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...keyBytes)));
 const { default: schema } = await import("../../../schema");
 const { createStreamWithMessage } = await import("../index");
 const { stopActiveForThread } = await import("./library");
+const { discardSecretsOfThread } = await import("../../request-secret");
 const { storeRequestedSecret } = await import("../../lib/secret-requests");
 
 const OWNER = "user-owner";
@@ -198,6 +199,40 @@ describe("a paused reply that is abandoned", () => {
         );
 
         expect(await holdsValue(ref)).toBe(true);
+    });
+
+    it("abandons the stopped replies' pending requests when the named prompt matches no live reply", async () => {
+        await insertStream("done", Date.now(), "old-prompt");
+
+        const live = String(await insertStream("streaming", undefined, "prompt-B"));
+        const ref = await storeSecret(live);
+
+        await insertSnapshot("pending", live, undefined, "appr-live", true);
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { messageId: "old-prompt", threadId }));
+
+        const snapshots: { approvalId: string; status: string }[] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshots.find((snapshot) => snapshot.approvalId === "appr-live")?.status).toBe("denied");
+        expect(await holdsValue(ref)).toBe(false);
+    });
+
+    it("keeps a sibling continuation's references when one run sharing the reply key ends", async () => {
+        const first = String(await insertStream("streaming", Date.now()));
+        const second = String(await insertStream("streaming", Date.now()));
+        const ref = await storeSecret("stream-A");
+
+        await insertSnapshot("approved", "stream-A", first, "appr-1");
+        await insertSnapshot("approved", "stream-A", second, "appr-2");
+
+        await run(async (ctx) => await ctx.runMutation(discardSecretsOfThread, { streamId: first, threadId: threadId as never }));
+
+        expect(await holdsValue(ref)).toBe(true);
+
+        await run(async (ctx) => await ctx.db.patch(second as never, { status: "done" }));
+        await run(async (ctx) => await ctx.runMutation(discardSecretsOfThread, { streamId: first, threadId: threadId as never }));
+
+        expect(await holdsValue(ref)).toBe(false);
     });
 
     it("loses it when a new message moves the conversation past the request", async () => {

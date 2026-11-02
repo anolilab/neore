@@ -248,6 +248,7 @@ export const stopActiveForThread = internalMutation
         // placeholder key, or a reply started from another row), it falls back to the whole thread.
         const named = args.messageId === undefined ? [] : live.filter((stream) => stream.messageId === args.messageId);
         const streams = named.length > 0 ? named : live;
+        const stoppedWholeThread = args.messageId !== undefined && named.length === 0 && live.length > 0;
 
         // Replies that stay live share a reply key with a stopped continuation when one pause started several: its
         // references are theirs too, so they are not discarded under them.
@@ -307,7 +308,8 @@ export const stopActiveForThread = internalMutation
         const settling = live.filter((stream) => stream.runClaimedAt !== undefined);
         const keep = new Set(await Promise.all(settling.map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId }))));
 
-        await discardPausedThreadSecrets(ctx, { keep, messageId: args.messageId, threadId });
+        // A stale id that fell back to the whole thread must not narrow the cleanup to some older reply.
+        await discardPausedThreadSecrets(ctx, { keep, messageId: stoppedWholeThread ? undefined : args.messageId, threadId });
 
         // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
         const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");

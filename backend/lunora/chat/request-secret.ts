@@ -130,7 +130,28 @@ export const discardSecretsOfThread = internalMutation
     .input({ streamId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
     .output(v.null())
     .mutation(async ({ args: { streamId, threadId }, ctx }) => {
-        await discardThreadSecrets(ctx, { replyKey: await replyKeyOfStream(ctx, { streamId, threadId }), threadId });
+        const replyKey = await replyKeyOfStream(ctx, { streamId, threadId });
+
+        // One pause can start several continuations under the same reply key: while a sibling is still live, its references are its own.
+        let cursor: string | undefined;
+
+        do {
+            const page = await ctx.db.persistentStreams.findMany({
+                cursor,
+                limit: 50,
+                where: { status: { in: ["pending", "streaming"] }, threadId },
+            });
+
+            for (const stream of page.page) {
+                if (stream._id !== streamId && (await replyKeyOfStream(ctx, { streamId: stream._id, threadId })) === replyKey) {
+                    return null;
+                }
+            }
+
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
+
+        await discardThreadSecrets(ctx, { replyKey, threadId });
 
         return null;
     });
