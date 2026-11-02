@@ -5048,6 +5048,11 @@
     {
       "from": "function:memory_extract:extractMemories",
       "kind": "call",
+      "to": "function:lib_action_cache:remove"
+    },
+    {
+      "from": "function:memory_extract:extractMemories",
+      "kind": "call",
       "to": "function:memory_functions:confirmMemories"
     },
     {
@@ -20277,13 +20282,13 @@
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 47,
+      "line": 50,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
       "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 48,
+      "line": 51,
       "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
