@@ -4,9 +4,14 @@
  *
  * Unix agents run in their own process group, so stopping one stops the shells and tools it started.
  * Windows is not supported yet (no job object, and `.cmd` shims need a shell): `acpSupported` is false there.
+ *
+ * An agent runs at a lower priority than the app, and on Linux is the first the kernel's out-of-memory killer takes:
+ * a build or a test run an agent starts must not make the desktop sluggish, or cost the person the window.
  */
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { setPriority } from "node:os";
 import type { Readable, Writable } from "node:stream";
 
 import type { SpawnPlan } from "./types";
@@ -58,6 +63,34 @@ export const scrub = (text: string, plan: SpawnPlan): string => {
     return result;
 };
 
+/** The niceness an agent starts with: lower than the app's own, so its work yields to the desktop. */
+export const AGENT_NICE = 10;
+
+/** The out-of-memory score added to an agent (Linux, -1000 to 1000): the kernel picks it before the app, which keeps 0. Raising one's own score needs no privilege. */
+export const AGENT_OOM_SCORE_ADJ = 500;
+
+/**
+ * Lowers the priority of the agent `pid`, which is the leader of its group: what it starts afterwards inherits both
+ * values. Best effort — an agent that runs at the normal priority is better than one that does not start, and
+ * `/proc` may be read-only in a container. Set right after the spawn, so the first instants of the agent's start-up
+ * run unlowered; nothing it forks that early has done any work.
+ */
+export const lowerAgentPriority = (pid: number): void => {
+    try {
+        setPriority(pid, AGENT_NICE);
+    } catch {
+        // The process is already gone, or the platform has no such call.
+    }
+
+    if (process.platform === "linux") {
+        try {
+            writeFileSync(`/proc/${String(pid)}/oom_score_adj`, String(AGENT_OOM_SCORE_ADJ));
+        } catch {
+            // No /proc, or the agent ended in between.
+        }
+    }
+};
+
 /** Signals a whole process group. A group that is already gone (ESRCH) is the goal, not an error. */
 const signalGroup = (pid: number, signal: NodeJS.Signals): void => {
     try {
@@ -89,6 +122,10 @@ export const spawnAgent: Spawner = (plan) => {
         // itself is not kept as a cause for the same reason.
         // eslint-disable-next-line preserve-caught-error -- the cause can quote an environment value
         throw new Error(`could not start ${plan.command}: ${scrub((error as Error).message, plan)}`);
+    }
+
+    if (child.pid !== undefined) {
+        lowerAgentPriority(child.pid);
     }
 
     let stderr = "";
