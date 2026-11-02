@@ -10,8 +10,9 @@ import RequestSecretPrompt from "./request-secret-prompt";
 
 const SECRET = "sk-live-0123456789-supersecret";
 
-const { answer, preferencesRow, readFails, readPreferences, servers, thread } = vi.hoisted(() => {
+const { answer, preferencesRow, readFails, readHold, readPreferences, servers, thread } = vi.hoisted(() => {
     return {
+        readHold: { current: null as Promise<void> | null },
         readFails: { current: false },
         preferencesRow: { current: undefined as { mcpServers?: { name: string; url: string }[] } | null | undefined },
         readPreferences: vi.fn(),
@@ -73,6 +74,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             ? skipToken
                                             : async () => {
                                                   readPreferences();
+                                                  await readHold.current;
 
                                                   if (readFails.current) {
                                                       throw new Error("offline");
@@ -136,6 +138,7 @@ describe("the secret request card", () => {
     beforeEach(() => {
         thread.current = { userId: "owner" };
         preferencesRow.current = undefined;
+        readHold.current = null;
         readFails.current = false;
         readPreferences.mockClear();
         answer.mockClear();
@@ -258,6 +261,34 @@ describe("the secret request card", () => {
 
         expect(await screen.findByText(FILES_ADDRESS)).toBeTruthy();
         expect(screen.queryByText(SERVERS_NOT_LOADED)).toBeNull();
+    });
+
+    it("announces a retry in flight, marks the button busy, and keeps the failure alert if the retry fails too", async () => {
+        readFails.current = true;
+        servers.current = [{ name: "Files", url: "https://files.example.com/mcp" }];
+        mountCard(header);
+        await screen.findByText(SERVERS_NOT_LOADED);
+
+        let release = () => {};
+
+        readHold.current = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        fireEvent.click(screen.getByRole("button", { name: RETRY }));
+
+        const status = await screen.findByText("Loading…");
+        const button = screen.getByRole("button", { name: RETRY }) as HTMLButtonElement;
+
+        expect(status.getAttribute("role")).toBe("status");
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute("aria-busy")).toBe("true");
+
+        release();
+        readHold.current = null;
+
+        await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
+        expect(screen.getByText(SERVERS_NOT_LOADED).getAttribute("role")).toBe("alert");
+        expect(screen.getByRole("button", { name: RETRY }).getAttribute("aria-busy")).toBeNull();
     });
 
     it("closes the card, with no form, when the server says the conversation moved on", async () => {

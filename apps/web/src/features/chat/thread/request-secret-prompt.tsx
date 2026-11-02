@@ -118,6 +118,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const {
         data: preferences,
         isError: preferencesFailed,
+        errorUpdateCount: preferenceFailures,
         isFetching: preferencesFetching,
         isSuccess: preferencesLoaded,
         refetch: retryPreferences,
@@ -125,7 +126,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // A user who never saved a server has no `mcpServers` (or no row at all): once the read has answered, that is an empty list, not "still loading".
     const savedServers = preferences?.mcpServers ?? (preferencesLoaded ? [] : undefined);
     const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server, preferencesFailed) : undefined;
-    const valueMax = input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
+    // A retry with nothing cached puts the query back to loading; the failure line and its button stay through it, so focus is not lost and the wait is announced.
+    const loadFailureShown = server?.kind === "failed" || (server?.kind === "loading" && preferencesFetching && preferenceFailures > 0);
+    const valueMax =input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
     // Checked before anything is sent: the card clears the draft once it goes, and the server would refuse it after that.
     const tooLong = draft.trim().length > valueMax;
     // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
@@ -279,12 +282,12 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                 destination ? destinationId : "",
                                 tooLong ? tooLongId : "",
                                 saveError ? saveErrorId : "",
-                                server?.kind === "failed" ? loadErrorId : "",
+                                loadFailureShown ? loadErrorId : "",
                             ]
                                 .filter(Boolean)
                                 .join(" ") || undefined
                         }
-                        aria-invalid={tooLong || saveError !== null || server?.kind === "failed" || undefined}
+                        aria-invalid={tooLong || saveError !== null || loadFailureShown || undefined}
                         autoComplete="new-password"
                         autoCorrect="off"
                         id={valueId}
@@ -297,14 +300,24 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         type="password"
                         value={draft}
                     />
-                    {server?.kind === "failed" && (
+                    {loadFailureShown && (
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-destructive text-xs" id={loadErrorId} role="alert">
                                 {t`Your saved MCP servers could not be loaded, so this cannot be saved yet.`}
                             </p>
-                            <Button disabled={preferencesFetching} onClick={() => retryPreferences()} size="sm" type="button" variant="outline">
+                            <Button
+                                aria-busy={preferencesFetching || undefined}
+                                disabled={preferencesFetching}
+                                onClick={() => retryPreferences()}
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                            >
                                 {t`Retry`}
                             </Button>
+                            <span aria-live="polite" className="text-muted-foreground text-xs" role="status">
+                                {preferencesFetching ? t`Loading…` : ""}
+                            </span>
                         </div>
                     )}
                     {saveError && (
