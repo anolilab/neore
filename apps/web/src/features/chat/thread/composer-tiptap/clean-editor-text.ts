@@ -10,6 +10,15 @@ import type { Editor } from "@tiptap/core";
 export const cleanEditorText = (editor: Editor): void => {
     const { doc, tr } = editor.state;
     const ranges: { from: number; to: number }[] = [];
+    let lastTextblock = -1;
+
+    doc.descendants((block, blockPosition) => {
+        if (block.isTextblock) {
+            lastTextblock = blockPosition;
+        }
+
+        return !block.isTextblock;
+    });
 
     // One scan per textblock over the text of all its nodes: a selector or tag belongs to the character before it
     // even when that character sits in a node with other formatting. Anything that is not text (a hard break, a
@@ -34,8 +43,10 @@ export const cleanEditorText = (editor: Editor): void => {
         let at = 0;
 
         // The reported ranges come in order, so the node cursor only moves forward.
-        // A joiner at the end of the block waits for the letter typed after it (Persian); sending strips it.
-        const hidden = findHiddenText(text, { keepTrailingJoiner: true });
+        // A joiner at the end of the DOCUMENT waits for the letter typed after it (Persian); sending strips it. One at
+        // the end of an earlier block is followed by a newline in the text the draft holds, which the store strips, so
+        // it goes here too (else the editor keeps what the store drops and recounts it on every update).
+        const hidden = findHiddenText(text, { keepTrailingJoiner: blockPosition === lastTextblock });
 
         for (const { index, length } of hidden) {
             while (at + 1 < nodes.length && (nodes[at + 1]?.start ?? Infinity) <= index) {

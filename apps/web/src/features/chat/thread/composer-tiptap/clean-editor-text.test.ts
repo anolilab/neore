@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { findHiddenText } from "@neore/ai/utils";
+import { findHiddenText, stripHiddenText } from "@neore/ai/utils";
 import type { Content } from "@tiptap/core";
 import { Editor } from "@tiptap/core";
 import StarterKitExtension from "@tiptap/starter-kit";
@@ -41,6 +41,22 @@ describe(cleanEditorText, () => {
         cleanEditorText(editor);
 
         expect(editor.getText()).toBe("\u{645}\u{6CC}\u{200C}");
+    });
+
+    it("agrees with the store on a joiner that ends an earlier paragraph, and counts it once", () => {
+        const editor = editorWith("<p>\u{645}\u{6CC}\u{200C}</p><p>\u{62E}</p>");
+        let removed = 0;
+
+        for (let update = 0; update < 3; update += 1) {
+            const text = editor.getText({ blockSeparator: "\n" });
+
+            removed += stripHiddenText(text, { keepTrailingJoiner: true }).removed;
+            cleanEditorText(editor);
+        }
+
+        expect(removed).toBe(1);
+        expect(editor.getText({ blockSeparator: "\n" })).toBe("\u{645}\u{6CC}\n\u{62E}");
+        expect(stripHiddenText(editor.getText({ blockSeparator: "\n" }), { keepTrailingJoiner: true }).text).toBe(editor.getText({ blockSeparator: "\n" }));
     });
 
     it("is not an undo step of its own: Undo reverses the person's edit, not the cleanup", () => {
