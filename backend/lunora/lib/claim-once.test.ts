@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { claimKey, claimKeyFenced, claimOnce, completeKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
+import { claimKey, claimKeyFenced, claimOnce, completeKey, holdClaim, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
 
 const NOW = 1_800_000_000_000;
 const TTL = 60_000;
@@ -140,6 +140,76 @@ describe("releaseKey with a fence", () => {
 
         await mutate(releaseKey, { claimedAt: second, key: "a", scope: "s" });
         await expect(claim("a")).resolves.toBe(true);
+    });
+});
+
+describe("claimKeyFenced with unlessHeld", () => {
+    const other = { key: "legacy", scope: "old" };
+
+    it("is refused while the other claim is held, taking nothing, and accepted once it lapsed", async () => {
+        await mutate(claimKey, { ...other, ttlMs: TTL });
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBeNull();
+        expect(await rows()).toHaveLength(1);
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBe(NOW + TTL + 1);
+    });
+
+    it("takes the claim when the other is absent", async () => {
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBe(NOW);
+    });
+});
+
+describe("holdClaim", () => {
+    const hold = async (claimedAt: number, ttlMs: number, key = "a"): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await holdClaim(ctx, "s", key, claimedAt, ttlMs, "u"));
+    const expiries = async (): Promise<number[]> => {
+        const found: { expiresAt: number }[] = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+        return found.map((row) => row.expiresAt);
+    };
+
+    it("lengthens the claim its claimedAt names, and never shortens it", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        await expect(hold(claimedAt, 10 * TTL)).resolves.toBe(true);
+        expect(await expiries()).toEqual([NOW + 10 * TTL]);
+        await expect(hold(claimedAt, 1)).resolves.toBe(true);
+        expect(await expiries()).toEqual([NOW + 10 * TTL]);
+    });
+
+    it("takes a lapsed claim again under the same claimedAt when nobody took the key", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await expect(hold(claimedAt, 10 * TTL)).resolves.toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
+            expect.objectContaining({ claimedAt, expiresAt: NOW + 10 * TTL }),
+        ]);
+    });
+
+    it("takes the key again, tagged with the owner, once the lapsed row was purged", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await mutate(purgeExpiredClaims, {});
+        await expect(hold(claimedAt, 10 * TTL)).resolves.toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
+            expect.objectContaining({ claimedAt, expiresAt: NOW + 10 * TTL, userId: "u" }),
+        ]);
+    });
+
+    it("refuses, changing nothing, when another claim holds the key", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+
+        const other = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        await expect(hold(claimedAt, 10 * TTL)).resolves.toBe(false);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
+            expect.objectContaining({ claimedAt: other, expiresAt: NOW + TTL + 1 + TTL }),
+        ]);
     });
 });
 

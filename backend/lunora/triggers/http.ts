@@ -26,12 +26,20 @@ import type { HttpActionCtx } from "lunorash/server";
  * signature of the body "<ts>.<body>". (The key is not derived per scheme because
  * a native sender signs with the raw secret.)
  *
- * A native signature carries no timestamp, so the ONLY replay defence is the same
- * signature-keyed claim, and it lasts as long as the claim does:
- * `TRIGGER_CLAIM_TTL_MS`. A body-only request replayed after that window is
- * accepted again. For these two schemes nothing outside the signed bytes (a
- * delivery-id header, say) is ever trusted: it is not covered by the signature, so
- * a claim keyed on it would let anyone replay a captured body under a fresh id.
+ * A native signature carries no timestamp, so the ONLY replay defence is the
+ * body-keyed claim, and a window would end it: once the run is admitted the claim
+ * lasts `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively the trigger's life), well past any
+ * provider's redelivery period (GitHub offers "Redeliver" for three days). The gap this
+ * closes: with a 15-minute claim a captured request was accepted again once it lapsed.
+ * Until then the claim is only the 15-minute retry window, so a delivery that never ran
+ * frees itself even if giving the claim back fails. The signature binds the exact body, and
+ * the key is the body's digest, not the signature: during a rotation overlap one body signed
+ * with the old and the new secret carries two signatures and must run once. The sender's delivery-id header
+ * (`X-GitHub-Delivery`) is never trusted: it is not covered by the signature, so a claim
+ * keyed on it would let anyone replay a captured body under a fresh id. The price of
+ * keying on the body is that two byte-identical bodies are one delivery; a delivery
+ * that does not run (filtered, refused at admission, failed before the agent started)
+ * gives its claim back, as for `gitlab-token`, so a redelivery of that one still runs.
  *
  * One more sender, with its own scheme (`triggers/presets.ts`):
  *   gitlab-token: X-Gitlab-Token: <secret>, sent as plain text, plus
@@ -57,7 +65,7 @@ import type { HttpActionCtx } from "lunorash/server";
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import { releaseRetryDelayMs, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { releaseRetryDelayMs, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, secretsMatch, sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
@@ -325,6 +333,8 @@ interface Delivery {
 interface SchemeHandler {
     /** The headers this scheme owns. A trigger refuses a request carrying any header of a scheme it does not use. */
     headers: ReadonlyArray<string>;
+    /** The scheme has no timestamp window, so its signature is claimed for the trigger's life (see `requiresDeliveryId` for the release rule). */
+    permanentClaim?: boolean;
     /** Read the credential and the bytes it covers, or say why the request is refused. Timestamps are checked here. */
     read: (headers: Headers, body: Uint8Array) => Delivery | { error: string };
     /**
@@ -357,6 +367,7 @@ const SCHEMES: Record<WebhookSignatureScheme, SchemeHandler> = {
     },
     native: {
         headers: ["x-hub-signature-256"],
+        permanentClaim: true,
         read: (headers, body) => {
             const native = headers.get("x-hub-signature-256");
 
@@ -399,9 +410,10 @@ interface ReplayGuard {
 
 /**
  * Takes the once-only claim of a verified delivery, or answers `null` when it was taken before. A scheme that
- * requires a delivery id claims it with the body's digest for `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
- * permanent) and gives it back whenever the delivery does not run; the others claim their signature for
- * `TRIGGER_CLAIM_TTL_MS`.
+ * requires a delivery id claims it with the body's digest and a `native` one claims the body's digest; both take the
+ * claim for `TRIGGER_CLAIM_TTL_MS`, which `executeTrigger` stretches to `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
+ * permanent) once the run is admitted, and both give the claim back whenever the delivery does not run. A
+ * timestamped one claims its signed bytes for `TRIGGER_CLAIM_TTL_MS` and keeps nothing longer.
  */
 const takeReplayGuard = async (
     context: HttpActionCtx,
@@ -414,7 +426,11 @@ const takeReplayGuard = async (
     }: { delivery: Delivery; rawBody: Uint8Array; scheme: SchemeHandler; trigger: WebhookTrigger; triggerId: string },
 ): Promise<ReplayGuard | null> => {
     let claimKey: { key: string; scope: string };
-    let ttlMs = TRIGGER_CLAIM_TTL_MS;
+    let unlessHeld: { key: string; scope: string } | undefined;
+    // A delivery that never runs must free itself even when its release is lost, so every claim is TAKEN for the retry
+    // window; a permanent one is stretched to `TRIGGER_DELIVERY_CLAIM_TTL_MS` by the admission transaction once the run is admitted.
+    const ttlMs = TRIGGER_CLAIM_TTL_MS;
+    const permanent = scheme.requiresDeliveryId === true || scheme.permanentClaim === true;
 
     if (scheme.requiresDeliveryId) {
         // The handler refused a delivery without one before getting here.
@@ -425,14 +441,23 @@ const takeReplayGuard = async (
         // The body is in the key because GitLab documents that recursive webhooks share one event UUID.
         // The trigger id leads, so deleting the trigger can find its claims.
         claimKey = { key: `${triggerId}:${delivery.deliveryId}:${await sha256Hex(rawBody)}`, scope: TRIGGER_DELIVERY_SCOPE };
-        ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
+    } else if (permanent) {
+        // Keyed on the body the signature covers, not the signature: during a rotation overlap the same delivery signed with the
+        // old and the new secret carries two signatures but ONE body, and must run once.
+        // The trigger id leads, so deleting the trigger can find its claims. "body" keeps the key apart from a `gitlab-token` one.
+        const bodyDigest = await sha256Hex(delivery.signedPayload);
+
+        claimKey = { key: `${triggerId}:body:${bodyDigest}`, scope: TRIGGER_DELIVERY_SCOPE };
+        // Deliveries accepted before native claims moved here hold a 15-minute claim under the old key; until those lapse, a
+        // redelivery of one is still a duplicate.
+        unlessHeld = { key: `${triggerId}:${bodyDigest}`, scope: "trigger-webhook" };
     } else {
         // Keyed on the signed bytes, not the signature: during a rotation overlap the same delivery signed with the
         // old and the new secret carries two signatures but ONE payload, and must run once.
         claimKey = { key: `${triggerId}:${await sha256Hex(delivery.signedPayload)}`, scope: "trigger-webhook" };
     }
 
-    const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, userId: trigger.userId });
+    const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, unlessHeld, userId: trigger.userId });
 
     if (claimedAt === null) {
         return null;
@@ -440,8 +465,6 @@ const takeReplayGuard = async (
 
     // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
     const claim = { ...claimKey, claimedAt };
-
-    const permanent = scheme.requiresDeliveryId === true;
 
     return {
         args: permanent ? { claim, releaseUnlessRun: true } : { claim },
@@ -454,7 +477,8 @@ const takeReplayGuard = async (
                 }
 
                 // A permanent claim must not be left behind: schedule the release again (it is idempotent), and still fail
-                // this request so the sender retries rather than being told 2xx for work that did not run.
+                // this request so the sender retries rather than being told 2xx for work that did not run. If even that
+                // cannot be scheduled, the claim was only taken for the retry window and lapses on its own.
                 await httpScheduler(context).runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
 
                 throw error;
