@@ -206,7 +206,19 @@ export const routeSpeakers = async (args: {
     }
 
     try {
-        const model = await getUtilityModel(gateway, { rules: await loadRules(), threadId, userId });
+        // The rules read is under the same deadline as the routing call: a stalled read falls back to the rotation.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const rules = await Promise.race([
+            loadRules(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error("Reading the model filter rules ran out of time"));
+                }, ROUTER_TIMEOUT_MS);
+            }),
+        ]).finally(() => {
+            clearTimeout(timer);
+        });
+        const model = await getUtilityModel(gateway, { rules, threadId, userId });
         const result = await generateText({
             abortSignal: AbortSignal.timeout(ROUTER_TIMEOUT_MS),
             model,

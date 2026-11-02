@@ -56,4 +56,27 @@ describe("createRunLowRiskCheck", () => {
         // The model never resolved, so the budget was not spent and nothing was asked.
         expect(outcomes).toEqual(["budget"]);
     });
+
+    it("does not wait out the deadline again on a later check once the lookup has stalled", async () => {
+        vi.useFakeTimers();
+
+        const ctx = { log: { event: vi.fn() }, runMutation: vi.fn(async () => true), runQuery: vi.fn(async () => true) };
+        const { check } = createRunLowRiskCheck(ctx as never, { threadId: "t", untrustedContext: Promise.resolve(false), userId: "u" });
+        const call = (toolCallId: string) => {
+            return {
+                input: { city: "Berlin" },
+                key: "mcp:Weather:get_forecast",
+                messages: [{ content: [{ text: "weather?", type: "text" as const }], role: "user" as const }],
+                toolCallId,
+            };
+        };
+
+        const first = check(call("call-1"));
+
+        await vi.advanceTimersByTimeAsync(LOW_RISK_DEADLINE_MS + 1);
+        await expect(first).resolves.toBe(false);
+
+        // No timer advance: the second check must settle without the deadline firing again.
+        await expect(check(call("call-2"))).resolves.toBe(false);
+    });
 });

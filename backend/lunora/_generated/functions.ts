@@ -9609,7 +9609,7 @@ export interface Caller {
     };
     pages: {
         agent: {
-            getPageForAgent: (args: { pageId: Id<"pages">; userId: string }) => Promise<{ content: string; title: string }>;
+            getPageForAgent: (args: { pageId: Id<"pages">; userId: string }) => Promise<{ content: string; ownerId: string; title: string }>;
             proposePageEdit: (args: { instruction: string; pageId: Id<"pages"> }) => Promise<{ proposedMarkdown: string }>;
         };
         comments: {
