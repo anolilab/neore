@@ -80,6 +80,7 @@ import {
     liveReplyTail,
     MAX_ASIDE_ANSWER_CHARS,
     MAX_ASIDE_QUESTION_CHARS,
+    normalizeAsideQuestion,
     signAsideAnswer,
     verifyAsideAnswer,
 } from "./lib/aside";
@@ -314,7 +315,7 @@ export const askAside = authAction
     )
     .action(async ({ args: { entryId, question: rawQuestion, threadId, unlockProof }, ctx }) => {
         const { plan, role, userId } = ctx.user;
-        const question = rawQuestion.trim();
+        const question = normalizeAsideQuestion(rawQuestion);
 
         if (!question || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "Ask a question first");
@@ -454,10 +455,12 @@ export const addAsideToThread = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ messageId: v.string() }))
-    .mutation(async ({ args: { answer, entryId, question, threadId, token, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { answer, entryId, question: rawQuestion, threadId, token, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
+        // `askAside` signed and answered the question without hidden characters; what is written into the thread is that one.
+        const question = normalizeAsideQuestion(rawQuestion);
 
-        if (!question.trim() || !answer.trim() || !entryId.trim()) {
+        if (!question || !answer.trim() || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "There is nothing to add");
         }
 

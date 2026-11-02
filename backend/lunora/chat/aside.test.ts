@@ -100,6 +100,7 @@ type Asked = { answer: string; token: string; withThread: boolean };
 const OWNER = "owner-user";
 const OTHER = "other-user";
 const SECRET = "s".repeat(40);
+const HIDDEN_CHARACTERS = /[\u{E0000}-\u{E007F}\u{202E}]/u;
 const QUESTION = "What does idempotent mean?";
 
 let harness: Harness;
@@ -248,6 +249,14 @@ describe("askAside", () => {
         expect(call.prompt).toContain("Working on the importer now.");
         expect(call.prompt).toContain("What does idempotent mean?");
         expect(call).not.toHaveProperty("tools");
+    });
+
+    it("asks the model the question without tag or bidi characters, and refuses one that was only those", async () => {
+        await ask("What does idempotent mean?\u{E0069}\u{E0067}\u{202E}");
+
+        expect(promptOfCall()).toContain("What does idempotent mean?");
+        expect(promptOfCall()).not.toMatch(HIDDEN_CHARACTERS);
+        await expect(ask("\u{E0069}\u{E0067}")).rejects.toThrow("Ask a question first");
     });
 
     it("puts the text written so far of the running reply in the prompt", async () => {
@@ -696,6 +705,35 @@ describe("addAsideToThread", () => {
 
         expect(added).toMatchObject({ agentName: "Side question", message: { role: "assistant" }, status: "success" });
         expect(added.order).toBeGreaterThan(Math.max(...before.map((row) => row.order)));
+        expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
+    });
+
+    it("writes the question without hidden characters, whatever the panel sends back", async () => {
+        await finishReply();
+
+        const asked = await ask(`${QUESTION}\u{E0069}\u{E0067}`);
+        const { messageId } = (await as(OWNER).mutation(
+            addAsideToThread as never,
+            { answer: asked.answer, entryId: lastEntryId(), question: `${QUESTION}\u{E0069}\u{E0067}`, threadId, token: asked.token } as never,
+        )) as { messageId: string };
+        const all = await rows("messages");
+        const added = all.find((row) => row._id === messageId);
+
+        expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
+    });
+
+    it("adds a side question whose text has hidden characters and spaces at its edges", async () => {
+        await finishReply();
+
+        const edged = `\u{200B} ${QUESTION}\u{200B} \u{E0069}`;
+        const asked = await ask(edged);
+        const { messageId } = (await as(OWNER).mutation(
+            addAsideToThread as never,
+            { answer: asked.answer, entryId: lastEntryId(), question: edged, threadId, token: asked.token } as never,
+        )) as { messageId: string };
+        const messageRows = await rows("messages");
+        const added = messageRows.find((row) => row._id === messageId);
+
         expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
     });
 

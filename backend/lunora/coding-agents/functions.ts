@@ -9,6 +9,7 @@
  * Every public procedure loads by id and compares `userId`; another user's run
  * answers NOT_FOUND, never FORBIDDEN, so ids cannot be probed.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -289,7 +290,8 @@ export const createRun = internalMutation
             return { error: "Invalid branch name" };
         }
 
-        const prompt = args.prompt.trim();
+        // The sandbox agent runs this text with the user's key: hidden characters never reach it.
+        const prompt = stripHiddenText(args.prompt).text.trim();
 
         if (prompt.length === 0 || prompt.length > PROMPT_MAX) {
             return { error: `The task must be between 1 and ${String(PROMPT_MAX)} characters` };

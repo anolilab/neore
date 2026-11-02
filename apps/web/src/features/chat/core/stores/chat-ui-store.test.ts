@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -22,6 +23,13 @@ describe("restoreComposer", () => {
         expect({ attachedReferences, composerAttachments, composerText }).toStrictEqual(draft);
     });
 
+    it("filters hidden characters out of the restored draft and counts them once", () => {
+        useChatUIStore.getState().restoreComposer({ ...draft, composerText: "hi\u{E0041}\u{E0042}\u{202E}" });
+
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
+    });
+
     it.each([
         ["text", { composerText: "new draft" }],
         ["attachments", { composerAttachments: [{ ...attachment, id: "a2" }] }],
@@ -37,5 +45,61 @@ describe("restoreComposer", () => {
         expect(after.composerText).toBe(before.composerText);
         expect(after.composerAttachments).toBe(before.composerAttachments);
         expect(after.attachedReferences).toBe(before.attachedReferences);
+    });
+});
+
+describe("setComposerText hidden characters", () => {
+    beforeEach(() => {
+        useChatUIStore.getState().reset();
+    });
+
+    it("keeps tag characters out of the draft and counts what it removed", () => {
+        useChatUIStore.getState().setComposerText("hi\u{E0041}\u{E0042} there\u{202E}");
+
+        expect(useChatUIStore.getState().composerText).toBe("hi there");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
+    });
+
+    it("keeps a Persian ZWNJ typed one character at a time, and sending strips a lone trailing joiner", () => {
+        const word = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
+        let typed = "";
+
+        for (const character of word) {
+            typed += character;
+            useChatUIStore.getState().setComposerText(typed);
+            typed = useChatUIStore.getState().composerText;
+        }
+
+        expect(typed).toBe(word);
+        expect(stripHiddenText("\u{645}\u{6CC}\u{200C}").text).toBe("\u{645}\u{6CC}");
+    });
+
+    it("forgets the count once the draft is empty", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}");
+        useChatUIStore.getState().setComposerText("");
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(0);
+    });
+
+    it("still reports what was removed when the draft is left empty by it", () => {
+        useChatUIStore.getState().setComposerText("\u{E0041}\u{E0042}");
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(2);
+    });
+
+    it("adds characters removed from a paste that became a file", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}");
+        useChatUIStore.getState().noteComposerHiddenRemoved(4);
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(5);
+    });
+
+    it("does not count the same characters again when the cleaned text comes back", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}b");
+        useChatUIStore.getState().setComposerText("ab");
+        useChatUIStore.getState().setComposerText("abc");
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(1);
     });
 });

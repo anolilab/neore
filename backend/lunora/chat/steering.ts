@@ -25,6 +25,7 @@
  * The model's content-safety check covers it there too: the gateway checks
  * every model call's user text (`/internal/model/proxy`), steered text included.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
@@ -54,7 +55,8 @@ export const steerRun = authMutation
     .output(v.object({ steerId: v.string() }))
     .mutation(async ({ args: { steerId: requestedId, streamId, text: rawText, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
-        const text = rawText.trim();
+        // The composer strips these too; a client that skips it still sends text straight into a running reply.
+        const text = stripHiddenText(rawText).text.trim();
 
         if (!text) {
             throw new LunoraError("BAD_REQUEST", "There is nothing to send");

@@ -119,6 +119,18 @@ describe("prompt queue persistence", () => {
         expect(serializePromptQueue(EMPTY_PROMPT_QUEUE)).toBeUndefined();
     });
 
+    it("drops a restored item whose text is empty once its hidden characters are stripped", () => {
+        const stored = JSON.stringify({
+            items: [
+                { id: "a", text: "\u{E0041}\u{202E}" },
+                { id: "b", text: "keep\u{202E}" },
+            ],
+        });
+
+        expect(restorePromptQueue(stored)?.items.map((entry) => [entry.id, entry.text])).toStrictEqual([["b", "keep"]]);
+        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", text: "\u{200B}" }] }))).toBeUndefined();
+    });
+
     it("reads malformed storage as no queue", () => {
         expect(restorePromptQueue(null)).toBeUndefined();
         expect(restorePromptQueue("{not json")).toBeUndefined();
@@ -354,5 +366,20 @@ describe(settleQueuedSteer, () => {
         const restored = restorePromptQueue(serializePromptQueue(pendingQueue()));
 
         expect(restored?.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
+    });
+});
+
+describe("hidden characters in queued prompts", () => {
+    const tagged = "a\u{E0041}b\u{202E}c";
+
+    it("never queues them", () => {
+        expect(enqueuePrompt(EMPTY_PROMPT_QUEUE, { attachments: [], id: "1", text: tagged }).items[0]?.text).toBe("abc");
+        expect(prependPrompt(EMPTY_PROMPT_QUEUE, { attachments: [], id: "1", text: tagged }).items[0]?.text).toBe("abc");
+    });
+
+    it("drops them from a queue restored after a reload", () => {
+        const restored = restorePromptQueue(JSON.stringify({ items: [{ id: "1", text: tagged }] }));
+
+        expect(restored?.items[0]?.text).toBe("abc");
     });
 });

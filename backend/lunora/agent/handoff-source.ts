@@ -10,6 +10,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
+import { FILE_TOKEN_ESTIMATE_CHARS, IMAGE_TOKEN_ESTIMATE_CHARS } from "../chat/lib/auto-continue";
 import { walkPath } from "./branch-rows";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
 import { extractText } from "./shared";
@@ -122,11 +123,35 @@ export const collectHandoffSource = async (
     };
 };
 
+/** The characters an image or file part of a row stands for: it has no text, but the model is sent it. */
+const mediaCharacters = (row: Pick<Row, "message">): number => {
+    const content = (row.message as { content?: unknown } | undefined)?.content;
+
+    if (!Array.isArray(content)) {
+        return 0;
+    }
+
+    let characters = 0;
+
+    for (const part of content as ReadonlyArray<{ type?: unknown } | null>) {
+        if (part?.type === "image") {
+            characters += IMAGE_TOKEN_ESTIMATE_CHARS;
+        } else if (part?.type === "file") {
+            characters += FILE_TOKEN_ESTIMATE_CHARS;
+        }
+    }
+
+    return characters;
+};
+
+/** The characters of a row the model is sent: its stored text plus a fixed estimate for each image or file part. */
+export const rowCharacters = (row: Pick<Row, "message" | "text">): number => (row.text?.length ?? 0) + mediaCharacters(row);
+
 /**
- * Estimated tokens of the stored text of the path ending at `from` (inclusive), counting up toward `cap` and
- * stopping the walk once past it. `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read:
- * a path longer than that many pages counts as past the cap whatever its rows say. `maxRows` counts only that many
- * rows from `from`: the window a reply actually reads.
+ * Estimated tokens of the path ending at `from` (inclusive), counting up toward `cap` and stopping the walk once
+ * past it: the stored text of each row plus a fixed estimate for each image or file part, which have no text.
+ * `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read: a path longer than that many pages
+ * counts as past the cap whatever its rows say. `maxRows` counts only that many rows from `from`.
  */
 export const pathTokens = async (
     context: Reader,
@@ -149,7 +174,7 @@ export const pathTokens = async (
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: Math.min(PAGE_ROWS, rowsLeft), stopAtId: options.stopAtId });
 
         for (const row of rows) {
-            characters += row.text?.length ?? 0;
+            characters += rowCharacters(row);
         }
 
         rowsLeft -= rows.length;
@@ -162,6 +187,31 @@ export const pathTokens = async (
     }
 
     return estimateTokensFromCharacters(characters);
+};
+
+/**
+ * The rows a reply on the path ending at `from` reads as history, oldest first: the newest `limit` of the
+ * successful ones, as the reply loader takes them (`agent/client/search.ts`). A failed or pending row is skipped
+ * and does not use up the window; a divider is a successful row like any other. Gives up after
+ * {@link MAX_SEARCH_PAGES} pages of rows.
+ */
+export const replyWindowRows = async (context: Reader, threadId: Id<"threads">, from: Row | null, limit: number): Promise<Row[]> => {
+    const window: Row[] = [];
+    let cursor = from;
+
+    for (let page = 0; cursor && window.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS });
+
+        for (const row of rows) {
+            if (row.status === "success" && window.length < limit) {
+                window.push(row);
+            }
+        }
+
+        cursor = next;
+    }
+
+    return window.toReversed();
 };
 
 /** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */
