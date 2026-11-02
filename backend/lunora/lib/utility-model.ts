@@ -65,6 +65,28 @@ const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRul
 };
 
 /**
+ * Whether a candidate can honour the user's allowed regions. The shared predicate accepts a model when ANY of its
+ * regions is allowed, but the gateway pins an OpenRouter call to a region only for exactly `["EU"]` (the EU endpoint);
+ * otherwise it may be served from any of the model's regions. So a candidate qualifies when EVERY region of it is
+ * allowed, or when the gateway will route it to the one allowed endpoint.
+ */
+const staysInAllowedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+    const allowed = rules?.allowedRegions;
+
+    if (!allowed || allowed.length === 0) {
+        return true;
+    }
+
+    const regions = deriveModelRegions(definition);
+
+    if (regions.every((region) => allowed.includes(region))) {
+        return true;
+    }
+
+    return definition.provider === "openrouter" && allowed.length === 1 && allowed[0] === "EU" && regions.includes("EU");
+};
+
+/**
  * The first of `preferred` then the fallbacks (or `preferred` alone with `strict`) that the user's rules allow,
  * judged by the same predicate that vets a run's backup model, and by the paid-plan rule: a model outside the free
  * tier needs the plan grant (`withPaidPlanGrant`). `undefined` when none does.
@@ -86,6 +108,7 @@ export const pickUtilityModelId = (
             definition.enabled !== false &&
             (paidPlan || !requiresPaidPlan(definition)) &&
             avoidsBlockedRegions(definition, rules) &&
+            staysInAllowedRegions(definition, rules) &&
             backupFilterRejection(definition, rules) === null
         );
     });
