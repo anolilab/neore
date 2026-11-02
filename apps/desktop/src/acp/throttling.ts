@@ -1,6 +1,6 @@
 /**
- * What a hidden desktop window costs a remote command (plans/acp-agent-host.md §4.5, §10 Q4; method in
- * plans/acp-s4-throttling.md). Only the page relay, which claims commands, and the heartbeat run in the window
+ * What a hidden desktop window costs a remote command (prisis/plans/neore/acp-agent-host.md §4.5, §10 Q4; method in
+ * prisis/plans/neore/acp-s4-throttling.md). Only the page relay, which claims commands, and the heartbeat run in the window
  * and can slip; the main process posts turn output from its own timers. Two numbers decide whether background
  * throttling stays on: how long a command waits to be claimed, and the longest silence between heartbeats.
  */

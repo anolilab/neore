@@ -1,5 +1,5 @@
 /**
- * Where a handoff goes in the context (plans/harness-switch.md, S2): first, ahead of the turns after the
+ * Where a handoff goes in the context (prisis/plans/neore/harness-switch.md, S2): first, ahead of the turns after the
  * switch; the same bytes at the same place on every turn; nothing from before a portable divider; and on a
  * switch back only what happened since the agent left.
  */

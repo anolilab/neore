@@ -1,5 +1,5 @@
 //! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel` and
-//! `acp_permission_answer` (plans/acp-agent-host.md §4.1).
+//! `acp_permission_answer` (prisis/plans/neore/acp-agent-host.md §4.1).
 //!
 //! They are signed device calls like any other, but they are not device tools: nothing runs here. Rust checks the
 //! signature, the device and the expiry, decides whether the command may be carried out at all (a start needs an

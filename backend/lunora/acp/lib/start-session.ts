@@ -5,7 +5,7 @@ import { type DeviceTaintSource, mergeTaint } from "../../devices/lib/taint";
 
 /**
  * Opens a session for a host thread on a computer that offered the (agent, folder) pair: the `starting` session row and
- * the signed `acp_start` (plans/acp-agent-host.md §3, §4.1). The caller has checked the offer; Rust checks it again.
+ * the signed `acp_start` (prisis/plans/neore/acp-agent-host.md §3, §4.1). The caller has checked the offer; Rust checks it again.
  * Shared by `startHostSession` and the creation of a host worker, so there is one way to start an agent on a host.
  * A refusal leaves the session row written: the caller throws to roll it back, or ends the session itself.
  */

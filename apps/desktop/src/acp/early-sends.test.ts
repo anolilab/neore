@@ -1,5 +1,5 @@
 /**
- * A message that arrives before its session is open (`early-sends.ts`, plans/acp-agent-host.md §4.6): it runs once
+ * A message that arrives before its session is open (`early-sends.ts`, prisis/plans/neore/acp-agent-host.md §4.6): it runs once
  * when the session opens, and ends its stream with an error when the session never opens, the envelope expires
  * first, or the turn is stopped.
  */

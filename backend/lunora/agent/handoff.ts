@@ -1,5 +1,5 @@
 /**
- * The handoff a thread's agent switch gives the new model (plans/harness-switch.md, S2): a summary of the
+ * The handoff a thread's agent switch gives the new model (prisis/plans/neore/harness-switch.md, S2): a summary of the
  * older turns and the most recent turns verbatim, as one text built ONCE at the switch and stored on the
  * divider (`agent-switch-logic.ts`). Every later turn sends those same bytes, so the new provider can cache
  * the prefix from the second turn on. Nothing in it varies per call: no clock, no locale, no re-summarising.

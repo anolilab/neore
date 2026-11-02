@@ -1,5 +1,5 @@
 /**
- * Host turn output, server side (plans/acp-agent-host.md §4.2–4.3): the internal functions behind
+ * Host turn output, server side (prisis/plans/neore/acp-agent-host.md §4.2–4.3): the internal functions behind
  * `POST /hosts/ingest` (`acp/http.ts`).
  *
  * - {@link verifyHostPost}: a query on the owner's shard that loads the device, checks the `turn` signature and
@@ -318,7 +318,7 @@ const applyTurnPost = async (
     // host reads `ended` and stops posting.
     if (!isLiveStream(stream)) {
         // A restart that comes after the reaper: the turn was cut off, not merely silent. The reply stays as it
-        // was saved; only the reason moves on, so Continue (plans/acp-agent-host.md §4.5) is offered all the same.
+        // was saved; only the reason moves on, so Continue (prisis/plans/neore/acp-agent-host.md §4.5) is offered all the same.
         if (stream.hostEndReason === "timeout" && events.some((event) => event.kind === "turn_end" && event.reason === "interrupted")) {
             await ctx.db.patch("persistentStreams", stream._id, { hostEndReason: "interrupted" });
         }

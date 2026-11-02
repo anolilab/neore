@@ -1,5 +1,5 @@
 /**
- * Where a switch's handoff goes in the context a model is sent (plans/harness-switch.md, S2).
+ * Where a switch's handoff goes in the context a model is sent (prisis/plans/neore/harness-switch.md, S2).
  *
  * The rows of the active path are walked in order, dividers included:
  *

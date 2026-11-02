@@ -1,5 +1,5 @@
 /**
- * Posts a coding agent's turn output to the backend (plans/acp-agent-host.md §4.2–4.5), straight from the main
+ * Posts a coding agent's turn output to the backend (prisis/plans/neore/acp-agent-host.md §4.2–4.5), straight from the main
  * process. The page is not in this path.
  *
  * - **One batch at a time per turn, at most one post per 250 ms** (`turn-channel.ts`). Deltas queued in between

@@ -1,5 +1,5 @@
 /**
- * The measurement behind the child buffer's byte budget (plans/acp-s7-children.md): replays an agent's recorded
+ * The measurement behind the child buffer's byte budget (prisis/plans/neore/acp-s7-children.md): replays an agent's recorded
  * `session/update`s through the ledger the session uses and reports how many bytes of child events waited for a parent
  * call that had not appeared, at the most, per session.
  */

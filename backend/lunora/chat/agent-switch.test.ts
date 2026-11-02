@@ -1,5 +1,5 @@
 /**
- * Switching a thread's agent (plans/harness-switch.md, S1), driven against the real schema:
+ * Switching a thread's agent (prisis/plans/neore/harness-switch.md, S1), driven against the real schema:
  * the divider row's place in the tree, the agent each path runs on, and the refusals.
  */
 import { lunoraTest } from "@lunora/testing";

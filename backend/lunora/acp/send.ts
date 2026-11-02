@@ -1,5 +1,5 @@
 /**
- * `POST /hosts/send` — a message into a coding-agent thread from the web or the phone (plans/acp-agent-host.md
+ * `POST /hosts/send` — a message into a coding-agent thread from the web or the phone (prisis/plans/neore/acp-agent-host.md
  * §4.6). The caller's bearer token names the owner; the body is `{ requestId, threadId, text, unlockProof? }`.
  *
  * {@link sendToHost} stores everything in one mutation and returns before anything reaches the computer: the
@@ -134,7 +134,7 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "rate_limited" as const };
     }
 
-    // The first prompt after a switch carries what the agent is taking over (plans/harness-switch.md, S3); the saved
+    // The first prompt after a switch carries what the agent is taking over (prisis/plans/neore/harness-switch.md, S3); the saved
     // message is the user's own words alone. A prompt too long for the call with it is refused, never cut.
     const handoff = await pendingHandoffOf(ctx, thread);
     const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
