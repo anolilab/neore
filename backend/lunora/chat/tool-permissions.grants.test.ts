@@ -5,16 +5,21 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
+import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import {
     consumeLowRiskCheck,
     getLowRiskApprovalContext,
+    getLowRiskTrustedServers,
     getToolPermissionSettings,
+    MAX_TRUST_ENTRY_LENGTH,
     pruneExpiredToolPermissionGrants,
     recordApprovalPreference,
     revokeToolPermissionGrant,
     setAutoApproveLowRisk,
+    setLowRiskTrustedServer,
     setToolPermission,
 } from "./tool-permissions";
 
@@ -52,6 +57,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const USER = "grant-user";
 const KEY = "mcp:Files:delete";
+const URL = "https://files.example/mcp";
 const NOW = Date.UTC(2026, 9, 30, 12, 0, 0);
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -67,7 +73,27 @@ const grantsOf = async (): Promise<Record<string, number> | undefined> => {
     return row?.toolPermissionGrants;
 };
 
-const stored = async (): Promise<{ toolPermissionGrants?: Record<string, number>; toolPermissions?: Record<string, string> } | null> =>
+/** Saves the MCP server the trust tests name, on the caller's row (created when absent). */
+const saveFilesServer = async (): Promise<void> =>
+    await harness.run(async (ctx: any) => {
+        const row = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q: any) => q.eq("userId", USER))
+            .unique();
+        const mcpServers = [{ enabled: true, name: "Files", protocol: "http", url: URL }];
+
+        if (row) {
+            await ctx.db.patch(row._id, { mcpServers });
+        } else {
+            await ctx.db.insert("aiUserPreferences", { mcpServers, userId: USER });
+        }
+    });
+
+const stored = async (): Promise<{
+    lowRiskTrustedServers?: string[];
+    toolPermissionGrants?: Record<string, number>;
+    toolPermissions?: Record<string, string>;
+} | null> =>
     await harness.run(
         async (ctx: any) =>
             await ctx.db
@@ -239,6 +265,82 @@ describe("the quick check setting", () => {
     });
 });
 
+describe("setLowRiskTrustedServer", () => {
+    const trustedOf = async (): Promise<string[] | undefined> => {
+        const row = await stored();
+
+        return row?.lowRiskTrustedServers;
+    };
+    const trust = async (server: unknown, trusted = true) => await as().mutation(setLowRiskTrustedServer as never, { server, trusted } as never);
+    const files = { kind: "mcp", name: "Files", url: URL };
+
+    beforeEach(async () => {
+        await saveFilesServer();
+    });
+
+    it("trusts an MCP server by name and url, and a connector by slug, then takes it back", async () => {
+        await trust(files);
+        await trust({ kind: "connector", slug: "notion" });
+
+        expect(await trustedOf()).toStrictEqual([mcpTrustId("Files", URL), connectorTrustId("notion")]);
+
+        await trust(files, false);
+
+        expect(await trustedOf()).toStrictEqual([connectorTrustId("notion")]);
+    });
+
+    it("does not list a server twice", async () => {
+        await trust(files);
+        await trust(files);
+
+        expect(await trustedOf()).toStrictEqual([mcpTrustId("Files", URL)]);
+    });
+
+    it("refuses an MCP server the caller has not saved", async () => {
+        await expect(trust({ kind: "mcp", name: "Files", url: "https://elsewhere.example/mcp" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(trust({ kind: "mcp", name: "Nope", url: URL })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(await trustedOf()).toBeUndefined();
+    });
+
+    it("stops at the cap", async () => {
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q: any) => q.eq("userId", USER))
+                .unique();
+
+            await ctx.db.patch(row._id, { lowRiskTrustedServers: Array.from({ length: MAX_TRUSTED_SERVERS }, (_, index) => connectorTrustId(`c${index}`)) });
+        });
+
+        await expect(trust({ kind: "connector", slug: "one-too-many" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        // A server already on the list can still be taken off at the cap.
+        await trust({ kind: "connector", slug: "c0" }, false);
+        expect(await trustedOf()).toHaveLength(MAX_TRUSTED_SERVERS - 1);
+    });
+
+    it("writes only the caller's own row", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { userId: "someone-else" }));
+        await trust({ kind: "connector", slug: "notion" });
+
+        const others = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("aiUserPreferences")
+                    .withIndex("by_userId", (q: any) => q.eq("userId", "someone-else"))
+                    .unique(),
+        );
+
+        expect(others?.lowRiskTrustedServers).toBeUndefined();
+        expect(await trustedOf()).toStrictEqual([connectorTrustId("notion")]);
+    });
+
+    it("needs a signed-in caller", async () => {
+        await expect(
+            harness.withIdentity({ userId: null } as never).mutation(setLowRiskTrustedServer as never, { server: files, trusted: true } as never),
+        ).rejects.toThrow();
+    });
+});
+
 describe("getLowRiskApprovalContext", () => {
     const THREAD_ARGS = async (extra: Record<string, unknown> = {}) =>
         await harness.run(async (ctx: any) => await ctx.db.insert("threads", { title: "t", userId: USER, ...extra }));
@@ -326,8 +428,13 @@ describe("getLowRiskApprovalContext", () => {
         await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
 
         const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("Files", URL);
+
+        await saveFilesServer();
+        await as().mutation(setLowRiskTrustedServer as never, { server: { kind: "mcp", name: "Files", url: URL }, trusted: true } as never);
+
         const askFor = async (permissionKey: string): Promise<boolean> =>
-            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey, threadId, userId: USER }));
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey, threadId, trustId, userId: USER }));
 
         expect(await askFor(KEY)).toBe(true);
 
@@ -336,6 +443,67 @@ describe("getLowRiskApprovalContext", () => {
         expect(await askFor(KEY)).toBe(false);
         // Another tool is still eligible.
         expect(await askFor(`${KEY}-other`)).toBe(true);
+    });
+
+    it("is false for a server the user has not trusted, until they trust it, and false again once they take it back", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("Files", URL);
+        const askFor = async (id: string | undefined): Promise<boolean> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey: KEY, threadId, trustId: id, userId: USER }));
+        const setTrust = async (trusted: boolean) =>
+            await as().mutation(setLowRiskTrustedServer as never, { server: { kind: "mcp", name: "Files", url: URL }, trusted } as never);
+
+        await saveFilesServer();
+
+        expect(await askFor(trustId)).toBe(false);
+
+        await setTrust(true);
+        expect(await askFor(trustId)).toBe(true);
+        // The same name at another url is another server; a call naming no server is nobody's.
+        expect(await askFor(mcpTrustId("Files", "https://elsewhere.example/mcp"))).toBe(false);
+        expect(await askFor(undefined)).toBe(false);
+
+        // Revoked while a run is going: the next call's re-check refuses.
+        await setTrust(false);
+        expect(await askFor(trustId)).toBe(false);
+    });
+
+    it("stops trusting a server that is no longer saved, for the run builder and for a call mid-run", async () => {
+        await as().mutation(setAutoApproveLowRisk as never, { enabled: true } as never);
+
+        const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("Files", URL);
+        const askFor = async (): Promise<boolean> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey: KEY, threadId, trustId, userId: USER }));
+        const trustedNow = async (): Promise<string[]> => await harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskTrustedServers, { userId: USER }));
+
+        await saveFilesServer();
+        await as().mutation(setLowRiskTrustedServer as never, { server: { kind: "mcp", name: "Files", url: URL }, trusted: true } as never);
+        expect(await askFor()).toBe(true);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db
+                .query("aiUserPreferences")
+                .withIndex("by_userId", (q: any) => q.eq("userId", USER))
+                .unique();
+
+            await ctx.db.patch(row._id, { mcpServers: [] });
+        });
+
+        expect(await trustedNow()).toStrictEqual([]);
+        expect(await askFor()).toBe(false);
+    });
+
+    it("accepts the trust id of a server whose name and url are full of control characters at their caps", async () => {
+        const threadId = await THREAD_ARGS();
+        const trustId = mcpTrustId("\u{1}".repeat(MAX_LENGTH.short), "\u{1}".repeat(MAX_LENGTH.url));
+
+        expect(trustId.length).toBeLessThanOrEqual(MAX_TRUST_ENTRY_LENGTH);
+        await expect(
+            harness.run(async (ctx: any) => await ctx.runQuery(getLowRiskApprovalContext, { permissionKey: KEY, threadId, trustId, userId: USER })),
+        ).resolves.toBe(false);
     });
 
     it("is false once a context summary of the thread folded in untrusted content", async () => {

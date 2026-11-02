@@ -15,6 +15,7 @@ import {
 } from "./low-risk-approval";
 import { documentTextPart } from "./attached-text";
 import { formatPageContextPart } from "./page-context";
+import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolDescriptor } from "./tool-permissions";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
 
@@ -28,8 +29,12 @@ const TAINTED_MESSAGES = [
     },
 ];
 
-const mcpDescriptor = (tool = "get_forecast", server = "Weather"): ToolDescriptor => {
-    return { key: toolPermissionKey("mcp", tool, server), source: "mcp" };
+const SERVER_URL = "https://weather.example/mcp";
+/** Trusts every server, for the tests that are about something else. */
+const trustAll: ReadonlySet<string> = { has: () => true } as unknown as ReadonlySet<string>;
+
+const mcpDescriptor = (tool = "get_forecast", server = "Weather", url = SERVER_URL): ToolDescriptor => {
+    return { key: toolPermissionKey("mcp", tool, server), source: "mcp", trustId: mcpTrustId(server, url) };
 };
 
 const dependencies = (overrides: Partial<LowRiskApproverDependencies> = {}) => {
@@ -61,14 +66,13 @@ const call = (overrides: Partial<Parameters<ReturnType<typeof createLowRiskAppro
 };
 
 describe("lowRiskIneligibleReason", () => {
-    const interactive = {};
+    const interactive = { lowRiskTrusted: trustAll };
 
     it("admits an MCP or connector tool left at its default ask", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(), "mcp_Weather__get_forecast", false, interactive)).toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, interactive)).toBeNull();
         expect(
             lowRiskIneligibleReason(
-                { key: toolPermissionKey("connector", "search_docs", "notion"), source: "connector" },
-                "mcp_notion__search_docs",
+                { key: toolPermissionKey("connector", "search_docs", "notion"), source: "connector", trustId: connectorTrustId("notion") },
                 false,
                 interactive,
             ),
@@ -77,32 +81,28 @@ describe("lowRiskIneligibleReason", () => {
 
     it("never admits a built-in: person tools, delegation and every other built-in", () => {
         for (const name of ["askUser", "delegateToSubAgent", "messageWorker", "delegateToCodingAgent", "requestSecret", "somethingNew"]) {
-            expect(lowRiskIneligibleReason({ key: toolPermissionKey("builtin", name), source: "builtin" }, name, false, interactive)).toBe("builtin");
+            expect(lowRiskIneligibleReason({ key: toolPermissionKey("builtin", name), source: "builtin" }, false, interactive)).toBe("builtin");
         }
     });
 
     it("never admits a device tool", () => {
-        expect(lowRiskIneligibleReason({ key: toolPermissionKey("device", "fs_read", "d1"), source: "device" }, "device_d1__fs_read", false, interactive)).toBe(
-            "device",
-        );
+        expect(lowRiskIneligibleReason({ key: toolPermissionKey("device", "fs_read", "d1"), source: "device" }, false, interactive)).toBe("device");
     });
 
     it("never admits a tool the user set themselves", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(), "mcp_Weather__get_forecast", true, interactive)).toBe("user-choice");
+        expect(lowRiskIneligibleReason(mcpDescriptor(), true, interactive)).toBe("user-choice");
     });
 
     it("never admits a headless or API-key run", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(), "x", false, { headless: true })).toBe("headless");
-        expect(lowRiskIneligibleReason(mcpDescriptor(), "x", false, { apiKeyOrigin: true })).toBe("api-key-origin");
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, { headless: true, lowRiskTrusted: trustAll })).toBe("headless");
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, { apiKeyOrigin: true, lowRiskTrusted: trustAll })).toBe("api-key-origin");
     });
 
     it("never admits a tool its server calls destructive or open-world", () => {
-        expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { destructiveHint: true } }, "x_get", false, interactive)).toBe("annotated-risky");
-        expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { openWorldHint: true } }, "x_get", false, interactive)).toBe("annotated-risky");
+        expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { destructiveHint: true } }, false, interactive)).toBe("annotated-risky");
+        expect(lowRiskIneligibleReason({ ...mcpDescriptor(), annotations: { openWorldHint: true } }, false, interactive)).toBe("annotated-risky");
         // A server that says the tool is not read-only is believed, whatever its name.
-        expect(lowRiskIneligibleReason({ ...mcpDescriptor("get_invoice"), annotations: { readOnlyHint: false } }, "x_get_invoice", false, interactive)).toBe(
-            "annotated-risky",
-        );
+        expect(lowRiskIneligibleReason({ ...mcpDescriptor("get_invoice"), annotations: { readOnlyHint: false } }, false, interactive)).toBe("annotated-risky");
     });
 
     it.each([
@@ -121,7 +121,7 @@ describe("lowRiskIneligibleReason", () => {
         "spawn_agent",
         "Messages.send",
     ])("never admits the outward or destructive tool %s", (tool) => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("outward");
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).toBe("outward");
     });
 
     it.each([
@@ -135,24 +135,24 @@ describe("lowRiskIneligibleReason", () => {
         "fork_repository",
         "set_status",
     ])("never admits the writing tool %s", (tool) => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).not.toBeNull();
     });
 
     it.each(["assign_issue", "grant_access", "enable_feature", "start_job", "archive_page", "transition_issue", "approve_request"])(
         "never admits %s: a verb that is not a read verb is out even when no blocklist word is in the name",
         (tool) => {
-            expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("not-read-verb");
+            expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).toBe("not-read-verb");
         },
     );
 
     it.each(["sendemail", "createpullrequest", "getissue", "postmessage"])("never admits %s: a read verb must be a word of its own", (tool) => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).not.toBeNull();
     });
 
     it.each(["get_and_delete_file", "fetch_and_send", "listAndMerge", "get_or_create_user"])(
         "never admits %s: a read verb up front does not excuse a writing word",
         (tool) => {
-            expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).not.toBeNull();
+            expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).not.toBeNull();
         },
     );
 
@@ -169,23 +169,68 @@ describe("lowRiskIneligibleReason", () => {
         "view_file",
         "get_forecast",
     ])("admits the read tool %s", (tool) => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).toBeNull();
+    });
+
+    it("refuses a server the user has not trusted, whatever the tool is called", () => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, {})).toBe("untrusted-server");
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, { lowRiskTrusted: new Set() })).toBe("untrusted-server");
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, { lowRiskTrusted: new Set([mcpTrustId("Other", SERVER_URL)]) })).toBe("untrusted-server");
+        // A descriptor with no known server has nothing to be trusted by.
+        expect(lowRiskIneligibleReason({ key: mcpDescriptor().key, source: "mcp" }, false, { lowRiskTrusted: trustAll })).toBe("untrusted-server");
+        expect(
+            lowRiskIneligibleReason(
+                { key: toolPermissionKey("connector", "search_docs", "notion"), source: "connector", trustId: connectorTrustId("notion") },
+                false,
+                {
+                    lowRiskTrusted: new Set([connectorTrustId("slack")]),
+                },
+            ),
+        ).toBe("untrusted-server");
+    });
+
+    it("admits a trusted MCP server's read tool and a trusted connector's", () => {
+        expect(lowRiskIneligibleReason(mcpDescriptor(), false, { lowRiskTrusted: new Set([mcpTrustId("Weather", SERVER_URL)]) })).toBeNull();
+        expect(
+            lowRiskIneligibleReason(
+                { key: toolPermissionKey("connector", "search_docs", "notion"), source: "connector", trustId: connectorTrustId("notion") },
+                false,
+                {
+                    lowRiskTrusted: new Set([connectorTrustId("notion")]),
+                },
+            ),
+        ).toBeNull();
+    });
+
+    it("drops the trust of a server whose url changed", () => {
+        const trusted = new Set([mcpTrustId("Weather", SERVER_URL)]);
+
+        expect(lowRiskIneligibleReason(mcpDescriptor("get_forecast", "Weather", "https://elsewhere.example/mcp"), false, { lowRiskTrusted: trusted })).toBe(
+            "untrusted-server",
+        );
+    });
+
+    it("scans only the tool's own name for outward words, so a server called mail does not turn its read tools away", () => {
+        expect(lowRiskIneligibleReason(mcpDescriptor("list_issues", "mail"), false, { lowRiskTrusted: trustAll })).toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor("get_forecast", "Slack Messages"), false, { lowRiskTrusted: trustAll })).toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor("send_message", "mail"), false, { lowRiskTrusted: trustAll })).toBe("outward");
+        expect(lowRiskIneligibleReason(mcpDescriptor("get_or_create_user", "mail"), false, { lowRiskTrusted: trustAll })).toBe("outward");
     });
 
     it("takes the tool's name off its key, so a server name never counts as the verb", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor("assign_issue", "get_things"), "mcp_get_things__assign_issue", false, interactive)).toBe("not-read-verb");
+        expect(lowRiskIneligibleReason(mcpDescriptor("assign_issue", "get_things"), false, interactive)).toBe("not-read-verb");
     });
 
     it.each(["get_sms_code", "list_pushes", "get_replies", "find_patches"])("refuses %s, whose outward word is plural or ends in s", (tool) => {
-        expect(lowRiskIneligibleReason(mcpDescriptor(tool), `mcp_Weather__${tool}`, false, interactive)).toBe("outward");
+        expect(lowRiskIneligibleReason(mcpDescriptor(tool), false, interactive)).toBe("outward");
     });
 
     it("refuses a key whose server name holds a colon, so no part of it is read as the verb", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor("drain_account", "x:get"), "mcp_x_get__drain_account", false, interactive)).toBe("ambiguous-key");
+        expect(lowRiskIneligibleReason(mcpDescriptor("drain_account", "x:get"), false, interactive)).toBe("ambiguous-key");
     });
 
     it("reads words, not substrings", () => {
-        expect(lowRiskIneligibleReason(mcpDescriptor("query_postgres", "Postgres"), "mcp_Postgres__query_postgres", false, interactive)).toBeNull();
+        expect(lowRiskIneligibleReason(mcpDescriptor("query_postgres", "Postgres"), false, interactive)).toBeNull();
     });
 });
 
@@ -458,11 +503,22 @@ describe("applyToolPermissions with the quick check", () => {
 
     it("lets an eligible tool run unasked when the check clears it", async () => {
         const check = vi.fn(async () => true);
-        const { requiresApproval, tools: applied } = applyToolPermissions(tools("mcp_Weather__get_forecast"), describeMcp, {}, { lowRiskCheck: check });
+        const { requiresApproval, tools: applied } = applyToolPermissions(
+            tools("mcp_Weather__get_forecast"),
+            describeMcp,
+            {},
+            { lowRiskCheck: check, lowRiskTrusted: trustAll },
+        );
 
         await expect(ask(applied, "mcp_Weather__get_forecast")).resolves.toBe(false);
         expect(requiresApproval).toEqual(["mcp_Weather__get_forecast"]);
-        expect(check).toHaveBeenCalledWith({ input: { q: 1 }, key: "mcp:Weather:get_forecast", messages: CLEAN_MESSAGES, toolCallId: "c1" });
+        expect(check).toHaveBeenCalledWith({
+            input: { q: 1 },
+            key: "mcp:Weather:get_forecast",
+            messages: CLEAN_MESSAGES,
+            toolCallId: "c1",
+            trustId: mcpTrustId("Weather", SERVER_URL),
+        });
     });
 
     it("asks when the check does not clear the call, or fails", async () => {
@@ -472,7 +528,7 @@ describe("applyToolPermissions with the quick check", () => {
                 throw new Error("boom");
             },
         ]) {
-            const { tools: applied } = applyToolPermissions(tools("mcp_Weather__get_forecast"), describeMcp, {}, { lowRiskCheck });
+            const { tools: applied } = applyToolPermissions(tools("mcp_Weather__get_forecast"), describeMcp, {}, { lowRiskCheck, lowRiskTrusted: trustAll });
 
             await expect(ask(applied, "mcp_Weather__get_forecast")).resolves.toBe(true);
         }
@@ -495,7 +551,7 @@ describe("applyToolPermissions with the quick check", () => {
         // The device tool is `auto` by default; forcing it to ask must not make it eligible either.
         const overrides = { "device:abc:shell_run": "ask" as const, "mcp:Weather:get_alerts": "ask" as const };
 
-        const { tools: applied } = applyToolPermissions(set, describeTool, overrides, { lowRiskCheck: approvesEverything });
+        const { tools: applied } = applyToolPermissions(set, describeTool, overrides, { lowRiskCheck: approvesEverything, lowRiskTrusted: trustAll });
 
         for (const name of [
             "askUser",
@@ -525,7 +581,12 @@ describe("applyToolPermissions with the quick check", () => {
             "mcp_Mail__sendemail",
             "mcp_GitHub__createpullrequest",
         ];
-        const { tools: applied } = applyToolPermissions(tools(...names, "mcp_GitHub__get_issue"), describeMcp, {}, { lowRiskCheck: approvesEverything });
+        const { tools: applied } = applyToolPermissions(
+            tools(...names, "mcp_GitHub__get_issue"),
+            describeMcp,
+            {},
+            { lowRiskCheck: approvesEverything, lowRiskTrusted: trustAll },
+        );
 
         for (const name of names) {
             expect((applied[name] as { needsApproval: unknown }).needsApproval, name).toBe(true);
@@ -543,7 +604,7 @@ describe("applyToolPermissions with the quick check", () => {
                 tools("mcp_Weather__get_forecast"),
                 describeMcp,
                 {},
-                { ...options, lowRiskCheck: approvesEverything },
+                { ...options, lowRiskCheck: approvesEverything, lowRiskTrusted: trustAll },
             );
             const tool = applied["mcp_Weather__get_forecast"] as { needsApproval?: unknown } | undefined;
 
@@ -560,7 +621,7 @@ describe("applyToolPermissions with the quick check", () => {
             tools("mcp_Weather__get_forecast"),
             describeMcp,
             {},
-            { lowRiskCheck: check, now: 1000, timedGrants: { [key]: Date.now() + 60_000 } },
+            { lowRiskCheck: check, lowRiskTrusted: trustAll, now: 1000, timedGrants: { [key]: Date.now() + 60_000 } },
         );
 
         await expect(ask(live.tools, "mcp_Weather__get_forecast")).resolves.toBe(false);
@@ -570,7 +631,7 @@ describe("applyToolPermissions with the quick check", () => {
             tools("mcp_Weather__get_forecast"),
             describeMcp,
             {},
-            { lowRiskCheck: check, now: 1000, timedGrants: { [key]: 2000 } },
+            { lowRiskCheck: check, lowRiskTrusted: trustAll, now: 1000, timedGrants: { [key]: 2000 } },
         );
 
         // `now` is the instant the grant was judged at; the lapse is re-read at the call.
