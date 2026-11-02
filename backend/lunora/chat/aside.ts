@@ -58,7 +58,12 @@ import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
-import { getUtilityModelForUser, loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
+import {
+    getUtilityModelForUser,
+    loadSharedModelFilterRules,
+    MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE,
+    ModelFilterRulesUnavailableError,
+} from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,

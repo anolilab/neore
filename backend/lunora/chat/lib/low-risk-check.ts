@@ -92,9 +92,20 @@ export const createRunLowRiskCheck = (
         // Re-reads the setting and the thread's sharing, so switching the setting off or sharing the thread mid-run holds from the next call.
         consumeBudget: async () => {
             // No allowed model: nothing will be asked, so none of the budget is spent.
-            const modelAvailable = await resolveModel()
-                .then(() => true)
-                .catch(() => false);
+            // Bounded by the same deadline as the call itself: a model that never resolves must leave the call with the person.
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const modelAvailable = await Promise.race([
+                resolveModel()
+                    .then(() => true)
+                    .catch(() => false),
+                new Promise<boolean>((resolve) => {
+                    timer = setTimeout(() => {
+                        resolve(false);
+                    }, LOW_RISK_DEADLINE_MS);
+                }),
+            ]).finally(() => {
+                clearTimeout(timer);
+            });
 
             return (
                 modelAvailable && (await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }))

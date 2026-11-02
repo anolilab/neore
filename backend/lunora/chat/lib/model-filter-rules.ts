@@ -72,7 +72,7 @@ const intersect = (a: string[] | undefined, b: string[] | undefined): string[] |
     return both.length > 0 ? both : [NOTHING_ALLOWED];
 };
 
-const NOTHING_ALLOWED = "\u0000none";
+const NOTHING_ALLOWED = "\u{0}none";
 
 const union = (a: string[] | undefined, b: string[] | undefined): string[] | undefined => (a || b ? [...new Set([...(a ?? []), ...(b ?? [])])] : undefined);
 
@@ -108,7 +108,11 @@ export const mergeModelFilterRules = (payer: ModelFilterRules, other: ModelFilte
  * apply, so the model is one each of them allows. The caller's plan grades the paid-plan rule, as they pay. For the
  * owner's own call it is just their rules.
  */
-export const loadSharedModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, callerId: string, ownerId: string | undefined): Promise<ModelFilterRules> => {
+export const loadSharedModelFilterRules = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    callerId: string,
+    ownerId: string | undefined,
+): Promise<ModelFilterRules> => {
     const caller = await loadModelFilterRules(ctx, callerId);
 
     if (!ownerId || ownerId === callerId) {

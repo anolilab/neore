@@ -7,8 +7,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOW_RISK_DEADLINE_MS } from "./low-risk-approval";
 import { createRunLowRiskCheck } from "./low-risk-check";
 
-vi.mock("../../lib/utility-model", () => {
-    return { getUtilityModel: vi.fn(async () => await new Promise(() => {})) };
+vi.mock("../../lib/utility-model", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../../lib/utility-model")>()), getUtilityModel: vi.fn(async () => await new Promise(() => {})) };
+});
+vi.mock("./model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
 });
 vi.mock("../../lib/services", () => {
     return { gatewayFetch: () => async () => new Response() };
@@ -46,6 +53,7 @@ describe("createRunLowRiskCheck", () => {
         await vi.advanceTimersByTimeAsync(LOW_RISK_DEADLINE_MS + 1);
 
         await expect(result).resolves.toBe(false);
-        expect(outcomes).toEqual(["failed"]);
+        // The model never resolved, so the budget was not spent and nothing was asked.
+        expect(outcomes).toEqual(["budget"]);
     });
 });
