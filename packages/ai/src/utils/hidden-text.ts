@@ -6,8 +6,11 @@
  *
  * Two kinds of character are hidden only OUT OF PLACE, because a run of either can carry an invisible payload (the
  * "variation-selector smuggling" and tag-character techniques) while a single one renders something:
- * - a variation selector (U+FE00 to U+FE0F, U+E0100 to U+E01EF) stays when it is the ONE selector directly after a
- *   visible base character (VS15/VS16 after an emoji, an ideographic selector after a CJK ideograph);
+ * - a variation selector stays only when it is the ONE selector directly after a base character it can really select
+ *   a variant of (one selector after each letter would still smuggle a byte per letter): U+FE0E and U+FE0F after a
+ *   character that can take emoji presentation (`Extended_Pictographic`, `Emoji_Presentation`; after a keycap base,
+ *   0-9 # *, only when U+20E3 follows); U+E0100 to U+E01EF after an ideograph; U+FE00 to U+FE0D after an ideograph or a
+ *   math or other symbol (`Sm`, `So`), never after a letter or digit;
  * - the tag letters, digits and CANCEL TAG of a subdivision flag (England, Scotland, Wales) stay when they directly
  *   follow U+1F3F4 and are well formed: 1 to 6 tag characters, then U+E007F.
  * The `strict` form treats every selector and tag as hidden.
@@ -23,8 +26,12 @@ const HIDDEN_STRICT = /[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}\p{Cc}\p{Cf}\u{E0000
 // U+1F3F4 BLACK FLAG, 1 to 6 tag digits or letters (a subdivision code such as `gbeng`), CANCEL TAG.
 const SUBDIVISION_FLAG = /\u{1F3F4}[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]{1,6}\u{E007F}/gu;
 const BLACK_FLAG_UNITS = 2;
-// Something a selector can modify: a letter, number, punctuation mark or symbol (emoji are symbols). Not another selector, a mark, a space or a control.
-const BASE_CHARACTER = /^[\p{L}\p{N}\p{P}\p{S}]$/u;
+// What each kind of selector can modify. Another selector, a mark, a space or a control is no base for any of them.
+const EMOJI_BASE = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}]$/u;
+const KEYCAP_BASE = /^[0-9#*]$/u;
+const IDEOGRAPH = /^\p{Ideographic}$/u;
+const SYMBOL = /^[\p{Sm}\p{So}]$/u;
+const COMBINING_ENCLOSING_KEYCAP = 0x20_e3;
 
 type Range = { index: number; length: number };
 
@@ -46,8 +53,22 @@ const belongsInPlace = (value: string, index: number, codePoint: number, flagTag
         return flagTags.some(([from, to]) => index >= from && index < to);
     }
 
-    // A second selector in a run follows a selector, which is no base character.
-    return isVariationSelector(codePoint) && BASE_CHARACTER.test(characterBefore(value, index));
+    if (!isVariationSelector(codePoint)) {
+        return false;
+    }
+
+    // A second selector in a run follows a selector, which is no base character for any of the tests below.
+    const base = characterBefore(value, index);
+
+    if (codePoint >= 0xe_01_00) {
+        return IDEOGRAPH.test(base);
+    }
+
+    if (codePoint >= 0xfe_0e) {
+        return EMOJI_BASE.test(base) || (KEYCAP_BASE.test(base) && value.codePointAt(index + 1) === COMBINING_ENCLOSING_KEYCAP);
+    }
+
+    return IDEOGRAPH.test(base) || SYMBOL.test(base);
 };
 
 /**
@@ -105,7 +126,7 @@ export const showHidden = (value: string, options: { strict?: boolean } = {}): s
  * The text with every hidden character removed, and how many there were. A newline and a tab stay (a prompt has
  * lines); a carriage return does not, so `\r\n` arrives as `\n`. U+200D and U+200C stay: emoji sequences and
  * Persian, Arabic and Indic text need them to render. A variation selector stays only as the one directly after a
- * base character, and a tag only as the tail of a subdivision flag.
+ * character it can select a variant of (see the top of the file), and a tag only as the tail of a subdivision flag.
  */
 export const stripHiddenText = (value: string): { removed: number; text: string } => {
     const ranges = scan(value, { layout: true });

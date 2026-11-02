@@ -93,8 +93,8 @@ describe("variation selectors", () => {
     const heart = "\u{2764}\u{FE0F}";
     const ideograph = "\u{8FBB}\u{E0100}";
 
-    it("keeps one selector directly after a base character: an emoji with VS16, a text VS15, a CJK ideograph with an IVS", () => {
-        const text = `${heart} \u{2764}\u{FE0E} ${ideograph} 1\u{FE0F}\u{20E3}`;
+    it("keeps one selector directly after a base it can select a variant of: an emoji with VS16, a text VS15, a keycap, a CJK ideograph with an IVS", () => {
+        const text = `${heart} \u{2764}\u{FE0E} ${ideograph} 1\u{FE0F}\u{20E3} \u{845B}\u{E0100} \u{8FBB}\u{FE00} \u{2264}\u{FE00}`;
 
         expect(stripHiddenText(text)).toEqual({ removed: 0, text });
         expect(hasHiddenText(text)).toBe(false);
@@ -102,12 +102,30 @@ describe("variation selectors", () => {
         expect(findHiddenText(text)).toEqual([]);
     });
 
-    it("strips a run of selectors after a letter but its first, and counts them", () => {
+    it("strips a run of selectors after a letter, all of them, and counts them", () => {
         const payload = selectors(20);
 
-        expect(stripHiddenText(`a${payload}b`)).toEqual({ removed: 19, text: `a${payload.slice(0, 1)}b` });
+        expect(stripHiddenText(`a${payload}b`)).toEqual({ removed: 20, text: "ab" });
         expect(hasHiddenText(`a${payload}b`)).toBe(true);
-        expect(showHidden(`a${payload}b`)).toBe(`a${payload.slice(0, 1)}${"?".repeat(19)}b`);
+        expect(showHidden(`a${payload}b`)).toBe(`a${"?".repeat(20)}b`);
+    });
+
+    it("strips one selector after each letter of a word (a byte per letter)", () => {
+        const word = [..."hello"].map((letter, n) => `${letter}${String.fromCodePoint(0xfe_00 + n)}`).join("");
+
+        expect(stripHiddenText(word)).toEqual({ removed: 5, text: "hello" });
+    });
+
+    it("strips a selector after a letter with a diacritic, a digit and a bare keycap base, in every block", () => {
+        expect(stripHiddenText("\u{E9}\u{FE0F}")).toEqual({ removed: 1, text: "\u{E9}" });
+        expect(stripHiddenText("e\u{301}\u{FE0F}")).toEqual({ removed: 1, text: "e\u{301}" });
+        expect(stripHiddenText("1\u{FE0F}")).toEqual({ removed: 1, text: "1" });
+        expect(stripHiddenText("1\u{FE0F}2")).toEqual({ removed: 1, text: "12" });
+        expect(stripHiddenText("#\u{FE0F}\u{20E3}")).toEqual({ removed: 0, text: "#\u{FE0F}\u{20E3}" });
+        expect(stripHiddenText("a\u{FE00}")).toEqual({ removed: 1, text: "a" });
+        expect(stripHiddenText("1\u{FE00}")).toEqual({ removed: 1, text: "1" });
+        expect(stripHiddenText("a\u{E0100}")).toEqual({ removed: 1, text: "a" });
+        expect(stripHiddenText("\u{2764}\u{E0100}")).toEqual({ removed: 1, text: "\u{2764}" });
     });
 
     it("strips a second selector after an emoji's own, in both blocks", () => {
@@ -125,7 +143,10 @@ describe("variation selectors", () => {
     });
 
     it("reports a stripped selector in findHiddenText, an astral one being two units", () => {
-        expect(findHiddenText("a\u{FE00}\u{E0100}")).toEqual([{ index: 2, length: 2 }]);
+        expect(findHiddenText("a\u{FE00}\u{E0100}")).toEqual([
+            { index: 1, length: 1 },
+            { index: 2, length: 2 },
+        ]);
     });
 
     it("counts every selector in the strict form", () => {
