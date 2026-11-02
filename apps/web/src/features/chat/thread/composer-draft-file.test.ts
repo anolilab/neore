@@ -4,10 +4,11 @@ import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, un
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
-        const state = { chat: "chat-1", text: draft };
+        const state = { chat: "chat-1" as string | null, ids: [result.attachmentId], text: draft };
         const options = {
             attach: vi.fn(async () => result),
             discard: vi.fn(),
+            getAttachmentIds: () => state.ids,
             getChatKey: () => state.chat,
             getDraft: () => state.text,
             onAttached: vi.fn(),
@@ -30,6 +31,33 @@ describe("attachLongPaste", () => {
         expect(options.onAttached).toHaveBeenCalledWith("a1");
         expect(options.onFailure).not.toHaveBeenCalled();
         expect(state.text).toBe("before after");
+    });
+
+    it("does not announce the file when it was removed during the upload", async () => {
+        const { options, state } = setup({ attachmentId: "a1" });
+
+        options.attach.mockImplementation(async () => {
+            state.ids = [];
+
+            return { attachmentId: "a1" };
+        });
+
+        expect(await attachLongPaste(options)).toBe(true);
+        expect(options.onAttached).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when the composer unmounted during a failed upload", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
+
+        options.attach.mockImplementation(async () => {
+            state.chat = null;
+
+            return { attachmentId: "a1", error: "Too big" };
+        });
+
+        expect(await attachLongPaste(options)).toBe(false);
+        expect(options.setDraft).not.toHaveBeenCalled();
+        expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
     });
 
     it("puts the text into the composer at the paste position and reports the error, not the success, when the upload failed", async () => {

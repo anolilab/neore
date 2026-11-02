@@ -72,6 +72,7 @@ import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
+import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
 // Context window limits (in characters, roughly 4 chars per token)
@@ -476,11 +477,7 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
-    const threadIdRef = useRef(threadId);
-
-    useEffect(() => {
-        threadIdRef.current = threadId;
-    }, [threadId]);
+    const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
@@ -806,11 +803,16 @@ const ComposerInput = ({
     // The paste did not land in the draft, so say where it went and let the person take it back.
     const announcePasteAttached = useCallback(
         (attachmentId: string, pastedText: string) => {
-            showInfo(t`Long text was attached as a file.`, {
+            const toastId = showInfo(t`Long text was attached as a file.`, {
                 action: {
                     label: t`Undo`,
                     // The file may have been sent or removed since: then the text is no longer ours to put back.
                     onClick: () => {
+                        // The composer is gone (another chat is open): the draft and files now are not this paste's.
+                        if (!isMounted()) {
+                            return;
+                        }
+
                         undoLongPaste({
                             attachmentId,
                             getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
@@ -823,8 +825,10 @@ const ComposerInput = ({
                 },
                 duration: 8000,
             });
+
+            trackToast(toastId);
         },
-        [removeAttachment, setText, t],
+        [isMounted, removeAttachment, setText, t, trackToast],
     );
 
     // Handle paste - auto-convert long text to attachment
@@ -866,7 +870,8 @@ const ComposerInput = ({
                 await attachLongPaste({
                     attach: attachTextAsFile,
                     discard: removeAttachment,
-                    getChatKey: () => threadIdRef.current,
+                    getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                    getChatKey,
                     getDraft: () => useChatUIStore.getState().composerText,
                     onAttached: (attachmentId) => {
                         announcePasteAttached(attachmentId, pastedText);
@@ -886,7 +891,7 @@ const ComposerInput = ({
                 });
             }
         },
-        [handleFileSelect, announcePasteAttached, attachTextAsFile, pasteSelection, removeAttachment, setText, t],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.
@@ -1469,6 +1474,7 @@ const ComposerInput = ({
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
                 followUp={followUp}
+                hasAttachments={hasAttachments}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}

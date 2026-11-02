@@ -19,7 +19,9 @@ vi.mock("@lingui/react/macro", () => {
 });
 vi.mock("./composer-tiptap/composer-tiptap-editor", () => {
     return {
-        ComposerTiptapEditor: () => <div data-testid="editor" />,
+        ComposerTiptapEditor: ({ describedBy, invalid }: { describedBy?: string; invalid?: boolean }) => (
+            <div data-described-by={describedBy} data-invalid={String(Boolean(invalid))} data-testid="editor" />
+        ),
     };
 });
 
@@ -103,5 +105,37 @@ describe("the composer over the cap", () => {
         render(<ComposerInputArea onAttachDraftAsFile={() => {}} onChange={() => {}} onSubmit={() => {}} value={"x".repeat(MAX_PROMPT_CHARS + 5)} />);
 
         expect(screen.getByRole("alert").textContent).toContain("100,000");
+    });
+
+    it("points the editor at the notice and marks it invalid", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value={over} />);
+
+        const editor = screen.getByTestId("editor");
+
+        expect(editor.dataset.describedBy).toBe(screen.getByRole("alert").id);
+        expect(editor.dataset.invalid).toBe("true");
+    });
+
+    it("leaves the editor undescribed and valid under the cap", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value="hi" />);
+
+        const editor = screen.getByTestId("editor");
+
+        expect(Object.hasOwn(editor.dataset, "describedBy")).toBe(false);
+        expect(editor.dataset.invalid).toBe("false");
+    });
+});
+
+describe("an attachment-only draft", () => {
+    it("shows an enabled Send control", () => {
+        render(<ComposerInputArea hasAttachments onChange={() => {}} onSubmit={() => {}} value="" />);
+
+        expect((screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("shows no Send control with neither text nor attachments", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value="" />);
+
+        expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
     });
 });

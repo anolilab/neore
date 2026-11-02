@@ -75,6 +75,8 @@ interface ComposerInputAreaProps {
      */
     followUp?: FollowUpControl;
 
+    /** Whether the draft has attachments; with some, an empty text can still be sent. */
+    hasAttachments?: boolean;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -141,6 +143,7 @@ const ComposerInputArea = ({
     customVariables,
     disabled = false,
     followUp = "none",
+    hasAttachments = false,
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -177,7 +180,8 @@ const ComposerInputArea = ({
         };
     }, []);
 
-    const isEmpty = !value.trim();
+    // An attachment-only draft is sendable, so it needs the send control as much as typed text does.
+    const isEmpty = !value.trim() && !hasAttachments;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -276,7 +280,9 @@ const ComposerInputArea = ({
                         bannedWordMatches={bannedWordMatches}
                         currentThreadId={currentThreadId}
                         customVariables={customVariables}
+                        describedBy={overCapDescription}
                         disabled={disabled}
+                        invalid={isOverCap}
                         isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}

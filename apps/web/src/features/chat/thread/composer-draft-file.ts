@@ -84,10 +84,12 @@ export const insertPastedText = (draft: string, text: string, start: number, end
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
     discard: (attachmentId: string) => void;
+    /** Ids of the attachments in the composer right now. */
+    getAttachmentIds: () => string[];
     /** The chat the composer belongs to right now; a paste is never written into a different one than it started in. */
-    getChatKey: () => string | undefined;
+    getChatKey: () => string | null | undefined;
     getDraft: () => string;
-    /** Called with the new attachment's id once the text is a file. */
+    /** Called with the new attachment's id once the text is a file that is still in the composer. */
     onAttached: (attachmentId: string) => void;
     /** Called with the reason when the text could not become a file; the text is already back in the composer. */
     onFailure: (error: string) => void;
@@ -108,6 +110,7 @@ interface AttachLongPasteOptions {
 export const attachLongPaste = async ({
     attach,
     discard,
+    getAttachmentIds,
     getChatKey,
     getDraft,
     onAttached,
@@ -122,7 +125,10 @@ export const attachLongPaste = async ({
     const { attachmentId, error } = await attach(pastedText);
 
     if (error === undefined) {
-        onAttached(attachmentId);
+        // A file removed during the upload is gone: announcing it (and offering Undo) would be false.
+        if (getAttachmentIds().includes(attachmentId)) {
+            onAttached(attachmentId);
+        }
 
         return true;
     }
