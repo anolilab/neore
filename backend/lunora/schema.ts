@@ -684,6 +684,8 @@ export const schema = defineSchema({
         acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
+        // The wire protocol the computer's signed manifest reported (`MIN_DEVICE_PROTOCOL`); unset until a build that reports it has sent one.
+        hostProtocol: v.optional(v.number()),
         lastSeenAt: v.optional(v.number()),
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
