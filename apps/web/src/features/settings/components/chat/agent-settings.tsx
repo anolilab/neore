@@ -196,11 +196,12 @@ const AgentSettings: FC = () => {
                                 <Label className="text-base font-medium" htmlFor="commitAsMe">
                                     {t`Commit as me`}
                                 </Label>
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-muted-foreground text-sm" id="commitAsMeDescription">
                                     {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author.`}
                                 </p>
                             </div>
                             <Switch
+                                aria-describedby="commitAsMeDescription"
                                 checked={aiPreferences?.codingAgentCommitIdentity === "user"}
                                 disabled={setCommitIdentityMutation.isPending}
                                 id="commitAsMe"
