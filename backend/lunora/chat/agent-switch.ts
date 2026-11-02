@@ -17,6 +17,7 @@
  * daily allowance is spent, `beginSwitchSummary` lets one summary run per thread at a time and counts it
  * against its own rate limit, and only then does the action call the gateway.
  */
+import { estimateTokensFromCharacters } from "@neore/ai/models";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -24,23 +25,27 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
+import { handoffAboveOf, handoffBeforeDeltaOf, leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
 import { type AgentRef, HANDOFF_MAX_CHARACTERS, type SwitchAgentRef, vAgentRef, vAgentSwitchMode, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import {
     assertWithinBudget,
     capSummary,
     composeHandoff,
-    HANDOFF_BUDGET_TOKENS,
-    HANDOFF_SUMMARY_MAX_TOKENS,
+    DEFAULT_HANDOFF_LIMITS,
+    fullHistoryCapFor,
+    handoffLimitsFor,
     HANDOFF_SUMMARY_SYSTEM,
     HandoffTooLargeError,
+    handoffTokens,
     planHandoff,
     summaryPromptOf,
     type HandoffKind,
+    type HandoffLimits,
     type HandoffTurn,
 } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving, pathTokens, rowsSince } from "../agent/handoff-source";
+import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff } from "../agent/handoff-context";
+import { collectHandoffSource, findDividerLeaving, pathTokens, replyWindowRows, rowCharacters, rowsSince } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -56,6 +61,7 @@ import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityMode
 import { loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
+import { getModelContextWindow } from "./lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import { findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
 
@@ -340,8 +346,11 @@ const modeFor = async (
 ): Promise<{ boundaryId?: string; mode: "delta" | "full" | "portable" }> => {
     // Only an unrequested mode needs the size of the path, and only whether it passes the threshold.
     const wanted = requested ?? ((await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf)) ? "portable" : "full");
+    // What the target would be sent whole, as the history or as a delta's restored context, has to fit its window.
+    const fits = await historyFits(ctx, checked);
 
-    if (wanted === "full") {
+    // The whole history goes only to a model whose window holds it: a small one is handed a summary instead of an overflow.
+    if (wanted === "full" && fits) {
         return { mode: "full" };
     }
 
@@ -349,11 +358,43 @@ const modeFor = async (
 
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
-    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+    if (
+        fits &&
+        earlier &&
+        (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES
+    ) {
         return { boundaryId: earlier.part.startMessageId, mode: "delta" };
     }
 
     return { mode: "portable" };
+};
+
+/** The context window of the model a switch moves to. */
+const windowOf = (checked: Extract<Checked, { kind: "ready" }>): number => getModelContextWindow(checked.to.model);
+
+/**
+ * Whether what a reply on the target is sent fits its window with room for the reply: the context the reply
+ * loader builds, assembled the same way — the newest DEFAULT_RECENT_MESSAGES successful rows (text, and a fixed
+ * estimate for each image or file), with the stored handoffs `assembleHandoffContext` keeps standing in for the
+ * rows above them and for what a switched-back model saw.
+ */
+const historyFits = async (ctx: QueryCtx, checked: Extract<Checked, { kind: "ready" }>): Promise<boolean> => {
+    const cap = fullHistoryCapFor(windowOf(checked));
+    const threadId = checked.thread._id;
+    const window = await replyWindowRows(ctx, threadId, checked.leaf, DEFAULT_RECENT_MESSAGES);
+    const oldest = window[0];
+    const earlier = oldest && oldest.order > 0 && needsEarlierHandoff(window) ? await handoffAboveOf(ctx, { belowMessageId: oldest._id, threadId }) : [];
+    const bases = new Map(
+        await Promise.all(
+            deltaOrphans(window).map(
+                async ({ id, model }) => [model, await handoffBeforeDeltaOf(ctx, { dividerMessageId: id as Id<"messages">, threadId })] as const,
+            ),
+        ),
+    );
+    const { blocks, docs } = assembleHandoffContext(window, earlier, bases);
+    const characters = docs.reduce((sum, doc) => sum + rowCharacters(doc), 0);
+
+    return estimateTokensFromCharacters(characters) + blocks.reduce((sum, block) => sum + handoffTokens(block.text), 0) <= cap;
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });
@@ -362,6 +403,8 @@ const vPlan = v.object({
     agent: vAgentRef,
     /** Whether the daily limits have room for the round a summary is charged as; unset when the switch needs no summary call. */
     allowance: v.optional(v.boolean()),
+    /** The target's context window, which the handoff's budget is derived from. */
+    contextWindow: v.optional(v.number()),
     leafId: v.optional(v.string()),
     mode: v.optional(vAgentSwitchMode),
     omittedEarlier: v.optional(v.boolean()),
@@ -369,9 +412,9 @@ const vPlan = v.object({
 });
 
 /** Whether handing these turns over takes a summary call. A thread too large to hand over is reported by the action. */
-const needsSummary = (newestFirst: HandoffTurn[]): boolean => {
+const needsSummary = (newestFirst: HandoffTurn[], limits: HandoffLimits): boolean => {
     try {
-        return planHandoff(newestFirst).older.length > 0;
+        return planHandoff(newestFirst, limits).older.length > 0;
     } catch (error) {
         if (error instanceof HandoffTooLargeError) {
             return false;
@@ -391,6 +434,7 @@ export const planAgentSwitchHandler = async (
 ): Promise<{
     agent: AgentRef;
     allowance?: boolean;
+    contextWindow?: number;
     leafId?: string;
     mode?: "delta" | "full" | "portable";
     omittedEarlier?: boolean;
@@ -410,9 +454,10 @@ export const planAgentSwitchHandler = async (
     }
 
     const source = await collectHandoffSource(ctx, checked.thread._id, checked.leaf, { stopAtId: boundaryId });
-    const base = { agent: checked.from, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
+    const contextWindow = windowOf(checked);
+    const base = { agent: checked.from, contextWindow, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
 
-    if (!needsSummary(source.turns)) {
+    if (!needsSummary(source.turns, handoffLimitsFor(contextWindow))) {
         return base;
     }
 
@@ -498,11 +543,11 @@ export const beginSwitchSummary = internalMutation
     .mutation(async ({ args, ctx }) => await beginSwitchSummaryHandler(ctx, args));
 
 /** Writes the summary of `older`, or throws a refusal. Costs one utility-model call, metered by the gateway. */
-export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
+export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean, limits?: HandoffLimits) => Promise<string>;
 
 export const summariseWith =
     (ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "runQuery">, who: { threadId: string; userId: string }): Summarise =>
-    async (older, omittedEarlier) => {
+    async (older, omittedEarlier, limits) => {
         try {
             // The history is the owner's and the switch is the caller's, so a model must satisfy both users' rules.
             const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: who.threadId as Id<"threads"> });
@@ -514,9 +559,9 @@ export const summariseWith =
             const rules = await loadSharedModelFilterRules(ctx, who.userId, thread.userId);
             const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules });
             const { text } = await generateText({
-                maxOutputTokens: HANDOFF_SUMMARY_MAX_TOKENS,
+                maxOutputTokens: (limits ?? DEFAULT_HANDOFF_LIMITS).summaryMaxTokens,
                 model,
-                prompt: summaryPromptOf(older, omittedEarlier),
+                prompt: summaryPromptOf(older, omittedEarlier, limits),
                 system: HANDOFF_SUMMARY_SYSTEM,
                 temperature: 0,
             });
@@ -566,10 +611,11 @@ const buildHandoff = async (
         return { mode: kind, summarized: false, text: "" };
     }
 
-    const { older, tail } = planHandoff(turns);
+    const limits = handoffLimitsFor(plan.contextWindow);
+    const { older, tail } = planHandoff(turns, limits);
 
     if (older.length === 0) {
-        return { mode: kind, summarized: false, text: assertWithinBudget(composeHandoff({ kind, tail })) };
+        return { mode: kind, summarized: false, text: assertWithinBudget(composeHandoff({ kind, tail }), limits) };
     }
 
     if (plan.allowance === false) {
@@ -584,9 +630,9 @@ const buildHandoff = async (
 
     held.fence = fence;
 
-    const summary = capSummary(await summarise(older, plan.omittedEarlier === true));
+    const summary = capSummary(await summarise(older, plan.omittedEarlier === true, limits), limits);
 
-    return { mode: kind, summarized: true, text: assertWithinBudget(composeHandoff({ kind, summary, tail })) };
+    return { mode: kind, summarized: true, text: assertWithinBudget(composeHandoff({ kind, summary, tail }), limits) };
 };
 
 /**
@@ -695,15 +741,17 @@ export const previewAgentSwitchHandler = async (ctx: QueryCtx, args: Omit<Switch
     }
 
     const { boundaryId } = await modeFor(ctx, checked, "portable");
+    const limits = handoffLimitsFor(windowOf(checked));
     // A reply reads the last DEFAULT_RECENT_MESSAGES rows, so that is what keeping the history costs.
     const window = { cap: PREVIEW_TOKEN_CAP, maxRows: DEFAULT_RECENT_MESSAGES };
     const contextTokens = await pathTokens(ctx, checked.thread._id, checked.leaf, window);
     const sinceTokens = boundaryId ? await pathTokens(ctx, checked.thread._id, checked.leaf, { ...window, stopAtId: boundaryId }) : contextTokens;
     // A switch back keeps what the model saw and hands over only what came since; a first handoff is the whole of it.
-    const handoffTokens = contextTokens - sinceTokens + Math.min(sinceTokens, HANDOFF_BUDGET_TOKENS);
+    const handedTokens = contextTokens - sinceTokens + Math.min(sinceTokens, limits.budgetTokens);
     const coldStartCostly = await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf);
+    const defaultMode = coldStartCostly || !(await historyFits(ctx, checked)) ? "portable" : "full";
 
-    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode: coldStartCostly ? "portable" : "full", handoffTokens };
+    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode, handoffTokens: handedTokens };
 };
 
 export const previewAgentSwitch = authQuery
