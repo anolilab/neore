@@ -49,6 +49,7 @@ const vSendResult = v.union(
             v.literal("locked"),
             v.literal("not_found"),
             v.literal("offline"),
+            v.literal("outdated"),
             v.literal("rate_limited"),
             v.literal("session_ended"),
             v.literal("session_starting"),
@@ -139,7 +140,7 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
 
     if ("error" in queued) {
-        const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline" } as const;
+        const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline", outdated: "outdated" } as const;
 
         return { outcome: outcomes[queued.error] };
     }
@@ -170,6 +171,7 @@ const STATUS: Record<string, number> = {
     locked: 403,
     not_found: 404,
     offline: 409,
+    outdated: 409,
     rate_limited: 429,
     session_ended: 409,
     session_starting: 409,

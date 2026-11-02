@@ -24,6 +24,7 @@ const REFUSALS = {
     ineligible: "That computer is no longer paired.",
     input_too_large: "The message is too long to send to the agent.",
     offline: "The host did not answer: that computer is offline.",
+    outdated: "The Neore app on that computer is out of date. Update it, then try again.",
 } as const;
 
 /** How often a message that met a computer with no room for another call is tried again before it fails. A turn holding the session does not count ({@link HostSendRefusal}). */

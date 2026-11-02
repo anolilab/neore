@@ -18,7 +18,7 @@ import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYT
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { mergeTaint } from "./lib/taint";
-import { countOpenCalls, isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
+import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
@@ -93,7 +93,16 @@ export const getDeviceToolContext = internalQuery
 
 const vCreateResult = v.union(
     v.object({ callId: v.string() }),
-    v.object({ error: v.union(v.literal("busy"), v.literal("ineligible"), v.literal("input_too_large"), v.literal("offline"), v.literal("rate_limited")) }),
+    v.object({
+        error: v.union(
+            v.literal("busy"),
+            v.literal("ineligible"),
+            v.literal("input_too_large"),
+            v.literal("offline"),
+            v.literal("outdated"),
+            v.literal("rate_limited"),
+        ),
+    }),
 );
 
 /**
@@ -131,6 +140,10 @@ export const createDeviceCall = internalMutation
 
         if (!isDeviceInScope(device, await resolveThreadProject(ctx, thread, userId, [device]))) {
             return { error: "ineligible" as const };
+        }
+
+        if (isDeviceOutdated(device)) {
+            return { error: "outdated" as const };
         }
 
         const { now } = ctx;
