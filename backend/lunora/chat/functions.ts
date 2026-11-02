@@ -27,6 +27,7 @@ import {
     type SystemOptimizerStyle,
     type UserOptimizerStyle,
 } from "@neore/ai/prompts/optimizer";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
@@ -1045,6 +1046,12 @@ export const continueThread = authAction
     .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
         const { userId } = context.user;
 
+        const cleanPrompt = stripHiddenText(prompt).text;
+
+        if (cleanPrompt.trim() === "") {
+            throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
+        }
+
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
@@ -1068,7 +1075,7 @@ export const continueThread = authAction
             userId,
         });
 
-        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt });
+        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt: cleanPrompt });
 
         context.log.event("chat.continue_thread", { model });
 

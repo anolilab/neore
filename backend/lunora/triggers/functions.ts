@@ -1,4 +1,5 @@
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -356,6 +357,21 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
 });
 
 /** Create a new trigger */
+/** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
+const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+    if (value === undefined) {
+        return value;
+    }
+
+    const { removed, text } = stripHiddenText(value);
+
+    if (removed > 0 && text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", `${label} is empty after removing hidden characters`);
+    }
+
+    return text as T;
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -448,12 +464,12 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: args.inputTemplate,
+            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
-            systemPrompt: args.systemPrompt,
+            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
             timezone,
             triggerCount: 0,
             type: triggerType,
@@ -559,7 +575,7 @@ export const updateTrigger = authMutation
 
         if (args.model !== undefined) patch.model = args.model;
 
-        if (args.systemPrompt !== undefined) patch.systemPrompt = args.systemPrompt;
+        if (args.systemPrompt !== undefined) patch.systemPrompt = cleanPromptField(args.systemPrompt, "The system prompt");
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
@@ -622,7 +638,7 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
+        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;

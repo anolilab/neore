@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { withUnlockProofBody } from "@neore/client-runtime";
 import type { QueryClient } from "@tanstack/react-query";
@@ -62,7 +63,18 @@ export interface SendMessageEnv extends ChatActionBase {
 }
 
 /** The body of the provider's `sendMessage`: one user turn, local or through the gateway. */
-export const runSendMessage = async (env: SendMessageEnv, text: string, attachments?: PendingAttachment[]) => {
+export const runSendMessage = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[]) => {
+    // Every caller (the composer, voice, a queued prompt) ends here, and the local branch never reaches the server's
+    // filter, so hidden characters leave the text before either branch sees it.
+    const { removed, text } = stripHiddenText(rawText);
+
+    // Only hidden characters is not a message (the server refuses it the same way).
+    if (removed > 0 && text.trim() === "" && !attachments?.length) {
+        useChatUIStore.getState().setIsSubmitting(false);
+
+        return;
+    }
+
     const {
         authGate,
         authHeader,

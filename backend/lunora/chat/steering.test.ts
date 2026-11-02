@@ -148,6 +148,13 @@ describe("steerRun", () => {
         expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "queued", text: "use the other file" }]);
     });
 
+    it("queues the steer without hidden characters, and refuses one made only of them", async () => {
+        const { steerId } = await steer("use\u{E0041}\u{202E} the other file\u{7}");
+
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "queued", text: "use the other file" }]);
+        await expect(steer("\u{E0041}\u{200B} \u{202E}", OWNER, streamId, "second")).rejects.toThrow("There is nothing to send");
+    });
+
     it("queues a repeated steer id once, whether it is still queued or already taken", async () => {
         const { steerId } = await steer("use the other file", OWNER, streamId, "client-steer-1");
 

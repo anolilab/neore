@@ -118,6 +118,25 @@ describe("task model", () => {
     });
 });
 
+describe("hidden characters in a task", () => {
+    const stored = async (taskId: string) => await harness.run(async (ctx: any) => await ctx.db.get("tasks", taskId));
+
+    it("stores the instructions, title and success criteria without them", async () => {
+        const { taskId } = (await as(USER).mutation(
+            createTask as never,
+            definition({ instructions: "Summarise\u{E0069}\u{E0067} the news\u{202E}", successCriteria: "Short\u{E0041}", title: "News\u{E0042}" }) as never,
+        )) as { taskId: string };
+
+        expect(await stored(taskId)).toMatchObject({ instructions: "Summarise the news", successCriteria: "Short", title: "News" });
+    });
+
+    it("refuses instructions that were only hidden characters", async () => {
+        await expect(as(USER).mutation(createTask as never, definition({ instructions: "\u{E0069}\u{E0067}" }) as never)).rejects.toThrow(
+            "Instructions is required",
+        );
+    });
+});
+
 describe("recurring tasks", () => {
     it(`are capped at ${String(MAX_RECURRING_TASKS_PER_USER)} per user, on create and on edit`, async () => {
         for (let index = 0; index < MAX_RECURRING_TASKS_PER_USER; index += 1) {
