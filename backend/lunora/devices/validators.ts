@@ -47,7 +47,7 @@ export const vDeviceManifestTool = v.object({
 
 /**
  * One (agent, folder) pair the user approved on the computer, as its signed manifest offers it
- * (plans/acp-agent-host.md §3): labels and opaque ids, never a path or a command line.
+ * (prisis/plans/neore/acp-agent-host.md §3): labels and opaque ids, never a path or a command line.
  */
 export const vAcpOffer = v.object({
     agentKey: v.string().max(128),

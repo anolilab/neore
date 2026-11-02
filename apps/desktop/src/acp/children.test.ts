@@ -1,5 +1,5 @@
 /**
- * The ledger of an agent's own children (`children.ts`, plans/acp-agent-host.md §4.7): ownership by the spawn call,
+ * The ledger of an agent's own children (`children.ts`, prisis/plans/neore/acp-agent-host.md §4.7): ownership by the spawn call,
  * a byte-budgeted buffer for events that arrive before their card, and a card that ends once.
  */
 import { describe, expect, it } from "vitest";

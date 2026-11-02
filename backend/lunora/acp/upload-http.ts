@@ -1,6 +1,6 @@
 /**
  * The device upload route: `POST /hosts/uploads` to create and `PATCH|HEAD /hosts/uploads/:uploadId` to continue,
- * where a paired computer's main process uploads a file its coding agent wrote (plans/acp-agent-host.md §4.8).
+ * where a paired computer's main process uploads a file its coding agent wrote (prisis/plans/neore/acp-agent-host.md §4.8).
  * The bytes go over TUS to the same handler a browser's upload takes (`lib/upload-route.ts`), for the device's
  * user; what differs is how the caller proves who it is. A device holds no session and no API key, so every request
  * carries a signature under the `upload` domain (`devices/lib/signing.ts`):

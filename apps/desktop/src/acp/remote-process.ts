@@ -1,5 +1,5 @@
 /**
- * A coding agent on a server as an `AgentProcess` (plans/ssh-environments.md §7, S7). The session stack above it
+ * A coding agent on a server as an `AgentProcess` (prisis/plans/neore/ssh-environments.md §7, S7). The session stack above it
  * (JSON-RPC, permissions, turns, the ingest) is the one the computer's own agents use; what differs is where the
  * process runs. `neore-host` on the server owns it, and its stdin, stdout and stderr travel over the connection the
  * server's calls use: this computer's Rust core sends the bytes and tells this module what comes back, as engine

@@ -1,5 +1,5 @@
 /**
- * What a coding-agent command's end means for the thread (plans/acp-agent-host.md §4.1, §4.6), whichever way the
+ * What a coding-agent command's end means for the thread (prisis/plans/neore/acp-agent-host.md §4.1, §4.6), whichever way the
  * call ends: the desktop's signed result, its refusal to run the call, the claim window closing, or the deadline.
  *
  * - `acp_send` accepted: the host holds the prompt, so the turn is `received` (forward only; the host's own

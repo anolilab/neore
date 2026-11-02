@@ -32,7 +32,7 @@ const vHostSessionView = v.object({
 
 /**
  * One session with how its last turn ended, so Continue is offered after a restart or a timeout
- * (plans/acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
+ * (prisis/plans/neore/acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
  * reaper moves the reason from `timeout` to `interrupted` and writes no second reply.
  */
 const vHostSessionDetail = v.object({
@@ -132,7 +132,7 @@ export const getHostSession = authQuery
     });
 
 /**
- * What the runner of a thread can do (plans/provider-capabilities.md §6): the report its host sent for a host
+ * What the runner of a thread can do (prisis/plans/neore/provider-capabilities.md §6): the report its host sent for a host
  * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
  * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
  * stranger learns nothing, not even that the id exists.

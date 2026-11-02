@@ -1,5 +1,5 @@
 /**
- * A coding agent's reply on a paired computer says where the computer is with it (plans/acp-agent-host.md §4.6):
+ * A coding agent's reply on a paired computer says where the computer is with it (prisis/plans/neore/acp-agent-host.md §4.6):
  * "Sending" until the computer has received the turn, "Working" only once the agent has started, and nothing
  * that looks like the agent at work before the computer has acknowledged anything. The body is read the way every
  * viewer without a gateway token reads it: the persisted stream, which carries `hostState`.

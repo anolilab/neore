@@ -1,5 +1,5 @@
 /**
- * Sends one imported session to the backend (`POST /hosts/ingest`, plans/acp-agent-host.md S6): `import_open` first,
+ * Sends one imported session to the backend (`POST /hosts/ingest`, prisis/plans/neore/acp-agent-host.md S6): `import_open` first,
  * which makes the thread or finds the one that is already there; then the turns in batches, each claimed by its
  * position (`firstSeq`), as a live turn's events are; then `import_end`.
  *

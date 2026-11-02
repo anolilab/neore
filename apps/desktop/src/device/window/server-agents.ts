@@ -1,5 +1,5 @@
 /**
- * The coding agents of one server, in the local window (plans/ssh-environments.md §7, S7). The agent's command is a path ON
+ * The coding agents of one server, in the local window (prisis/plans/neore/ssh-environments.md §7, S7). The agent's command is a path ON
  * the server and a folder is one of the folders shared for it; both are decided here, by the person, and nowhere else.
  * Pure text helpers first, so what the person is asked to confirm is tested; the DOM follows.
  */

@@ -1,5 +1,5 @@
 /**
- * What an agent's `session/update` says about its children (plans/acp-agent-host.md §4.7), as the ledger takes it
+ * What an agent's `session/update` says about its children (prisis/plans/neore/acp-agent-host.md §4.7), as the ledger takes it
  * (`children.ts`). Pure, so the session and the buffer measurement (`child-buffer.ts`) read the same wire the same way.
  */
 import type { ChildInput } from "./children";

@@ -1,4 +1,4 @@
-"""Dictation spike benchmark (plans/desktop-dictation.md S1): run whisper.cpp models over the
+"""Dictation spike benchmark (prisis/plans/neore/desktop-dictation.md S1): run whisper.cpp models over the
 fixed clips and report size, time, peak memory, CPU and accuracy (word error rate, or
 character error rate for ja/zh).
 

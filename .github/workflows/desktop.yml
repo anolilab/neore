@@ -247,7 +247,7 @@ jobs:
             - name: "Write the host checksum manifest"
               run: "pnpm --filter @neore/desktop run host-bundle manifest"
 
-            # On-device dictation (plans/desktop-dictation.md): whisper.cpp at its pinned commit, built for each architecture the
+            # On-device dictation (prisis/plans/neore/desktop-dictation.md): whisper.cpp at its pinned commit, built for each architecture the
             # app ships. Linux builds on the oldest runner it ships from and fails if the helper needs a newer glibc than that.
             # Windows builds both: arm64 with clang-cl, cross-built on this x64 runner (`dictation-desktop.yml` builds it the same
             # way on every pull request). The Intel macOS app ships without a helper.

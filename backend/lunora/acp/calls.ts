@@ -1,5 +1,5 @@
 /**
- * The clock on a coding-agent command (plans/acp-agent-host.md §4.1). Live queries do not re-run as time passes, so
+ * The clock on a coding-agent command (prisis/plans/neore/acp-agent-host.md §4.1). Live queries do not re-run as time passes, so
  * every deadline here is a scheduled check on one call: `createAcpCall` schedules the first at the end of the
  * claim window and each claim schedules one at the end of its lease. A check reads the call as it is now and does
  * only what is due, so a check that outlived its reason does nothing.

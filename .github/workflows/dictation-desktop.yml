@@ -1,4 +1,4 @@
-# On-device dictation on every OS the desktop ships to (plans/desktop-dictation.md, S4): builds the real
+# On-device dictation on every OS the desktop ships to (prisis/plans/neore/desktop-dictation.md, S4): builds the real
 # whisper.cpp helper with `apps/desktop/scripts/build-dictation-helper.mjs`, then runs the S2 acceptance tests on
 # each runner — the dictation unit and integration suites, the helper itself on a spoken clip, and the Electron
 # end-to-end suite (network blocked, checksum mismatch, killed helper, no audio on disk, microphone only for the

@@ -1,5 +1,5 @@
 /**
- * Messages that reach this computer before their session is open (plans/acp-agent-host.md §4.6).
+ * Messages that reach this computer before their session is open (prisis/plans/neore/acp-agent-host.md §4.6).
  *
  * A phone can send just after it started a session, and the relay can claim the `acp_send` before the `acp_start`
  * it follows. The command is acknowledged once its receipt is on disk (`commands.ts`), and is carried out when the
