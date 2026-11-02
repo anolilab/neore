@@ -43167,6 +43167,9 @@
                           },
                           "skill": {
                             "properties": {
+                              "baseSlug": {
+                                "type": "string"
+                              },
                               "description": {
                                 "type": "string"
                               },
@@ -43208,6 +43211,7 @@
                               }
                             },
                             "required": [
+                              "baseSlug",
                               "description",
                               "disabledTools",
                               "droppedTools",
@@ -43289,6 +43293,12 @@
                       },
                       "type": "array"
                     },
+                    "existingSlugs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "name": {
                       "type": "string"
                     },
@@ -43306,6 +43316,7 @@
                   "required": [
                     "description",
                     "entries",
+                    "existingSlugs",
                     "name",
                     "skillSlotsLeft"
                   ],

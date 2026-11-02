@@ -428,14 +428,20 @@ export const pickGuide = <T extends Pickable>(guides: ReadonlyArray<T>, headSha:
 /** The characters of a reply read in looking for the answer, summed over every candidate start. */
 const MAX_JSON_SCAN_CHARS = 4_000_000;
 
+/**
+ * The longest answer the search can return, and what unmatched braces may cost once an answer is found. An object longer than
+ * this is not read as closed, so a reply full of unmatched braces costs this much once, not once per brace.
+ */
+const MAX_ANSWER_CHARS = 300_000;
+
 const BRACE_STEP: Readonly<Record<string, number>> = { "{": 1, "}": -1 };
 
 /** The end of the JSON object that opens at `start`, or -1: strings and escapes are skipped, so a brace inside text does not count. */
-const objectEnd = (source: string, start: number): number => {
+const objectEnd = (source: string, start: number, limit: number = source.length): number => {
     let depth = 0;
     let inString = false;
 
-    for (let index = start; index < source.length; index += 1) {
+    for (let index = start; index < Math.min(limit, source.length); index += 1) {
         const char = source[index];
 
         if (inString) {
@@ -464,23 +470,41 @@ const hasStops = (value: unknown): boolean => typeof value === "object" && value
  * The JSON object a coding agent answered with, out of whatever text surrounds it (prose, a fenced block): the LAST
  * object that has a `stops` array. The transcript can echo text a pull request planted, and an agent that echoes a diff
  * has any number of braces before its answer, so the scan runs from the end and the first hit is the agent's last word.
- * Objects nested in the answer are met first and skipped, because only the top level has `stops`. `null` when there is
- * none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
+ * An object nested in the answer that also has `stops` is met first, then replaced by the answer enclosing it. `null`
+ * when there is none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount,
+ * and an answer up to {@link MAX_ANSWER_CHARS} is read whole however much sits inside it.
  */
-export const extractJsonObject = (reply: string): unknown => {
+export const extractJsonObject = (reply: string, stats?: { scanned: number }): unknown => {
     let budget = MAX_JSON_SCAN_CHARS;
+    // What unmatched braces may still cost once an answer is found. Objects that close are charged to `budget` only: the
+    // enclosing answer and the objects nested in it are read to look for it, and must not eat the allowance meant for strays.
+    let unmatchedBudget = Infinity;
+    let found: { end: number; value: unknown } | null = null;
 
-    for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0; from = reply.lastIndexOf("{", from - 1)) {
-        const end = objectEnd(reply, from);
+    for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0 && unmatchedBudget > 0; from = reply.lastIndexOf("{", from - 1)) {
+        const reach = Math.min(budget, found === null ? budget : MAX_ANSWER_CHARS);
+        const end = objectEnd(reply, from, from + reach);
+        const read = (end === -1 ? Math.min(reply.length, from + reach) : end + 1) - from;
 
-        budget -= (end === -1 ? reply.length : end + 1) - from;
+        budget -= read;
 
-        if (end !== -1) {
+        if (end === -1) {
+            unmatchedBudget -= read;
+        }
+
+        if (stats) {
+            stats.scanned += read;
+        }
+
+        // Once an answer is found, only an object that ENCLOSES it can replace it: that is the same answer with the hit
+        // nested inside (`"metadata":{"stops":[]}`), whereas one that ends before it is an earlier, echoed answer.
+        if (end !== -1 && (found === null || end > found.end)) {
             try {
                 const parsed = JSON.parse(reply.slice(from, end + 1)) as unknown;
 
                 if (hasStops(parsed)) {
-                    return parsed;
+                    found = { end, value: parsed };
+                    unmatchedBudget = Math.min(unmatchedBudget, MAX_ANSWER_CHARS);
                 }
             } catch {
                 // Not JSON: try the previous opening brace.
@@ -492,7 +516,7 @@ export const extractJsonObject = (reply: string): unknown => {
         }
     }
 
-    return null;
+    return found?.value ?? null;
 };
 
 /**
