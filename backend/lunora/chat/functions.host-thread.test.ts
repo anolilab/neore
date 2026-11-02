@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { branchThread, generateSummary, getFollowupSuggestions } from "./functions";
+import { branchThread, continueThread, generateSummary, getFollowupSuggestions } from "./functions";
 
 const OWNER = "user-owner";
 
@@ -87,5 +87,13 @@ describe("a host-run thread", () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(branchThread as never, { threadId } as never)).rejects.toMatchObject({
             code: "CONFLICT",
         });
+    });
+});
+
+describe("continueThread", () => {
+    it("refuses a prompt that is empty once the hidden characters are gone, before it touches the thread", async () => {
+        await expect(
+            harness.withIdentity({ userId: OWNER }).action(continueThread as never, { model: "gpt-4o", prompt: "\u{E0041}\u{202E}", threadId } as never),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });

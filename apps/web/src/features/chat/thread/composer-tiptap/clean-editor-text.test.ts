@@ -34,6 +34,19 @@ describe(cleanEditorText, () => {
         expect(editor.getText({ blockSeparator: "\n" })).toBe("hi there\nx");
     });
 
+    it("is not an undo step of its own: Undo reverses the person's edit, not the cleanup", () => {
+        const editor = editorWith("<p>hi\u{E0041} there</p>");
+        let history: unknown;
+
+        editor.on("transaction", ({ transaction }) => {
+            history = transaction.getMeta("addToHistory");
+        });
+
+        cleanEditorText(editor);
+
+        expect(history).toBe(false);
+    });
+
     it("empties a document that held nothing but hidden characters", () => {
         const editor = editorWith("<p>\u{E0041}\u{E0042}</p>");
 

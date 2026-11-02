@@ -47,9 +47,7 @@ export const stripHiddenText = (value: string): { removed: number; text: string 
 
 /** Where each hidden character sits in `value` (UTF-16 offset and length, a tag character is 2 units), in order. */
 export const findHiddenText = (value: string): { index: number; length: number }[] =>
-    value
-        .matchAll(HIDDEN_EXCEPT_LAYOUT)
-        .map((match) => {
-            return { index: match.index, length: match[0].length };
-        })
-        .toArray();
+    // Array.from, not the iterator helpers (`.map().toArray()`): Safari < 18.4, Chrome < 122 and Firefox < 131 lack them.
+    Array.from(value.matchAll(HIDDEN_EXCEPT_LAYOUT), (match) => {
+        return { index: match.index, length: match[0].length };
+    });

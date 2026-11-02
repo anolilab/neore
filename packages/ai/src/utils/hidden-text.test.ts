@@ -90,4 +90,19 @@ describe("findHiddenText", () => {
             { index: 4, length: 1 },
         ]);
     });
+
+    it("works where iterator helpers do not exist (Safari < 18.4, Chrome < 122, Firefox < 131)", () => {
+        const prototype = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())) as { map?: unknown; toArray?: unknown };
+        const saved = { map: prototype.map, toArray: prototype.toArray };
+
+        delete prototype.map;
+        delete prototype.toArray;
+
+        try {
+            expect(findHiddenText("a\u{E0041}b")).toEqual([{ index: 1, length: 2 }]);
+        } finally {
+            prototype.map = saved.map;
+            prototype.toArray = saved.toArray;
+        }
+    });
 });

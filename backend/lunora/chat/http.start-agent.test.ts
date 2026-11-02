@@ -13,6 +13,7 @@ import { switchThreadAgentHandler } from "./agent-switch";
 import { runChatStart } from "./http";
 
 const savedPrompts: unknown[] = [];
+const createdThreads: { language?: string }[] = [];
 
 vi.mock("../auth/lib/helper", () => {
     return {
@@ -96,6 +97,12 @@ const fakeContext = (): any => {
                 streamingConfigs.push(args.streamingConfig);
 
                 return "stream-1";
+            }
+
+            if (reference.__lunoraRef === "chat_functions:createThreadWithInitialMessage") {
+                createdThreads.push(args);
+
+                return { messageId: "m-new", threadId: "t-new" };
             }
 
             if (reference.__lunoraRef === "agent_branches:setActiveLeaf") {
@@ -260,5 +267,14 @@ describe("/chat/start hidden characters", () => {
         expect(saved).toContain("title");
         expect(saved).not.toContain("\u{E0041}");
         expect(saved).not.toContain("\u{202E}");
+    });
+
+    it("strips the language stored on a new thread", async () => {
+        createdThreads.length = 0;
+
+        const response = await start({ language: "en\u{E0041}\u{202E}glish", prompt: "hi", threadId: undefined });
+
+        expect(response.status).toBe(200);
+        expect(createdThreads.map((created) => created.language)).toStrictEqual(["english"]);
     });
 });

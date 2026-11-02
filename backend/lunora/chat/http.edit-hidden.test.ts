@@ -75,11 +75,16 @@ const context = () =>
         },
     }) as never;
 
-const edit = async (text: string): Promise<Response> =>
+const edit = async (text: string | string[]): Promise<Response> =>
     await editMessageHttpAction(
         context(),
         new Request("https://example.test/chat/edit", {
-            body: JSON.stringify({ content: [{ text, type: "text" }], messageId: MESSAGE_ID }),
+            body: JSON.stringify({
+                content: [text].flat().map((part) => {
+                    return { text: part, type: "text" };
+                }),
+                messageId: MESSAGE_ID,
+            }),
             method: "POST",
         }),
     );
@@ -107,5 +112,12 @@ describe("editMessageHttpAction hidden characters", () => {
         expect(state.saved).toStrictEqual([]);
         expect(state.enqueued).toStrictEqual([]);
         expect(state.charges).toBe(0);
+    });
+
+    it("drops a blank text part and keeps the edit when another part has text", async () => {
+        const response = await edit(["\u{E0041}\u{202E}", "fix this"]);
+
+        expect(response.status).toBe(200);
+        expect(state.saved[0]?.message.content).toStrictEqual([{ text: "fix this", type: "text" }]);
     });
 });

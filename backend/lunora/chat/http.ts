@@ -426,6 +426,12 @@ const withoutHiddenText = (body: ChatStartBody): ChatStartBody => {
         ...(body.prompt !== undefined && { prompt: cleaned(body.prompt) as string }),
         ...(body.customSystemPrompt !== undefined && { customSystemPrompt: cleaned(body.customSystemPrompt) as string }),
         ...(body.negativePrompt !== undefined && { negativePrompt: cleaned(body.negativePrompt) as string }),
+        // Stored on a new thread and interpolated into the system prompt; the other strings are model options.
+        ...(body.language !== undefined && { language: cleaned(body.language) as string }),
+        ...(body.style !== undefined && { style: cleaned(body.style) as string }),
+        ...(body.quality !== undefined && { quality: cleaned(body.quality) as string }),
+        ...(body.imageSize !== undefined && { imageSize: cleaned(body.imageSize) as string }),
+        ...(body.searchMode !== undefined && { searchMode: cleaned(body.searchMode) as string }),
         ...(goal !== undefined && { goal: cleanGoal }),
         ...(pageContext !== undefined && { pageContext: cleanPageContext }),
     };
@@ -1173,6 +1179,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         }
 
         // Add text and other content parts
+        let droppedHiddenOnlyText = false;
+
         for (const part of content) {
             switch (part.type) {
                 case "file": {
@@ -1197,11 +1205,11 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     // The edit is a prompt like any other: the composer strips, and this is the check no client can skip.
                     const { removed, text } = stripHiddenText(String(part.text ?? ""));
 
+                    // A text part that was only hidden characters is dropped; the edit is refused below only when nothing else is left.
                     if (removed > 0 && text.trim() === "") {
-                        return Response.json(
-                            { error: "The prompt is empty after removing hidden characters" },
-                            { headers: { "Content-Type": "application/json" }, status: 400 },
-                        );
+                        droppedHiddenOnlyText = true;
+
+                        break;
                     }
 
                     messageContent.push({ text, type: "text" });
@@ -1213,6 +1221,13 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     break;
                 }
             }
+        }
+
+        if (droppedHiddenOnlyText && messageContent.length === 0) {
+            return Response.json(
+                { error: "The prompt is empty after removing hidden characters" },
+                { headers: { "Content-Type": "application/json" }, status: 400 },
+            );
         }
 
         // Only a prompt can be edited. The edit is saved as a SIBLING of the

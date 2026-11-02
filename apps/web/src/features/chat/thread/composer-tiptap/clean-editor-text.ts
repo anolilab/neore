@@ -28,5 +28,6 @@ export const cleanEditorText = (editor: Editor): void => {
         tr.delete(from, to);
     }
 
-    editor.view.dispatch(tr.setMeta("preventUpdate", true));
+    // Not undoable on its own: Undo must reverse the person's edit, not this cleanup.
+    editor.view.dispatch(tr.setMeta("preventUpdate", true).setMeta("addToHistory", false));
 };
