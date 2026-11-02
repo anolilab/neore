@@ -118,8 +118,8 @@ const idleWorker = async (toolCallId = "call-1"): Promise<string> => {
     return admitted.run.childThreadId!;
 };
 
-const message = async (workerId: string, clientId: string, userId = OWNER) =>
-    await as(userId).mutation(dispatchToWorker as never, { clientId, message: "Next question", workerId } as never);
+const message = async (workerId: string, clientId: string, userId = OWNER, text = "Next question") =>
+    await as(userId).mutation(dispatchToWorker as never, { clientId, message: text, workerId } as never);
 
 /** A message the lead sent through its tool: the run is owed a post-back, which a typed one is not. */
 const dispatchAsLead = async (workerId: string, toolCallId: string) =>
@@ -168,6 +168,23 @@ describe("dispatchToWorker", () => {
             task: "Next question",
         });
         expect(jobsQueueMessages.filter((queued) => queued.body.functionPath.includes("runSubAgent"))).toHaveLength(1);
+    });
+
+    it("hands the worker the message without tag or bidi characters", async () => {
+        const workerId = await idleWorker();
+
+        await message(workerId, "client-1", OWNER, "Next\u{E0069}\u{E0067} question\u{202E}");
+
+        const rows = await runRows();
+
+        expect(rows[1]).toMatchObject({ task: "Next question" });
+    });
+
+    it("refuses a message that was only hidden characters, and starts nothing", async () => {
+        const workerId = await idleWorker();
+
+        await expect(message(workerId, "client-1", OWNER, "\u{E0069}\u{E0067}")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(await runRows()).toHaveLength(1);
     });
 
     it("returns the same run for the same clientId, starting and enqueuing nothing more", async () => {

@@ -7,6 +7,7 @@
  * This is separate from the thread/message data which comes directly from Lunora.
  */
 
+import { stripHiddenText } from "@neore/ai/utils";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
@@ -97,6 +98,8 @@ interface ChatUIStore {
 
     // Banned content error returned by the server — restores composer text + shows inline error
     composerBannedContent: { message: string; words: string[] } | null;
+    /** Hidden characters (tag block, bidi controls, ...) taken out of the draft since it was last empty; drives the composer's notice. */
+    composerHiddenRemoved: number;
     // Composer state
     composerText: string;
     copiedMessageId: string | null;
@@ -112,9 +115,11 @@ interface ChatUIStore {
     isCanvasOpen: boolean;
     // Submission state (to prevent suggestions from opening between submit and streaming)
     isSubmitting: boolean;
+    // Composer actions
+    noteComposerHiddenRemoved: (count: number) => void;
+
     // Canvas/Artifact actions
     openCanvas: (documentId: string) => void;
-
     removeAttachedReference: (id: string) => void;
     removeAttachment: (id: string) => void;
     removeEditAttachment: (id: string) => void;
@@ -126,17 +131,16 @@ interface ChatUIStore {
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
     setAttachedReferences: (references: ReferenceSelection[]) => void;
-    setCanvasDirty: (dirty: boolean) => void;
 
+    setCanvasDirty: (dirty: boolean) => void;
     setCanvasEditMode: (mode: "edit" | "preview") => void;
+
     setCanvasHistoryVersions: (versions: [number, number] | null) => void;
 
     setCanvasViewMode: (mode: "editor" | "history") => void;
 
     // Banned content actions
     setComposerBannedContent: (value: { message: string; words: string[] } | null) => void;
-
-    // Composer actions
     setComposerText: (text: string) => void;
 
     setCopiedMessageId: (id: string | null) => void;
@@ -185,6 +189,7 @@ const initialState = {
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
+    composerHiddenRemoved: 0,
     composerText: "",
     copiedMessageId: null as string | null,
     editAttachments: [] as PendingAttachment[],
@@ -246,6 +251,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                         attachedReferences: [],
                         composerAttachments: [],
                         composerBannedContent: null,
+                        composerHiddenRemoved: 0,
                         composerText: "",
                     });
                 },
@@ -311,7 +317,12 @@ export const useChatUIStore = create<ChatUIStore>()(
                         return;
                     }
 
-                    set(draft);
+                    // The draft may be raw text from a failed send: it goes through the same filter as typing.
+                    const { removed, text: clean } = stripHiddenText(draft.composerText);
+
+                    set((state) => {
+                        return { ...draft, composerHiddenRemoved: state.composerHiddenRemoved + removed, composerText: clean };
+                    });
                 },
 
                 setActiveDocumentId: (documentId) => {
@@ -350,7 +361,20 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 // Composer actions - synchronous to preserve cursor position
                 setComposerText: (text) => {
-                    set({ composerText: text });
+                    // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter. A joiner at the
+                    // end waits for the next letter (Persian is typed one character at a time); sending strips it.
+                    const { removed, text: clean } = stripHiddenText(text, { keepTrailingJoiner: true });
+
+                    set((state) => {
+                        return { composerHiddenRemoved: clean === "" ? removed : state.composerHiddenRemoved + removed, composerText: clean };
+                    });
+                },
+
+                // Characters taken out of text that never became the draft (a long paste turned into a file).
+                noteComposerHiddenRemoved: (count) => {
+                    set((state) => {
+                        return { composerHiddenRemoved: state.composerHiddenRemoved + count };
+                    });
                 },
 
                 setCopiedMessageId: (id) => {

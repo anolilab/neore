@@ -1,4 +1,5 @@
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -302,12 +303,15 @@ const vGetTriggersOutput = v.array(
         triggerCount: v.number(),
         type: v.string(),
         updatedAt: v.number(),
+        // While a rotation's overlap lasts: when the previous secret stops working. Never the secret itself.
+        webhookPreviousSecretExpiresAt: v.union(v.number(), v.null()),
         webhookSignatureScheme: v.union(vWebhookSignatureScheme, v.null()),
     }),
 );
 
 export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(async ({ ctx: context }): Promise<Infer<typeof vGetTriggersOutput>> => {
     const { userId } = context.user;
+    const { now } = context;
 
     const userTriggers = await context.db
         .query("triggers")
@@ -345,12 +349,29 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             triggerCount: t.triggerCount ?? 0,
             type: t.type,
             updatedAt: t.updatedAt,
+            webhookPreviousSecretExpiresAt:
+                t.webhookPreviousSecret !== undefined && (t.webhookPreviousSecretExpiresAt ?? 0) > now ? (t.webhookPreviousSecretExpiresAt ?? null) : null,
             webhookSignatureScheme: t.type === "webhook" ? (t.webhookSignatureScheme ?? "timestamped") : null,
         };
     });
 });
 
 /** Create a new trigger */
+/** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
+const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+    if (value === undefined) {
+        return value;
+    }
+
+    const { removed, text } = stripHiddenText(value);
+
+    if (removed > 0 && text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", `${label} is empty after removing hidden characters`);
+    }
+
+    return text as T;
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -443,12 +464,12 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: args.inputTemplate,
+            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
-            systemPrompt: args.systemPrompt,
+            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
             timezone,
             triggerCount: 0,
             type: triggerType,
@@ -554,7 +575,7 @@ export const updateTrigger = authMutation
 
         if (args.model !== undefined) patch.model = args.model;
 
-        if (args.systemPrompt !== undefined) patch.systemPrompt = args.systemPrompt;
+        if (args.systemPrompt !== undefined) patch.systemPrompt = cleanPromptField(args.systemPrompt, "The system prompt");
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
@@ -617,7 +638,7 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
+        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;
@@ -729,6 +750,51 @@ export const setTriggerEnabled = authMutation
         }
 
         context.log.event("triggers.set_trigger_enabled", { enabled: args.enabled });
+    });
+
+/** How long a rotation may keep the old secret working, when the owner asks for it. */
+export const WEBHOOK_SECRET_OVERLAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Replaces a webhook trigger's secret. The new secret is returned once, like the first. By default the old one
+ * stops working at once; `keepOldFor24h` leaves it accepted for `WEBHOOK_SECRET_OVERLAP_MS` so a sender can be
+ * updated without a gap. Only one previous secret is kept: rotating again ends any overlap still running.
+ * The URL names the trigger and does not change.
+ */
+export const rotateWebhookSecret = authMutation
+    .use(rateLimit("triggers/update"))
+    .input({
+        keepOldFor24h: v.optional(v.boolean()),
+        triggerId: v.id("triggers"),
+    })
+    .output(v.object({ previousSecretExpiresAt: v.union(v.number(), v.null()), webhookSecret: v.string() }))
+    .mutation(async ({ args, ctx: context }) => {
+        const { userId } = context.user;
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
+
+        if (!trigger || trigger.userId !== userId) {
+            throw new LunoraError("NOT_FOUND", "Trigger not found");
+        }
+
+        if (trigger.type !== "webhook") {
+            throw new LunoraError("BAD_REQUEST", "Only a webhook trigger has a secret");
+        }
+
+        const keepOld = args.keepOldFor24h === true && trigger.webhookSecret !== undefined;
+        const plaintextSecret = crypto.randomUUID();
+        const previousSecretExpiresAt = keepOld ? context.now + WEBHOOK_SECRET_OVERLAP_MS : null;
+
+        // `undefined` removes the previous secret, so a rotation without an overlap leaves none behind.
+        await patchRow(context.db, "triggers", trigger, {
+            updatedAt: context.now,
+            webhookPreviousSecret: keepOld ? trigger.webhookSecret : undefined,
+            webhookPreviousSecretExpiresAt: previousSecretExpiresAt ?? undefined,
+            webhookSecret: await encryptKey(plaintextSecret, "tool-keys"),
+        });
+
+        context.log.event("triggers.rotate_webhook_secret", { overlap: keepOld });
+
+        return { previousSecretExpiresAt, webhookSecret: plaintextSecret };
     });
 
 /**

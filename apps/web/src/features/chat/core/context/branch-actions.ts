@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { withUnlockProofBody } from "@neore/client-runtime";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
@@ -218,7 +219,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
 };
 
 /** The body of the provider's `editMessage`: replaces the user message `messageId` and answers the new text as a sibling branch. */
-export const runEditMessage = async (env: EditMessageEnv, messageId: string, newText: string) => {
+export const runEditMessage = async (env: EditMessageEnv, messageId: string, rawText: string) => {
     const {
         authHeader,
         handleError,
@@ -240,6 +241,14 @@ export const runEditMessage = async (env: EditMessageEnv, messageId: string, new
     setError(null);
 
     if (!threadId || !isAuthenticated) {
+        return;
+    }
+
+    // The local branch never reaches the server's filter, so hidden characters leave the edit before either branch sees it.
+    const { removed, text: newText } = stripHiddenText(rawText);
+
+    // Only hidden characters is not a message (the server refuses it the same way).
+    if (removed > 0 && newText.trim() === "") {
         return;
     }
 
