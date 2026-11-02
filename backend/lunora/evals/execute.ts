@@ -278,7 +278,8 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
     let faithfulness: JudgeVerdict | undefined;
 
     try {
-        const rules = await loadModelFilterRules(ctx, userId);
+        // Only a judge needs the rules: a case with none is scored by its checks even when the read would fail.
+        const rules = claim.judgeEnabled ? await loadModelFilterRules(ctx, userId) : {};
         const wantsCorrectness = claim.judgeEnabled && (claim.datasetKind === "agent" || claim.expectedAnswer !== undefined || claim.rubric !== undefined);
 
         if (wantsCorrectness) {
