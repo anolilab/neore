@@ -48,6 +48,7 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
+import { cleanEditorText } from "./clean-editor-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
@@ -311,7 +312,8 @@ const ComposerTiptapEditor = ({
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {
             isInternalUpdate.current = true;
-            const text = ed.getText({ blockSeparator: "\n" });
+            // Reads the raw text (the store counts what it removes), then cleans the document itself.
+            const text = cleanEditorText(ed);
 
             onChange(text);
             // Reset flag after microtask

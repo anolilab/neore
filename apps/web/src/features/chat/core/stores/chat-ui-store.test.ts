@@ -58,4 +58,26 @@ describe("setComposerText hidden characters", () => {
 
         expect(useChatUIStore.getState().composerHiddenRemoved).toBe(0);
     });
+
+    it("still reports what was removed when the draft is left empty by it", () => {
+        useChatUIStore.getState().setComposerText("\u{E0041}\u{E0042}");
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(2);
+    });
+
+    it("adds characters removed from a paste that became a file", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}");
+        useChatUIStore.getState().noteComposerHiddenRemoved(4);
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(5);
+    });
+
+    it("does not count the same characters again when the cleaned text comes back", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}b");
+        useChatUIStore.getState().setComposerText("ab");
+        useChatUIStore.getState().setComposerText("abc");
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(1);
+    });
 });

@@ -727,7 +727,7 @@ const ComposerInput = ({
             }
 
             // Check for long text content
-            const pastedText = stripHiddenText(e.clipboardData.getData("text/plain")).text;
+            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(e.clipboardData.getData("text/plain"));
 
             if (pastedText) {
                 const lines = pastedText.split("\n").length;
@@ -736,6 +736,10 @@ const ComposerInput = ({
                 // Auto-convert if text is long (>500 chars or >10 lines)
                 if (chars > 500 || lines > 10) {
                     e.preventDefault();
+
+                    if (pasteRemoved > 0) {
+                        useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+                    }
 
                     // Create text file attachment
                     const blob = new Blob([pastedText], { type: "text/plain" });

@@ -140,6 +140,7 @@ interface ChatUIStore {
     setComposerBannedContent: (value: { message: string; words: string[] } | null) => void;
 
     // Composer actions
+    noteComposerHiddenRemoved: (count: number) => void;
     setComposerText: (text: string) => void;
 
     setCopiedMessageId: (id: string | null) => void;
@@ -358,7 +359,12 @@ export const useChatUIStore = create<ChatUIStore>()(
                     // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter.
                     const { removed, text: clean } = stripHiddenText(text);
 
-                    set({ composerHiddenRemoved: clean === "" ? 0 : get().composerHiddenRemoved + removed, composerText: clean });
+                    set({ composerHiddenRemoved: clean === "" ? removed : get().composerHiddenRemoved + removed, composerText: clean });
+                },
+
+                // Characters taken out of text that never became the draft (a long paste turned into a file).
+                noteComposerHiddenRemoved: (count) => {
+                    set({ composerHiddenRemoved: get().composerHiddenRemoved + count });
                 },
 
                 setCopiedMessageId: (id) => {
