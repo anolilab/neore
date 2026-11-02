@@ -621,8 +621,10 @@ describe("a run the watchdog reads wrongly", () => {
         expect(afterStuck.expiresAt).toBeLessThan(Date.now());
     });
 
-    it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
+    /** The run saved its final assistant row (the content given) and then its worker died before it could close the run. */
+    const dieAfterSavingFinalRow = async (content: unknown[]) => {
         await startRunThatDiesInStepTwo();
+
         // The same reply as the saved step: it shares its order.
         const last = await harness.run(async (ctx: any) => {
             const rows = await ctx.db
@@ -633,13 +635,12 @@ describe("a run the watchdog reads wrongly", () => {
             return rows.at(-1);
         });
 
-        await insertRow({
-            message: { content: [{ text: "All done.", type: "text" }], role: "assistant" },
-            order: last.order,
-            stepOrder: last.stepOrder + 1,
-            text: "All done.",
-        });
+        await insertRow({ message: { content, role: "assistant" }, order: last.order, stepOrder: last.stepOrder + 1, text: "All done." });
         await patchStream({ beatAt: deadBeat() });
+    };
+
+    it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
 
         expect(await inspect()).toStrictEqual({ kind: "finished" });
         expect(enqueued).toHaveLength(0);
@@ -647,6 +648,58 @@ describe("a run the watchdog reads wrongly", () => {
 
         expect(state230.streamStatus).toBe("done");
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {
+        await dieAfterSavingFinalRow([
+            { input: { query: "q" }, providerExecuted: true, toolCallId: "ws-1", toolName: "web_search", type: "tool-call" },
+            { output: { value: "found" }, toolCallId: "ws-1", toolName: "web_search", type: "tool-result" },
+            { text: "All done.", type: "text" },
+        ]);
+
+        expect(await inspect()).toStrictEqual({ kind: "finished" });
+    });
+
+    it("still refuses a row whose tool call has no result", async () => {
+        await dieAfterSavingFinalRow([{ input: {}, toolCallId: "t-1", toolName: "echo", type: "tool-call" }]);
+
+        expect(await inspect()).toMatchObject({ kind: "fail" });
+    });
+
+    it("hands a finished goal round to its review exactly once, and the goal keeps the thread", async () => {
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "test-model" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 2_000_000,
+                    maxRounds: 5,
+                    promptMessageId: ids.messageId,
+                    round: 0,
+                    startMessageId: ids.messageId,
+                    status: "active",
+                    text: "Say hello",
+                    threadId: ids.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        expect(await inspect()).toStrictEqual({ kind: "finished" });
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.args).toStrictEqual({ goalId, round: 1 });
+
+        const state = await readState();
+
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("running");
+
+        // The stream is closed: another look finds nothing to do, and nothing is queued twice.
+        expect(await inspect()).toStrictEqual({ kind: "gone" });
+        expect(enqueued).toHaveLength(1);
     });
 
     it("ends quietly, not in error, when a newer reply took the thread", async () => {

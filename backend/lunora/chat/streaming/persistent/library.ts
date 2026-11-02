@@ -812,7 +812,7 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
 };
 
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
-export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">): Promise<void> => {
+export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, options: { holdThread?: boolean } = {}): Promise<void> => {
     await recordPausedRunUsage(ctx, stream);
     // No run will take a follow-up typed during the pause: its text goes, as on every other end of a stream.
     const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
@@ -824,7 +824,8 @@ export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStre
         where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId },
     });
 
-    if (page.every((other) => other._id === stream._id) && !(await hasLiveEdit(ctx, stream.threadId as Id<"threads">))) {
+    // `holdThread`: a goal owns the thread's status until it ends, as after a run that finished itself.
+    if (!options.holdThread && page.every((other) => other._id === stream._id) && !(await hasLiveEdit(ctx, stream.threadId as Id<"threads">))) {
         await patchThread(ctx.db, stream.threadId as Id<"threads">, { status: "active", updatedAt: ctx.now });
     }
 };

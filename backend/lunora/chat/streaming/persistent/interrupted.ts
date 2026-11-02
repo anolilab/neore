@@ -13,7 +13,9 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internal } from "../../../_generated/internal";
 import { internalMutation } from "../../../_generated/server";
+import { enqueueJob } from "../../../lib/job-queue";
 import { patchRow } from "../../../lib/patch";
+import { activeGoalsOf } from "../../goals/rows";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, RUN_WATCH_RETRY, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
@@ -162,6 +164,22 @@ const replyEndOf = async (ctx: { db: Record<string, any> }, stream: Doc<"persist
     return page.some((other) => other._id === stream._id) ? Math.min(...newer.map((other) => other._creationTime)) : 0;
 };
 
+/**
+ * Whether an assistant row holds a tool call that was NOT answered in the same row. A tool the provider runs itself (web
+ * search and the like) keeps both its call and its result in the row, so it is a complete answer, not a call waiting for
+ * a result row.
+ */
+const callsToolsWithoutResult = (content: unknown): boolean => {
+    if (!Array.isArray(content)) {
+        return false;
+    }
+
+    const parts = content as { toolCallId?: string; type?: string }[];
+    const answered = new Set(parts.filter((part) => part?.type === "tool-result").map((part) => part.toolCallId));
+
+    return parts.some((part) => part?.type === "tool-call" && !answered.has(part.toolCallId));
+};
+
 /** The rows this reply saved since its stream began (every invocation of it), as `settleSavedRows` reads them. */
 const savedRowsOf = async (
     ctx: { db: { get: (table: "messages", id: Id<"messages">) => Promise<Doc<"messages"> | null> } & Record<string, any> },
@@ -186,7 +204,7 @@ const savedRowsOf = async (
             const message = row.message as { content?: unknown; role?: string } | undefined;
 
             return {
-                callsTools: Array.isArray(message?.content) && message.content.some((part: { type?: string }) => part?.type === "tool-call"),
+                callsTools: callsToolsWithoutResult(message?.content),
                 empty: isEmptyPlaceholder(row),
                 id: row._id,
                 order: row.order,
@@ -293,8 +311,17 @@ export const inspectRun = internalMutation
         }
 
         if (plan.action === "finish") {
-            // The answer is saved whole: record it once and close the stream, as a run that ended itself would have.
-            await endPausedRun(ctx, { ...stream, pausedRun });
+            // The answer is saved whole: record it once and close the stream, as a run that ended itself would have. A goal's
+            // run is handed to its review the way the run's own end would (`handOffToGoalReview`): the review job claims its
+            // round, so a repeat does nothing, and the goal keeps the thread's status.
+            const goals = await activeGoalsOf(ctx, threadId);
+            const ownGoal = goals.find((goal) => goal.promptMessageId === stream.messageId);
+
+            await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: goals.length > 0 });
+
+            if (ownGoal) {
+                await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });
+            }
 
             return { kind: "finished" as const };
         }
