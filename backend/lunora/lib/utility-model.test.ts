@@ -60,11 +60,28 @@ describe("pickUtilityModelId", () => {
         expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
     });
 
+    it("refuses a candidate served in a region the user did not allow, unless the gateway pins it to the only allowed one (EU)", () => {
+        // The default is served in the US and EU: with ["EU", "CH"] the gateway uses the default endpoint, so the US is reachable.
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+
     it("refuses a multi-region OpenRouter model when a blocked region is among its regions, since the gateway does not route around it", () => {
         // Every candidate is served in the US among other regions; "any region unblocked" would admit them all.
         expect(pickUtilityModelId({ blockedRegions: ["US"] })).toBeUndefined();
         expect(() => requireUtilityModelId({ blockedRegions: ["US"] })).toThrow(NoAllowedUtilityModelError);
         expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+
+    it("admits a multi-region candidate under blocked regions when the gateway pins it to the EU endpoint and EU is not blocked", () => {
+        // Allowed exactly ["EU"]: the call is served from the EU alone, so the US block does not reach it.
+        const rules = { allowedRegions: ["EU"], blockedRegions: ["US"] };
+
+        expect(pickUtilityModelId(rules, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // EU itself blocked: nothing is left; and without the EU pin the US stays reachable.
+        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
     });
 
     it("answers nothing when the rules exclude every candidate", () => {

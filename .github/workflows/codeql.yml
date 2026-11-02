@@ -48,7 +48,7 @@ jobs:
                   files="$(mktemp)"
                   git diff --name-only -z "${BASE_SHA}...HEAD" > "${files}"
 
-                  if grep -qzE '(\.rs$|(^|/)Cargo\.(toml|lock)$)' "${files}"; then
+                  if grep -qzE '(\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.cargo/config(\.toml)?$|(^|/)rust-toolchain(\.toml)?$)' "${files}"; then
                       echo "changed=true" >> "${GITHUB_OUTPUT}"
                   else
                       echo "changed=false" >> "${GITHUB_OUTPUT}"

@@ -249,6 +249,25 @@ describe("main window", () => {
         expect(mainWindow().loaded).toContain(`${SITE}/chat`);
     });
 
+    it("shows the recovery page when the site cannot load or its renderer dies, and ignores a cancelled load", () => {
+        const failed = guardOf(mainWindow(), "did-fail-load") as unknown as (event: unknown, code: number, text: string, url: string, isMainFrame: boolean) => void;
+        const gone = guardOf(mainWindow(), "render-process-gone") as unknown as (event: unknown, details: { reason: string }) => void;
+        const recoveryPages = () => mainWindow().loaded.filter((url) => url.startsWith("data:text/html"));
+
+        failed({}, -3, "ERR_ABORTED", `${SITE}/chat`, true);
+        failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat`, false);
+        gone({}, { reason: "clean-exit" });
+        expect(recoveryPages()).toHaveLength(0);
+
+        failed({}, -105, "ERR_NAME_NOT_RESOLVED", `${SITE}/chat`, true);
+        expect(recoveryPages()).toHaveLength(1);
+        expect(decodeURIComponent(recoveryPages()[0] ?? "")).toContain("Neore could not start");
+
+        gone({}, { reason: "crashed" });
+        expect(recoveryPages()).toHaveLength(2);
+        expect(decodeURIComponent(recoveryPages()[1] ?? "")).toContain("Neore stopped responding");
+    });
+
     it("hands a popup to another origin to the system browser and opens no window", async () => {
         const result = mainWindow().webContents.windowOpen?.({ url: "https://example.org/x" });
 
