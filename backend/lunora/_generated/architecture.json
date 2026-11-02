@@ -3201,11 +3201,6 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
-      "from": "function:coding_agents_execute:createPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -3239,11 +3234,6 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:finishRun",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3306,11 +3296,6 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
-      "from": "function:coding_agents_execute:pollPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3324,11 +3309,6 @@
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:postRunResult"
-    },
-    {
-      "from": "function:coding_agents_execute:reapPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:reapRun",
@@ -15793,6 +15773,13 @@
       "module": "source-control"
     },
     {
+      "detail": "action",
+      "id": "function:source_control_pr_link_retry:retryOpenedPullRequestLink",
+      "kind": "function",
+      "name": "source_control.pr_link_retry.retryOpenedPullRequestLink",
+      "module": "source-control"
+    },
+    {
       "detail": "query",
       "id": "function:source_control_pr_threads:getForThread",
       "kind": "function",
@@ -19784,55 +19771,61 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 140,
+      "line": 139,
       "reason": "\"improvePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 243,
+      "line": 242,
       "reason": "\"optimizeSystemPromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 291,
+      "line": 290,
       "reason": "\"iteratePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 528,
+      "line": 516,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 563,
+      "line": 551,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 630,
+      "line": 618,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 652,
+      "line": 640,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 665,
+      "line": 653,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 684,
+      "line": 672,
+      "reason": "\"runChatStart\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 779,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
@@ -19844,85 +19837,79 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 803,
+      "line": 796,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 808,
+      "line": 805,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 817,
+      "line": 844,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 856,
+      "line": 877,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 889,
+      "line": 895,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 907,
-      "reason": "\"runChatStart\" is not a registered function"
-    },
-    {
-      "file": "chat/http",
-      "kind": "call",
-      "line": 1028,
+      "line": 1016,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1043,
+      "line": 1031,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1052,
+      "line": 1040,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1076,
+      "line": 1064,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1194,
+      "line": 1182,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1202,
+      "line": 1190,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1343,
+      "line": 1331,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1369,
+      "line": 1357,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -22936,6 +22923,12 @@
       "kind": "write",
       "line": 151,
       "reason": "\"markGuideFailed\" is not a registered function"
+    },
+    {
+      "file": "source-control/pr-link-retry",
+      "kind": "call",
+      "line": 35,
+      "reason": "\"recordOpenedPullRequestWithRetry\" is not a registered function"
     },
     {
       "file": "source-control/pr-thread-links",
