@@ -1,6 +1,6 @@
 /**
  * What the settings window can do, against a real model store and settings file in a temp folder and a `fetch` that is only counted.
- * These are the two acceptance checks of prisis/plans/neore/desktop-dictation.md S3: with the switch off nothing is downloaded, and delete removes the file.
+ * These are the two acceptance checks of desktop-dictation.md S3: with the switch off nothing is downloaded, and delete removes the file.
  */
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";

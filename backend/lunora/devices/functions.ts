@@ -441,7 +441,7 @@ export const listPendingDeviceCalls = authQuery
  * Claim-once: the first relay to claim a call runs it; a second window, a
  * stale page or a late claim past the claim window gets `claimed: false`.
  *
- * A coding-agent command is claimed on a lease (prisis/plans/neore/acp-agent-host.md §4.1): one that is not completed in time
+ * A coding-agent command is claimed on a lease (acp-agent-host.md §4.1): one that is not completed in time
  * goes back to `pending` (`acp/calls.ts`) and is claimed again, until its deadline, however long ago it was first
  * taken. The claim window only decides whether it is ever taken.
  */

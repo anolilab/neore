@@ -1,5 +1,5 @@
 /**
- * Remote control of a coding agent against the in-memory harness (prisis/plans/neore/acp-agent-host.md §4.1, §4.4, §4.6, S4):
+ * Remote control of a coding agent against the in-memory harness (acp-agent-host.md §4.1, §4.4, §4.6, S4):
  * the offers a manifest carries, starting a session, sending into one (`sendToHost`), the lease and the clock on
  * a command, the prompt that is cleared, Stop and the permission answers.
  *

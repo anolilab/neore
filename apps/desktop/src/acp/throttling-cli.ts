@@ -1,4 +1,4 @@
-// The hidden-window measurement of prisis/plans/neore/acp-s4-throttling.md, from a machine other than the one under test.
+// The hidden-window measurement of acp-s4-throttling.md, from a machine other than the one under test.
 //
 //   pnpm --filter @neore/desktop exec tsx src/acp/throttling-cli.ts sample 60 > samples.jsonl   (one hour, every 10 s)
 //   pnpm --filter @neore/desktop exec tsx src/acp/throttling-cli.ts report samples.jsonl

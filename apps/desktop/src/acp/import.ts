@@ -1,5 +1,5 @@
 /**
- * Importing the sessions an agent keeps (prisis/plans/neore/acp-agent-host.md S6), from the local window only.
+ * Importing the sessions an agent keeps (acp-agent-host.md S6), from the local window only.
  *
  * - **Only what the agent advertised.** `session/list` is sent only when the handshake said the agent lists
  * sessions, `session/load` only when it said it loads them (`capabilities.ts`, read through the shared rules of

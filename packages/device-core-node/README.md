@@ -62,4 +62,4 @@ cargo fmt --manifest-path packages/device-core-node/Cargo.toml -- --check
   anything that is not a turn post for this paired computer.
 - Desktop main-process calls go through `HostTransport`
   (`apps/desktop/src/device/transport.ts`), not the addon directly.
-- Design and threat model: `prisis/plans/neore/ssh-environments.md`; root `CLAUDE.md`, "Native shell".
+- Design and threat model: `ssh-environments.md`; root `CLAUDE.md`, "Native shell".

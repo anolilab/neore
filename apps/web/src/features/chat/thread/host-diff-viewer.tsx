@@ -2,7 +2,7 @@
 
 /**
  * A host turn's frozen patch as text, one list of lines per file, where lines can be selected and commented on
- * (prisis/plans/neore/acp-agent-host.md §4.9). The patch is the agent's text, so every line is plain text, never Markdown. Each file's
+ * (acp-agent-host.md §4.9). The patch is the agent's text, so every line is plain text, never Markdown. Each file's
  * lines are a multi-select list with a roving tab stop: Arrow keys move, Shift with an arrow extends the selection,
  * Space selects the line, Enter (or the button) opens the comment box, Escape clears. A selection stays in one file
  * and in one hunk: the comment quotes a single hunk header, so extending past the hunk's edge does nothing.

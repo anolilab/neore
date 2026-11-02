@@ -9,7 +9,7 @@ procedure cannot ship without someone having looked at its authorization.
 **Why it matters here more than usual.** A user's rows live on their own
 shard, which `authorizeShard` opens to them and to anyone they granted a thread
 or page — so a collaborator reaches EVERY procedure on the owner's shard, and
-`__root__` is open to all (prisis/plans/neore/per-user-sharding.md). The procedure's own
+`__root__` is open to all (per-user-sharding.md). The procedure's own
 check below is therefore the PRIMARY control.
 Row-level security (next section) sits underneath it as defence in depth: it
 refuses a caller with no connection to a row at all, but does not know which

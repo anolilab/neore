@@ -3,7 +3,7 @@
 A Cloudflare Worker written in **Rust** (workers-rs 0.8.7 and the xberg crate,
 pinned exactly) that extracts text, tables and metadata from PDF, Office,
 spreadsheet, HTML, XML and archive files. Design, measured limits and the layout
-rules xberg applies are in `prisis/plans/neore/document-parser.md` (prisis/plans/neore/document-parser.md);
+rules xberg applies are in `document-parser.md` (document-parser.md);
 user-facing notes in [`docs/services/document-parser.mdx`](../../docs/services/document-parser.mdx).
 
 ## Who calls it

@@ -24,9 +24,9 @@ export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_c
 
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed
- * again until its deadline (prisis/plans/neore/acp-agent-host.md §4.1). The desktop writes its receipt within a second or two
+ * again until its deadline (acp-agent-host.md §4.1). The desktop writes its receipt within a second or two
  * of the claim, so this covers a relay or main process that died in between. A guess, not a measurement: the
- * latency it should be set from is the S4 throttling record (`prisis/plans/neore/acp-s4-throttling.md`).
+ * latency it should be set from is the S4 throttling record (`acp-s4-throttling.md`).
  */
 export const ACP_CLAIM_LEASE_MS = 30_000;
 

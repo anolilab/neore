@@ -1,6 +1,6 @@
 /**
  * What an agent told us at the handshake, as a capability report (`@neore/ai/capabilities`,
- * prisis/plans/neore/provider-capabilities.md §5). Pure, and keyed by what the agent ADVERTISED, never by its name.
+ * provider-capabilities.md §5). Pure, and keyed by what the agent ADVERTISED, never by its name.
  *
  * Only the `sessions` members are mapped so far: they are the ones something here acts on (the import of an
  * agent's saved sessions). A member left out reads as `unknown`, which hides its control; reporting one nothing

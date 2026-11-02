@@ -1,5 +1,5 @@
 /**
- * A worker run on a paired computer's coding agent (prisis/plans/neore/agent-orchestrator.md S5): the dispatch as the existing
+ * A worker run on a paired computer's coding agent (agent-orchestrator.md S5): the dispatch as the existing
  * `acp_send` call, and the reads that tie a run to its host turn. Light on purpose: the `acp` module reads these from
  * the turn's end, and `functions.ts` (which finishes runs) is loaded from there only when a run is actually waiting.
  */

@@ -58,7 +58,7 @@ const { systemPrompt, userPrompt } = buildUserOptimizerPrompt(style, prompt.trim
   _model_ accepts as input (files, images, tools); `capabilities/` is what a
   _runner_ can do. The latter is dependency-free plain data because the web app,
   the desktop main process, the backend and the mobile app all read it
-  (`prisis/plans/neore/provider-capabilities.md`).
+  (`provider-capabilities.md`).
 - **Local model hosts live in `models/local-endpoint.ts`.** `LOCAL_ENDPOINT_HOSTS`
   must agree with the web app's CSP and the backend's loopback validator
   (root `CLAUDE.md`, "Local models").

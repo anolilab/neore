@@ -1,4 +1,4 @@
-// Builds the `neore-host` binaries the desktop uploads to servers (prisis/plans/neore/ssh-environments.md §8) and the manifest
+// Builds the `neore-host` binaries the desktop uploads to servers (ssh-environments.md §8) and the manifest
 // of their SHA-256 checksums, into `host-bundle/`. electron-builder ships that folder as `resources/neore-host`.
 //
 //   node scripts/host-bundle.mjs build <rust-target>...   build, check and copy binaries

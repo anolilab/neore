@@ -1,5 +1,5 @@
 /**
- * The handoff text and its budget (prisis/plans/neore/harness-switch.md, S2): framed as data, quoted, inside the budget on
+ * The handoff text and its budget (harness-switch.md, S2): framed as data, quoted, inside the budget on
  * a realistic long thread, byte-stable, and never cutting a message.
  */
 import { PROMPT_CACHE_COLD_START_TOKENS } from "@neore/ai/models";

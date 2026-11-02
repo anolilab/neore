@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-await-expression-member -- reads a field off a row just awaited */
 /**
- * A thread's agent switched to or from a coding agent on a paired computer (prisis/plans/neore/harness-switch.md, slice S3),
+ * A thread's agent switched to or from a coding agent on a paired computer (harness-switch.md, slice S3),
  * driven against the real schema through the switch's own entry point (`runAgentSwitch`) with a summary call that
  * fails the test if it is ever made: none of these switches summarises, so none charges.
  *
