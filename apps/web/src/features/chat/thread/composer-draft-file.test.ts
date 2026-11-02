@@ -1,6 +1,50 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+
+describe("attachLongPaste", () => {
+    const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
+        const state = { text: draft };
+        const options = {
+            attach: vi.fn(async () => result),
+            discard: vi.fn(),
+            getDraft: () => state.text,
+            onAttached: vi.fn(),
+            onFailure: vi.fn(),
+            pastedText: "PASTED",
+            selection: { end: 6, start: 6 },
+            setDraft: vi.fn((text: string) => {
+                state.text = text;
+            }),
+        };
+
+        return { options, state };
+    };
+
+    it("reports the file and leaves the composer alone when the upload worked", async () => {
+        const { options, state } = setup({ attachmentId: "a1" });
+
+        expect(await attachLongPaste(options)).toBe(true);
+        expect(options.onAttached).toHaveBeenCalledWith("a1");
+        expect(options.onFailure).not.toHaveBeenCalled();
+        expect(state.text).toBe("before after");
+    });
+
+    it("puts the text into the composer at the paste position and reports the error, not the success, when the upload failed", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(await attachLongPaste(options)).toBe(false);
+        expect(state.text).toBe("beforePASTED after");
+        expect(options.discard).toHaveBeenCalledWith("a1");
+        expect(options.onFailure).toHaveBeenCalledWith("Too big");
+        expect(options.onAttached).not.toHaveBeenCalled();
+    });
+
+    it("replaces a selection and clamps an offset past the end", () => {
+        expect(insertPastedText("hello world", "X", 0, 5)).toBe("X world");
+        expect(insertPastedText("abc", "X", 99, 99)).toBe("abcX");
+    });
+});
 
 describe("moveDraftToFile", () => {
     const setup = (result: { attachmentId: string; error?: string }, current = "draft") => {

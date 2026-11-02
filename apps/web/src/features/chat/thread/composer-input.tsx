@@ -61,7 +61,7 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
@@ -779,6 +779,48 @@ const ComposerInput = ({
         });
     }, [attachTextAsFile, removeAttachment, setText]);
 
+    // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
+    const pasteSelection = useCallback((): { end: number; start: number } => {
+        const editor = inputAreaRef.current?.getEditor()?.getEditor();
+
+        if (!editor || editor.isDestroyed) {
+            const { length } = useChatUIStore.getState().composerText;
+
+            return { end: length, start: length };
+        }
+
+        const { doc, selection } = editor.state;
+
+        return {
+            end: doc.textBetween(0, selection.to, "\n").length,
+            start: doc.textBetween(0, selection.from, "\n").length,
+        };
+    }, []);
+
+    // The paste did not land in the draft, so say where it went and let the person take it back.
+    const announcePasteAttached = useCallback(
+        (attachmentId: string, pastedText: string) => {
+            showInfo(t`Long text was attached as a file.`, {
+                action: {
+                    label: t`Undo`,
+                    // The file may have been sent or removed since: then the text is no longer ours to put back.
+                    onClick: () => {
+                        undoLongPaste({
+                            attachmentId,
+                            getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                            getDraft: () => useChatUIStore.getState().composerText,
+                            pastedText,
+                            removeAttachment,
+                            setDraft: setText,
+                        });
+                    },
+                },
+                duration: 8000,
+            });
+        },
+        [removeAttachment, setText, t],
+    );
+
     // Handle paste - auto-convert long text to attachment
     const handlePaste = useCallback(
         async (e: React.ClipboardEvent) => {
@@ -812,29 +854,29 @@ const ComposerInput = ({
             if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
                 e.preventDefault();
 
-                const { attachmentId } = await attachTextAsFile(pastedText);
+                // Read before the upload: the caret moves while it runs.
+                const selection = pasteSelection();
 
-                // The paste did not land in the draft, so say where it went and let the person take it back.
-                showInfo(t`Long text was attached as a file.`, {
-                    action: {
-                        label: t`Undo`,
-                        // The file may have been sent or removed since: then the text is no longer ours to put back.
-                        onClick: () => {
-                            undoLongPaste({
-                                attachmentId,
-                                getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
-                                getDraft: () => useChatUIStore.getState().composerText,
-                                pastedText,
-                                removeAttachment,
-                                setDraft: setText,
-                            });
-                        },
+                await attachLongPaste({
+                    attach: attachTextAsFile,
+                    discard: removeAttachment,
+                    getDraft: () => useChatUIStore.getState().composerText,
+                    onAttached: (attachmentId) => {
+                        announcePasteAttached(attachmentId, pastedText);
                     },
-                    duration: 8000,
+                    // A recognised failure was toasted where it was worded; the text is back in the composer.
+                    onFailure: (error) => {
+                        if (!toastedMessages.has(error)) {
+                            showError(error);
+                        }
+                    },
+                    pastedText,
+                    selection,
+                    setDraft: setText,
                 });
             }
         },
-        [handleFileSelect, attachTextAsFile, removeAttachment, setText, t],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, pasteSelection, removeAttachment, setText],
     );
 
     // Handle text change — clear banned content error when user edits.

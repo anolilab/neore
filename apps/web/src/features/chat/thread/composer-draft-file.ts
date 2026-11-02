@@ -72,3 +72,54 @@ export const undoLongPaste = ({ attachmentId, getAttachmentIds, getDraft, pasted
 
     return true;
 };
+
+/** `text` spliced into `draft` over the offsets `start` to `end`, as a normal paste would; offsets past the end land at the end. */
+export const insertPastedText = (draft: string, text: string, start: number, end: number): string => {
+    const from = Math.min(start, draft.length);
+    const to = Math.min(Math.max(end, from), draft.length);
+
+    return draft.slice(0, from) + text + draft.slice(to);
+};
+
+interface AttachLongPasteOptions {
+    attach: (text: string) => Promise<TextFileResult>;
+    discard: (attachmentId: string) => void;
+    getDraft: () => string;
+    /** Called with the new attachment's id once the text is a file. */
+    onAttached: (attachmentId: string) => void;
+    /** Called with the reason when the text could not become a file; the text is already back in the composer. */
+    onFailure: (error: string) => void;
+    pastedText: string;
+    /** Where the paste landed in the draft, read before the upload started. */
+    selection: { end: number; start: number };
+    setDraft: (text: string) => void;
+}
+
+/**
+ * Moves a pasted text (whose default paste was prevented) into a file. When that fails the text goes into the composer at
+ * the paste position instead and the failed chip goes, so the paste is never in neither place.
+ */
+export const attachLongPaste = async ({
+    attach,
+    discard,
+    getDraft,
+    onAttached,
+    onFailure,
+    pastedText,
+    selection,
+    setDraft,
+}: AttachLongPasteOptions): Promise<boolean> => {
+    const { attachmentId, error } = await attach(pastedText);
+
+    if (error === undefined) {
+        onAttached(attachmentId);
+
+        return true;
+    }
+
+    discard(attachmentId);
+    setDraft(insertPastedText(getDraft(), pastedText, selection.start, selection.end));
+    onFailure(error);
+
+    return false;
+};
