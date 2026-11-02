@@ -25,11 +25,11 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:579
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:579
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
@@ -7375,8 +7375,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:766
-#: src/features/chat/thread/composer-input.tsx:1163
+#: src/features/chat/thread/composer-input.tsx:770
+#: src/features/chat/thread/composer-input.tsx:1167
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -7672,7 +7672,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1185
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -7871,11 +7871,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1188
+#: src/features/chat/thread/composer-input.tsx:1192
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1189
+#: src/features/chat/thread/composer-input.tsx:1193
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -10164,7 +10164,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1369
+#: src/features/chat/thread/composer-input.tsx:1373
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -12073,7 +12073,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1025
+#: src/features/chat/thread/composer-input.tsx:1029
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -12470,7 +12470,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1057
+#: src/features/chat/thread/composer-input.tsx:1061
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -26525,7 +26525,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:984
+#: src/features/chat/thread/composer-input.tsx:988
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -29480,7 +29480,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:457
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -32408,8 +32408,8 @@ msgstr "入力して検索"
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
-#: src/features/chat/thread/composer-input.tsx:1360
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
+#: src/features/chat/thread/composer-input.tsx:1364
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:167
 msgid "Type your message..."
 msgstr "メッセージを入力..."
 
@@ -32798,7 +32798,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1220
+#: src/features/chat/thread/composer-input.tsx:1224
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -32988,12 +32988,12 @@ msgstr "ドキュメントをナレッジベースにアップロードし、コ
 
 #: src/features/chat/thread/composer-input.tsx:403
 #: src/features/chat/thread/composer-input.tsx:603
-#: src/features/chat/thread/composer-input.tsx:1141
+#: src/features/chat/thread/composer-input.tsx:1145
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1134
+#: src/features/chat/thread/composer-input.tsx:1138
 msgid "Upload failed: {0}"
 msgstr ""
 

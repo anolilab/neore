@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { UTILITY_FALLBACK_MODELS } from "../lib/utility-model";
+import { UTILITY_FALLBACK_MODELS, withPaidPlanGrant } from "../lib/utility-model";
 import { createCategoryChat, createTitleChat } from "./functions";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -77,6 +77,22 @@ describe.each([
         await expect(run()).rejects.toThrow(REACHED);
 
         expect(getAgent).toHaveBeenCalledWith(UTILITY_FALLBACK_MODELS[0], expect.anything());
+    });
+
+    it("leaves the platform's own default model unmetered, as it always was", async () => {
+        await expect(run()).rejects.toThrow(REACHED);
+
+        expect(getAgent).toHaveBeenCalledWith(DEFAULT_TITLE_GENERATION_MODEL, expect.objectContaining({ userId: undefined }));
+    });
+
+    it("meters a paid fallback to the user whose plan authorized it", async () => {
+        const paid = "anthropic/claude-haiku-4.5";
+
+        state.rules = withPaidPlanGrant({ allowedModels: [paid] }, true);
+
+        await expect(run()).rejects.toThrow(REACHED);
+
+        expect(getAgent).toHaveBeenCalledWith(paid, expect.objectContaining({ userId: "user-1" }));
     });
 
     it("ends quietly, without reaching any model, when the rules allow none", async () => {

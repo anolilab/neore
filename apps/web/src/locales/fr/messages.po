@@ -25,11 +25,11 @@ msgstr " · modèle : {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# ligne} other {# lignes}}, {1, plural, one {# colonne} other {# colonnes}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:579
 msgid "-- INSERT --"
 msgstr "-- INSERTION --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:579
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -7375,8 +7375,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:766
-#: src/features/chat/thread/composer-input.tsx:1163
+#: src/features/chat/thread/composer-input.tsx:770
+#: src/features/chat/thread/composer-input.tsx:1167
 msgid "Conversion failed"
 msgstr "Échec de la conversion"
 
@@ -7672,7 +7672,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "Impossible d’appliquer les modifications"
 
-#: src/features/chat/thread/composer-input.tsx:1185
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Could not attach the chat"
 msgstr "Impossible de joindre la discussion"
 
@@ -7871,11 +7871,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1188
+#: src/features/chat/thread/composer-input.tsx:1192
 msgid "Could not read that chat"
 msgstr "Impossible de lire cette discussion"
 
-#: src/features/chat/thread/composer-input.tsx:1189
+#: src/features/chat/thread/composer-input.tsx:1193
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossible de lire cette discussion. Si elle est verrouillée, déverrouillez-la d'abord."
 
@@ -10164,7 +10164,7 @@ msgstr "Déposez un fichier ou cliquez pour l’importer"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1369
+#: src/features/chat/thread/composer-input.tsx:1373
 msgid "Drop files here"
 msgstr "Déposez les fichiers ici"
 
@@ -12073,7 +12073,7 @@ msgid "Failed to attach collection"
 msgstr "Impossible de joindre la collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1025
+#: src/features/chat/thread/composer-input.tsx:1029
 msgid "Failed to attach file"
 msgstr "Impossible de joindre le fichier"
 
@@ -12470,7 +12470,7 @@ msgstr "Impossible de demander l’export"
 msgid "Failed to reset to defaults"
 msgstr "Impossible de rétablir les valeurs par défaut"
 
-#: src/features/chat/thread/composer-input.tsx:1057
+#: src/features/chat/thread/composer-input.tsx:1061
 msgid "Failed to restore attachment"
 msgstr "Impossible de restaurer la pièce jointe"
 
@@ -26525,7 +26525,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Note chaque réponse de 0 à 100 % par rapport à la réponse attendue ou à la grille d’évaluation. Ajoute un petit appel de modèle par cas."
 
-#: src/features/chat/thread/composer-input.tsx:984
+#: src/features/chat/thread/composer-input.tsx:988
 msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
@@ -29480,7 +29480,7 @@ msgstr "Suggéré"
 msgid "Suggested answers"
 msgstr "Réponses suggérées"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:457
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion disponible, appuyez sur Flèche droite pour l’accepter"
 
@@ -32408,8 +32408,8 @@ msgstr "Tapez pour rechercher"
 msgid "Type your answer…"
 msgstr "Saisissez votre réponse…"
 
-#: src/features/chat/thread/composer-input.tsx:1360
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
+#: src/features/chat/thread/composer-input.tsx:1364
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:167
 msgid "Type your message..."
 msgstr "Saisissez votre message..."
 
@@ -32798,7 +32798,7 @@ msgstr "Documentation à jour pour n’importe quelle bibliothèque ou framework
 msgid "Update Duration"
 msgstr "Modifier la durée"
 
-#: src/features/chat/thread/composer-input.tsx:1220
+#: src/features/chat/thread/composer-input.tsx:1224
 msgid "Update failed"
 msgstr "Échec de la mise à jour"
 
@@ -32988,12 +32988,12 @@ msgstr "Importez des documents dans votre base de connaissances et regroupez-les
 
 #: src/features/chat/thread/composer-input.tsx:403
 #: src/features/chat/thread/composer-input.tsx:603
-#: src/features/chat/thread/composer-input.tsx:1141
+#: src/features/chat/thread/composer-input.tsx:1145
 msgid "Upload failed"
 msgstr "Échec de l’importation"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1134
+#: src/features/chat/thread/composer-input.tsx:1138
 msgid "Upload failed: {0}"
 msgstr ""
 

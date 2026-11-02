@@ -153,15 +153,7 @@ export const improvePromptHttpAction = async (context: HttpActionCtx, request: R
     } catch (error) {
         chatLogger.error("Error improving prompt:", error);
 
-        const errorMessage = userFacingError(error)?.message ?? "Failed to improve prompt";
-
-        return Response.json(
-            { error: errorMessage },
-            {
-                headers: { "Content-Type": "application/json" },
-                status: 500,
-            },
-        );
+        return respondWithUserError(error, "Failed to improve prompt");
     }
 };
 
@@ -178,7 +170,8 @@ const respondWithUserError = (error: unknown, fallback: string) => {
             );
         }
 
-        return Response.json({ error: userError.message }, { headers: { "Content-Type": "application/json" }, status: 500 });
+        // The refusal's own 4xx (a model filter that allows no model, unreadable settings): a 500 reads as transient and is retried.
+        return Response.json({ error: userError.message }, { headers: { "Content-Type": "application/json" }, status: userError.status });
     }
 
     return Response.json({ error: fallback }, { headers: { "Content-Type": "application/json" }, status: 500 });
