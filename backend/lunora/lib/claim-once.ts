@@ -11,7 +11,7 @@
  * | ------------------ | ------------------------ | ----------------------------- | ---------------------------- |
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
- * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` (`gitlab-token`) |
+ * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` (`gitlab-token`), `<triggerId>:sig:<sig hex>` (`native`) | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` |
  * | `watch-webhook`    | `<watchId>:<sig hex>`    | {@link TRIGGER_CLAIM_TTL_MS}   | `source-control/freshness-internal.ts` (a repository webhook: marks it dirty, nothing more) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
@@ -81,7 +81,7 @@ export const AI_DISCLOSURE_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
 
 /**
- * A `gitlab-token` trigger's deliveries (`triggers/http.ts`): GitLab sends no timestamp, so no window ends
+ * A `gitlab-token` or `native` trigger's deliveries (`triggers/http.ts`): neither sender gives a timestamp, so no window ends
  * the replay risk, and the claim must outlast any trigger. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
  * is effectively forever while staying a finite `expiresAt`, so {@link purgeExpiredClaims} still reaps it.
  * It is cleared sooner by {@link releaseClaimsWithPrefix} when the trigger is deleted, and with the account

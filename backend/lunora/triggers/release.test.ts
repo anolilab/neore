@@ -282,14 +282,15 @@ describe("a refused admission gives a gitlab-token claim back", () => {
         expect(await deliver(triggerId)).toBeUndefined();
     });
 
-    it("and leaves another scheme's claim to lapse, as before", async () => {
+    it("and gives a native claim back too, since it never lapses", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
+        expect(first.releaseUnlessRun).toBe(true);
         world.chargeOk = false;
         expect(await admit(first)).toBe(DAILY_LIMIT_MESSAGE);
-        expect(await claims()).toHaveLength(1);
-        expect(await deliver(triggerId, "native")).toBeUndefined();
+        expect(await claims()).toEqual([]);
+        expect(await deliver(triggerId, "native")).toBeDefined();
     });
 });
 
@@ -335,14 +336,14 @@ describe("executeTrigger gives a gitlab-token claim back when the delivery never
         expect(await deliver(triggerId)).toBeUndefined();
     });
 
-    it("and does not release the claim of another scheme", async () => {
+    it("and releases a native claim the same way", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
         await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false }));
         await execute(first);
 
-        expect(await claims()).toHaveLength(1);
+        expect(await claims()).toEqual([]);
     });
 });
 
@@ -419,13 +420,14 @@ describe("a release that fails is retried, not dropped", () => {
         expect(await deliver(triggerId, "gitlab-token", { filters: [{ op: "equals", path: "object_kind", value: "merge_request" }] })).toBeDefined();
     });
 
-    it("in the webhook handler: a native trigger's failed release is not retried in the background", async () => {
+    it("in the webhook handler: a native trigger's failed release is retried in the background too", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const filters = [{ op: "equals", path: "object_kind", value: "push" }];
 
         world.releaseFailures = 1;
         expect(await deliver(triggerId, "native", { filters, status: 500 })).toBeUndefined();
-        expect(lastDelivery.jobs).toEqual([]);
+        expect(lastDelivery.jobs).toHaveLength(1);
+        expect(lastDelivery.jobs[0]!.args).toMatchObject({ attempt: 1, scope: TRIGGER_DELIVERY_SCOPE });
     });
 
     it("is idempotent: a second attempt, or one for a claim a newer holder replaced, deletes nothing", async () => {

@@ -266,6 +266,56 @@ describe("trigger webhook signing", () => {
             expect(await replay.json()).toMatchObject({ duplicate: true });
             expect(scheduled).toHaveLength(1);
         });
+        it("still refuses a replay after the 15-minute claim window, and long after, under the same or a fresh delivery id", async () => {
+            const { post, scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+
+            expect(await statusOf(body, await nativeHeaders(body, { "x-github-delivery": "one" }))).toBe(200);
+
+            for (const [elapsed, id] of [
+                [TRIGGER_CLAIM_TTL_MS + 1, "one"],
+                [3 * 24 * 60 * 60 * 1000, "two"],
+                [365 * 24 * 60 * 60 * 1000, "one"],
+            ] as const) {
+                vi.setSystemTime(NOW + elapsed);
+
+                const replay = await post(body, await nativeHeaders(body, { "x-github-delivery": id }));
+
+                expect(await replay.json()).toMatchObject({ duplicate: true });
+            }
+
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("claims the signature for the long TTL in the delivery scope, with no 15-minute claim beside it", async () => {
+            const { scheduled, statusOf, triggerId } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+
+            expect(await statusOf(body, await nativeHeaders(body))).toBe(200);
+
+            const rows: { expiresAt: number; key: string; scope: string }[] = await harness.run(
+                async (ctx: any) => await ctx.db.query("idempotencyClaims").collect(),
+            );
+
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS, scope: TRIGGER_DELIVERY_SCOPE });
+            expect(rows[0]!.key).toMatch(new RegExp(String.raw`^${triggerId}:sig:[\da-f]{64}$`, "u"));
+            expect(scheduled[0]).toMatchObject({ claim: { scope: TRIGGER_DELIVERY_SCOPE }, releaseUnlessRun: true });
+        });
+
+        it("gives the claim back when scheduling fails, so the sender's redelivery runs even after the old window", async () => {
+            const { scheduled, scheduler, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+
+            scheduler.fail = true;
+            expect(await statusOf(body, await nativeHeaders(body))).toBe(500);
+
+            scheduler.fail = false;
+            vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+            expect(await statusOf(body, await nativeHeaders(body))).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
         it("refuses a timestamped delivery on a native trigger", async () => {
             const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
             const body = '{"event":"x"}';
@@ -751,13 +801,18 @@ describe("provider signature schemes", () => {
         });
 
         for (const scheme of ["native", "timestamped"] as const) {
-            it(`does not make a ${scheme} trigger require or record a delivery id`, async () => {
+            it(`does not make a ${scheme} trigger require or key its claim on a delivery id`, async () => {
                 const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, webhookSignatureScheme: scheme });
                 const headers = scheme === "native" ? { "x-hub-signature-256": `sha256=${await hmacHex("{}")}` } : await signedHeaders("{}");
 
                 expect(await statusOf("{}", { ...headers, "x-gitlab-event-uuid": UUID })).toBe(200);
                 expect(scheduled).toHaveLength(1);
-                expect(await records()).toEqual([]);
+
+                const rows = await claims();
+                const keys = rows.map((row) => row.key);
+
+                expect(keys).toHaveLength(1);
+                expect(keys[0]).not.toContain(UUID);
             });
         }
     });

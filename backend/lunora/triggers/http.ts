@@ -26,12 +26,17 @@ import type { HttpActionCtx } from "lunorash/server";
  * signature of the body "<ts>.<body>". (The key is not derived per scheme because
  * a native sender signs with the raw secret.)
  *
- * A native signature carries no timestamp, so the ONLY replay defence is the same
- * signature-keyed claim, and it lasts as long as the claim does:
- * `TRIGGER_CLAIM_TTL_MS`. A body-only request replayed after that window is
- * accepted again. For these two schemes nothing outside the signed bytes (a
- * delivery-id header, say) is ever trusted: it is not covered by the signature, so
- * a claim keyed on it would let anyone replay a captured body under a fresh id.
+ * A native signature carries no timestamp, so the ONLY replay defence is the
+ * signature-keyed claim, and a window would end it: the claim is taken for
+ * `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively for the trigger's life), well past any
+ * provider's redelivery period (GitHub offers "Redeliver" for three days). The gap this
+ * closes: with a 15-minute claim a captured request was accepted again once it lapsed.
+ * The signature binds the exact body, so it is the key. The sender's delivery-id header
+ * (`X-GitHub-Delivery`) is never trusted: it is not covered by the signature, so a claim
+ * keyed on it would let anyone replay a captured body under a fresh id. The price of
+ * keying on the signature is that two byte-identical bodies are one delivery; a delivery
+ * that does not run (filtered, refused at admission, failed before the agent started)
+ * gives its claim back, as for `gitlab-token`, so a redelivery of that one still runs.
  *
  * One more sender, with its own scheme (`triggers/presets.ts`):
  *   gitlab-token: X-Gitlab-Token: <secret>, sent as plain text, plus
@@ -316,6 +321,8 @@ interface Delivery {
 interface SchemeHandler {
     /** The headers this scheme owns. A trigger refuses a request carrying any header of a scheme it does not use. */
     headers: ReadonlyArray<string>;
+    /** The scheme has no timestamp window, so its signature is claimed for the trigger's life (see `requiresDeliveryId` for the release rule). */
+    permanentClaim?: boolean;
     /** Read the credential and the bytes it covers, or say why the request is refused. Timestamps are checked here. */
     read: (headers: Headers, body: Uint8Array) => Delivery | { error: string };
     /**
@@ -348,6 +355,7 @@ const SCHEMES: Record<WebhookSignatureScheme, SchemeHandler> = {
     },
     native: {
         headers: ["x-hub-signature-256"],
+        permanentClaim: true,
         read: (headers, body) => {
             const native = headers.get("x-hub-signature-256");
 
@@ -391,8 +399,8 @@ interface ReplayGuard {
 /**
  * Takes the once-only claim of a verified delivery, or answers `null` when it was taken before. A scheme that
  * requires a delivery id claims it with the body's digest for `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
- * permanent) and gives it back whenever the delivery does not run; the others claim their signature for
- * `TRIGGER_CLAIM_TTL_MS`.
+ * permanent), a `native` one claims its signature for the same time, and both give the claim back whenever the
+ * delivery does not run; a timestamped one claims its signature for `TRIGGER_CLAIM_TTL_MS`.
  */
 const takeReplayGuard = async (
     context: HttpActionCtx,
@@ -406,6 +414,7 @@ const takeReplayGuard = async (
 ): Promise<ReplayGuard | null> => {
     let claimKey: { key: string; scope: string };
     let ttlMs = TRIGGER_CLAIM_TTL_MS;
+    const permanent = scheme.requiresDeliveryId === true || scheme.permanentClaim === true;
 
     if (scheme.requiresDeliveryId) {
         // The handler refused a delivery without one before getting here.
@@ -416,6 +425,10 @@ const takeReplayGuard = async (
         // The body is in the key because GitLab documents that recursive webhooks share one event UUID.
         // The trigger id leads, so deleting the trigger can find its claims.
         claimKey = { key: `${triggerId}:${delivery.deliveryId}:${await sha256Hex(rawBody)}`, scope: TRIGGER_DELIVERY_SCOPE };
+        ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
+    } else if (permanent) {
+        // The trigger id leads, so deleting the trigger can find its claims. "sig" keeps the key apart from a `gitlab-token` one.
+        claimKey = { key: `${triggerId}:sig:${normalizeSignature(delivery.presented)}`, scope: TRIGGER_DELIVERY_SCOPE };
         ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
     } else {
         claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
@@ -429,8 +442,6 @@ const takeReplayGuard = async (
 
     // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
     const claim = { ...claimKey, claimedAt };
-
-    const permanent = scheme.requiresDeliveryId === true;
 
     return {
         args: permanent ? { claim, releaseUnlessRun: true } : { claim },
