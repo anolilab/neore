@@ -78,6 +78,7 @@ import { mediaJobStamp } from "./media-abandon";
 import type { FalAudioResponse } from "./lib/fal-media-parsing";
 import { extractFalAudioUrl, resolveFalVideoUrl } from "./lib/fal-media-parsing";
 import { canRunPaidModel, INTERNAL_PREFIX_RE, readRunPlan } from "./lib/agent-run";
+import { loadOptimizerModelRules } from "./lib/optimizer-model-rules";
 import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
 import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
@@ -2654,7 +2655,9 @@ const runOptimizer = async (
         await requireThreadPermissionInAction(context, threadId as Id<"threads">, userId, "read");
     }
 
-    const agent = await getAgent(modelId, { gateway: gatewayFetch(context) });
+    // The caller's own filters, also on a shared thread: the rewrite is theirs and goes to the model they allowed.
+    const modelFilterRules = await loadOptimizerModelRules(context, userId, modelId);
+    const agent = await getAgent(modelId, { gateway: gatewayFetch(context), modelFilterRules });
     const { thread } = threadId
         ? await agent.continueThread(context, { threadId })
         : await agent.createThread(context, { title: "Prompt Optimization", userId });

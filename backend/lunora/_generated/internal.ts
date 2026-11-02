@@ -252,7 +252,7 @@ export interface InternalApiTypes {
         };
         functions: {
             getActiveOrganizationQuery: FunctionReference<"query", { organizationId: string; userId: string }, { id: string; name: string; role: string; slug: string | null } | null>;
-            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean } }>;
+            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }; readFailed?: boolean }>;
             getDecryptedMessengerKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedProviderKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedToolKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;

@@ -20283,6 +20283,12 @@
       "reason": "\"callMCPToolFromAppHttpAction\" is not a registered function"
     },
     {
+      "file": "chat/lib/optimizer-model-rules",
+      "kind": "call",
+      "line": 20,
+      "reason": "\"loadOptimizerModelRules\" is not a registered function"
+    },
+    {
       "file": "chat/lib/pause-run",
       "kind": "call",
       "line": 53,
