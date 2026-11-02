@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 const LUNORA_ROOT = path.resolve(import.meta.dirname, "..");
 const SAVERS: ReadonlySet<string> = new Set(["saveAiUserPreferences", "saveUserSettings"]);
 const ORGANIZATION_ARGUMENT = 4;
+const ACTIVE_ORGANIZATION = /^(?:ctx|context)\.user\.activeOrganization\?\.id \?\? null$/;
 
 /** Writers that run without a signed-in user, so they have no organization to pass. */
 const WRITERS_WITHOUT_ORGANIZATION: ReadonlySet<string> = new Set(["consumeAsMcpHeader", "consumeAsProviderKey", "pruneExpiredToolPermissionGrants"]);
@@ -49,8 +50,10 @@ const enclosingName = (node: ts.Node): string => {
     return "<module>";
 };
 
-const findNullOrganizationWrites = (): string[] => {
-    const found: string[] = [];
+type SaverCall = { argument: string; kind: ts.SyntaxKind | undefined; location: string; owner: string };
+
+const findSaverCalls = (): SaverCall[] => {
+    const found: SaverCall[] = [];
 
     for (const file of sourceFiles(LUNORA_ROOT)) {
         const text = readFileSync(file, "utf8");
@@ -63,13 +66,14 @@ const findNullOrganizationWrites = (): string[] => {
         const visit = (node: ts.Node): void => {
             if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && SAVERS.has(node.expression.text)) {
                 const argument = node.arguments[ORGANIZATION_ARGUMENT];
-                const owner = enclosingName(node);
+                const { line } = source.getLineAndCharacterOfPosition(node.getStart());
 
-                if (argument?.kind === ts.SyntaxKind.NullKeyword && !WRITERS_WITHOUT_ORGANIZATION.has(owner)) {
-                    const { line } = source.getLineAndCharacterOfPosition(node.getStart());
-
-                    found.push(`${path.relative(LUNORA_ROOT, file)}:${line + 1} ${owner}`);
-                }
+                found.push({
+                    argument: argument?.getText(source) ?? "",
+                    kind: argument?.kind,
+                    location: `${path.relative(LUNORA_ROOT, file)}:${line + 1}`,
+                    owner: enclosingName(node),
+                });
             }
 
             ts.forEachChild(node, visit);
@@ -81,8 +85,40 @@ const findNullOrganizationWrites = (): string[] => {
     return found;
 };
 
+const findNullOrganizationWrites = (): string[] =>
+    findSaverCalls()
+        .filter(({ kind, owner }) => kind === ts.SyntaxKind.NullKeyword && !WRITERS_WITHOUT_ORGANIZATION.has(owner))
+        .map(({ location, owner }) => `${location} ${owner}`);
+
+/** The signed-in mutations that gained the active organization, by the function holding the call. */
+const SIGNED_IN_WRITERS: ReadonlyArray<string> = [
+    "deleteCustomProvider",
+    "saveCustomProvider",
+    "setLowRiskTrustedServer",
+    "setTaskEmailEnabled",
+    "updateBrowserSettings",
+    "writeToolGrant",
+    "writeToolPermission",
+];
+
 describe("settings lock on signed-in writes", () => {
     it("passes the active organization from every user mutation", () => {
         expect(findNullOrganizationWrites()).toEqual([]);
+    });
+
+    it("passes the caller's active organization, not another expression, from every writer that has one", () => {
+        const wrong = findSaverCalls()
+            .filter(({ owner }) => !WRITERS_WITHOUT_ORGANIZATION.has(owner))
+            .filter(({ argument }) => !ACTIVE_ORGANIZATION.test(argument))
+            .map(({ argument, location, owner }) => `${location} ${owner}: ${argument || "(missing)"}`);
+
+        expect(wrong).toEqual([]);
+    });
+
+    it.each(SIGNED_IN_WRITERS)("finds the call in %s", (name) => {
+        const calls = findSaverCalls().filter(({ owner }) => owner === name);
+
+        expect(calls.length).toBeGreaterThan(0);
+        expect(calls.every(({ argument }) => argument.includes("activeOrganization"))).toBe(true);
     });
 });

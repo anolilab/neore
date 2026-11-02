@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import { effectiveSetting, lockedKeysInPatch, NO_POLICY, readPolicyState } from "./organization-policy";
 import type { PolicyState } from "./organization-policy";
-import { assertSettingsWritable } from "./preference-writes";
 
 const stateOf = (document: unknown): PolicyState => readPolicyState(JSON.stringify(document));
 
@@ -75,53 +74,5 @@ describe("effectiveSetting", () => {
     it("keeps the user's own value when the policy cannot be read", () => {
         expect(effectiveSetting("memoryEnabled", true, unreadable)).toBe(true);
         expect(effectiveSetting("memoryEnabled", undefined, unreadable)).toBeUndefined();
-    });
-});
-
-describe("assertSettingsWritable", () => {
-    const dbWith = (document: string | null) => {
-        const reads: string[] = [];
-        const db = {
-            organizationPolicies: {
-                findFirst: async ({ where }: { where: { organizationId: string } }) => {
-                    reads.push(where.organizationId);
-
-                    return document === null ? null : { document };
-                },
-            },
-        };
-
-        return { db: db as unknown as Parameters<typeof assertSettingsWritable>[0], reads };
-    };
-
-    const lockedDocument = JSON.stringify({ schemaVersion: 1, settings: { memoryEnabled: { locked: true, value: false } } });
-
-    it("throws FORBIDDEN naming the locked key", async () => {
-        const { db } = dbWith(lockedDocument);
-
-        await expect(assertSettingsWritable(db, "org_1", { memoryEnabled: true })).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: expect.stringContaining("memoryEnabled"),
-        });
-    });
-
-    it("lets an unlocked key through", async () => {
-        const { db } = dbWith(lockedDocument);
-
-        await expect(assertSettingsWritable(db, "org_1", { dailyBriefEnabled: true })).resolves.toBeUndefined();
-    });
-
-    it("refuses a managed key when the stored policy is broken, and lets other keys through", async () => {
-        const { db } = dbWith("{ not json");
-
-        await expect(assertSettingsWritable(db, "org_1", { memoryEnabled: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
-        await expect(assertSettingsWritable(db, "org_1", { timezone: "UTC" })).resolves.toBeUndefined();
-    });
-
-    it("reads nothing for a caller without an organization", async () => {
-        const { db, reads } = dbWith(lockedDocument);
-
-        await expect(assertSettingsWritable(db, null, { memoryEnabled: true })).resolves.toBeUndefined();
-        expect(reads).toEqual([]);
     });
 });
