@@ -217,7 +217,9 @@ const requestOf = (input: string): string | undefined => {
 export const answerHostPermission = authMutation
     .use(rateLimit("hosts/answer"))
     .input({ optionId: v.string().max(128), requestId: v.string().max(128), threadId: v.id("threads") })
-    .output(v.object({ reason: v.optional(v.union(v.literal("busy"), v.literal("not_waiting"), v.literal("offline"))), sent: v.boolean() }))
+    .output(
+        v.object({ reason: v.optional(v.union(v.literal("busy"), v.literal("not_waiting"), v.literal("offline"), v.literal("outdated"))), sent: v.boolean() }),
+    )
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
 
@@ -269,7 +271,7 @@ export const answerHostPermission = authMutation
         );
 
         if ("error" in call) {
-            return { reason: call.error === "offline" ? ("offline" as const) : ("busy" as const), sent: false };
+            return { reason: call.error === "offline" || call.error === "outdated" ? call.error : ("busy" as const), sent: false };
         }
 
         ctx.log.event("acp.answer_host_permission", { sent: true });

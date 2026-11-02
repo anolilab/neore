@@ -21,6 +21,13 @@ import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/dev
 
 const idsOf = (key: string): string[] => (key === "" ? [] : key.split(","));
 
+/** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
+const toastClockSkew = (error: unknown): void => {
+    if ((error as { data?: { code?: unknown } } | null)?.data?.code === "DEVICE_CLOCK_SKEW") {
+        toast.error((error as Error).message, { id: "device-clock-skew" });
+    }
+};
+
 /**
  * Mounted only inside the desktop shell, for a signed-in account, after first
  * paint (`lib/native/native-bridge.tsx`). While this computer is paired to the
@@ -161,11 +168,7 @@ const DeviceRelay: FC = () => {
         return onNativeDeviceChanged(() => {
             // A refused manifest leaves the previous tool set in place. A wrong clock is the one cause a person can fix, so it is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
-                send(id).catch((error: unknown) => {
-                    if ((error as { data?: { code?: unknown } } | null)?.data?.code === "DEVICE_CLOCK_SKEW") {
-                        toast.error((error as Error).message, { id: "device-clock-skew" });
-                    }
-                });
+                send(id).catch(toastClockSkew);
             }
         });
     }, [deviceId, hostKey, paired]);
@@ -184,9 +187,8 @@ const DeviceRelay: FC = () => {
                     deviceId: reportedFor as Id<"devices">,
                     viaDeviceId: viaDeviceFor(deviceId, reportedFor) as Id<"devices"> | undefined,
                 })
-                .catch(() => {
-                    // Display only: a lost report leaves the chat saying "sent to the device".
-                });
+                .catch(toastClockSkew);
+            // Display only: any other lost report leaves the chat saying "sent to the device".
         });
     }, [deviceId, paired]);
 

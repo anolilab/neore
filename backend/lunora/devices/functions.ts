@@ -383,13 +383,8 @@ export const updateDeviceManifest = authMutation
         // Signed with the rest: a computer that predates the field reports none, which is not "outdated".
         const protocol = parseProtocol(manifest.protocol);
 
-        await ctx.db.patch("devices", device._id, {
-            acpOffers: offers,
-            lastSeenAt: now,
-            manifest: tools,
-            manifestIssuedAt: issuedAt,
-            ...(protocol !== undefined && { hostProtocol: protocol }),
-        });
+        // `undefined` removes the field: a later build that stops reporting it is judged as unreported, not by the old number.
+        await patchRow(ctx.db, "devices", device, { acpOffers: offers, hostProtocol: protocol, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 

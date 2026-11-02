@@ -7,6 +7,7 @@
  * (`checkAcpCall`) is called by the test at the moment it would have fired.
  */
 import { lunoraTest } from "@lunora/testing";
+import { MIN_DEVICE_PROTOCOL } from "../devices/lib/constants";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
@@ -86,6 +87,8 @@ const insertUser = async () =>
     )) as string;
 
 let manifestAt = 0;
+
+const OUT_OF_DATE = /out of date/;
 
 const manifest = async (deviceId: string, secret: string, extra: Record<string, unknown>) => {
     manifestAt += 1;
@@ -324,6 +327,13 @@ describe("startHostSession", () => {
         expect(envelope.input).toEqual({ agentKey: "claude", folderId: "f1", sessionId: session?.hostSessionId, threadId: result.threadId });
         // No path and no command line ever leave the desktop, so none can be in the call.
         expect(call?.envelope).not.toContain("/");
+    });
+
+    it("tells the person to update an outdated computer instead of calling it busy or unavailable", async () => {
+        const device = await pairedDevice(ownerId);
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(start("tap-old", {}, device.deviceId)).rejects.toThrow(OUT_OF_DATE);
     });
 
     it("starts one session for a double tap", async () => {
@@ -1096,6 +1106,13 @@ describe("answerHostPermission", () => {
         }
 
         await expect(answer(threadId, "r3", "r3-allow_once")).resolves.toEqual({ reason: "busy", sent: false });
+    });
+
+    it("reports an outdated computer as outdated, not busy", async () => {
+        const { device, threadId } = await waiting();
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "outdated", sent: false });
     });
 
     it("queues one answer per request: a second tap, or the other device, finds the first on its way", async () => {

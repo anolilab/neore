@@ -5244,6 +5244,10 @@
                         {
                           "const": "offline",
                           "type": "string"
+                        },
+                        {
+                          "const": "outdated",
+                          "type": "string"
                         }
                       ]
                     },

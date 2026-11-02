@@ -8300,7 +8300,7 @@ export interface Caller {
             verifyHostPost: (args: { deviceId: string; now: number; payload: string; signature: string }) => Promise<null | { userId: string }>;
         };
         remote: {
-            answerHostPermission: (args: { optionId: string; requestId: string; threadId: Id<"threads"> }) => Promise<{ reason?: "busy" | "not_waiting" | "offline"; sent: boolean }>;
+            answerHostPermission: (args: { optionId: string; requestId: string; threadId: Id<"threads"> }) => Promise<{ reason?: "busy" | "not_waiting" | "offline" | "outdated"; sent: boolean }>;
             cancelHostTurn: (args: { threadId: Id<"threads"> }) => Promise<{ cancelled: boolean }>;
             getHostPendingPermissions: (args: { threadId: Id<"threads"> }) => Promise<Array<{ command?: string; folder?: string; incomplete?: boolean; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string }>>;
             startHostSession: (args: { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }) => Promise<{ started: boolean; threadId?: string }>;

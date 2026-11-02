@@ -135,27 +135,25 @@ impl NonceSet {
     }
 }
 
-/// A difference this large between this computer's clock and the backend's is the likelier cause of a refused
-/// request than a slow answer: the backend allows a call five minutes.
+/// The backend<->desktop protocol this build reports in its signed manifest. It moves when the backend must treat an
+/// older app as outdated; it is NOT the desktop<->SSH-host wire version (`host::PROTOCOL_VERSION`).
+pub const BACKEND_PROTOCOL_VERSION: u32 = 3;
+
+/// How far ahead of this computer's clock the backend's signing time must be before the clock is blamed.
 const CLOCK_SKEW_NOTICE_MS: u64 = 2 * 60 * 1000;
 
-/// A sentence naming the clock when it is off by more than [`CLOCK_SKEW_NOTICE_MS`] against the time the backend
-/// signed the call, else nothing. The clock is the cause worth naming: nothing else a person can fix makes a fresh
-/// call look expired.
+/// A sentence naming the clock when the backend signed the call at a time still in the future for this computer by
+/// more than [`CLOCK_SKEW_NOTICE_MS`], else nothing. A call that is merely old (held past its lifetime, redelivered
+/// after a lapsed claim) looks the same as a fast clock, so only the unambiguous direction is named.
 pub fn clock_hint(issued_at: u64, now: u64) -> String {
-    if issued_at == 0 || now.abs_diff(issued_at) < CLOCK_SKEW_NOTICE_MS {
+    if issued_at == 0 || issued_at <= now.saturating_add(CLOCK_SKEW_NOTICE_MS) {
         return String::new();
     }
 
-    let minutes = now.abs_diff(issued_at) / 60_000;
-    let direction = if now > issued_at {
-        "ahead of"
-    } else {
-        "behind"
-    };
+    let minutes = (issued_at - now) / 60_000;
 
     format!(
-        ". This computer's clock is about {minutes} minutes {direction} the server's. Set the date and time to update automatically, then try again."
+        ". This computer's clock is about {minutes} minutes behind the server's. Set the date and time to update automatically, then try again."
     )
 }
 
@@ -419,7 +417,7 @@ mod tests {
         let mut nonces = NonceSet::default();
         let ten_minutes = 10 * 60 * 1000;
 
-        // This computer is ten minutes ahead of the server that signed the call.
+        // This computer is ten minutes ahead of the server: indistinguishable from a call held that long, so no blame.
         let ahead = verify_call(
             SECRET,
             "dev1",
@@ -429,13 +427,9 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(ahead.contains("has expired"), "{ahead}");
-        assert!(
-            ahead.contains("clock is about 10 minutes ahead of the server"),
-            "{ahead}"
-        );
+        assert_eq!(ahead, "the request has expired");
 
-        // And twenty minutes behind: the call looks like it expires far in the future.
+        // This computer is twenty minutes behind: the call looks like it expires far in the future.
         let signed_at = 100 * 60 * 1000;
         let behind = verify_call(
             SECRET,

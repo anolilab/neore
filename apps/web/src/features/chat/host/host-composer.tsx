@@ -138,7 +138,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                 onError: () => toast.error(t`Could not send your answer.`),
                 onSuccess: (result) => {
                     if (!result.sent) {
-                        toast.error(result.reason === "busy" ? t`Your computer is busy. Try again in a moment.` : t`That request is no longer waiting.`);
+                        toast.error(result.reason === "not_waiting" ? t`That request is no longer waiting.` : messages[result.reason ?? "busy"]);
                     }
                 },
             },

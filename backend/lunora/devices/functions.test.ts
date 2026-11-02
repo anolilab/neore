@@ -281,6 +281,19 @@ describe("a computer too old for the backend", () => {
         await send(Date.now(), MIN_DEVICE_PROTOCOL);
         expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
     });
+
+    it("forgets an old protocol when a later manifest reports none, so eligibility follows the current build", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, extra: Record<string, unknown>) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, extra)) as never);
+
+        await send(Date.now() - 2000, { protocol: MIN_DEVICE_PROTOCOL - 1 });
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "outdated" });
+        await send(Date.now(), {});
+        expect(updateRequiredOf(await listed(ownerId), deviceId)).toBe(false);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
+    });
 });
 
 describe("getDeviceToolContext", () => {
