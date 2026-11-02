@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
-    return { invalidateQueries: vi.fn() };
+    return { client: { invalidateQueries: vi.fn() }, invalidateQueries: vi.fn() };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -10,9 +10,7 @@ vi.mock("@tanstack/react-query", () => {
         skipToken: Symbol("skip"),
         useMutation: vi.fn(),
         useQuery: vi.fn(),
-        useQueryClient: () => {
-            return { invalidateQueries: state.invalidateQueries };
-        },
+        useQueryClient: () => state.client,
     };
 });
 
@@ -35,7 +33,9 @@ const address = { number: 1, repository: "a/b" };
 
 describe("useRefreshPullForOtherGuideHead", () => {
     beforeEach(() => {
-        state.invalidateQueries.mockClear();
+        state.invalidateQueries = vi.fn();
+        // A new client per test, as in a new session: the record of refreshed heads belongs to it.
+        state.client = { invalidateQueries: state.invalidateQueries };
     });
 
     it("reads the pull request again once per guide head that is not the page's", () => {
@@ -72,6 +72,22 @@ describe("useRefreshPullForOtherGuideHead", () => {
         rerender({ at: other });
 
         expect(state.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["develop", "user-a", "pull", other] });
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(6);
+    });
+
+    it("does not read the pull request again when the tab is left and opened on the same stale guide", () => {
+        const { unmount } = renderHook(() => useRefreshPullForOtherGuideHead(address, "newer", "page"));
+
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(3);
+
+        unmount();
+        renderHook(() => useRefreshPullForOtherGuideHead(address, "newer", "page"));
+
+        expect(state.invalidateQueries).toHaveBeenCalledTimes(3);
+
+        // A new head still refreshes.
+        renderHook(() => useRefreshPullForOtherGuideHead(address, "newest", "page"));
+
         expect(state.invalidateQueries).toHaveBeenCalledTimes(6);
     });
 
