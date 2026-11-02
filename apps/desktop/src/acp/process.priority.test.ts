@@ -90,6 +90,9 @@ describe("the priority an agent gets relative to the app", () => {
     });
 });
 
+const EXEC_ARGS = /exec "\$@"/u;
+const RESTORE_PWD = /export PWD="\$1"; shift; exec "\$@"/u;
+
 describe("how an agent is started", () => {
     const host = (overrides: Partial<HostPriority> = {}): HostPriority => {
         return { hasNice: true, hasSh: true, nice: 4, oomScoreAdj: 200, platform: "linux", ...overrides };
@@ -100,9 +103,9 @@ describe("how an agent is started", () => {
         const launch = agentLaunch(target, host());
 
         expect(launch.command).toBe("/bin/sh");
-        expect(launch.args.slice(2)).toEqual(["sh", "/usr/bin/nice", "-n", "10", "claude", "--flag", "a b; rm -rf /"]);
+        expect(launch.args.slice(2)).toEqual(["sh", "/usr/bin/nice", "-n", "10", "--", "claude", "--flag", "a b; rm -rf /"]);
         expect(launch.args[1]).toContain("echo 700 > /proc/self/oom_score_adj");
-        expect(launch.args[1]).toContain("exec \"$@\"");
+        expect(launch.args[1]).toMatch(EXEC_ARGS);
         expect(launch.args[1]).not.toContain("claude");
         // sh would otherwise add PWD to an environment that is exactly the plan's.
         expect(launch.args[1]).toContain("unset PWD; exec");
@@ -112,7 +115,24 @@ describe("how an agent is started", () => {
     it("starts through nice alone on macOS", () => {
         const launch = agentLaunch(target, host({ platform: "darwin" }));
 
-        expect(launch).toEqual({ args: ["-n", "10", "claude", "--flag", "a b; rm -rf /"], command: "/usr/bin/nice", lowerAfterSpawn: { nice: false, oomScoreAdj: false } });
+        expect(launch).toEqual({
+            args: ["-n", "10", "--", "claude", "--flag", "a b; rm -rf /"],
+            command: "/usr/bin/nice",
+            lowerAfterSpawn: { nice: false, oomScoreAdj: false },
+        });
+    });
+
+    it("keeps a PWD the plan sets, passed as an argument rather than written into the script", () => {
+        const launch = agentLaunch({ ...target, env: { PWD: "/work/$(x)" } }, host());
+
+        expect(launch.args[1]).toMatch(RESTORE_PWD);
+        expect(launch.args[1]).not.toContain("unset PWD");
+        expect(launch.args[1]).not.toContain("/work");
+        expect(launch.args.slice(2, 5)).toEqual(["sh", "/work/$(x)", "/usr/bin/nice"]);
+    });
+
+    it("ends nice's options before a command whose name starts with a dash", () => {
+        expect(agentLaunch({ args: [], command: "-agent" }, host({ platform: "darwin" })).args).toEqual(["-n", "10", "--", "-agent"]);
     });
 
     it("asks nice for only what is left when the app is already near the cap", () => {
@@ -121,7 +141,11 @@ describe("how an agent is started", () => {
     });
 
     it("falls back to lowering after the spawn for what has no wrapper", () => {
-        expect(agentLaunch(target, host({ hasNice: false, hasSh: false }))).toEqual({ args: target.args, command: "claude", lowerAfterSpawn: { nice: true, oomScoreAdj: true } });
+        expect(agentLaunch(target, host({ hasNice: false, hasSh: false }))).toEqual({
+            args: target.args,
+            command: "claude",
+            lowerAfterSpawn: { nice: true, oomScoreAdj: true },
+        });
         expect(agentLaunch(target, host({ hasNice: false, platform: "darwin" })).lowerAfterSpawn).toEqual({ nice: true, oomScoreAdj: false });
     });
 });

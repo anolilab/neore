@@ -104,16 +104,17 @@ export interface AgentLaunch {
 /**
  * The command that starts the agent already lowered, so nothing it forks in its first instants keeps full priority.
  * `nice -n DELTA` sets the niceness, and on Linux a `sh` writes the score into `/proc/self` and `exec`s on (same pid,
- * so the agent inherits it; `PWD`, which `sh` adds to the environment, is dropped again). The plan's command and arguments travel as separate argv entries, never through a shell
+ * so the agent inherits it; `PWD`, which `sh` adds to the environment, is dropped again, or restored when the plan sets it). The plan's command and arguments travel as separate argv entries, never through a shell
  * string. Without `nice` or `sh` the matching value is set after the spawn instead.
  */
-export const agentLaunch = (plan: Pick<SpawnPlan, "args" | "command">, host: HostPriority): AgentLaunch => {
+export const agentLaunch = (plan: Partial<Pick<SpawnPlan, "env">> & Pick<SpawnPlan, "args" | "command">, host: HostPriority): AgentLaunch => {
     let { args, command } = plan;
     const delta = agentNiceness(host.nice) - host.nice;
     const niceInline = host.hasNice && host.platform !== "win32";
 
     if (niceInline) {
-        args = ["-n", String(delta), command, ...args];
+        // `--` ends nice's options, so a command whose name starts with `-` is still the command.
+        args = ["-n", String(delta), "--", command, ...args];
         command = NICE_PATH;
     }
 
@@ -121,7 +122,13 @@ export const agentLaunch = (plan: Pick<SpawnPlan, "args" | "command">, host: Hos
 
     if (oomInline) {
         // A refused write (a read-only /proc) must not stop the agent: the score is only a preference.
-        args = ["-c", `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null; unset PWD; exec "$@"`, "sh", command, ...args];
+        const score = `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null`;
+        // A PWD the plan sets is put back as given (sh rewrites it at start), passed as an argument, never into the script.
+        const pwd = plan.env?.PWD;
+
+        const restorePwd = pwd === undefined ? [`${score}; unset PWD; exec "$@"`] : [`${score}; export PWD="$1"; shift; exec "$@"`, pwd];
+
+        args = ["-c", restorePwd[0] as string, "sh", ...restorePwd.slice(1), command, ...args];
         command = SH_PATH;
     }
 
