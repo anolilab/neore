@@ -213,11 +213,12 @@ const receivedItsHandoff = async (
     args: { agent: SwitchAgentRef; lastSeen: Doc<"messages">; sessions: ReadonlyArray<Session>; threadId: Id<"threads"> },
 ) => {
     const { agent, lastSeen, sessions, threadId } = args;
-    const arrival = await findDividerEntering(ctx, threadId, lastSeen, agentKeyOf(agent));
+    const { divider: arrival, exhausted } = await findDividerEntering(ctx, threadId, lastSeen, agentKeyOf(agent));
 
     if (!arrival) {
-        // It opened the thread itself: nothing was due.
-        return true;
+        // Only a complete search shows it opened the thread itself, with nothing due. A search that gave up at its
+        // bound may have missed the divider that owed it a handoff, so the safe answer is the fresh session.
+        return !exhausted;
     }
 
     const due = arrival.part.mode === "native" ? arrival.part.catchUp : arrival.part.handoff;

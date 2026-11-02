@@ -2515,7 +2515,7 @@ export interface IndexNamesByTable {
     threads: "by_userId" | "by_user_and_status" | "by_user_and_status_createdAt" | "by_user_and_pinned" | "by_publicAccessToken" | "by_user_and_pinned_deleted" | "by_projectId" | "by_user_and_organization" | "by_user_and_team" | "by_userId_externalThreadId" | "by_user_and_order" | "by_user_and_updatedAt" | "by_user_and_organization_and_updatedAt";
     threadTags: "by_user_and_order";
     threadVariables: "by_thread" | "by_user";
-    toolApprovalRuns: "by_approvalId" | "by_threadId" | "by_status_createdAt" | "by_status_resolvedAt" | "by_userId_status_createdAt";
+    toolApprovalRuns: "by_approvalId" | "by_threadId" | "by_threadId_status_createdAt" | "by_status_createdAt" | "by_status_resolvedAt" | "by_userId_status_createdAt";
     triggerExecutions: "by_triggerId_startedAt" | "by_triggerId_status";
     triggers: "by_userId_organizationId" | "by_type_enabled" | "by_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_type_enabled_nextTriggerAt";
     twoFactor: "userId";
