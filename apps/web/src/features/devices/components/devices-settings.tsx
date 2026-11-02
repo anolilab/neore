@@ -45,6 +45,8 @@ interface DeviceView {
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
     transport?: "ssh";
+    /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
+    updateRequired?: boolean;
     viaDeviceId?: string;
 }
 
@@ -168,6 +170,11 @@ const DeviceRow: FC<{
                 <p className="text-muted-foreground text-xs">
                     {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                 </p>
+                {device.updateRequired === true && (
+                    <p className="text-destructive text-xs" role="status">
+                        {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                    </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}

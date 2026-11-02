@@ -276,6 +276,7 @@ export const devices = sqliteTable("devices", {
     acpOffers: text("acpOffers", { mode: "json" }).$type<Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>>(),
     createdAt: real("createdAt").notNull(),
     encryptedSecret: text("encryptedSecret"),
+    hostProtocol: real("hostProtocol"),
     lastSeenAt: real("lastSeenAt"),
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),

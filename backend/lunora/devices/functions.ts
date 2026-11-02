@@ -33,8 +33,16 @@ import {
 } from "./lib/constants";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
-import { claimWindowMs, expireOpenCalls, isAcpTool, isForwardPhase } from "./lib/state";
-import { capUtf8, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
+import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
+import {
+    capUtf8,
+    clockSkewMessage,
+    DEVICE_CLOCK_SKEW_CODE,
+    generateDeviceSecret,
+    isFreshTimestamp,
+    parseSignedPayload,
+    verifyDevicePayload,
+} from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
 const vDeviceName = v.string().check((value) => value.trim().length > 0 && value.length <= 80, { message: "Name must be 1-80 characters" });
@@ -171,6 +179,7 @@ export const listDevices = authQuery
                 name: device.name,
                 platform: device.platform,
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
+                updateRequired: isDeviceOutdated(device),
                 ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
                 ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
@@ -327,6 +336,10 @@ export const heartbeatDevice = authMutation
         return { paired: true };
     });
 
+/** The wire protocol a signed manifest reports, or `undefined` when absent or not a small whole number. */
+const parseProtocol = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 1000 ? value : undefined;
+
 /**
  * Stores the device's tool list. The manifest is SIGNED by the device's Rust
  * core, must be fresh and newer than the stored one (no rollback to an older
@@ -348,6 +361,10 @@ export const updateDeviceManifest = authMutation
         const manifest = parseSignedPayload(args.payload, "manifest", device._id as string);
         const issuedAt = manifest?.issuedAt;
 
+        if (typeof issuedAt === "number" && Number.isFinite(issuedAt) && !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
+            throw new LunoraError("BAD_REQUEST", clockSkewMessage(issuedAt, now), { data: { code: DEVICE_CLOCK_SKEW_CODE } });
+        }
+
         if (
             !manifest ||
             !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS) ||
@@ -363,7 +380,16 @@ export const updateDeviceManifest = authMutation
             throw new LunoraError("BAD_REQUEST", "Manifest tools are invalid");
         }
 
-        await ctx.db.patch("devices", device._id, { acpOffers: offers, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        // Signed with the rest: a computer that predates the field reports none, which is not "outdated".
+        const protocol = parseProtocol(manifest.protocol);
+
+        await ctx.db.patch("devices", device._id, {
+            acpOffers: offers,
+            lastSeenAt: now,
+            manifest: tools,
+            manifestIssuedAt: issuedAt,
+            ...(protocol !== undefined && { hostProtocol: protocol }),
+        });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 
@@ -543,6 +569,10 @@ export const reportDeviceCallProgress = authMutation
         const { now } = ctx;
         const report = parseSignedPayload(args.payload, "progress", device._id as string);
         const phase = report?.phase;
+
+        if (typeof report?.issuedAt === "number" && Number.isFinite(report.issuedAt) && !isFreshTimestamp(report.issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
+            throw new LunoraError("BAD_REQUEST", clockSkewMessage(report.issuedAt, now), { data: { code: DEVICE_CLOCK_SKEW_CODE } });
+        }
 
         if (
             report?.callId !== args.callId ||

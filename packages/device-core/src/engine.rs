@@ -906,6 +906,8 @@ impl DeviceState {
             Domain::Manifest,
             &json!({
                 "v": 1, "kind": "manifest", "deviceId": pairing.device_id, "issuedAt": issued_at, "tools": tools,
+                // The wire protocol this build speaks: the backend asks an older one to update before it hands it calls.
+                "protocol": crate::host::PROTOCOL_VERSION,
                 // The pairs the user approved for coding agents, so the web and the phone can offer them.
                 "acpOffers": self.acp_offers(),
             }),

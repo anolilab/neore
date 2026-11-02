@@ -74,6 +74,9 @@ pub struct CallEnvelope {
     pub expires_at: u64,
     #[serde(default)]
     pub input: Value,
+    /// The backend's clock when it signed the call; 0 when an older backend did not say. Only used to explain a refusal.
+    #[serde(default)]
+    pub issued_at: u64,
     pub kind: String,
     pub nonce: String,
     #[serde(default)]
@@ -132,6 +135,30 @@ impl NonceSet {
     }
 }
 
+/// A difference this large between this computer's clock and the backend's is the likelier cause of a refused
+/// request than a slow answer: the backend allows a call five minutes.
+const CLOCK_SKEW_NOTICE_MS: u64 = 2 * 60 * 1000;
+
+/// A sentence naming the clock when it is off by more than [`CLOCK_SKEW_NOTICE_MS`] against the time the backend
+/// signed the call, else nothing. The clock is the cause worth naming: nothing else a person can fix makes a fresh
+/// call look expired.
+pub fn clock_hint(issued_at: u64, now: u64) -> String {
+    if issued_at == 0 || now.abs_diff(issued_at) < CLOCK_SKEW_NOTICE_MS {
+        return String::new();
+    }
+
+    let minutes = now.abs_diff(issued_at) / 60_000;
+    let direction = if now > issued_at {
+        "ahead of"
+    } else {
+        "behind"
+    };
+
+    format!(
+        ". This computer's clock is about {minutes} minutes {direction} the server's. Set the date and time to update automatically, then try again."
+    )
+}
+
 pub fn verify_call(
     secret: &str,
     device_id: &str,
@@ -169,11 +196,17 @@ pub fn verify_call_unrecorded(
     }
 
     if call.expires_at <= now {
-        return Err("the request has expired".into());
+        return Err(format!(
+            "the request has expired{}",
+            clock_hint(call.issued_at, now)
+        ));
     }
 
     if call.expires_at > now + MAX_ENVELOPE_AHEAD_MS {
-        return Err("the request expires too far ahead".into());
+        return Err(format!(
+            "the request expires too far ahead{}",
+            clock_hint(call.issued_at, now)
+        ));
     }
 
     Ok(call)
@@ -379,5 +412,58 @@ mod tests {
             &mut nonces
         )
         .is_err());
+    }
+
+    #[test]
+    fn a_skewed_clock_is_named_in_the_refusal() {
+        let mut nonces = NonceSet::default();
+        let ten_minutes = 10 * 60 * 1000;
+
+        // This computer is ten minutes ahead of the server that signed the call.
+        let ahead = verify_call(
+            SECRET,
+            "dev1",
+            &envelope(json!({ "nonce": "n4", "issuedAt": 1_000, "expiresAt": 5_000 })),
+            1_000 + ten_minutes,
+            &mut nonces,
+        )
+        .unwrap_err();
+
+        assert!(ahead.contains("has expired"), "{ahead}");
+        assert!(
+            ahead.contains("clock is about 10 minutes ahead of the server"),
+            "{ahead}"
+        );
+
+        // And twenty minutes behind: the call looks like it expires far in the future.
+        let signed_at = 100 * 60 * 1000;
+        let behind = verify_call(
+            SECRET,
+            "dev1",
+            &envelope(
+                json!({ "nonce": "n5", "issuedAt": signed_at, "expiresAt": signed_at + 5_000 }),
+            ),
+            signed_at - 20 * 60 * 1000,
+            &mut nonces,
+        )
+        .unwrap_err();
+
+        assert!(behind.contains("too far ahead"), "{behind}");
+        assert!(behind.contains("20 minutes behind the server"), "{behind}");
+    }
+
+    #[test]
+    fn a_slow_answer_does_not_blame_the_clock() {
+        let mut nonces = NonceSet::default();
+        let expired = verify_call(
+            SECRET,
+            "dev1",
+            &envelope(json!({ "nonce": "n6", "issuedAt": 1_000, "expiresAt": 2_000 })),
+            3_000,
+            &mut nonces,
+        )
+        .unwrap_err();
+
+        assert_eq!(expired, "the request has expired");
     }
 }

@@ -2,6 +2,7 @@ import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDeviceStatus } from "@/lib/native/bridge";
@@ -158,9 +159,13 @@ const DeviceRelay: FC = () => {
         };
 
         return onNativeDeviceChanged(() => {
-            // A refused manifest leaves the previous tool set in place.
+            // A refused manifest leaves the previous tool set in place. A wrong clock is the one cause a person can fix, so it is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
-                send(id).catch(() => {});
+                send(id).catch((error: unknown) => {
+                    if ((error as { data?: { code?: unknown } } | null)?.data?.code === "DEVICE_CLOCK_SKEW") {
+                        toast.error((error as Error).message, { id: "device-clock-skew" });
+                    }
+                });
             }
         });
     }, [deviceId, hostKey, paired]);
