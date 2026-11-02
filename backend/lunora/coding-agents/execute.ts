@@ -331,7 +331,7 @@ const startPullRequestForRun = async (
         return await fail(problem ?? "not available");
     }
 
-    // Read here, not in the sandbox: the person's details reach the commit only when they opted in.
+    // Read outside the sandbox; only an opted-in person's details come back.
     const person = (await ctx.runQuery(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId })) ?? undefined;
 
     const started = await startPullRequest(
