@@ -26,7 +26,11 @@ vi.mock("../lib/job-queue", () => {
     };
 });
 vi.mock("./lib/daily-limit", () => {
-    return { chargeDailyLimit: async () => ({ ok: true }) };
+    return {
+        chargeDailyLimit: async () => {
+            return { ok: true };
+        },
+    };
 });
 vi.mock("./lib/enabled-model", () => {
     return { assertPaidModel: async () => {} };

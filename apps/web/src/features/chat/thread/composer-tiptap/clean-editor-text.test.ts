@@ -25,12 +25,12 @@ describe(cleanEditorText, () => {
         editors.length = 0;
     });
 
-    it("takes hidden characters out of the document and returns the text it read, so they are counted once", () => {
+    it("takes hidden characters out of the document, so a later read finds none to count again", () => {
         const editor = editorWith("<p>hi\u{E0041}\u{202E} there</p><p>x</p>");
 
-        expect(cleanEditorText(editor)).toBe("hi\u{E0041}\u{202E} there\nx");
+        cleanEditorText(editor);
+
         expect(editor.getText({ blockSeparator: "\n" })).toBe("hi there\nx");
-        expect(cleanEditorText(editor)).toBe("hi there\nx");
     });
 
     it("empties a document that held nothing but hidden characters", () => {

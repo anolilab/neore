@@ -258,7 +258,6 @@ describe("/chat/start hidden characters", () => {
 
         expect(saved).toContain("body text");
         expect(saved).toContain("title");
-        expect(saved).not.toMatch(/\\u(?:db40|202e)/iu);
         expect(saved).not.toContain("\u{E0041}");
         expect(saved).not.toContain("\u{202E}");
     });

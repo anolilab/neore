@@ -120,9 +120,14 @@ describe("prompt queue persistence", () => {
     });
 
     it("drops a restored item whose text is empty once its hidden characters are stripped", () => {
-        const stored = JSON.stringify({ items: [{ id: "a", text: "\u{E0041}\u{202E}" }, { id: "b", text: "keep\u{202E}" }] });
+        const stored = JSON.stringify({
+            items: [
+                { id: "a", text: "\u{E0041}\u{202E}" },
+                { id: "b", text: "keep\u{202E}" },
+            ],
+        });
 
-        expect(restorePromptQueue(stored)?.items.map((item) => [item.id, item.text])).toStrictEqual([["b", "keep"]]);
+        expect(restorePromptQueue(stored)?.items.map((entry) => [entry.id, entry.text])).toStrictEqual([["b", "keep"]]);
         expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", text: "\u{200B}" }] }))).toBeUndefined();
     });
 

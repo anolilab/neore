@@ -115,9 +115,11 @@ interface ChatUIStore {
     isCanvasOpen: boolean;
     // Submission state (to prevent suggestions from opening between submit and streaming)
     isSubmitting: boolean;
+    // Composer actions
+    noteComposerHiddenRemoved: (count: number) => void;
+
     // Canvas/Artifact actions
     openCanvas: (documentId: string) => void;
-
     removeAttachedReference: (id: string) => void;
     removeAttachment: (id: string) => void;
     removeEditAttachment: (id: string) => void;
@@ -129,18 +131,16 @@ interface ChatUIStore {
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
     setAttachedReferences: (references: ReferenceSelection[]) => void;
-    setCanvasDirty: (dirty: boolean) => void;
 
+    setCanvasDirty: (dirty: boolean) => void;
     setCanvasEditMode: (mode: "edit" | "preview") => void;
+
     setCanvasHistoryVersions: (versions: [number, number] | null) => void;
 
     setCanvasViewMode: (mode: "editor" | "history") => void;
 
     // Banned content actions
     setComposerBannedContent: (value: { message: string; words: string[] } | null) => void;
-
-    // Composer actions
-    noteComposerHiddenRemoved: (count: number) => void;
     setComposerText: (text: string) => void;
 
     setCopiedMessageId: (id: string | null) => void;
