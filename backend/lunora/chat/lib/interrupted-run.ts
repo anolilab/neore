@@ -35,6 +35,8 @@ export interface SavedRow {
 
 export type SavedRun =
     | {
+          /** The last saved row is a complete answer (an assistant row with no tool call): the run only had to close. */
+          finished: boolean;
           /** The row the resume continues from (the last saved row), or `undefined` for the prompt. */
           from: string | undefined;
           ok: true;
@@ -45,7 +47,12 @@ export type SavedRun =
           /** Model steps that finished. */
           stepsUsed: number;
       }
-    | { ok: false; reason: "tool_call_without_result" | "unsettled_row" };
+    | {
+          ok: false;
+          reason: "tool_call_without_result" | "unsettled_row";
+          /** The finished rows the run did save: the reply is recorded (and billed) for them even though it is not resumed. */
+          replyRowIds: string[];
+      };
 
 const inOrder = (a: SavedRow, b: SavedRow): number => a.order - b.order || a.stepOrder - b.stepOrder;
 
@@ -58,17 +65,20 @@ export const settleSavedRows = (rows: ReadonlyArray<SavedRow>): SavedRun => {
     const placeholders = ordered.filter((row) => row.empty && (row.status === "pending" || row.status === "failed"));
     const saved = ordered.filter((row) => !placeholders.includes(row));
 
+    const finishedIds = saved.filter((row) => row.status === "success").map((row) => row.id);
+
     if (saved.some((row) => row.status !== "success")) {
-        return { ok: false, reason: "unsettled_row" };
+        return { ok: false, reason: "unsettled_row", replyRowIds: finishedIds };
     }
 
     const last = saved.at(-1);
 
     if (last?.role === "assistant" && last.callsTools) {
-        return { ok: false, reason: "tool_call_without_result" };
+        return { ok: false, reason: "tool_call_without_result", replyRowIds: finishedIds };
     }
 
     return {
+        finished: last?.role === "assistant",
         from: last?.id,
         ok: true,
         placeholders: placeholders.map((row) => row.id),
@@ -79,7 +89,7 @@ export const settleSavedRows = (rows: ReadonlyArray<SavedRow>): SavedRun => {
 
 export type InterruptionRefusal = "steered" | "too_many_interruptions" | "tool_in_flight" | "tool_call_without_result" | "unsettled_row";
 
-export type InterruptionPlan = { action: "fail"; reason: InterruptionRefusal } | { action: "resume" } | { action: "wait" };
+export type InterruptionPlan = { action: "fail"; reason: InterruptionRefusal } | { action: "finish" } | { action: "resume" } | { action: "wait" };
 
 /** Whether a claimed, unpaused run is dead, and if so whether it may be resumed. */
 export const planInterruption = (input: {
@@ -92,6 +102,11 @@ export const planInterruption = (input: {
 }): InterruptionPlan => {
     if (input.now - input.beatAt < RUN_STALE_MS) {
         return { action: "wait" };
+    }
+
+    // The worker died between saving the answer and closing the run: a resume would ask the model again and extend the reply.
+    if (input.saved.ok && input.saved.finished) {
+        return { action: "finish" };
     }
 
     if (input.interruptions >= MAX_INTERRUPTION_RESUMES) {

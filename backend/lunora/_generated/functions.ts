@@ -823,6 +823,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming:streamRunThread": lunora_chat_streaming_82.streamRunThread as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_83.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted_watch:watchRun": lunora_chat_streaming_persistent_interrupted_watch_84.watchRun as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_interrupted:assertRunEpoch": lunora_chat_streaming_persistent_interrupted_85.assertRunEpoch as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:beatRun": lunora_chat_streaming_persistent_interrupted_85.beatRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:inspectRun": lunora_chat_streaming_persistent_interrupted_85.inspectRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:markToolRun": lunora_chat_streaming_persistent_interrupted_85.markToolRun as unknown as RegisteredLunoraFunction,
@@ -4374,17 +4375,33 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
 });
+installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.assertRunEpoch.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
+if (typeof source["streamId"] !== "string") return DEFER;
+return { "epoch": source["epoch"], "streamId": source["streamId"] };
+});
 installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.beatRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
-return { "streamId": source["streamId"] };
+return { "epoch": source["epoch"], "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.inspectRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
+});
+installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.markToolRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["delta"] !== "number" || !Number.isFinite(source["delta"])) return DEFER;
+if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
+if (typeof source["streamId"] !== "string") return DEFER;
+return { "delta": source["delta"], "epoch": source["epoch"], "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_86.claimStreamRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8644,7 +8661,7 @@ export interface Caller {
             getSearchDomainBlocklistQuery: (args: { userId: string }) => Promise<Array<string>>;
             getSessionUserQuery: (args?: {}) => Promise<null | import("../lib/auth-types.js").SessionUser>;
             getUserAuthFlagsQuery: (args: { sessionId?: string; userId: string }) => Promise<{ isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
-            getUserPreferencesQuery: (args: { userId: string }) => Promise<{ aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
+            getUserPreferencesQuery: (args: { userId: string }) => Promise<{ aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; resumeInterruptedRuns?: boolean; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
             getUserRunPlanQuery: (args: { userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             getUserSettings: (args?: {}) => Promise<import("./dataModel.js").Doc_userSettings | null>;
             hasPassword: (args?: {}) => Promise<boolean>;
@@ -9009,24 +9026,25 @@ export interface Caller {
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                 };
                 interrupted: {
-                    beatRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<null>;
-                    inspectRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ kind: "gone" } | { kind: "fresh" } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
-                    markToolRun: (args: { delta: 1 | -1; streamId: Id<"persistentStreams"> }) => Promise<null>;
-                    registerResumableRun: (args: { run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
+                    assertRunEpoch: (args: { epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
+                    beatRun: (args: { epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
+                    inspectRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ kind: "gone" } | { kind: "fresh" } | { kind: "finished" } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
+                    markToolRun: (args: { delta: number; epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
+                    registerResumableRun: (args: { epoch: number; reply: { skill?: { id?: string; name: string }; timeZone?: string }; resumable: boolean; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                 };
                 interrupted_watch: {
                     watchRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<null>;
                 };
                 library: {
-                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }) => Promise<void>;
-                    claimRunResume: (args: { pauseId: string; streamId: Id<"persistentStreams"> }) => Promise<{ from: string; replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string } | null>;
+                    addChunk: (args: { final: boolean; reasoning?: string; restart?: boolean; runEpoch?: number; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }) => Promise<void>;
+                    claimRunResume: (args: { pauseId: string; streamId: Id<"persistentStreams"> }) => Promise<{ epoch: number; from: string; replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string } | null>;
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
                     getChunksAfter: (args: { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams">; threadId?: string; userId?: string; withPendingRequest?: boolean }) => Promise<{ chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string; toolProgress?: { ended?: boolean; message?: string; progress?: number; serverName: string; toolCallId: string; toolName: string; total?: number } }>; locked: boolean; pendingRequest?: { question?: string; toolCallId: string; toolName: string | null }; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "done" | "timeout" | "pending" | "error">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ hostState?: "accepted" | "received" | "running" | "ended"; messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }>; userId?: string }>;
-                    pauseRunForRateLimit: (args: { from: string; placeholderId?: string; provider?: string; replyRowIds: Array<string>; retryAt?: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; skill?: { id?: string; name: string }; status: number; stepsUsed: number; streamId: Id<"persistentStreams">; timeZone?: string }) => Promise<{ paused: boolean; reason?: "not_live" | "steered" | "step_repeated" | "too_long" | "too_many_pauses"; retryAt?: number }>;
+                    pauseRunForRateLimit: (args: { from: string; placeholderId?: string; provider?: string; replyRowIds: Array<string>; retryAt?: number; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; runEpoch?: number; skill?: { id?: string; name: string }; status: number; stepsUsed: number; streamId: Id<"persistentStreams">; timeZone?: string }) => Promise<{ paused: boolean; reason?: "not_live" | "steered" | "step_repeated" | "too_long" | "too_many_pauses"; retryAt?: number }>;
                     retryPausedRunsNow: (args: { threadId: string }) => Promise<boolean>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
                     settleStoppedRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<null>;
@@ -10909,6 +10927,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                     cleanupExpiredStreams: (args) => callRegistered(context, "chat_streaming_persistent_crons:cleanupExpiredStreams", args),
                 },
                 interrupted: {
+                    assertRunEpoch: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:assertRunEpoch", args),
                     beatRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:beatRun", args),
                     inspectRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:inspectRun", args),
                     markToolRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:markToolRun", args),

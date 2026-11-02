@@ -14,8 +14,9 @@ import type { Doc, Id } from "../../../_generated/dataModel";
 import { internal } from "../../../_generated/internal";
 import { internalMutation } from "../../../_generated/server";
 import { patchRow } from "../../../lib/patch";
-import { interruptionMessage, planInterruption, RUN_WATCH_MS, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
+import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
+import { assertCurrentRun } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { endPausedRun, enqueueRunResume, isEmptyPlaceholder, isLiveStream, isSuperseded, removeEmptyPending, STREAM_TTL_MS } from "./library";
@@ -23,10 +24,18 @@ import { endPausedRun, enqueueRunResume, isEmptyPlaceholder, isLiveStream, isSup
 /**
  * The run that holds a stream registers it for resuming: the job's own arguments are stored (a resume re-enters the same
  * job), the first beat is set, and, the first time, the watchdog is started. A resume registers again to beat, not to
- * start a second watchdog. `false` when the stream is not live or was never claimed.
+ * start a second watchdog. `resumable` is the person's setting, read by the run's own action (on the stream's shard the
+ * row of a collaborator on a shared thread is absent). `false` when the stream is not live or was never claimed; a run
+ * a newer one replaced is refused (`RUN_REPLACED`).
  */
 export const registerResumableRun = internalMutation
-    .input({ run: v.object({ ...runStreamingAgentFields }), streamId: v.id("persistentStreams") })
+    .input({
+        epoch: v.number(),
+        reply: v.object({ skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })), timeZone: v.optional(v.string()) }),
+        resumable: v.boolean(),
+        run: v.object({ ...runStreamingAgentFields }),
+        streamId: v.id("persistentStreams"),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
@@ -35,9 +44,17 @@ export const registerResumableRun = internalMutation
             return false;
         }
 
+        assertCurrentRun(stream, args.epoch);
+
         const run = Object.fromEntries(Object.entries(args.run).filter(([key]) => key !== "resume")) as typeof args.run;
 
-        await ctx.db.patch("persistentStreams", stream._id, { beatAt: ctx.now, runArgs: run });
+        await ctx.db.patch("persistentStreams", stream._id, {
+            beatAt: ctx.now,
+            expiresAt: Math.max(stream.expiresAt, ctx.now + STREAM_TTL_MS),
+            replyContext: args.reply,
+            resumable: args.resumable,
+            runArgs: run,
+        });
 
         if (stream.runArgs === undefined) {
             await ctx.scheduler.runAfter(RUN_WATCH_MS, internal.chat.streaming.persistent.interrupted_watch.watchRun, { streamId: stream._id });
@@ -48,39 +65,48 @@ export const registerResumableRun = internalMutation
 
 /**
  * The run is alive. Written about once a minute, never faster: it patches the stream row, which re-runs the live
- * stream query for every viewer (the reason chunks keep no counter there). Ignored while paused or when not live.
+ * stream query for every viewer (the reason chunks keep no counter there). Ignored while paused or when not live. A beat
+ * from a run a newer one replaced is refused (`RUN_REPLACED`): that run stops.
  */
 export const beatRun = internalMutation
-    .input({ streamId: v.id("persistentStreams") })
+    .input({ epoch: v.number(), streamId: v.id("persistentStreams") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
+        if (stream && isLiveStream(stream)) {
+            assertCurrentRun(stream, args.epoch);
+        }
+
         if (stream && isLiveStream(stream) && stream.pause === undefined) {
-            await ctx.db.patch("persistentStreams", stream._id, { beatAt: ctx.now });
+            // The stream's expiry moves with the beat (the same write), so a death late in its window is the watchdog's to see, not the sweep's.
+            await ctx.db.patch("persistentStreams", stream._id, { beatAt: ctx.now, expiresAt: Math.max(stream.expiresAt, ctx.now + STREAM_TTL_MS) });
         }
 
         return null;
     });
 
 /**
- * A tool call begins (`+1`) or ends (`-1`). A worker that dies with one open may have paid for or changed something and
- * leaves no row, so `inspectRun` refuses to resume it. A begin on a stream that is no longer live is refused, so the
- * tool does not run unmarked.
+ * A tool call begins (`+1`) or its step is saved and the calls in it end (`-n`). A worker that dies with one open may
+ * have paid for or changed something and leaves no row, so `inspectRun` refuses to resume it. A begin on a stream that is
+ * no longer live is refused, so the tool does not run unmarked; so is any mark from a run a newer one replaced
+ * (`RUN_REPLACED`), which would otherwise corrupt the newer run's count.
  */
 export const markToolRun = internalMutation
-    .input({ delta: v.union(v.literal(1), v.literal(-1)), streamId: v.id("persistentStreams") })
+    .input({ delta: v.number(), epoch: v.number(), streamId: v.id("persistentStreams") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
         if (!stream || !isLiveStream(stream)) {
-            if (args.delta === 1) {
+            if (args.delta > 0) {
                 throw new LunoraError("CONFLICT", "The stream is no longer live");
             }
 
             return null;
         }
+
+        assertCurrentRun(stream, args.epoch);
 
         const next = Math.max(0, (stream.toolsInFlight ?? 0) + args.delta);
 
@@ -89,7 +115,44 @@ export const markToolRun = internalMutation
         return null;
     });
 
-/** The rows the run saved since its stream began (every invocation of it), as `settleSavedRows` reads them. */
+/**
+ * The run is about to finish (stamp, record approvals, close): refused if a newer run holds the stream, before any of
+ * that is done. A finish with no epoch (another kind of run) is not asked.
+ */
+export const assertRunEpoch = internalMutation
+    .input({ epoch: v.number(), streamId: v.id("persistentStreams") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (stream) {
+            assertCurrentRun(stream, args.epoch);
+        }
+
+        return null;
+    });
+
+/**
+ * When the stream's reply ends: the creation time of the thread's next stream (a new message, a regenerate, an edit
+ * starts one), `Infinity` when there is none. `0` when the thread has so many newer streams that the next one is not
+ * in view: nothing is then read as this reply's.
+ */
+const replyEndOf = async (ctx: { db: Record<string, any> }, stream: Doc<"persistentStreams">): Promise<number> => {
+    const { page } = (await ctx.db.persistentStreams.findMany({
+        limit: 4,
+        orderBy: [{ _creationTime: "desc" }],
+        where: { threadId: stream.threadId },
+    })) as { page: Doc<"persistentStreams">[] };
+    const newer = page.filter((other) => other._id !== stream._id && other._creationTime >= stream._creationTime);
+
+    if (newer.length === 0) {
+        return Number.POSITIVE_INFINITY;
+    }
+
+    return page.some((other) => other._id === stream._id) ? Math.min(...newer.map((other) => other._creationTime)) : 0;
+};
+
+/** The rows this reply saved since its stream began (every invocation of it), as `settleSavedRows` reads them. */
 const savedRowsOf = async (
     ctx: { db: { get: (table: "messages", id: Id<"messages">) => Promise<Doc<"messages"> | null> } & Record<string, any> },
     stream: Doc<"persistentStreams">,
@@ -100,13 +163,15 @@ const savedRowsOf = async (
         return [];
     }
 
+    // Rows of a newer stream (a new message, a regenerate, an edit) are another reply's: they are never this one's anchor, steps or usage.
+    const until = await replyEndOf(ctx, stream);
     const rows: Doc<"messages">[] = await ctx.db
         .query("messages")
         .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", stream.threadId).gte("order", prompt.order))
         .collect();
 
     return rows
-        .filter((row) => row._id !== prompt._id && row._creationTime >= stream._creationTime)
+        .filter((row) => row._id !== prompt._id && row._creationTime >= stream._creationTime && row._creationTime < until)
         .map((row) => {
             const message = row.message as { content?: unknown; role?: string } | undefined;
 
@@ -125,14 +190,17 @@ const savedRowsOf = async (
 const vVerdict = v.union(
     v.object({ kind: v.literal("gone") }),
     v.object({ kind: v.literal("fresh") }),
+    v.object({ kind: v.literal("finished") }),
     v.object({ kind: v.literal("resumed") }),
     v.object({ kind: v.literal("fail"), message: v.string(), threadId: v.string() }),
 );
 
 /**
- * The watchdog's look at one stream. `gone`: nothing left to watch. `fresh`: alive (or waiting out a rate limit): look
- * again later. `resumed`: the worker was dead, the resume is queued. `fail`: dead and not safe to resume; the caller
- * ends the run with the message (`failRun`), after the rows it saved were recorded here as one reply.
+ * The watchdog's look at one stream. `gone`: nothing left to watch (also a run a newer stream superseded, which ends
+ * quietly). `fresh`: alive (or waiting out a rate limit): look again later. `finished`: the worker died after saving
+ * the whole answer, so the run was closed here instead of asking the model again. `resumed`: the worker was dead, the
+ * resume is queued. `fail`: dead and not safe to resume; the caller ends the run with the message (`failRun`), after
+ * the rows it saved were recorded here as one reply.
  */
 export const inspectRun = internalMutation
     .input({ streamId: v.id("persistentStreams") })
@@ -159,16 +227,39 @@ export const inspectRun = internalMutation
             return { kind: "fresh" as const };
         }
 
-        const settings = await ctx.db.userSettings.findFirst({ where: { userId: stream.userId } });
+        // The usual case, and the cheap one: a run that beat lately is alive, and no message is read for it.
+        const beatAt = stream.beatAt ?? stream.runClaimedAt;
 
-        if (settings?.resumeInterruptedRuns === false) {
+        if (now - beatAt < RUN_STALE_MS) {
+            return { kind: "fresh" as const };
+        }
+
+        if (stream.resumable === false) {
             // Opted out: the stream expires into `timeout` as it always did.
             return { kind: "gone" as const };
         }
 
         const saved = settleSavedRows(await savedRowsOf(ctx, stream));
+        const threadId = stream.threadId as Id<"threads">;
+        // Everything this reply saved so far is one reply: recorded once, whichever way it ends.
+        const pausedRun = {
+            replyRowIds: [...new Set([...(stream.pausedRun?.replyRowIds ?? []), ...saved.replyRowIds])],
+            stepsUsed: saved.ok ? saved.stepsUsed : (stream.pausedRun?.stepsUsed ?? 0),
+            ...((stream.pausedRun?.skill ?? stream.replyContext?.skill) && { skill: (stream.pausedRun?.skill ?? stream.replyContext?.skill)! }),
+            ...((stream.pausedRun?.timeZone ?? stream.replyContext?.timeZone) && { timeZone: (stream.pausedRun?.timeZone ?? stream.replyContext?.timeZone)! }),
+        };
+        const from = saved.ok ? (saved.from ?? stream.messageId) : stream.messageId;
+
+        // A newer reply took the thread: this one is a branch nobody reads. It ends quietly, whatever else is wrong with it,
+        // and never sets the thread to `error` under the reply that is live.
+        if (await isSuperseded(ctx, stream, from)) {
+            await endPausedRun(ctx, { ...stream, pausedRun });
+
+            return { kind: "gone" as const };
+        }
+
         const plan = planInterruption({
-            beatAt: stream.beatAt ?? stream.runClaimedAt,
+            beatAt,
             interruptions: stream.interruptions ?? 0,
             now,
             saved,
@@ -179,15 +270,6 @@ export const inspectRun = internalMutation
         if (plan.action === "wait") {
             return { kind: "fresh" as const };
         }
-
-        const threadId = stream.threadId as Id<"threads">;
-        // Everything this reply saved so far is one reply: recorded once, whichever way it ends.
-        const pausedRun = {
-            replyRowIds: [...new Set([...(stream.pausedRun?.replyRowIds ?? []), ...(saved.ok ? saved.replyRowIds : [])])],
-            stepsUsed: saved.ok ? saved.stepsUsed : (stream.pausedRun?.stepsUsed ?? 0),
-            ...(stream.pausedRun?.skill && { skill: stream.pausedRun.skill }),
-            ...(stream.pausedRun?.timeZone && { timeZone: stream.pausedRun.timeZone }),
-        };
 
         // The dead step opened an empty placeholder before its call; the resume opens its own, and a failed run keeps no empty bubble.
         if (saved.ok) {
@@ -200,19 +282,19 @@ export const inspectRun = internalMutation
             }
         }
 
-        if (plan.action === "fail") {
-            await recordPausedRunUsage(ctx, { ...stream, pausedRun });
-            await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined, toolsInFlight: undefined });
-
-            return { kind: "fail" as const, message: interruptionMessage(plan.reason), threadId: stream.threadId };
-        }
-
-        const from = saved.ok ? (saved.from ?? stream.messageId) : stream.messageId;
-
-        if (await isSuperseded(ctx, stream, from)) {
+        if (plan.action === "finish") {
+            // The answer is saved whole: record it once and close the stream, as a run that ended itself would have.
             await endPausedRun(ctx, { ...stream, pausedRun });
 
-            return { kind: "gone" as const };
+            return { kind: "finished" as const };
+        }
+
+        if (plan.action === "fail") {
+            // `toolsInFlight` stays: a failure that could not be delivered (`failRun` threw) is looked at again and must fail the same way.
+            await recordPausedRunUsage(ctx, { ...stream, pausedRun });
+            await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined });
+
+            return { kind: "fail" as const, message: interruptionMessage(plan.reason), threadId: stream.threadId };
         }
 
         const interruptions = (stream.interruptions ?? 0) + 1;

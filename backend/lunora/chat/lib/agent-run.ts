@@ -35,6 +35,7 @@ import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
 import { injectsUntrustedContext } from "./low-risk-approval";
+import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
@@ -464,6 +465,7 @@ export const loadRunContext = async (
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization: toPersonalization(prefs),
+            resumeInterruptedRuns: prefs.resumeInterruptedRuns,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
@@ -850,6 +852,8 @@ export const finishRun = async (
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
         pending: { reasoning: string; text: string };
+        /** The run's epoch (`run-epoch.ts`): a run a newer one replaced finishes nothing and gets `RUN_REPLACED`. */
+        runEpoch?: number;
         savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
         snapshot: ToolRunConfig;
         streamId: string;
@@ -864,6 +868,7 @@ export const finishRun = async (
         keepOpenUnlessPaused,
         mcpLabels,
         pending,
+        runEpoch,
         savedMessages,
         snapshot,
         streamId,
@@ -871,6 +876,14 @@ export const finishRun = async (
         unsaved = { reasoning: "", text: "" },
         userId,
     } = args;
+
+    // Before the calls are stamped and the approvals recorded: a replaced run does none of it.
+    if (runEpoch !== undefined) {
+        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
+            epoch: runEpoch,
+            streamId: streamId as Id<"persistentStreams">,
+        });
+    }
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, savedMessages, userId });
 
@@ -896,6 +909,7 @@ export const finishRun = async (
         await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
             final: paused || keepOpenUnlessPaused !== true,
             reasoning: pending.reasoning || undefined,
+            ...(runEpoch !== undefined && { runEpoch }),
             streamId: streamId as Id<"persistentStreams">,
             text: pending.text,
         });
@@ -1316,6 +1330,8 @@ export const setThreadStatus = async (
 export const failRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
     args: {
+        /** The run's epoch (`run-epoch.ts`): a run a newer one replaced ends nothing, and `failRun` returns without a trace. */
+        runEpoch?: number;
         safeMessage: string;
         /** Stamps the run's auto-approved calls onto the rows it saved before it failed. Best effort: it runs after the run is closed. */
         stamp?: () => Promise<void>;
@@ -1324,7 +1340,7 @@ export const failRun = async (
         threadStatus: "active" | "error";
     },
 ): Promise<void> => {
-    const { safeMessage, stamp, streamId, threadId, threadStatus } = args;
+    const { runEpoch, safeMessage, stamp, streamId, threadId, threadStatus } = args;
 
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
     // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
@@ -1338,10 +1354,16 @@ export const failRun = async (
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: true,
+                ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: `\n\nError: ${safeMessage}`,
             });
-        } catch {
+        } catch (error) {
+            // A newer run holds the stream: this one's failure is not the reply's, and it ends nothing of theirs.
+            if (isRunReplaced(error)) {
+                return;
+            }
+
             // A stop can land between the read above and the write, which then refuses it. Read again before
             // calling it a failure, so a stopped run never ends in `error`.
             endedElsewhere = (await readStatus()) === "done";

@@ -1184,8 +1184,11 @@ export interface Doc_persistentStreams {
     pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
     pausedSteps?: Array<string>;
     producer?: "host";
+    replyContext?: { skill?: { id?: string; name: string }; timeZone?: string };
+    resumable?: boolean;
     runArgs?: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string };
     runClaimedAt?: number;
+    runEpoch?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     stoppedAt?: number;
@@ -4166,8 +4169,11 @@ export interface Insert_persistentStreams {
     pausedRun?: { replyRowIds: Array<string>; skill?: { id?: string; name: string }; stepsUsed: number; timeZone?: string };
     pausedSteps?: Array<string>;
     producer?: "host";
+    replyContext?: { skill?: { id?: string; name: string }; timeZone?: string };
+    resumable?: boolean;
     runArgs?: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string };
     runClaimedAt?: number;
+    runEpoch?: number;
     status: string;
     steers?: Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>;
     stoppedAt?: number;

@@ -19,6 +19,7 @@ import { endActiveGoals } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
+import { assertCurrentRun, epochOf } from "../../lib/run-epoch";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
@@ -112,6 +113,8 @@ export const addChunk = internalMutation
         reasoning: v.optional(v.string()),
         /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
         restart: v.optional(v.boolean()),
+        /** The writing run's epoch (`run-epoch.ts`): a chunk from a run a newer one replaced is refused. */
+        runEpoch: v.optional(v.number()),
         /** Group chat: this chunk starts a new participant's reply. */
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
@@ -139,6 +142,8 @@ export const addChunk = internalMutation
         if (stream.status !== "pending" && stream.status !== "streaming") {
             throw new LunoraError("CONFLICT", "Stream is not streaming; did it timeout?");
         }
+
+        assertCurrentRun(stream, args.runEpoch);
 
         // The chunk's position: one past the stream's last chunk, read off
         // `by_streamId_seq` in this same mutation. The counter deliberately
@@ -845,6 +850,8 @@ export const pauseRunForRateLimit = internalMutation
         replyRowIds: v.array(v.string().max(MAX_LENGTH.id)),
         retryAt: v.optional(v.number()),
         run: v.object({ ...runStreamingAgentFields }),
+        /** The pausing run's epoch (`run-epoch.ts`): a run a newer one replaced pauses nothing. */
+        runEpoch: v.optional(v.number()),
         skill: v.optional(v.object({ id: v.optional(v.string().max(MAX_LENGTH.id)), name: v.string().max(MAX_LENGTH.short) })),
         status: v.number(),
         stepsUsed: v.number(),
@@ -855,7 +862,13 @@ export const pauseRunForRateLimit = internalMutation
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
-        if (!stream || !isLiveStream(stream) || stream.pause !== undefined) {
+        if (!stream || !isLiveStream(stream)) {
+            return { paused: false, reason: "not_live" as const };
+        }
+
+        assertCurrentRun(stream, args.runEpoch);
+
+        if (stream.pause !== undefined) {
             return { paused: false, reason: "not_live" as const };
         }
 
@@ -919,6 +932,8 @@ export const pauseRunForRateLimit = internalMutation
     });
 
 const vResumeClaim = v.object({
+    /** The run's epoch from here on (`run-epoch.ts`): its writes carry it, and an older run's are refused. */
+    epoch: v.number(),
     from: v.string(),
     /** The reply rows the run saved before this pause (all pauses): the resume records one reply covering them and its own. */
     replyRowIds: v.array(v.string()),
@@ -955,18 +970,23 @@ export const claimRunResume = internalMutation
             return null;
         }
 
+        // The run that held the stream until now, if it is alive after all, is replaced by this one.
+        const epoch = epochOf(stream) + 1;
+
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
         await patchRow(ctx.db, "persistentStreams", stream, {
             beatAt: ctx.now,
             expiresAt: ctx.now + STREAM_TTL_MS,
             pause: undefined,
             pauseCause: undefined,
+            runEpoch: epoch,
             toolsInFlight: undefined,
         });
 
         const done = stream.pausedRun;
 
         return {
+            epoch,
             from,
             replyRowIds: done?.replyRowIds ?? [],
             ...(done?.skill && { skill: done.skill }),

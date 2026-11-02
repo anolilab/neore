@@ -1070,6 +1070,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            resumeInterruptedRuns: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1092,6 +1093,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1107,6 +1109,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                resumeInterruptedRuns: undefined,
                 threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,

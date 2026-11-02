@@ -14,7 +14,7 @@ import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, unknown>; delayMs: number | undefined }[],
-        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, withTools: false },
+        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, optOut: false, withTools: false },
         registry: new Map<string, unknown>(),
     };
 });
@@ -71,7 +71,13 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 contextParts: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
-                prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                prefs: {
+                    language: undefined,
+                    location: undefined,
+                    personalization: undefined,
+                    resumeInterruptedRuns: modelState.optOut ? false : undefined,
+                    timezone: "Europe/Berlin",
+                },
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: null,
@@ -123,8 +129,8 @@ vi.mock("./lib/get-agent", () => {
 
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runStreamingAgent } = await import("./execute");
-const { claimRunResume } = await import("./streaming/persistent/library");
-const { beatRun, inspectRun, markToolRun } = await import("./streaming/persistent/interrupted");
+const { addChunk, claimRunResume } = await import("./streaming/persistent/library");
+const { assertRunEpoch, beatRun, inspectRun, markToolRun } = await import("./streaming/persistent/interrupted");
 const { watchRun } = await import("./streaming/persistent/interrupted-watch");
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -180,6 +186,7 @@ beforeEach(async () => {
     enqueued.length = 0;
     modelState.builtAgents = 0;
     modelState.withTools = false;
+    modelState.optOut = false;
     modelState.groupConfig = null;
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
@@ -428,7 +435,7 @@ describe("a run whose worker dies mid-step", () => {
     it("is not resumed when the person opted out: it expires as it always did", async () => {
         await startRunThatDiesInStepTwo();
         await patchStream({ beatAt: deadBeat() });
-        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { resumeInterruptedRuns: false, userId: OWNER }));
+        await patchStream({ resumable: false });
 
         expect(await inspect()).toStrictEqual({ kind: "gone" });
         expect(enqueued).toHaveLength(0);
@@ -440,7 +447,7 @@ describe("a run whose worker dies mid-step", () => {
     it("is resumed when the setting is on", async () => {
         await startRunThatDiesInStepTwo();
         await patchStream({ beatAt: deadBeat() });
-        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { resumeInterruptedRuns: true, userId: OWNER }));
+        await patchStream({ resumable: true });
 
         expect(await inspect()).toStrictEqual({ kind: "resumed" });
     });
@@ -509,7 +516,7 @@ describe("a run whose worker dies mid-step", () => {
 describe("the beat and the tool marks", () => {
     it("beatRun moves the beat of a live, unpaused stream", async () => {
         await patchStream({ beatAt: 1, runClaimedAt: 1 });
-        await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { streamId: ids.streamId as never }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
 
         const beaten = await readStream();
 
@@ -517,8 +524,8 @@ describe("the beat and the tool marks", () => {
     });
 
     it("markToolRun counts open tools, never below zero, and refuses to start one on a stream that ended", async () => {
-        const mark = async (delta: 1 | -1) =>
-            await harness.run(async (ctx: any) => await ctx.runMutation(markToolRun, { delta, streamId: ids.streamId as never }));
+        const mark = async (delta: number) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(markToolRun, { delta, epoch: 0, streamId: ids.streamId as never }));
 
         await mark(1);
         await mark(1);
@@ -534,5 +541,142 @@ describe("the beat and the tool marks", () => {
 
         await patchStream({ status: "done" });
         await expect(mark(1)).rejects.toThrow();
+    });
+});
+
+const insertRow = async (fields: Record<string, unknown>) =>
+    await harness.run(
+        async (ctx: any) =>
+            await ctx.db.insert("messages", {
+                status: "success",
+                threadId: ids.threadId,
+                tool: false,
+                userId: OWNER,
+                ...fields,
+            }),
+    );
+
+describe("a run the watchdog reads wrongly", () => {
+    it("registers the person's opt-out and the reply's context from the run itself", async () => {
+        modelState.optOut = true;
+        await startRunThatDiesInStepTwo();
+
+        const stream = await readStream();
+
+        expect(stream.resumable).toBe(false);
+        expect(stream.replyContext).toMatchObject({ timeZone: "Europe/Berlin" });
+    });
+
+    it("moves the stream's expiry with the beat", async () => {
+        await patchStream({ beatAt: 1, expiresAt: Date.now() + 1000, runClaimedAt: 1 });
+        await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
+
+        expect((await readStream()).expiresAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000);
+    });
+
+    it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
+        await startRunThatDiesInStepTwo();
+        // The same reply as the saved step: it shares its order.
+        const last = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+
+            return rows.at(-1);
+        });
+
+        await insertRow({
+            message: { content: [{ text: "All done.", type: "text" }], role: "assistant" },
+            order: last.order,
+            stepOrder: last.stepOrder + 1,
+            text: "All done.",
+        });
+        await patchStream({ beatAt: deadBeat() });
+
+        expect(await inspect()).toStrictEqual({ kind: "finished" });
+        expect(enqueued).toHaveLength(0);
+        expect((await readState()).streamStatus).toBe("done");
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("ends quietly, not in error, when a newer reply took the thread", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat(), toolsInFlight: 1 });
+        // The newer reply: its own stream, and rows that would fail this run if they were read as its own.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 60_000,
+                messageId: ids.messageId,
+                status: "streaming",
+                streamingConfig: { contentType: "text", model: "test-model" },
+                threadId: ids.threadId,
+                userId: OWNER,
+            });
+        });
+        await insertRow({ message: { content: [], role: "assistant" }, order: 1, status: "pending", stepOrder: 5 });
+
+        expect(await inspect()).toStrictEqual({ kind: "gone" });
+        expect((await readState()).threadStatus).not.toBe("error");
+        expect((await readState()).streamStatus).toBe("done");
+    });
+
+    it("records the rows a refused run saved", async () => {
+        await startRunThatDiesInStepTwo();
+        // The tool result never landed: the run is refused, but its assistant row is a reply that was paid for.
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+            const tool = rows.find((row: any) => row.message?.role === "tool");
+
+            await ctx.db.delete("messages", tool._id);
+        });
+        await patchStream({ beatAt: deadBeat() });
+        vi.mocked(scheduleReplyUsage).mockClear();
+
+        expect(await inspect()).toMatchObject({ kind: "fail" });
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+        expect(vi.mocked(scheduleReplyUsage).mock.calls[0]![1]).toMatchObject({ tokens: expect.any(Number), userId: OWNER });
+    });
+});
+
+describe("a run a newer one replaced", () => {
+    it("is refused on every write that matters, and the current run is untouched", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+        const claim = (await harness.run(
+            async (ctx: any) => await ctx.runMutation(claimRunResume, { pauseId: pause!.id, streamId: ids.streamId as never }),
+        )) as { epoch: number };
+
+        expect(claim.epoch).toBe(1);
+
+        const stale = async (fn: () => Promise<unknown>) => await expect(fn()).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        const mutate = async (ref: any, args: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(ref, { streamId: ids.streamId as never, ...args }));
+        const before = await readStream();
+
+        await stale(async () => await mutate(addChunk, { final: false, runEpoch: 0, text: "stale" }));
+        await stale(async () => await mutate(addChunk, { final: true, runEpoch: 0, text: "stale end" }));
+        await stale(async () => await mutate(beatRun, { epoch: 0 }));
+        await stale(async () => await mutate(markToolRun, { delta: 1, epoch: 0 }));
+        await stale(async () => await mutate(markToolRun, { delta: -1, epoch: 0 }));
+        await stale(async () => await mutate(assertRunEpoch, { epoch: 0 }));
+
+        const after = await readStream();
+
+        expect(after.status).toBe(before.status);
+        expect(after.toolsInFlight).toBeUndefined();
+        expect((await readState()).chunkText).not.toContain("stale");
+
+        // The current run writes as usual.
+        await mutate(addChunk, { final: false, runEpoch: 1, text: "fresh" });
+        await mutate(beatRun, { epoch: 1 });
+        await mutate(assertRunEpoch, { epoch: 1 });
+        expect((await readState()).chunkText).toContain("fresh");
     });
 });

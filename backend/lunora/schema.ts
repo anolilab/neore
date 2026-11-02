@@ -1862,6 +1862,12 @@ export const schema = defineSchema({
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
         pausedSteps: v.optional(v.array(v.string())),
         producer: v.optional(v.literal("host")),
+        // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
+        // any pause stored it in `pausedRun`.
+        replyContext: v.optional(v.object({ skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })), timeZone: v.optional(v.string()) })),
+        // Whether the person lets a dead run resume (`userSettings.resumeInterruptedRuns`), decided by the run's own action
+        // (the setting lives on the person's shard, the stream may sit on a thread owner's). Absent = on.
+        resumable: v.optional(v.boolean()),
         // The job's own arguments, stored by a run that may be resumed when its worker dies (`registerResumableRun`).
         // Absent: tool-approval continuations, group turns and stateless runs, which are never resumed that way.
         runArgs: v.optional(v.object({ ...runStreamingAgentFields })),
@@ -1869,6 +1875,9 @@ export const schema = defineSchema({
         // The run arrives on the jobs queue, which delivers at least once; a
         // redelivery finds this set and does nothing.
         runClaimedAt: v.optional(v.number()),
+        // Which run holds this stream: absent for the first claim, one more for each resume claim (`claimRunResume`). A run
+        // carries its number on every write that matters and is refused once a newer run holds the stream (`run-epoch.ts`).
+        runEpoch: v.optional(v.number()),
         status: v.string(),
         // Messages the run's user sent into it while it streams (`chat/steering.ts`).
         // `queued` until the run takes them at a step boundary; a delivered entry

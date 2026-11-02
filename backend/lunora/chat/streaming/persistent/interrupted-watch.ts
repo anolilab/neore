@@ -15,21 +15,33 @@ export const watchRun = internalAction
     .input({ streamId: v.id("persistentStreams") })
     .output(v.null())
     .action(async ({ args, ctx }) => {
-        const verdict = await ctx.runMutation(internal.chat.streaming.persistent.interrupted.inspectRun, { streamId: args.streamId });
+        // A look that throws (a busy shard, a failed `failRun`) must not end the chain: nothing else would restart it, and the
+        // stream would be left to expire. The next look repeats the same decision (a refused resume keeps its reasons on the row).
+        try {
+            const verdict = await ctx.runMutation(internal.chat.streaming.persistent.interrupted.inspectRun, { streamId: args.streamId });
 
-        if (verdict.kind === "gone") {
-            return null;
-        }
+            if (verdict.kind === "gone") {
+                return null;
+            }
 
-        if (verdict.kind === "fail") {
-            streamLogger.warn(`[BgAgent] Stream ${args.streamId} was interrupted and is not resumed: ${verdict.message}`);
-            await failRun(ctx, { safeMessage: verdict.message, streamId: args.streamId, threadId: verdict.threadId, threadStatus: "error" });
+            if (verdict.kind === "finished") {
+                streamLogger.warn(`[BgAgent] Stream ${args.streamId} lost its worker after saving the whole answer; closed`);
 
-            return null;
-        }
+                return null;
+            }
 
-        if (verdict.kind === "resumed") {
-            streamLogger.warn(`[BgAgent] Stream ${args.streamId} lost its worker; resume queued`);
+            if (verdict.kind === "fail") {
+                streamLogger.warn(`[BgAgent] Stream ${args.streamId} was interrupted and is not resumed: ${verdict.message}`);
+                await failRun(ctx, { safeMessage: verdict.message, streamId: args.streamId, threadId: verdict.threadId, threadStatus: "error" });
+
+                return null;
+            }
+
+            if (verdict.kind === "resumed") {
+                streamLogger.warn(`[BgAgent] Stream ${args.streamId} lost its worker; resume queued`);
+            }
+        } catch (error) {
+            streamLogger.error(`[BgAgent] Looking at stream ${args.streamId} failed; looking again:`, error);
         }
 
         await ctx.scheduler.runAfter(RUN_WATCH_MS, internal.chat.streaming.persistent.interrupted_watch.watchRun, { streamId: args.streamId });

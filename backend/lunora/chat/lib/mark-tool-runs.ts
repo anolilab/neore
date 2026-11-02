@@ -1,68 +1,118 @@
 /**
  * Marks every tool call of a run on its stream while it executes (`markToolRun`), so a worker that dies inside a tool
  * is never resumed: the tool may have paid for or changed something and leaves no row (`interrupted-run.ts`).
- * The mark is written BEFORE the tool starts and a refused mark (the stream ended) stops the tool; the unmark is
- * best effort, because a lost one only makes a later death fail instead of resume.
+ *
+ * The mark is written BEFORE the tool starts and stays until the step that holds the call has been SAVED (`release`,
+ * from the step's `onStepFinish`, which the agent runs after it saved the rows). A tool that has returned but whose
+ * rows are not saved yet is still unaccounted for: a death in that window would otherwise look like "not in a tool" and
+ * the resume would call the tool again. A refused mark (the stream ended, or a newer run holds it) stops the tool; any
+ * other failure of the mark is logged and the tool runs, counted as open all the same.
  */
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
+import { streamLogger } from "../../lib/logger";
+import { errorCodeOf, isRunReplaced } from "./run-epoch";
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
     typeof value === "object" && value !== null && Symbol.asyncIterator in (value as object);
 
-export const markToolRuns = <T extends Record<string, unknown>>(ctx: Pick<ActionCtx, "runMutation">, streamId: string, tools: T): T => {
-    const mark = async (delta: 1 | -1) =>
-        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.markToolRun, { delta, streamId: streamId as Id<"persistentStreams"> });
-    const end = async () => {
-        await mark(-1).catch(() => undefined);
+export interface ToolRunMarker {
+    /** Called once the step's rows are saved: the tools that finished in it are accounted for. Best effort, like every unmark. */
+    release: () => Promise<void>;
+    wrap: <T extends Record<string, unknown>>(tools: T) => T;
+}
+
+export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: { epoch: number; onReplaced: () => void; streamId: string }): ToolRunMarker => {
+    const { epoch, onReplaced, streamId } = args;
+    // Tools that returned (or threw) and wait for their step to be saved.
+    let finished = 0;
+    const mark = async (delta: number) =>
+        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.markToolRun, { delta, epoch, streamId: streamId as Id<"persistentStreams"> });
+    const begin = async () => {
+        try {
+            await mark(1);
+        } catch (error) {
+            if (isRunReplaced(error)) {
+                onReplaced();
+            }
+
+            // A stream that ended or was taken over stops the tool; a shard blip must not, and the tool then counts as open
+            // anyway (a mark that never landed is clamped at zero on release).
+            if (isRunReplaced(error) || errorCodeOf(error) === "CONFLICT") {
+                throw error;
+            }
+
+            streamLogger.warn(`[BgAgent] Could not mark a tool call on stream ${streamId}:`, error);
+        }
+    };
+    const end = () => {
+        finished += 1;
     };
 
-    const marked: Record<string, unknown> = {};
+    return {
+        release: async () => {
+            const count = finished;
 
-    for (const [name, definition] of Object.entries(tools)) {
-        const execute = (definition as { execute?: (...args: unknown[]) => unknown } | undefined)?.execute;
+            if (count === 0) {
+                return;
+            }
 
-        if (typeof execute !== "function") {
-            marked[name] = definition;
+            finished -= count;
+            await mark(-count).catch((error: unknown) => {
+                if (isRunReplaced(error)) {
+                    onReplaced();
+                }
+            });
+        },
+        wrap: <T extends Record<string, unknown>>(tools: T): T => {
+            const marked: Record<string, unknown> = {};
 
-            continue;
-        }
+            for (const [name, definition] of Object.entries(tools)) {
+                const execute = (definition as { execute?: (...args: unknown[]) => unknown } | undefined)?.execute;
 
-        marked[name] = {
-            ...(definition as object),
-            execute: async (...args: unknown[]) => {
-                await mark(1);
+                if (typeof execute !== "function") {
+                    marked[name] = definition;
 
-                let output: unknown;
-
-                try {
-                    output = await execute.apply(definition, args);
-                } catch (error) {
-                    await end();
-
-                    throw error;
+                    continue;
                 }
 
-                // A streaming tool is open until its last yield.
-                if (isAsyncIterable(output)) {
-                    const stream = output;
+                marked[name] = {
+                    ...(definition as object),
+                    execute: async (...executeArgs: unknown[]) => {
+                        await begin();
 
-                    return (async function* markedStream() {
+                        let output: unknown;
+
                         try {
-                            yield* stream;
-                        } finally {
-                            await end();
+                            output = await execute.apply(definition, executeArgs);
+                        } catch (error) {
+                            end();
+
+                            throw error;
                         }
-                    })();
-                }
 
-                await end();
+                        // A streaming tool is open until its last yield.
+                        if (isAsyncIterable(output)) {
+                            const stream = output;
 
-                return output;
-            },
-        };
-    }
+                            return (async function* markedStream() {
+                                try {
+                                    yield* stream;
+                                } finally {
+                                    end();
+                                }
+                            })();
+                        }
 
-    return marked as T;
+                        end();
+
+                        return output;
+                    },
+                };
+            }
+
+            return marked as T;
+        },
+    };
 };
