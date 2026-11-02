@@ -63,6 +63,51 @@ describe("parseOrganizationPolicy", () => {
         });
     });
 
+    describe("repeated keys", () => {
+        it("rejects a repeated key whose last value would hide an unknown rule", () => {
+            expect(rejected('{"schemaVersion":1,"models":{"blocked":["x"]},"models":{"allowed":["a"]}}')).toContain("repeats a key");
+        });
+
+        it("rejects a repeated key inside a nested object", () => {
+            expect(rejected('{"schemaVersion":1,"settings":{"memoryEnabled":{"locked":true,"locked":false,"value":true}}}')).toContain("repeats a key");
+        });
+
+        it("rejects a repeated key inside an object held by an array", () => {
+            expect(rejected('{"schemaVersion":1,"models":{"allowed":[{"id":"a","id":"b"}]}}')).toContain("repeats a key");
+        });
+
+        it("treats an escaped spelling of a key as the same key", () => {
+            expect(rejected(String.raw`{"schemaVersion":1,"\u0073chemaVersion":1}`)).toContain("repeats a key");
+        });
+
+        it("does not repeat the key back in the error", () => {
+            const key = `k${"x".repeat(400)}`;
+
+            expect(rejected(`{"schemaVersion":1,"${key}":1,"${key}":2}`).length).toBeLessThan(120);
+        });
+
+        it("accepts the same key in two different objects", () => {
+            const result = parse(
+                '{"schemaVersion":1,"settings":{"memoryEnabled":{"locked":true,"value":true},"dailyBriefEnabled":{"locked":false,"value":false}}}',
+            );
+
+            expect(result.ok).toBe(true);
+        });
+
+        it("accepts a document with no repeated key and parses it as before", () => {
+            expect(parse('{"schemaVersion":1,"models":{"allowed":["a"]},"permissionCap":"ask"}')).toEqual({
+                ok: true,
+                policy: { models: { allowed: ["a"] }, permissionCap: "ask", schemaVersion: 1 },
+            });
+        });
+
+        it("does not mistake a string value that looks like a key for one", () => {
+            const result = parse(String.raw`{"schemaVersion":1,"models":{"allowed":["\"schemaVersion\":1","a\",\"allowed\":"]}}`);
+
+            expect(result).toEqual({ ok: true, policy: { models: { allowed: ['"schemaVersion":1', 'a","allowed":'] }, schemaVersion: 1 } });
+        });
+    });
+
     describe("schemaVersion", () => {
         it("rejects a missing schemaVersion", () => {
             expect(rejected({})).toContain("schemaVersion is required");

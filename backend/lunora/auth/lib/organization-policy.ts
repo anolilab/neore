@@ -150,19 +150,85 @@ const parseSettings = (value: unknown): { error: string } | { settings: Record<s
     return { settings };
 };
 
+/**
+ * Whether any JSON object in `text` repeats a key. `JSON.parse` keeps only the
+ * last of a repeated key, so every check on the parsed value would miss what the
+ * earlier occurrences said.
+ *
+ * Only call this on text `JSON.parse` has accepted: it relies on the text being
+ * well-formed. Guarantees, at any depth:
+ *  - a key is a string token directly followed by `:`, so a string value or an
+ *    array item that merely contains `"x":` is never read as one (the pattern
+ *    consumes each string whole, escapes included);
+ *  - keys are compared after decoding, so `"a"` and `"\u0061"` are one key;
+ *  - each object has its own key set, so the same key in two objects is fine.
+ */
+const hasRepeatedKey = (text: string): boolean => {
+    // One entry per open container: a key set for an object, `undefined` for an array.
+    const open: (Set<string> | undefined)[] = [];
+    let previous = "";
+
+    for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|[[\]{}:]/g)) {
+        switch (token) {
+            case ":": {
+                const keys = open.at(-1);
+                const key = JSON.parse(previous) as string;
+
+                if (keys?.has(key)) {
+                    return true;
+                }
+
+                keys?.add(key);
+                break;
+            }
+            case "[": {
+                open.push(undefined);
+                break;
+            }
+            case "]":
+            case "}": {
+                open.pop();
+                break;
+            }
+            case "{": {
+                open.push(new Set());
+                break;
+            }
+            default:
+        }
+
+        previous = token;
+    }
+
+    return false;
+};
+
+/** `JSON.parse` that also refuses a document repeating a key; the error never quotes the text. */
+const readJson = (text: string): { error: string } | { value: unknown } => {
+    let value: unknown;
+
+    try {
+        value = JSON.parse(text);
+    } catch {
+        return { error: "The policy is not valid JSON" };
+    }
+
+    return hasRepeatedKey(text) ? { error: "The policy repeats a key within one object" } : { value };
+};
+
 /** Parse and validate a policy document. Nothing is stored unless the result is `ok`. */
 export const parseOrganizationPolicy = (text: string): PolicyParseResult => {
     if (text.length > MAX_POLICY_CHARS) {
         return fail(`The policy is larger than ${String(MAX_POLICY_CHARS)} characters`);
     }
 
-    let parsed: unknown;
+    const json = readJson(text);
 
-    try {
-        parsed = JSON.parse(text);
-    } catch {
-        return fail("The policy is not valid JSON");
+    if ("error" in json) {
+        return fail(json.error);
     }
+
+    const parsed = json.value;
 
     if (!isRecord(parsed)) {
         return fail("The policy must be a JSON object");
