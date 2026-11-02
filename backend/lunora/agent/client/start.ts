@@ -375,7 +375,6 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
 
             return inFlightSave;
         },
-        // Resolves once the work an abort started (failing the pending row) is done; immediately when none was.
         settleAbort: async () => {
             await aborting;
         },
