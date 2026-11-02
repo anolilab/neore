@@ -673,7 +673,9 @@ describe("a run the watchdog reads wrongly", () => {
                     .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
                     .collect();
 
-                for (const row of rows.filter((candidate: any) => candidate.status === "pending" && candidate.message?.role === "assistant")) {
+                const placeholders = rows.filter((candidate: any) => candidate.status === "pending" && candidate.message?.role === "assistant");
+
+                for (const row of placeholders) {
                     await ctx.db.delete("messages", row._id);
                 }
             });
@@ -811,6 +813,39 @@ describe("a run the watchdog reads wrongly", () => {
         const call = labelled.message.content.find((part: any) => part.type === "tool-call");
 
         expect(call.providerOptions.neore).toMatchObject({ mcpServerName: "srv", mcpToolName: "echo" });
+    });
+
+    it("stamps the reply and queues the follow-up suggestions of a recovered reply exactly once", async () => {
+        const { internal } = await import("../_generated/internal");
+        const { recoverFinishedReply } = await import("./lib/recover-finished-reply");
+
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+
+        const verdict = await inspect();
+
+        expect(verdict).toMatchObject({ goal: false, kind: "finished" });
+
+        const queued: unknown[] = [];
+
+        await harness.action(async (ctx: any) => {
+            const scheduler = {
+                runAfter: async (...call: unknown[]) => {
+                    queued.push(call[1]);
+
+                    return await ctx.scheduler.runAfter(...call);
+                },
+            };
+
+            await recoverFinishedReply({ runMutation: ctx.runMutation.bind(ctx), runQuery: ctx.runQuery.bind(ctx), scheduler } as never, verdict as never);
+        });
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", ids.threadId as never));
+
+        expect(thread.lastReplyAt).toBeGreaterThan(0);
+        expect(queued.filter((target) => target === internal.chat.functions.generateFollowupSuggestionsForThread)).toHaveLength(1);
+
+        // The close is the claim: the stream is done, so another look recovers nothing.
+        expect(await inspect()).toStrictEqual({ kind: "gone" });
     });
 
     it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {

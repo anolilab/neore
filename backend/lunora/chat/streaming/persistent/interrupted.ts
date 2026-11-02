@@ -340,7 +340,10 @@ export const inspectRun = internalMutation
         }
 
         if (plan.action === "finish") {
-            // The answer is saved whole: record it once and close the stream, as a run that ended itself would have. A goal's
+            // The answer is saved whole: record it once and close the stream, as a run that ended itself would have. What the
+            // normal end also leaves on the thread (the reply stamp, the follow-up suggestions) and the after-run work are done by
+            // the caller, once, from this verdict (`recoverFinishedReply` in `interrupted-watch.ts`): the stream is closed here
+            // in the same transaction, so a repeat finds nothing to recover. A goal's
             // run is handed to its review the way the run's own end would (`handOffToGoalReview`): the review job claims its
             // round, so a repeat does nothing, and the goal keeps the thread's status.
             const finishedGoals = await activeGoalsOf(ctx, threadId);
