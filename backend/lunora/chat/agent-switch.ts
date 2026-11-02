@@ -17,6 +17,7 @@
  * daily allowance is spent, `beginSwitchSummary` lets one summary run per thread at a time and counts it
  * against its own rate limit, and only then does the action call the gateway.
  */
+import { estimateTokensFromCharacters } from "@neore/ai/models";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -24,7 +25,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { handoffAboveOf, leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
+import { handoffAboveOf, handoffBeforeDeltaOf, leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
 import { type AgentRef, HANDOFF_MAX_CHARACTERS, type SwitchAgentRef, vAgentRef, vAgentSwitchMode, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import {
@@ -43,7 +44,8 @@ import {
     type HandoffLimits,
     type HandoffTurn,
 } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving, pathTokens, pathWindow, rowsSince } from "../agent/handoff-source";
+import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff } from "../agent/handoff-context";
+import { collectHandoffSource, findDividerLeaving, pathTokens, replyWindowRows, rowCharacters, rowsSince } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -371,21 +373,28 @@ const modeFor = async (
 const windowOf = (checked: Extract<Checked, { kind: "ready" }>): number => getModelContextWindow(checked.to.model);
 
 /**
- * Whether what a reply on the target is sent fits its window with room for the reply: the last DEFAULT_RECENT_MESSAGES
- * rows (text, and a fixed estimate for each image or file), plus the stored handoff that stands in for the rows
- * above them when the thread was switched before.
+ * Whether what a reply on the target is sent fits its window with room for the reply: the context the reply
+ * loader builds, assembled the same way — the newest DEFAULT_RECENT_MESSAGES successful rows (text, and a fixed
+ * estimate for each image or file), with the stored handoffs `assembleHandoffContext` keeps standing in for the
+ * rows above them and for what a switched-back model saw.
  */
 const historyFits = async (ctx: QueryCtx, checked: Extract<Checked, { kind: "ready" }>): Promise<boolean> => {
     const cap = fullHistoryCapFor(windowOf(checked));
-    const { covered, oldest, tokens } = await pathWindow(ctx, checked.thread._id, checked.leaf, { cap, handoffs: true, maxRows: DEFAULT_RECENT_MESSAGES });
+    const threadId = checked.thread._id;
+    const window = await replyWindowRows(ctx, threadId, checked.leaf, DEFAULT_RECENT_MESSAGES);
+    const oldest = window[0];
+    const earlier = oldest && oldest.order > 0 && needsEarlierHandoff(window) ? await handoffAboveOf(ctx, { belowMessageId: oldest._id, threadId }) : [];
+    const bases = new Map(
+        await Promise.all(
+            deltaOrphans(window).map(
+                async ({ id, model }) => [model, await handoffBeforeDeltaOf(ctx, { dividerMessageId: id as Id<"messages">, threadId })] as const,
+            ),
+        ),
+    );
+    const { blocks, docs } = assembleHandoffContext(window, earlier, bases);
+    const characters = docs.reduce((sum, doc) => sum + rowCharacters(doc), 0);
 
-    if (tokens > cap || covered || !oldest || oldest.order <= 0) {
-        return tokens <= cap;
-    }
-
-    const above = await handoffAboveOf(ctx, { belowMessageId: oldest._id, threadId: checked.thread._id });
-
-    return tokens + above.reduce((sum, text) => sum + handoffTokens(text), 0) <= cap;
+    return estimateTokensFromCharacters(characters) + blocks.reduce((sum, block) => sum + handoffTokens(block.text), 0) <= cap;
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });

@@ -144,60 +144,37 @@ const mediaCharacters = (row: Pick<Row, "message">): number => {
     return characters;
 };
 
-/** What {@link pathWindow} counted. */
-export interface PathWindow {
-    /** A `portable` divider with a handoff ended the count: everything before it is replaced by that handoff, so no earlier one is needed. */
-    covered: boolean;
-    /** The oldest row counted, or `null` when none was. */
-    oldest: Row | null;
-    tokens: number;
-}
+/** The characters of a row the model is sent: its stored text plus a fixed estimate for each image or file part. */
+export const rowCharacters = (row: Pick<Row, "message" | "text">): number => (row.text?.length ?? 0) + mediaCharacters(row);
 
 /**
  * Estimated tokens of the path ending at `from` (inclusive), counting up toward `cap` and stopping the walk once
  * past it: the stored text of each row plus a fixed estimate for each image or file part, which have no text.
  * `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read: a path longer than that many pages
- * counts as past the cap whatever its rows say. `maxRows` counts only that many rows from `from`: the window a reply
- * actually reads. With `handoffs`, a divider's stored handoff counts as the text the model is sent, and a `portable`
- * one ends the count, since it stands in for every row before it.
+ * counts as past the cap whatever its rows say. `maxRows` counts only that many rows from `from`.
  */
-export const pathWindow = async (
+export const pathTokens = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row | null,
-    options: { cap: number; handoffs?: boolean; maxPages?: number; maxRows?: number; stopAtId?: string },
-): Promise<PathWindow> => {
+    options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
+): Promise<number> => {
     let characters = 0;
     let cursor = from;
-    let oldest: Row | null = null;
-    let covered = false;
     let pages = 0;
     let rowsLeft = options.maxRows ?? Infinity;
 
-    while (cursor && cursor._id !== options.stopAtId && !covered) {
+    while (cursor && cursor._id !== options.stopAtId) {
         pages += 1;
 
         if (options.maxPages !== undefined && pages > options.maxPages) {
-            return { covered, oldest, tokens: options.cap + 1 };
+            return options.cap + 1;
         }
 
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: Math.min(PAGE_ROWS, rowsLeft), stopAtId: options.stopAtId });
 
         for (const row of rows) {
-            const part = options.handoffs ? agentSwitchOf(row) : undefined;
-
-            if (part?.handoff) {
-                characters += part.handoff.length;
-                covered = part.mode === "portable";
-            }
-
-            oldest = row;
-
-            if (covered) {
-                break;
-            }
-
-            characters += (row.text?.length ?? 0) + mediaCharacters(row);
+            characters += rowCharacters(row);
         }
 
         rowsLeft -= rows.length;
@@ -209,19 +186,32 @@ export const pathWindow = async (
         cursor = next;
     }
 
-    return { covered, oldest, tokens: estimateTokensFromCharacters(characters) };
+    return estimateTokensFromCharacters(characters);
 };
 
-/** Estimated tokens of the path ending at `from`; see {@link pathWindow}. */
-export const pathTokens = async (
-    context: Reader,
-    threadId: Id<"threads">,
-    from: Row | null,
-    options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
-): Promise<number> => {
-    const { tokens } = await pathWindow(context, threadId, from, options);
+/**
+ * The rows a reply on the path ending at `from` reads as history, oldest first: the newest `limit` of the
+ * successful ones, as the reply loader takes them (`agent/client/search.ts`). A failed or pending row is skipped
+ * and does not use up the window; a divider is a successful row like any other. Gives up after
+ * {@link MAX_SEARCH_PAGES} pages of rows.
+ */
+export const replyWindowRows = async (context: Reader, threadId: Id<"threads">, from: Row | null, limit: number): Promise<Row[]> => {
+    const window: Row[] = [];
+    let cursor = from;
 
-    return tokens;
+    for (let page = 0; cursor && window.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS });
+
+        for (const row of rows) {
+            if (row.status === "success" && window.length < limit) {
+                window.push(row);
+            }
+        }
+
+        cursor = next;
+    }
+
+    return window.toReversed();
 };
 
 /** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */

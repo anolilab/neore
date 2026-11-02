@@ -7,10 +7,12 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { agentSwitchOf } from "../agent/agent-switch-logic";
+import type { AgentSwitchPart } from "../agent/agent-switch-validators";
 import { handoffAboveOf, handoffBeforeDeltaOf } from "../agent/agent-switch";
 import { collectHandoffSource } from "../agent/handoff-source";
 import { HANDOFF_REFUSED_TOO_LARGE, HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_MAX_TOKENS, handoffLimitsFor, handoffTokens } from "../agent/handoff";
 import { assembleHandoffContext } from "../agent/handoff-context";
+import { insertAgentSwitchRow } from "../agent/table-writes";
 import { hasClaim, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
@@ -706,6 +708,110 @@ describe("whether the target is sent the history whole", () => {
         await switchTo(C, "click-1", "full");
 
         expect(await dividers()).toMatchObject([{ mode: "portable" }]);
+    });
+
+    /** A divider written by hand, with the handoff it stores; the thread's current agent follows it. */
+    const addDivider = async (from: string, to: string, mode: AgentSwitchPart["mode"], handoff?: string): Promise<void> => {
+        const all = await rows();
+        const start = all.at(-1)!._id as string;
+        const index = order;
+
+        order += 1;
+        await run(async (ctx) => {
+            await insertAgentSwitchRow(ctx.db, {
+                order: index,
+                part: { from: { kind: "model", model: from }, mode, startMessageId: start, to: { kind: "model", model: to }, ...(handoff && { handoff }) },
+                threadId: threadId as never,
+                userId: owner,
+            });
+            await ctx.db.patch("threads", threadId as never, { activeAgent: { kind: "model", model: to }, hasHandoff: true });
+        });
+    };
+
+    const fillerTurns = async (count: number): Promise<void> => {
+        for (let index = 0; index < count; index += 1) {
+            await addTurn(`q${index}`, `a${index}`);
+        }
+    };
+
+    // About 5,000 tokens: past the 4,500 a 6,000-token window lets a history take.
+    const BIG_HANDOFF = `restored ${"h".repeat(20_000)}`;
+
+    it("counts the older handoff a switch back restores when a portable divider sits earlier in the window", async () => {
+        await addTurn("old question", "old answer");
+        await addDivider(A, B, "portable", BIG_HANDOFF);
+        await fillerTurns(60);
+        await addDivider(B, C, "portable", "a short handoff");
+        await addTurn("question on C", "answer on C");
+        // A left through the first divider, which is above the window: the reply is sent what it saw, the big handoff.
+        await addDivider(C, A, "delta", "what happened since");
+        await addTurn("question on A", "answer on A");
+
+        await switchTo(C, "click-1", "full");
+
+        const made = await dividers();
+
+        expect(made.at(-1)).toMatchObject({ mode: "portable", to: { model: C } });
+    });
+
+    it("leaves out a handoff that a later switch back discards, and keeps the history whole", async () => {
+        await addTurn("first question", "first answer");
+        await addDivider(A, B, "full");
+        await addTurn("question for B", "answer from B");
+        // Restores what A saw and adds a big handoff...
+        await addDivider(B, A, "delta", BIG_HANDOFF);
+        await addTurn("question for A", "answer from A");
+        // ...which this switch back drops: B is restored as it was when it left, without that handoff.
+        await addDivider(A, B, "delta", "a short handoff");
+        await addTurn("question for B again", "answer from B again");
+
+        await switchTo(C, "click-1", "full");
+
+        const made = await dividers();
+
+        expect(made.at(-1)).toMatchObject({ mode: "full", to: { model: C } });
+        expect(summaryCalls).not.toHaveBeenCalled();
+    });
+
+    it("counts the newest successful rows, not the newest rows of any status", async () => {
+        const addStatusTurn = async (text: string, status: "failed" | "success"): Promise<void> => {
+            const index = order;
+
+            order += 1;
+
+            for (const [stepOrder, role] of (["user", "assistant"] as const).entries()) {
+                await run(
+                    async (ctx) =>
+                        await ctx.db.insert("messages", {
+                            message: role === "user" ? { content: text.slice(0, 10), role } : { content: [{ text, type: "text" as const }], role },
+                            order: index,
+                            status,
+                            stepOrder,
+                            text: role === "user" ? text.slice(0, 10) : text,
+                            threadId,
+                            tool: false,
+                            userId: owner,
+                        }),
+                );
+            }
+        };
+
+        // Seven large turns, 60 failed ones (120 rows), then 43 tiny ones: a reply reads the 43 and the 7 (100 rows), not the failed ones.
+        for (let index = 0; index < 7; index += 1) {
+            await addStatusTurn(`large ${index} ${"x".repeat(3000)}`, "success");
+        }
+
+        for (let index = 0; index < 60; index += 1) {
+            await addStatusTurn(`failed ${index}`, "failed");
+        }
+
+        for (let index = 0; index < 43; index += 1) {
+            await addStatusTurn(`tiny ${index}`, "success");
+        }
+
+        await switchTo(C, "click-1", "full");
+
+        expect(await dividers()).toMatchObject([{ mode: "portable", to: { model: C } }]);
     });
 
     it("does not restore a model's earlier context as a delta when that context overflows its window", async () => {
