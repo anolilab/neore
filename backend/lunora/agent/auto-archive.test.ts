@@ -3,9 +3,10 @@
  * thread has: the live one is inserted last, past any sample of the first 50.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
+import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
 
@@ -102,6 +103,50 @@ describe("archiveIfStillIdle and requests waiting on the owner", () => {
 
     it("archives a thread whose request expired unanswered", async () => {
         expect(await archiveWithApproval("pending", 1)).toBe(true);
+    });
+
+    it("keeps a thread whose request is created exactly at the cutoff, and archives one a millisecond older", async () => {
+        const now = Date.now();
+        const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+
+        try {
+            expect(await archiveWithApproval("pending", pendingApprovalCutoff(now))).toBe(false);
+            expect(await archiveWithApproval("pending", pendingApprovalCutoff(now) - 1)).toBe(true);
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
+
+    it("keeps a thread whose live request sits behind many expired ones", async () => {
+        const kept = await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+            const config = {
+                autoMediaEnrichment: false,
+                mcpServerNames: [],
+                model: "m",
+                researchDepth: "balanced",
+                searchMode: "chat",
+                shouldAutoContinue: false,
+                toolNames: [],
+            };
+
+            for (let index = 0; index < 30; index += 1) {
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: `old-${index}`,
+                    config,
+                    createdAt: 1 + index,
+                    status: "pending",
+                    threadId,
+                    userId: OWNER,
+                });
+            }
+
+            await ctx.db.insert("toolApprovalRuns", { approvalId: "live", config, createdAt: Date.now(), status: "pending", threadId, userId: OWNER });
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+        expect(kept).toBe(false);
     });
 
     it("archives a thread whose request was answered", async () => {

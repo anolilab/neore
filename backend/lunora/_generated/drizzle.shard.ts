@@ -1665,6 +1665,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
 }, (t) => ({
     by_approvalId: index("by_approvalId").on(t.approvalId),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_threadId_status_createdAt: index("by_threadId_status_createdAt").on(t.threadId, t.status, t.createdAt),
     by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
     by_status_resolvedAt: index("by_status_resolvedAt").on(t.status, t.resolvedAt),
     by_userId_status_createdAt: index("by_userId_status_createdAt").on(t.userId, t.status, t.createdAt),

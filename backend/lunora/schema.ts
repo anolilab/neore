@@ -3076,6 +3076,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_approvalId", ["approvalId"])
         .index("by_threadId", ["threadId"])
+        // Auto-archive's "does this thread still wait on a person" (`agent/auto-archive.ts`).
+        .index("by_threadId_status_createdAt", ["threadId", "status", "createdAt"])
         .index("by_status_createdAt", ["status", "createdAt"])
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).

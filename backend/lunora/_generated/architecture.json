@@ -81,6 +81,11 @@
       "to": "table:persistentStreams"
     },
     {
+      "from": "function:agent_auto_archive:archiveIfStillIdle",
+      "kind": "read",
+      "to": "table:toolApprovalRuns"
+    },
+    {
       "from": "function:agent_auto_archive:autoArchiveContinue",
       "kind": "call",
       "to": "function:agent_auto_archive:archiveIfStillIdle"
@@ -20377,61 +20382,61 @@
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 41,
+      "line": 44,
       "reason": "\"purgeExpiredToolApprovalRuns\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 41,
+      "line": 44,
       "reason": "\"purgeExpiredToolApprovalRunsForUser\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 53,
+      "line": 56,
       "reason": "\"deleteToolApprovalRunsForThread\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "write",
-      "line": 58,
+      "line": 61,
       "reason": "\"deleteToolApprovalRunsForThread\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 65,
+      "line": 68,
       "reason": "\"purgeExpiredToolApprovalRuns\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 69,
+      "line": 72,
       "reason": "\"purgeExpiredToolApprovalRuns\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 73,
+      "line": 76,
       "reason": "\"purgeExpiredToolApprovalRuns\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "write",
-      "line": 81,
+      "line": 84,
       "reason": "\"purgeExpiredToolApprovalRuns\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "read",
-      "line": 100,
+      "line": 103,
       "reason": "\"purgeExpiredToolApprovalRunsForUser\" is not a registered function"
     },
     {
       "file": "chat/lib/tool-approval-cleanup",
       "kind": "write",
-      "line": 106,
+      "line": 109,
       "reason": "\"purgeExpiredToolApprovalRunsForUser\" is not a registered function"
     },
     {
