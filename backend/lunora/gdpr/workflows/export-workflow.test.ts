@@ -27,6 +27,7 @@ const refOf = (reference: unknown): string => (reference as { __lunoraRef: strin
 
 const execute = async (): Promise<void> => {
     const context = {
+        event: { instanceId: "instance-1" },
         params: PARAMS,
         run: async (reference: unknown, args: Record<string, unknown>, options?: { dedupId?: string }) => {
             const ref = refOf(reference);
@@ -135,9 +136,11 @@ describe("data export workflow: replay", () => {
         const cache = new Map<string, unknown>();
         const unkeyed: string[] = [];
 
-        const replay = async (): Promise<void> => {
+        const ids: string[] = [];
+        const replay = async (instanceId = "instance-1"): Promise<void> => {
             let inStep = false;
             const context = {
+                event: { instanceId },
                 params: PARAMS,
                 run: async (reference: unknown, _args: Record<string, unknown>, options?: { dedupId?: string }) => {
                     const ref = refOf(reference);
@@ -149,6 +152,8 @@ describe("data export workflow: replay", () => {
 
                         return [];
                     }
+
+                    ids.push(options.dedupId);
 
                     if (!cache.has(options.dedupId)) {
                         effects.push(`${ref}#${options.dedupId}`);
@@ -177,11 +182,19 @@ describe("data export workflow: replay", () => {
 
         expect(unkeyed).toEqual([]);
         expect(effects.filter((effect) => effect.includes("sendExportReadyEmail"))).toHaveLength(1);
+        // Two steps sharing an id would answer the second from the first's cache: its effect would never run.
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(effects).toHaveLength(ids.length);
 
         const first = effects.length;
 
         await replay();
 
         expect(effects).toHaveLength(first);
+
+        // A fresh instance for the same request collects again.
+        await replay("instance-2");
+
+        expect(effects).toHaveLength(first * 2);
     });
 });

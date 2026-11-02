@@ -43,6 +43,9 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // Every step works on this user's rows, which live on their shard.
         const context = onUserShard(workflowContext, workflowContext.params.userId);
         const args = context.params;
+        // Scoped to this INSTANCE: a fresh instance for the same request (a restart after a failure) must run
+        // its sweeps and its open check again, not read the first instance's cached answers.
+        const scope = `${args.requestId}:${context.event.instanceId}`;
         const steps = internal.gdpr.steps.residual_deletion_steps;
 
         /**
@@ -79,7 +82,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         requestId: args.requestId,
                         status: "processing",
                     },
-                    { dedupId: stepDedupId(args.requestId, "open-deletion-request") },
+                    { dedupId: stepDedupId(scope, "open-deletion-request") },
                 ),
         );
 
@@ -95,7 +98,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "revoke-user-sessions") },
+                    { dedupId: stepDedupId(scope, "revoke-user-sessions") },
                 ),
         );
 
@@ -106,11 +109,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await context.step.do(
             "deregister-messenger-webhooks",
             async () =>
-                await context.run(
-                    steps.deregisterMessengerWebhooks,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "deregister-messenger-webhooks") },
-                ),
+                await context.run(steps.deregisterMessengerWebhooks, { userId: args.userId }, { dedupId: stepDedupId(scope, "deregister-messenger-webhooks") }),
         );
         // Tasks go before anything they could write: a recurring task firing
         // between "delete threads" and a late task step would create a thread that
@@ -119,25 +118,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain(
             "stop-user-tasks",
             async (round) =>
-                await context.run(
-                    internal.tasks.gdpr.deleteUserTasks,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "stop-user-tasks", round) },
-                ),
+                await context.run(internal.tasks.gdpr.deleteUserTasks, { userId: args.userId }, { dedupId: stepDedupId(scope, "stop-user-tasks", round) }),
         );
         // Eval runs start headless agent runs too — same reasoning, same pair of steps.
         await drain(
             "stop-user-evals",
             async (round) =>
-                await context.run(
-                    internal.evals.gdpr.deleteUserEvals,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "stop-user-evals", round) },
-                ),
+                await context.run(internal.evals.gdpr.deleteUserEvals, { userId: args.userId }, { dedupId: stepDedupId(scope, "stop-user-evals", round) }),
         );
         await context.step.do(
             "kill-user-sandboxes",
-            async () => await context.run(steps.killUserSandboxes, { userId: args.userId }, { dedupId: stepDedupId(args.requestId, "kill-user-sandboxes") }),
+            async () => await context.run(steps.killUserSandboxes, { userId: args.userId }, { dedupId: stepDedupId(scope, "kill-user-sandboxes") }),
         );
         // Coding-agent runs: cancel and kill their sandboxes while the rows still name them.
         await context.step.do(
@@ -146,18 +137,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.coding_agents.gdpr.stopUserCodingAgentRuns,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "stop-user-coding-agents") },
+                    { dedupId: stepDedupId(scope, "stop-user-coding-agents") },
                 ),
         );
         // Connector grants: revoked at the provider while the tokens still exist.
         await context.step.do(
             "revoke-connector-grants",
-            async () =>
-                await context.run(
-                    steps.revokeUserConnectorGrants,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "revoke-connector-grants") },
-                ),
+            async () => await context.run(steps.revokeUserConnectorGrants, { userId: args.userId }, { dedupId: stepDedupId(scope, "revoke-connector-grants") }),
         );
         // Pro: cancelled at Creem and its payment rows deleted, on `__root__` where
         // they live — `workflowContext.run`, since `context` pins the user's shard.
@@ -167,7 +153,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await workflowContext.run(
                     internal.billing.gdpr.cancelBilling,
                     { referenceId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "cancel-user-billing"), shardKey: ROOT_SHARD_KEY },
+                    { dedupId: stepDedupId(scope, "cancel-user-billing"), shardKey: ROOT_SHARD_KEY },
                 ),
         );
 
@@ -187,7 +173,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-thread-metadata") },
+                    { dedupId: stepDedupId(scope, "delete-user-thread-metadata") },
                 ),
         );
 
@@ -206,7 +192,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 const result = (await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserThreadCascade,
                     { cursor, userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-thread-cascade", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-thread-cascade", round) },
                 )) as {
                     cursor: string | null;
                     hasMore: boolean;
@@ -234,7 +220,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserDocuments,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-documents", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-documents", round) },
                 ),
         );
 
@@ -250,7 +236,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserPresentations,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-presentations", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-presentations", round) },
                 ),
         );
 
@@ -266,18 +252,14 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserPersistentStreams,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-persistent-streams", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-persistent-streams", round) },
                 ),
         );
 
         await drain(
             "delete-user-sub-agent-runs",
             async (round) =>
-                await context.run(
-                    steps.deleteUserSubAgentRuns,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-sub-agent-runs", round) },
-                ),
+                await context.run(steps.deleteUserSubAgentRuns, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-sub-agent-runs", round) }),
         );
 
         // --- Phase 2: Delete threads, messages, and streams ---
@@ -296,7 +278,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-all-for-user-id-async") },
+                    { dedupId: stepDedupId(scope, "delete-all-for-user-id-async") },
                 ),
         );
 
@@ -314,7 +296,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserMemories,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-memories", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-memories", round) },
                 ),
         );
 
@@ -330,23 +312,19 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.memory.gdpr.deleteUserMemoryReflectionData,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-memory-reflection", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-memory-reflection", round) },
                 ),
         );
         await drain(
             "delete-user-knowledge",
             async (round) =>
-                await context.run(steps.deleteUserKnowledge, { userId: args.userId }, { dedupId: stepDedupId(args.requestId, "delete-user-knowledge", round) }),
+                await context.run(steps.deleteUserKnowledge, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-knowledge", round) }),
         );
         // After memories and knowledge: sweeps whatever embeddings they did not name.
         await drain(
             "delete-user-embeddings",
             async (round) =>
-                await context.run(
-                    steps.deleteUserEmbeddings,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-embeddings", round) },
-                ),
+                await context.run(steps.deleteUserEmbeddings, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-embeddings", round) }),
         );
         await drain(
             "delete-user-streaming-messages",
@@ -354,35 +332,23 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     steps.deleteUserStreamingMessages,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-streaming-messages", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-streaming-messages", round) },
                 ),
         );
         await drain(
             "delete-user-integrations",
             async (round) =>
-                await context.run(
-                    steps.deleteUserIntegrations,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-integrations", round) },
-                ),
+                await context.run(steps.deleteUserIntegrations, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-integrations", round) }),
         );
         await drain(
             "delete-user-tasks",
             async (round) =>
-                await context.run(
-                    internal.tasks.gdpr.deleteUserTasks,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-tasks", round) },
-                ),
+                await context.run(internal.tasks.gdpr.deleteUserTasks, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-tasks", round) }),
         );
         await drain(
             "delete-user-evals",
             async (round) =>
-                await context.run(
-                    internal.evals.gdpr.deleteUserEvals,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-evals", round) },
-                ),
+                await context.run(internal.evals.gdpr.deleteUserEvals, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-evals", round) }),
         );
         await drain(
             "delete-user-coding-agent-runs",
@@ -390,7 +356,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.coding_agents.gdpr.deleteUserCodingAgentRuns,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-coding-agent-runs", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-coding-agent-runs", round) },
                 ),
         );
         await drain(
@@ -399,17 +365,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.notifications.gdpr.deleteUserNotifications,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-notifications", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-notifications", round) },
                 ),
         );
         await drain(
             "delete-user-pages",
             async (round) =>
-                await context.run(
-                    internal.pages.gdpr.deleteUserPages,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-pages", round) },
-                ),
+                await context.run(internal.pages.gdpr.deleteUserPages, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-pages", round) }),
         );
         await drain(
             "delete-user-devices",
@@ -417,7 +379,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.devices.gdpr.deleteUserDevices,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-devices", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-devices", round) },
                 ),
         );
         await drain(
@@ -426,7 +388,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.acp.gdpr.deleteUserAcpSessions,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-acp-sessions", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-acp-sessions", round) },
                 ),
         );
         await drain(
@@ -435,7 +397,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.source_control.gdpr.deleteUserReviewDrafts,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-review-drafts", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-review-drafts", round) },
                 ),
         );
         await drain(
@@ -444,7 +406,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.source_control.gdpr.deleteUserPullRequestThreads,
                     { userId: args.userId },
-                    { dedupId: `delete-pull-request-threads:${args.requestId}:${String(round)}` },
+                    { dedupId: stepDedupId(scope, "delete-pull-request-threads", round) },
                 ),
         );
         await drain(
@@ -453,7 +415,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.source_control.gdpr.deleteUserGuides,
                     { userId: args.userId },
-                    { dedupId: `delete-pull-request-guides:${args.requestId}:${String(round)}` },
+                    { dedupId: stepDedupId(scope, "delete-pull-request-guides", round) },
                 ),
         );
         // Its own dispatch id per batch: a replay skips the finished steps' callbacks, so the body's positional ids
@@ -464,7 +426,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.source_control.gdpr.deleteUserWatchedRepositories,
                     { userId: args.userId },
-                    { dedupId: `delete-watched-repositories:${args.requestId}:${String(round)}` },
+                    { dedupId: stepDedupId(scope, "delete-watched-repositories", round) },
                 ),
         );
         await drain(
@@ -473,7 +435,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     steps.anonymiseGatewayUsageDeductions,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "anonymise-gateway-usage-deductions", round) },
+                    { dedupId: stepDedupId(scope, "anonymise-gateway-usage-deductions", round) },
                 ),
         );
         await context.step.do(
@@ -482,7 +444,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserBrowserData,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-browser-data") },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-data") },
                 ),
         );
 
@@ -500,7 +462,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-skills") },
+                    { dedupId: stepDedupId(scope, "delete-user-skills") },
                 ),
         );
 
@@ -518,7 +480,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-connectors") },
+                    { dedupId: stepDedupId(scope, "delete-user-connectors") },
                 ),
         );
 
@@ -534,7 +496,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserImportJobs,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-import-jobs", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-import-jobs", round) },
                 ),
         );
 
@@ -550,7 +512,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserFiles,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-files", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-files", round) },
                 ),
         );
 
@@ -564,11 +526,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain(
             "delete-user-workflow-data",
             async (round) =>
-                await context.run(
-                    steps.deleteUserWorkflowData,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-workflow-data", round) },
-                ),
+                await context.run(steps.deleteUserWorkflowData, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-workflow-data", round) }),
         );
 
         await context.step.do(
@@ -579,7 +537,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-projects") },
+                    { dedupId: stepDedupId(scope, "delete-user-projects") },
                 ),
         );
 
@@ -597,7 +555,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-prompts") },
+                    { dedupId: stepDedupId(scope, "delete-user-prompts") },
                 ),
         );
 
@@ -610,11 +568,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         await drain(
             "delete-user-usage-daily",
             async (round) =>
-                await context.run(
-                    steps.deleteUserUsageDaily,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-usage-daily", round) },
-                ),
+                await context.run(steps.deleteUserUsageDaily, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-usage-daily", round) }),
         );
 
         await context.step.do(
@@ -625,7 +579,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-settings") },
+                    { dedupId: stepDedupId(scope, "delete-user-settings") },
                 ),
         );
 
@@ -645,7 +599,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     {
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "delete-auth-records") },
+                    { dedupId: stepDedupId(scope, "delete-auth-records") },
                 ),
         );
 
@@ -655,7 +609,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     steps.deleteUserIdentity,
                     { userEmail: args.userEmail, userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "delete-user-identity", round) },
+                    { dedupId: stepDedupId(scope, "delete-user-identity", round) },
                 ),
         );
         // Last data step: every audited delete above wrote a `documentHistory` snapshot.
@@ -665,7 +619,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(
                     steps.purgeUserDocumentHistory,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(args.requestId, "purge-user-document-history", round) },
+                    { dedupId: stepDedupId(scope, "purge-user-document-history", round) },
                 ),
         );
 
@@ -684,7 +638,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     await context.run(
                         internal.gdpr.steps.posthog_steps.deletePostHogPerson,
                         { userId: args.userId },
-                        { dedupId: stepDedupId(args.requestId, "erase-post-hog-person") },
+                        { dedupId: stepDedupId(scope, "erase-post-hog-person") },
                     ),
             );
         } catch (error) {
@@ -796,7 +750,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         requestId: args.requestId,
                         status: "completed",
                     },
-                    { dedupId: stepDedupId(args.requestId, "complete-deletion-request") },
+                    { dedupId: stepDedupId(scope, "complete-deletion-request") },
                 ),
         );
 
@@ -816,15 +770,14 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         performedBy: "system",
                         userId: args.userId,
                     },
-                    { dedupId: stepDedupId(args.requestId, "log-audit") },
+                    { dedupId: stepDedupId(scope, "log-audit") },
                 ),
         );
 
         // After the final audit write: keep the compliance record, minus the PII.
         await context.step.do(
             "minimise-gdpr-records",
-            async () =>
-                await context.run(steps.minimiseGdprRecords, { userId: args.userId }, { dedupId: stepDedupId(args.requestId, "minimise-gdpr-records") }),
+            async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId }, { dedupId: stepDedupId(scope, "minimise-gdpr-records") }),
         );
 
         // Last, and best effort: the deletion is complete and minimised whether or not this goes out, so
@@ -844,7 +797,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                             scope: DELETION_CONFIRMATION_EMAIL_SCOPE,
                             ttlMs: DELETION_CONFIRMATION_CLAIM_TTL_MS,
                         },
-                        { dedupId: stepDedupId(args.requestId, "claim-deletion-confirmed-email") },
+                        { dedupId: stepDedupId(scope, "claim-deletion-confirmed-email") },
                     ),
             );
 
@@ -857,7 +810,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                             {
                                 userEmail: args.userEmail,
                             },
-                            { dedupId: stepDedupId(args.requestId, "send-deletion-confirmed-email-action") },
+                            { dedupId: stepDedupId(scope, "send-deletion-confirmed-email-action") },
                         ),
                 );
             }
