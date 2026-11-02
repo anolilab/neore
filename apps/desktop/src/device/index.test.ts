@@ -29,6 +29,7 @@ type IpcEvent = { sender: WebContents; senderFrame: Frame | null };
 const fake = vi.hoisted(() => {
     return {
         appListeners: new Map<string, () => void>(),
+        clipboardWrite: vi.fn(),
         coreEmit: undefined as undefined | ((json: string) => void),
         coreImpl: undefined as undefined | Record<string, ReturnType<typeof vi.fn>>,
         coreThrows: false,
@@ -93,6 +94,7 @@ vi.mock("electron", () => {
             on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
         },
         BrowserWindow,
+        clipboard: { writeText: (text: string) => fake.clipboardWrite(text) },
         dialog: {
             showMessageBox: vi.fn(async (..._args: unknown[]) => {
                 return { checkboxChecked: false, response: 1 };
@@ -379,6 +381,72 @@ describe("relay channels (the site window)", () => {
         expect(() => invoke(LOCAL_CHANNEL.pickFolder, siteEvent())).toThrow("device: not the device window");
         expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, siteEvent(), "dev_1")).toThrow("device: not the device window");
         expect(core.promptAnswer).not.toHaveBeenCalled();
+    });
+});
+
+describe("copy diagnostics", () => {
+    const VIEW = {
+        hosts: [
+            {
+                acpAgents: [],
+                acpConsents: [],
+                address: "build.example.com",
+                agentsSupported: true,
+                allowShellNetwork: false,
+                connected: true,
+                deviceId: "srv-1",
+                forwardAgent: false,
+                identityFile: null,
+                multiplexed: true,
+                name: "build-box",
+                platform: "linux",
+                port: 22,
+                reconnect: null,
+                requireShellSandbox: true,
+                roots: [],
+                sandboxDetail: "Landlock ABI 5",
+                user: "deploy",
+            },
+        ],
+        mcpServers: [],
+        mcpStatus: [],
+        paired: true,
+        requireShellSandbox: true,
+        roots: [],
+        sandboxUnavailable: null,
+        shellNetwork: "off",
+    };
+
+    beforeEach(() => {
+        fake.clipboardWrite.mockClear();
+        core.settingsGet.mockReturnValue(JSON.stringify(VIEW));
+        invoke(DEVICE_CHANNEL.openSettings, siteEvent());
+    });
+
+    it("writes the server's diagnostics to the clipboard for the device window", () => {
+        invoke(LOCAL_CHANNEL.copyDiagnostics, localEvent(), "srv-1");
+
+        expect(fake.clipboardWrite).toHaveBeenCalledTimes(1);
+
+        const text = String(fake.clipboardWrite.mock.calls[0]?.[0]);
+
+        expect(text).toContain("Neore diagnostics: server build-box");
+        expect(text).toContain("Neore: 1.2.3");
+        expect(text).toContain("Route: deploy@build.example.com:22");
+        expect(text).toContain("Shell sandbox: landlock");
+    });
+
+    it("writes the diagnostics of this computer when no server is named, and refuses an unknown server", () => {
+        invoke(LOCAL_CHANNEL.copyDiagnostics, localEvent());
+
+        expect(String(fake.clipboardWrite.mock.calls[0]?.[0])).toContain("Neore diagnostics: this computer");
+        expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, localEvent(), "nope")).toThrow("That server is not on this computer.");
+        expect(fake.clipboardWrite).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes nothing for the site", () => {
+        expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, siteEvent(), "srv-1")).toThrow("device: not the device window");
+        expect(fake.clipboardWrite).not.toHaveBeenCalled();
     });
 });
 

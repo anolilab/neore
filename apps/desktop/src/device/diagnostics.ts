@@ -1,8 +1,8 @@
 /**
  * The text "Copy diagnostics" puts on the clipboard, for this computer or for one server. It is meant to be
  * pasted into a support request, so it is built from an allow-list of fields (never a whole view object) and
- * every free-text value — a sandbox message the server wrote — goes through `redact`, and a connection's last error is
- * reduced to a category (`reasonCategory`) because no pattern can recognise every secret in ssh's own text.
+ * every free-text value the user typed goes through `redact`, while text a server or ssh wrote (the last error, the platform,
+ * the sandbox detail) is reduced to a category because no pattern can recognise every secret in ssh's own text.
  * It holds no pairing or host secret, no key material, no token, and no path under the home folder.
  */
 import type { HostView, SettingsView } from "./types";
@@ -22,17 +22,30 @@ const MAX_TEXT = 500;
 
 const AUTHORIZATION_HEADER = /\b(?<name>(?:proxy-)?authorization)\s*[:=][^\n\r]*/giu;
 const SECRET_NAME = String.raw`\b(?<name>\w*(?:secret|token|passphrase|passw(?:or)?d|apikey|api_key)\w*)\s*[:=]\s*`;
-const SECRET_VALUE = String.raw`(?:"[^"]*"|'[^']*'|(?:bearer\s+)?\S+)`;
+const SECRET_VALUE = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:bearer\s+)?\S+)`;
 const SECRET_ASSIGNMENT = new RegExp(SECRET_NAME + SECRET_VALUE, "giu");
 const BEARER = /\b(?:bearer|basic)\s+[\w.~+/=-]{8,}/giu;
 const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/gu;
 const KNOWN_TOKEN = /\b(?:sk|pk|ghp|gho|ghs|github_pat|xox[a-z]|AKIA|eyJ)[\w.-]{12,}/gu;
-const LONG_BLOB = /\b[\w+/=-]{40,}\b/gu;
+const LONG_BLOB = /(?<![\w+/=-])[\w+/=-]{40,}(?![\w+/=-])/gu;
 
-const USER_FOLDER = /\/(?:Users|home)\/[^\s/]+/gu;
-const WINDOWS_USER_FOLDER = /[A-Za-z]:\\Users\\[^\s\\]+/gu;
+const USER_FOLDER = /\/(?:Users|home)\/[^\s/]+/giu;
+const WINDOWS_USER_FOLDER = /[a-z]:[\\/]Users[\\/][^\s\\/]+/giu;
+const WINDOWS_STYLE_PATH = /^(?:[A-Za-z]:|\\\\)/u;
+const PATH_SEPARATORS = /[\\/]+/u;
+const REGEX_SPECIALS = /[$()*+.?[\\\]^{|}]/gu;
 const WHITESPACE = /\s+/gu;
 const TRAILING_SEPARATORS = /[/\\]$/u;
+
+/** A Windows home folder, matched whatever the case and whichever slash the text uses. */
+const windowsPrefix = (base: string): RegExp =>
+    new RegExp(
+        base
+            .split(PATH_SEPARATORS)
+            .map((part) => part.replaceAll(REGEX_SPECIALS, String.raw`\$&`))
+            .join(String.raw`[\\/]+`),
+        "giu",
+    );
 
 /** Free text made safe to paste: secrets and keys blanked, the home folder shortened to `~`, length capped. */
 export const redact = (value: string, home: string): string => {
@@ -47,10 +60,10 @@ export const redact = (value: string, home: string): string => {
     const base = home.replace(TRAILING_SEPARATORS, "");
 
     if (base.length > 1) {
-        result = result.split(base).join("~");
+        result = WINDOWS_STYLE_PATH.test(base) ? result.replaceAll(windowsPrefix(base), "~") : result.split(base).join("~");
     }
 
-    result = result.replaceAll(USER_FOLDER, "~").replaceAll(WINDOWS_USER_FOLDER, "~").replaceAll(WHITESPACE, " ").trim();
+    result = result.replaceAll(WINDOWS_USER_FOLDER, "~").replaceAll(USER_FOLDER, "~").replaceAll(WHITESPACE, " ").trim();
 
     return result.length > MAX_TEXT ? `${result.slice(0, MAX_TEXT)}…` : result;
 };
@@ -74,15 +87,31 @@ export const reasonCategory = (reason: string): string => {
     return found === undefined ? "connection failed" : found[1];
 };
 
-/** A platform string the server reported, cut down to harmless characters. */
-const platformText = (platform: string | null, home: string): string => {
+/** The operating system a server reported, as one of the names its host software uses, else `other`. */
+const platformText = (platform: string | null): string => {
     if (platform === null) {
         return "unknown";
     }
 
-    const clean = redact(platform, home).replaceAll(/[^\w .-]/gu, "").slice(0, 64).trim();
+    const name = platform.trim().toLowerCase();
 
-    return clean === "" ? "unknown" : clean;
+    return ["linux", "macos", "windows"].includes(name) ? name : "other";
+};
+
+const SANDBOX_CATEGORIES: ReadonlyArray<readonly [RegExp, string]> = [
+    [/^Landlock ABI \d+$/u, "landlock"],
+    [/^macOS sandbox-exec$/u, "sandbox-exec"],
+    [/^this Linux kernel has no Landlock|^there is no shell sandbox|is missing$|^the sandbox needs \/proc\/self\/fd/u, "none"],
+];
+
+/**
+ * What a server's sandbox probe said, as a fixed category. The detail is text the server wrote and can say anything, so
+ * it is never copied: only the mechanism it names (the host software's own phrases), else `other`.
+ */
+export const sandboxCategory = (detail: string): string => {
+    const found = SANDBOX_CATEGORIES.find(([pattern]) => pattern.test(detail.trim()));
+
+    return found === undefined ? "other" : found[1];
 };
 
 /** An ssh user or address the person typed, redacted and cut down to the characters a login or host name can hold. */
@@ -127,9 +156,9 @@ const hostLines = (host: HostView, context: DiagnosticsContext): string[] => {
         `Server: ${redact(host.name, home)} (${host.deviceId})`,
         routeLine(host, home),
         `Connection: ${host.connected ? "connected" : "not connected"}`,
-        `Server platform: ${platformText(host.platform, home)}`,
+        `Server platform: ${platformText(host.platform)}`,
         `Coding agents: ${agentsLine(host.agentsSupported)}`,
-        `Shell sandbox: ${host.sandboxDetail === null ? "not known" : redact(host.sandboxDetail, home)}`,
+        `Shell sandbox: ${host.sandboxDetail === null ? "not known" : sandboxCategory(host.sandboxDetail)}`,
         `Shell policy: sandbox ${host.requireShellSandbox ? "required" : "optional"}, network ${host.allowShellNetwork ? "allowed" : "blocked"}`,
         `Shared folders: ${String(host.roots.length)}`,
         `Registered agents: ${String(host.acpAgents.length)}`,

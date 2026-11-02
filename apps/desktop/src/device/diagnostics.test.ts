@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deviceDiagnostics, reasonCategory, redact, serverDiagnostics } from "./diagnostics";
+import { deviceDiagnostics, reasonCategory, redact, sandboxCategory, serverDiagnostics } from "./diagnostics";
 import type { HostView, SettingsView } from "./types";
 
 const HOME = "/Users/ada";
@@ -173,15 +173,65 @@ describe("redact values", () => {
     });
 });
 
+describe("redact holes", () => {
+    it("removes a quoted value that holds an escaped quote", () => {
+        const text = ["passwd", String.raw`"abc\"hunter2" host=x`].join("=");
+        const out = redact(text, HOME);
+
+        expect(out).not.toContain("hunter2");
+        expect(out).toContain("host=x");
+        expect(redact(String.raw`token='it\'s secret9' end`, HOME)).toBe("token=[removed] end");
+    });
+
+    it("removes a long base64 value that ends in padding", () => {
+        const blob = `${"A".repeat(38)}==`;
+
+        expect(redact(`key ${blob} end`, HOME)).toBe("key [removed] end");
+        expect(redact(`key ${"B".repeat(39)}= end`, HOME)).toBe("key [removed] end");
+    });
+
+    it("hides a home folder whatever the case, slash or drive", () => {
+        expect(redact(String.raw`open c:\users\alice\code`, String.raw`C:\Users\Alice`)).toBe(String.raw`open ~\code`);
+        expect(redact("open C:/Users/Alice/code", String.raw`C:\Users\Alice`)).toBe("open ~/code");
+        expect(redact(String.raw`open D:\Users\bob\x and /home/carol/y and /Users/dan/z`, HOME)).toBe(String.raw`open ~\x and ~/y and ~/z`);
+    });
+});
+
+describe("the sandbox detail", () => {
+    const withDetail = (sandboxDetail: string | null): SettingsView => {
+        return { ...view, hosts: [{ ...host, sandboxDetail }] };
+    };
+    const line = (sandboxDetail: string | null): string =>
+        (serverDiagnostics(withDetail(sandboxDetail), "dev_123", context) ?? "").split("\n").find((l) => l.startsWith("Shell sandbox:")) ?? "";
+
+    it("is a category, so a short unlabelled secret never reaches the text", () => {
+        expect(line("hunter2")).toBe("Shell sandbox: other");
+        expect(line("Landlock ABI 5 hunter2")).toBe("Shell sandbox: other");
+        expect(line(null)).toBe("Shell sandbox: not known");
+    });
+
+    it("names what the host software normally reports", () => {
+        expect(sandboxCategory("Landlock ABI 5")).toBe("landlock");
+        expect(sandboxCategory("macOS sandbox-exec")).toBe("sandbox-exec");
+        expect(sandboxCategory("this Linux kernel has no Landlock (needs 5.13+ with Landlock enabled)")).toBe("none");
+        expect(sandboxCategory("there is no shell sandbox on this operating system")).toBe("none");
+        expect(sandboxCategory("/usr/bin/sandbox-exec is missing")).toBe("none");
+    });
+});
+
 describe("the server platform", () => {
     it("is cut to harmless characters and redacted", () => {
         const odd: SettingsView = { ...view, hosts: [{ ...host, platform: `linux\nPassword=hunter2 <script>${"x".repeat(200)}` }] };
         const text = serverDiagnostics(odd, "dev_123", context) ?? "";
         const line = text.split("\n").find((l) => l.startsWith("Server platform:")) ?? "";
 
-        expect(line).not.toContain("hunter2");
-        expect(line).not.toContain("<");
-        expect(line.length).toBeLessThanOrEqual("Server platform: ".length + 64);
+        expect(line).toBe("Server platform: other");
+    });
+
+    it("keeps the three names the host software uses", () => {
+        const text = serverDiagnostics({ ...view, hosts: [{ ...host, platform: "macos" }] }, "dev_123", context) ?? "";
+
+        expect(text).toContain("Server platform: macos");
     });
 });
 
