@@ -392,7 +392,7 @@ export const getExportRequest = internalQuery.input({ userId: v.string() }).quer
 
 export const getRequestById = internalQuery
     .input({ requestId: v.id("gdprRequests") })
-    .query(async ({ args: { requestId }, ctx: context }) => await context.db.get(requestId));
+    .query(async ({ args: { requestId }, ctx: context }) => await context.db.get("gdprRequests", requestId));
 
 export const logAudit = internalMutation
     .input({
@@ -424,7 +424,7 @@ export const cancelStuckExport = authMutation.use(rateLimit("gdpr/request")).mut
         .first();
 
     if (request && (request.status === "pending" || request.status === "processing")) {
-        await ctx.db.patch(request._id, { status: "cancelled" });
+        await ctx.db.patch("gdprRequests", request._id, { status: "cancelled" });
         await ctx.db.insert("gdprAuditLog", {
             action: "export_cancelled",
             details: JSON.stringify({ action: "cancelled", requestId: request._id }),
@@ -461,7 +461,7 @@ export const updateRequestProgress = internalMutation
         const { fromStatus, requestId, ...updates } = args;
 
         if (fromStatus !== undefined) {
-            const current = await context.db.get(requestId);
+            const current = await context.db.get("gdprRequests", requestId);
 
             if (current === null || !fromStatus.includes(current.status)) {
                 return false;
@@ -499,7 +499,7 @@ export const updateRequestProgress = internalMutation
             patch.expiresAt = context.now + EXPORT_EXPIRY_MS;
         }
 
-        await context.db.patch(requestId, withoutUndefined(patch));
+        await context.db.patch("gdprRequests", requestId, withoutUndefined(patch));
 
         return true;
     });

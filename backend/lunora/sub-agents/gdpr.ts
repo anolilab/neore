@@ -19,7 +19,7 @@ export const eraseSubAgentRunsForUser = async (ctx: MutationCtx, userId: string)
 
     await Promise.all(
         rows.map(async (row) => {
-            await ctx.db.delete(row._id).catch((error: unknown) => {
+            await ctx.db.delete("subAgentRuns", row._id).catch((error: unknown) => {
                 gdprLogger.error(`Failed to delete subAgentRuns ${row._id}:`, error);
             });
         }),
@@ -39,7 +39,7 @@ export const pruneSubAgentRunsBefore = async (ctx: MutationCtx, cutoff: number, 
         where: { createdAt: { lt: cutoff }, status: { in: ["succeeded", "failed", "cancelled"] } },
     });
 
-    await Promise.all(runs.map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all(runs.map(async (row) => await ctx.db.delete("subAgentRuns", row._id)));
 
     return runs.length;
 };

@@ -65,7 +65,7 @@ describe("failAbandonedEditReply", () => {
 
         await expect(lapse(threadId, promptId)).resolves.toStrictEqual({ added: false, failed: 1 });
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(pending));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("messages", pending));
 
         expect(row).toMatchObject({ status: "failed", text: ABANDONED_REPLY_TEXT });
         expect(await rowsOf(threadId)).toHaveLength(2);

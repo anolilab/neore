@@ -297,11 +297,11 @@ const d1Facade = (tables: Record<string, Record<string, unknown>[]>) => {
 
     const db = new Proxy(
         {
-            delete: async (id: string) => {
+            delete: async (_table: string, id: string) => {
                 rows.delete(id);
             },
-            get: async (id: string) => rows.get(id)?.row ?? null,
-            patch: async (id: string, fields: Record<string, unknown>) => {
+            get: async (_table: string, id: string) => rows.get(id)?.row ?? null,
+            patch: async (_table: string, id: string, fields: Record<string, unknown>) => {
                 const entry = rows.get(id);
 
                 if (entry) {

@@ -21,14 +21,14 @@ export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Pr
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", trigger._id))
             .take(BATCH);
 
-        await Promise.all(executions.map((row) => ctx.db.delete(row._id)));
+        await Promise.all(executions.map((row) => ctx.db.delete("triggerExecutions", row._id)));
 
         if (full(executions)) {
             hasMore = true;
             continue;
         }
 
-        await ctx.db.delete(trigger._id);
+        await ctx.db.delete("triggers", trigger._id);
     }
 
     return { hasMore: hasMore || full(triggers) };

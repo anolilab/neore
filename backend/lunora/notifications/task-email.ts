@@ -110,7 +110,7 @@ export const claimOutcomeEmail = internalMutation
     .input({ id: v.id("outcomeEmails") })
     .output(v.union(v.number(), v.null()))
     .mutation(async ({ args: { id }, ctx }) => {
-        const row = await ctx.db.get(id);
+        const row = await ctx.db.get("outcomeEmails", id);
         const abandoned = row?.status === "sending" && (row.claimedAt ?? 0) < Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
 
         if (!row || (row.status !== "pending" && !abandoned)) {
@@ -120,7 +120,7 @@ export const claimOutcomeEmail = internalMutation
         // The claim time is the token: only the run that holds this claim may settle the row.
         const claimedAt = Date.now();
 
-        await ctx.db.patch(id, { claimedAt, status: "sending" });
+        await ctx.db.patch("outcomeEmails", id, { claimedAt, status: "sending" });
 
         return claimedAt;
     });
@@ -133,7 +133,7 @@ export const holdsOutcomeEmailClaim = internalQuery
     .input({ claimedAt: v.number(), id: v.id("outcomeEmails") })
     .output(v.boolean())
     .query(async ({ args: { claimedAt, id }, ctx }) => {
-        const row = await ctx.db.get(id);
+        const row = await ctx.db.get("outcomeEmails", id);
 
         return row?.status === "sending" && row.claimedAt === claimedAt;
     });
@@ -151,7 +151,7 @@ export const settleOutcomeEmail = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { claimedAt, id, result }, ctx }) => {
-        const row = await ctx.db.get(id);
+        const row = await ctx.db.get("outcomeEmails", id);
 
         // A run whose claim was reclaimed by a later run must not change the row the later run owns.
         if (!row || row.claimedAt !== claimedAt || (row.status !== "sending" && row.status !== "pending")) {
@@ -161,7 +161,7 @@ export const settleOutcomeEmail = internalMutation
         switch (result) {
             case "deferred": {
                 // Not an attempt: the row waits for its configuration, and no attempt is used up while it does.
-                await patchById(ctx.db, id, { claimedAt: undefined, status: "pending" });
+                await patchById(ctx.db, "outcomeEmails", id, { claimedAt: undefined, status: "pending" });
                 break;
             }
 
@@ -173,17 +173,17 @@ export const settleOutcomeEmail = internalMutation
                     console.warn(`[notifications] Giving up on the outcome email for ${row.notificationId as string} after ${attempts} attempts`);
                 }
 
-                await patchById(ctx.db, id, { attempts, claimedAt: undefined, status: gaveUp ? "failed" : "pending" });
+                await patchById(ctx.db, "outcomeEmails", id, { attempts, claimedAt: undefined, status: gaveUp ? "failed" : "pending" });
                 break;
             }
 
             case "sent": {
-                await patchById(ctx.db, id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
+                await patchById(ctx.db, "outcomeEmails", id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
                 break;
             }
 
             default: {
-                await ctx.db.delete(id);
+                await ctx.db.delete("outcomeEmails", id);
             }
         }
 
@@ -205,7 +205,7 @@ export const dispatchOutcomeEmails = internalMutation
             const { page } = await ctx.db.outcomeEmails.findMany({ limit: PRUNE_BATCH, where: { createdAt: { lt: cutoff }, status } });
 
             for (const row of page) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("outcomeEmails", row._id);
             }
         }
 

@@ -129,7 +129,7 @@ export const takeRequestedSecret = async (
 
     if (isSecretExpired(row, args.now)) {
         if (row.encryptedValue !== undefined) {
-            await patchRow(ctx.db, row, { encryptedValue: undefined });
+            await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined });
         }
 
         return { ok: false, status: "expired" };
@@ -152,12 +152,12 @@ export const takeRequestedSecret = async (
     try {
         value = await decryptKey(row.encryptedValue, "provider-keys");
     } catch {
-        await patchRow(ctx.db, row, { encryptedValue: undefined, status: "used" });
+        await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined, status: "used" });
 
         return { ok: false, status: "unreadable" };
     }
 
-    await patchRow(ctx.db, row, { encryptedValue: undefined, status: "used" });
+    await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined, status: "used" });
 
     return { ok: true, use: row.use, value };
 };
@@ -194,7 +194,7 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
     const live = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey === args.replyKey);
 
     for (const row of live) {
-        await patchRow(ctx.db, row, { encryptedValue: undefined });
+        await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined });
     }
 
     return live.length;
@@ -208,7 +208,7 @@ export const deleteThreadSecrets = async (ctx: Database, args: { threadId: Id<"t
         .collect();
 
     for (const row of rows) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("requestedSecrets", row._id);
     }
 
     return rows.length;
@@ -222,7 +222,7 @@ export const sweepExpiredSecrets = async (ctx: Database, now: number, limit: num
         .take(limit);
 
     for (const row of rows) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("requestedSecrets", row._id);
     }
 
     return rows.length;

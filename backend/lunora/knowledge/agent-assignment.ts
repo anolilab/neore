@@ -79,7 +79,7 @@ export const assignToProject = authMutation
         const knowledgeFileId = input.knowledgeFileId as Id<"knowledgeFiles">;
 
         // Verify ownership
-        const file = await ctx.db.get(knowledgeFileId);
+        const file = await ctx.db.get("knowledgeFiles", knowledgeFileId);
 
         if (!file || file.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
@@ -140,7 +140,7 @@ export const unassignFromProject = authMutation
         const link = links.find((l) => (l.knowledgeFileId as string) === (knowledgeFileId as string));
 
         if (link) {
-            await ctx.db.delete(link._id);
+            await ctx.db.delete("projectKnowledge", link._id);
         }
 
         ctx.log.event("knowledge.unassign_from_project", { removed: Boolean(link) });
@@ -172,7 +172,7 @@ export const getProjectKnowledge = authQuery
 
         const files = await Promise.all(
             links.map(async (link) => {
-                const file = await ctx.db.get(link.knowledgeFileId);
+                const file = await ctx.db.get("knowledgeFiles", link.knowledgeFileId);
 
                 if (!file) {
                     return null;

@@ -108,10 +108,10 @@ const fakeContext = (): any => {
                     return await run(async (ctx) => await runAgentModelOf(ctx, args));
                 }
                 case "agent_messages:getMessagesByIds": {
-                    return await run(async (ctx) => await Promise.all(args.messageIds.map(async (id: string) => await ctx.db.get(id))));
+                    return await run(async (ctx) => await Promise.all(args.messageIds.map(async (id: string) => await ctx.db.get("messages", id))));
                 }
                 case "agent_threads:getThreadInternal": {
-                    return await run(async (ctx) => await ctx.db.get(args.threadId));
+                    return await run(async (ctx) => await ctx.db.get("threads", args.threadId));
                 }
                 case "chat_functions:gateThreadAction": {
                     return await run(async (ctx) => await gateThreadActionHandler(ctx, args));
@@ -189,7 +189,7 @@ describe("/chat/start after a switch", () => {
     });
 
     it("does not let a pre-switch model outside the registry override a regenerate", async () => {
-        await run(async (ctx) => await ctx.db.patch(threadId, { model: "custom/local-llama" }));
+        await run(async (ctx) => await ctx.db.patch("threads", threadId, { model: "custom/local-llama" }));
         await insertRow("u2", 1, 0, "user", "more");
         await insertRow("a2", 1, 1, "assistant", "sure");
         await switchTo(B);

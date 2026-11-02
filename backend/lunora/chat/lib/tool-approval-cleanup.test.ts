@@ -54,7 +54,7 @@ describe("a thread waiting on an expired request", () => {
         await harness.run(async (ctx: any) => await ctx.db.insert("threads", { awaitingInput: "approval", status: "active", title: "W", userId: "u1" }));
     const awaitingOf = async (threadId: string) =>
         await harness.run(async (ctx: any) => {
-            const row = await ctx.db.get(threadId);
+            const row = await ctx.db.get("threads", threadId);
 
             return row.awaitingInput;
         });

@@ -26,11 +26,11 @@ const fakeDatabase = (tables: { skillRatings: Row[]; skillStats: Row[] }) => {
         };
 
     return {
-        delete: async (id: string) => {
+        delete: async (_table: string, id: string) => {
             tables.skillRatings = tables.skillRatings.filter((row) => row._id !== id);
             tables.skillStats = tables.skillStats.filter((row) => row._id !== id);
         },
-        patch: async (id: string, fields: Record<string, unknown>) => {
+        patch: async (_table: string, id: string, fields: Record<string, unknown>) => {
             Object.assign(
                 all().find((row) => row._id === id)!,
                 fields,
@@ -102,7 +102,7 @@ describe(recomputeSkillRatings, () => {
         const database = fakeDatabase(tables);
 
         await recomputeSkillRatings(database as never, ["skill-a"] as never, "alice");
-        await database.delete("r1");
+        await database.delete("skillRatings", "r1");
         await recomputeSkillRatings(database as never, ["skill-a"] as never, "alice");
         await recomputeSkillRatings(database as never, ["skill-a"] as never, "alice");
 

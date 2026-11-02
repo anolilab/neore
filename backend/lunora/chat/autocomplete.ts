@@ -20,6 +20,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { chatLogger } from "../lib/logger";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
+import { loadModelFilterRules } from "./lib/model-filter-rules";
 import { autocompleteContext, buildAutocompletePrompt, cleanCompletion, MAX_AUTOCOMPLETE_ARG_CHARS, MIN_AUTOCOMPLETE_CHARS } from "./lib/autocomplete";
 
 /** A suggestion that arrives later than this is no longer wanted; the user has typed on. */
@@ -70,7 +71,7 @@ export const suggestCompletion = authAction
                 abortSignal: AbortSignal.timeout(AUTOCOMPLETE_TIMEOUT_MS),
                 maxOutputTokens: MAX_OUTPUT_TOKENS,
                 maxRetries: 0,
-                model: await getUtilityModel(gatewayFetch(ctx), { userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId }),
                 prompt,
                 system,
                 temperature: 0.2,

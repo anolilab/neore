@@ -26,12 +26,14 @@ import { scriptedModel, textStep } from "./group/test-models";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const { groupState, modelState, registry, skillState, toolsState } = vi.hoisted(() => {
+const { groupState, modelState, prefsState, registry, skillState, toolsState } = vi.hoisted(() => {
     return {
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
         /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
         modelState: { builtAgents: 0, model: undefined as unknown },
+        /** Whether the agent-module preference read reports a failure. */
+        prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
@@ -149,7 +151,14 @@ beforeAll(async () => {
     registry.set(
         "auth_functions:getAgentModulePreferencesQuery",
         internalQuery.input({ userId: v.string() }).query(async () => {
-            return { autoDetectComplexity: false, autoMediaEnrichment: false, enableDatasource: false, enableKnowledge: false, enablePlanner: false };
+            return {
+                autoDetectComplexity: false,
+                autoMediaEnrichment: false,
+                enableDatasource: false,
+                enableKnowledge: false,
+                enablePlanner: false,
+                ...(prefsState.readFailed && { readFailed: true }),
+            };
         }),
     );
     registry.set(
@@ -181,6 +190,7 @@ beforeEach(async () => {
     vi.mocked(runGroupTurn).mockClear();
     groupState.calls = 0;
     groupState.config = null;
+    prefsState.readFailed = false;
     modelState.builtAgents = 0;
     modelState.model = scriptedModel([textStep("Hello there.")]);
     skillState.calls = [];
@@ -234,8 +244,8 @@ const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPromp
 
 const readState = async () =>
     await harness.run(async (ctx: any) => {
-        const thread = await ctx.db.get(ids.threadId as never);
-        const stream = await ctx.db.get(ids.streamId as never);
+        const thread = await ctx.db.get("threads", ids.threadId as never);
+        const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
         const chunks = await ctx.db
             .query("persistentChunks")
             .withIndex("by_streamId_seq", (q: any) => q.eq("streamId", ids.streamId))
@@ -282,7 +292,7 @@ describe("runStreamingAgent: a successful turn", () => {
 
 describe("runStreamingAgent: a redelivered job", () => {
     it("returns quietly when the stream was already claimed, without reading the thread or touching the model", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { runClaimedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { runClaimedAt: Date.now() }));
 
         await run();
 
@@ -311,7 +321,7 @@ describe("runStreamingAgent: a redelivered job", () => {
 
 describe("runStreamingAgent: a goal's queued round", () => {
     it("does not run when its goal ended after the round was queued, and gives the thread back", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.messageId as never, { agentName: "neore:goal" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { agentName: "neore:goal" }));
 
         await run();
 
@@ -345,8 +355,23 @@ describe("runStreamingAgent: a failed run", () => {
         expect(scheduleReplyUsage).not.toHaveBeenCalled();
     });
 
+    it("refuses the run, with a readable error and no model call, when the model settings could not be read", async () => {
+        prefsState.readFailed = true;
+
+        await run();
+
+        const state = await readState();
+
+        // The defaults a failed read answers carry no ZDR, region or provider rule: nothing may go out under them.
+        expect(modelState.builtAgents).toBe(0);
+        expect(state.chunkText).toContain("Your model settings could not be read; try again.");
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("error");
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+
     it("finishes the stream and frees the thread when the chat is locked after the stream started", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
 
         await run();
 

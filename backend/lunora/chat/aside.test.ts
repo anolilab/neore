@@ -6,9 +6,12 @@
 import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
 const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
     return {
@@ -36,8 +39,11 @@ vi.mock("../usage/schedule", () => {
     return { scheduleReplyUsage };
 });
 
-vi.mock("../lib/utility-model", () => {
-    return { getUtilityModel };
+vi.mock("../lib/utility-model", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
+        getUtilityModel,
+    };
 });
 
 vi.mock("./lib/get-agent", () => {
@@ -169,7 +175,7 @@ const insertChunks = async (stream: string, texts: string[]): Promise<void> => {
     }
 };
 
-const patchThread = async (fields: Record<string, unknown>) => await harness.run(async (ctx: any) => await ctx.db.patch(threadId, fields));
+const patchThread = async (fields: Record<string, unknown>) => await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, fields));
 
 const customModel = "custom:my-endpoint/llama3";
 
@@ -275,7 +281,7 @@ describe("askAside", () => {
     });
 
     it("works with no reply running", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
         await expect(ask()).resolves.toMatchObject({ answer: "It means safe to repeat." });
     });
@@ -320,7 +326,7 @@ describe("askAside", () => {
                     userId: OWNER,
                 });
 
-                await ctx.db.patch(threadId, { activeLeafMessageId: leaf });
+                await ctx.db.patch("threads", threadId, { activeLeafMessageId: leaf });
             });
 
             await ask();
@@ -405,6 +411,41 @@ describe("askAside", () => {
         expect(getAgent).not.toHaveBeenCalled();
         expect(generateText.mock.calls[0]![0].model).toStrictEqual({ id: "utility-model" });
         expect(promptOfCall()).not.toContain("importer");
+    });
+
+    it("answers a BAD_REQUEST that says so, not an internal error, when the model filter rules cannot be read", async () => {
+        await patchThread({ mode: "image", model: "not-a-text-model" });
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("answers a BAD_REQUEST, not an internal error, when the rules cannot be read on a thread that runs on its own model", async () => {
+        registry.set(
+            "auth_functions:getAgentModulePreferencesQuery",
+            internalQuery.input({ userId: v.string() }).query(async () => {
+                throw new Error("D1 unavailable");
+            }),
+        );
+
+        try {
+            await expect(ask()).rejects.toMatchObject({ code: "BAD_REQUEST", message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE });
+        } finally {
+            registerModule(registry, "auth_functions", await import("../auth/functions"));
+        }
+
+        expect(generateText).not.toHaveBeenCalled();
     });
 
     it("uses the utility model for a thread that is not on a text model", async () => {
@@ -501,6 +542,15 @@ describe("askAside", () => {
             expect(await remainingText(OTHER)).toBe(reader - 1);
             expect(await remainingText(OWNER)).toBe(owner);
         });
+
+        it("meters the utility model to the reader, under the owner's filter rules", async () => {
+            await patchThread({ mode: "image", model: "not-a-text-model" });
+            await grantRead();
+
+            await expect(ask(QUESTION, OTHER)).resolves.toMatchObject({ withThread: true });
+
+            expect(getUtilityModel).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: OTHER }), undefined);
+        });
     });
 
     describe("on a locked thread", () => {
@@ -511,7 +561,7 @@ describe("askAside", () => {
             const hashed = await hashPasscode(PASSCODE, 1000);
 
             await harness.run(async (ctx: any) => {
-                await ctx.db.patch(threadId, { lockedAt: Date.now() - 60_000 });
+                await ctx.db.patch("threads", threadId, { lockedAt: Date.now() - 60_000 });
                 await ctx.db.insert("threadPasscodes", {
                     createdAt: 1,
                     epoch,
@@ -562,8 +612,12 @@ describe("askAside", () => {
         await expect(snapshotFor(OWNER)).resolves.toHaveProperty("rows");
         await expect(snapshotFor(OTHER)).rejects.toThrow();
 
-        await grantRead(OTHER);
+        const grantId = await grantRead(OTHER);
+
         await expect(snapshotFor(OTHER)).resolves.toHaveProperty("rows");
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("threadAccess", grantId));
+        await expect(snapshotFor(OTHER)).rejects.toThrow();
     });
 
     it("refuses an empty question", async () => {
@@ -580,7 +634,7 @@ describe("askAside", () => {
 });
 
 describe("addAsideToThread", () => {
-    const finishReply = async () => await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+    const finishReply = async () => await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
     it("is refused while a reply is running, and writes nothing", async () => {
         const before = await rows("messages");
@@ -593,13 +647,13 @@ describe("addAsideToThread", () => {
     it("is refused on a coding agent's thread while its turn runs past the stream's expiry", async () => {
         // A host turn waiting on a permission prompt outlives `expiresAt`; the reaper extends it rather than ending it.
         await patchThread({ runner: "host" });
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { expiresAt: Date.now() - 1000 }));
 
         await expect(addToThread()).rejects.toThrow("Wait for the reply");
     });
 
     it("is not blocked by a dead stream the reaper has not reached", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { expiresAt: Date.now() - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { expiresAt: Date.now() - 1000 }));
 
         await expect(addToThread()).resolves.toHaveProperty("messageId");
     });

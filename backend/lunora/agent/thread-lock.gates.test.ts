@@ -220,7 +220,7 @@ describe("thread row reads", () => {
     });
 
     it("getThreadByPublicToken refuses a locked thread even if it is still marked public", async () => {
-        await run(async (ctx) => await ctx.db.patch(lockedId as never, { isPublic: true, publicAccessToken: "tok-locked" }));
+        await run(async (ctx) => await ctx.db.patch("threads", lockedId as never, { isPublic: true, publicAccessToken: "tok-locked" }));
 
         expect(await run(async (ctx) => await ctx.runQuery(getThreadByPublicToken, { publicAccessToken: "tok-locked" }))).toBeNull();
     });
@@ -436,7 +436,7 @@ describe("knowledge, prompts, projects and memory", () => {
         const messageId = await run(async (ctx) => await firstMessageId(ctx, lockedId));
 
         await run(async (ctx) => await ctx.runMutation(recordRetrievedMemories, { memories: [{ memoryId: "m1", score: 1 }], messageId, userId: OWNER }));
-        const message: any = await run(async (ctx) => await ctx.db.get(messageId));
+        const message: any = await run(async (ctx) => await ctx.db.get("messages", messageId));
 
         expect(message.retrievedMemories).toBeUndefined();
     });
@@ -495,8 +495,8 @@ describe("the remaining writers and readers of a locked chat", () => {
                 .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", openId))
                 .first();
 
-            await ctx.db.patch(locked._id, { embeddingId: "emb-locked" });
-            await ctx.db.patch(open._id, { embeddingId: "emb-open" });
+            await ctx.db.patch("messages", locked._id, { embeddingId: "emb-locked" });
+            await ctx.db.patch("messages", open._id, { embeddingId: "emb-open" });
         });
 
         const hits: any[] = await run(

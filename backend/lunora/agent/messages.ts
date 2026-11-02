@@ -42,7 +42,8 @@ import { resolveThreadReadAccess } from "./thread-read-access";
 import { isLockedWithoutProof, isUnlockProofValid } from "./thread-passcode";
 import { getStreamingMessagesWithMetadata } from "./streams";
 import { insertVector, searchVectors } from "./vector/index";
-import { validateVectorDimension, type VectorTableId, vVectorId } from "./vector/tables";
+import { deleteVectorRow } from "./table-writes";
+import { findVectorRow, validateVectorDimension, type VectorTableId, type VectorTableName, vVectorId } from "./vector/tables";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { ownedChatFileIdsIn } from "../lib/storage-ownership";
@@ -54,10 +55,10 @@ const publicMessage = (message: Doc<"messages">): MessageDoc =>
     message as unknown as MessageDoc;
 
 export const deleteMessage = async (context: MutationContext, messageDocument: Doc<"messages">) => {
-    await context.db.delete(messageDocument._id);
+    await context.db.delete("messages", messageDocument._id);
 
     if (messageDocument.embeddingId) {
-        await context.db.delete(messageDocument.embeddingId as Id<"embeddings_1536">);
+        await deleteVectorRow(context.db, messageDocument.embeddingId as Id<VectorTableName>);
     }
 
     if (messageDocument.fileIds) {
@@ -74,7 +75,7 @@ export const deleteByIds = internalMutation
         // One at a time: `deleteMessage` releases file references read-modify-write, so
         // parallel deletes of messages sharing a file lose decrements (`changeRefcount`).
         for (const id of args.messageIds) {
-            const message = await ctx.db.get(id);
+            const message = await ctx.db.get("messages", id);
 
             if (message) {
                 await deleteMessage(ctx, message);
@@ -161,7 +162,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
     const { threadId } = args;
 
     if (!userId && args.threadId) {
-        const thread = await context.db.get(args.threadId);
+        const thread = await context.db.get("threads", args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
         userId = thread.userId ?? undefined;
@@ -180,12 +181,12 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         ...rest
     } = args;
 
-    const promptMessage = promptMessageId && (await context.db.get(promptMessageId));
+    const promptMessage = promptMessageId && (await context.db.get("messages", promptMessageId));
 
     // Unset for a thread that never branched. Otherwise a row inserted right
     // under the stored leaf becomes the leaf, which keeps `resolveLeafRow`'s
     // descent at zero steps.
-    const threadDocument = await context.db.get(threadId);
+    const threadDocument = await context.db.get("threads", threadId);
     let activeLeafId = threadDocument?.activeLeafMessageId ?? undefined;
     // A continuation (tool approval) owns a fresh `order` and saves into it
     // once per step; later saves resume after the rows earlier ones put there.
@@ -231,12 +232,12 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
                 .filter((m) => !pendingMessageId || m._id !== pendingMessageId)
                 .map(async (m) => {
                     if (m.embeddingId) {
-                        await context.db.delete(m.embeddingId as Id<"embeddings_1536">);
+                        await deleteVectorRow(context.db, m.embeddingId as Id<VectorTableName>);
                     }
 
                     // The vector was just deleted, so the field is REMOVED
                     // (`patchRow`): a dangling id would point search at nothing.
-                    await patchRow(context.db, m, { embeddingId: undefined, error: "Restarting", status: "failed" });
+                    await patchRow(context.db, "messages", m, { embeddingId: undefined, error: "Restarting", status: "failed" });
                 }),
         );
     }
@@ -318,7 +319,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         };
 
         if (i === 0 && pendingMessageId) {
-            const pendingMessage = await context.db.get(pendingMessageId);
+            const pendingMessage = await context.db.get("messages", pendingMessageId);
 
             assert(pendingMessage, `Pending msg ${pendingMessageId} not found`);
 
@@ -339,14 +340,14 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             // forever. `embeddingId` is the exception: it describes the NEW
             // content, so an old vector must not survive it (`patchRow` removes
             // the field when there is no new one).
-            await patchRow(context.db, pendingMessage, {
+            await patchRow(context.db, "messages", pendingMessage, {
                 ...withoutUndefined({ ...messageDocument, order: pendingMessage.order, stepOrder: pendingMessage.stepOrder }),
                 ...(pendingMessage.embeddingId !== undefined && { embeddingId: messageDocument.embeddingId }),
             });
             // The row AS PATCHED: callers read the saved content back (the
             // approval requests a paused run records, the text memory
             // extraction reads), and the pre-patch row has an empty body.
-            toReturn.push((await context.db.get(pendingMessage._id)) ?? pendingMessage);
+            toReturn.push((await context.db.get("messages", pendingMessage._id)) ?? pendingMessage);
             continue;
         }
 
@@ -383,11 +384,11 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         const messageId = insertedId as Id<"messages">;
 
         if (activeLeafId) {
-            const inserted = await context.db.get(messageId);
+            const inserted = await context.db.get("messages", messageId);
             const parent = inserted && (await parentOf(context, threadId, inserted));
 
             if (parent?._id === activeLeafId) {
-                await context.db.patch(threadId, { activeLeafMessageId: messageId });
+                await context.db.patch("threads", threadId, { activeLeafMessageId: messageId });
                 activeLeafId = messageId;
             }
         }
@@ -396,7 +397,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             await changeMessageFiles(context, threadId, [], message.fileIds);
         }
 
-        toReturn.push((await context.db.get(messageId))!);
+        toReturn.push((await context.db.get("messages", messageId))!);
     }
 
     // A saved reply is activity on its own: readers that look at threads by `updatedAt` (the routines' quiet check)
@@ -404,7 +405,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
     if (threadDocument && messages.some((item) => item.message.role === "user")) {
         const now = Date.now();
 
-        await context.db.patch(threadId, { updatedAt: now, ...(fromUser === true && { lastUserMessageAt: now }) });
+        await context.db.patch("threads", threadId, { updatedAt: now, ...(fromUser === true && { lastUserMessageAt: now }) });
     }
 
     return { messages: toReturn.map((item) => publicMessage(item)) };
@@ -439,7 +440,7 @@ const withToolResultFiles = async <M extends { fileIds?: Id<"chatFiles">[]; mess
 
 /** `leafId` when it is an agent-switch divider hanging directly under `promptId` — what a regenerate of the newest turn points at. */
 const dividerUnder = async (context: MutationContext, leafId: Id<"messages">, promptId: Id<"messages">): Promise<Id<"messages"> | undefined> => {
-    const leaf = await context.db.get(leafId);
+    const leaf = await context.db.get("messages", leafId);
 
     return leaf && leaf.parentMessageId === promptId && agentSwitchOf(leaf) ? leaf._id : undefined;
 };
@@ -469,7 +470,7 @@ export const pinFollowingRowParent = async (context: MutationContext, threadId: 
         .order("desc")
         .first();
 
-    await context.db.patch(nextRow._id, { parentMessageId: previousRow?._id ?? BRANCH_ROOT });
+    await context.db.patch("messages", nextRow._id, { parentMessageId: previousRow?._id ?? BRANCH_ROOT });
 };
 
 export const getMaxMessage = async (context: QueryContext, threadId: Id<"threads">, order?: number): Promise<Doc<"messages"> | null> =>
@@ -513,7 +514,7 @@ export const finalizeMessage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { messageId, result }, ctx }) => {
-        const message = await ctx.db.get(messageId);
+        const message = await ctx.db.get("messages", messageId);
 
         // A stop deletes an empty pending row before it aborts the model (chat/streaming/persistent/library.ts), so the abort's fail finds none.
         if (!message) {
@@ -555,13 +556,13 @@ export const finalizeMessage = internalMutation
 
         if (result.status === "failed") {
             if (message.embeddingId) {
-                await ctx.db.delete(message.embeddingId as Id<"embeddings_1536">);
+                await deleteVectorRow(ctx.db, message.embeddingId as Id<VectorTableName>);
             }
 
             // Vector deleted above, so the field is removed rather than left dangling.
-            await patchRow(ctx.db, message, { embeddingId: undefined, error: result.error, status: "failed" });
+            await patchRow(ctx.db, "messages", message, { embeddingId: undefined, error: result.error, status: "failed" });
         } else {
-            await ctx.db.patch(messageId, { status: "success" });
+            await ctx.db.patch("messages", messageId, { status: "success" });
         }
 
         return null;
@@ -574,7 +575,7 @@ export const updateMessage = internalMutation
     })
     .output(v.from(vMessageDocument))
     .mutation(async ({ args, ctx }) => {
-        const message = await ctx.db.get(args.messageId);
+        const message = await ctx.db.get("messages", args.messageId);
 
         assert(message, `Message ${args.messageId} not found`);
 
@@ -594,15 +595,15 @@ export const updateMessage = internalMutation
 
         if (args.patch.status === "failed") {
             if (message.embeddingId) {
-                await ctx.db.delete(message.embeddingId as Id<"embeddings_1536">);
+                await deleteVectorRow(ctx.db, message.embeddingId as Id<VectorTableName>);
             }
 
             patch.embeddingId = undefined;
         }
 
-        await patchRow(ctx.db, message, patch);
+        await patchRow(ctx.db, "messages", message, patch);
 
-        return publicMessage((await ctx.db.get(args.messageId))!);
+        return publicMessage((await ctx.db.get("messages", args.messageId))!);
     });
 
 export const patchMessageTiming = internalMutation
@@ -612,7 +613,7 @@ export const patchMessageTiming = internalMutation
         ttftMs: v.optional(v.number()),
     })
     .mutation(async ({ args, ctx }) => {
-        const message = await ctx.db.get(args.messageId);
+        const message = await ctx.db.get("messages", args.messageId);
 
         if (!message) {
             return;
@@ -622,7 +623,7 @@ export const patchMessageTiming = internalMutation
         // because this writer can run before any are known, producing a usage row
         // that holds only timings. See the note on `messages.usage` in the
         // generator's NARROWED_COLUMNS.
-        await ctx.db.patch(args.messageId, {
+        await ctx.db.patch("messages", args.messageId, {
             usage: {
                 ...message.usage,
                 durationMs: args.durationMs,
@@ -667,7 +668,7 @@ export const cloneMessageBatch = internalMutation
 
         // A branched source forks as the path its owner is looking at, written
         // as a straight line: the copy's explicit parents would name source ids.
-        const sourceThread = await ctx.db.get(args.sourceThreadId);
+        const sourceThread = await ctx.db.get("threads", args.sourceThreadId);
         let activePath: Set<string> | undefined;
 
         if (sourceThread?.activeLeafMessageId) {
@@ -678,7 +679,7 @@ export const cloneMessageBatch = internalMutation
 
         // The list cuts by `order` alone — a whole turn. A fork names its last
         // row exactly (`resolveForkEnd`), so a fork at a prompt leaves its reply.
-        const lastToCopy = args.upToAndIncludingMessageId ? await ctx.db.get(args.upToAndIncludingMessageId) : null;
+        const lastToCopy = args.upToAndIncludingMessageId ? await ctx.db.get("messages", args.upToAndIncludingMessageId) : null;
         const firstMessage = result.page[0];
         const lastMessage = result.page.at(-1);
 
@@ -716,12 +717,15 @@ export const cloneMessageBatch = internalMutation
                     let embeddingId: VectorTableId | undefined;
 
                     if (m.embeddingId) {
-                        const vector = (await ctx.db.get(m.embeddingId as unknown as VectorTableId)) as unknown as {
-                            model: string;
-                            table: string;
-                            userId?: string;
-                            vector: number[];
-                        } | null;
+                        const found = await findVectorRow(ctx.db, m.embeddingId);
+                        const vector = found?.row as
+                            | {
+                                  model: string;
+                                  table: string;
+                                  userId?: string;
+                                  vector: number[];
+                              }
+                            | undefined;
 
                         assert(vector, `Vector ${m.embeddingId} not found`);
                         const dimension = vector.vector.length;
@@ -909,7 +913,7 @@ export const listMessagesByThreadIdHandler = async (
 const listMessagesPage = async (context: QueryContext, args: InferArgs<typeof listMessagesByThreadIdArgs>): Promise<PaginationResult<Doc<"messages">>> => {
     const allStatuses = messageStatuses;
     const statuses = args.statuses ?? allStatuses;
-    const last = args.upToAndIncludingMessageId && (await context.db.get(args.upToAndIncludingMessageId));
+    const last = args.upToAndIncludingMessageId && (await context.db.get("messages", args.upToAndIncludingMessageId));
 
     assert(!last || last.threadId === args.threadId, "upToAndIncludingMessageId must be a message in the thread");
     const toolOptions = args.excludeToolMessages ? [false] : [true, false];
@@ -988,7 +992,7 @@ export const readMessagesByIds = async (
     ctx: Pick<QueryContext, "db">,
     args: { messageIds: Id<"messages">[]; threadId?: Id<"threads">; unlockProof?: string },
 ): Promise<(ReturnType<typeof publicMessage> | null)[]> => {
-    const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
+    const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get("messages", id)));
     const found = rows.filter((m): m is Doc<"messages"> => m !== null);
     const unlocked = await withoutLockedThreads(ctx, found, { threadId: args.threadId, unlockProof: args.unlockProof });
     const visible = new Set(unlocked.map((m) => m._id));
@@ -1023,7 +1027,7 @@ export const getMessagesByIdsUnfiltered = internalQuery
     .input({ messageIds: v.array(v.id("messages")) })
     .output(v.from(v.array(v.union(v.null(), vMessageDocument))))
     .query(async ({ args, ctx }) => {
-        const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
+        const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get("messages", id)));
 
         return rows.map((m) => (m ? publicMessage(m) : null));
     });
@@ -1130,7 +1134,7 @@ export const _fetchSearchMessages = internalQuery
     })
     .output(v.from(v.array(vMessageDocument)))
     .query(async ({ args, ctx }) => {
-        const beforeMessage = args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
+        const beforeMessage = args.beforeMessageId && (await ctx.db.get("messages", args.beforeMessageId));
         const { searchAllMessagesForUserId, threadId } = args;
 
         assert(searchAllMessagesForUserId || threadId, "Specify searchAllMessagesForUserId or threadId to search");
@@ -1254,7 +1258,7 @@ export const textSearch = internalQuery
     .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vMessageDocument)) }))
     .query(async ({ args, ctx }) => {
         assert(args.searchAllMessagesForUserId || args.threadId, "Specify userId or threadId");
-        const targetMessage = args.targetMessageId && (await ctx.db.get(args.targetMessageId));
+        const targetMessage = args.targetMessageId && (await ctx.db.get("messages", args.targetMessageId));
         const order = targetMessage?.order;
         const text = args.text || targetMessage?.text;
 
@@ -1297,7 +1301,7 @@ export const getMessageSearchFields = internalQuery
         }),
     )
     .query(async ({ args, ctx }) => {
-        const message = await ctx.db.get(args.messageId);
+        const message = await ctx.db.get("messages", args.messageId);
 
         if (message && (await isLockedWithoutProof(ctx, message.threadId, args.unlockProof))) {
             return { embedding: undefined, embeddingModel: undefined, text: undefined };
@@ -1308,7 +1312,8 @@ export const getMessageSearchFields = internalQuery
         let embeddingModel;
 
         if (message?.embeddingId) {
-            const target = (await ctx.db.get(message.embeddingId as unknown as VectorTableId)) as unknown as { model: string; vector: number[] } | null;
+            const found = await findVectorRow(ctx.db, message.embeddingId);
+            const target = found?.row as { model: string; vector: number[] } | undefined;
 
             embedding = target?.vector;
             embeddingModel = target?.model;

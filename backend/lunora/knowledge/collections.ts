@@ -212,7 +212,7 @@ export const updateCollection = authMutation
             changes.organizationId = args.shareWithOrganization ? organizationId : undefined;
         }
 
-        await patchRow(ctx.db, collection, changes);
+        await patchRow(ctx.db, "knowledgeCollections", collection, changes);
 
         ctx.log.event("knowledge.update_collection", { sharingChanged: args.shareWithOrganization !== undefined });
 
@@ -252,8 +252,8 @@ export const deleteCollection = authMutation
 
         for (const file of files) {
             await (args.deleteFiles
-                ? ctx.db.patch(file._id, { status: DELETING_STATUS, updatedAt: now })
-                : patchRow(ctx.db, file, { collectionId: undefined, updatedAt: now }));
+                ? ctx.db.patch("knowledgeFiles", file._id, { status: DELETING_STATUS, updatedAt: now })
+                : patchRow(ctx.db, "knowledgeFiles", file, { collectionId: undefined, updatedAt: now }));
         }
 
         if (args.deleteFiles && files.length > 0) {
@@ -265,8 +265,8 @@ export const deleteCollection = authMutation
             .withIndex("by_collectionId", (q) => q.eq("collectionId", collection._id))
             .collect();
 
-        await Promise.all(links.map((link) => ctx.db.delete(link._id)));
-        await ctx.db.delete(collection._id);
+        await Promise.all(links.map((link) => ctx.db.delete("knowledgeCollectionLinks", link._id)));
+        await ctx.db.delete("knowledgeCollections", collection._id);
 
         ctx.log.event("knowledge.delete_collection", { deleteFiles: args.deleteFiles === true, fileCount: files.length });
 
@@ -296,14 +296,14 @@ export const setFileCollection = authMutation
             await requireOwnCollection(ctx.db, args.collectionId, userId);
         }
 
-        const files = await Promise.all([...new Set(args.fileIds)].map(async (fileId) => await ctx.db.get(fileId)));
+        const files = await Promise.all([...new Set(args.fileIds)].map(async (fileId) => await ctx.db.get("knowledgeFiles", fileId)));
 
         if (files.some((file) => !file || file.userId !== userId)) {
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
         }
 
         for (const file of files) {
-            await patchRow(ctx.db, file!, { collectionId: args.collectionId, updatedAt: ctx.now });
+            await patchRow(ctx.db, "knowledgeFiles", file!, { collectionId: args.collectionId, updatedAt: ctx.now });
         }
 
         ctx.log.event("knowledge.set_file_collection", { fileCount: files.length, moved: args.collectionId !== undefined });
@@ -374,7 +374,7 @@ export const detachCollectionFromThread = authMutation
             .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
             .collect();
 
-        await Promise.all(links.filter((link) => link.collectionId === args.collectionId).map((link) => ctx.db.delete(link._id)));
+        await Promise.all(links.filter((link) => link.collectionId === args.collectionId).map((link) => ctx.db.delete("knowledgeCollectionLinks", link._id)));
 
         ctx.log.event("knowledge.detach_collection", { scope: "thread" });
 
@@ -446,7 +446,7 @@ export const detachCollectionFromProject = authMutation
             .withIndex("by_projectId", (q) => q.eq("projectId", args.projectId))
             .collect();
 
-        await Promise.all(links.filter((link) => link.collectionId === args.collectionId).map((link) => ctx.db.delete(link._id)));
+        await Promise.all(links.filter((link) => link.collectionId === args.collectionId).map((link) => ctx.db.delete("knowledgeCollectionLinks", link._id)));
 
         ctx.log.event("knowledge.detach_collection", { scope: "project" });
 
@@ -588,7 +588,7 @@ export const resolveRetrievalScope = internalQuery
         }),
     )
     .query(async ({ args: { admittedRun, threadId, unlockProof, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         // A locked chat's attachments are its content. Without a proof, or an
         // admitted run, the search gets an explicit, empty scope rather than the
@@ -686,7 +686,7 @@ export const gatedKnowledgeFileIds = internalQuery
                 continue;
             }
 
-            const thread = await ctx.db.get(lockedId);
+            const thread = await ctx.db.get("threads", lockedId);
 
             if (!thread || !isThreadLocked(thread)) {
                 continue;

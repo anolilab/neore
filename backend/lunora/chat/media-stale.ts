@@ -95,7 +95,7 @@ export const failStaleMediaRows = internalMutation
                 }
 
                 if (!lockedThreads.has(row.threadId)) {
-                    const thread = await ctx.db.get(row.threadId);
+                    const thread = await ctx.db.get("threads", row.threadId);
 
                     lockedThreads.set(row.threadId, thread !== null && isThreadLocked(thread));
                 }
@@ -105,7 +105,7 @@ export const failStaleMediaRows = internalMutation
                     continue;
                 }
 
-                await patchRow(ctx.db, row, {
+                await patchRow(ctx.db, "messages", row, {
                     error: "The generation stopped before it finished.",
                     message: { content: [{ text: ABANDONED_MEDIA_TEXT, type: "text" }], role: "assistant" },
                     status: "failed",

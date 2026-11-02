@@ -60,7 +60,7 @@ describe("a branch of a locked chat", () => {
     it("is locked, under a new epoch, and opens with the same passcode", async () => {
         await inherit();
 
-        const branch = await harness.run(async (ctx: any) => await ctx.db.get(branchId));
+        const branch = await harness.run(async (ctx: any) => await ctx.db.get("threads", branchId));
         const row = await harness.run(async (ctx: any) => await readPasscodeRow(ctx.db, branchId as never));
 
         expect(branch?.lockedAt).toBeTypeOf("number");
@@ -106,13 +106,13 @@ describe("a branch of a locked chat", () => {
                 .collect();
 
             for (const row of rows) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("threadPasscodes", row._id);
             }
         });
 
         await expect(inherit()).rejects.toThrow(MISSING_PASSCODE);
 
-        const branch = await harness.run(async (ctx: any) => await ctx.db.get(branchId));
+        const branch = await harness.run(async (ctx: any) => await ctx.db.get("threads", branchId));
 
         expect(branch?.lockedAt).toBeUndefined();
     });

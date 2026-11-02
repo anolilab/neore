@@ -12343,6 +12343,12 @@
           "optional": false,
           "unique": false
         },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "state": {
           "kind": "string",
           "nullable": false,
@@ -12463,6 +12469,12 @@
           "optional": false,
           "unique": false
         },
+        "revision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "state": {
           "kind": "string",
           "nullable": false,
@@ -12487,6 +12499,12 @@
         "by_reference": {
           "fields": [
             "referenceId"
+          ],
+          "unique": false
+        },
+        "by_state": {
+          "fields": [
+            "state"
           ],
           "unique": false
         }

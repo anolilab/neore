@@ -264,10 +264,10 @@ export const writeContent = async (
 
         if (outcome.kind === "orphaned") {
             if (row.orphaned !== true) {
-                await ctx.db.patch(row._id, { orphaned: true });
+                await ctx.db.patch("pageComments", row._id, { orphaned: true });
             }
         } else if (row.orphaned === true || row.anchorText !== outcome.anchorText) {
-            await patchRow(ctx.db, row, { anchorText: outcome.anchorText, orphaned: undefined });
+            await patchRow(ctx.db, "pageComments", row, { anchorText: outcome.anchorText, orphaned: undefined });
         }
     }
 
@@ -276,6 +276,7 @@ export const writeContent = async (
     const revision = page.revision + 1;
 
     await ctx.db.patch(
+        "pages",
         page._id,
         withoutUndefined({
             content: input.content ?? page.content ?? "",
@@ -323,6 +324,7 @@ const recordSnapshot = async (
 
     if (action === "update" && latest) {
         await ctx.db.patch(
+            "pageVersions",
             latest._id,
             withoutUndefined({
                 content: input.content ?? "",
@@ -354,7 +356,7 @@ const recordSnapshot = async (
         .take(MAX_VERSIONS_PER_PAGE + 5);
 
     for (const row of overflow.slice(MAX_VERSIONS_PER_PAGE)) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("pageVersions", row._id);
     }
 };
 
@@ -385,13 +387,33 @@ export const deletePageRows = async (ctx: MutationCtx, pageId: Id<"pages">): Pro
     // Replies before roots, so no reply is ever left pointing at a deleted root.
     const orderedComments = comments.toSorted((a, b) => Number(a.parentId === undefined) - Number(b.parentId === undefined));
 
-    for (const row of [...orderedComments, ...versions, ...grants, ...invites, ...presence, ...favorites]) {
-        await ctx.db.delete(row._id);
+    for (const row of orderedComments) {
+        await ctx.db.delete("pageComments", row._id);
     }
 
-    const page = await ctx.db.get(pageId);
+    for (const row of versions) {
+        await ctx.db.delete("pageVersions", row._id);
+    }
 
-    await ctx.db.delete(pageId);
+    for (const row of grants) {
+        await ctx.db.delete("pageAccess", row._id);
+    }
+
+    for (const row of invites) {
+        await ctx.db.delete("pageInvites", row._id);
+    }
+
+    for (const row of presence) {
+        await ctx.db.delete("pagePresence", row._id);
+    }
+
+    for (const row of favorites) {
+        await ctx.db.delete("pageFavorites", row._id);
+    }
+
+    const page = await ctx.db.get("pages", pageId);
+
+    await ctx.db.delete("pages", pageId);
 
     // The anonymous `/p/$token` link resolves through `shardRoutes`; a deleted
     // page must not leave its route behind. A route write never fails the delete.
@@ -454,7 +476,7 @@ export const getPage = authQuery
             let cursor = page.parentPageId;
 
             while (cursor && breadcrumbs.length < MAX_BREADCRUMB_DEPTH) {
-                const ancestor = await ctx.db.get(cursor);
+                const ancestor = await ctx.db.get("pages", cursor);
 
                 if (!ancestor || ancestor.userId !== page.userId) {
                     break;
@@ -546,7 +568,7 @@ export const getPageVersion = authQuery
     .input({ versionId: v.id("pageVersions") })
     .output(v.object({ _id: v.id("pageVersions"), contentJson: v.optional(v.any()), createdAt: v.number(), title: v.string() }))
     .query(async ({ args: { versionId }, ctx }) => {
-        const pageId = await parentKeyOf(ctx, versionId, "pageId");
+        const pageId = await parentKeyOf(ctx, "pageVersions", versionId, "pageId");
 
         if (!pageId) {
             throw new LunoraError("NOT_FOUND", "Version not found");
@@ -554,7 +576,7 @@ export const getPageVersion = authQuery
 
         await requirePageAccess(ctx, pageId as Id<"pages">, ctx.user.userId, "read");
 
-        const version = await ctx.db.get(versionId);
+        const version = await ctx.db.get("pageVersions", versionId);
 
         if (!version) {
             throw new LunoraError("NOT_FOUND", "Version not found");
@@ -615,7 +637,7 @@ export const renamePage = authMutation
     .mutation(async ({ args, ctx }) => {
         const { page } = await requirePageAccess(ctx, args.pageId, ctx.user.userId, "write");
 
-        await patchRow(ctx.db, page, {
+        await patchRow(ctx.db, "pages", page, {
             ...(args.title !== undefined && { title: requireTitle(args.title) }),
             // `null` clears the icon; `patchRow` removes a key set to `undefined`.
             ...(args.icon !== undefined && { icon: requireIcon(args.icon) }),
@@ -648,7 +670,7 @@ export const syncGrantDisplay = async (
     const { page: grants } = await db.pageAccess.findMany({ where: { pageId } });
 
     for (const grant of grants) {
-        await patchRow(db, grant, { icon: display.icon, title: display.title });
+        await patchRow(db, "pageAccess", grant, { icon: display.icon, title: display.title });
     }
 };
 
@@ -682,7 +704,7 @@ export const movePage = authMutation
 
         const order = orderForIndex(siblingOrders(owned, parentPageId, page._id), Math.floor(args.index));
 
-        await patchRow(ctx.db, page, { order, parentPageId });
+        await patchRow(ctx.db, "pages", page, { order, parentPageId });
 
         ctx.log.event("pages.move_page", { index: Math.floor(args.index) });
 
@@ -707,7 +729,7 @@ export const setPageFavorite = authMutation
             // Past row-level security: a grantee may not update their grant (that
             // would let them raise its permission), but this writes only the star.
             if (grant) {
-                await patchRow(systemDb(ctx), grant, { favoritedAt: args.isFavorite ? (grant.favoritedAt ?? ctx.now) : undefined });
+                await patchRow(systemDb(ctx), "pageAccess", grant, { favoritedAt: args.isFavorite ? (grant.favoritedAt ?? ctx.now) : undefined });
             }
 
             ctx.log.event("pages.set_page_favorite", { isFavorite: args.isFavorite, isGrant: true });
@@ -720,7 +742,7 @@ export const setPageFavorite = authMutation
         if (args.isFavorite && !existing) {
             await ctx.db.insert("pageFavorites", { createdAt: ctx.now, pageId: args.pageId, userId });
         } else if (!args.isFavorite && existing) {
-            await ctx.db.delete(existing._id);
+            await ctx.db.delete("pageFavorites", existing._id);
         }
 
         ctx.log.event("pages.set_page_favorite", { isFavorite: args.isFavorite, isGrant: false });
@@ -811,14 +833,14 @@ export const restorePageVersion = authMutation
     .input({ baseRevision: v.number(), versionId: v.id("pageVersions") })
     .output(v.object({ revision: v.number() }))
     .mutation(async ({ args, ctx }) => {
-        const pageId = await parentKeyOf(ctx, args.versionId, "pageId");
+        const pageId = await parentKeyOf(ctx, "pageVersions", args.versionId, "pageId");
 
         if (!pageId) {
             throw new LunoraError("NOT_FOUND", "Version not found");
         }
 
         const { page } = await requirePageAccess(ctx, pageId as Id<"pages">, ctx.user.userId, "write");
-        const version = await ctx.db.get(args.versionId);
+        const version = await ctx.db.get("pageVersions", args.versionId);
 
         if (!version) {
             throw new LunoraError("NOT_FOUND", "Version not found");
@@ -845,7 +867,7 @@ export const createPageFromDocument = authMutation
     .output(v.object({ pageId: v.id("pages") }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const document = await ctx.db.get(args.documentId);
+        const document = await ctx.db.get("documents", args.documentId);
 
         if (!document || document.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Document not found");

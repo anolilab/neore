@@ -56,6 +56,7 @@ import { messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { vDeviceTaintSource } from "../devices/validators";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { isThreadLocked } from "../lib/thread-lock";
 import { getUtilityModel } from "../lib/utility-model";
@@ -195,7 +196,7 @@ const preparedValidator = v.object({
 
 /** Marks the thread so later jobs skip reading its path from the top. */
 const markPathTooLong = async (ctx: MutationCtx, thread: Thread): Promise<null> => {
-    await ctx.db.patch(thread._id, { summaryPathTooLongAt: ctx.now });
+    await ctx.db.patch("threads", thread._id, { summaryPathTooLongAt: ctx.now });
 
     return null;
 };
@@ -208,7 +209,7 @@ export const prepareThreadSummary = internalMutation
     .input({ afterMessageId: v.id("messages"), threadId: v.id("threads") })
     .output(v.union(preparedValidator, v.null()))
     .mutation(async ({ args, ctx }) => {
-        const thread = ownedBy(await ctx.db.get(args.threadId));
+        const thread = ownedBy(await ctx.db.get("threads", args.threadId));
 
         // A thread found too long is not read again for a while: its jobs do not even look at its rows.
         if (!thread || (thread.summaryPathTooLongAt !== undefined && ctx.now - thread.summaryPathTooLongAt < SUMMARY_TOO_LONG_RECHECK_MS)) {
@@ -324,7 +325,7 @@ export const finishThreadSummary = internalMutation
         }
 
         // The model call took a while: the thread may have been locked, deleted or opted out meanwhile.
-        const thread = ownedBy(await ctx.db.get(args.threadId));
+        const thread = ownedBy(await ctx.db.get("threads", args.threadId));
 
         // Refused after the model call: the claim goes too, so a job after a re-enable or an unlock retries at once.
         const refuse = async (): Promise<false> => {
@@ -369,7 +370,7 @@ export const finishThreadSummary = internalMutation
         const stale = [...existing.filter((row) => row._id === args.previousSummaryId), ...others.slice(SUMMARIES_KEPT_PER_THREAD - 1)];
 
         for (const row of stale) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("threadContextSummaries", row._id);
         }
 
         return true;
@@ -413,7 +414,11 @@ export const runThreadSummary = internalAction
                 // A stalled gateway call must not hold the user's scheduler lane: it fails, and the cut is released.
                 abortSignal: AbortSignal.timeout(SUMMARY_CALL_TIMEOUT_MS),
                 maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
-                model: await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: job.userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), {
+                    rules: await loadModelFilterRules(ctx, job.userId),
+                    threadId: args.threadId,
+                    userId: job.userId,
+                }),
                 prompt: buildSummaryPrompt(job.previousSummary, job.transcript),
                 system: SUMMARY_SYSTEM_PROMPT,
             });
@@ -455,7 +460,7 @@ export const getThreadSummaryForContext = internalQuery
             return null;
         }
 
-        const thread = ownedBy(await ctx.db.get(args.threadId));
+        const thread = ownedBy(await ctx.db.get("threads", args.threadId));
 
         // The same rules as making one: an opt-out or a lock stops reading what is already stored.
         if (!thread || (await blockerOf(ctx, thread)) !== null) {
@@ -506,10 +511,10 @@ export const listThreadSummariesForExport = internalQuery
  * the edit (a summary ending above it never saw it), and any whose covered row is gone.
  */
 export const dropSummariesFromEdit = async (ctx: MutationCtx, threadId: Id<"threads">, editedOrder: number): Promise<void> => {
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
 
     if (thread) {
-        await ctx.db.patch(threadId, { summaryEpoch: (thread.summaryEpoch ?? 0) + 1 });
+        await ctx.db.patch("threads", threadId, { summaryEpoch: (thread.summaryEpoch ?? 0) + 1 });
     }
 
     const stored = await summariesOf(ctx, threadId);
@@ -518,7 +523,7 @@ export const dropSummariesFromEdit = async (ctx: MutationCtx, threadId: Id<"thre
         const covered = await getThreadRow(ctx, threadId, summary.coveredUpToMessageId);
 
         if (!covered || covered.order >= editedOrder) {
-            await ctx.db.delete(summary._id);
+            await ctx.db.delete("threadContextSummaries", summary._id);
         }
     }
 };
@@ -540,7 +545,7 @@ export const eraseUserThreadSummaries = internalMutation
         });
 
         for (const row of rows) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("threadContextSummaries", row._id);
         }
 
         const more = rows.length === batch;
@@ -566,7 +571,7 @@ export const deleteThreadSummaries = async (ctx: Pick<MutationCtx, "db">, thread
         .take(batch);
 
     for (const row of rows) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("threadContextSummaries", row._id);
     }
 
     return rows.length === batch;

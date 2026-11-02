@@ -64,7 +64,7 @@ export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostS
     const thread = found ? await ctx.db.threads.findFirst({ where: { _id: found.threadId } }) : null;
 
     if (found && !thread) {
-        await ctx.db.delete(found._id);
+        await ctx.db.delete("acpSessions", found._id);
     } else if (found) {
         if (thread?.deleted === true) {
             return { ended: true, existing: true, next: found.importedTurns ?? 0, outcome: "applied", threadId: found.threadId as string };
@@ -72,7 +72,7 @@ export const openImport = async (ctx: MutationCtx, device: Doc<"devices">, hostS
 
         // An import begun on one of the user's computers can be finished from another: the hand-over is the open.
         if (found.importState === "importing" && found.deviceId !== device._id) {
-            await ctx.db.patch(found._id, { deviceId: device._id, hostSessionId, updatedAt: now });
+            await ctx.db.patch("acpSessions", found._id, { deviceId: device._id, hostSessionId, updatedAt: now });
         }
 
         return {
@@ -207,7 +207,7 @@ export const applyImportTurns = async (
 
     const count = held + unseen.length;
 
-    await ctx.db.patch(session._id, { importedTurns: count, importState: closes ? "done" : "importing", lastEventAt: now, updatedAt: now });
+    await ctx.db.patch("acpSessions", session._id, { importedTurns: count, importState: closes ? "done" : "importing", lastEventAt: now, updatedAt: now });
 
     return { ended: closes, next: count, outcome: "applied" };
 };

@@ -29,7 +29,7 @@ const fakeContext = (tables: { member: Row[]; skills: Row[]; userSkills: Row[] }
 
     return {
         db: {
-            get: async (id: string) => tables.skills.find((skill) => skill._id === id) ?? null,
+            get: async (_table: string, id: string) => tables.skills.find((skill) => skill._id === id) ?? null,
             member: facade(tables.member),
             query: () => {
                 return {

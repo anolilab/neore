@@ -283,11 +283,6 @@
     {
       "from": "function:agent_messages:finalizeMessage",
       "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_messages:finalizeMessage",
-      "kind": "write",
       "to": "table:messages"
     },
     {
@@ -314,11 +309,6 @@
       "from": "function:agent_messages:textSearch",
       "kind": "read",
       "to": "table:messages"
-    },
-    {
-      "from": "function:agent_messages:updateMessage",
-      "kind": "write",
-      "to": "table:embeddings_1536"
     },
     {
       "from": "function:agent_node_executions:create",
@@ -966,39 +956,19 @@
       "to": "table:threads"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_1024"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_128"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_1408"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_256"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_512"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_768"
     },
     {
       "from": "function:agent_vector:deleteBatchForThread",
@@ -1006,44 +976,24 @@
       "to": "table:embeddings_1536"
     },
     {
-      "from": "function:agent_vector:insertBatch",
-      "kind": "write",
-      "to": "table:messages"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1024"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_128"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1408"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_256"
     },
     {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_512"
     },
     {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_768"
+    },
+    {
+      "from": "function:agent_vector:insertBatch",
+      "kind": "write",
+      "to": "table:messages"
     },
     {
       "from": "function:agent_workflow_executions:create",
@@ -2231,6 +2181,16 @@
       "to": "function:lib_document_history:recordHistory"
     },
     {
+      "from": "function:chat_functions:improvePrompt",
+      "kind": "call",
+      "to": "function:agent_threads:getThreadInternal"
+    },
+    {
+      "from": "function:chat_functions:iteratePrompt",
+      "kind": "call",
+      "to": "function:agent_threads:getThreadInternal"
+    },
+    {
       "from": "function:chat_functions:makeThreadTemporary",
       "kind": "call",
       "to": "function:agent_threads:createTemporaryThread"
@@ -2254,6 +2214,11 @@
       "from": "function:chat_functions:makeThreadTemporary",
       "kind": "read",
       "to": "table:userSettings"
+    },
+    {
+      "from": "function:chat_functions:optimizeSystemPrompt",
+      "kind": "call",
+      "to": "function:agent_threads:getThreadInternal"
     },
     {
       "from": "function:chat_functions:pinThread",
@@ -3251,11 +3216,6 @@
       "to": "function:coding_agents_functions:setPullRequestSandbox"
     },
     {
-      "from": "function:coding_agents_execute:createPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:appendRunLog"
@@ -3289,11 +3249,6 @@
       "from": "function:coding_agents_execute:finishRun",
       "kind": "call",
       "to": "function:coding_agents_functions:setPullRequestSandbox"
-    },
-    {
-      "from": "function:coding_agents_execute:finishRun",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:pollCodingAgentRun",
@@ -3356,11 +3311,6 @@
       "to": "function:coding_agents_functions:postRunResult"
     },
     {
-      "from": "function:coding_agents_execute:pollPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
-    },
-    {
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:expirePullRequest"
@@ -3374,11 +3324,6 @@
       "from": "function:coding_agents_execute:reapPullRequest",
       "kind": "call",
       "to": "function:coding_agents_functions:postRunResult"
-    },
-    {
-      "from": "function:coding_agents_execute:reapPullRequest",
-      "kind": "call",
-      "to": "function:source_control_pr_threads:recordOpenedPullRequest"
     },
     {
       "from": "function:coding_agents_execute:reapRun",
@@ -4886,6 +4831,11 @@
       "to": "table:actionCache"
     },
     {
+      "from": "function:lib_action_cache:removeIfAttempt",
+      "kind": "write",
+      "to": "table:actionCache"
+    },
+    {
       "from": "function:lib_claim_once:purgeClaimsWithPrefix",
       "kind": "schedule",
       "to": "function:lib_claim_once:purgeClaimsWithPrefix"
@@ -5039,6 +4989,11 @@
       "from": "function:memory_extract:extractMemories",
       "kind": "call",
       "to": "function:lib_action_cache:put"
+    },
+    {
+      "from": "function:memory_extract:extractMemories",
+      "kind": "call",
+      "to": "function:lib_action_cache:removeIfAttempt"
     },
     {
       "from": "function:memory_extract:extractMemories",
@@ -6068,6 +6023,11 @@
     {
       "from": "function:saas_notification_functions:markNotificationsRead",
       "kind": "read",
+      "to": "table:gatewayNotifications"
+    },
+    {
+      "from": "function:saas_notification_functions:markNotificationsRead",
+      "kind": "write",
       "to": "table:gatewayNotifications"
     },
     {
@@ -13601,6 +13561,12 @@
     },
     {
       "detail": "mutation",
+      "id": "function:lib_action_cache:removeIfAttempt",
+      "kind": "function",
+      "name": "lib.action_cache.removeIfAttempt"
+    },
+    {
+      "detail": "mutation",
       "id": "function:lib_claim_once:claimKey",
       "kind": "function",
       "name": "lib.claim_once.claimKey"
@@ -15835,6 +15801,13 @@
       "id": "function:source_control_merge_functions:setAutoMerge",
       "kind": "function",
       "name": "source_control.merge_functions.setAutoMerge",
+      "module": "source-control"
+    },
+    {
+      "detail": "action",
+      "id": "function:source_control_pr_link_retry:retryOpenedPullRequestLink",
+      "kind": "function",
+      "name": "source_control.pr_link_retry.retryOpenedPullRequestLink",
       "module": "source-control"
     },
     {
@@ -18353,20 +18326,14 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 291,
+      "line": 293,
       "reason": "\"setActiveLeafHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 341,
+      "line": 343,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/branches",
-      "kind": "write",
-      "line": 436,
-      "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
       "file": "agent/client/files",
@@ -18730,128 +18697,122 @@
     },
     {
       "file": "agent/gdpr",
-      "kind": "write",
-      "line": 25,
-      "reason": "\"eraseEmbeddingRow\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
       "kind": "read",
-      "line": 39,
+      "line": 42,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 44,
+      "line": 47,
       "reason": "\"eraseEmbeddingsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 53,
+      "line": 56,
       "reason": "\"eraseStreamingMessagesForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 58,
+      "line": 61,
       "reason": "\"eraseStreamingMessagesForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 70,
+      "line": 73,
       "reason": "\"eraseChatFileAccessForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 77,
+      "line": 80,
       "reason": "\"eraseChatFileThreadsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 82,
+      "line": 85,
       "reason": "\"eraseChatFileThreadsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 90,
+      "line": 93,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 94,
+      "line": 97,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 106,
+      "line": 109,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 107,
+      "line": 110,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 108,
+      "line": 111,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 115,
+      "line": 118,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 119,
+      "line": 122,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 126,
+      "line": 130,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 135,
+      "line": 131,
+      "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 132,
+      "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 142,
       "reason": "\"eraseProjectsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 143,
+      "line": 150,
       "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 143,
-      "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
-      "kind": "write",
-      "line": 148,
-      "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
-      "kind": "write",
-      "line": 148,
+      "line": 150,
       "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
     },
     {
@@ -18868,74 +18829,74 @@
     },
     {
       "file": "agent/gdpr",
-      "kind": "read",
-      "line": 163,
+      "kind": "write",
+      "line": 162,
+      "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 162,
       "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 175,
+      "line": 170,
+      "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "read",
+      "line": 182,
       "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 57,
-      "reason": "\"deleteMessage\" is not a registered function"
-    },
-    {
-      "file": "agent/messages",
-      "kind": "write",
-      "line": 60,
+      "line": 58,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 222,
+      "line": 223,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 234,
+      "line": 374,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 373,
+      "line": 391,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 390,
-      "reason": "\"addMessagesHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/messages",
-      "kind": "write",
-      "line": 407,
+      "line": 408,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 456,
+      "line": 457,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 466,
+      "line": 467,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 472,
+      "line": 473,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
@@ -19079,8 +19040,8 @@
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 195,
-      "reason": "\"deleteVectorRow\" is not a registered function"
+      "line": 201,
+      "reason": "the written table is not a string literal"
     },
     {
       "file": "agent/thread-lock",
@@ -19139,31 +19100,31 @@
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 144,
+      "line": 145,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 512,
+      "line": 517,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 521,
+      "line": 526,
       "reason": "\"dropSummariesFromEdit\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "read",
-      "line": 563,
+      "line": 568,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
       "file": "agent/thread-summaries",
       "kind": "write",
-      "line": 569,
+      "line": 574,
       "reason": "\"deleteThreadSummaries\" is not a registered function"
     },
     {
@@ -19181,19 +19142,25 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1524,
+      "line": 1525,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
       "file": "agent/vector/index",
       "kind": "read",
-      "line": 41,
+      "line": 45,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "agent/vector/index",
       "kind": "write",
-      "line": 133,
+      "line": 137,
+      "reason": "the written table is not a string literal"
+    },
+    {
+      "file": "agent/vector/index",
+      "kind": "write",
+      "line": 200,
       "reason": "the written table is not a string literal"
     },
     {
@@ -19247,67 +19214,67 @@
     {
       "file": "auth/gdpr",
       "kind": "read",
-      "line": 56,
+      "line": 57,
       "reason": "\"anonymiseGatewayUsage\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 61,
+      "line": 62,
       "reason": "\"anonymiseGatewayUsage\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 94,
+      "line": 95,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 98,
+      "line": 99,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 102,
+      "line": 103,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 106,
+      "line": 107,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 110,
+      "line": 111,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 114,
+      "line": 115,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 118,
+      "line": 119,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 122,
+      "line": 123,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 131,
+      "line": 132,
       "reason": "\"deleteUserRecord\" is not a registered function"
     },
     {
@@ -19470,7 +19437,7 @@
       "file": "chat-import/functions",
       "kind": "write",
       "line": 107,
-      "reason": "the written table is not a string literal"
+      "reason": "\"releaseSupersededImportFiles\" is not a registered function"
     },
     {
       "file": "chat-import/gdpr",
@@ -19505,13 +19472,7 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 556,
-      "reason": "\"runAgentSwitch\" is not a registered function"
-    },
-    {
-      "file": "chat/agent-switch",
-      "kind": "call",
-      "line": 575,
+      "line": 557,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
@@ -19523,31 +19484,37 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 585,
+      "line": 577,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 596,
+      "line": 586,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 615,
+      "line": 597,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 638,
-      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
+      "line": 616,
+      "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
       "line": 639,
+      "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 640,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19613,43 +19580,55 @@
     {
       "file": "chat/gdpr",
       "kind": "write",
-      "line": 65,
+      "line": 66,
+      "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 67,
+      "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 68,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 71,
+      "line": 76,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 82,
+      "line": 87,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 91,
+      "line": 97,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 35,
+      "line": 36,
       "reason": "\"handOffToGoalReview\" is not a registered function"
     },
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 58,
+      "line": 59,
       "reason": "\"otherGoalHoldsThread\" is not a registered function"
     },
     {
       "file": "chat/goals/execute",
       "kind": "call",
-      "line": 70,
+      "line": 71,
       "reason": "\"noteGoalPaused\" is not a registered function"
     },
     {
@@ -19697,127 +19676,127 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 332,
+      "line": 334,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 332,
+      "line": 334,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 353,
+      "line": 355,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 353,
+      "line": 355,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 536,
+      "line": 538,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 536,
+      "line": 538,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 545,
+      "line": 547,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 545,
+      "line": 547,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 577,
+      "line": 579,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 577,
+      "line": 579,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 587,
+      "line": 589,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 587,
+      "line": 589,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 618,
+      "line": 620,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 618,
+      "line": 620,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 619,
+      "line": 621,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 619,
+      "line": 621,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 670,
+      "line": 672,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 761,
+      "line": 770,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 779,
+      "line": 788,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 789,
+      "line": 798,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 818,
+      "line": 827,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -19829,146 +19808,140 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 242,
+      "line": 235,
       "reason": "\"optimizeSystemPromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 290,
+      "line": 283,
       "reason": "\"iteratePromptHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 516,
+      "line": 509,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 551,
+      "line": 544,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 618,
+      "line": 611,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 640,
+      "line": 633,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 653,
+      "line": 646,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 672,
+      "line": 665,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 779,
+      "line": 772,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 791,
+      "line": 784,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 796,
+      "line": 789,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 805,
+      "line": 798,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 844,
+      "line": 837,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 877,
+      "line": 870,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 895,
+      "line": 888,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1016,
+      "line": 1009,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1031,
+      "line": 1024,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1040,
+      "line": 1033,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1064,
+      "line": 1057,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1182,
+      "line": 1175,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1190,
+      "line": 1183,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1331,
+      "line": 1324,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1357,
+      "line": 1350,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 120,
-      "reason": "\"readRunPlan\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
@@ -19979,122 +19952,128 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 158,
-      "reason": "\"loadModelFilterRules\" is not a registered function"
+      "line": 122,
+      "reason": "\"readRunPlan\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 201,
+      "line": 191,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 259,
+      "line": 249,
       "reason": "\"discardRunSecrets\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 279,
+      "line": 269,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 370,
+      "line": 360,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 406,
+      "line": 396,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 407,
+      "line": 397,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 415,
+      "line": 405,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 435,
+      "line": 425,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 576,
+      "line": 566,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 611,
+      "line": 601,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 622,
+      "line": 612,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 637,
+      "line": 627,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 649,
+      "line": 639,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 670,
+      "line": 660,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 791,
+      "line": 781,
       "reason": "\"createRunSteering\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 831,
+      "line": 821,
       "reason": "\"stampSavedToolCalls\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 893,
+      "line": 883,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 906,
+      "line": 896,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 970,
+      "line": 960,
       "reason": "\"endStoppedRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 1062,
+      "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
@@ -20105,31 +20084,31 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1082,
+      "line": 1179,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1189,
-      "reason": "\"resumeApprovedRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 1310,
+      "line": 1300,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1342,
+      "line": 1332,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1349,
+      "line": 1339,
+      "reason": "\"failRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 1350,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -20141,19 +20120,13 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1370,
+      "line": 1366,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1376,
-      "reason": "\"failRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 1390,
+      "line": 1380,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -20267,13 +20240,13 @@
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 77,
+      "line": 111,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 94,
+      "line": 130,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
@@ -20283,10 +20256,16 @@
       "reason": "\"callMCPToolFromAppHttpAction\" is not a registered function"
     },
     {
-      "file": "chat/lib/optimizer-model-rules",
+      "file": "chat/lib/model-filter-rules",
       "kind": "call",
-      "line": 20,
-      "reason": "\"loadOptimizerModelRules\" is not a registered function"
+      "line": 50,
+      "reason": "\"loadModelFilterRules\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/model-filter-rules",
+      "kind": "call",
+      "line": 51,
+      "reason": "\"loadModelFilterRules\" is not a registered function"
     },
     {
       "file": "chat/lib/pause-run",
@@ -20399,19 +20378,19 @@
     {
       "file": "chat/lib/thread-helpers",
       "kind": "call",
-      "line": 27,
+      "line": 29,
       "reason": "\"validateThreadAccess\" is not a registered function"
     },
     {
       "file": "chat/lib/thread-helpers",
       "kind": "call",
-      "line": 61,
+      "line": 63,
       "reason": "\"validateThreadAccessWithData\" is not a registered function"
     },
     {
       "file": "chat/lib/thread-helpers",
       "kind": "call",
-      "line": 102,
+      "line": 108,
       "reason": "\"getAgentForUser\" is not a registered function"
     },
     {
@@ -21167,20 +21146,20 @@
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 35,
-      "reason": "the written table is not a string literal"
+      "line": 36,
+      "reason": "\"deleteOneByOne\" is not a registered function"
     },
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 50,
-      "reason": "the written table is not a string literal"
+      "line": 52,
+      "reason": "\"deleteParentsWithChildren\" is not a registered function"
     },
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 58,
-      "reason": "the written table is not a string literal"
+      "line": 60,
+      "reason": "\"deleteParentsWithChildren\" is not a registered function"
     },
     {
       "file": "gdpr/deletion-guard",
@@ -21779,13 +21758,19 @@
     {
       "file": "knowledge/file-removal",
       "kind": "write",
-      "line": 69,
+      "line": 70,
       "reason": "\"deleteKnowledgeFile\" is not a registered function"
     },
     {
       "file": "knowledge/file-removal",
       "kind": "write",
       "line": 71,
+      "reason": "\"deleteKnowledgeFile\" is not a registered function"
+    },
+    {
+      "file": "knowledge/file-removal",
+      "kind": "write",
+      "line": 74,
       "reason": "\"deleteKnowledgeFile\" is not a registered function"
     },
     {
@@ -21821,55 +21806,67 @@
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 58,
+      "line": 59,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 61,
-      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
-    },
-    {
-      "file": "knowledge/gdpr",
-      "kind": "read",
-      "line": 65,
+      "line": 60,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 75,
+      "line": 64,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "read",
-      "line": 79,
+      "line": 68,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 85,
+      "line": 78,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "read",
-      "line": 92,
+      "line": 82,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "write",
+      "line": 89,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "write",
+      "line": 90,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "read",
+      "line": 98,
       "reason": "\"eraseProjectKnowledgeForProject\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 97,
+      "line": 103,
       "reason": "\"eraseProjectKnowledgeForProject\" is not a registered function"
     },
     {
       "file": "knowledge/ingest",
       "kind": "call",
-      "line": 59,
+      "line": 60,
       "reason": "\"keepVectorsOnlyIfSaved\" is not a registered function"
     },
     {
@@ -21929,25 +21926,25 @@
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 245,
+      "line": 264,
       "reason": "at module scope"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 251,
+      "line": 270,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 261,
+      "line": 280,
       "reason": "at module scope"
     },
     {
       "file": "lib/action-cache",
       "kind": "call",
-      "line": 273,
+      "line": 292,
       "reason": "at module scope"
     },
     {
@@ -22055,13 +22052,13 @@
     {
       "file": "lib/patch",
       "kind": "write",
-      "line": 54,
+      "line": 62,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "lib/patch",
       "kind": "write",
-      "line": 64,
+      "line": 71,
       "reason": "the written table is not a string literal"
     },
     {
@@ -22152,6 +22149,12 @@
       "file": "lib/shard-routes",
       "kind": "write",
       "line": 94,
+      "reason": "\"deleteShardRoutesOf\" is not a registered function"
+    },
+    {
+      "file": "lib/shard-routes",
+      "kind": "write",
+      "line": 98,
       "reason": "\"deleteShardRoutesOf\" is not a registered function"
     },
     {
@@ -22391,67 +22394,97 @@
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 312,
+      "line": 313,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 325,
+      "line": 326,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 338,
+      "line": 340,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 350,
+      "line": 352,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 357,
+      "line": 359,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 364,
+      "line": 366,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 368,
+      "line": 370,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 375,
+      "line": 377,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 379,
+      "line": 381,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 389,
+      "line": 391,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 394,
+      "line": 395,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 399,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 403,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 407,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 411,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 416,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
@@ -22665,27 +22698,21 @@
       "reason": "\"eraseGatewayNotificationsForUser\" is not a registered function"
     },
     {
-      "file": "saas/notification-functions",
-      "kind": "write",
-      "line": 97,
-      "reason": "the written table is not a string literal"
-    },
-    {
       "file": "sandbox/functions",
       "kind": "read",
-      "line": 251,
+      "line": 252,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
       "file": "sandbox/functions",
       "kind": "write",
-      "line": 257,
+      "line": 258,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
       "file": "sandbox/functions",
       "kind": "schedule",
-      "line": 260,
+      "line": 261,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
@@ -22933,6 +22960,12 @@
       "kind": "write",
       "line": 151,
       "reason": "\"markGuideFailed\" is not a registered function"
+    },
+    {
+      "file": "source-control/pr-link-retry",
+      "kind": "call",
+      "line": 35,
+      "reason": "\"recordOpenedPullRequestWithRetry\" is not a registered function"
     },
     {
       "file": "source-control/pr-thread-links",
@@ -23207,13 +23240,13 @@
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1385,
+      "line": 1392,
       "reason": "\"reapSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1447,
+      "line": 1454,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
@@ -23417,13 +23450,7 @@
     {
       "file": "usage/gdpr",
       "kind": "write",
-      "line": 16,
-      "reason": "\"eraseUsageForUser\" is not a registered function"
-    },
-    {
-      "file": "usage/gdpr",
-      "kind": "read",
-      "line": 29,
+      "line": 20,
       "reason": "\"eraseUsageForUser\" is not a registered function"
     },
     {
@@ -23440,8 +23467,14 @@
     },
     {
       "file": "usage/gdpr",
+      "kind": "read",
+      "line": 41,
+      "reason": "\"eraseUsageForUser\" is not a registered function"
+    },
+    {
+      "file": "usage/gdpr",
       "kind": "write",
-      "line": 63,
+      "line": 67,
       "reason": "\"pruneUsageDaysBefore\" is not a registered function"
     },
     {
@@ -23507,25 +23540,37 @@
     {
       "file": "workflow/gdpr",
       "kind": "write",
-      "line": 23,
+      "line": 24,
+      "reason": "\"eraseWorkflowVersionsAndPresenceForUser\" is not a registered function"
+    },
+    {
+      "file": "workflow/gdpr",
+      "kind": "write",
+      "line": 25,
       "reason": "\"eraseWorkflowVersionsAndPresenceForUser\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "read",
-      "line": 31,
+      "line": 34,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "read",
-      "line": 35,
+      "line": 38,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "write",
-      "line": 41,
+      "line": 45,
+      "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
+    },
+    {
+      "file": "workflow/gdpr",
+      "kind": "write",
+      "line": 46,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {

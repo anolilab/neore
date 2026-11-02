@@ -84,7 +84,7 @@ export const insertSteerRow = async (ctx: MutationCtx, args: SteerRowArgs): Prom
         return null;
     }
 
-    await patchRow(ctx.db, pending, {
+    await patchRow(ctx.db, "messages", pending, {
         // Readers that order by creation time (the extension) must see the continuation after the steer, as storage does.
         createdAt: (steerRow.createdAt ?? steerRow._creationTime) + 1,
         order: steerRow.order,

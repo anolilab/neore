@@ -70,7 +70,7 @@ export const put = internalMutation
 
         if (existing) {
             // A computation can legitimately return `undefined`; a patch refuses it.
-            await ctx.db.patch(existing._id, { expiresAt, ...withoutUndefined({ value: args.value }) });
+            await ctx.db.patch("actionCache", existing._id, { expiresAt, ...withoutUndefined({ value: args.value }) });
 
             return null;
         }
@@ -89,7 +89,26 @@ export const remove = internalMutation
         const row = await ctx.db.actionCache.findFirst({ where: { key: args.key } });
 
         if (row) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("actionCache", row._id);
+        }
+
+        return null;
+    });
+
+/**
+ * Drop an entry only while it is still the one `attempt` wrote: a marker stored as `{ attempt, ... }`. A concurrent
+ * attempt that refreshed the entry owns it now, and this attempt's cleanup must leave it. One mutation, so the
+ * comparison and the delete cannot interleave with that refresh.
+ */
+export const removeIfAttempt = internalMutation
+    .input({ attempt: v.string(), key: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.actionCache.findFirst({ where: { key: args.key } });
+        const owner = (row?.value as { attempt?: unknown } | null | undefined)?.attempt;
+
+        if (row && owner === args.attempt) {
+            await ctx.db.delete("actionCache", row._id);
         }
 
         return null;
@@ -111,7 +130,7 @@ export const removeByArgs = internalMutation
         const row = await ctx.db.actionCache.findFirst({ where: { key } });
 
         if (row) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("actionCache", row._id);
         }
 
         return null;
@@ -141,7 +160,7 @@ export const removeAll = internalMutation
             }
 
             for (const row of rows) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("actionCache", row._id);
             }
         }
 
@@ -194,7 +213,7 @@ export const bumpGeneration = internalMutation
         const existing = await ctx.db.actionCache.findFirst({ where: { key } });
 
         if (existing) {
-            await ctx.db.patch(existing._id, { expiresAt, value });
+            await ctx.db.patch("actionCache", existing._id, { expiresAt, value });
         } else {
             await ctx.db.insert("actionCache", { expiresAt, key, name, value });
         }
@@ -210,7 +229,7 @@ export const purgeExpired = internalMutation
         const { page: rows } = await ctx.db.actionCache.findMany({ limit: CACHE_SWEEP_BATCH, where: { expiresAt: { lt: ctx.now } } });
 
         for (const row of rows) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("actionCache", row._id);
         }
 
         return rows.length;

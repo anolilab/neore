@@ -145,7 +145,41 @@ describe.each(Object.keys(runs))("%s", (name) => {
     });
 });
 
+describe.each(Object.keys(runs))("%s with a blocked region", (name) => {
+    it("refuses a model that is reachable in a blocked region even though another of its regions is allowed", async () => {
+        // The optimizer model is served from CN and US; blocking CN alone must refuse it, as the background models do.
+        await saveRules({ blockedRegions: ["CN"] });
+
+        const error = await failure(runs[name]!());
+
+        expect(error.code).toBe("BAD_REQUEST");
+        expect(error.message).toContain(NO_ALLOWED_OPTIMIZER_MODEL_MESSAGE);
+        expect(getAgent).not.toHaveBeenCalled();
+    });
+});
+
 describe("loadOptimizerModelRules", () => {
+    it("applies the thread owner's rules as well as the caller's on a shared thread", async () => {
+        const rulesOf: Record<string, unknown> = { owner: { blockedModels: [DEFAULT_PROMPT_IMPROVEMENT_MODEL] }, [USER]: {} };
+        const runQuery = vi.fn(async (_reference: unknown, args: { userId: string }) => {
+            return { modelFilterRules: rulesOf[args.userId] };
+        });
+
+        const error = await failure(loadOptimizerModelRules({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
+
+        expect(error.code).toBe("BAD_REQUEST");
+        expect(error.message).toContain(NO_ALLOWED_OPTIMIZER_MODEL_MESSAGE);
+    });
+
+    it("refuses when the owner's settings cannot be read", async () => {
+        const runQuery = vi.fn(async (_reference: unknown, args: { userId: string }) => (args.userId === "owner" ? { readFailed: true } : {}));
+
+        const error = await failure(loadOptimizerModelRules({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
+
+        expect(error.code).toBe("BAD_REQUEST");
+        expect(error.message).toContain(MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
+    });
+
     const withAnswer = (answer: () => unknown) => ({ runQuery: vi.fn(async () => answer()) }) as never;
 
     it("refuses when the preferences read answers readFailed", async () => {

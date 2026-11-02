@@ -9,5 +9,5 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 
 export const deleteFileRow = async (db: MutationCtx["db"], fileId: Id<"files">): Promise<void> => {
-    await db.delete(fileId);
+    await db.delete("files", fileId);
 };

@@ -34,8 +34,9 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateObject };
 });
 
-vi.mock("../lib/utility-model", () => {
+vi.mock("../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
         getUtilityModel: async () => {
             return {};
         },
@@ -321,7 +322,7 @@ describe("runCloudGuide", () => {
         const guideId = await reserved();
 
         hostRead.mockImplementation(async () => {
-            await run(async (ctx) => await ctx.db.patch(guideId, { failure: "quota", status: "failed" }));
+            await run(async (ctx) => await ctx.db.patch("pullRequestGuides", guideId, { failure: "quota", status: "failed" }));
 
             return pullRequest();
         });

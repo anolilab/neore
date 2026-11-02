@@ -106,6 +106,7 @@ export const finishRun = async (
     const now = Date.now();
 
     await ctx.db.patch(
+        "evalRuns",
         run._id,
         withoutUndefined({
             completedAt: now,
@@ -121,7 +122,7 @@ export const finishRun = async (
 
     // Only the transition out of `running` is news, and a cancel is the user's own doing.
     if (run.status === "running" && status !== "cancelled") {
-        const dataset = await ctx.db.get(run.datasetId);
+        const dataset = await ctx.db.get("evalDatasets", run.datasetId);
 
         await notifyQuietly(ctx, {
             dedupeKey: `eval:${run._id}`,
@@ -153,7 +154,7 @@ const advance = async (ctx: MutationCtx, run: Doc<"evalRuns">, nextIndex: number
         return;
     }
 
-    await ctx.db.patch(run._id, { ...spend, nextIndex, updatedAt: Date.now() });
+    await ctx.db.patch("evalRuns", run._id, { ...spend, nextIndex, updatedAt: Date.now() });
     // Jobs queue (`lib/job-queue.ts`); a redelivery is refused by `claimCase`.
     await enqueueJob(internal.evals.execute.runEvalCase, { index: nextIndex, runId: run._id });
 };
@@ -193,7 +194,7 @@ export const claimCase = internalMutation
     .input({ index: v.number(), runId: v.id("evalRuns") })
     .output(v.from(vClaim))
     .mutation(async ({ args: { index, runId }, ctx }) => {
-        const run = await ctx.db.get(runId);
+        const run = await ctx.db.get("evalRuns", runId);
 
         if (!run || run.status !== "running" || run.nextIndex !== index) {
             return null;
@@ -250,7 +251,7 @@ export const claimCase = internalMutation
         }
 
         const caseId = run.caseIds[index]!;
-        const evalCase = await ctx.db.get(caseId);
+        const evalCase = await ctx.db.get("evalCases", caseId);
         const { now } = ctx;
 
         if (!evalCase || evalCase.userId !== run.userId) {
@@ -344,6 +345,7 @@ const recordOutcome = async (ctx: MutationCtx, result: Doc<"evalResults">, outco
 
     if (outcome.kind === "error") {
         await ctx.db.patch(
+            "evalResults",
             result._id,
             withoutUndefined({
                 answer: outcome.answer,
@@ -358,6 +360,7 @@ const recordOutcome = async (ctx: MutationCtx, result: Doc<"evalResults">, outco
         );
     } else {
         await ctx.db.patch(
+            "evalResults",
             result._id,
             withoutUndefined({
                 answer: outcome.answer,
@@ -377,7 +380,7 @@ const recordOutcome = async (ctx: MutationCtx, result: Doc<"evalResults">, outco
         );
     }
 
-    const run = await ctx.db.get(result.runId);
+    const run = await ctx.db.get("evalRuns", result.runId);
 
     if (run) {
         // The runner counts per call; an outcome without a count (the reaper's, or a
@@ -396,7 +399,7 @@ export const completeCase = internalMutation
     .input({ outcome: v.from(vCaseOutcome), resultId: v.id("evalResults") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const result = await ctx.db.get(args.resultId);
+        const result = await ctx.db.get("evalResults", args.resultId);
 
         if (!result || result.status !== "running") {
             return null;
@@ -412,7 +415,7 @@ export const reapCase = internalMutation
     .input({ resultId: v.id("evalResults") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const result = await ctx.db.get(args.resultId);
+        const result = await ctx.db.get("evalResults", args.resultId);
 
         if (!result || result.status !== "running") {
             return null;

@@ -53,12 +53,17 @@ import { ASIDE_ADD_CLAIM_TTL_MS, ASIDE_ADD_SCOPE, claimOnce } from "../lib/claim
 import { authAction, authMutation, rateLimit } from "../lib/crpc";
 import { chatLogger } from "../lib/logger";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
-import { isAgentRunError, loadModelFilterRules, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import {
+    getUtilityModelForUser,
+    loadSharedModelFilterRules,
+    MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE,
+    ModelFilterRulesUnavailableError,
+} from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,
@@ -345,7 +350,10 @@ export const askAside = authAction
             const [prefs, userProviderKeys, modelFilterRules, runModel] = await Promise.all([
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
-                loadModelFilterRules(ctx, userId),
+                // An unreadable rules read answers like a refusal, not an internal error.
+                loadSharedModelFilterRules(ctx, userId, thread?.userId).catch((error: unknown) => {
+                    throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
+                }),
                 resolveRunModel(ctx, chosen.model, userId),
             ]);
             const agent = await getAgent(chosen.model, {
@@ -362,7 +370,8 @@ export const askAside = authAction
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
         } else {
-            model = await getUtilityModel(gateway, { threadId, userId });
+            // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too; the call is metered to, and graded by the plan of, the caller.
+            model = await getUtilityModelForUser(ctx, gateway, { filterUserId: thread?.userId, threadId, userId });
         }
 
         // Charged only now that the call is certain to be made: a refusal above, or a failure while the model was

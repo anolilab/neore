@@ -192,7 +192,7 @@ export const renameDevice = authMutation
             throw new LunoraError("NOT_FOUND", "Device not found");
         }
 
-        await ctx.db.patch(device._id, { name: args.name.trim() });
+        await ctx.db.patch("devices", device._id, { name: args.name.trim() });
 
         ctx.log.event("devices.rename_device", { renamed: true });
 
@@ -238,7 +238,7 @@ export const setDeviceProjectScope = authMutation
             }
         }
 
-        await patchRow(ctx.db, device, { projectIds });
+        await patchRow(ctx.db, "devices", device, { projectIds });
 
         ctx.log.event("devices.set_device_project_scope", { projects: projectIds?.length ?? null });
 
@@ -271,7 +271,7 @@ export const revokeDevice = authMutation
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
-            await ctx.db.delete(revoked._id);
+            await ctx.db.delete("devices", revoked._id);
         }
 
         ctx.log.event("devices.revoke_device", { hosts: hosts.length, revoked: true });
@@ -319,7 +319,7 @@ export const heartbeatDevice = authMutation
             return { paired: false };
         }
 
-        await ctx.db.patch(device._id, { lastSeenAt: ctx.now });
+        await ctx.db.patch("devices", device._id, { lastSeenAt: ctx.now });
         await ensureDeviceRoute(ctx, device._id as string, ctx.user.userId, ctx.now);
 
         ctx.log.event("devices.heartbeat_device", { paired: true });
@@ -363,7 +363,7 @@ export const updateDeviceManifest = authMutation
             throw new LunoraError("BAD_REQUEST", "Manifest tools are invalid");
         }
 
-        await ctx.db.patch(device._id, { acpOffers: offers, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        await ctx.db.patch("devices", device._id, { acpOffers: offers, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 
@@ -446,7 +446,7 @@ export const claimDeviceCall = authMutation
 
         await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
 
-        await ctx.db.patch(call._id, { claimedAt: now, status: "claimed", ...(args.claimId !== undefined && { claimId: args.claimId }) });
+        await ctx.db.patch("deviceCalls", call._id, { claimedAt: now, status: "claimed", ...(args.claimId !== undefined && { claimId: args.claimId }) });
 
         if (isAcpTool(call.toolName)) {
             await ctx.scheduler.runAfter(ACP_CLAIM_LEASE_MS + 1000, internal.acp.calls.checkAcpCall, { callId: call._id });
@@ -504,7 +504,7 @@ export const completeDeviceCall = authMutation
 
         const status = result.status as "completed" | "denied" | "failed";
 
-        await ctx.db.patch(call._id, {
+        await ctx.db.patch("deviceCalls", call._id, {
             completedAt: now,
             status,
             ...(output && { output: output.text, truncated: output.truncated || result.truncated === true }),
@@ -560,7 +560,7 @@ export const reportDeviceCallProgress = authMutation
             return { accepted: false };
         }
 
-        await ctx.db.patch(call._id, { phase: next, phaseAt: now });
+        await ctx.db.patch("deviceCalls", call._id, { phase: next, phaseAt: now });
 
         ctx.log.event("devices.report_device_call_progress", { phase: next });
 
@@ -592,7 +592,7 @@ export const releaseDeviceCall = authMutation
         if (released) {
             const error = `The device refused the request: ${args.reason}`;
 
-            await ctx.db.patch(call._id, { completedAt: ctx.now, error, status: "failed", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
+            await ctx.db.patch("deviceCalls", call._id, { completedAt: ctx.now, error, status: "failed", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
             await onAcpCallEnded(ctx, call, { error, status: "failed" }, ctx.now);
         }
 

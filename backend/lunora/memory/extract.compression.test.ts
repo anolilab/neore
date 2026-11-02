@@ -19,11 +19,21 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
+
 vi.mock("../lib/utility-model", () => {
     return {
         getUtilityModel: async () => {
             return {};
         },
+        NoAllowedUtilityModelError: class extends Error {},
     };
 });
 // The harness action ctx has no `services`; no embedding is wanted here either.

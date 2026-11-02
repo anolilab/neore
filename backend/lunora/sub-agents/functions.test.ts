@@ -149,7 +149,7 @@ describe("admitSubAgentRun", () => {
         const [level1] = await runs();
         const child1 = await insertThread(userId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(level1._id, { childThreadId: child1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", level1._id, { childThreadId: child1 }));
 
         expect(await admit({ parentThreadId: child1 })).toHaveProperty("runId");
 
@@ -157,7 +157,7 @@ describe("admitSubAgentRun", () => {
         const level2 = all.find((run) => run.depth === 2)!;
         const child2 = await insertThread(userId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(level2._id, { childThreadId: child2 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", level2._id, { childThreadId: child2 }));
 
         expect(await admit({ parentThreadId: child2 })).toStrictEqual({ error: expect.stringMatching(DEPTH_CAP) });
     });
@@ -168,14 +168,14 @@ describe("admitSubAgentRun", () => {
         const [level1] = await runs();
         const child1 = await insertThread(userId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(level1._id, { childThreadId: child1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", level1._id, { childThreadId: child1 }));
 
         // Back to back, each finished before the next — the concurrency cap never trips.
         for (let index = 0; index < SUB_AGENT_MAX_PER_RUN; index += 1) {
             const started = await admit({ parentThreadId: child1 });
 
             expect(started).toHaveProperty("runId");
-            await harness.run(async (ctx: any) => await ctx.db.patch((started as { runId: string }).runId, { status: "succeeded" }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", (started as { runId: string }).runId, { status: "succeeded" }));
         }
 
         expect(await admit({ parentThreadId: child1 })).toStrictEqual({ error: expect.stringMatching(PER_RUN_CAP) });
@@ -186,7 +186,7 @@ describe("admitSubAgentRun", () => {
             const started = await admit();
 
             expect(started).toHaveProperty("runId");
-            await harness.run(async (ctx: any) => await ctx.db.patch((started as { runId: string }).runId, { status: "succeeded" }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", (started as { runId: string }).runId, { status: "succeeded" }));
         }
     });
 
@@ -246,7 +246,7 @@ describe("linkChildThread", () => {
         const [run] = await runs();
         const child = await insertThread(userId);
         const statusOf = async () => {
-            const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+            const row = await harness.run(async (ctx: any) => await ctx.db.get("threads", child));
 
             return row.status;
         };
@@ -278,7 +278,7 @@ describe("linkChildThread", () => {
         );
         await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("threads", child));
 
         expect(row.status).toBe("running");
     });
@@ -348,7 +348,7 @@ describe("finishRun", () => {
 
             const [run] = await runs();
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
             await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { error: "boom", kind: "failed" }));
 
             expect(await messagesIn(threadId)).toHaveLength(0);
@@ -366,13 +366,13 @@ describe("finishRun", () => {
 
             const [run] = await runs();
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() }));
             await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Held." }));
 
             expect(await messagesIn(threadId)).toHaveLength(0);
             expect(await firstRun()).not.toHaveProperty("resultPostedAt");
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: null }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: null }));
 
             expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0, 1))).toBe(true);
             expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0, 1))).toBe(false);
@@ -385,7 +385,7 @@ describe("finishRun", () => {
 
             const [run] = await runs();
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() }));
             await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Held." }));
 
             const before = postJobs().length;
@@ -400,7 +400,7 @@ describe("finishRun", () => {
             expect(await messagesIn(threadId)).toHaveLength(0);
 
             // Terminal: unlocking later does not revive it.
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: null }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: null }));
             expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 0))).toBe(false);
             expect(await messagesIn(threadId)).toHaveLength(0);
         });
@@ -474,7 +474,7 @@ describe("finishRun", () => {
             const [run] = await runs();
 
             await insertStream("streaming");
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
             await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "Lost." }));
 
             expect(await messagesIn(threadId)).toHaveLength(0);
@@ -497,7 +497,7 @@ describe("finishRun", () => {
             // A re-check while it still streams posts nothing.
             expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 1))).toBe(false);
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "completed" }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "completed" }));
 
             expect(await harness.run(async (ctx: any) => await postRunResult(ctx, run._id, 2))).toBe(true);
             // A duplicate re-check, e.g. one scheduled before the post landed.
@@ -627,7 +627,7 @@ describe("cancelling a run", () => {
             const [parentRun] = await runs();
             const childThread = await insertThread(userId);
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", parentRun._id, { childThreadId: childThread }));
             await harness.run(async (ctx: any) => await claimQueuedRun(ctx, parentRun._id));
             await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
             // A sibling under the same parent thread.
@@ -651,7 +651,7 @@ describe("cancelling a run", () => {
             const [parentRun] = await runs();
             const childThread = await insertThread(userId);
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", parentRun._id, { childThreadId: childThread }));
             await harness.run(async (ctx: any) => await finishRun(ctx, parentRun._id, { kind: "succeeded", result: "done" }));
             await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
 
@@ -669,7 +669,7 @@ describe("cancelling a run", () => {
             const [parentRun] = await runs();
             const childThread = await insertThread(userId);
 
-            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", parentRun._id, { childThreadId: childThread }));
             await harness.run(async (ctx: any) => await claimQueuedRun(ctx, parentRun._id));
             await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
 

@@ -65,7 +65,7 @@ export const findPendingRequestOnLatestTurn = async (
     threadId: Id<"threads">,
     approvalId: string,
 ): Promise<{ input: unknown; toolCallId: string | null; toolName: string | null } | undefined> => {
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
     // A branched thread's latest turn is the end of the path the user is on;
     // the newest rows in storage order may belong to a sibling branch.
     const recent = thread?.activeLeafMessageId
@@ -176,7 +176,7 @@ export const claimToolApproval = async (
         throw new LunoraError("CONFLICT", "This tool request is no longer pending");
     }
 
-    await ctx.db.patch(run._id, {
+    await ctx.db.patch("toolApprovalRuns", run._id, {
         resolvedAt: Date.now(),
         resolvedBy: callerId,
         status: decision === "deny" ? "denied" : "approved",

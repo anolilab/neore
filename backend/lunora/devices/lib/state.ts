@@ -72,7 +72,7 @@ export const expireOpenCalls = async (ctx: Pick<MutationCtx, "db">, deviceId: Id
         await Promise.all(
             page.map(
                 async (call) =>
-                    await ctx.db.patch(call._id, {
+                    await ctx.db.patch("deviceCalls", call._id, {
                         completedAt: now,
                         error: reason,
                         status: "expired",
