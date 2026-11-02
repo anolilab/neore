@@ -441,12 +441,42 @@ describe("a run whose worker dies mid-step", () => {
 
         expect(modelState.builtAgents).toBe(agentsBefore);
 
-        modelState.model = scriptedModel([textStep("All done.")]);
+        // The first run made its model calls and died inside the second; the resume must make that second call again, once.
+        let resumedModelCalls = 0;
+        const answer = scriptedModel([textStep("All done.")]);
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async (options) => {
+                resumedModelCalls += 1;
+
+                return await answer.doStream(options);
+            },
+        });
         await run({ resume: midway.pause!.id });
+        expect(resumedModelCalls).toBe(1);
         // ... and so is a second delivery of the resume.
         await run({ resume: midway.pause!.id });
+        expect(resumedModelCalls).toBe(1);
 
         const state = await readState();
+        const stored = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                    .collect(),
+        );
+        const finalAnswers = stored.filter(
+            (row: any) =>
+                row.message?.role === "assistant" &&
+                row.status === "success" &&
+                Array.isArray(row.message.content) &&
+                row.message.content.every((part: any) => part.type !== "tool-call"),
+        );
+
+        // Exactly one final assistant answer, and its text once in the stream.
+        expect(finalAnswers).toHaveLength(1);
+        expect(state.chunkText.split("All done.")).toHaveLength(2);
 
         expect(state.rows.map((row) => [row.role, row.status])).toStrictEqual([
             ["user", "success"],
