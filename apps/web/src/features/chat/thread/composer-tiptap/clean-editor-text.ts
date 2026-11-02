@@ -11,12 +11,44 @@ export const cleanEditorText = (editor: Editor): void => {
     const { doc, tr } = editor.state;
     const ranges: { from: number; to: number }[] = [];
 
-    doc.descendants((node, position) => {
-        if (node.isText && node.text !== undefined) {
-            for (const { index, length } of findHiddenText(node.text)) {
-                ranges.push({ from: position + index, to: position + index + length });
+    // One scan per textblock over the text of all its nodes: a selector or tag belongs to the character before it
+    // even when that character sits in a node with other formatting. Anything that is not text (a hard break, a
+    // mention) stands as a newline, which is no base for either.
+    doc.descendants((block, blockPosition) => {
+        if (!block.isTextblock) {
+            return true;
+        }
+
+        const nodes: { docPosition: number; start: number }[] = [];
+        let text = "";
+
+        block.forEach((child, offset) => {
+            if (child.isText && child.text !== undefined) {
+                nodes.push({ docPosition: blockPosition + 1 + offset, start: text.length });
+                text += child.text;
+            } else {
+                text += "\n";
+            }
+        });
+
+        let at = 0;
+
+        // The reported ranges come in order, so the node cursor only moves forward.
+        for (const { index, length } of findHiddenText(text)) {
+            while (at + 1 < nodes.length && (nodes[at + 1]?.start ?? Infinity) <= index) {
+                at += 1;
+            }
+
+            const node = nodes[at];
+
+            if (node) {
+                const from = node.docPosition + (index - node.start);
+
+                ranges.push({ from, to: from + length });
             }
         }
+
+        return false;
     });
 
     if (ranges.length === 0) {

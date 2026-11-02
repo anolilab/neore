@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { findHiddenText, hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
 
@@ -54,6 +54,22 @@ describe("stripHiddenText", () => {
         expect(stripHiddenText(`${family} ${heart} ${persian}`)).toEqual({ removed: 0, text: `${family} ${heart} ${persian}` });
         expect(hasHiddenText(family + persian)).toBe(false);
         expect(showHidden(family + persian)).toBe(family + persian);
+    });
+
+    it("keeps a joiner after an emoji's own selector, and counts every joiner of a payload", () => {
+        expect(stripHiddenText("\u{2764}\u{FE0F}\u{200D}\u{1F525}")).toEqual({ removed: 0, text: "\u{2764}\u{FE0F}\u{200D}\u{1F525}" });
+    });
+
+    it("strips a run of alternating ZWNJ and ZWJ between two letters", () => {
+        expect(stripHiddenText("a\u{200C}\u{200D}\u{200C}\u{200D}\u{200D}b")).toEqual({ removed: 5, text: "ab" });
+        expect(hasHiddenText("a\u{200D}\u{200D}b")).toBe(true);
+    });
+
+    it("strips a joiner at the start or the end of the text, or beside a hidden character", () => {
+        expect(stripHiddenText("\u{200D}a")).toEqual({ removed: 1, text: "a" });
+        expect(stripHiddenText("a\u{200C}")).toEqual({ removed: 1, text: "a" });
+        expect(stripHiddenText("a\u{200B}\u{200D}b")).toEqual({ removed: 2, text: "ab" });
+        expect(stripHiddenText("a\u{200D}\u{E0041}b")).toEqual({ removed: 2, text: "ab" });
     });
 
     it("still removes a tag payload, RLO and ZWSP beside joiners", () => {
@@ -137,7 +153,7 @@ describe("variation selectors", () => {
         expect(stripHiddenText("\u{FE0F}x")).toEqual({ removed: 1, text: "x" });
         expect(stripHiddenText("a \u{FE0F}")).toEqual({ removed: 1, text: "a " });
         expect(stripHiddenText("a\n\u{FE0F}")).toEqual({ removed: 1, text: "a\n" });
-        expect(stripHiddenText("a\u{200D}\u{FE0F}")).toEqual({ removed: 1, text: "a\u{200D}" });
+        expect(stripHiddenText("a\u{200D}\u{FE0F}")).toEqual({ removed: 2, text: "a" });
         expect(stripHiddenText("a\u{200B}\u{FE0F}")).toEqual({ removed: 2, text: "a" });
         expect(stripHiddenText("a\u{E0041}\u{FE0F}")).toEqual({ removed: 2, text: "a" });
     });
@@ -216,6 +232,30 @@ describe("findHiddenText", () => {
         } finally {
             prototype.map = saved.map;
             prototype.toArray = saved.toArray;
+        }
+    });
+});
+
+describe("many subdivision flags", () => {
+    it("scans 20,000 flags in linear time", () => {
+        const england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        const value = england.repeat(20_000);
+        const started = performance.now();
+
+        expect(stripHiddenText(value)).toEqual({ removed: 0, text: value });
+        expect(performance.now() - started).toBeLessThan(500);
+    });
+
+    it("reads the flag ranges once, not once per tag character", () => {
+        const england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        const reads = vi.spyOn(Array.prototype, "some");
+
+        try {
+            stripHiddenText(england.repeat(2000));
+
+            expect(reads).not.toHaveBeenCalled();
+        } finally {
+            reads.mockRestore();
         }
     });
 });

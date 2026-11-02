@@ -106,12 +106,17 @@ describe("parseHooks", () => {
             expect(parseHooks(textOf("name", String.raw`\t`)).ok).toBe(false);
         });
 
-        it("refuses a zero width joiner or non-joiner in a name or a glob, which a prompt may keep", () => {
+        it("refuses a zero width joiner or non-joiner in a name, a glob and a prompt: the file is repository content", () => {
             for (const joiner of [String.raw`\u200d`, String.raw`\u200c`]) {
                 expect(parseHooks(textOf("name", joiner)).ok).toBe(false);
                 expect(parseHooks(textOf("glob", joiner)).ok).toBe(false);
-                expect(parseHooks(textOf("prompt", joiner)).ok).toBe(true);
+                expect(parseHooks(textOf("prompt", joiner)).ok).toBe(false);
             }
+        });
+
+        it("refuses a variation selector and a flag tag in a prompt", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\ud83d\udc4d\ufe0f`)).ok).toBe(false);
+            expect(parseHooks(textOf("prompt", String.raw`\ud83c\udff4\udb40\udc67\udb40\udc7f`)).ok).toBe(false);
         });
 
         it("refuses them in a manual hook too", () => {

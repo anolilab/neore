@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { findHiddenText } from "@neore/ai/utils";
 import type { Content } from "@tiptap/core";
 import { Editor } from "@tiptap/core";
 import StarterKitExtension from "@tiptap/starter-kit";
@@ -35,16 +36,65 @@ describe(cleanEditorText, () => {
     });
 
     it("is not an undo step of its own: Undo reverses the person's edit, not the cleanup", () => {
-        const editor = editorWith("<p>hi\u{E0041} there</p>");
-        let history: unknown;
+        const editor = editorWith("<p>hi</p>");
 
-        editor.on("transaction", ({ transaction }) => {
-            history = transaction.getMeta("addToHistory");
+        editor.commands.insertContentAt(3, "\u{E0041} there\u{202E}");
+        cleanEditorText(editor);
+        expect(editor.getText()).toBe("hi there");
+
+        editor.commands.undo();
+
+        expect(editor.getText()).toBe("hi");
+        expect(findHiddenText(editor.getText())).toEqual([]);
+    });
+
+    it("keeps an emoji and its selector when they sit in nodes with different formatting", () => {
+        const editor = editorWith({
+            content: [
+                {
+                    content: [
+                        { marks: [{ type: "bold" }], text: "\u{2764}", type: "text" },
+                        { text: "\u{FE0F}", type: "text" },
+                    ],
+                    type: "paragraph",
+                },
+            ],
+            type: "doc",
+        });
+        const before = editor.state.doc;
+
+        cleanEditorText(editor);
+
+        expect(editor.state.doc).toBe(before);
+        expect(editor.getText()).toBe("\u{2764}\u{FE0F}");
+    });
+
+    it("removes a stray selector across nodes, and a flag tag payload split from its flag", () => {
+        const editor = editorWith({
+            content: [
+                {
+                    content: [
+                        { marks: [{ type: "bold" }], text: "ab", type: "text" },
+                        { text: "\u{FE0F}c", type: "text" },
+                        { marks: [{ type: "italic" }], text: "\u{E0041}d", type: "text" },
+                    ],
+                    type: "paragraph",
+                },
+            ],
+            type: "doc",
         });
 
         cleanEditorText(editor);
 
-        expect(history).toBe(false);
+        expect(editor.getText()).toBe("abcd");
+    });
+
+    it("does not carry a base across a hard break", () => {
+        const editor = editorWith("<p>\u{2764}<br>\u{FE0F}x</p>");
+
+        cleanEditorText(editor);
+
+        expect(editor.getText({ blockSeparator: "\n" })).not.toContain("\u{FE0F}");
     });
 
     it("empties a document that held nothing but hidden characters", () => {

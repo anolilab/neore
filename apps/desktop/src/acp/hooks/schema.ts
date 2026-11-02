@@ -28,7 +28,7 @@ const promptSchema = z
     .string()
     .max(MAX_PROMPT)
     .refine((value) => value.trim() !== "", "a prompt is not empty")
-    .refine((value) => !hasHiddenText(value, { layout: true }), "a prompt has no control or invisible characters (a newline and a tab are fine)");
+    .refine((value) => !hasHiddenText(value, { layout: true, strict: true }), "a prompt has no control or invisible characters (a newline and a tab are fine)");
 
 const fileHook = <Event extends "created" | "deleted" | "saved">(on: Event) =>
     z.strictObject({
