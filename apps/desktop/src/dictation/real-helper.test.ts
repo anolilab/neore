@@ -22,6 +22,10 @@ import { startRecognizer } from "./recognizer.js";
  * "Too slow": the default model takes more than this many times the clip's own length on a four-core CI runner. The slowest build
  * S1 accepted (Linux arm64, small) took 0.84 times; the Windows arm64 build it rejected took 4.3. A supported platform must be inside
  * it; an unsupported one is only recorded, so the step summary says when it is safe to mark supported.
+ *
+ * `NEORE_WHISPER_RETRIES` re-runs a failed attempt. The windows-latest x64 leg sets it to 1: across 15 CI runs its factor was 0.43 to
+ * 1.27 (median 0.62) except once, a single 39.7 s (3.61x) outlier that passed on re-run, i.e. a contended runner, not a slower build.
+ * A retry keeps the 1.5x budget meaningful (the rejected Windows arm64 build took 4.3x every time); raising it past 3.6x would not.
  */
 const BUDGET = 1.5;
 
@@ -45,7 +49,7 @@ describe.runIf(cli !== undefined && clip !== undefined && models.length > 0)("th
         await rm(directory, { force: true, recursive: true });
     });
 
-    it.each(models)("recognises the clip with %s and hands the text back on stdout", { timeout: 300_000 }, async (name, modelPath) => {
+    it.each(models)("recognises the clip with %s and hands the text back on stdout", { retry: Number(process.env.NEORE_WHISPER_RETRIES ?? 0), timeout: 300_000 }, async (name, modelPath) => {
         const pcm = pcmOf(readFileSync(clip as string));
         const clipSeconds = pcm.length / 2 / SAMPLE_RATE;
         const started = performance.now();

@@ -455,7 +455,20 @@ jobs:
               with:
                   egress-policy: "audit"
 
+            # The fetch has stalled on a hosted runner before (job 125075739204 failed this step and then sat until the run
+            # was cancelled), so it gets a short budget and one retry. `continue-on-error` keeps the job alive for the retry,
+            # which runs only when the first attempt failed; if both fail, the second one fails the job.
             - name: "Git checkout"
+              id: "checkout"
+              continue-on-error: true
+              timeout-minutes: 5
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Git checkout (retry)"
+              if: "steps.checkout.outcome == 'failure'"
+              timeout-minutes: 5
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
               with:
                   persist-credentials: false
