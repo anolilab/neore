@@ -555,16 +555,24 @@ export const recordPendingToolApprovals = internalMutation
         await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
 
         const uniqueIds = new Set(approvalIds);
+        const secretIds = new Set(secretApprovalIds);
 
         for (const approvalId of uniqueIds) {
-            await ctx.db.insert("toolApprovalRuns", { approvalId, config, createdAt, status: "pending", threadId, userId: ownerId });
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId,
+                config,
+                createdAt,
+                secretRequest: secretIds.has(approvalId),
+                status: "pending",
+                threadId,
+                userId: ownerId,
+            });
         }
 
         // One notification per pause, to the thread OWNER — only they can answer
         // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
         // answered with something, and nothing offers to "approve" them.
         const askUserIds = new Set(askUserApprovalIds);
-        const secretIds = new Set(secretApprovalIds);
         const [first] = uniqueIds;
         const secret = [...uniqueIds].find((id) => secretIds.has(id));
         const question = [...uniqueIds].find((id) => askUserIds.has(id));
