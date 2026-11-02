@@ -262,6 +262,9 @@ jobs:
             # The helper alone: the same arguments the app gives it, a spoken clip in, its text out, and the time it took.
             - name: "The real helper on a spoken clip"
               if: "always()"
+              env:
+                  # One retry on the shared windows-latest x64 runner only (see `real-helper.test.ts`).
+                  NEORE_WHISPER_RETRIES: "${{ matrix.os == 'windows-latest' && '1' || '0' }}"
               run: "pnpm --filter @neore/desktop exec vitest run src/dictation/real-helper.test.ts"
 
             - name: "End-to-end tests"

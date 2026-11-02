@@ -530,6 +530,7 @@ const hostCard = (host: HostView): HTMLElement => {
             },
             host.name,
         ),
+        button("Copy diagnostics", () => hostAction(() => globalThis.neoreDevice.copyDiagnostics(host.deviceId), "Diagnostics copied."), host.name),
         button(
             "Remove",
             async () => {
@@ -1097,6 +1098,10 @@ $("shell-network").addEventListener("change", async (event) => {
     await update(() => {
         return { shellNetwork: tier };
     });
+});
+
+$("copy-diagnostics").addEventListener("click", () => {
+    hostAction(() => globalThis.neoreDevice.copyDiagnostics(), "Diagnostics copied.");
 });
 
 $("unpair").addEventListener("click", async () => {
