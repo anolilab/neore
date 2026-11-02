@@ -214,7 +214,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         savedMessages: call.getSavedMessages(),
     };
 
-    return Object.assign(result, metadata, { getPendingMessageId: call.getPendingMessageId });
+    return Object.assign(result, metadata, { getPendingMessageId: call.getPendingMessageId, settleAbort: call.settleAbort });
 };
 
 export default streamText;

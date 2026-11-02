@@ -148,6 +148,8 @@ export const runStreamingAgent = internalAction
             let mcpClients: import("@ai-sdk/mcp").MCPClient[] = [];
             // The rows this invocation has saved so far, for a failure that reaches the outer catch before `recordRun`.
             let savedSoFar: () => typeof priorRows = () => [];
+            // The work an abort of the model call started: the run does not end before it has landed.
+            let settleAbort: () => Promise<void> = async () => undefined;
 
             const { customSystemPrompt, model: requestedModel, reasoningEffort, statelessMode } = streamingConfig;
             // Reassigned once, when an invoked skill names a preferred model.
@@ -558,6 +560,7 @@ export const runStreamingAgent = internalAction
                 });
 
                 savedSoFar = () => result.savedMessages ?? [];
+                settleAbort = result.settleAbort;
 
                 // Write chunks to persistent storage (DB only, no HTTP response)
                 const timingStart = Date.now();
@@ -795,6 +798,7 @@ export const runStreamingAgent = internalAction
                 }
             } finally {
                 clearInterval(beat);
+                await settleAbort();
                 await closeMCPClients(mcpClients);
             }
         },

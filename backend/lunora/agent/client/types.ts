@@ -282,6 +282,8 @@ export type PendingMessageAccess = {
      * is off, or the last step left no placeholder). It moves on as steps finish, so ask when you need it.
      */
     getPendingMessageId: () => string | undefined;
+    /** Resolves once the work an abort of the generation started (failing its pending row) is done; at once when none was. */
+    settleAbort: () => Promise<void>;
 };
 
 export type UsageHandler = (

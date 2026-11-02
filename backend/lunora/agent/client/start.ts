@@ -122,6 +122,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         toSave: { step: StepResult<TOOLS> } | { object: GenerateObjectResult<unknown> },
         shouldCreatePendingMessage?: boolean,
     ) => Promise<void>;
+    settleAbort: () => Promise<void>;
     stepOrder: number;
     /** Steering: delivers a queued message at a step boundary, after which saves follow it. */
     takeSteer: () => Promise<{ messageId: string; text: string } | null>;
@@ -209,15 +210,23 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     // The step save an abort waits for: it may still move the pending row.
     let inFlightSave: Promise<void> | undefined;
 
+    // The abort's own work, kept so the run can wait for it (`settleAbort`): left loose, it lands after the run returned.
+    let aborting: Promise<void> | undefined;
+
     if (args.abortSignal) {
         const { abortSignal } = args;
 
         abortSignal.addEventListener(
             "abort",
-            async () => {
-                // A step save already under way may still move the pending row: let it land before failing what is left.
-                await inFlightSave?.catch(() => undefined);
-                await fail(abortSignal.reason?.toString() ?? "abortSignal");
+            () => {
+                aborting = (async () => {
+                    // A step save already under way may still move the pending row: let it land before failing what is left.
+                    await inFlightSave?.catch(() => undefined);
+                    await fail(abortSignal.reason?.toString() ?? "abortSignal");
+                })().catch((error: unknown) => {
+                    // Nobody can handle this failure: the run is over or ending, and the row stays for the stream's expiry.
+                    console.warn("[startGeneration] Failing the pending message after an abort did not land:", error);
+                });
             },
             { once: true },
         );
@@ -365,6 +374,10 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
             inFlightSave = saveStep(toSave, shouldCreatePendingMessage);
 
             return inFlightSave;
+        },
+        // Resolves once the work an abort started (failing the pending row) is done; immediately when none was.
+        settleAbort: async () => {
+            await aborting;
         },
         stepOrder: stepOrder ?? 0,
         takeSteer: async () => {
