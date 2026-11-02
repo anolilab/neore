@@ -1325,3 +1325,92 @@ describe("a run whose registration for resuming fails", () => {
         expect(state.streamStatus).not.toBe("error");
     });
 });
+
+describe("a run whose model call is aborted", () => {
+    const KEY = "agent_messages:finalizeMessage";
+
+    afterEach(async () => {
+        registerModule(registry, "agent_messages", await import("../agent/messages"));
+    });
+
+    it("does not return before the abort's write to the pending row has landed", async () => {
+        const original = registry.get(KEY);
+        let release = () => {};
+        let reached = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const released = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        const writeStarted = new Promise<void>((resolve) => {
+            reached = resolve;
+        });
+
+        // The abort's write to the pending row waits here, as one stuck behind a busy shard would.
+        registry.set(
+            KEY,
+            internalMutation
+                .input({ messageId: v.string(), result: v.any() })
+                .output(v.null())
+                .mutation(async ({ args, ctx }) => {
+                    reached();
+                    await released;
+
+                    await ctx.runMutation(original as never, args as never);
+
+                    return null;
+                }),
+        );
+
+        modelState.withTools = true;
+
+        let call = 0;
+        const first = scriptedModel([toolCallStep("echo", "call-1")]);
+
+        // The first step leaves a pending row for the next one.
+        modelState.model = new MockLanguageModelV3({
+            doStream: async (options) => {
+                call += 1;
+
+                if (call === 1) {
+                    return await first.doStream(options);
+                }
+
+                // A newer run takes the stream during the second step: the run's next write is refused and its model call aborted.
+                await patchStream({ runEpoch: 1 });
+
+                return await scriptedModel([textStep("Too late.")]).doStream(options);
+            },
+        });
+
+        let returned = false;
+        const running = (async () => {
+            await run().catch(() => undefined);
+            returned = true;
+        })();
+
+        // Phase 1: the abort has started its write, and it is held.
+        await writeStarted;
+
+        // Phase 2: the run is held with it. Yield the event loop a few times so any return that is not waiting would have happened.
+        for (let turn = 0; turn < 20; turn += 1) {
+            await new Promise<void>((resolve) => {
+                setImmediate(resolve);
+            });
+        }
+
+        // (Not a database read: the harness runs one write at a time, so a read would wait behind the held one.)
+        expect(returned).toBe(false);
+
+        // Phase 3: the write lands, the run returns, and the row is finalized.
+        release();
+        await running;
+
+        expect(returned).toBe(true);
+
+        const { rows } = await readState();
+
+        expect(rows.some((row) => row.status === "pending")).toBe(false);
+        expect(rows.some((row) => row.role === "assistant" && row.status === "failed")).toBe(true);
+    });
+});

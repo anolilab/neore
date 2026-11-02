@@ -379,3 +379,15 @@ export const closeMCPClients = async (clients: MCPClient[]): Promise<void> => {
 
     toolsLogger.debug(`[MCP] Closed ${clients.length} MCP client(s)`);
 };
+
+/**
+ * Closes the clients, then waits for `settle`. The close needs no database, so a `settle` stalled on a write
+ * must not keep the clients open; `settle` still runs, and its failure still propagates, when the close throws.
+ */
+export const closeMCPClientsThenSettle = async (clients: MCPClient[], settle: () => Promise<void>): Promise<void> => {
+    try {
+        await closeMCPClients(clients);
+    } finally {
+        await settle();
+    }
+};
