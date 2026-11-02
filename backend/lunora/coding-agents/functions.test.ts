@@ -383,15 +383,16 @@ describe("commit author lookup", () => {
         harness.close();
     });
 
-    const lookup = async (): Promise<unknown> => await harness.run(async (ctx: any) => await ctx.runQuery(commitAuthorFor, { userId: USER }));
+    const lookup = async (userId: string = USER): Promise<unknown> => await harness.run(async (ctx: any) => await ctx.runQuery(commitAuthorFor, { userId }));
 
-    const optIn = async (identity: "agent" | "user") =>
+    const optIn = async (userId: string, identity: "agent" | "user" = "user") =>
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("aiUserPreferences", { codingAgentCommitIdentity: identity, userId });
+        });
+
+    const addAccount = async (emailVerified: boolean): Promise<string> =>
         await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("aiUserPreferences", {
-                    codingAgentCommitIdentity: identity,
-                    userId: USER,
-                }),
+            async (ctx: any) => await ctx.db.insert("user", { createdAt: 1, email: "dana@example.com", emailVerified, name: "Dana Tester", updatedAt: 1 }),
         );
 
     it("returns null when the person has no preference row", async () => {
@@ -399,8 +400,43 @@ describe("commit author lookup", () => {
     });
 
     it("returns null when the opted-in person has no account row", async () => {
-        await optIn("user");
+        await optIn(USER);
 
         expect(await lookup()).toBeNull();
+    });
+
+    it("returns the account's name and email for an opted-in person with a verified email", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId);
+
+        expect(await lookup(userId)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
+    });
+
+    it("keeps the agent as author for a verified account that did not opt in", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId, "agent");
+
+        expect(await lookup(userId)).toBeNull();
+    });
+
+    it("returns null for an opted-in person whose email is not verified", async () => {
+        const userId = await addAccount(false);
+
+        await optIn(userId);
+
+        expect(await lookup(userId)).toBeNull();
+    });
+
+    it("returns null for an opted-in, verified person whose account deletion is underway", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "deletion", status: "processing", userEmail: "dana@example.com", userId });
+        });
+
+        expect(await lookup(userId)).toBeNull();
     });
 });

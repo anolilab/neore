@@ -1347,15 +1347,15 @@ msgstr "#1 auf OpenRouter nach Token-Nutzung"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# Favorit} other {# Favoriten}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:226
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Datenquelle: ~2.700 Tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:223
+#: src/features/settings/components/chat/agent-settings.tsx:225
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Wissen: ~2.600 Tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:222
+#: src/features/settings/components/chat/agent-settings.tsx:224
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Aufgabenplanung: ~2.500 Tokens (+200)"
 
@@ -2647,11 +2647,11 @@ msgstr "Agent antwortet"
 msgid "Agent builder"
 msgstr "Agent-Builder"
 
-#: src/features/settings/components/chat/agent-settings.tsx:59
+#: src/features/settings/components/chat/agent-settings.tsx:61
 msgid "Agent Capabilities"
 msgstr "Agent-Fähigkeiten"
 
-#: src/features/settings/components/chat/agent-settings.tsx:76
+#: src/features/settings/components/chat/agent-settings.tsx:78
 #: src/features/settings/lib/settings-keywords.ts:56
 #: src/features/settings/lib/settings-keywords.ts:57
 #: src/features/settings/lib/settings-keywords.ts:58
@@ -2659,7 +2659,7 @@ msgstr "Agent-Fähigkeiten"
 msgid "Agent Modules"
 msgstr "Agent-Module"
 
-#: src/features/settings/components/chat/agent-settings.tsx:50
+#: src/features/settings/components/chat/agent-settings.tsx:52
 msgid "Agent settings updated"
 msgstr "Agent-Einstellungen aktualisiert"
 
@@ -3501,7 +3501,7 @@ msgstr "Einen künstlerischen Stil auf jedes Bild anwenden"
 msgid "Apply artistic style"
 msgstr "Künstlerischen Stil anwenden"
 
-#: src/features/settings/components/chat/agent-settings.tsx:107
+#: src/features/settings/components/chat/agent-settings.tsx:109
 msgid "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 msgstr "Best Practices, Muster und domänenspezifische Richtlinien anwenden. Bereichert Antworten mit Expertenwissen und bewährten Ansätzen."
 
@@ -3951,7 +3951,7 @@ msgstr ""
 msgid "Auto"
 msgstr "Automatisch"
 
-#: src/features/settings/components/chat/agent-settings.tsx:144
+#: src/features/settings/components/chat/agent-settings.tsx:146
 #: src/features/settings/lib/settings-keywords.ts:59
 msgid "Auto Media Enrichment"
 msgstr "Automatische Medienanreicherung"
@@ -3977,7 +3977,7 @@ msgstr "Automatisches Löschen aktiv"
 msgid "Auto-detect"
 msgstr "Automatisch erkennen"
 
-#: src/features/settings/components/chat/agent-settings.tsx:169
+#: src/features/settings/components/chat/agent-settings.tsx:171
 #: src/features/settings/lib/settings-keywords.ts:60
 msgid "Auto-Detect Task Complexity"
 msgstr "Aufgabenkomplexität automatisch erkennen"
@@ -4056,15 +4056,15 @@ msgstr "Automatisches Health-Tracking der Anbieter mit Circuit-Breaker-Muster. A
 msgid "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 msgstr "Automatische Anfrageklassifizierung (Simple/Standard/Complex/Reasoning) leitet jede Anfrage an das optimale Modell weiter. Zustandsbewusstes Fallback mit Circuit-Breaker-Muster sorgt für 99,9 % Verfügbarkeit."
 
-#: src/features/settings/components/chat/agent-settings.tsx:172
+#: src/features/settings/components/chat/agent-settings.tsx:174
 msgid "Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when needed."
 msgstr "Passende Module automatisch anhand des erkannten Aufgabentyps aktivieren. Vereinfacht die Nutzung, indem Funktionen bei Bedarf intelligent aktiviert werden."
 
-#: src/features/settings/components/chat/agent-settings.tsx:163
+#: src/features/settings/components/chat/agent-settings.tsx:165
 msgid "Automatically enable modules based on task complexity"
 msgstr "Module automatisch anhand der Aufgabenkomplexität aktivieren"
 
-#: src/features/settings/components/chat/agent-settings.tsx:147
+#: src/features/settings/components/chat/agent-settings.tsx:149
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "Bei Suchmodi automatisch relevante Bilder und Videos zu Textantworten hinzufügen."
 
@@ -4076,7 +4076,7 @@ msgstr "Bereinigung automatisch gemäß Konfiguration ausführen"
 msgid "automation"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:162
+#: src/features/settings/components/chat/agent-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:60
 #: src/features/skills/components/skill-form-dialog.tsx:119
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
@@ -4308,7 +4308,7 @@ msgstr "Sperren"
 msgid "Base"
 msgstr "Basis"
 
-#: src/features/settings/components/chat/agent-settings.tsx:221
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Basis (nur Agent-Loop): ~2.300 Tokens"
 
@@ -4741,7 +4741,7 @@ msgstr "Brave: Wenn Anfragen fehlschlagen, senke die Shields für diese Website.
 msgid "Brazil"
 msgstr "Brasilien"
 
-#: src/features/settings/components/chat/agent-settings.tsx:87
+#: src/features/settings/components/chat/agent-settings.tsx:89
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Komplexe Aufgaben in nummerierte Schritte mit Fortschrittsverfolgung aufteilen. Ideal für mehrstufige Projekte und Entwicklungsaufgaben."
 
@@ -6273,9 +6273,9 @@ msgstr "Programmierung"
 msgid "Coding agent log"
 msgstr "Coding-Agent-Protokoll"
 
-#: src/features/settings/components/chat/agent-settings.tsx:190
+#: src/features/settings/components/chat/agent-settings.tsx:192
 msgid "Coding Agent Pull Requests"
-msgstr ""
+msgstr "Pull Requests von Coding-Agenten"
 
 #: src/features/notifications/lib/notification-labels.ts:45
 msgid "Coding agent run failed"
@@ -6533,17 +6533,17 @@ msgstr "kommerzielles Design"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "Kommerzielle Projekte, die die absolut beste Bildqualität von Black Forest Labs verlangen"
 
-#: src/features/settings/components/chat/agent-settings.tsx:197
+#: src/features/settings/components/chat/agent-settings.tsx:199
 msgid "Commit as me"
-msgstr ""
+msgstr "In meinem Namen committen"
 
 #: src/features/develop/components/pull-request-view.tsx:72
 msgid "Commits"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:200
+#: src/features/settings/components/chat/agent-settings.tsx:202
 msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email."
-msgstr ""
+msgstr "Commits werden unter deinem Namen und deiner E-Mail-Adresse erstellt, wobei Neore Agent als Co-Autor aufgeführt wird. Ist die Option aus, bleibt der Agent der Autor – ebenso bei einem Konto ohne Namen oder ohne bestätigte E-Mail-Adresse."
 
 #: src/features/settings/connectors/connector-category.ts:6
 #: src/features/skills/components/skill-form-dialog.tsx:121
@@ -6803,7 +6803,7 @@ msgstr "Bedingung (JavaScript-Ausdruck)"
 msgid "Conditional branching"
 msgstr "Bedingte Verzweigung"
 
-#: src/features/settings/components/chat/agent-settings.tsx:60
+#: src/features/settings/components/chat/agent-settings.tsx:62
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Erweiterte KI-Agent-Module für eine bessere Aufgabenausführung konfigurieren"
 
@@ -8759,7 +8759,7 @@ msgstr "Datenraster"
 msgid "Data Protection Officer"
 msgstr "Datenschutzbeauftragter"
 
-#: src/features/settings/components/chat/agent-settings.tsx:124
+#: src/features/settings/components/chat/agent-settings.tsx:126
 #: src/features/settings/lib/settings-keywords.ts:58
 msgid "Data Source Module"
 msgstr "Datenquellen-Modul"
@@ -10904,7 +10904,7 @@ msgstr "Aktiviere oder deaktiviere Modelle, um festzulegen, welche in der Modell
 msgid "Enable skills in Settings to add them as participants."
 msgstr "Aktiviere Skills in den Einstellungen, um sie als Teilnehmer hinzuzufügen."
 
-#: src/features/settings/components/chat/agent-settings.tsx:77
+#: src/features/settings/components/chat/agent-settings.tsx:79
 msgid "Enable specialized modules to enhance AI capabilities"
 msgstr "Spezialisierte Module aktivieren, um die KI-Fähigkeiten zu erweitern"
 
@@ -11429,7 +11429,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Geschätzte Anbieterkosten {display}, abgerechnet über deinen eigenen API-Schlüssel"
 
-#: src/features/settings/components/chat/agent-settings.tsx:217
+#: src/features/settings/components/chat/agent-settings.tsx:219
 msgid "Estimated token cost per conversation"
 msgstr "Geschätzte Token-Kosten pro Unterhaltung"
 
@@ -12675,7 +12675,7 @@ msgstr "Kontoverknüpfung konnte nicht aufgehoben werden"
 msgid "Failed to unpin thread"
 msgstr "Anheften des Threads konnte nicht aufgehoben werden"
 
-#: src/features/settings/components/chat/agent-settings.tsx:47
+#: src/features/settings/components/chat/agent-settings.tsx:49
 msgid "Failed to update agent settings"
 msgstr "Agent-Einstellungen konnten nicht aktualisiert werden"
 
@@ -12748,9 +12748,9 @@ msgstr "Prompt konnte nicht aktualisiert werden"
 msgid "Failed to update provider"
 msgstr "Anbieter konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/agent-settings.tsx:30
+#: src/features/settings/components/chat/agent-settings.tsx:31
 msgid "Failed to update pull request settings"
-msgstr ""
+msgstr "Die Pull-Request-Einstellungen konnten nicht aktualisiert werden"
 
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:47
 msgid "Failed to update reply tools"
@@ -16845,7 +16845,7 @@ msgstr "Wissenssammlungen"
 msgid "Knowledge files to search"
 msgstr "Zu durchsuchende Wissensdateien"
 
-#: src/features/settings/components/chat/agent-settings.tsx:104
+#: src/features/settings/components/chat/agent-settings.tsx:106
 #: src/features/settings/lib/settings-keywords.ts:57
 msgid "Knowledge Module"
 msgstr "Wissensmodul"
@@ -17855,7 +17855,7 @@ msgstr ""
 #: src/features/canvas/canvas-panel.tsx:731
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
-#: src/features/settings/components/chat/agent-settings.tsx:39
+#: src/features/settings/components/chat/agent-settings.tsx:41
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
@@ -21096,7 +21096,7 @@ msgstr "Notiz (optional)"
 msgid "Note for the next run (optional)"
 msgstr "Notiz für den nächsten Durchlauf (optional)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:227
+#: src/features/settings/components/chat/agent-settings.tsx:229
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Hinweis: Module werden pro Unterhaltung angewendet, nicht pro Nachricht. Aktiviere nur die Module, die du brauchst, um den Token-Verbrauch zu optimieren."
 
@@ -24260,9 +24260,9 @@ msgstr ""
 msgid "Pull request opened"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:33
+#: src/features/settings/components/chat/agent-settings.tsx:35
 msgid "Pull request settings updated"
-msgstr ""
+msgstr "Pull-Request-Einstellungen aktualisiert"
 
 #: src/features/code/components/code-shell.tsx:95
 msgid "Pull requests"
@@ -29974,7 +29974,7 @@ msgstr "Aufgabe abgeschlossen"
 msgid "Task needs your review: {title}"
 msgstr "Aufgabe wartet auf deine Prüfung: {title}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:84
+#: src/features/settings/components/chat/agent-settings.tsx:86
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "Task Planning Module"
 msgstr "Aufgabenplanungsmodul"
@@ -30505,7 +30505,7 @@ msgstr ""
 msgid "The agent is working. You can send these when it is done."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:67
+#: src/features/settings/components/chat/agent-settings.tsx:69
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "Die Agentenschleife ist für eine systematische Aufgabenausführung immer aktiv. Diese Einstellungen steuern zusätzliche spezialisierte Module, die die Fähigkeiten der KI für bestimmte Aufgabentypen erweitern."
 
@@ -32000,7 +32000,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "Token-Budget"
 
-#: src/features/settings/components/chat/agent-settings.tsx:216
+#: src/features/settings/components/chat/agent-settings.tsx:218
 msgid "Token Cost Impact"
 msgstr "Auswirkung auf Token-Kosten"
 
@@ -33589,7 +33589,7 @@ msgstr "Usbekistan"
 msgid "Valid JSON"
 msgstr "Gültiges JSON"
 
-#: src/features/settings/components/chat/agent-settings.tsx:127
+#: src/features/settings/components/chat/agent-settings.tsx:129
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Datenqualität prüfen und maßgebliche Quellen priorisieren. Unverzichtbar für Rechercheaufgaben und Faktenchecks."
 
@@ -34742,9 +34742,9 @@ msgstr "Welche KI-Modelle sind enthalten?"
 msgid "Which providers are supported?"
 msgstr "Welche Anbieter werden unterstützt?"
 
-#: src/features/settings/components/chat/agent-settings.tsx:191
+#: src/features/settings/components/chat/agent-settings.tsx:193
 msgid "Who a pull request's commits are made as"
-msgstr ""
+msgstr "Als wer die Commits eines Pull Requests erstellt werden"
 
 #: src/features/chat/group/create-group-chat-button.tsx:212
 #: src/features/chat/group/group-participant-bar.tsx:100

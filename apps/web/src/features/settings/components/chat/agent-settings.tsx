@@ -7,7 +7,7 @@ import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
 import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 const AgentSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const { data: aiPreferences, isLoading } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const updateAIUserPreferencesMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
     // Server-written (not in the generic settings save): the commit identity has its own setter.
@@ -30,6 +31,7 @@ const AgentSettings: FC = () => {
                 toast.error(t`Failed to update pull request settings`);
             },
             onSuccess: () => {
+                void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getAIUserPreferences.queryKey({}) });
                 toast.success(t`Pull request settings updated`);
             },
         }),
