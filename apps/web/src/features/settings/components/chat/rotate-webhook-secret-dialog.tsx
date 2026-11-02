@@ -26,12 +26,18 @@ const RotateWebhookSecretDialog: FC<RotateWebhookSecretDialogProperties> = ({ lo
     const { t } = useLingui();
     const overlapId = useId();
     const [keepOld, setKeepOld] = useState(false);
+    const [wasOpen, setWasOpen] = useState(open);
+
+    // Every opening starts unticked: a successful rotation closes the dialog from the parent, not through onOpenChange.
+    if (open !== wasOpen) {
+        setWasOpen(open);
+
+        if (open) setKeepOld(false);
+    }
 
     return (
         <AlertDialog
             onOpenChange={(next) => {
-                if (!next) setKeepOld(false);
-
                 onOpenChange(next);
             }}
             open={open}

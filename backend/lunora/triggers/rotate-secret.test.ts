@@ -72,12 +72,12 @@ const hmacHex = async (secret: string, payload: string): Promise<string> => {
 /** One timestamped delivery signed with `secret`, through the handler against the stored row; the status code. */
 let counter = 0;
 
-const deliver = async (triggerId: string, secret: string): Promise<number> => {
+const deliverResponse = async (triggerId: string, secret: string, same?: { body: string; timestamp: string }): Promise<Response> => {
     // A fresh body per call, so the replay claim never answers for the signature check.
     counter += 1;
 
-    const body = `{"n":${String(counter)}}`;
-    const timestamp = String(Math.floor(Date.now() / 1000));
+    const body = same?.body ?? `{"n":${String(counter)}}`;
+    const timestamp = same?.timestamp ?? String(Math.floor(Date.now() / 1000));
     const context = {
         runMutation: async (reference: unknown, args: unknown) => {
             const mutations = new Map<unknown, unknown>([
@@ -92,7 +92,12 @@ const deliver = async (triggerId: string, secret: string): Promise<number> => {
         scheduler: { runAfter: async () => undefined },
     };
     const headers = { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(secret, `${timestamp}.${body}`)}` };
-    const response = await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body, headers, method: "POST" }), triggerId);
+
+    return await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body, headers, method: "POST" }), triggerId);
+};
+
+const deliver = async (triggerId: string, secret: string): Promise<number> => {
+    const response = await deliverResponse(triggerId, secret);
 
     return response.status;
 };
@@ -147,6 +152,21 @@ describe("rotateWebhookSecret", () => {
         vi.setSystemTime(NOW + WEBHOOK_SECRET_OVERLAP_MS + 1);
         expect(await deliver(triggerId, oldSecret)).toBe(401);
         expect(await deliver(triggerId, newSecret)).toBe(200);
+    });
+
+    it("runs one delivery once when it is signed with both the old and the new secret during an overlap", async () => {
+        const { triggerId, webhookSecret: oldSecret } = await create();
+
+        await enable(triggerId);
+
+        const { webhookSecret: newSecret } = await rotate(triggerId, true);
+        const same = { body: '{"event":"push"}', timestamp: String(Math.floor(Date.now() / 1000)) };
+        const first = await deliverResponse(triggerId, oldSecret, same);
+        const second = await deliverResponse(triggerId, newSecret, same);
+
+        expect(first.status).toBe(200);
+        expect(await first.json()).not.toHaveProperty("duplicate");
+        expect(await second.json()).toMatchObject({ duplicate: true });
     });
 
     it("a second rotation ends the overlap of the first, and a plain rotation clears a running one", async () => {

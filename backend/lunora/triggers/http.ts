@@ -53,7 +53,7 @@ import type { HttpActionCtx } from "lunorash/server";
  *
  * A missing or empty secret is refused for every scheme (fail closed). A rotation (`rotateWebhookSecret`)
  * replaces the secret at once; if the owner opted into an overlap, the previous secret is also accepted until its
- * `webhookPreviousSecretExpiresAt`, for every scheme. Replay claims are keyed on the signature or delivery, never the secret.
+ * `webhookPreviousSecretExpiresAt`, for every scheme. Replay claims are keyed on the signed bytes or the delivery, never the secret or the signature.
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -427,7 +427,9 @@ const takeReplayGuard = async (
         claimKey = { key: `${triggerId}:${delivery.deliveryId}:${await sha256Hex(rawBody)}`, scope: TRIGGER_DELIVERY_SCOPE };
         ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
     } else {
-        claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
+        // Keyed on the signed bytes, not the signature: during a rotation overlap the same delivery signed with the
+        // old and the new secret carries two signatures but ONE payload, and must run once.
+        claimKey = { key: `${triggerId}:${await sha256Hex(delivery.signedPayload)}`, scope: "trigger-webhook" };
     }
 
     const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, userId: trigger.userId });

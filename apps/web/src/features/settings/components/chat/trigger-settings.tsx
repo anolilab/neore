@@ -44,6 +44,7 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
+import { useShownWebhookSecrets } from "@/features/settings/hooks/use-shown-webhook-secrets";
 import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
@@ -464,7 +465,7 @@ const TriggerSettings: FC = () => {
     const [editStartZone, setEditStartZone] = useState("");
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
-    const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
+    const { dismiss: dismissWebhookSecret, secrets: shownWebhookSecrets, show: showWebhookSecret } = useShownWebhookSecrets();
     const [deletingTrigger, setDeletingTrigger] = useState<TriggerRow | null>(null);
     const [rotatingTrigger, setRotatingTrigger] = useState<TriggerRow | null>(null);
 
@@ -527,11 +528,11 @@ const TriggerSettings: FC = () => {
                     setFormData(EMPTY_FORM);
                     void refetch();
 
-                    setNewWebhookSecret(data.webhookSecret ?? null);
+                    if (data.webhookSecret) showWebhookSecret({ id: String(data.triggerId), name: formData.name, secret: data.webhookSecret });
                 },
             },
         );
-    }, [createTrigger, formData, refetch, t]);
+    }, [createTrigger, formData, refetch, showWebhookSecret, t]);
 
     const handleUpdate = useCallback(() => {
         if (!editingTriggerId || !editFormData.name.trim()) return;
@@ -621,25 +622,26 @@ const TriggerSettings: FC = () => {
                     onSuccess: (data) => {
                         toast.success(t`Secret rotated`);
                         setRotatingTrigger(null);
-                        setNewWebhookSecret(data.webhookSecret);
+                        showWebhookSecret({ id: rotatingTrigger._id, name: rotatingTrigger.name, secret: data.webhookSecret });
                         void refetch();
                     },
                 },
             );
         },
-        [rotateSecret, rotatingTrigger, refetch, t],
+        [rotateSecret, rotatingTrigger, refetch, showWebhookSecret, t],
     );
 
-    const handleCopyWebhookSecret = useCallback(async () => {
-        if (!newWebhookSecret) return;
-
-        try {
-            await navigator.clipboard.writeText(newWebhookSecret);
-            toast.success(t`Webhook secret copied to clipboard`);
-        } catch {
-            toast.error(t`Could not copy the secret. Select it and copy it manually.`);
-        }
-    }, [newWebhookSecret, t]);
+    const handleCopyWebhookSecret = useCallback(
+        async (secret: string) => {
+            try {
+                await navigator.clipboard.writeText(secret);
+                toast.success(t`Webhook secret copied to clipboard`);
+            } catch {
+                toast.error(t`Could not copy the secret. Select it and copy it manually.`);
+            }
+        },
+        [t],
+    );
 
     const handleTestRun = useCallback(
         async (triggerId: Id<"triggers">) => {
@@ -737,25 +739,25 @@ const TriggerSettings: FC = () => {
                     />
                 )}
 
-                {newWebhookSecret && (
-                    <Card className="border-amber-500/50">
+                {shownWebhookSecrets.map((shown) => (
+                    <Card className="border-amber-500/50" key={shown.id}>
                         <CardContent className="space-y-2 p-4">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <CardHeading className="font-medium">{t`Webhook secret`}</CardHeading>
+                                    <CardHeading className="font-medium">{t`Webhook secret for "${shown.name}"`}</CardHeading>
                                     <p className="text-muted-foreground text-sm">
                                         {t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}
                                     </p>
                                 </div>
-                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => setNewWebhookSecret(null)} size="sm" variant="ghost">
+                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => dismissWebhookSecret(shown.id)} size="sm" variant="ghost">
                                     <X aria-hidden="true" className="size-4" />
                                 </Button>
                             </div>
                             <div className="flex items-center gap-2">
-                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{newWebhookSecret}</code>
+                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{shown.secret}</code>
                                 <Button
                                     onClick={() => {
-                                        void handleCopyWebhookSecret();
+                                        void handleCopyWebhookSecret(shown.secret);
                                     }}
                                     size="sm"
                                     variant="outline"
@@ -766,7 +768,7 @@ const TriggerSettings: FC = () => {
                             </div>
                         </CardContent>
                     </Card>
-                )}
+                ))}
 
                 {/* Trigger List */}
                 {triggers && triggers.length > 0 ? (
