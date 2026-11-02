@@ -225,7 +225,12 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
                     await fail(abortSignal.reason?.toString() ?? "abortSignal");
                 })().catch((error: unknown) => {
                     // Nobody can handle this failure: the run is over or ending, and the row stays for the stream's expiry.
-                    console.warn("[startGeneration] Failing the pending message after an abort did not land:", error);
+                    console.error("[startGeneration] abort.fail_pending_message", {
+                        error: error instanceof Error ? { message: error.message, name: error.name, stack: error.stack } : String(error),
+                        messageId: pendingMessageId,
+                        operation: "agent.messages.finalizeMessage",
+                        threadId,
+                    });
                 });
             },
             { once: true },
