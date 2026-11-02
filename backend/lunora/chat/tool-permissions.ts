@@ -378,7 +378,7 @@ const writeToolPermission = async (ctx: PreferenceCtx, key: string, mode: ToolPe
         throw new LunoraError("BAD_REQUEST", "Too many tool permission overrides");
     }
 
-    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissions: next });
+    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissions: next }, null);
 };
 
 /** Set (or, with `mode: null`, reset to default) one tool's permission. */
@@ -410,7 +410,7 @@ export const setAutoApproveLowRisk = authMutation
             .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
             .unique();
 
-        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { autoApproveLowRisk: enabled });
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { autoApproveLowRisk: enabled }, ctx.user.activeOrganization?.id ?? null);
 
         ctx.log.event("chat.set_auto_approve_low_risk", { enabled });
 
@@ -451,7 +451,7 @@ export const setLowRiskTrustedServer = authMutation
             throw new LunoraError("BAD_REQUEST", "Too many trusted servers");
         }
 
-        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { lowRiskTrustedServers: next });
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { lowRiskTrustedServers: next }, null);
 
         ctx.log.event("chat.set_low_risk_trusted_server", { kind: server.kind, trusted });
 
@@ -485,7 +485,7 @@ const writeToolGrant = async (ctx: PreferenceCtx, key: string, expiresAt: number
         delete next[soonest];
     }
 
-    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next });
+    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next }, null);
 };
 
 /** End a time-boxed allow early: the tool asks again from the next message (a run already going keeps the allow it started with). */
@@ -518,7 +518,7 @@ export const pruneExpiredToolPermissionGrants = internalMutation
             const grants = row.toolPermissionGrants;
 
             if (grants && Object.values(grants).some((expiresAt) => expiresAt <= ctx.now)) {
-                await saveAiUserPreferences(ctx.db, row, row.userId, { toolPermissionGrants: activeGrants(grants, ctx.now) });
+                await saveAiUserPreferences(ctx.db, row, row.userId, { toolPermissionGrants: activeGrants(grants, ctx.now) }, null);
             }
         }
 

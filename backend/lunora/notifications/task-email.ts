@@ -45,7 +45,7 @@ export const setTaskEmailEnabled = authMutation
 
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
 
-        await saveUserSettings(ctx.db, settings, userId, { taskEmailEnabled: enabled });
+        await saveUserSettings(ctx.db, settings, userId, { taskEmailEnabled: enabled }, null);
 
         ctx.log.event("notifications.set_task_email_enabled", { enabled });
 
