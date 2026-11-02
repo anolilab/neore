@@ -731,7 +731,8 @@ describe("addAsideToThread", () => {
             addAsideToThread as never,
             { answer: asked.answer, entryId: lastEntryId(), question: edged, threadId, token: asked.token } as never,
         )) as { messageId: string };
-        const added = (await rows("messages")).find((row) => row._id === messageId);
+        const messageRows = await rows("messages");
+        const added = messageRows.find((row) => row._id === messageId);
 
         expect(added.message.content).toBe("**Side question**\n\n> What does idempotent mean?\n\nIt means safe to repeat.");
     });

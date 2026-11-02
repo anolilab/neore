@@ -75,7 +75,7 @@ const context = () =>
         },
     }) as never;
 
-const edit = async (text: string | string[]): Promise<Response> =>
+const edit = async (text: unknown): Promise<Response> =>
     await editMessageHttpAction(
         context(),
         new Request("https://example.test/chat/edit", {
@@ -119,5 +119,18 @@ describe("editMessageHttpAction hidden characters", () => {
 
         expect(response.status).toBe(200);
         expect(state.saved[0]?.message.content).toStrictEqual([{ text: "fix this", type: "text" }]);
+    });
+
+    it.each([
+        ["missing", undefined],
+        ["null", null],
+        ["an object", { text: "fix this" }],
+    ])("refuses a text part whose text is %s and saves nothing", async (_label, text) => {
+        const response = await edit(text);
+
+        expect(response.status).toBe(400);
+        expect(state.saved).toStrictEqual([]);
+        expect(state.enqueued).toStrictEqual([]);
+        expect(state.charges).toBe(0);
     });
 });

@@ -1195,8 +1195,12 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     break;
                 }
                 case "text": {
+                    if (typeof part.text !== "string") {
+                        return Response.json({ error: "A text part needs a text string" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+                    }
+
                     // The edit is a prompt like any other: the composer strips, and this is the check no client can skip.
-                    const { removed, text } = stripHiddenText(String(part.text ?? ""));
+                    const { removed, text } = stripHiddenText(part.text);
 
                     // A text part that was only hidden characters is dropped; the edit is refused below only when nothing else is left.
                     if (removed > 0 && text.trim() === "") {
