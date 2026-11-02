@@ -13,7 +13,7 @@
 import type { Infer } from "lunorash/server";
 
 import { parseGoalReviewNote } from "../../chat/goals/shared";
-import { isCompressedHistory } from "../../chat/lib/auto-continue";
+import { readCompressedHistory } from "../../chat/lib/compressed-history";
 import type { vDeviceTaintSource } from "../validators";
 
 export type DeviceTaintSource = Infer<typeof vDeviceTaintSource>;
@@ -104,13 +104,21 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
 
     const list = messages ?? [];
 
-    // History compressed to text no longer shows its tool results or attachments, so what it folded away is unknown:
-    // assume a page was read.
-    if (isCompressedHistory(list)) {
-        found.add("web");
-    }
-
     for (const message of list) {
+        // History compressed to text no longer shows its tool results or attachments. The summary records the
+        // sources of what it folded away; one with no record (compressed before it was kept) is unknown: assume a page was read.
+        const compressed = readCompressedHistory(message);
+
+        if (compressed) {
+            const recorded = compressed.taint ?? ["web"];
+
+            for (const source of recorded) {
+                if (TAINT_ORDER.includes(source as DeviceTaintSource)) {
+                    found.add(source as DeviceTaintSource);
+                }
+            }
+        }
+
         if (message.role === "user") {
             for (const source of goalNoteTaint(message.content)) {
                 found.add(source);

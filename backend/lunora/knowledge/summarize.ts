@@ -17,6 +17,7 @@ import z from "zod/v4";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 
 ("use node");
@@ -48,7 +49,7 @@ export const resummarizeFile = internalAction
 
         try {
             const { getUtilityModel } = await import("../lib/utility-model");
-            const model = await getUtilityModel(gatewayFetch(ctx));
+            const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, file.userId), userId: file.userId });
 
             const result = await generateText({
                 model,
@@ -130,7 +131,7 @@ export const summarizeCollection = internalAction
 
         try {
             const { getUtilityModel } = await import("../lib/utility-model");
-            const model = await getUtilityModel(gatewayFetch(ctx), { userId });
+            const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId });
 
             const result = await generateText({
                 model,
