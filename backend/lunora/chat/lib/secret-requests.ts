@@ -185,14 +185,15 @@ export const replyKeyOfStream = async (ctx: Database, args: { streamId: string; 
  * Drop the ciphertext of the references of one reply (`replyKey`) that are still saved on `threadId`, keeping the rows
  * (a later spend reads `used`). Called when that reply ends for good — finished, failed or stopped, never at a pause —
  * so a value does not wait out its 24 hours once the reply that received it is over, and another reply on the thread
- * keeps its own. Returns how many it dropped.
+ * keeps its own. `abandon` marks them `abandoned` (a stop that left no run to spend them) instead of leaving `saved`,
+ * which a later spend would read as `used`. Returns how many it dropped.
  *
  * What remains: the row itself (status, label, destination, ref, approvalId, expiresAt) until the sweep; and the
  * ciphertext of a reply that never reached an end — a worker killed mid-continuation, or a stream the timeout reaper
  * closed, which does not call this — until its `expiresAt` passes and the housekeeping sweep (every 10 minutes on a
  * shard that was active, else daily for 30 days) deletes the row. A decline stores nothing at all.
  */
-export const discardThreadSecrets = async (ctx: Database, args: { replyKey: string; threadId: Id<"threads"> }): Promise<number> => {
+export const discardThreadSecrets = async (ctx: Database, args: { abandon?: boolean; replyKey: string; threadId: Id<"threads"> }): Promise<number> => {
     const rows = await ctx.db
         .query("requestedSecrets")
         .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
@@ -200,37 +201,59 @@ export const discardThreadSecrets = async (ctx: Database, args: { replyKey: stri
     const live = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey === args.replyKey);
 
     for (const row of live) {
-        await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined });
+        await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined, ...(args.abandon && { status: "abandoned" as const }) });
     }
 
     return live.length;
 };
 
+/** Rows per page of the walk that classifies a pause's requests. */
+const SECRET_SCAN_PAGE = 50;
+
 /**
- * The ids of the thread's recent approval requests that are `requestSecret` calls. Read from the saved messages (the
- * snapshot does not name the tool), a window deep enough to reach the turn a Stop or a new message just moved past.
+ * Which of `wanted` (approval ids of paused requests) are `requestSecret` calls. Read from the saved messages (the
+ * snapshot does not name the tool), newest first and in pages, until every wanted id has been seen as a request, so an
+ * old pause is reached however many rows followed it; an id that never shows ends the walk at the thread's first row.
  */
-const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">): Promise<Set<string>> => {
-    const recent = await ctx.db
-        .query("messages")
-        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
-        .order("desc")
-        .take(40);
+const secretApprovalIdsOf = async (ctx: Database, threadId: Id<"threads">, wanted: ReadonlySet<string>): Promise<Set<string>> => {
     const ids = new Set<string>();
 
-    for (const message of recent) {
-        const content = (message.message as { content?: unknown } | undefined)?.content;
-        const parts = Array.isArray(content) ? (content as { approvalId?: string; toolCallId?: string; toolName?: string; type?: string }[]) : [];
-        const secretCalls = new Set(
-            parts.filter((part) => part.type === "tool-call" && part.toolName === REQUEST_SECRET_TOOL_NAME).map((part) => part.toolCallId),
-        );
+    if (wanted.size === 0) {
+        return ids;
+    }
 
-        for (const part of parts) {
-            if (part.type === "tool-approval-request" && part.approvalId !== undefined && secretCalls.has(part.toolCallId)) {
-                ids.add(part.approvalId);
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+
+    do {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .order("desc")
+            .paginate({ cursor, numItems: SECRET_SCAN_PAGE });
+
+        for (const message of page.page) {
+            const content = (message.message as { content?: unknown } | undefined)?.content;
+            const parts = Array.isArray(content) ? (content as { approvalId?: string; toolCallId?: string; toolName?: string; type?: string }[]) : [];
+            const secretCalls = new Set(
+                parts.filter((part) => part.type === "tool-call" && part.toolName === REQUEST_SECRET_TOOL_NAME).map((part) => part.toolCallId),
+            );
+
+            for (const part of parts) {
+                if (!(part.type === "tool-approval-request" && part.approvalId !== undefined && wanted.has(part.approvalId))) {
+                    continue;
+                }
+
+                seen.add(part.approvalId);
+
+                if (secretCalls.has(part.toolCallId)) {
+                    ids.add(part.approvalId);
+                }
             }
         }
-    }
+
+        cursor = page.isDone || seen.size >= wanted.size ? null : page.continueCursor;
+    } while (cursor !== null);
 
     return ids;
 };
@@ -301,10 +324,11 @@ export const discardPausedThreadSecrets = async (
 
     // The secret requests of the reply are denied with it: nothing is waiting on them, and a late answer must not resume it.
     // Any other pending approval stays as it was, answerable.
-    const secretApprovals = await secretApprovalIdsOf(ctx, args.threadId);
+    const abandoned = pending.filter((run) => keys.has(run.config.replyKey ?? run.streamId ?? ""));
+    const secretApprovals = await secretApprovalIdsOf(ctx, args.threadId, new Set(abandoned.map((run) => run.approvalId)));
 
-    for (const run of pending) {
-        if (keys.has(run.config.replyKey ?? run.streamId ?? "") && secretApprovals.has(run.approvalId)) {
+    for (const run of abandoned) {
+        if (secretApprovals.has(run.approvalId)) {
             await patchRow(ctx.db, run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
         }
     }

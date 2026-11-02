@@ -249,6 +249,17 @@ export const stopActiveForThread = internalMutation
         const named = args.messageId === undefined ? [] : live.filter((stream) => stream.messageId === args.messageId);
         const streams = named.length > 0 ? named : live;
 
+        // Replies that stay live share a reply key with a stopped continuation when one pause started several: its
+        // references are theirs too, so they are not discarded under them.
+        const stopping = new Set(streams.map((stream) => stream._id));
+        const keptKeys = new Set(
+            await Promise.all(
+                live
+                    .filter((stream) => !stopping.has(stream._id))
+                    .map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId: stream.threadId as Id<"threads"> })),
+            ),
+        );
+
         for (const stream of streams) {
             // A coding agent's turn has no run here to notice the stop: end it now, keep the text written so
             // far as the reply, and tell its host to cancel.
@@ -280,7 +291,12 @@ export const stopActiveForThread = internalMutation
             if (waiting || stream.runClaimedAt === undefined) {
                 const threadId = stream.threadId as Id<"threads">;
 
-                await discardThreadSecrets(ctx, { replyKey: await replyKeyOfStream(ctx, { streamId: stream._id, threadId }), threadId });
+                const replyKey = await replyKeyOfStream(ctx, { streamId: stream._id, threadId });
+
+                if (!keptKeys.has(replyKey)) {
+                    // Nothing will spend them now: a late spend reads `abandoned`, not `used`.
+                    await discardThreadSecrets(ctx, { abandon: true, replyKey, threadId });
+                }
             }
         }
 

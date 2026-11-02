@@ -335,4 +335,53 @@ describe("a paused reply that is abandoned", () => {
             expect(await holdsValue(ref)).toBe(keepsValue);
         });
     });
+
+    it("keeps the ciphertext of the other continuation of one pause when an unclaimed one is stopped by its prompt", async () => {
+        const stopped = String(await insertStream("streaming", undefined, "prompt-A"));
+        const other = String(await insertStream("streaming", Date.now(), "prompt-B"));
+        const ref = await storeSecret("stream-A");
+
+        await insertSnapshot("approved", "stream-A", stopped, "one");
+        await insertSnapshot("approved", "stream-A", other, "two");
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { messageId: "prompt-A", threadId }));
+
+        expect(await holdsValue(ref)).toBe(true);
+    });
+
+    it("finds an old pending secret request below more than 40 newer rows", async () => {
+        const ref = await storeSecret("stream-A");
+
+        await insertRequestMessage("appr-stream-A-pending");
+        await insertSnapshot("pending", "stream-A");
+
+        for (let index = 0; index < 60; index += 1) {
+            await insertRequestMessage(`newer-${index}`, "mcp_files__read");
+        }
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        const [snapshot] = await run(async (ctx) => await ctx.db.query("toolApprovalRuns").collect());
+
+        expect(snapshot).toMatchObject({ resolvedBy: "abandoned", status: "denied" });
+        expect(await holdsValue(ref)).toBe(false);
+    });
+
+    it("reads a late spend as abandoned after a stopped unclaimed continuation, with another secret request pending", async () => {
+        const continuation = String(await insertStream("streaming"));
+        const ref = await storeSecret("stream-A");
+
+        await insertRequestMessage("other");
+        await insertSnapshot("approved", "stream-A", continuation, "answered");
+        await insertSnapshot("pending", "stream-A", undefined, "other");
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        const { takeRequestedSecret } = await import("../../lib/secret-requests");
+        const spend = await run(
+            async (ctx) => await takeRequestedSecret(ctx, { kind: "provider_key", now: Date.now(), ref, startedBy: OWNER, threadId, userId: OWNER }),
+        );
+
+        expect(spend).toStrictEqual({ ok: false, status: "abandoned" });
+    });
 });
