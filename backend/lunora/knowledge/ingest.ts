@@ -16,6 +16,7 @@ import { validateVectorDimension, type VectorDimension } from "../agent/vector/t
 import { fetchWithTimeout, isSafeUrl } from "../chat/tools/utilities";
 import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from "../lib/document-limits";
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
 import {
@@ -357,7 +358,7 @@ export const ingestFile = internalAction
             try {
                 const { getUtilityModel } = await import("../lib/utility-model");
                 // Attributed to the owner, so the gateway meters it on their account.
-                const model = await getUtilityModel(gatewayFetch(ctx), { userId: args.userId });
+                const model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, args.userId), userId: args.userId });
 
                 const summaryResult = await generateText({
                     model,

@@ -161,6 +161,15 @@ written here is what is not.
   stream tokens). Billing: 1 credit = 1,000 microdollars, via
   `deductCreditsFromGateway`.
 
+- **Background model calls follow the user's model filter rules.** `getUtilityModel`
+  (`backend/lunora/lib/utility-model.ts`) takes the user's `modelFilterRules` in its
+  context (`loadModelFilterRules`; the type refuses a `userId` without them), picks the
+  first candidate the same predicate as the backup model allows, and hands the rules to the
+  gateway (where `requireZDR` / `denyDataCollection` route). When none is allowed it throws
+  `NoAllowedUtilityModelError` and the step is skipped (the low-risk classifier, which is
+  `strict`, fails closed = ask). Titles, categories, summaries and follow-ups build their own
+  agent: use `resolveBackgroundModel` there, never a bare `getAgent(DEFAULT_…)`.
+
 - **Knowledge rerank** — `POST /internal/rerank` on the gateway wraps Workers AI
   `bge-reranker-base`; `retrieve.ts` blends its order with the RRF order instead of
   replacing it (the model is English/Chinese). `AI` is unbound in dev, so the route

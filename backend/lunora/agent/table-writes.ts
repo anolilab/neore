@@ -190,9 +190,12 @@ export const insertChatFileAccess = async (db: Database, fileId: Id<"chatFiles">
     await db.insert("chatFileAccess", { createdAt: Date.now(), fileId, userId });
 };
 
-/** Delete one vector row (`agent/vector`), e.g. a memory's embedding. */
-export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName>): Promise<void> => {
-    const table = await findVectorTable(db, vectorId);
+/**
+ * Delete one vector row (`agent/vector`), e.g. a memory's embedding. A caller that already knows the row's
+ * table passes it, which skips the probe.
+ */
+export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName>, knownTable?: VectorTableName): Promise<void> => {
+    const table = knownTable ?? (await findVectorTable(db, vectorId));
 
     if (table !== null) {
         await db.delete(table, vectorId);

@@ -17,8 +17,8 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { getUtilityModelForUser } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
 import { requirePageAccess } from "./access";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -76,7 +76,7 @@ export const proposePageEdit = authAction
         }
 
         // Through the LLM gateway, so the call is metered and attributed like every other.
-        const model = await getUtilityModel(gatewayFetch(ctx), { userId: ctx.user.userId }, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
+        const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: ctx.user.userId }, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
         const result = await generateText({
             maxOutputTokens: 16_000,
             model,

@@ -326,7 +326,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             charge: async () => await ctx.runMutation(internal.chat.goals.internal.chargeGoalRound, { userId }),
             first,
             goal: { ...options.goal },
-            review: async ({ round, transcript }) => await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, threadId, transcript, userId }),
+            review: async ({ round, transcript }) =>
+                await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, rules: modelFilterRules, threadId, transcript, userId }),
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
             startedAt,
             stopped: options.shouldStop,
