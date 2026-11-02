@@ -362,15 +362,20 @@ export const updateDeviceManifest = authMutation
         const manifest = parseSignedPayload(args.payload, "manifest", device._id as string);
         const issuedAt = manifest?.issuedAt;
 
-        if (typeof issuedAt === "number" && Number.isFinite(issuedAt) && !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
+        const retransmit = typeof issuedAt === "number" && device.manifestIssuedAt !== undefined && issuedAt <= device.manifestIssuedAt;
+
+        // A stale stamp is the clock only when it is not an old retransmit of a manifest already taken (or the stamp is ahead).
+        if (
+            manifest &&
+            typeof issuedAt === "number" &&
+            Number.isFinite(issuedAt) &&
+            !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS) &&
+            (issuedAt > now || !retransmit)
+        ) {
             throw new LunoraError("BAD_REQUEST", clockSkewMessage(issuedAt, now), { data: clockSkewData(issuedAt, now) });
         }
 
-        if (
-            !manifest ||
-            !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS) ||
-            (device.manifestIssuedAt !== undefined && issuedAt <= device.manifestIssuedAt)
-        ) {
+        if (!manifest || !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS) || retransmit) {
             throw new LunoraError("BAD_REQUEST", "Manifest is stale or malformed");
         }
 
@@ -452,6 +457,21 @@ export const claimDeviceCall = authMutation
         // The same window asking again: its claim was saved and the answer was lost, so it is told so. No other
         // window, and no claim without an id, is ever handed a call that is already taken.
         if (call?.status === "claimed" && args.claimId !== undefined && call.claimId === args.claimId) {
+            const holder = await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
+
+            // It fell below the minimum protocol since the first claim: the retry must not run it. A stop is always let through.
+            if (call.toolName !== "acp_cancel" && isDeviceOutdated(holder)) {
+                await ctx.db.patch("deviceCalls", call._id, {
+                    completedAt: now,
+                    error: OUTDATED_NOTICE,
+                    status: "failed",
+                    ...(isAcpTool(call.toolName) && ACP_CLEARED),
+                });
+                await onAcpCallEnded(ctx, call, { error: OUTDATED_NOTICE, status: "failed" }, now);
+
+                return { claimed: false };
+            }
+
             return { claimed: true };
         }
 
@@ -579,23 +599,29 @@ export const reportDeviceCallProgress = authMutation
         const report = parseSignedPayload(args.payload, "progress", device._id as string);
         const phase = report?.phase;
 
-        if (typeof report?.issuedAt === "number" && Number.isFinite(report.issuedAt) && !isFreshTimestamp(report.issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
-            throw new LunoraError("BAD_REQUEST", clockSkewMessage(report.issuedAt, now), { data: clockSkewData(report.issuedAt, now) });
+        const wellFormed = report?.callId === args.callId && typeof phase === "string" && PHASES.has(phase);
+        const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: device._id, userId } });
+        const next = phase as "prompting" | "running";
+        const current = wellFormed && call?.status === "claimed" && isForwardPhase(call.phase, next);
+        const issuedAt = report?.issuedAt;
+
+        // A stamp outside the window is the clock only when it is ahead, or when this report is about a call that is current:
+        // a late but correctly stamped report for a finished call is just old.
+        if (
+            wellFormed &&
+            typeof issuedAt === "number" &&
+            Number.isFinite(issuedAt) &&
+            !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS) &&
+            (issuedAt > now || current)
+        ) {
+            throw new LunoraError("BAD_REQUEST", clockSkewMessage(issuedAt, now), { data: clockSkewData(issuedAt, now) });
         }
 
-        if (
-            report?.callId !== args.callId ||
-            typeof phase !== "string" ||
-            !PHASES.has(phase) ||
-            !isFreshTimestamp(report.issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)
-        ) {
+        if (!wellFormed || !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
             throw new LunoraError("BAD_REQUEST", "Progress report is malformed");
         }
 
-        const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: device._id, userId } });
-        const next = phase as "prompting" | "running";
-
-        if (call?.status !== "claimed" || !isForwardPhase(call.phase, next)) {
+        if (!current) {
             return { accepted: false };
         }
 

@@ -1115,6 +1115,19 @@ describe("answerHostPermission", () => {
         await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "outdated", sent: false });
     });
 
+    it("does not report a still-pending answer as sent once its computer has gone outdated, but a claimed one stays sent", async () => {
+        const { device, threadId } = await waiting();
+
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "outdated", sent: false });
+
+        const [call] = await rows("deviceCalls", { toolName: "acp_permission_answer" });
+
+        await run(async (ctx) => await ctx.db.patch("deviceCalls", call!._id, { claimedAt: Date.now(), status: "claimed" }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+    });
+
     it("queues one answer per request: a second tap, or the other device, finds the first on its way", async () => {
         const { threadId } = await waiting();
 

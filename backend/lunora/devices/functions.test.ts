@@ -202,6 +202,17 @@ describe("updateDeviceManifest", () => {
         await expect(update(NaN)).rejects.toThrow(STALE_ERROR);
     });
 
+    it("calls a stale stamp an old retransmit, not clock skew, when a newer manifest is already stored", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const update = async (issuedAt: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt)) as never);
+
+        await update(Date.now());
+        await expect(update(Date.now() - 45 * 60_000)).rejects.toThrow(STALE_ERROR);
+        // Ahead of the server: that one is the clock whatever is stored.
+        await expect(update(Date.now() + 3 * 60 * 60_000)).rejects.toMatchObject({ data: { code: "DEVICE_CLOCK_SKEW" } });
+    });
+
     it("refuses another user's device", async () => {
         const { deviceId, secret } = await register(ownerId);
 
@@ -278,6 +289,22 @@ describe("a computer too old for the backend", () => {
 
             expect(updateRequiredOf(await listed(ownerId), deviceId), String(protocol)).toBe(true);
         }
+    });
+
+    it("fails a same-claim retry too once the computer has gone outdated", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const claim = async () => await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, claimId: "window-a", deviceId } as never);
+
+        await expect(claim()).resolves.toEqual({ claimed: true });
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        await expect(claim()).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ error: expect.stringContaining("out of date"), status: "failed" });
     });
 
     it("lists a call queued before the computer was marked outdated, and its claim fails it with the notice", async () => {
@@ -939,6 +966,25 @@ describe("reportDeviceCallProgress", () => {
         await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { phase: "running" }))).resolves.toEqual({ accepted: true });
         await expect(report(ownerId, await signedProgress(deviceId, secret, callId))).resolves.toEqual({ accepted: false });
         expect(await readCall(callId)).toMatchObject({ phase: "running", status: "claimed" });
+    });
+
+    it("does not call a late report clock skew when its call is not current or is another call's", async () => {
+        const { deviceId, secret } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const other = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const late = Date.now() - 60 * 60_000;
+
+        // Not claimed, so not current: a late report is just old.
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late }))).rejects.toThrow(MALFORMED_ERROR);
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
+        await expect(report(ownerId, { ...(await signedProgress(deviceId, secret, other.callId, { issuedAt: late })), callId })).rejects.toThrow(
+            MALFORMED_ERROR,
+        );
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late, phase: "completed" }))).rejects.toThrow(MALFORMED_ERROR);
+        // Already past this phase: not current either.
+        await report(ownerId, await signedProgress(deviceId, secret, callId, { phase: "running" }));
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late }))).rejects.toThrow(MALFORMED_ERROR);
     });
 
     it("refuses a stale report, another call's report and an unknown phase", async () => {

@@ -18,7 +18,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
-import { countOpenCalls, isDeviceOnline } from "../devices/lib/state";
+import { countOpenCalls, isDeviceOnline, isDeviceOutdated } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
@@ -243,18 +243,32 @@ export const answerHostPermission = authMutation
 
         // One answer per request: a second tap, or the phone and the web at once, finds the first still on its way.
         // A pending call past its claim window can no longer be claimed, so it does not count.
+        let queuedPending = false;
         const queued = await countOpenCalls(
             ctx,
             session.deviceId,
-            (open) =>
-                open.toolName === "acp_permission_answer" &&
-                open.threadId === args.threadId &&
-                !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS) &&
-                requestOf(open.input) === args.requestId,
+            (open) => {
+                const mine =
+                    open.toolName === "acp_permission_answer" &&
+                    open.threadId === args.threadId &&
+                    !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS) &&
+                    requestOf(open.input) === args.requestId;
+
+                queuedPending ||= mine && open.status === "pending";
+
+                return mine;
+            },
             1,
         );
 
         if (queued > 0) {
+            // A still-pending answer would be failed at claim on a computer that has since gone outdated: not sent.
+            const device = queuedPending ? await ctx.db.devices.findFirst({ where: { _id: session.deviceId, userId } }) : null;
+
+            if (device && isDeviceOutdated(device)) {
+                return { reason: "outdated" as const, sent: false };
+            }
+
             return { sent: true };
         }
 
