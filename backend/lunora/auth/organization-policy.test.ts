@@ -20,7 +20,7 @@ const OUTSIDER = "user-outsider";
 const ORG = "org-1";
 const OTHER_ORG = "org-2";
 
-const { sessionFrom, sessions } = vi.hoisted(() => {
+const { sessionFrom, sessions, staleRead } = vi.hoisted(() => {
     const sessionByUser = new Map<string, { id: string; role: string } | null>();
 
     return {
@@ -32,6 +32,8 @@ const { sessionFrom, sessions } = vi.hoisted(() => {
                 : null;
         },
         sessions: sessionByUser,
+        // Set by a test to the policy row as an earlier read saw it; the next policy read in a mutation answers with it.
+        staleRead: { current: undefined as undefined | object },
     };
 });
 
@@ -44,8 +46,24 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// The harness runs each mutation in its own transaction, one after another, so it cannot interleave two writers the way
+// two shards do. A writer that read a row which another writer then changed is simulated instead: the guard receives the
+// mutation's live `ctx.db`, and where a test set `staleRead`, that mutation's policy read answers with the older row
+// while the database already holds the newer one.
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        rateLimitGuard: async (context: any) => {
+            const stale = staleRead.current;
+
+            if (!stale || context.rateLimitKey !== "organization/policy") {
+                return;
+            }
+
+            staleRead.current = undefined;
+            context.db.organizationPolicies.findFirst = async () => stale;
+        },
+    };
 });
 
 const { getOrganizationPolicy, setOrganizationPolicy } = await import("./organization-policy");
@@ -58,7 +76,7 @@ const as = (userId: string) => harness.withIdentity({ userId } as never);
 
 const seed = async <T>(run: (db: any) => Promise<T>): Promise<T> => (await harness.run(async (ctx: any) => await run(ctx.db))) as T;
 
-const rowsOf = async (organizationId: string): Promise<{ document: string; revision: number }[]> =>
+const rowsOf = async (organizationId: string): Promise<{ _id: string; document: string; revision: number }[]> =>
     await seed(async (db) => {
         const { page } = await db.organizationPolicies.findMany({ where: { organizationId } });
 
@@ -80,6 +98,7 @@ const POLICY = { models: { allowed: ["model-a"] }, permissionCap: "ask", schemaV
 beforeEach(() => {
     harness = lunoraTest(schema as never);
     sessions.clear();
+    staleRead.current = undefined;
     sessions.set(OWNER, { id: ORG, role: "owner" });
     sessions.set(ADMIN, { id: ORG, role: "admin" });
     sessions.set(MEMBER, { id: ORG, role: "member" });
@@ -136,6 +155,42 @@ describe("setOrganizationPolicy", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]!.revision).toBe(2);
         expect(JSON.parse(rows[0]!.document)).toEqual({ schemaVersion: 1 });
+    });
+
+    it("updates an unchanged row and moves its revision by one", async () => {
+        await write(OWNER, POLICY);
+
+        const [before] = await rowsOf(ORG);
+
+        await expect(write(OWNER, { permissionCap: "off", schemaVersion: 1 })).resolves.toEqual({ revision: before!.revision + 1 });
+
+        const rows = await rowsOf(ORG);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.revision).toBe(2);
+        expect(JSON.parse(rows[0]!.document)).toEqual({ permissionCap: "off", schemaVersion: 1 });
+    });
+
+    it("refuses a stale update with CONFLICT and keeps the newer document", async () => {
+        await write(OWNER, POLICY);
+
+        const [stale] = await rowsOf(ORG);
+        const newer = JSON.stringify({ permissionCap: "off", schemaVersion: 1 });
+
+        // Another owner's write commits after this writer read revision 1 and before it writes.
+        await seed(async (db) => {
+            await db.patch("organizationPolicies", stale!._id, { document: newer, revision: 2 });
+        });
+        staleRead.current = stale;
+
+        await expect(write(OWNER, { permissionCap: "auto", schemaVersion: 1 })).rejects.toMatchObject({ code: "CONFLICT" });
+
+        const rows = await rowsOf(ORG);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.revision).toBe(2);
+        expect(rows[0]!.document).toBe(newer);
+        expect(staleRead.current).toBeUndefined();
     });
 
     // The harness runs each mutation in its own transaction, so it cannot interleave two writers the way two shards do;

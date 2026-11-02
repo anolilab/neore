@@ -64,7 +64,14 @@ export const setOrganizationPolicy = authMutation
         };
 
         if (existing) {
-            await context.db.patch("organizationPolicies", existing._id, row);
+            // Global-table operations are not one transaction, so another owner's write can land after the read above. The
+            // patch only applies while the stored revision is still the one this writer read; otherwise the newer
+            // document stays and this writer is told to retry, rather than answering a revision another writer also got.
+            const { applied } = await context.db.patchIf("organizationPolicies", existing._id, { patch: row, where: { revision: existing.revision } });
+
+            if (!applied) {
+                throw new LunoraError("CONFLICT", "The organization's policy changed while it was being saved; try again.");
+            }
         } else {
             await context.db.insert("organizationPolicies", { ...row, organizationId });
         }
