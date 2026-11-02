@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string): string => readFileSync(join(import.meta.dirname, "..", ".github/workflows", name), "utf8");
 
+const ALCHEMY_RUN = /alchemy (deploy|"\$\{args)/;
+
 const deploy = read("deploy.yml");
 const preview = read("preview.yml");
 
@@ -39,6 +41,6 @@ describe("backend codegen before Alchemy", () => {
 
     it("covers the preview deploy, which calls deploy.yml rather than running Alchemy itself", () => {
         expect(preview).toContain('uses: "./.github/workflows/deploy.yml"');
-        expect(preview).not.toMatch(/alchemy (deploy|"\$\{args)/);
+        expect(preview).not.toMatch(ALCHEMY_RUN);
     });
 });
