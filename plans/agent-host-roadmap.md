@@ -1,9 +1,10 @@
 # Agent host roadmap: ACP, SSH, orchestration, outside agents, mobile control
 
-Status: **plan only, nothing started**, 2026-10-26. This file is the index for ten
-plans. It holds the decisions they share, the order to build them in, what was
-rejected, and the questions the owner must answer before a first slice starts.
-Each plan repeats only the parts of these decisions it builds on.
+Status: **mostly planned, not started**, 2026-10-26. This file is the index for the
+plans still open; the desktop terminal has shipped and its plan was removed. It holds
+the decisions they share, the order to build them in, what was rejected, and the
+questions the owner must answer before a first slice starts. Each plan repeats only
+the parts of these decisions it builds on.
 
 ## 1. Ranked plans
 
