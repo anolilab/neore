@@ -50,6 +50,7 @@ import { buildAgentTools } from "./lib/agent-tools";
 import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClients } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
@@ -187,6 +188,14 @@ export const runStreamingAgent = internalAction
                         { isAnonymous: isAnonymous === true, messageId, organizationId, origin, streamId, streamingConfig, threadId, userId, userPrompt },
                         groupConfig,
                     );
+
+                    return;
+                }
+
+                // A failed preference read answers defaults, not the user's choices: a ZDR, region or provider rule may be
+                // hiding behind them, so the run is refused rather than sent out unrestricted.
+                if (agentModulePrefs.readFailed === true) {
+                    await failRun(ctx, { safeMessage: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, streamId, threadId, threadStatus: "error" });
 
                     return;
                 }
