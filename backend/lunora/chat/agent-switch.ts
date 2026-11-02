@@ -184,6 +184,17 @@ export const assertNotStreaming = async (ctx: QueryCtx, thread: Doc<"threads">):
     }
 };
 
+/** Refuses a switch while the path ends on a prompt whose reply has not started. */
+export const assertReplyStarted = async (ctx: QueryCtx, thread: Doc<"threads">, leaf: Doc<"messages">): Promise<void> => {
+    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
+    // reply then hangs off, past the divider. A prompt whose run already started, and was stopped or failed
+    // before a reply, is no gap, or the user could never leave the model that is not answering. A regenerate's
+    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.
+    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+};
+
 /** Everything that decides whether a switch may happen, before anything is claimed or written. */
 const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> => {
     // The right a collaborator already has to pick the model of a send.
@@ -232,13 +243,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         return { agent: from, kind: "same" };
     }
 
-    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
-    // reply then hangs off, past the divider. A prompt whose run already started — and was stopped or failed
-    // before a reply — is no gap, or the user could never leave the model that is not answering. (A regenerate's
-    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.)
-    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
-        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
+    await assertReplyStarted(ctx, thread, leaf);
 
     return { from, kind: "ready", leaf, thread, to };
 };

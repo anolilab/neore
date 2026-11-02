@@ -16,6 +16,7 @@ const useHostSendErrorMessages = (): Record<HostSendError, string> => {
         offline: t`Your computer is offline. Open Neore on it and try again.`,
         rate_limited: t`You are sending too fast. Wait a moment.`,
         session_ended: t`This session has ended. Start a new one from the desktop app.`,
+        session_starting: t`The agent is still opening its session. Try again in a moment.`,
         too_large: t`That message is too long to send from here.`,
         turn_running: t`The agent is still working on the last message.`,
         unreachable: t`Could not reach the server. Try again.`,
