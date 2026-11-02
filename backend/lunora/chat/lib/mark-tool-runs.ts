@@ -24,17 +24,28 @@ export interface ToolRunMarker {
 
 export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: { epoch: number; onReplaced: () => void; streamId: string }): ToolRunMarker => {
     const { epoch, onReplaced, streamId } = args;
-    // Tools that returned (or threw) and wait for their step to be saved.
+    // Tools marked and not yet released, and of those the ones that returned (or threw) and wait for their step to be saved.
+    let open = 0;
     let finished = 0;
-    const mark = async (delta: number) =>
-        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.markToolRun, { delta, epoch, streamId: streamId as Id<"persistentStreams"> });
+    // A mark whose answer was lost may or may not have landed: the next release states the count outright to settle it.
+    let uncertain = false;
+    const mark = async (delta: number, setTo?: number) =>
+        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.markToolRun, {
+            delta,
+            epoch,
+            ...(setTo !== undefined && { setTo }),
+            streamId: streamId as Id<"persistentStreams">,
+        });
     // Any failure of the mark stops the tool: one that ran without a confirmed mark could be run again by a resume after a death.
     const begin = async () => {
         try {
             await mark(1);
+            open += 1;
         } catch (error) {
             if (isRunReplaced(error)) {
                 onReplaced();
+            } else {
+                uncertain = true;
             }
 
             throw error;
@@ -46,18 +57,25 @@ export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: {
 
     return {
         release: async () => {
-            const count = finished;
-
-            if (count === 0) {
+            if (finished === 0 && !uncertain) {
                 return;
             }
 
-            finished -= count;
-            await mark(-count).catch((error: unknown) => {
+            // The count the stream should hold now: the tools still running. Stated as an absolute value, so sending it
+            // again after an answer was lost cannot undercount a live tool; a failure leaves everything as it was and the
+            // next step's release tries again.
+            const remaining = open - finished;
+
+            try {
+                await mark(0, remaining);
+                open = remaining;
+                finished = 0;
+                uncertain = false;
+            } catch (error) {
                 if (isRunReplaced(error)) {
                     onReplaced();
                 }
-            });
+            }
         },
         wrap: <T extends Record<string, unknown>>(tools: T): T => {
             const marked: Record<string, unknown> = {};

@@ -19,7 +19,9 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
             groupConfig: null as unknown,
             model: undefined as unknown,
             optOut: false,
+            prefsFail: false,
             prefsReads: [] as { shardKey: string; userId: string }[],
+            threadStateless: false,
             withTools: false,
         },
         registry: new Map<string, unknown>(),
@@ -51,6 +53,10 @@ vi.mock("../lib/cross-shard", () => {
     return {
         callOnShard: vi.fn(async (_reference: unknown, args: { userId: string }, options: { shardKey: string }) => {
             modelState.prefsReads.push({ shardKey: options.shardKey, userId: args.userId });
+
+            if (modelState.prefsFail) {
+                throw new Error("shard unreachable");
+            }
 
             return { resumeInterruptedRuns: modelState.optOut ? false : undefined };
         }),
@@ -97,7 +103,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 },
                 researchDepth: "balanced",
                 retrievedMemories: [],
-                threadSettings: null,
+                threadSettings: modelState.threadStateless ? { statelessMode: true } : null,
                 userProviderKeys: undefined,
             };
         }),
@@ -205,6 +211,8 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.optOut = false;
+    modelState.prefsFail = false;
+    modelState.threadStateless = false;
     modelState.prefsReads.length = 0;
     modelState.groupConfig = null;
     vi.mocked(runGroupTurn).mockClear();
@@ -596,7 +604,9 @@ describe("a run the watchdog reads wrongly", () => {
 
         await patchStream({ beatAt: 1, expiresAt: Date.now() + 1000, runClaimedAt: Date.now() });
         await beat();
-        expect((await readStream()).expiresAt).toBeGreaterThan(Date.now() + margin - 5000);
+        const extended = await readStream();
+
+        expect(extended.expiresAt).toBeGreaterThan(Date.now() + margin - 5000);
 
         // A run that is alive but stuck keeps beating: past the ceiling (its claim + the stream's life + the margin) the
         // expiry stays where it was, so the sweep still times the stream out.
@@ -782,10 +792,14 @@ describe("a run judged dead but still alive", () => {
         const before = await readState();
 
         await expect(save(0)).rejects.toMatchObject({ code: "RUN_REPLACED" });
-        expect((await readState()).rows).toHaveLength(before.rows.length);
+        const refused = await readState();
+
+        expect(refused.rows).toHaveLength(before.rows.length);
 
         await save(1);
-        expect((await readState()).rows).toHaveLength(before.rows.length + 1);
+        const saved = await readState();
+
+        expect(saved.rows).toHaveLength(before.rows.length + 1);
     });
 
     it("lands no step beside the resume's when its epoch changes before the step is saved", async () => {
@@ -837,6 +851,50 @@ describe("a run judged dead but still alive", () => {
         expect(state.chunkText).not.toContain("provider exploded");
         expect(state.streamStatus).not.toBe("error");
         expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+});
+
+describe("the resume setting and mode of a run", () => {
+    it("fails closed: a preference read that fails leaves the run unresumable", async () => {
+        modelState.prefsFail = true;
+        await startRunThatDiesInStepTwo();
+
+        const registered = await readStream();
+
+        expect(registered.resumable).toBe(false);
+    });
+
+    it("keeps a resumed run stateful even when its thread was switched to stateless meanwhile", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+
+        modelState.threadStateless = true;
+        modelState.model = scriptedModel([textStep("All done.")]);
+        await run({ resume: pause!.id });
+
+        const state = await readState();
+
+        // A stateless pass would have saved no row and answered the original prompt alone.
+        expect(state.rows.map((row) => [row.role, row.status])).toStrictEqual([
+            ["user", "success"],
+            ["assistant", "success"],
+            ["tool", "success"],
+            ["assistant", "success"],
+        ]);
+    });
+
+    it("fences the run on the fail branch too, until the stream is closed", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat(), toolsInFlight: 1 });
+        expect(await inspect()).toMatchObject({ kind: "fail" });
+
+        const late = async () =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(markToolRun, { delta: 1, epoch: 0, streamId: ids.streamId as never }));
+
+        await expect(late()).rejects.toMatchObject({ code: "RUN_REPLACED" });
     });
 });
 

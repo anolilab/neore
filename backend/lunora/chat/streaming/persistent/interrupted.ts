@@ -107,13 +107,15 @@ export const beatRun = internalMutation
     });
 
 /**
- * A tool call begins (`+1`) or its step is saved and the calls in it end (`-n`). A worker that dies with one open may
+ * A tool call begins (`+1`) or its step is saved and the calls in it end (`setTo`: the count the run still has open, an
+ * absolute value, so a release that is sent again after a lost answer cannot undercount a live tool).
+ * A worker that dies with one open may
  * have paid for or changed something and leaves no row, so `inspectRun` refuses to resume it. A begin on a stream that is
  * no longer live is refused, so the tool does not run unmarked; so is any mark from a run a newer one replaced
  * (`RUN_REPLACED`), which would otherwise corrupt the newer run's count.
  */
 export const markToolRun = internalMutation
-    .input({ delta: v.number(), epoch: v.number(), streamId: v.id("persistentStreams") })
+    .input({ delta: v.number(), epoch: v.number(), setTo: v.optional(v.number()), streamId: v.id("persistentStreams") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
@@ -133,7 +135,7 @@ export const markToolRun = internalMutation
             throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
         }
 
-        const next = Math.max(0, (stream.toolsInFlight ?? 0) + args.delta);
+        const next = args.setTo === undefined ? Math.max(0, (stream.toolsInFlight ?? 0) + args.delta) : Math.max(0, args.setTo);
 
         await patchRow(ctx.db, "persistentStreams", stream, { toolsInFlight: next === 0 ? undefined : next });
 
@@ -300,7 +302,8 @@ export const inspectRun = internalMutation
         if (plan.action === "fail") {
             // `toolsInFlight` stays: a failure that could not be delivered (`failRun` threw) is looked at again and must fail the same way.
             await recordPausedRunUsage(ctx, { ...stream, pausedRun });
-            await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined });
+            // The run judged dead is fenced here too: until `failRun` closes the stream, a slow worker must not start a tool or save a step.
+            await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined, runEpoch: epochOf(stream) + 1 });
 
             return { kind: "fail" as const, message: interruptionMessage(plan.reason), threadId: stream.threadId };
         }

@@ -1109,7 +1109,8 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
-                resumeInterruptedRuns: undefined,
+                // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
+                resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,

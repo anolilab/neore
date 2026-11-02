@@ -459,7 +459,7 @@ export interface InternalApiTypes {
                 interrupted: {
                     beatRun: FunctionReference<"mutation", { epoch: number; streamId: Id<"persistentStreams"> }, null>;
                     inspectRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, { kind: "gone" } | { kind: "fresh" } | { kind: "finished" } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
-                    markToolRun: FunctionReference<"mutation", { delta: number; epoch: number; streamId: Id<"persistentStreams"> }, null>;
+                    markToolRun: FunctionReference<"mutation", { delta: number; epoch: number; setTo?: number; streamId: Id<"persistentStreams"> }, null>;
                     registerResumableRun: FunctionReference<"mutation", { epoch: number; reply: { skill?: { id?: string; name: string }; timeZone?: string }; resumable: boolean; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; streamId: Id<"persistentStreams"> }, boolean>;
                 };
                 interrupted_watch: {

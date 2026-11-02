@@ -804,12 +804,13 @@ export const createRunSteering = (
 /**
  * Whether the person lets a run of theirs resume after its worker dies (`userSettings.resumeInterruptedRuns`, absent = on).
  * Read ON THEIR OWN shard: a collaborator's prompt on a shared thread runs on the thread owner's, which holds no
- * `userSettings` row for them. A failed read leaves it on.
+ * `userSettings` row for them. A failed read leaves it OFF: the run is then not resumed, which costs a convenience, where
+ * resuming a run the person opted out of would not.
  */
 export const readResumeInterruptedRuns = async (userId: string): Promise<boolean> =>
     await callOnShard(internal.auth.functions.getUserPreferencesQuery, { userId }, { shardKey: userId })
         .then((prefs) => prefs.resumeInterruptedRuns !== false)
-        .catch(() => true);
+        .catch(() => false);
 
 /** What `stampSavedToolCalls` needs of a run: its labels and auto-approvals, and the rows it saved. */
 export interface SavedToolCallStamp {

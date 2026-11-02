@@ -423,7 +423,9 @@ export const runStreamingAgent = internalAction
                     skillEffort: invokedSkill?.config?.reasoningEffort,
                     threadEffort: appThread?.reasoningEffort,
                 });
-                const threadStatelessMode = appThread?.statelessMode ?? statelessMode;
+                // A resumed run continues stored rows, so it keeps the stateful mode it registered with: a thread switched to
+                // stateless meanwhile would otherwise send the original prompt alone and restart the reply.
+                const threadStatelessMode = resumedFrom === undefined ? (appThread?.statelessMode ?? statelessMode) : false;
 
                 // Reasoning provider options and, for auto-continue, step compression.
                 const streamTextArgs: any = buildRunStreamArgs({

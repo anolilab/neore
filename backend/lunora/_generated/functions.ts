@@ -4393,8 +4393,15 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["delta"] !== "number" || !Number.isFinite(source["delta"])) return DEFER;
 if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["setTo"] !== undefined) {
+if (typeof source["setTo"] !== "number" || !Number.isFinite(source["setTo"])) return DEFER;
+__val1 = source["setTo"];
+__has1 = true;
+}
 if (typeof source["streamId"] !== "string") return DEFER;
-return { "delta": source["delta"], "epoch": source["epoch"], "streamId": source["streamId"] };
+return { "delta": source["delta"], "epoch": source["epoch"], ...(__has1 ? { "setTo": __val1 } : {}), "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_86.claimStreamRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9034,7 +9041,7 @@ export interface Caller {
                 interrupted: {
                     beatRun: (args: { epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
                     inspectRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ kind: "gone" } | { kind: "fresh" } | { kind: "finished" } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
-                    markToolRun: (args: { delta: number; epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
+                    markToolRun: (args: { delta: number; epoch: number; setTo?: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
                     registerResumableRun: (args: { epoch: number; reply: { skill?: { id?: string; name: string }; timeZone?: string }; resumable: boolean; run: { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                 };
                 interrupted_watch: {

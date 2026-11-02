@@ -336,7 +336,9 @@ describe("a provider rate limit on the first model call", () => {
         // Queued a moment after the provider's time, so it does not land just before the limit lifts.
         expect(enqueued[0]!.delayMs).toBeGreaterThan(RETRY_IN_MS + RATE_LIMIT_RESUME_SLACK_MS - 5000);
         expect(enqueued[0]!.delayMs).toBeLessThanOrEqual(RETRY_IN_MS + RATE_LIMIT_RESUME_SLACK_MS);
-    });
+        // The first test of the file pays for the lazy imports of the whole run; under the full suite's load (500 files in
+        // one process pool) that outgrew the default 5 s once, though it takes ~0.5 s alone.
+    }, 30_000);
 
     it("keeps the pause visible to the live query that drives the countdown", async () => {
         modelState.model = planned([rateLimited()]);

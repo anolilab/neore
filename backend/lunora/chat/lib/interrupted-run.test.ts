@@ -96,8 +96,8 @@ describe("createToolRunMarker", () => {
         const calls: string[] = [];
         const onReplaced = vi.fn();
         const ctx = {
-            runMutation: vi.fn(async (_ref: unknown, args: { delta: number; epoch: number }) => {
-                calls.push(`mark${args.delta > 0 ? "+" : "-"}${Math.abs(args.delta)}@${args.epoch}`);
+            runMutation: vi.fn(async (_ref: unknown, args: { delta: number; epoch: number; setTo?: number }) => {
+                calls.push(args.setTo === undefined ? `mark+${args.delta}@${args.epoch}` : `set${args.setTo}@${args.epoch}`);
             }),
         };
         const marker = createToolRunMarker(ctx as never, { epoch: 2, onReplaced, streamId: "stream-1" });
@@ -132,11 +132,39 @@ describe("createToolRunMarker", () => {
         expect(calls).toStrictEqual(["mark+1@2", "run", "mark+1@2", "run"]);
 
         await marker.release();
-        expect(calls.at(-1)).toBe("mark-2@2");
+        expect(calls.at(-1)).toBe("set0@2");
 
         // Nothing finished since: nothing to release.
         await marker.release();
         expect(calls).toHaveLength(5);
+
+        vi.doUnmock("../../_generated/internal");
+    });
+
+    it("settles a release whose answer was lost by stating the count again, never by subtracting again", async () => {
+        const { calls, ctx, marker, tools } = await setup();
+
+        await tools.ok!.execute!();
+        ctx.runMutation.mockRejectedValueOnce(new Error("answer lost"));
+        await marker.release();
+
+        // Nothing is forgotten: the next release states the same count outright.
+        await marker.release();
+        expect(calls.slice(-1)).toStrictEqual(["set0@2"]);
+        await marker.release();
+        expect(calls.filter((call) => call.startsWith("set"))).toHaveLength(1);
+
+        vi.doUnmock("../../_generated/internal");
+    });
+
+    it("states the count after a mark that failed on an unknown footing, so a mark that did land cannot linger", async () => {
+        const { calls, ctx, marker, tools } = await setup();
+
+        ctx.runMutation.mockRejectedValueOnce(new Error("shard blip"));
+        await expect(tools.ok!.execute!()).rejects.toThrow("shard blip");
+        await marker.release();
+
+        expect(calls).toStrictEqual(["set0@2"]);
 
         vi.doUnmock("../../_generated/internal");
     });
