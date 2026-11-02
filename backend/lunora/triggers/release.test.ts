@@ -232,7 +232,7 @@ const deliver = async (
 const claims = async (): Promise<{ scope: string }[]> => {
     const rows: { scope: string }[] = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
 
-    return rows.filter((row) => row.scope !== TRIGGER_ADMISSION_SCOPE);
+    return rows.filter((row) => !row.scope.startsWith(TRIGGER_ADMISSION_SCOPE));
 };
 
 /** What `executeTrigger` does first with a scheduled delivery. */
@@ -588,6 +588,48 @@ describe("a retried admission", () => {
         world.chargeOk = false;
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).toBe(DAILY_LIMIT_MESSAGE);
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args))).not.toBeNull();
+    });
+});
+
+describe("a retried admission that had already refused", () => {
+    /** An execution admitted twice with the same id: the first try refused and committed, the second is the retry after its answer was lost. */
+    const admission = async (triggerPatch: Record<string, unknown>) => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native", ...triggerPatch });
+        const first = (await deliver(triggerId, "native"))!;
+        const executionId = await harness.run(
+            async (ctx: any) => await ctx.runMutation(internal.triggers.functions.createExecution, { payload: first.payload, triggerId: first.triggerId }),
+        );
+        const args = {
+            claim: first.claim,
+            executionId,
+            filterPayload: first.payload ?? "",
+            releaseUnlessRun: true,
+            requireEnabled: true,
+            triggerId: first.triggerId,
+        };
+
+        return { again: async () => await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, args)), triggerId };
+    };
+    const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
+
+    it("stays filtered after the filters change, running and charging nothing", async () => {
+        const { again, triggerId } = await admission({ filters: [{ op: "equals", path: "object_kind", value: "push" }] });
+
+        expect(await again()).toMatchObject({ filtered: expect.any(String) });
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: [] }));
+        expect(await again()).toMatchObject({ filtered: expect.any(String) });
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([expect.objectContaining({ status: "filtered" })]);
+    });
+
+    it("stays skipped after the trigger is enabled again, running and charging nothing", async () => {
+        const { again, triggerId } = await admission({ enabled: false });
+
+        expect(await again()).toEqual({ skipped: "disabled" });
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: true }));
+        expect(await again()).toEqual({ skipped: "disabled" });
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([]);
     });
 });
 

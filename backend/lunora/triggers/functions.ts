@@ -1153,6 +1153,13 @@ const giveBackClaim = async (
 /** The scope recording that an execution was admitted and charged, so a retry of its admission does not charge it again. */
 export const TRIGGER_ADMISSION_SCOPE = "trigger-admission";
 
+/** The answers of an admission that removed its execution row. Each is recorded with the removal, so a retry repeats the answer. */
+const ADMISSION_SKIPS = {
+    disabled: { skipped: "disabled" as const },
+    duplicate: { skipped: "duplicate" as const },
+    filtered: { filtered: "Already evaluated against the filters." },
+};
+
 export const admitTriggerRun = internalMutation
     .input({
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
@@ -1174,6 +1181,25 @@ export const admitTriggerRun = internalMutation
             return null;
         }
 
+        for (const outcome of Object.keys(ADMISSION_SKIPS) as (keyof typeof ADMISSION_SKIPS)[]) {
+            if (executionId && (await hasClaim(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId))) {
+                return ADMISSION_SKIPS[outcome];
+            }
+        }
+
+        /** Removes the running row of an execution that will not run and records why, in the same transaction, so a retry cannot run it. */
+        const dropRunning = async (outcome: keyof typeof ADMISSION_SKIPS, ownerId: string): Promise<void> => {
+            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete("triggerExecutions", running._id);
+            }
+
+            if (executionId) {
+                await claimOnce(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId, JOB_CLAIM_TTL_MS, ownerId);
+            }
+        };
+
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -1190,17 +1216,13 @@ export const admitTriggerRun = internalMutation
         if (requireEnabled === true && trigger.enabled !== true) {
             // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
             // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
-            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
-
-            if (running && running.triggerId === triggerId && running.status === "running") {
-                await ctx.db.delete("triggerExecutions", running._id);
-            }
+            await dropRunning("disabled", trigger.userId);
 
             if (claim) {
                 await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
             }
 
-            return { skipped: "disabled" as const };
+            return ADMISSION_SKIPS.disabled;
         }
 
         if (filterPayload !== undefined) {
@@ -1211,11 +1233,7 @@ export const admitTriggerRun = internalMutation
 
                 await recordFiltered(ctx, triggerId, reason, undefined);
 
-                const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
-
-                if (running && running.triggerId === triggerId && running.status === "running") {
-                    await ctx.db.delete("triggerExecutions", running._id);
-                }
+                await dropRunning("filtered", trigger.userId);
 
                 if (claim) {
                     await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
@@ -1245,13 +1263,9 @@ export const admitTriggerRun = internalMutation
         // run, so no refusal after it can leave a thread or a charge behind. It lapsing before this point is no reason to
         // drop an acknowledged delivery: the key is taken again unless another delivery holds it, and only then is this one a duplicate.
         if (claim && releaseUnlessRun && !(await holdClaim(ctx, claim.scope, claim.key, claim.claimedAt, TRIGGER_DELIVERY_CLAIM_TTL_MS, trigger.userId))) {
-            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
+            await dropRunning("duplicate", trigger.userId);
 
-            if (running && running.triggerId === triggerId && running.status === "running") {
-                await ctx.db.delete("triggerExecutions", running._id);
-            }
-
-            return { skipped: "duplicate" as const };
+            return ADMISSION_SKIPS.duplicate;
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {

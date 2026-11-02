@@ -195,7 +195,10 @@ describe("admitTriggerRun filter recheck", () => {
         // The redelivery's claim still holds the key.
         const rows: Claim[] = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
 
-        expect(rows).toEqual([expect.objectContaining({ claimedAt: NOW + TRIGGER_CLAIM_TTL_MS + 1, key: first.claim!.key })]);
+        // (Beside it sits the record that this execution was refused, which is not a delivery claim.)
+        expect(rows.filter((row) => row.scope === first.claim!.scope)).toEqual([
+            expect.objectContaining({ claimedAt: NOW + TRIGGER_CLAIM_TTL_MS + 1, key: first.claim!.key }),
+        ]);
     });
 
     it("keeps the claim of a delivery that is admitted", async () => {
