@@ -83,7 +83,7 @@ const saveFilesServer = async (): Promise<void> =>
         const mcpServers = [{ enabled: true, name: "Files", protocol: "http", url: URL }];
 
         if (row) {
-            await ctx.db.patch(row._id, { mcpServers });
+            await ctx.db.patch("aiUserPreferences", row._id, { mcpServers });
         } else {
             await ctx.db.insert("aiUserPreferences", { mcpServers, userId: USER });
         }
@@ -309,7 +309,9 @@ describe("setLowRiskTrustedServer", () => {
                 .withIndex("by_userId", (q: any) => q.eq("userId", USER))
                 .unique();
 
-            await ctx.db.patch(row._id, { lowRiskTrustedServers: Array.from({ length: MAX_TRUSTED_SERVERS }, (_, index) => connectorTrustId(`c${index}`)) });
+            await ctx.db.patch("aiUserPreferences", row._id, {
+                lowRiskTrustedServers: Array.from({ length: MAX_TRUSTED_SERVERS }, (_, index) => connectorTrustId(`c${index}`)),
+            });
         });
 
         await expect(trust({ kind: "connector", slug: "one-too-many" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -489,7 +491,7 @@ describe("getLowRiskApprovalContext", () => {
                 .withIndex("by_userId", (q: any) => q.eq("userId", USER))
                 .unique();
 
-            await ctx.db.patch(row._id, { mcpServers: [] });
+            await ctx.db.patch("aiUserPreferences", row._id, { mcpServers: [] });
         });
 
         expect(await trustedNow()).toStrictEqual([]);

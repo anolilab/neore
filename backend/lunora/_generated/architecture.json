@@ -996,41 +996,6 @@
       "to": "table:messages"
     },
     {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1024"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_128"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1408"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_256"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_512"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_768"
-    },
-    {
       "from": "function:agent_workflow_executions:create",
       "kind": "write",
       "to": "table:workflowExecutions"
@@ -19163,13 +19128,19 @@
     {
       "file": "agent/vector/index",
       "kind": "read",
-      "line": 43,
+      "line": 45,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "agent/vector/index",
       "kind": "write",
-      "line": 135,
+      "line": 137,
+      "reason": "the written table is not a string literal"
+    },
+    {
+      "file": "agent/vector/index",
+      "kind": "write",
+      "line": 200,
       "reason": "the written table is not a string literal"
     },
     {

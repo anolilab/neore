@@ -733,13 +733,13 @@ describe("activity and waiting on a person", () => {
         const session = await sessionOf(receipt.workerId);
 
         // No chunk since the turn began (one long tool call), but the desktop's keepalive moved the session's clock.
-        await run(async (context) => await context.db.patch(receipt.runId, { startedAt: Date.now() - SUB_AGENT_STALE_MS - 1 }));
-        await run(async (context) => await context.db.patch(session._id, { lastEventAt: Date.now() - 60_000 }));
+        await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId as never, { startedAt: Date.now() - SUB_AGENT_STALE_MS - 1 }));
+        await run(async (context) => await context.db.patch("acpSessions", session._id as never, { lastEventAt: Date.now() - 60_000 }));
         await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, Date.now()));
         expect(await runRow(receipt.runId)).toMatchObject({ status: "running" });
 
         // The same turn with both clocks past the window is stuck.
-        await run(async (context) => await context.db.patch(session._id, { lastEventAt: Date.now() - SUB_AGENT_STALE_MS - 60_000 }));
+        await run(async (context) => await context.db.patch("acpSessions", session._id as never, { lastEventAt: Date.now() - SUB_AGENT_STALE_MS - 60_000 }));
         await run(async (context) => await functions.reapSubAgentRun(context, receipt.runId as never, Date.now()));
         expect(await runRow(receipt.runId)).toMatchObject({ status: "failed" });
     });
@@ -758,8 +758,8 @@ describe("activity and waiting on a person", () => {
         const currentAt = Date.now() - 600_000;
 
         // The view shows the later of the run's start and its host's last event.
-        await run(async (context) => await context.db.patch(receipt.runId, { startedAt: currentAt - 600_000 }));
-        await run(async (context) => await context.db.patch(_id, { lastEventAt: Date.now() - 1000, status: "ended" }));
+        await run(async (context) => await context.db.patch("subAgentRuns", receipt.runId as never, { startedAt: currentAt - 600_000 }));
+        await run(async (context) => await context.db.patch("acpSessions", _id as never, { lastEventAt: Date.now() - 1000, status: "ended" }));
         await run(
             async (context) =>
                 await context.db.insert("acpSessions", {
