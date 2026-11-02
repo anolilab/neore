@@ -72,7 +72,7 @@ describe("archiveIfStillIdle and live streams", () => {
 });
 
 describe("archiveIfStillIdle and requests waiting on the owner", () => {
-    const archiveWithApproval = (status: "approved" | "pending") =>
+    const archiveWithApproval = (status: "approved" | "pending", createdAt = Date.now()) =>
         harness.run(async (ctx: any) => {
             const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
 
@@ -87,7 +87,7 @@ describe("archiveIfStillIdle and requests waiting on the owner", () => {
                     shouldAutoContinue: false,
                     toolNames: [],
                 },
-                createdAt: 1,
+                createdAt,
                 status,
                 threadId,
                 userId: OWNER,
@@ -98,6 +98,10 @@ describe("archiveIfStillIdle and requests waiting on the owner", () => {
 
     it("keeps a thread with a pending approval, question or secret card", async () => {
         expect(await archiveWithApproval("pending")).toBe(false);
+    });
+
+    it("archives a thread whose request expired unanswered", async () => {
+        expect(await archiveWithApproval("pending", 1)).toBe(true);
     });
 
     it("archives a thread whose request was answered", async () => {

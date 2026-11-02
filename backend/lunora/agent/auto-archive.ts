@@ -14,6 +14,7 @@ import { v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, type MutationCtx } from "../_generated/server";
+import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
@@ -64,9 +65,11 @@ const threadHasLiveStream = async (ctx: MutationCtx, threadId: Id<"threads">): P
 /**
  * True when a tool approval, a question or a secret card (all pending
  * `toolApprovalRuns`) waits on the owner. The run is paused, so it has no live stream.
+ * A request older than its answer window is expired (answering it fails closed) and
+ * only awaits the purge, so it no longer holds the thread.
  */
 const threadWaitsOnPerson = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> =>
-    (await ctx.db.toolApprovalRuns.findFirst({ where: { status: "pending", threadId } })) !== null;
+    (await ctx.db.toolApprovalRuns.findFirst({ where: { createdAt: { gt: ctx.now - PENDING_APPROVAL_TTL_MS }, status: "pending", threadId } })) !== null;
 
 /**
  * Archives one thread if, as read now, it is still due. The eligibility check runs
