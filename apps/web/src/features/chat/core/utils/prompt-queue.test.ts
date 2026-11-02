@@ -119,6 +119,13 @@ describe("prompt queue persistence", () => {
         expect(serializePromptQueue(EMPTY_PROMPT_QUEUE)).toBeUndefined();
     });
 
+    it("drops a restored item whose text is empty once its hidden characters are stripped", () => {
+        const stored = JSON.stringify({ items: [{ id: "a", text: "\u{E0041}\u{202E}" }, { id: "b", text: "keep\u{202E}" }] });
+
+        expect(restorePromptQueue(stored)?.items.map((item) => [item.id, item.text])).toStrictEqual([["b", "keep"]]);
+        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", text: "\u{200B}" }] }))).toBeUndefined();
+    });
+
     it("reads malformed storage as no queue", () => {
         expect(restorePromptQueue(null)).toBeUndefined();
         expect(restorePromptQueue("{not json")).toBeUndefined();

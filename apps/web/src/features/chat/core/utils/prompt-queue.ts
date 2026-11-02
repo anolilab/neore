@@ -277,7 +277,14 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
     for (const candidate of rawItems as unknown[]) {
         const { droppedAttachments, id, steer, text } = (candidate ?? {}) as { droppedAttachments?: unknown; id?: unknown; steer?: unknown; text?: unknown };
 
-        if (typeof id !== "string" || typeof text !== "string" || !text.trim()) {
+        if (typeof id !== "string" || typeof text !== "string") {
+            continue;
+        }
+
+        const clean = stripHiddenText(text).text;
+
+        // A text of nothing but hidden characters is empty once stripped: sending it would be a blank prompt.
+        if (!clean.trim()) {
             continue;
         }
 
@@ -289,7 +296,7 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
             ...(dropped > 0 && { droppedAttachments: dropped }),
             id,
             ...(restoredSteer && { steer: restoredSteer }),
-            text: stripHiddenText(text).text,
+            text: clean,
         });
     }
 
