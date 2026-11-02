@@ -17,6 +17,9 @@ const preview = read("preview.yml");
 describe("backend codegen before Alchemy", () => {
     const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen");
     const packages = deploy.indexOf("build:packages");
+    const parallelStart = deploy.indexOf("- parallel:");
+    // The parallel block ends where the next step at its own indent begins.
+    const parallelEnd = deploy.indexOf("\n            - name:", parallelStart);
     const alchemy = deploy.indexOf('id: "alchemy"');
 
     it("runs in deploy.yml, after the packages build and before the Alchemy step", () => {
@@ -25,6 +28,13 @@ describe("backend codegen before Alchemy", () => {
         expect(alchemy).toBeGreaterThan(-1);
         expect(codegen).toBeGreaterThan(packages);
         expect(codegen).toBeLessThan(alchemy);
+    });
+
+    it("runs outside the parallel block, which would race it against build:packages", () => {
+        expect(parallelStart).toBeGreaterThan(-1);
+        expect(packages).toBeGreaterThan(parallelStart);
+        expect(packages).toBeLessThan(parallelEnd);
+        expect(codegen).toBeGreaterThan(parallelEnd);
     });
 
     it("covers the preview deploy, which calls deploy.yml rather than running Alchemy itself", () => {
