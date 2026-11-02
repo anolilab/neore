@@ -14,6 +14,7 @@ import { v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, type MutationCtx } from "../_generated/server";
+import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
@@ -62,8 +63,23 @@ const threadHasLiveStream = async (ctx: MutationCtx, threadId: Id<"threads">): P
 };
 
 /**
+ * True when a tool approval, a question or a secret card (all pending
+ * `toolApprovalRuns`) waits on the owner. The run is paused, so it has no live stream.
+ * A request older than its answer window is expired (answering it fails closed) and
+ * only awaits the purge, so it no longer holds the thread.
+ */
+const threadWaitsOnPerson = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const live = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", threadId).eq("status", "pending").gte("createdAt", pendingApprovalCutoff(ctx.now)))
+        .take(1);
+
+    return live.length > 0;
+};
+
+/**
  * Archives one thread if, as read now, it is still due. The eligibility check runs
- * on the fresh row, its project's pin state and its live streams, in the same
+ * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
  */
 export const archiveIfStillIdle = internalMutation
@@ -83,7 +99,7 @@ export const archiveIfStillIdle = internalMutation
         // The row checks run first, so a thread that is not due never reads its streams.
         const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
 
-        if (due.length === 0 || (await threadHasLiveStream(ctx, args.threadId))) {
+        if (due.length === 0 || (await threadHasLiveStream(ctx, args.threadId)) || (await threadWaitsOnPerson(ctx, args.threadId))) {
             return false;
         }
 

@@ -28,6 +28,9 @@ import { clearAwaitingInput } from "../../agent/table-writes";
 export const RESOLVED_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 export const PENDING_APPROVAL_TTL_MS = 7 * RESOLVED_APPROVAL_TTL_MS;
 
+/** A pending request created before this instant is expired; one created exactly at it is not. */
+export const pendingApprovalCutoff = (now: number): number => now - PENDING_APPROVAL_TTL_MS;
+
 const PURGE_BATCH = 100;
 
 /**
@@ -64,7 +67,7 @@ export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">,
     const [pending, approved, denied] = await Promise.all([
         ctx.db
             .query("toolApprovalRuns")
-            .withIndex("by_status_createdAt", (q) => q.eq("status", "pending").lt("createdAt", now - PENDING_APPROVAL_TTL_MS))
+            .withIndex("by_status_createdAt", (q) => q.eq("status", "pending").lt("createdAt", pendingApprovalCutoff(now)))
             .take(PURGE_BATCH),
         ctx.db
             .query("toolApprovalRuns")
@@ -86,7 +89,7 @@ export const purgeExpiredToolApprovalRuns = async (ctx: Pick<MutationCtx, "db">,
 
 /** Has this row outlived its retention? Pending rows by age, resolved rows by resolution time. */
 export const isToolApprovalRunExpired = (row: { createdAt: number; resolvedAt?: number; status: string }, now: number): boolean =>
-    row.status === "pending" ? row.createdAt < now - PENDING_APPROVAL_TTL_MS : (row.resolvedAt ?? row.createdAt) < now - RESOLVED_APPROVAL_TTL_MS;
+    row.status === "pending" ? row.createdAt < pendingApprovalCutoff(now) : (row.resolvedAt ?? row.createdAt) < now - RESOLVED_APPROVAL_TTL_MS;
 
 /**
  * Shard-local sweep of one user's expired rows, run whenever that user records
