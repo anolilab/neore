@@ -3106,6 +3106,11 @@
       "to": "table:messages"
     },
     {
+      "from": "function:chat_tool_permissions:getLowRiskTrustedServers",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
       "from": "function:chat_tool_permissions:getToolPermissionGrantsQuery",
       "kind": "read",
       "to": "table:aiUserPreferences"
@@ -3142,6 +3147,11 @@
     },
     {
       "from": "function:chat_tool_permissions:setAutoApproveLowRisk",
+      "kind": "read",
+      "to": "table:aiUserPreferences"
+    },
+    {
+      "from": "function:chat_tool_permissions:setLowRiskTrustedServer",
       "kind": "read",
       "to": "table:aiUserPreferences"
     },
@@ -11671,6 +11681,13 @@
     },
     {
       "detail": "query",
+      "id": "function:chat_tool_permissions:getLowRiskTrustedServers",
+      "kind": "function",
+      "name": "chat.tool_permissions.getLowRiskTrustedServers",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
       "id": "function:chat_tool_permissions:getPendingToolApproval",
       "kind": "function",
       "name": "chat.tool_permissions.getPendingToolApproval",
@@ -11737,6 +11754,13 @@
       "id": "function:chat_tool_permissions:setAutoApproveLowRisk",
       "kind": "function",
       "name": "chat.tool_permissions.setAutoApproveLowRisk",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_tool_permissions:setLowRiskTrustedServer",
+      "kind": "function",
+      "name": "chat.tool_permissions.setLowRiskTrustedServer",
       "module": "chat"
     },
     {
@@ -19173,25 +19197,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 156,
+      "line": 157,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 284,
+      "line": 294,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 310,
+      "line": 320,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 806,
+      "line": 816,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {
@@ -19347,25 +19371,25 @@
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 44,
+      "line": 45,
       "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 46,
+      "line": 47,
       "reason": "\"saveAiUserPreferences\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 58,
+      "line": 59,
       "reason": "\"saveUserSettings\" is not a registered function"
     },
     {
       "file": "auth/lib/preference-writes",
       "kind": "write",
-      "line": 60,
+      "line": 61,
       "reason": "\"saveUserSettings\" is not a registered function"
     },
     {
@@ -20133,25 +20157,31 @@
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 146,
-      "reason": "\"buildAgentTools\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-tools",
-      "kind": "call",
       "line": 147,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 149,
+      "line": 148,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 154,
+      "line": 150,
+      "reason": "\"buildAgentTools\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-tools",
+      "kind": "call",
+      "line": 155,
+      "reason": "\"buildAgentTools\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-tools",
+      "kind": "call",
+      "line": 222,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
@@ -20559,19 +20589,19 @@
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 321,
+      "line": 363,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 380,
+      "line": 463,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {
       "file": "chat/tool-permissions",
       "kind": "read",
-      "line": 538,
+      "line": 621,
       "reason": "\"recordApprovalPreference\" is not a registered function"
     },
     {

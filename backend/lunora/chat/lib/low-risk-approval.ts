@@ -13,13 +13,18 @@
  * - a tool that waits for a person, a device tool, a delegation (sub-agent,
  *   coding agent) — and every other built-in, since each built-in that defaults
  *   to `ask` is one of those;
+ * - a tool of a server the user has not marked as trusted (`aiUserPreferences.lowRiskTrustedServers`,
+ *   `low-risk-trust.ts`). A server's tool descriptions and schemas reach the model unfiltered, so a malicious server
+ *   could steer it into another server's read tool with chat data, and this check sees only the key and arguments.
+ *   Only MCP servers (by name AND url) and connectors (by slug) the user trusts are eligible;
  * - a call whose context carries untrusted content (`computeTaint`, the signal
  *   that makes a device call always prompt);
  * - a tool the user chose `ask` for themselves — only the DEFAULT `ask` is eligible;
  * - a tool whose name does not START with a read verb (`READ_VERBS`: get, list, search, read, fetch, find, query,
  *   describe, lookup, view). That is an allowlist: `create_issue`, `save_issue`, `create_event` or `sendemail` are never
  *   eligible, whatever the model would say. A name that starts with a read verb but also carries a writing or outward
- *   word (`get_or_create_user`, `fetch_and_send`) is out as well (`OUTWARD_WORDS`);
+ *   word (`get_or_create_user`, `fetch_and_send`) is out as well (`OUTWARD_WORDS`, scanned over the tool's own name, not
+ *   the server's);
  * - a tool whose server declares it destructive or open-world. Server annotations are untrusted: they only ever
  *   narrow what is eligible;
  * - a call made after knowledge-base excerpts, memories, project context or any skill text were injected into the
@@ -70,6 +75,8 @@ export interface LowRiskCall {
     /** Messages the model saw before the call, taint is read off them. Absent: unknown, so left to the person. */
     messages: ReadonlyArray<unknown> | undefined;
     toolCallId: string;
+    /** The server's entry in the trust list (`low-risk-trust.ts`), re-checked when the approval is. */
+    trustId?: string;
 }
 
 export type LowRiskCheck = (call: LowRiskCall) => Promise<boolean>;
@@ -196,10 +203,9 @@ const toolNameOf = (key: string): string => {
 /** Why a call to this tool is never put to the quick check, or `null` when it may be. */
 export const lowRiskIneligibleReason = (
     descriptor: ToolDescriptor,
-    runtimeName: string,
     /** The user set this tool's mode themselves (an override exists), whatever it says. */
     userChose: boolean,
-    options: Pick<ToolPermissionOptions, "apiKeyOrigin" | "headless">,
+    options: Pick<ToolPermissionOptions, "apiKeyOrigin" | "headless" | "lowRiskTrusted">,
 ): string | null => {
     if (options.headless) {
         return "headless";
@@ -219,6 +225,11 @@ export const lowRiskIneligibleReason = (
         return "builtin";
     }
 
+    // A server's tool descriptions reach the model unfiltered and the check sees only the call, so only a server the user trusts is checked.
+    if (descriptor.trustId === undefined || !options.lowRiskTrusted?.has(descriptor.trustId)) {
+        return "untrusted-server";
+    }
+
     if (userChose) {
         return "user-choice";
     }
@@ -228,13 +239,14 @@ export const lowRiskIneligibleReason = (
         return "annotated-risky";
     }
 
-    if ([...wordsOf(runtimeName), ...wordsOf(descriptor.key)].some((word) => OUTWARD_WORDS.has(word))) {
-        return "outward";
-    }
-
     // A server name or slug with a colon in it makes the key's tool name ambiguous: never guess which part is the verb.
     if (descriptor.key.split(":").length !== 3) {
         return "ambiguous-key";
+    }
+
+    // The tool's own name only: a server called "mail" must not turn away its `list_messages`.
+    if (wordsOf(toolNameOf(descriptor.key)).some((word) => OUTWARD_WORDS.has(word))) {
+        return "outward";
     }
 
     // An allowlist, taken off the key's tool name so the server's name (and `mcp_<server>__`) never counts as the verb.
