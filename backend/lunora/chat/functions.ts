@@ -1700,7 +1700,7 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
     }
 
     // The thread's messages are the OWNER's: a collaborator who asked for the summary does not widen the models they go to.
-    const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_SUMMARIZATION_MODEL);
+    const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_SUMMARIZATION_MODEL, userId);
 
     // The owner's model filters allow no background model: the thread is left unsummarised.
     if (!background) {
@@ -3672,7 +3672,7 @@ export const getFollowupSuggestions = authAction
         const language = threadLanguage || userLanguage;
 
         // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
-        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
+        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
 
         // The model filters allow no background model: no suggestions, as for a host-run thread.
         if (!background) {
@@ -3762,7 +3762,7 @@ export const generateFollowupSuggestionsForThread = internalAction
             const language = threadLanguage || userLanguage;
 
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
-            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string);
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
 
             if (!background) {
                 return;

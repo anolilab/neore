@@ -362,8 +362,8 @@ export const askAside = authAction
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
         } else {
-            // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too.
-            model = await getUtilityModelForUser(ctx, gateway, { threadId, userId: thread?.userId ?? userId });
+            // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too; the call is metered to, and graded by the plan of, the caller.
+            model = await getUtilityModelForUser(ctx, gateway, { filterUserId: thread?.userId, threadId, userId });
         }
 
         // Charged only now that the call is certain to be made: a refusal above, or a failure while the model was

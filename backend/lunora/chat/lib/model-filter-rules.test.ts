@@ -141,6 +141,23 @@ describe("getUtilityModelForUser", () => {
     });
 });
 
+describe("getUtilityModelForUser for a collaborator on the owner's thread", () => {
+    it("applies the owner's filter rules but meters and grades the caller", async () => {
+        const runQuery = vi.fn(async (reference: unknown, args: { userId: string }) =>
+            String(reference).includes(PLAN_REF) || JSON.stringify(reference).includes(PLAN_REF)
+                ? args.userId === "collaborator"
+                    ? { isAdmin: false, plan: "premium" }
+                    : FREE_PLAN
+                : prefs(args.userId === "owner" ? { modelFilterRules: { allowedModels: ["anthropic/claude-haiku-4.5"] } } : {}),
+        );
+        const model = await getUtilityModelForUser({ runQuery } as never, async () => new Response("{}"), { filterUserId: "owner", userId: "collaborator" });
+
+        expect((model as unknown as { config: { modelId: string; userId: string } }).config).toMatchObject({ modelId: "anthropic/claude-haiku-4.5", userId: "collaborator" });
+        expect(runQuery.mock.calls.filter(([reference]) => !String(reference).includes(PLAN_REF) && !JSON.stringify(reference).includes(PLAN_REF)).map(([, args]) => (args as { userId: string }).userId)).toEqual(["owner"]);
+        expect(runQuery.mock.calls.filter(([reference]) => String(reference).includes(PLAN_REF) || JSON.stringify(reference).includes(PLAN_REF)).map(([, args]) => (args as { userId: string }).userId)).toEqual(["collaborator"]);
+    });
+});
+
 describe("ModelFilterRulesUnavailableError", () => {
     it("reads as a settings problem, not as a refusal by the rules", () => {
         const error = new ModelFilterRulesUnavailableError();

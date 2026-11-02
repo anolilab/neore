@@ -39,13 +39,16 @@ const settled = async <T>(read: () => Promise<T>): Promise<T | typeof FAILED> =>
  * Background model calls (`getUtilityModel`) read them the same way, and the returned rules also carry whether the
  * user's plan opens paid-plan models, which `pickUtilityModelId` applies to its candidates.
  *
+ * `planUserId` names whose plan opens paid-plan models when that is not the rules' owner: a collaborator's call on
+ * the owner's thread runs under the owner's filters (privacy) but is paid for, and so graded, as the caller.
+ *
  * Throws `ModelFilterRulesUnavailableError` when the read fails: that is not the same as "no rules". An unreadable
  * plan is just "free".
  */
-export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<ModelFilterRules> => {
+export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, planUserId: string = userId): Promise<ModelFilterRules> => {
     const [preferences, plan] = await Promise.all([
         settled(async () => await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId })),
-        settled(async () => await ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId })),
+        settled(async () => await ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId: planUserId })),
     ]);
 
     if (preferences === FAILED || preferences?.readFailed === true) {
@@ -56,18 +59,20 @@ export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, use
 };
 
 /**
- * A background model for a user-facing action, under the user's filter rules. Reading the rules and resolving the
+ * A background model for a user-facing action, under the user's filter rules (`filterUserId`'s when given: the thread owner's, while `userId` stays the caller who is metered and whose plan applies). Reading the rules and resolving the
  * model share one failure boundary, so a refusal (no allowed model) or an unreadable rules read both reach the
  * client as a BAD_REQUEST that says why, rather than as an internal error.
  */
 export const getUtilityModelForUser = async (
     ctx: Pick<ActionCtx, "runQuery">,
     gateway: ServiceFetch,
-    context: { threadId?: string; userId: string },
+    context: { filterUserId?: string; threadId?: string; userId: string },
     preferred?: string,
 ): ReturnType<typeof getUtilityModel> => {
     try {
-        return await getUtilityModel(gateway, { ...context, rules: await loadModelFilterRules(ctx, context.userId) }, preferred);
+        const { filterUserId, ...who } = context;
+
+        return await getUtilityModel(gateway, { ...who, rules: await loadModelFilterRules(ctx, filterUserId ?? who.userId, who.userId) }, preferred);
     } catch (error) {
         if (error instanceof ModelFilterRulesUnavailableError) {
             throw new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
