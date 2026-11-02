@@ -317,7 +317,7 @@ export const saveCustomProvider = authMutation
         };
         const customAIProviders = { ...providers, [id]: row };
 
-        await saveAiUserPreferences(ctx.db, prefs, userId, { customAIProviders }, null);
+        await saveAiUserPreferences(ctx.db, prefs, userId, { customAIProviders }, ctx.user.activeOrganization?.id ?? null);
 
         ctx.log.event("chat.save_custom_provider", {
             created: existing === undefined,
@@ -346,7 +346,7 @@ export const deleteCustomProvider = authMutation
 
         const rest = Object.fromEntries(Object.entries(providers).filter(([id]) => id !== args.id));
 
-        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { customAIProviders: rest }, null);
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { customAIProviders: rest }, ctx.user.activeOrganization?.id ?? null);
         console.info(`[BYOK Audit] userId=${ctx.user.userId} action=delete purposes=[custom-providers]`);
         ctx.log.event("chat.delete_custom_provider", { remaining: Object.keys(rest).length });
 

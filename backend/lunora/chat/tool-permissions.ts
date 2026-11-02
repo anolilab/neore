@@ -378,7 +378,7 @@ const writeToolPermission = async (ctx: PreferenceCtx, key: string, mode: ToolPe
         throw new LunoraError("BAD_REQUEST", "Too many tool permission overrides");
     }
 
-    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissions: next }, null);
+    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissions: next }, ctx.user.activeOrganization?.id ?? null);
 };
 
 /** Set (or, with `mode: null`, reset to default) one tool's permission. */
@@ -451,7 +451,7 @@ export const setLowRiskTrustedServer = authMutation
             throw new LunoraError("BAD_REQUEST", "Too many trusted servers");
         }
 
-        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { lowRiskTrustedServers: next }, null);
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { lowRiskTrustedServers: next }, ctx.user.activeOrganization?.id ?? null);
 
         ctx.log.event("chat.set_low_risk_trusted_server", { kind: server.kind, trusted });
 
@@ -485,7 +485,7 @@ const writeToolGrant = async (ctx: PreferenceCtx, key: string, expiresAt: number
         delete next[soonest];
     }
 
-    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next }, null);
+    await saveAiUserPreferences(ctx.db, prefs, userId, { toolPermissionGrants: next }, ctx.user.activeOrganization?.id ?? null);
 };
 
 /** End a time-boxed allow early: the tool asks again from the next message (a run already going keeps the allow it started with). */
