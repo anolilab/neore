@@ -1436,7 +1436,13 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   devices, evals, pages, tasks … do), wired into the deletion workflow, so it
   draws none. Any `cross_module_table_write` outside `gdpr/steps/` is a
   regression.
-- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`
+- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`,
+  which are GIT-IGNORED (they changed on nearly every backend PR and caused the
+  merge conflicts). `_generated/app.ts` imports `architecture.js`, so anything
+  that compiles or runs it needs codegen first: backend `lint:types`, `test` and
+  `test:coverage` `dependsOn: codegen` in `backend/project.json`; `lunora build`
+  and `lunora dev` run it themselves. A new job running bare `tsc`/`vitest` in
+  `backend/` on a fresh checkout must run `pnpm codegen` first (TS2307 else).
   (Studio → Functions → Architecture; admin-gated
   `GET /_lunora/admin/architecture`). ~1,900 edges and ~510 "call sites could not
   be drawn" — mostly by design: refs held in variables
