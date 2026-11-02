@@ -1360,6 +1360,7 @@ const ComposerInput = ({
     );
 
     const hasAttachments = attachments.length > 0;
+    const hasCompletedAttachments = attachments.some((a) => a.status === "complete");
     const hasAttachedReferences = attachedReferences.length > 0;
     const editingAttachment = editingAttachmentId ? attachments.find((a) => a.id === editingAttachmentId) : null;
 
@@ -1474,7 +1475,7 @@ const ComposerInput = ({
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
                 followUp={followUp}
-                hasAttachments={hasAttachments}
+                hasCompletedAttachments={hasCompletedAttachments}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}

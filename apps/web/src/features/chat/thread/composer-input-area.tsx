@@ -75,8 +75,8 @@ interface ComposerInputAreaProps {
      */
     followUp?: FollowUpControl;
 
-    /** Whether the draft has attachments; with some, an empty text can still be sent. */
-    hasAttachments?: boolean;
+    /** Whether the draft has a finished upload; with one, an empty text can still be sent. */
+    hasCompletedAttachments?: boolean;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -143,7 +143,7 @@ const ComposerInputArea = ({
     customVariables,
     disabled = false,
     followUp = "none",
-    hasAttachments = false,
+    hasCompletedAttachments = false,
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -180,8 +180,9 @@ const ComposerInputArea = ({
         };
     }, []);
 
-    // An attachment-only draft is sendable, so it needs the send control as much as typed text does.
-    const isEmpty = !value.trim() && !hasAttachments;
+    const isEmpty = !value.trim();
+    // A draft with only a finished attachment is sendable, so it needs the send control as much as typed text does.
+    const canSend = !isEmpty || hasCompletedAttachments;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -316,7 +317,7 @@ const ComposerInputArea = ({
                     survive when transcribed text makes the input non-empty. */}
                 {isStreaming ? (
                     <>
-                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && !isEmpty && !isUploading && (
+                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && canSend && !isUploading && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
@@ -343,7 +344,7 @@ const ComposerInputArea = ({
                                 </TooltipContent>
                             </Tooltip>
                         )}
-                        {canQueueWhileStreaming && (!isEmpty || isUploading) && (
+                        {canQueueWhileStreaming && (canSend || isUploading) && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
@@ -397,7 +398,7 @@ const ComposerInputArea = ({
                         <Suspense fallback={null}>
                             <ComposerVoiceInput compact={compact} disabled={disabled} hidden={!isEmpty || isUploading} />
                         </Suspense>
-                        {(!isEmpty || isUploading) && (
+                        {(canSend || isUploading) && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={

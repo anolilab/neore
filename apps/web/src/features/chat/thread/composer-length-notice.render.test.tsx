@@ -17,6 +17,9 @@ vi.mock("@lingui/react/macro", () => {
         },
     };
 });
+vi.mock("./composer-voice-input", () => {
+    return { default: ({ hidden }: { hidden?: boolean }) => (hidden ? null : <button type="button">Dictate</button>) };
+});
 vi.mock("./composer-tiptap/composer-tiptap-editor", () => {
     return {
         ComposerTiptapEditor: ({ describedBy, invalid }: { describedBy?: string; invalid?: boolean }) => (
@@ -128,9 +131,21 @@ describe("the composer over the cap", () => {
 
 describe("an attachment-only draft", () => {
     it("shows an enabled Send control", () => {
-        render(<ComposerInputArea hasAttachments onChange={() => {}} onSubmit={() => {}} value="" />);
+        render(<ComposerInputArea hasCompletedAttachments onChange={() => {}} onSubmit={() => {}} value="" />);
 
         expect((screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("keeps the microphone beside an attached file", async () => {
+        render(<ComposerInputArea hasCompletedAttachments onChange={() => {}} onSubmit={() => {}} value="" />);
+
+        expect(await screen.findByRole("button", { name: "Dictate" })).toBeTruthy();
+    });
+
+    it("shows no Send control while the only attachment has not completed", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value="" />);
+
+        expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
     });
 
     it("shows no Send control with neither text nor attachments", () => {
