@@ -1127,6 +1127,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_claim_once:claimKey": lunora_lib_claim_once_134.claimKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_134.claimKeyFenced as unknown as RegisteredLunoraFunction,
     "lib_claim_once:completeKey": lunora_lib_claim_once_134.completeKey as unknown as RegisteredLunoraFunction,
+    "lib_claim_once:extendKey": lunora_lib_claim_once_134.extendKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeClaimsWithPrefix": lunora_lib_claim_once_134.purgeClaimsWithPrefix as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_134.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_134.reapLapsedClaims as unknown as RegisteredLunoraFunction,
@@ -6034,14 +6035,25 @@ __has4 = true;
 }
 if (typeof source["scope"] !== "string") return DEFER;
 if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
-let __has5 = false;
-let __val5;
+let __has6 = false;
+let __val6;
+if (source["unlessHeld"] !== undefined) {
+if (typeof source["unlessHeld"] !== "object" || source["unlessHeld"] === null || Array.isArray(source["unlessHeld"])) return DEFER;
+if (Object.getPrototypeOf(source["unlessHeld"]) !== Object.prototype && Object.getPrototypeOf(source["unlessHeld"]) !== null) return DEFER;
+if (typeof source["unlessHeld"]["key"] !== "string") return DEFER;
+if (typeof source["unlessHeld"]["scope"] !== "string") return DEFER;
+const __obj5 = { "key": source["unlessHeld"]["key"], "scope": source["unlessHeld"]["scope"] };
+__val6 = __obj5;
+__has6 = true;
+}
+let __has7 = false;
+let __val7;
 if (source["userId"] !== undefined) {
 if (typeof source["userId"] !== "string") return DEFER;
-__val5 = source["userId"];
-__has5 = true;
+__val7 = source["userId"];
+__has7 = true;
 }
-return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
+return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has6 ? { "unlessHeld": __val6 } : {}), ...(__has7 ? { "userId": __val7 } : {}) };
 });
 installCompiledValidatorMap(lunora_lib_claim_once_134.completeKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -6049,6 +6061,17 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { "key": source["key"], "scope": source["scope"] };
+});
+installCompiledValidatorMap(lunora_lib_claim_once_134.extendKey.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+if (typeof source["key"] !== "string") return DEFER;
+if (source["key"].length > 1024) return DEFER;
+if (typeof source["scope"] !== "string") return DEFER;
+if (source["scope"].length > 200) return DEFER;
+if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
+return { "claimedAt": source["claimedAt"], "key": source["key"], "scope": source["scope"], "ttlMs": source["ttlMs"] };
 });
 installCompiledValidatorMap(lunora_lib_claim_once_134.purgeClaimsWithPrefix.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9451,8 +9474,9 @@ export interface Caller {
         };
         claim_once: {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
-            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<null | number>;
+            claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; unlessHeld?: { key: string; scope: string }; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
+            extendKey: (args: { claimedAt: number; key: string; scope: string; ttlMs: number }) => Promise<boolean>;
             purgeClaimsWithPrefix: (args: { prefix: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
@@ -11345,6 +11369,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
             claimKeyFenced: (args) => callRegistered(context, "lib_claim_once:claimKeyFenced", args),
             completeKey: (args) => callRegistered(context, "lib_claim_once:completeKey", args),
+            extendKey: (args) => callRegistered(context, "lib_claim_once:extendKey", args),
             purgeClaimsWithPrefix: (args) => callRegistered(context, "lib_claim_once:purgeClaimsWithPrefix", args),
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),

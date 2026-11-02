@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { claimKey, claimKeyFenced, claimOnce, completeKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
+import { claimKey, claimKeyFenced, claimOnce, completeKey, extendKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
 
 const NOW = 1_800_000_000_000;
 const TTL = 60_000;
@@ -140,6 +140,46 @@ describe("releaseKey with a fence", () => {
 
         await mutate(releaseKey, { claimedAt: second, key: "a", scope: "s" });
         await expect(claim("a")).resolves.toBe(true);
+    });
+});
+
+describe("claimKeyFenced with unlessHeld", () => {
+    const other = { key: "legacy", scope: "old" };
+
+    it("is refused while the other claim is held, taking nothing, and accepted once it lapsed", async () => {
+        await mutate(claimKey, { ...other, ttlMs: TTL });
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBeNull();
+        expect(await rows()).toHaveLength(1);
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBe(NOW + TTL + 1);
+    });
+
+    it("takes the claim when the other is absent", async () => {
+        await expect(mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL, unlessHeld: other })).resolves.toBe(NOW);
+    });
+});
+
+describe("extendKey", () => {
+    it("lengthens only the claim its claimedAt names, and never shortens", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        await expect(mutate(extendKey, { claimedAt: claimedAt + 1, key: "a", scope: "s", ttlMs: 10 * TTL })).resolves.toBe(false);
+        await expect(mutate(extendKey, { claimedAt, key: "a", scope: "s", ttlMs: 10 * TTL })).resolves.toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
+            expect.objectContaining({ expiresAt: NOW + 10 * TTL }),
+        ]);
+        await expect(mutate(extendKey, { claimedAt, key: "a", scope: "s", ttlMs: 1 })).resolves.toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
+            expect.objectContaining({ expiresAt: NOW + 10 * TTL }),
+        ]);
+    });
+
+    it("leaves a lapsed claim alone", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await expect(mutate(extendKey, { claimedAt, key: "a", scope: "s", ttlMs: 10 * TTL })).resolves.toBe(false);
     });
 });
 

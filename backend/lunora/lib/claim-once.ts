@@ -11,7 +11,7 @@
  * | ------------------ | ------------------------ | ----------------------------- | ---------------------------- |
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
- * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` (`gitlab-token`), `<triggerId>:sig:<sig hex>` (`native`) | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` |
+ * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` (`gitlab-token`), `<triggerId>:body:<body sha256>` (`native`) | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` |
  * | `watch-webhook`    | `<watchId>:<sig hex>`    | {@link TRIGGER_CLAIM_TTL_MS}   | `source-control/freshness-internal.ts` (a repository webhook: marks it dirty, nothing more) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
@@ -82,7 +82,8 @@ export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
 
 /**
  * A `gitlab-token` or `native` trigger's deliveries (`triggers/http.ts`): neither sender gives a timestamp, so no window ends
- * the replay risk, and the claim must outlast any trigger. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
+ * the replay risk, and the claim must outlast any trigger. The claim is TAKEN for {@link TRIGGER_CLAIM_TTL_MS} and stretched to this
+ * once the run reaches the model (`extendClaim`), so a delivery that never ran frees itself even when its release is lost. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
  * is effectively forever while staying a finite `expiresAt`, so {@link purgeExpiredClaims} still reaps it.
  * It is cleared sooner by {@link releaseClaimsWithPrefix} when the trigger is deleted, and with the account
  * (the claim is tagged with the owner).
@@ -169,6 +170,23 @@ export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { le
 
 const claim = async (ctx: ClaimCtx, scope: string, key: string, options: ClaimOptions): Promise<boolean> =>
     (await claimFence(ctx, scope, key, options)) !== null;
+
+/**
+ * Gives a held claim a longer life, for work that turned out to need one: the claim was taken short so that a delivery
+ * that never ran frees itself, and is stretched once the run is known to have started. Only the claim named by `claimedAt`
+ * is touched: one that lapsed and was replaced is not ours. Answers whether the claim was extended.
+ */
+export const extendClaim = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, ttlMs: number): Promise<boolean> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    if (!existing || existing.claimedAt !== claimedAt || existing.expiresAt <= Date.now()) {
+        return false;
+    }
+
+    await patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, claimedAt + ttlMs) });
+
+    return true;
+};
 
 /** `true` while an unexpired claim for `(scope, key)` exists. Reads only, so a caller can decide before it acts. */
 export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<boolean> => {
@@ -279,9 +297,31 @@ export const claimKey = internalMutation
 
 /** {@link claimKey} that answers with the claim's `claimedAt` (for {@link releaseKey}'s `claimedAt`), or `null` when the key is held. */
 export const claimKeyFenced = internalMutation
-    .input(vClaimArgs)
+    .input({
+        key: v.string(),
+        leaseMs: v.optional(v.number()),
+        onLapse: v.optional(v.object({ args: v.optional(v.string()), target: v.string() })),
+        scope: v.string(),
+        ttlMs: v.number(),
+        // Another claim that already stands for the same work (a key scheme this one replaced): while it is held the key is refused.
+        // Checked in the same transaction as the claim, so the two cannot disagree.
+        unlessHeld: v.optional(v.object({ key: v.string(), scope: v.string() })),
+        userId: v.optional(v.string()),
+    })
     .output(v.union(v.null(), v.number()))
-    .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, userId }, ctx }) => await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId }));
+    .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, unlessHeld, userId }, ctx }) => {
+        if (unlessHeld && (await hasClaim(ctx, unlessHeld.scope, unlessHeld.key))) {
+            return null;
+        }
+
+        return await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId });
+    });
+
+/** {@link extendClaim} for a caller outside a transaction. */
+export const extendKey = internalMutation
+    .input({ claimedAt: v.number(), key: v.string().max(1024), scope: v.string().max(200), ttlMs: v.number() })
+    .output(v.boolean())
+    .mutation(async ({ args: { claimedAt, key, scope, ttlMs }, ctx }) => await extendClaim(ctx, scope, key, claimedAt, ttlMs));
 
 export const completeKey = internalMutation
     .input({ key: v.string(), scope: v.string() })

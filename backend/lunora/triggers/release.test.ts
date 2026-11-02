@@ -13,7 +13,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { releaseClaim, retryReleaseKey, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { DAILY_LIMIT_MESSAGE } from "../tasks/account";
 import { executeTrigger } from "./execute";
@@ -27,6 +27,7 @@ const world = vi.hoisted(() => {
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
         registry: new Map<string, unknown>(),
         releaseFailures: 0,
+        retriesUnschedulable: false,
         userExists: true,
         userLookupThrows: false,
     };
@@ -132,6 +133,7 @@ beforeEach(() => {
     world.userLookupThrows = false;
     world.failAt = undefined;
     world.releaseFailures = 0;
+    world.retriesUnschedulable = false;
     harness = lunoraTest(schema as never);
 });
 
@@ -182,6 +184,10 @@ const deliver = async (
         },
         scheduler: {
             runAfter: async (delay: number, reference: unknown, args: Record<string, unknown>) => {
+                if (world.retriesUnschedulable && reference !== internal.triggers.execute.executeTrigger) {
+                    throw new Error("scheduler unavailable");
+                }
+
                 if (reference === internal.triggers.execute.executeTrigger) {
                     scheduled.push(args as Scheduled);
                 } else {
@@ -325,14 +331,15 @@ describe("executeTrigger gives a gitlab-token claim back when the delivery never
         expect(await claims()).toEqual([]);
     });
 
-    it("but keeps it once the agent ran", async () => {
+    it("but keeps it once the agent ran, for the long TTL instead of the retry window it was taken for", async () => {
         const triggerId = await insertTrigger();
         const first = (await deliver(triggerId))!;
 
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_CLAIM_TTL_MS })]);
         await execute(first);
 
         expect(world.agentRuns).toBe(1);
-        expect(await claims()).toEqual([expect.objectContaining({ scope: TRIGGER_DELIVERY_SCOPE })]);
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS, scope: TRIGGER_DELIVERY_SCOPE })]);
         expect(await deliver(triggerId)).toBeUndefined();
     });
 
@@ -428,6 +435,25 @@ describe("a release that fails is retried, not dropped", () => {
         expect(await deliver(triggerId, "native", { filters, status: 500 })).toBeUndefined();
         expect(lastDelivery.jobs).toHaveLength(1);
         expect(lastDelivery.jobs[0]!.args).toMatchObject({ attempt: 1, scope: TRIGGER_DELIVERY_SCOPE });
+    });
+
+    it("a delivery whose release failed and whose retry cannot be scheduled blocks its redelivery only for the retry window", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const filters = [{ op: "equals", path: "object_kind", value: "push" }];
+
+        // A filtered delivery gives its claim back before answering; the release fails and so does the job that would retry it.
+        world.releaseFailures = 1;
+        world.retriesUnschedulable = true;
+        expect(await deliver(triggerId, "native", { filters, status: 500 })).toBeUndefined();
+        expect(lastDelivery.jobs).toHaveLength(0);
+
+        // Still held: it ran nothing, but nobody released it.
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_CLAIM_TTL_MS })]);
+        expect(await deliver(triggerId, "native")).toBeUndefined();
+
+        // No hand needed: the retry window ends and the sender's redelivery runs.
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+        expect(await deliver(triggerId, "native")).toBeDefined();
     });
 
     it("is idempotent: a second attempt, or one for a claim a newer holder replaced, deletes nothing", async () => {

@@ -17,15 +17,16 @@ import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
-import { releaseRetryDelayMs } from "../lib/claim-once";
+import { releaseRetryDelayMs, TRIGGER_DELIVERY_CLAIM_TTL_MS } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
-const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
+const RELEASE_DEFERRED_NOTE =
+    "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds or the claim lapses.";
 
 const RELEASE_LOST_NOTE =
-    "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until it is released by hand.";
+    "Giving this delivery back failed and no retry could be scheduled; a redelivery is refused as a duplicate until the claim lapses (15 minutes).";
 
 /** A run error only the owner's settings can cure; it repeats until they do, so it counts toward pausing the trigger. */
 export const isUserFixableRunError = (error: unknown): error is AgentRunError => error instanceof AgentRunError && USER_FIXABLE_RUN_ERRORS.has(error.kind);
@@ -69,6 +70,23 @@ export const executeTrigger = internalAction
                 await ctx.scheduler.runAfter(releaseRetryDelayMs(1), internal.lib.claim_once.retryReleaseKey, { ...claim, attempt: 1 });
 
                 return RELEASE_DEFERRED_NOTE;
+            }
+        };
+
+        /**
+         * The run reached the model, so its permanent claim is stretched from the retry window it was taken for to
+         * `TRIGGER_DELIVERY_CLAIM_TTL_MS`. Failing to is not worth failing the run over (the claim then lapses with the
+         * retry window, as a timestamped delivery's does), so it is logged.
+         */
+        const keepClaim = async (): Promise<void> => {
+            if (!claim || !releaseUnlessRun) {
+                return;
+            }
+
+            try {
+                await ctx.runMutation(internal.lib.claim_once.extendKey, { ...claim, ttlMs: TRIGGER_DELIVERY_CLAIM_TTL_MS });
+            } catch (error) {
+                console.error(`[Triggers] Could not extend the replay claim of trigger ${triggerId}:`, error);
             }
         };
 
@@ -311,8 +329,9 @@ export const executeTrigger = internalAction
                 botId: bot ? trigger.botId : undefined,
                 memory: true,
                 model,
-                onGenerationStart: () => {
+                onGenerationStart: async () => {
                     started = true;
+                    await keepClaim();
                 },
                 onThread: () => {
                     threadCreated = true;
