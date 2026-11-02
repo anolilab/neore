@@ -67,7 +67,7 @@ export const POLL_INTERVAL_MS = 4000;
 /** A run still unfinished this long after it started is over, whatever the sandbox says. */
 const POLL_DEADLINE_MS = RUN_TIMEOUT_MS + 60_000;
 
-type RunnerCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "scheduler">;
+type RunnerCtx = Pick<ActionCtx, "log" | "runMutation" | "runQuery" | "scheduler">;
 
 /** The user's provider key for `agent`, or `undefined`. */
 const loadProviderKey = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, agent: CodingAgentId): Promise<string | undefined> => {
@@ -335,8 +335,14 @@ const startPullRequestForRun = async (
     // Read on the person's own shard: a collaborator's run on a shared thread executes on the owner's, which holds no
     // preferences row for them. A failed read keeps the agent as author, the default that never guesses an identity.
     const person =
-        (await callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }).catch(() => null)) ??
-        undefined;
+        (await callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }).catch((error: unknown) => {
+            ctx.log.event("coding_agents.commit_identity_unreadable", {
+                message: error instanceof Error ? error.message : "unknown",
+                runId,
+            });
+
+            return null;
+        })) ?? undefined;
 
     const started = await startPullRequest(
         { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, person, repo, runId, title: pullRequestTitle(claim.prompt) },
