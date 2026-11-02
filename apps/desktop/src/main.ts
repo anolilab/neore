@@ -20,6 +20,7 @@ import { createDictation } from "./dictation/index.js";
 import type { DroppedFile } from "./dropped-files.js";
 import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
+import { recoveryPageUrl, shouldRecoverFromLoadFailure, shouldRecoverFromRendererGone } from "./recovery.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from "./sign-in.js";
 import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
@@ -27,6 +28,7 @@ import type { TerminalController } from "./terminal/index.js";
 import { registerTerminalIpc } from "./terminal/index.js";
 import { threadWindowUrl } from "./thread-window.js";
 import { classifyUrl, isDraftTarget, isLocalPage, isTrustedUrl } from "./trust.js";
+import { clearPendingUpdate, decideUpdateOutcome, PENDING_UPDATE_FILE, readPendingUpdate, writePendingUpdate } from "./update-notice.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
 
 interface ShellState {
@@ -282,6 +284,24 @@ const guardSiteWindow = (win: BrowserWindow): void => {
     contents.on("will-navigate", (event, url) => guardNavigation(event, url));
     contents.on("will-redirect", (event, url) => guardNavigation(event, url));
     contents.on("will-attach-webview", (event) => event.preventDefault());
+
+    // A site that cannot be loaded or a renderer that died leaves a blank window with no way forward: show our own page.
+    contents.on("did-fail-load", (_event, errorCode: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
+        if (!shouldRecoverFromLoadFailure(errorCode, isMainFrame, validatedUrl)) {
+            return;
+        }
+
+        log(`the page failed to load (${errorCode} ${description})`);
+        contents.loadURL(recoveryPageUrl("unreachable", newChatUrl(origin).href, `${description} (${errorCode})`));
+    });
+    contents.on("render-process-gone", (_event, details: { reason: string }) => {
+        if (!shouldRecoverFromRendererGone(details.reason)) {
+            return;
+        }
+
+        log(`the page process ended (${details.reason})`);
+        contents.loadURL(recoveryPageUrl("crashed", newChatUrl(origin).href, details.reason));
+    });
 
     if (process.platform === "darwin") {
         contents.on("did-finish-load", () => {
@@ -826,6 +846,40 @@ const registerIpc = (): void => {
     state.deviceReady = registerDeviceIpc({ isTrusted: isMainWindow, terminal: state.terminals });
 };
 
+const pendingUpdateFile = (): string => path.join(app.getPath("userData"), PENDING_UPDATE_FILE);
+
+const rememberDownloadedUpdate = (version: string): void => {
+    try {
+        writePendingUpdate(pendingUpdateFile(), { version });
+    } catch (error) {
+        log(`could not record the downloaded update: ${String(error)}`);
+    }
+};
+
+/**
+ * A downloaded update is installed when the app quits. If this start is still on the older version, the install did not
+ * happen (blocked, killed, no permission): say so once, with where to get the build by hand, instead of letting the person
+ * believe they run the new one. An applied update clears the record.
+ */
+const noticeUnappliedUpdate = (): void => {
+    try {
+        const file = pendingUpdateFile();
+        const outcome = decideUpdateOutcome(readPendingUpdate(file), app.getVersion());
+
+        if (outcome.kind === "applied") {
+            clearPendingUpdate(file);
+        } else if (outcome.kind === "not-applied") {
+            writePendingUpdate(file, { noticed: true, version: outcome.version });
+            showNotification(
+                "Neore was not updated",
+                `Version ${outcome.version} was downloaded but ${outcome.current} is still running. Install it from github.com/anolilab/neore/releases.`,
+            );
+        }
+    } catch (error) {
+        log(`could not check the downloaded update: ${String(error)}`);
+    }
+};
+
 /**
  * Checks GitHub Releases on start and downloads a found update; it is applied on
  * the next launch. Dev builds never check: they have no release to compare with.
@@ -836,10 +890,13 @@ const checkForUpdates = async (): Promise<void> => {
         return;
     }
 
+    noticeUnappliedUpdate();
+
     try {
         const { autoUpdater } = await import("electron-updater");
 
         autoUpdater.on("update-downloaded", (info) => {
+            rememberDownloadedUpdate(info.version);
             // Applied on the next launch; a restart mid-reply would lose the stream.
             showNotification("Neore update installed", `Version ${info.version} will be used after you restart Neore.`);
         });
