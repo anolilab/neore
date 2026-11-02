@@ -91,7 +91,7 @@ describe("the priority an agent gets relative to the app", () => {
 });
 
 const EXEC_ARGS = /exec "\$@"/u;
-const RESTORE_PWD = /export PWD="\$1"; shift; exec "\$@"/u;
+const RESTORE_PWD = /export PWD="\$NEORE_LAUNCH_PWD"; unset NEORE_LAUNCH_PWD; exec "\$@"/u;
 
 describe("how an agent is started", () => {
     const host = (overrides: Partial<HostPriority> = {}): HostPriority => {
@@ -118,17 +118,18 @@ describe("how an agent is started", () => {
         expect(launch).toEqual({
             args: ["-n", "10", "--", "claude", "--flag", "a b; rm -rf /"],
             command: "/usr/bin/nice",
+            env: {},
             lowerAfterSpawn: { nice: false, oomScoreAdj: false },
         });
     });
 
-    it("keeps a PWD the plan sets, passed as an argument rather than written into the script", () => {
-        const launch = agentLaunch({ ...target, env: { PWD: "/work/$(x)" } }, host());
+    it("keeps a PWD the plan sets, carried in the environment, never in the script or the argument list", () => {
+        const launch = agentLaunch({ ...target, env: { HOME: "/h", PWD: "/work/$(x)" } }, host());
 
         expect(launch.args[1]).toMatch(RESTORE_PWD);
         expect(launch.args[1]).not.toContain("unset PWD");
-        expect(launch.args[1]).not.toContain("/work");
-        expect(launch.args.slice(2, 5)).toEqual(["sh", "/work/$(x)", "/usr/bin/nice"]);
+        expect(launch.args.join(" ")).not.toContain("/work");
+        expect(launch.env).toEqual({ HOME: "/h", NEORE_LAUNCH_PWD: "/work/$(x)" });
     });
 
     it("ends nice's options before a command whose name starts with a dash", () => {
@@ -144,6 +145,7 @@ describe("how an agent is started", () => {
         expect(agentLaunch(target, host({ hasNice: false, hasSh: false }))).toEqual({
             args: target.args,
             command: "claude",
+            env: {},
             lowerAfterSpawn: { nice: true, oomScoreAdj: true },
         });
         expect(agentLaunch(target, host({ hasNice: false, platform: "darwin" })).lowerAfterSpawn).toEqual({ nice: true, oomScoreAdj: false });

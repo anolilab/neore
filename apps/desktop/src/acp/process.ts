@@ -97,6 +97,8 @@ export interface HostPriority {
 export interface AgentLaunch {
     readonly args: string[];
     readonly command: string;
+    /** The environment to spawn with: the plan's, except that a plan's `PWD` rides under {@link LAUNCH_PWD} until `sh` puts it back. */
+    readonly env: Record<string, string>;
     /** Still to do after the spawn because no wrapper could do it before: the agent is then unlowered for its first instants. */
     readonly lowerAfterSpawn: { readonly nice: boolean; readonly oomScoreAdj: boolean };
 }
@@ -104,11 +106,16 @@ export interface AgentLaunch {
 /**
  * The command that starts the agent already lowered, so nothing it forks in its first instants keeps full priority.
  * `nice -n DELTA` sets the niceness, and on Linux a `sh` writes the score into `/proc/self` and `exec`s on (same pid,
- * so the agent inherits it; `PWD`, which `sh` adds to the environment, is dropped again, or restored when the plan sets it). The plan's command and arguments travel as separate argv entries, never through a shell
+ * so the agent inherits it; `PWD`, which `sh` adds to the environment, is dropped again, or restored from the environment when the plan sets it). The plan's command and arguments travel as separate argv entries, never through a shell
  * string. Without `nice` or `sh` the matching value is set after the spawn instead.
  */
+/** Carries a plan's `PWD` past `sh`, which rewrites `PWD` at start; an argument would show it in the world-readable cmdline. */
+// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- the name of an environment variable, not a credential
+const LAUNCH_PWD = "NEORE_LAUNCH_PWD";
+
 export const agentLaunch = (plan: Partial<Pick<SpawnPlan, "env">> & Pick<SpawnPlan, "args" | "command">, host: HostPriority): AgentLaunch => {
     let { args, command } = plan;
+    let env = plan.env ?? {};
     const delta = agentNiceness(host.nice) - host.nice;
     const niceInline = host.hasNice && host.platform !== "win32";
 
@@ -123,16 +130,20 @@ export const agentLaunch = (plan: Partial<Pick<SpawnPlan, "env">> & Pick<SpawnPl
     if (oomInline) {
         // A refused write (a read-only /proc) must not stop the agent: the score is only a preference.
         const score = `{ echo ${String(agentOomScoreAdj(host.oomScoreAdj))} > ${OOM_SCORE_FILE}; } 2>/dev/null`;
-        // A PWD the plan sets is put back as given (sh rewrites it at start), passed as an argument, never into the script.
-        const pwd = plan.env?.PWD;
+        // A PWD the plan sets is put back as given, from the environment, never through the script or argv.
+        const { PWD: pwd, ...rest } = env;
 
-        const restorePwd = pwd === undefined ? [`${score}; unset PWD; exec "$@"`] : [`${score}; export PWD="$1"; shift; exec "$@"`, pwd];
+        if (pwd === undefined) {
+            args = ["-c", `${score}; unset PWD; exec "$@"`, "sh", command, ...args];
+        } else {
+            env = { ...rest, [LAUNCH_PWD]: pwd };
+            args = ["-c", `${score}; export PWD="$${LAUNCH_PWD}"; unset ${LAUNCH_PWD}; exec "$@"`, "sh", command, ...args];
+        }
 
-        args = ["-c", restorePwd[0] as string, "sh", ...restorePwd.slice(1), command, ...args];
         command = SH_PATH;
     }
 
-    return { args, command, lowerAfterSpawn: { nice: !niceInline, oomScoreAdj: host.platform === "linux" && !oomInline } };
+    return { args, command, env, lowerAfterSpawn: { nice: !niceInline, oomScoreAdj: host.platform === "linux" && !oomInline } };
 };
 
 const readHostOomScoreAdj = (): number => {
@@ -251,7 +262,7 @@ export const spawnAgent: Spawner = (plan) => {
             cwd: plan.cwd,
             detached: true,
             // Not inherited: the plan's environment is the whole environment.
-            env: plan.env,
+            env: launch.env,
             stdio: ["pipe", "pipe", "pipe"],
         });
     } catch (error) {
