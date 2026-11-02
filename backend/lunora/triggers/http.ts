@@ -27,7 +27,7 @@ import type { HttpActionCtx } from "lunorash/server";
  * a native sender signs with the raw secret.)
  *
  * A native signature carries no timestamp, so the ONLY replay defence is the
- * body-keyed claim, and a window would end it: once the run reaches the model the claim
+ * body-keyed claim, and a window would end it: once the run is admitted the claim
  * lasts `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively the trigger's life), well past any
  * provider's redelivery period (GitHub offers "Redeliver" for three days). The gap this
  * closes: with a 15-minute claim a captured request was accepted again once it lapsed.
@@ -412,7 +412,7 @@ interface ReplayGuard {
  * Takes the once-only claim of a verified delivery, or answers `null` when it was taken before. A scheme that
  * requires a delivery id claims it with the body's digest and a `native` one claims the body's digest; both take the
  * claim for `TRIGGER_CLAIM_TTL_MS`, which `executeTrigger` stretches to `TRIGGER_DELIVERY_CLAIM_TTL_MS` (effectively
- * permanent) once the run reaches the model, and both give the claim back whenever the delivery does not run. A
+ * permanent) once the run is admitted, and both give the claim back whenever the delivery does not run. A
  * timestamped one claims its signed bytes for `TRIGGER_CLAIM_TTL_MS` and keeps nothing longer.
  */
 const takeReplayGuard = async (
@@ -428,7 +428,7 @@ const takeReplayGuard = async (
     let claimKey: { key: string; scope: string };
     let unlessHeld: { key: string; scope: string } | undefined;
     // A delivery that never runs must free itself even when its release is lost, so every claim is TAKEN for the retry
-    // window; a permanent one is stretched to `TRIGGER_DELIVERY_CLAIM_TTL_MS` by `executeTrigger` once the run reaches the model.
+    // window; a permanent one is stretched to `TRIGGER_DELIVERY_CLAIM_TTL_MS` by the admission transaction once the run is admitted.
     const ttlMs = TRIGGER_CLAIM_TTL_MS;
     const permanent = scheme.requiresDeliveryId === true || scheme.permanentClaim === true;
 

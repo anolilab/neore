@@ -1127,7 +1127,6 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_claim_once:claimKey": lunora_lib_claim_once_134.claimKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:claimKeyFenced": lunora_lib_claim_once_134.claimKeyFenced as unknown as RegisteredLunoraFunction,
     "lib_claim_once:completeKey": lunora_lib_claim_once_134.completeKey as unknown as RegisteredLunoraFunction,
-    "lib_claim_once:extendKey": lunora_lib_claim_once_134.extendKey as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeClaimsWithPrefix": lunora_lib_claim_once_134.purgeClaimsWithPrefix as unknown as RegisteredLunoraFunction,
     "lib_claim_once:purgeExpiredClaims": lunora_lib_claim_once_134.purgeExpiredClaims as unknown as RegisteredLunoraFunction,
     "lib_claim_once:reapLapsedClaims": lunora_lib_claim_once_134.reapLapsedClaims as unknown as RegisteredLunoraFunction,
@@ -6062,17 +6061,6 @@ if (typeof source["key"] !== "string") return DEFER;
 if (typeof source["scope"] !== "string") return DEFER;
 return { "key": source["key"], "scope": source["scope"] };
 });
-installCompiledValidatorMap(lunora_lib_claim_once_134.extendKey.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
-if (typeof source["key"] !== "string") return DEFER;
-if (source["key"].length > 1024) return DEFER;
-if (typeof source["scope"] !== "string") return DEFER;
-if (source["scope"].length > 200) return DEFER;
-if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
-return { "claimedAt": source["claimedAt"], "key": source["key"], "scope": source["scope"], "ttlMs": source["ttlMs"] };
-});
 installCompiledValidatorMap(lunora_lib_claim_once_134.purgeClaimsWithPrefix.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9476,7 +9464,6 @@ export interface Caller {
             claimKey: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }) => Promise<boolean>;
             claimKeyFenced: (args: { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; unlessHeld?: { key: string; scope: string }; userId?: string }) => Promise<null | number>;
             completeKey: (args: { key: string; scope: string }) => Promise<null>;
-            extendKey: (args: { claimedAt: number; key: string; scope: string; ttlMs: number }) => Promise<boolean>;
             purgeClaimsWithPrefix: (args: { prefix: string; scope: string }) => Promise<null>;
             purgeExpiredClaims: (args?: {}) => Promise<number>;
             reapLapsedClaims: (args?: {}) => Promise<number>;
@@ -10046,7 +10033,7 @@ export interface Caller {
             executeTrigger: (args: { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
-            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" }>;
+            admitTriggerRun: (args: { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }) => Promise<null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
             createExecution: (args: { firing?: number; payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { botComputer?: boolean; botId?: string; cronExpression?: string; description?: string; eventSource?: { contains?: string; cooldownMinutes?: number; intervalMinutes?: number; kind: "page"; selector?: string; url: string } | { at: number; kind: "time" } | { cooldownMinutes?: number; intervalMinutes?: number; kind: "thread"; threadId: string }; filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>; inputTemplate?: string; model: string; name: string; quietWhenEmpty?: boolean; searchMode?: string; systemPrompt?: string; timezone?: string; type: "event" | "schedule" | "webhook"; webhookPreset?: { event: "pull_request_opened" | "pull_request_merged" | "pull_request_review_requested" | "issue_assigned"; provider: "github" } | { event: "merge_request_opened" | "merge_request_merged"; provider: "gitlab" }; webhookSignatureScheme?: "timestamped" | "native" | "gitlab-token" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
@@ -11369,7 +11356,6 @@ export const createCaller = (context: CallerCtx): Caller => ({
             claimKey: (args) => callRegistered(context, "lib_claim_once:claimKey", args),
             claimKeyFenced: (args) => callRegistered(context, "lib_claim_once:claimKeyFenced", args),
             completeKey: (args) => callRegistered(context, "lib_claim_once:completeKey", args),
-            extendKey: (args) => callRegistered(context, "lib_claim_once:extendKey", args),
             purgeClaimsWithPrefix: (args) => callRegistered(context, "lib_claim_once:purgeClaimsWithPrefix", args),
             purgeExpiredClaims: (args) => callRegistered(context, "lib_claim_once:purgeExpiredClaims", args),
             reapLapsedClaims: (args) => callRegistered(context, "lib_claim_once:reapLapsedClaims", args),

@@ -18,7 +18,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { CLAIM_PREFIX_BATCH, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { CLAIM_PREFIX_BATCH, holdClaim, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
@@ -1153,7 +1153,7 @@ export const admitTriggerRun = internalMutation
         requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.literal("disabled") })))
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.union(v.literal("disabled"), v.literal("duplicate")) })))
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
@@ -1220,6 +1220,19 @@ export const admitTriggerRun = internalMutation
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             return await refused(modelUnavailableMessage(model));
+        }
+
+        // A permanent claim is stretched from its retry window to its long life HERE, in the transaction that charges the
+        // run, so no refusal after it can leave a thread or a charge behind. It lapsing before this point is no reason to
+        // drop an acknowledged delivery: the key is taken again unless another delivery holds it, and only then is this one a duplicate.
+        if (claim && releaseUnlessRun && !(await holdClaim(ctx, claim.scope, claim.key, claim.claimedAt, TRIGGER_DELIVERY_CLAIM_TTL_MS, trigger.userId))) {
+            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete("triggerExecutions", running._id);
+            }
+
+            return { skipped: "duplicate" as const };
         }
 
         if (!(await chargeRound(ctx, trigger.userId, account))) {

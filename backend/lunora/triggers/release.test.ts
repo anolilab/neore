@@ -13,7 +13,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { extendClaim, releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { DAILY_LIMIT_MESSAGE } from "../tasks/account";
 import { executeTrigger } from "./execute";
@@ -24,12 +24,14 @@ const world = vi.hoisted(() => {
     return {
         agentRuns: 0,
         chargeOk: true,
-        extendFailures: 0,
+        charges: 0,
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        headlessCalls: 0,
         registry: new Map<string, unknown>(),
         releaseFailures: 0,
         retriesUnschedulable: false,
         userExists: true,
+        userLookupFailures: 0,
         userLookupThrows: false,
     };
 });
@@ -40,6 +42,8 @@ vi.mock("../chat/lib/headless-run", () => {
     return {
         // The stages of the real run (`headless-run.ts`) in order: provider keys, thread, then the model call, announced by `onGenerationStart`.
         runHeadlessAgent: async (_ctx: unknown, options: { onGenerationStart?: () => Promise<void> | void }) => {
+            world.headlessCalls += 1;
+
             if (world.failAt === "keys") {
                 throw new Error("provider keys unavailable");
             }
@@ -66,7 +70,9 @@ vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
         getUser: async (_ctx: unknown, userId: string) => {
-            if (world.userLookupThrows) {
+            if (world.userLookupThrows || world.userLookupFailures > 0) {
+                world.userLookupFailures -= 1;
+
                 throw new Error("user lookup failed");
             }
 
@@ -78,7 +84,11 @@ vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
 vi.mock("../tasks/account", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../tasks/account")>()),
-        chargeRound: async () => world.chargeOk,
+        chargeRound: async () => {
+            world.charges += 1;
+
+            return world.chargeOk;
+        },
     };
 });
 
@@ -106,22 +116,6 @@ let harness: Harness;
 beforeAll(async () => {
     registerModule(world.registry, "triggers_functions", await import("./functions"));
     registerModule(world.registry, "lib_claim_once", await import("../lib/claim-once"));
-    // The real extension, failing while `world.extendFailures` lasts.
-    world.registry.set(
-        "lib_claim_once:extendKey",
-        internalMutation
-            .input({ claimedAt: v.number(), key: v.string(), scope: v.string(), ttlMs: v.number() })
-            .output(v.boolean())
-            .mutation(async ({ args: { claimedAt, key, scope, ttlMs }, ctx }) => {
-                if (world.extendFailures > 0) {
-                    world.extendFailures -= 1;
-
-                    throw new Error("database unavailable");
-                }
-
-                return await extendClaim(ctx, scope, key, claimedAt, ttlMs);
-            }),
-    );
     // The real release, failing while `world.releaseFailures` lasts.
     world.registry.set(
         "lib_claim_once:releaseKey",
@@ -150,7 +144,9 @@ beforeEach(() => {
     world.userLookupThrows = false;
     world.failAt = undefined;
     world.releaseFailures = 0;
-    world.extendFailures = 0;
+    world.charges = 0;
+    world.headlessCalls = 0;
+    world.userLookupFailures = 0;
     world.retriesUnschedulable = false;
     harness = lunoraTest(schema as never);
 });
@@ -543,12 +539,26 @@ describe("a gitlab-token claim is kept only for a run that reached the model", (
     });
 });
 
-describe("a delivery whose claim cannot be kept does not run", () => {
-    it("when its claim lapsed and a redelivery took the key: only the redelivery runs", async () => {
+describe("a delivery whose claim lapsed before it was admitted", () => {
+    const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
+
+    it("is not dropped when nobody took the key: it runs and keeps the key for good", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
-        // The first delivery waited in the queue past the retry window; the sender redelivered meanwhile.
+        // It waited in the queue past the retry window.
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+        await execute(first);
+
+        expect(world.agentRuns).toBe(1);
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt: first.claim!.claimedAt, expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS })]);
+        expect(await deliver(triggerId, "native")).toBeUndefined();
+    });
+
+    it("does not run when a redelivery took the key, and leaves no thread, charge or execution row behind", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
         vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
 
         const redelivery = (await deliver(triggerId, "native"))!;
@@ -556,39 +566,27 @@ describe("a delivery whose claim cannot be kept does not run", () => {
         expect(redelivery.claim!.claimedAt).not.toBe(first.claim!.claimedAt);
 
         await execute(first);
+        // No model call (so no thread), no daily run used, no row, and the redelivery's claim untouched.
         expect(world.agentRuns).toBe(0);
-        // The redelivery's claim is untouched.
+        expect(world.headlessCalls).toBe(0);
+        expect(world.charges).toBe(0);
+        expect(await executions()).toEqual([]);
         expect(await claims()).toEqual([expect.objectContaining({ claimedAt: redelivery.claim!.claimedAt })]);
 
         await execute(redelivery);
         expect(world.agentRuns).toBe(1);
+        expect(world.charges).toBe(1);
     });
 
-    it("when extending its claim fails twice, and gives the claim back so the redelivery runs", async () => {
+    it("tries the admission again after a transient failure, and runs once", async () => {
         const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
         const first = (await deliver(triggerId, "native"))!;
 
-        world.extendFailures = 2;
-        await execute(first);
-
-        expect(world.agentRuns).toBe(0);
-        expect(await claims()).toEqual([]);
-
-        const redelivery = await deliver(triggerId, "native");
-
-        expect(redelivery).toBeDefined();
-        await execute(redelivery!);
-        expect(world.agentRuns).toBe(1);
-    });
-
-    it("but runs after one failed extension, which is retried once", async () => {
-        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
-        const first = (await deliver(triggerId, "native"))!;
-
-        world.extendFailures = 1;
+        world.userLookupFailures = 2;
         await execute(first);
 
         expect(world.agentRuns).toBe(1);
+        expect(world.charges).toBe(1);
         expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS })]);
     });
 });

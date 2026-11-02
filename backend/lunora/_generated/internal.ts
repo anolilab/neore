@@ -790,7 +790,6 @@ export interface InternalApiTypes {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
             claimKeyFenced: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; unlessHeld?: { key: string; scope: string }; userId?: string }, null | number>;
             completeKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
-            extendKey: FunctionReference<"mutation", { claimedAt: number; key: string; scope: string; ttlMs: number }, boolean>;
             purgeClaimsWithPrefix: FunctionReference<"mutation", { prefix: string; scope: string }, null>;
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
@@ -1141,7 +1140,7 @@ export interface InternalApiTypes {
             executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;
             createExecution: FunctionReference<"mutation", { firing?: number; payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1986,7 +1985,6 @@ export const internal: InternalApiTypes = {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },
             claimKeyFenced: { __lunoraRef: "lib_claim_once:claimKeyFenced" },
             completeKey: { __lunoraRef: "lib_claim_once:completeKey" },
-            extendKey: { __lunoraRef: "lib_claim_once:extendKey" },
             purgeClaimsWithPrefix: { __lunoraRef: "lib_claim_once:purgeClaimsWithPrefix" },
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },

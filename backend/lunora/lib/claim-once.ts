@@ -83,7 +83,7 @@ export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
 /**
  * A `gitlab-token` or `native` trigger's deliveries (`triggers/http.ts`): neither sender gives a timestamp, so no window ends
  * the replay risk, and the claim must outlast any trigger. The claim is TAKEN for {@link TRIGGER_CLAIM_TTL_MS} and stretched to this
- * once the run reaches the model (`extendClaim`), so a delivery that never ran frees itself even when its release is lost. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
+ * once the run is admitted (`holdClaim`, in the admission transaction), so a delivery that never ran frees itself even when its release is lost. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
  * is effectively forever while staying a finite `expiresAt`, so {@link purgeExpiredClaims} still reaps it.
  * It is cleared sooner by {@link releaseClaimsWithPrefix} when the trigger is deleted, and with the account
  * (the claim is tagged with the owner).
@@ -172,18 +172,30 @@ const claim = async (ctx: ClaimCtx, scope: string, key: string, options: ClaimOp
     (await claimFence(ctx, scope, key, options)) !== null;
 
 /**
- * Gives a held claim a longer life, for work that turned out to need one: the claim was taken short so that a delivery
- * that never ran frees itself, and is stretched once the run is known to have started. Only the claim named by `claimedAt`
- * is touched: one that lapsed and was replaced is not ours. Answers whether the claim was extended.
+ * Keeps a claim for work that turned out to need a longer life: the claim was taken short so that a delivery that never
+ * ran frees itself, and is stretched once the work is admitted. `claimedAt` names the claim the caller took. It is
+ * stretched while it is still the one on the key; if it lapsed and nobody took the key meanwhile it is taken again under
+ * the same `claimedAt` (the caller's fenced release still finds it). Answers `false` only when ANOTHER claim holds the key.
  */
-export const extendClaim = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, ttlMs: number): Promise<boolean> => {
+export const holdClaim = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, ttlMs: number, userId?: string): Promise<boolean> => {
     const existing = await findClaim(ctx, scope, key);
+    const expiresAt = claimedAt + ttlMs;
 
-    if (!existing || existing.claimedAt !== claimedAt || existing.expiresAt <= Date.now()) {
-        return false;
+    if (existing && existing.claimedAt === claimedAt) {
+        await patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, expiresAt) });
+
+        return true;
     }
 
-    await patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, claimedAt + ttlMs) });
+    if (existing) {
+        if (existing.expiresAt > Date.now()) {
+            return false;
+        }
+
+        await ctx.db.delete("idempotencyClaims", existing._id);
+    }
+
+    await ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, scope, ...(userId !== undefined && { userId }) });
 
     return true;
 };
@@ -316,12 +328,6 @@ export const claimKeyFenced = internalMutation
 
         return await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId });
     });
-
-/** {@link extendClaim} for a caller outside a transaction. */
-export const extendKey = internalMutation
-    .input({ claimedAt: v.number(), key: v.string().max(1024), scope: v.string().max(200), ttlMs: v.number() })
-    .output(v.boolean())
-    .mutation(async ({ args: { claimedAt, key, scope, ttlMs }, ctx }) => await extendClaim(ctx, scope, key, claimedAt, ttlMs));
 
 export const completeKey = internalMutation
     .input({ key: v.string(), scope: v.string() })

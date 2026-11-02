@@ -11,7 +11,7 @@ import { internal } from "../_generated/internal";
 import {
     claimKey,
     claimKeyFenced,
-    extendKey,
+    holdClaim,
     releaseKey,
     TRIGGER_CLAIM_TTL_MS,
     TRIGGER_DELIVERY_CLAIM_TTL_MS,
@@ -56,10 +56,6 @@ const SIGNED_TRIGGER = { enabled: true, type: "webhook", webhookSecret: SECRET }
 const claimMutation = (reference: unknown) => {
     if (reference === internal.lib.claim_once.releaseKey) {
         return releaseKey;
-    }
-
-    if (reference === internal.lib.claim_once.extendKey) {
-        return extendKey;
     }
 
     return reference === internal.lib.claim_once.claimKeyFenced ? claimKeyFenced : claimKey;
@@ -132,11 +128,11 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
     return { history, post, scheduled, scheduler, statusOf, triggerId };
 };
 
-/** What `executeTrigger` does when the run reaches the model: stretch the delivery's claim from the retry window to the long TTL. */
+/** What `executeTrigger` does when the run is admitted: stretch the delivery's claim from the retry window to the long TTL (admission does this). */
 const startRun = async (delivery: unknown): Promise<void> => {
     const { claim } = delivery as { claim: { claimedAt: number; key: string; scope: string } };
 
-    await harness.run(async (ctx: any) => await ctx.runMutation(extendKey, { ...claim, ttlMs: TRIGGER_DELIVERY_CLAIM_TTL_MS }));
+    await harness.run(async (ctx: any) => await holdClaim(ctx, claim.scope, claim.key, claim.claimedAt, TRIGGER_DELIVERY_CLAIM_TTL_MS));
 };
 
 const signedHeaders = async (body: string, timestampSeconds = Math.floor(NOW / 1000)) => {
