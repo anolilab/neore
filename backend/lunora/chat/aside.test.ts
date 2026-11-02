@@ -562,8 +562,12 @@ describe("askAside", () => {
         await expect(snapshotFor(OWNER)).resolves.toHaveProperty("rows");
         await expect(snapshotFor(OTHER)).rejects.toThrow();
 
-        await grantRead(OTHER);
+        const grantId = await grantRead(OTHER);
+
         await expect(snapshotFor(OTHER)).resolves.toHaveProperty("rows");
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("threadAccess", grantId));
+        await expect(snapshotFor(OTHER)).rejects.toThrow();
     });
 
     it("refuses an empty question", async () => {
