@@ -3,6 +3,7 @@
  * read must not crash the extraction (no gate log, exchange never marked processed), it extracts anyway and the
  * extraction itself then skips for lack of an allowed model.
  */
+/* eslint-disable max-classes-per-file */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,14 +12,14 @@ import schema from "../schema";
 import { extractMemories } from "./extract";
 
 const { generateText, loadModelFilterRules, ModelFilterRulesUnavailableError, NoAllowedUtilityModelError, registry } = vi.hoisted(() => {
-    class NoAllowedUtilityModelError extends Error {}
-    class ModelFilterRulesUnavailableError extends NoAllowedUtilityModelError {}
+    class Refusal extends Error {}
+    class RulesUnreadable extends Refusal {}
 
     return {
         generateText: vi.fn(),
         loadModelFilterRules: vi.fn(),
-        ModelFilterRulesUnavailableError,
-        NoAllowedUtilityModelError,
+        ModelFilterRulesUnavailableError: RulesUnreadable,
+        NoAllowedUtilityModelError: Refusal,
         registry: new Map<string, unknown>(),
     };
 });
@@ -87,9 +88,14 @@ describe("extractMemories when the model filter rules cannot be read", () => {
 
     const run = async () =>
         await harness.action(
-            async (ctx: any) => await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
         );
-    const processedRows = async () => await harness.run(async (ctx: any) => (await ctx.db.actionCache.findMany({})).page.filter((row: any) => row.name === "memory.processedExchange"));
+    const processedRows = async () => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.actionCache.findMany({}));
+
+        return page.filter((row: any) => row.name === "memory.processedExchange");
+    };
 
     it("leaves the exchange unmarked when the rules were unreadable, so a retry can extract it", async () => {
         loadModelFilterRules.mockRejectedValue(new ModelFilterRulesUnavailableError());

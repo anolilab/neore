@@ -54,7 +54,15 @@ afterEach(() => {
 
 const seed = async (judgeEnabled: boolean): Promise<string> =>
     await harness.run(async (ctx: any) => {
-        const datasetId = await ctx.db.insert("evalDatasets", { caseCount: 0, createdAt: 1, judgeEnabled, kind: "agent", name: "Dataset", updatedAt: 1, userId: USER });
+        const datasetId = await ctx.db.insert("evalDatasets", {
+            caseCount: 0,
+            createdAt: 1,
+            judgeEnabled,
+            kind: "agent",
+            name: "Dataset",
+            updatedAt: 1,
+            userId: USER,
+        });
         const caseId = await ctx.db.insert("evalCases", {
             checks: [{ kind: "contains", value: "x" }],
             createdAt: 1,
@@ -83,8 +91,7 @@ const seed = async (judgeEnabled: boolean): Promise<string> =>
         });
     });
 
-const resultOf = async (): Promise<string> =>
-    await harness.run(async (ctx: any) => JSON.stringify(await ctx.db.query("evalResults").collect()));
+const resultOf = async (): Promise<string> => await harness.run(async (ctx: any) => JSON.stringify(await ctx.db.query("evalResults").collect()));
 
 describe("runEvalCase when the model filter rules cannot be read", () => {
     it("scores a case by its checks when the judge is off", async () => {

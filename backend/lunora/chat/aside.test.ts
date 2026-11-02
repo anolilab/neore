@@ -543,13 +543,13 @@ describe("askAside", () => {
             expect(await remainingText(OWNER)).toBe(owner);
         });
 
-        it("picks the utility model under the OWNER's identity for a reader, since the owner's messages are what it receives", async () => {
+        it("meters the utility model to the reader, under the owner's filter rules", async () => {
             await patchThread({ mode: "image", model: "not-a-text-model" });
             await grantRead();
 
             await expect(ask(QUESTION, OTHER)).resolves.toMatchObject({ withThread: true });
 
-            expect(getUtilityModel).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: OWNER }), undefined);
+            expect(getUtilityModel).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: OTHER }), undefined);
         });
     });
 
