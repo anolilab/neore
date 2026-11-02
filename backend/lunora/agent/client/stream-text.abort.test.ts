@@ -44,7 +44,7 @@ const flush = async () => {
 };
 
 /** A thread whose pending rows are numbered p1, p2…; after `hold()`, finalizing the rows named in `held` waits for `release`. */
-const fakeThread = (held: string[], beforeFirstStreamFails?: () => Promise<void>) => {
+const fakeThread = (held: string[], beforeFirstStreamFails?: () => Promise<void>, rejectAddMessagesFrom?: number) => {
     let release = () => {};
     // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
     const gate = new Promise<void>((resolve) => {
@@ -55,8 +55,17 @@ const fakeThread = (held: string[], beforeFirstStreamFails?: () => Promise<void>
     let pending = 0;
     let holding = false;
     let creates = 0;
+    let adds = 0;
+    // Only the first finalize of a held row waits: a later one for the same row goes through.
+    const heldOnce = new Set<string>();
     const runMutation = vi.fn(async (ref: unknown, args: { messageId: string }) => {
         if (ref === internal.agent.messages.addMessages) {
+            adds += 1;
+
+            if (rejectAddMessagesFrom && adds >= rejectAddMessagesFrom) {
+                throw new Error("the pending row could not be created");
+            }
+
             pending += 1;
 
             return { messages: [{ _id: `p${pending}`, order: 1, status: "pending", stepOrder: pending }] };
@@ -65,7 +74,8 @@ const fakeThread = (held: string[], beforeFirstStreamFails?: () => Promise<void>
         if (ref === internal.agent.messages.finalizeMessage) {
             started.push(args.messageId);
 
-            if (holding && held.includes(args.messageId)) {
+            if (holding && held.includes(args.messageId) && !heldOnce.has(args.messageId)) {
+                heldOnce.add(args.messageId);
                 await gate;
             }
 
@@ -218,5 +228,72 @@ describe("settleAbort of a streamed generation", () => {
         expect(thread.finalized.slice(finalizedBefore)).toContain("p1");
 
         warn.mockRestore();
+    });
+
+    it("does not reject while the first attempt's abort write is open when the retry fails to start", async () => {
+        expect.assertions(6);
+
+        const controller = new AbortController();
+        let overflowRead = false;
+        const thread = fakeThread(
+            ["p1"],
+            async () => {
+                while (!overflowRead) {
+                    await sleep(0);
+                }
+            },
+            2,
+        );
+        // The abort lands right as the first attempt's overflow is read, before it has started its retry.
+        const warn = vi.spyOn(console, "warn").mockImplementation((message: unknown) => {
+            if (!String(message).includes("Context exceeded detected")) {
+                return;
+            }
+
+            overflowRead = true;
+            thread.hold();
+            controller.abort("stopped");
+        });
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const model = new MockLanguageModelV3({
+            doStream: async () => {
+                throw new Error("prompt is too long: the context length was exceeded");
+            },
+        });
+        let outcome: unknown;
+        let settledAs: "rejected" | "resolved" | undefined;
+        const running = streamText(
+            thread.context,
+            {} as never,
+            { abortSignal: controller.signal, model, promptMessageId: "m1" } as never,
+            { ...OPTIONS, saveStreamDeltas: true } as never,
+        )
+            .then((value) => {
+                settledAs = "resolved";
+                outcome = value;
+
+                return value;
+            })
+            .catch((error_: unknown) => {
+                settledAs = "rejected";
+                outcome = error_;
+            });
+
+        await flush();
+
+        // The retry's own failure of the row landed; the abort's write for the same row is still open, and the run has not ended around it.
+        expect(thread.started.filter((id) => id === "p1")).toHaveLength(2);
+        expect(thread.finalized.filter((id) => id === "p1")).toHaveLength(1);
+        expect(settledAs).toBeUndefined();
+
+        thread.release();
+        await running;
+
+        expect(thread.finalized.filter((id) => id === "p1")).toHaveLength(2);
+        expect(settledAs).toBe("rejected");
+        expect(outcome).toStrictEqual(new Error("the pending row could not be created"));
+
+        warn.mockRestore();
+        error.mockRestore();
     });
 });

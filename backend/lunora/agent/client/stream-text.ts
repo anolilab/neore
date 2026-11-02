@@ -204,7 +204,13 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
                 promptMessageId: undefined,
             } as typeof streamTextArgs;
 
-            return _doStreamText(context, component, retryArgs, options, true, abortSettlements);
+            // Awaited so a retry that rejects before it has a handle is seen here, not past this attempt's cleanup.
+            return await _doStreamText(context, component, retryArgs, options, true, abortSettlements).catch(async (retryError: unknown) => {
+                // This attempt's abort work is in the shared list: let it land before the rejection reaches a caller with no handle.
+                await settleAbort();
+
+                throw retryError;
+            });
         }
 
         // If an error occurs during streaming (e.g., in onStepFinish callbacks),
