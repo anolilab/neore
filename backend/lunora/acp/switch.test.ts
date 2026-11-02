@@ -1594,6 +1594,24 @@ describe("a saved session is reattached only if it received the conversation", (
         expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
     });
 
+    it("hands the whole conversation over when the divider that owed the handoff lies beyond the search bound", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchTo(threadId, hostTarget(device, CODEX));
+        await openStartedSession(device, threadId, undefined, "native-codex", CAN_LOAD);
+        await answerOpenCalls();
+        // More rows than one divider search reads (3,000), added after the stay began and never prompted.
+        await converse(threadId, 1550, 1, 100);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+        await openStartedSession(device, threadId, { loaded: true }, "native-1");
+        await answerOpenCalls();
+        await switchTo(threadId, hostTarget(device, CODEX));
+
+        expect((await lastStart()).nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)?.mode).toBe("portable");
+    });
+
     it("reattaches once the agent has been prompted with it", async () => {
         const device = await pairedDevice(ownerId);
         const threadId = await loadableHostThread(device);
