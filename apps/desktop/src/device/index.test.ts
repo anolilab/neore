@@ -377,6 +377,7 @@ describe("relay channels (the site window)", () => {
         expect(() => invoke(LOCAL_CHANNEL.promptAnswer, siteEvent(), 1, "once")).toThrow("device: not the device window");
         expect(() => invoke(LOCAL_CHANNEL.settingsGet, siteEvent())).toThrow("device: not the device window");
         expect(() => invoke(LOCAL_CHANNEL.pickFolder, siteEvent())).toThrow("device: not the device window");
+        expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, siteEvent(), "dev_1")).toThrow("device: not the device window");
         expect(core.promptAnswer).not.toHaveBeenCalled();
     });
 });
