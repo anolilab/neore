@@ -49,7 +49,8 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 });
 
 const { getOrganizationPolicy, setOrganizationPolicy } = await import("./organization-policy");
-const { deleteOrganizationPolicy, queueOrganizationPolicyErase } = await import("./organization-policy-erase");
+const { deleteOrganizationPolicy, queueOrganizationPolicyErase, sweepOrphanedOrganizationPolicies, sweepOrphanedPolicyPage } =
+    await import("./organization-policy-erase");
 
 let harness: ReturnType<typeof lunoraTest>;
 
@@ -264,5 +265,111 @@ describe("removing a deleted organization's policy", () => {
         expect(jobsQueueMessages).toStrictEqual([
             { body: { args: { organizationId: ORG }, functionPath: "auth_organization_policy_erase:deleteOrganizationPolicy", shardKey: "__root__" } },
         ]);
+    });
+});
+
+describe("the reconciliation sweep for policies of deleted organizations", () => {
+    const sweep = async (): Promise<void> => {
+        await harness.run(async (context: any) => await context.runMutation(sweepOrphanedOrganizationPolicies, {}));
+    };
+
+    const insertPolicy = async (organizationId: string, revision = 1): Promise<void> => {
+        await seed(async (db) => {
+            await db.insert("organizationPolicies", { document: "{}", organizationId, revision, schemaVersion: 1, updatedAt: 1 });
+        });
+    };
+
+    /** Creates a real organization row and returns the id a policy row names. */
+    const insertOrganization = async (name: string): Promise<string> =>
+        await seed(async (db) => await db.insert("organization", { createdAt: 1, name, slug: name }));
+
+    /** Delete audits for policy rows, as the audit trigger writes them. */
+    const policyDeleteAudits = async (): Promise<unknown[]> =>
+        await seed(async (db) => {
+            const { page } = await db.documentHistory.findMany({ where: { isDeleted: true, tableName: "organizationPolicies" } });
+
+            return page;
+        });
+
+    it("removes a policy whose organization no longer exists and keeps one whose organization does", async () => {
+        const existing = await insertOrganization("kept-org");
+
+        await insertPolicy(existing);
+        await insertPolicy("deleted-org");
+
+        await sweep();
+
+        expect(await rowsOf(existing)).toHaveLength(1);
+        expect(await rowsOf("deleted-org")).toHaveLength(0);
+        expect(await policyDeleteAudits()).toHaveLength(1);
+    });
+
+    it("deletes nothing and writes no audit row on a second run", async () => {
+        const existing = await insertOrganization("kept-org");
+
+        await insertPolicy(existing);
+        await insertPolicy("deleted-org");
+        await sweep();
+
+        const auditsAfterFirst = await policyDeleteAudits();
+
+        await sweep();
+
+        expect(await rowsOf(existing)).toHaveLength(1);
+        expect(await policyDeleteAudits()).toHaveLength(auditsAfterFirst.length);
+    });
+
+    it("keeps a policy whose organization could not be read", async () => {
+        await insertPolicy("deleted-org");
+
+        const deleted = await harness.run(async (context: any) => {
+            const failing = new Proxy(context.db, {
+                get: (target, property, receiver) =>
+                    property === "organization"
+                        ? {
+                              findFirst: async () => {
+                                  throw new Error("organization read failed");
+                              },
+                          }
+                        : Reflect.get(target, property, receiver),
+            });
+
+            const result = await sweepOrphanedPolicyPage(failing, undefined);
+
+            return result.deleted;
+        });
+
+        expect(deleted).toBe(0);
+        expect(await rowsOf("deleted-org")).toHaveLength(1);
+        expect(await policyDeleteAudits()).toHaveLength(0);
+    });
+
+    it("leaves a row rewritten since it was read", async () => {
+        await insertPolicy("deleted-org");
+
+        const deleted = await harness.run(async (context: any) => {
+            const rewriting = new Proxy(context.db, {
+                get: (target, property, receiver) =>
+                    property === "organization"
+                        ? {
+                              findFirst: async () => {
+                                  const { page } = await target.organizationPolicies.findMany({ where: { organizationId: "deleted-org" } });
+                                  const [row] = page;
+
+                                  await target.patch("organizationPolicies", row._id, { revision: row.revision + 1 });
+
+                                  return null;
+                              },
+                          }
+                        : Reflect.get(target, property, receiver),
+            });
+
+            const result = await sweepOrphanedPolicyPage(rewriting, undefined);
+
+            return result.deleted;
+        });
+
+        expect(deleted).toBe(0);
+        expect(await rowsOf("deleted-org")).toHaveLength(1);
     });
 });

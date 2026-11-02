@@ -571,6 +571,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_invitations:pruneInvitations": lunora_auth_invitations_38.pruneInvitations as unknown as RegisteredLunoraFunction,
     "auth_invitations:revokeInvitation": lunora_auth_invitations_38.revokeInvitation as unknown as RegisteredLunoraFunction,
     "auth_organization_policy_erase:deleteOrganizationPolicy": lunora_auth_organization_policy_erase_39.deleteOrganizationPolicy as unknown as RegisteredLunoraFunction,
+    "auth_organization_policy_erase:sweepOrphanedOrganizationPolicies": lunora_auth_organization_policy_erase_39.sweepOrphanedOrganizationPolicies as unknown as RegisteredLunoraFunction,
     "auth_organization_policy:getOrganizationPolicy": lunora_auth_organization_policy_40.getOrganizationPolicy as unknown as RegisteredLunoraFunction,
     "auth_organization_policy:setOrganizationPolicy": lunora_auth_organization_policy_40.setOrganizationPolicy as unknown as RegisteredLunoraFunction,
     "auth_organization:checkSlug": lunora_auth_organization_41.checkSlug as unknown as RegisteredLunoraFunction,
@@ -2975,6 +2976,18 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["organizationId"] !== "string") return DEFER;
 return { "organizationId": source["organizationId"] };
+});
+installCompiledValidatorMap(lunora_auth_organization_policy_erase_39.sweepOrphanedOrganizationPolicies.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["cursor"] !== undefined) {
+if (typeof source["cursor"] !== "string") return DEFER;
+__val1 = source["cursor"];
+__has1 = true;
+}
+return { ...(__has1 ? { "cursor": __val1 } : {}) };
 });
 installCompiledValidatorMap(lunora_auth_session_organization_42.getActiveOrganizationIdForSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8739,6 +8752,7 @@ export interface Caller {
         };
         organization_policy_erase: {
             deleteOrganizationPolicy: (args: { organizationId: string }) => Promise<null>;
+            sweepOrphanedOrganizationPolicies: (args: { cursor?: string }) => Promise<null>;
         };
         session_organization: {
             getActiveOrganizationIdForSession: (args: { sessionId: string; userId: string }) => Promise<string | null>;
@@ -10648,6 +10662,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         organization_policy_erase: {
             deleteOrganizationPolicy: (args) => callRegistered(context, "auth_organization_policy_erase:deleteOrganizationPolicy", args),
+            sweepOrphanedOrganizationPolicies: (args) => callRegistered(context, "auth_organization_policy_erase:sweepOrphanedOrganizationPolicies", args),
         },
         session_organization: {
             getActiveOrganizationIdForSession: (args) => callRegistered(context, "auth_session_organization:getActiveOrganizationIdForSession", args),

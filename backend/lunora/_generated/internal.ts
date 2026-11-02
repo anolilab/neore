@@ -275,6 +275,7 @@ export interface InternalApiTypes {
         };
         organization_policy_erase: {
             deleteOrganizationPolicy: FunctionReference<"mutation", { organizationId: string }, null>;
+            sweepOrphanedOrganizationPolicies: FunctionReference<"mutation", { cursor?: string }, null>;
         };
         session_organization: {
             getActiveOrganizationIdForSession: FunctionReference<"query", { sessionId: string; userId: string }, string | null>;
@@ -1483,6 +1484,7 @@ export const internal: InternalApiTypes = {
         },
         organization_policy_erase: {
             deleteOrganizationPolicy: { __lunoraRef: "auth_organization_policy_erase:deleteOrganizationPolicy" },
+            sweepOrphanedOrganizationPolicies: { __lunoraRef: "auth_organization_policy_erase:sweepOrphanedOrganizationPolicies" },
         },
         session_organization: {
             getActiveOrganizationIdForSession: { __lunoraRef: "auth_session_organization:getActiveOrganizationIdForSession" },

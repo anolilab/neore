@@ -269,6 +269,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.crons.vacuumDocumentHistory,
         schedule: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
     },
+    // Policies whose organization is gone, for a removal the queue never delivered (`auth/organization-policy-erase.ts`).
+    {
+        name: "sweepOrphanedOrganizationPolicies",
+        ref: internal.auth.organization_policy_erase.sweepOrphanedOrganizationPolicies,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
+    },
     // 0 0 * * *
     {
         // eslint-disable-next-line no-secrets/no-secrets
