@@ -165,11 +165,17 @@ describe("variation selectors", () => {
         ]);
     });
 
-    it("counts every selector in the strict form", () => {
+    it("counts every selector in the strict form but the one U+FE0E or U+FE0F after an emoji base", () => {
         expect(hasHiddenText(heart)).toBe(false);
-        expect(hasHiddenText(heart, { strict: true })).toBe(true);
+        expect(hasHiddenText(heart, { strict: true })).toBe(false);
+        expect(hasHiddenText("\u{26A0}\u{FE0F} check", { strict: true })).toBe(false);
+        expect(hasHiddenText("\u{2714}\u{FE0E}", { strict: true })).toBe(false);
         expect(hasHiddenText(ideograph, { strict: true })).toBe(true);
-        expect(showHidden(`a${heart}`, { strict: true })).toBe("a\u{2764}?");
+        expect(hasHiddenText("a\u{FE0F}", { strict: true })).toBe(true);
+        expect(hasHiddenText(`${heart}\u{FE0F}`, { strict: true })).toBe(true);
+        expect(hasHiddenText("\u{26A0}\u{FE00}", { strict: true })).toBe(true);
+        expect(hasHiddenText(`${heart}\u{200D}\u{1F525}`, { strict: true })).toBe(true);
+        expect(showHidden(`a${heart}\u{FE0F}`, { strict: true })).toBe("a\u{2764}\u{FE0F}?");
     });
 });
 
@@ -248,11 +254,26 @@ describe("findHiddenText", () => {
 describe("many subdivision flags", () => {
     it("scans 20,000 flags in linear time", () => {
         const england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
-        const value = england.repeat(20_000);
-        const started = performance.now();
+        // Character reads the scanner makes: linear work doubles with the input, quadratic work quadruples it.
+        const reads = (flags: number): number => {
+            const spy = vi.spyOn(String.prototype, "codePointAt");
 
-        expect(stripHiddenText(value)).toEqual({ removed: 0, text: value });
-        expect(performance.now() - started).toBeLessThan(500);
+            try {
+                const value = england.repeat(flags);
+
+                expect(stripHiddenText(value)).toEqual({ removed: 0, text: value });
+
+                return spy.mock.calls.length;
+            } finally {
+                spy.mockRestore();
+            }
+        };
+
+        const small = reads(10_000);
+        const large = reads(20_000);
+
+        expect(small).toBeGreaterThan(0);
+        expect(large).toBeLessThanOrEqual(small * 2.5);
     });
 
     it("reads the flag ranges once, not once per tag character", () => {

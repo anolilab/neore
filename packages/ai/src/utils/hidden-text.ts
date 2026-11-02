@@ -16,7 +16,8 @@
  *   renders nothing;
  * - the tag letters and CANCEL TAG of the three subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`)
  *   stay when they directly follow U+1F3F4 and spell exactly one of those codes, then U+E007F; any other tag sequence is text.
- * The `strict` form treats every selector and tag as hidden.
+ * The `strict` form treats every joiner and tag as hidden, and every selector but the one U+FE0E or U+FE0F directly after
+ * an emoji base (a name or a prompt with a plain emoji, such as a warning sign, still loads; a run or a selector after a letter does not).
  */
 
 // The format characters that RENDER stay (U+0600 to U+0605 Arabic number signs, U+06DD end of ayah, U+070F Syriac abbreviation
@@ -54,6 +55,8 @@ const characterBefore = (value: string, index: number): string => {
 };
 
 const isJoiner = (codePoint: number): boolean => codePoint === 0x20_0c || codePoint === 0x20_0d;
+
+const isEmojiSelector = (codePoint: number): boolean => codePoint === 0xfe_0e || codePoint === 0xfe_0f;
 
 /** Whether the variation selector at `index` selects a variant of the character before it (see the top of the file). */
 const selectorBelongs = (value: string, index: number, codePoint: number): boolean => {
@@ -145,7 +148,9 @@ const scan = (value: string, { layout = false, strict = false }: { layout?: bool
             continue;
         }
 
-        if (!strict && belongsInPlace(value, index, character.codePointAt(0) ?? 0, inFlag)) {
+        const codePoint = character.codePointAt(0) ?? 0;
+
+        if (strict ? isEmojiSelector(codePoint) && selectorBelongs(value, index, codePoint) : belongsInPlace(value, index, codePoint, inFlag)) {
             continue;
         }
 

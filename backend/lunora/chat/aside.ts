@@ -35,7 +35,6 @@
  *   reply across branches.
  */
 import { isCustomModelId, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
-import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage } from "ai";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
@@ -81,6 +80,7 @@ import {
     liveReplyTail,
     MAX_ASIDE_ANSWER_CHARS,
     MAX_ASIDE_QUESTION_CHARS,
+    normalizeAsideQuestion,
     signAsideAnswer,
     verifyAsideAnswer,
 } from "./lib/aside";
@@ -315,7 +315,7 @@ export const askAside = authAction
     )
     .action(async ({ args: { entryId, question: rawQuestion, threadId, unlockProof }, ctx }) => {
         const { plan, role, userId } = ctx.user;
-        const question = stripHiddenText(rawQuestion).text.trim();
+        const question = normalizeAsideQuestion(rawQuestion);
 
         if (!question || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "Ask a question first");
@@ -458,9 +458,9 @@ export const addAsideToThread = authMutation
     .mutation(async ({ args: { answer, entryId, question: rawQuestion, threadId, token, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         // `askAside` signed and answered the question without hidden characters; what is written into the thread is that one.
-        const question = stripHiddenText(rawQuestion).text;
+        const question = normalizeAsideQuestion(rawQuestion);
 
-        if (!question.trim() || !answer.trim() || !entryId.trim()) {
+        if (!question || !answer.trim() || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "There is nothing to add");
         }
 

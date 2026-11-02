@@ -114,8 +114,18 @@ describe("parseHooks", () => {
             }
         });
 
-        it("refuses a variation selector and a flag tag in a prompt", () => {
-            expect(parseHooks(textOf("prompt", String.raw`\ud83d\udc4d\ufe0f`)).ok).toBe(false);
+        it("takes an ordinary emoji (a base and one U+FE0F) in a prompt and a name", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f check`)).ok).toBe(true);
+            expect(parseHooks(textOf("name", String.raw`\u2714\ufe0f`)).ok).toBe(true);
+        });
+
+        it("refuses a selector run or a selector after a letter in a prompt", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f\ufe0f`)).ok).toBe(false);
+            expect(parseHooks(textOf("prompt", String.raw`a\ufe0f`)).ok).toBe(false);
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f\u200d\ud83d\udd25`)).ok).toBe(false);
+        });
+
+        it("refuses a flag tag in a prompt", () => {
             expect(parseHooks(textOf("prompt", String.raw`\ud83c\udff4\udb40\udc67\udb40\udc7f`)).ok).toBe(false);
         });
 

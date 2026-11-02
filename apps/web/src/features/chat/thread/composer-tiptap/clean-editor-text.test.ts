@@ -152,7 +152,7 @@ describe(cleanEditorText, () => {
     });
 
     it("works where Array.prototype.toReversed does not exist (Safari < 16, Chrome < 110)", () => {
-        const saved = Array.prototype.toReversed;
+        const original = Reflect.getOwnPropertyDescriptor(Array.prototype, "toReversed");
         const editor = editorWith("<p>a\u{E0041}b\u{202E}c</p>");
 
         Reflect.deleteProperty(Array.prototype, "toReversed");
@@ -160,7 +160,11 @@ describe(cleanEditorText, () => {
         try {
             cleanEditorText(editor);
         } finally {
-            Reflect.defineProperty(Array.prototype, "toReversed", { configurable: true, value: saved, writable: true });
+            if (original) {
+                Reflect.defineProperty(Array.prototype, "toReversed", original);
+            } else {
+                Reflect.deleteProperty(Array.prototype, "toReversed");
+            }
         }
 
         expect(editor.getText()).toBe("abc");

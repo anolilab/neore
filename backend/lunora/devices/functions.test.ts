@@ -33,7 +33,8 @@ const functions = await import("./functions");
 const internals = await import("./internal");
 const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing");
 const gdpr = await import("./gdpr");
-const { MAX_OPEN_CALLS_PER_DEVICE } = await import("./lib/constants");
+const { MAX_OPEN_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } = await import("./lib/constants");
+const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
 
@@ -49,6 +50,9 @@ const REQUIRES_AN_ACCOUNT_ERROR = /requires an account/u;
 const SIGNATURE_ERROR = /signature/u;
 const STALE_ERROR = /stale/u;
 const MALFORMED_ERROR = /malformed/u;
+const AHEAD_ERROR = /clock is about 1[89]\d minutes ahead of the server/u;
+const BEHIND_ERROR = /clock is about 4\d minutes behind the server/u;
+const HOUR_BEHIND_ERROR = /clock is about 6\d minutes behind the server/u;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 
@@ -75,8 +79,8 @@ const TOOLS = [
     { description: "Read a file", inputSchema: { properties: { path: { type: "string" } }, type: "object" }, kind: "fs", name: "fs_read", readOnly: true },
 ];
 
-const signManifest = async (deviceId: string, secret: string, issuedAt = Date.now()) => {
-    const payload = JSON.stringify({ deviceId, issuedAt, kind: "manifest", tools: TOOLS, v: 1 });
+const signManifest = async (deviceId: string, secret: string, issuedAt = Date.now(), extra: Record<string, unknown> = {}) => {
+    const payload = JSON.stringify({ deviceId, issuedAt, kind: "manifest", tools: TOOLS, v: 1, ...extra });
 
     return { deviceId, payload, signature: await signDevicePayload(secret, "manifest", payload) };
 };
@@ -181,12 +185,220 @@ describe("updateDeviceManifest", () => {
         ).rejects.toThrow(STALE_ERROR);
     });
 
+    it("names the clock when a signed manifest is stamped outside the window", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const update = async (issuedAt: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt)) as never);
+
+        await expect(update(Date.now() + 3 * 60 * 60_000)).rejects.toMatchObject({
+            data: { code: "DEVICE_CLOCK_SKEW", direction: "ahead", minutes: expect.any(Number) },
+            message: expect.stringMatching(AHEAD_ERROR),
+        });
+        await expect(update(Date.now() - 45 * 60_000)).rejects.toMatchObject({
+            data: { code: "DEVICE_CLOCK_SKEW", direction: "behind", minutes: expect.any(Number) },
+            message: expect.stringMatching(BEHIND_ERROR),
+        });
+        // Not a stamped time at all: still the plain malformed refusal, not a clock complaint.
+        await expect(update(NaN)).rejects.toThrow(STALE_ERROR);
+    });
+
+    it("calls a stale stamp an old retransmit, not clock skew, when a newer manifest is already stored", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const update = async (issuedAt: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt)) as never);
+
+        await update(Date.now());
+        await expect(update(Date.now() - 45 * 60_000)).rejects.toThrow(STALE_ERROR);
+        // Ahead of the server: that one is the clock whatever is stored.
+        await expect(update(Date.now() + 3 * 60 * 60_000)).rejects.toMatchObject({ data: { code: "DEVICE_CLOCK_SKEW" } });
+    });
+
     it("refuses another user's device", async () => {
         const { deviceId, secret } = await register(ownerId);
 
         await expect(as(STRANGER).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret)) as never)).rejects.toThrow(
             NOT_FOUND_ERROR,
         );
+    });
+});
+
+describe("a computer too old for the backend", () => {
+    const reportProtocol = async (userId: string, protocol: number | undefined) => {
+        const { deviceId, secret } = await register(userId);
+        const extra = protocol === undefined ? {} : { protocol };
+
+        await as(userId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, Date.now(), extra)) as never);
+
+        return deviceId;
+    };
+    const listed = async (userId: string) =>
+        (await as(userId).query(functions.listDevices as never, {} as never)) as { _id: string; updateRequired: boolean }[];
+
+    const updateRequiredOf = (devices: { _id: string; updateRequired: boolean }[], deviceId: string) =>
+        devices.find((device) => device._id === deviceId)?.updateRequired;
+
+    it("still gets calls when its manifest reports no protocol (it predates the report)", async () => {
+        const deviceId = await reportProtocol(ownerId, undefined);
+        const threadId = await insertThread(ownerId);
+
+        expect(updateRequiredOf(await listed(ownerId), deviceId)).toBe(false);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
+    });
+
+    it("still gets calls at the current protocol", async () => {
+        const deviceId = await reportProtocol(ownerId, MIN_DEVICE_PROTOCOL);
+        const threadId = await insertThread(ownerId);
+
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
+    });
+
+    it("gets an update notice instead of a call, for a tool and for a coding agent", async () => {
+        const deviceId = await reportProtocol(ownerId, MIN_DEVICE_PROTOCOL - 1);
+        const threadId = await insertThread(ownerId);
+
+        expect(updateRequiredOf(await listed(ownerId), deviceId)).toBe(true);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "outdated" });
+        await expect(
+            harness.run(
+                async (ctx: any) =>
+                    await createAcpCall(
+                        ctx,
+                        { deviceId: deviceId as never, input: {}, kind: "acp_send", threadId: threadId as never, userId: ownerId },
+                        Date.now(),
+                    ),
+            ),
+        ).resolves.toEqual({ error: "outdated" });
+        // Stop is never held back by a notice.
+        await expect(
+            harness.run(
+                async (ctx: any) =>
+                    await createAcpCall(
+                        ctx,
+                        { deviceId: deviceId as never, input: {}, kind: "acp_cancel", threadId: threadId as never, userId: ownerId },
+                        Date.now(),
+                    ),
+            ),
+        ).resolves.toHaveProperty("callId");
+    });
+
+    it("treats a protocol that is present but invalid as outdated, never as current", async () => {
+        for (const protocol of ["3", 3.5, 5000, -1, null]) {
+            const { deviceId, secret } = await register(ownerId);
+
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, Date.now(), { protocol })) as never);
+
+            expect(updateRequiredOf(await listed(ownerId), deviceId), String(protocol)).toBe(true);
+        }
+    });
+
+    it("fails a same-claim retry too once the computer has gone outdated", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const claim = async () => await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, claimId: "window-a", deviceId } as never);
+
+        await expect(claim()).resolves.toEqual({ claimed: true });
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        await expect(claim()).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ error: expect.stringContaining("out of date"), status: "failed" });
+    });
+
+    it("lists a call queued before the computer was marked outdated, and its claim fails it with the notice", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const pendingIds = async () =>
+            ((await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as { callId: string }[]).map((call) => call.callId);
+
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        expect(await pendingIds()).toEqual([callId]);
+        await expect(as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never)).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ error: expect.stringContaining("out of date"), status: "failed" });
+        expect(await pendingIds()).toEqual([]);
+    });
+
+    it("delivers a stop queued behind ten older calls of an outdated computer once those are failed", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 10; index += 1) {
+                await ctx.db.insert("deviceCalls", {
+                    createdAt: Date.now() - 1000 + index,
+                    deadline: Date.now() + 60_000,
+                    deviceId,
+                    deviceName: "Laptop",
+                    envelope: "",
+                    input: "{}",
+                    signature: "",
+                    status: "pending",
+                    taintedBy: [],
+                    threadId,
+                    toolName: "fs_read",
+                    userId: ownerId,
+                });
+            }
+        });
+
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        const stop = (await harness.run(
+            async (ctx: any) =>
+                await createAcpCall(
+                    ctx,
+                    { deviceId: deviceId as never, input: {}, kind: "acp_cancel", threadId: threadId as never, userId: ownerId },
+                    Date.now(),
+                ),
+        )) as { callId: string };
+        const pendingIds = async () =>
+            ((await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as { callId: string }[]).map((call) => call.callId);
+
+        const older = await pendingIds();
+
+        expect(older).toHaveLength(10);
+        expect(older).not.toContain(stop.callId);
+
+        for (const callId of older) {
+            await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
+        }
+
+        expect(await pendingIds()).toEqual([stop.callId]);
+        await expect(as(ownerId).mutation(functions.claimDeviceCall as never, { callId: stop.callId, deviceId } as never)).resolves.toEqual({ claimed: true });
+    });
+
+    it("is served again once an updated build reports the current protocol", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL - 1);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "outdated" });
+        await send(Date.now(), MIN_DEVICE_PROTOCOL);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
+    });
+
+    it("forgets an old protocol when a later manifest reports none, so eligibility follows the current build", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, extra: Record<string, unknown>) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, extra)) as never);
+
+        await send(Date.now() - 2000, { protocol: MIN_DEVICE_PROTOCOL - 1 });
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toEqual({ error: "outdated" });
+        await send(Date.now(), {});
+        expect(updateRequiredOf(await listed(ownerId), deviceId)).toBe(false);
+        expect(await createCall({ deviceId, threadId, userId: ownerId })).toHaveProperty("callId");
     });
 });
 
@@ -756,6 +968,25 @@ describe("reportDeviceCallProgress", () => {
         expect(await readCall(callId)).toMatchObject({ phase: "running", status: "claimed" });
     });
 
+    it("does not call a late report clock skew when its call is not current or is another call's", async () => {
+        const { deviceId, secret } = await pairedDevice(ownerId);
+        const threadId = await insertThread(ownerId);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const other = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const late = Date.now() - 60 * 60_000;
+
+        // Not claimed, so not current: a late report is just old.
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late }))).rejects.toThrow(MALFORMED_ERROR);
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
+        await expect(report(ownerId, { ...(await signedProgress(deviceId, secret, other.callId, { issuedAt: late })), callId })).rejects.toThrow(
+            MALFORMED_ERROR,
+        );
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late, phase: "completed" }))).rejects.toThrow(MALFORMED_ERROR);
+        // Already past this phase: not current either.
+        await report(ownerId, await signedProgress(deviceId, secret, callId, { phase: "running" }));
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: late }))).rejects.toThrow(MALFORMED_ERROR);
+    });
+
     it("refuses a stale report, another call's report and an unknown phase", async () => {
         const { deviceId, secret } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);
@@ -764,7 +995,10 @@ describe("reportDeviceCallProgress", () => {
 
         await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
 
-        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: Date.now() - 60 * 60_000 }))).rejects.toThrow(MALFORMED_ERROR);
+        await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { issuedAt: Date.now() - 60 * 60_000 }))).rejects.toMatchObject({
+            data: { code: "DEVICE_CLOCK_SKEW" },
+            message: expect.stringMatching(HOUR_BEHIND_ERROR),
+        });
         await expect(report(ownerId, { ...(await signedProgress(deviceId, secret, other.callId)), callId })).rejects.toThrow(MALFORMED_ERROR);
         await expect(report(ownerId, await signedProgress(deviceId, secret, callId, { phase: "completed" }))).rejects.toThrow(MALFORMED_ERROR);
         expect(await readCall(callId)).not.toHaveProperty("phase");

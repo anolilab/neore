@@ -57,6 +57,14 @@ export const MAX_MANIFEST_DESCRIPTION_CHARS = 2000;
 export const MAX_MANIFEST_SCHEMA_BYTES = 16 * 1024;
 export const MAX_MANIFEST_BYTES = 256 * 1024;
 
+/**
+ * The oldest backend<->desktop protocol (`BACKEND_PROTOCOL_VERSION` in `packages/device-core/src/envelope.rs`, not the
+ * SSH host's wire version) a computer may report in its signed manifest and still be handed calls. A manifest without one
+ * predates the report and is let through; one below this gets an update notice instead of calls it would fail.
+ * `constants.test.ts` pins it at or below the Rust constant.
+ */
+export const MIN_DEVICE_PROTOCOL = 3;
+
 /** A signed manifest or result older (or further ahead) than this is refused. */
 export const DEVICE_SIGNATURE_WINDOW_MS = 10 * 60_000;
 
