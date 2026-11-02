@@ -26220,6 +26220,12 @@
           "optional": true,
           "unique": false
         },
+        "secretRequest": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "status": {
           "kind": "union",
           "nullable": false,

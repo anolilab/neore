@@ -128,7 +128,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server, preferencesFailed) : undefined;
     // A retry with nothing cached puts the query back to loading; the failure line and its button stay through it, so focus is not lost and the wait is announced.
     const loadFailureShown = server?.kind === "failed" || (server?.kind === "loading" && preferencesFetching && preferenceFailures > 0);
-    const valueMax =input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
+    const valueMax = input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
     // Checked before anything is sent: the card clears the draft once it goes, and the server would refuse it after that.
     const tooLong = draft.trim().length > valueMax;
     // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
@@ -278,12 +278,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     </label>
                     <Input
                         aria-describedby={
-                            [
-                                destination ? destinationId : "",
-                                tooLong ? tooLongId : "",
-                                saveError ? saveErrorId : "",
-                                loadFailureShown ? loadErrorId : "",
-                            ]
+                            [destination ? destinationId : "", tooLong ? tooLongId : "", saveError ? saveErrorId : "", loadFailureShown ? loadErrorId : ""]
                                 .filter(Boolean)
                                 .join(" ") || undefined
                         }

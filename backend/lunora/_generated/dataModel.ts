@@ -1884,6 +1884,7 @@ export interface Doc_toolApprovalRuns {
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
+    secretRequest?: boolean;
     status: "pending" | "approved" | "denied";
     streamId?: string;
     threadId: string;
@@ -4856,6 +4857,7 @@ export interface Insert_toolApprovalRuns {
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
+    secretRequest?: boolean;
     status: "pending" | "approved" | "denied";
     streamId?: string;
     threadId: string;

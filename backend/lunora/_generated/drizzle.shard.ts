@@ -1658,6 +1658,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     createdAt: real("createdAt").notNull(),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
+    secretRequest: integer("secretRequest", { mode: "boolean" }),
     status: text("status", { mode: "json" }).$type<"pending" | "approved" | "denied">().notNull(),
     streamId: text("streamId"),
     threadId: text("threadId").notNull(),

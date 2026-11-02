@@ -269,10 +269,10 @@ describe("the secret request card", () => {
         mountCard(header);
         await screen.findByText(SERVERS_NOT_LOADED);
 
-        let release = () => {};
+        const hold = { release: () => {} };
 
         readHold.current = new Promise<void>((resolve) => {
-            release = resolve;
+            hold.release = resolve;
         });
         fireEvent.click(screen.getByRole("button", { name: RETRY }));
 
@@ -283,12 +283,12 @@ describe("the secret request card", () => {
         expect(button.disabled).toBe(true);
         expect(button.getAttribute("aria-busy")).toBe("true");
 
-        release();
+        hold.release();
         readHold.current = null;
 
         await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
         expect(screen.getByText(SERVERS_NOT_LOADED).getAttribute("role")).toBe("alert");
-        expect(screen.getByRole("button", { name: RETRY }).getAttribute("aria-busy")).toBeNull();
+        expect((screen.getByRole("button", { name: RETRY }) as HTMLButtonElement).disabled).toBe(false);
     });
 
     it("closes the card, with no form, when the server says the conversation moved on", async () => {
