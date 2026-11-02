@@ -280,7 +280,7 @@ describe("a computer too old for the backend", () => {
         }
     });
 
-    it("does not list or hand out a call queued before the computer was marked outdated, and fails it as outdated", async () => {
+    it("lists a call queued before the computer was marked outdated, and its claim fails it with the notice", async () => {
         const { deviceId, secret } = await register(ownerId);
         const threadId = await insertThread(ownerId);
         const send = async (issuedAt: number, protocol: number) =>
@@ -291,11 +291,62 @@ describe("a computer too old for the backend", () => {
         const pendingIds = async () =>
             ((await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as { callId: string }[]).map((call) => call.callId);
 
-        expect(await pendingIds()).toEqual([callId]);
         await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
-        expect(await pendingIds()).toEqual([]);
+        expect(await pendingIds()).toEqual([callId]);
         await expect(as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never)).resolves.toEqual({ claimed: false });
         expect(await readCall(callId)).toMatchObject({ error: expect.stringContaining("out of date"), status: "failed" });
+        expect(await pendingIds()).toEqual([]);
+    });
+
+    it("delivers a stop queued behind ten older calls of an outdated computer once those are failed", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 10; index += 1) {
+                await ctx.db.insert("deviceCalls", {
+                    createdAt: Date.now() - 1000 + index,
+                    deadline: Date.now() + 60_000,
+                    deviceId,
+                    deviceName: "Laptop",
+                    envelope: "",
+                    input: "{}",
+                    signature: "",
+                    status: "pending",
+                    taintedBy: [],
+                    threadId,
+                    toolName: "fs_read",
+                    userId: ownerId,
+                });
+            }
+        });
+
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        const stop = (await harness.run(
+            async (ctx: any) =>
+                await createAcpCall(
+                    ctx,
+                    { deviceId: deviceId as never, input: {}, kind: "acp_cancel", threadId: threadId as never, userId: ownerId },
+                    Date.now(),
+                ),
+        )) as { callId: string };
+        const pendingIds = async () =>
+            ((await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as { callId: string }[]).map((call) => call.callId);
+
+        const older = await pendingIds();
+
+        expect(older).toHaveLength(10);
+        expect(older).not.toContain(stop.callId);
+
+        for (const callId of older) {
+            await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
+        }
+
+        expect(await pendingIds()).toEqual([stop.callId]);
+        await expect(as(ownerId).mutation(functions.claimDeviceCall as never, { callId: stop.callId, deviceId } as never)).resolves.toEqual({ claimed: true });
     });
 
     it("is served again once an updated build reports the current protocol", async () => {

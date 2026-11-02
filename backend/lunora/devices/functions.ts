@@ -415,9 +415,7 @@ export const listPendingDeviceCalls = authQuery
         }
 
         const held = await Promise.all((args.hostDeviceIds ?? []).map(async (id) => await ctx.db.devices.findFirst({ where: { _id: id, userId } })));
-        const owned = [primary, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host] : []))];
-        const deviceIds = owned.map((device) => device._id);
-        const outdated = new Set<string>(owned.filter((device) => isDeviceOutdated(device)).map((device) => device._id as string));
+        const deviceIds = [args.deviceId, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host._id] : []))];
         const pages = await Promise.all(
             deviceIds.map(
                 async (deviceId) =>
@@ -427,7 +425,6 @@ export const listPendingDeviceCalls = authQuery
 
         return pages
             .flatMap(({ page }) => page)
-            .filter((call) => call.toolName === "acp_cancel" || !outdated.has(call.deviceId as string))
             .toSorted((a, b) => a.createdAt - b.createdAt)
             .slice(0, 10)
             .map((call) => {
