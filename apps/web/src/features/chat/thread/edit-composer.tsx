@@ -9,6 +9,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Separator } from "@neore/ui/components/separator";
@@ -24,6 +25,8 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+
+import { ComposerLengthNotice } from "./composer-length-notice";
 
 interface EditComposerProps {
     message: UIMessage;
@@ -68,7 +71,7 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
     }, [editText]);
 
     const handleSubmit = async () => {
-        if (!editText.trim() || isPending) {
+        if (!editText.trim() || isPending || editText.length > MAX_PROMPT_CHARS) {
             return;
         }
 
@@ -144,12 +147,14 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                 </div>
             </div>
 
+            <ComposerLengthNotice chars={editText.length} />
+
             <div className="m-1.5 flex items-center justify-end gap-2 self-end">
                 <Button onClick={handleCancel} size="sm" variant="ghost">
                     <XIcon className="mr-1 h-4 w-4" />
                     {t`Cancel`}
                 </Button>
-                <Button disabled={!editText.trim() || isPending} onClick={handleSubmit} size="sm" variant="default">
+                <Button disabled={!editText.trim() || isPending || editText.length > MAX_PROMPT_CHARS} onClick={handleSubmit} size="sm" variant="default">
                     <CheckIcon className="mr-1 h-4 w-4" />
                     {t`Save`}
                 </Button>

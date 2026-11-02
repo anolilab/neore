@@ -52,23 +52,23 @@ msgstr "„{0}” zawiera zmienne, które wymagają wartości."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "„{0}” wystartuje, gdy jego zależności zostaną ukończone"
 
-#: src/features/chat/thread/composer-input.tsx:562
+#: src/features/chat/thread/composer-input.tsx:563
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Nie można załączyć „{fileName}”: ten typ pliku nie jest obsługiwany."
 
-#: src/features/chat/thread/composer-input.tsx:555
+#: src/features/chat/thread/composer-input.tsx:556
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Nie udało się załączyć „{fileName}”: zawartość nie pasuje do typu pliku."
 
-#: src/features/chat/thread/composer-input.tsx:557
+#: src/features/chat/thread/composer-input.tsx:558
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Nie udało się przesłać „{fileName}”. Sprawdź połączenie i spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:560
+#: src/features/chat/thread/composer-input.tsx:561
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}” jest za duży. Dokumenty mogą mieć maksymalnie {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:561
+#: src/features/chat/thread/composer-input.tsx:562
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}” jest za duży. Pliki tego typu mogą mieć maksymalnie {maxMegabytes} MB."
 
@@ -2073,11 +2073,11 @@ msgstr "Dodaj co najmniej jeden model — użyj „Pobierz modele” lub wpisz i
 msgid "Add at least one model id"
 msgstr "Dodaj co najmniej jeden identyfikator modelu"
 
-#: src/features/chat/thread/composer-input-area.tsx:192
-#: src/features/chat/thread/composer-input-area.tsx:226
-#: src/features/chat/thread/composer-input-area.tsx:233
-#: src/features/chat/thread/composer-input-area.tsx:247
-#: src/features/chat/thread/edit-composer.tsx:125
+#: src/features/chat/thread/composer-input-area.tsx:196
+#: src/features/chat/thread/composer-input-area.tsx:230
+#: src/features/chat/thread/composer-input-area.tsx:237
+#: src/features/chat/thread/composer-input-area.tsx:251
+#: src/features/chat/thread/edit-composer.tsx:128
 msgid "Add attachment"
 msgstr "Dodaj załącznik"
 
@@ -3827,6 +3827,10 @@ msgstr ""
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr ""
 
+#: src/features/chat/thread/composer-length-notice.tsx:30
+msgid "Attach as file"
+msgstr ""
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Dołącz pliki lub całe kolekcje, z których AI będzie korzystać i które będzie cytować w tej rozmowie."
@@ -5140,7 +5144,7 @@ msgstr "Kanada"
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
-#: src/features/chat/thread/edit-composer.tsx:150
+#: src/features/chat/thread/edit-composer.tsx:155
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
@@ -5302,7 +5306,7 @@ msgstr "Podpis"
 msgid "Caption text"
 msgstr "Tekst podpisu"
 
-#: src/features/chat/thread/composer-input-area.tsx:221
+#: src/features/chat/thread/composer-input-area.tsx:225
 msgid "Capture screen"
 msgstr "Zrzut ekranu"
 
@@ -6041,7 +6045,7 @@ msgstr "Kliknij ikonę pinezki przy dowolnej wiadomości, aby ją tu zapisać."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Kliknij gwiazdkę przy dowolnym modelu w sekcji Wszystkie modele, aby go tu dodać."
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:296
 msgid "Click to edit"
 msgstr "Kliknij, aby edytować"
 
@@ -7371,8 +7375,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:764
-#: src/features/chat/thread/composer-input.tsx:1161
+#: src/features/chat/thread/composer-input.tsx:728
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Conversion failed"
 msgstr "Konwersja nie powiodła się"
 
@@ -7668,7 +7672,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "Nie udało się zastosować zmian"
 
-#: src/features/chat/thread/composer-input.tsx:1183
+#: src/features/chat/thread/composer-input.tsx:1211
 msgid "Could not attach the chat"
 msgstr "Nie udało się dołączyć czatu"
 
@@ -7867,11 +7871,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1186
+#: src/features/chat/thread/composer-input.tsx:1214
 msgid "Could not read that chat"
 msgstr "Nie udało się odczytać tego czatu"
 
-#: src/features/chat/thread/composer-input.tsx:1187
+#: src/features/chat/thread/composer-input.tsx:1215
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Nie udało się odczytać tego czatu. Jeśli jest zablokowany, najpierw go odblokuj."
 
@@ -10138,7 +10142,7 @@ msgstr "Przeciągnij pliki tutaj"
 msgid "Draw an image"
 msgstr "Narysuj obraz"
 
-#: src/features/chat/thread/composer-input-area.tsx:215
+#: src/features/chat/thread/composer-input-area.tsx:219
 msgid "Draw image"
 msgstr "Narysuj obraz"
 
@@ -10160,7 +10164,7 @@ msgstr "Upuść plik lub kliknij, aby przesłać"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1366
+#: src/features/chat/thread/composer-input.tsx:1395
 msgid "Drop files here"
 msgstr "Upuść pliki tutaj"
 
@@ -10436,8 +10440,8 @@ msgstr "Edytuj kolekcję"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:302
-#: src/features/chat/thread/composer-input.tsx:314
+#: src/features/chat/thread/composer-input.tsx:303
+#: src/features/chat/thread/composer-input.tsx:315
 msgid "Edit content"
 msgstr "Edytuj treść"
 
@@ -10534,7 +10538,7 @@ msgstr "Edytuj wybrane obszary obrazu za pomocą AI"
 msgid "Edit task"
 msgstr "Edytuj zadanie"
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:142
 msgid "Edit the reply..."
 msgstr ""
 
@@ -10550,7 +10554,7 @@ msgstr "Edytuj wyzwalacz"
 msgid "edit video"
 msgstr ""
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:142
 msgid "Edit your message..."
 msgstr "Edytuj swoją wiadomość..."
 
@@ -12069,7 +12073,7 @@ msgid "Failed to attach collection"
 msgstr "Nie udało się dołączyć kolekcji"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1023
+#: src/features/chat/thread/composer-input.tsx:1051
 msgid "Failed to attach file"
 msgstr "Nie udało się dołączyć pliku"
 
@@ -12466,7 +12470,7 @@ msgstr "Nie udało się wysłać żądania eksportu"
 msgid "Failed to reset to defaults"
 msgstr "Nie udało się przywrócić ustawień domyślnych"
 
-#: src/features/chat/thread/composer-input.tsx:1055
+#: src/features/chat/thread/composer-input.tsx:1083
 msgid "Failed to restore attachment"
 msgstr "Nie udało się przywrócić załącznika"
 
@@ -16255,11 +16259,11 @@ msgstr "Inteligentny model wideo, który myśli przed generowaniem"
 msgid "Intensity"
 msgstr "Intensywność"
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:308
 msgid "Interrupt and restart"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:320
+#: src/features/chat/thread/composer-input-area.tsx:324
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
@@ -17957,6 +17961,10 @@ msgstr "Wykryto długi tekst"
 #: src/features/marketing/data/models-data.ts:169
 msgid "Long text generation in images"
 msgstr "Generowanie długich tekstów na obrazach"
+
+#: src/features/chat/thread/composer-input.tsx:782
+msgid "Long text was attached as a file."
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:391
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
@@ -24251,11 +24259,11 @@ msgstr "Zapytania o analitykę użycia i koszty"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:330
+#: src/features/chat/thread/composer-input-area.tsx:334
 msgid "Queue message"
 msgstr "Dodaj wiadomość do kolejki"
 
-#: src/features/chat/thread/composer-input-area.tsx:349
+#: src/features/chat/thread/composer-input-area.tsx:353
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Dodaj wiadomość do kolejki — zostanie wysłana, gdy bieżąca odpowiedź się zakończy"
 
@@ -24519,7 +24527,7 @@ msgstr "Podgląd tylko do odczytu – rozwidlij, aby edytować"
 msgid "Read-only shared conversation"
 msgstr "Udostępniona rozmowa tylko do odczytu"
 
-#: src/features/chat/thread/composer-input.tsx:259
+#: src/features/chat/thread/composer-input.tsx:260
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Odczytywanie „{attachmentName}”…"
 
@@ -25108,10 +25116,10 @@ msgstr "Zapamiętaj mnie"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:321
-#: src/features/chat/thread/composer-input.tsx:333
-#: src/features/chat/thread/composer-input.tsx:387
-#: src/features/chat/thread/composer-input.tsx:396
+#: src/features/chat/thread/composer-input.tsx:322
+#: src/features/chat/thread/composer-input.tsx:334
+#: src/features/chat/thread/composer-input.tsx:388
+#: src/features/chat/thread/composer-input.tsx:397
 #: src/features/devices/components/devices-settings.tsx:193
 #: src/features/devices/components/devices-settings.tsx:199
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25806,11 +25814,11 @@ msgstr "Ponów za {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:411
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:405
+#: src/features/chat/thread/composer-input.tsx:406
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26304,7 +26312,7 @@ msgstr "Arabia Saudyjska"
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/chat/thread/edit-composer.tsx:154
+#: src/features/chat/thread/edit-composer.tsx:159
 #: src/features/chat/thread/request-secret-prompt.tsx:263
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
@@ -26521,7 +26529,7 @@ msgstr "Wynik"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Ocenia każdą odpowiedź w skali 0–100% względem oczekiwanej odpowiedzi lub kryteriów oceny. Dodaje małe wywołanie modelu na przypadek."
 
-#: src/features/chat/thread/composer-input.tsx:982
+#: src/features/chat/thread/composer-input.tsx:1010
 msgid "Screen capture failed. Please try again."
 msgstr "Przechwytywanie ekranu nie powiodło się. Spróbuj ponownie."
 
@@ -27168,12 +27176,12 @@ msgid "Send Magic Link"
 msgstr "Wyślij magiczny link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:159
-#: src/features/chat/thread/composer-input-area.tsx:383
+#: src/features/chat/thread/composer-input-area.tsx:163
+#: src/features/chat/thread/composer-input-area.tsx:387
 msgid "Send message"
 msgstr "Wyślij wiadomość"
 
-#: src/features/chat/thread/composer-input-area.tsx:159
+#: src/features/chat/thread/composer-input-area.tsx:163
 msgid "Send message ({sendShortcut})"
 msgstr ""
 
@@ -28858,11 +28866,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Strona statusu"
 
-#: src/features/chat/thread/composer-input-area.tsx:321
+#: src/features/chat/thread/composer-input-area.tsx:325
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:308
 msgid "Steer the reply"
 msgstr ""
 
@@ -28939,8 +28947,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:357
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:361
+#: src/features/chat/thread/composer-input-area.tsx:374
 msgid "Stop generating"
 msgstr "Zatrzymaj generowanie"
 
@@ -30203,7 +30211,7 @@ msgstr "Ustawiono kierunek tekstu na LTR"
 msgid "Text direction set to RTL"
 msgstr "Ustawiono kierunek tekstu na RTL"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:296
 msgid "Text document"
 msgstr "Dokument tekstowy"
 
@@ -30888,7 +30896,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Ujednolicona brama LLM dla nowoczesnych aplikacji AI."
 
-#: src/features/chat/thread/composer-input.tsx:556
+#: src/features/chat/thread/composer-input.tsx:557
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Przesyłanie „{fileName}” wygasło. Załącz plik ponownie."
 
@@ -31300,6 +31308,18 @@ msgstr "To wspomnienie zostało od tego czasu usunięte."
 #. placeholder {1}: methodLabels[method]
 #: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
+msgstr ""
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:25
+msgid "This message has {0} characters; the limit is {1}. Shorten it, or attach it as a file."
+msgstr ""
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:26
+msgid "This message has {0} characters; the limit is {1}. Shorten it."
 msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
@@ -32404,7 +32424,7 @@ msgstr "Pisz, aby wyszukać"
 msgid "Type your answer…"
 msgstr "Wpisz odpowiedź…"
 
-#: src/features/chat/thread/composer-input.tsx:1357
+#: src/features/chat/thread/composer-input.tsx:1386
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "Wpisz wiadomość..."
@@ -32567,6 +32587,7 @@ msgstr "Pod maską"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
+#: src/features/chat/thread/composer-input.tsx:784
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Cofnij"
@@ -32794,7 +32815,7 @@ msgstr "Aktualna dokumentacja dowolnej biblioteki lub frameworka"
 msgid "Update Duration"
 msgstr "Zmień czas trwania"
 
-#: src/features/chat/thread/composer-input.tsx:1218
+#: src/features/chat/thread/composer-input.tsx:1246
 msgid "Update failed"
 msgstr "Aktualizacja nie powiodła się"
 
@@ -32982,18 +33003,18 @@ msgstr "Przesyłaj pliki CSV, uruchamiaj analizy w Pythonie i eksportuj wykresy 
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Przesyłaj dokumenty do bazy wiedzy i grupuj je w kolekcje. AI przeszukuje je pod kątem kontekstu i cytuje użyte fragmenty."
 
-#: src/features/chat/thread/composer-input.tsx:402
-#: src/features/chat/thread/composer-input.tsx:601
-#: src/features/chat/thread/composer-input.tsx:1139
+#: src/features/chat/thread/composer-input.tsx:403
+#: src/features/chat/thread/composer-input.tsx:602
+#: src/features/chat/thread/composer-input.tsx:1167
 msgid "Upload failed"
 msgstr "Przesyłanie nie powiodło się"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1132
+#: src/features/chat/thread/composer-input.tsx:1160
 msgid "Upload failed: {0}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:210
+#: src/features/chat/thread/composer-input-area.tsx:214
 msgid "Upload file"
 msgstr "Prześlij plik"
 
@@ -33039,7 +33060,7 @@ msgstr "Przesłane"
 msgid "Uploaded {fileName}"
 msgstr "Przesłano {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:339
+#: src/features/chat/thread/composer-input.tsx:340
 msgid "Uploading {attachmentName}"
 msgstr "Przesyłanie {attachmentName}"
 
@@ -34155,10 +34176,10 @@ msgstr "Oczekiwanie na odpowiedź właściciela"
 msgid "Waiting for the owner to approve"
 msgstr "Oczekiwanie na zatwierdzenie przez właściciela"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
-#: src/features/chat/thread/composer-input-area.tsx:349
-#: src/features/chat/thread/composer-input-area.tsx:383
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:334
+#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:387
+#: src/features/chat/thread/composer-input-area.tsx:401
 msgid "Waiting for uploads to complete…"
 msgstr "Oczekiwanie na zakończenie przesyłania…"
 
@@ -35200,12 +35221,12 @@ msgid "Your First Chat"
 msgstr "Twój pierwszy czat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:647
+#: src/features/chat/thread/composer-input.tsx:648
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Twoje dane wejściowe są duże (~{0} tokenów) i zajmą znaczną część okna kontekstu modelu."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:641
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Twoje dane wejściowe są za duże (~{0} tokenów) i przekraczają okno kontekstu modelu. Skróć wiadomość lub usuń załączniki, aby ją wysłać."
 

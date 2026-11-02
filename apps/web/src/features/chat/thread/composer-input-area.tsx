@@ -30,6 +30,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 
 import type { ChatReference } from "./chat-reference";
+import { ComposerLengthNotice } from "./composer-length-notice";
 import ComposerTextCounter from "./composer-text-counter";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
 import { ComposerTiptapEditor } from "./composer-tiptap/composer-tiptap-editor";
@@ -57,6 +58,7 @@ interface ComposerInputAreaProps {
      * submit handler decides what queuing means; Enter already reaches it.
      */
     canQueueWhileStreaming?: boolean;
+
     /** Show compact version */
     compact?: boolean;
     /** The chat being typed into; the @ popup does not offer it as a reference */
@@ -71,6 +73,7 @@ interface ComposerInputAreaProps {
      * shows the button; omitted, it reads as "none", so a runner that did not say hides it.
      */
     followUp?: FollowUpControl;
+
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -81,6 +84,8 @@ interface ComposerInputAreaProps {
     maxRows?: number;
     /** Called when attachment button is clicked */
     onAddAttachment?: () => void;
+    /** Moves an over-the-cap draft into a text attachment; the length notice offers it */
+    onAttachDraftAsFile?: () => void;
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
     /** Called when "Capture screen" is chosen; omit where screen capture is unsupported */
@@ -126,6 +131,7 @@ const ComposerInputArea = ({
     autoFocus = true,
     bannedWordError,
     bannedWordMatches,
+    onAttachDraftAsFile,
     beforeInput,
     canQueueWhileStreaming = false,
     compact = false,
@@ -403,6 +409,8 @@ const ComposerInputArea = ({
 
             {/* Banned word error message */}
             {bannedWordError && <div className="px-3 pb-2 text-sm text-red-600 dark:text-red-400">{bannedWordError}</div>}
+
+            {onAttachDraftAsFile && <ComposerLengthNotice chars={value.length} onAttachAsFile={onAttachDraftAsFile} />}
         </>
     );
 };
