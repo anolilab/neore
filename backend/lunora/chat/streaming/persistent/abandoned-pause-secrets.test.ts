@@ -229,7 +229,7 @@ describe("a paused reply that is abandoned", () => {
 
         expect(await holdsValue(ref)).toBe(true);
 
-        await run(async (ctx) => await ctx.db.patch(second as never, { status: "done" }));
+        await run(async (ctx) => await ctx.db.patch("persistentStreams", second as never, { status: "done" }));
         await run(async (ctx) => await ctx.runMutation(discardSecretsOfThread, { streamId: first, threadId: threadId as never }));
 
         expect(await holdsValue(ref)).toBe(false);

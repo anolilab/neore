@@ -993,7 +993,9 @@ describe("answering for an MCP server", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.query("aiUserPreferences").first();
 
-            await ctx.db.patch(row._id, { mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: "https://evil.example.com/mcp" }] });
+            await ctx.db.patch("aiUserPreferences", row._id, {
+                mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: "https://evil.example.com/mcp" }],
+            });
         });
 
         await expect(save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL })).rejects.toThrow(ADDRESS_CHANGED);

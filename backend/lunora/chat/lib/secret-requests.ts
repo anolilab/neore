@@ -338,7 +338,7 @@ export const discardPausedThreadSecrets = async (
 
     for (const run of abandoned) {
         if (run.secretRequest === true || legacy.has(run.approvalId)) {
-            await patchRow(ctx.db, run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
+            await patchRow(ctx.db, "toolApprovalRuns", run, { resolvedAt: Date.now(), resolvedBy: APPROVAL_ABANDONED_BY, status: "denied" });
         }
     }
 
@@ -356,7 +356,7 @@ export const discardPausedThreadSecrets = async (
     const held = rows.filter((row) => row.encryptedValue !== undefined && row.replyKey !== undefined && keys.has(row.replyKey));
 
     for (const row of held) {
-        await patchRow(ctx.db, row, { encryptedValue: undefined, status: "abandoned" });
+        await patchRow(ctx.db, "requestedSecrets", row, { encryptedValue: undefined, status: "abandoned" });
     }
 
     return held.length;
