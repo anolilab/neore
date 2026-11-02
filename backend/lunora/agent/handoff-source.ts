@@ -218,6 +218,10 @@ const findDivider = async (
 export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
     await findDivider(context, threadId, from, (part) => agentKeyOf(part.from) === model);
 
+/** The newest divider on the path ending at `from` that moved on TO `model`: where the agent came into the thread. */
+export const findDividerEntering = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
+    await findDivider(context, threadId, from, (part) => agentKeyOf(part.to) === model);
+
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && part.mode !== "full");
+    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && (part.mode === "portable" || part.mode === "delta"));

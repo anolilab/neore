@@ -29,10 +29,18 @@ export const isLiveStream = (stream: Pick<Stream, "status">): boolean => stream.
  */
 export const createHostStream = async (
     ctx: Pick<MutationCtx, "db">,
-    stream: { hostState: HostState; messageId: string; regenerate?: boolean; threadId: Id<"threads">; turnId: string; userId: string },
+    stream: {
+        carriesHandoff?: boolean;
+        hostState: HostState;
+        messageId: string;
+        regenerate?: boolean;
+        threadId: Id<"threads">;
+        turnId: string;
+        userId: string;
+    },
     now: number,
 ): Promise<Id<"persistentStreams">> => {
-    const { hostState, messageId, regenerate, threadId, turnId, userId } = stream;
+    const { carriesHandoff, hostState, messageId, regenerate, threadId, turnId, userId } = stream;
     const expiresAt = now + HOST_STREAM_IDLE_MS;
     const streamId = await ctx.db.insert("persistentStreams", {
         expiresAt,
@@ -45,6 +53,7 @@ export const createHostStream = async (
         threadId,
         userId,
         ...(regenerate && { hostRegenerate: true }),
+        ...(carriesHandoff && { carriesHandoff: true }),
     });
 
     await noteShardDue(ctx, expiresAt);
