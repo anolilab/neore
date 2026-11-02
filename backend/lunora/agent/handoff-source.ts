@@ -10,6 +10,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
+import { FILE_TOKEN_ESTIMATE_CHARS, IMAGE_TOKEN_ESTIMATE_CHARS } from "../chat/lib/auto-continue";
 import { walkPath } from "./branch-rows";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
 import { extractText } from "./shared";
@@ -122,34 +123,81 @@ export const collectHandoffSource = async (
     };
 };
 
+/** The characters an image or file part of a row stands for: it has no text, but the model is sent it. */
+const mediaCharacters = (row: Pick<Row, "message">): number => {
+    const content = (row.message as { content?: unknown } | undefined)?.content;
+
+    if (!Array.isArray(content)) {
+        return 0;
+    }
+
+    let characters = 0;
+
+    for (const part of content as ReadonlyArray<{ type?: unknown } | null>) {
+        if (part?.type === "image") {
+            characters += IMAGE_TOKEN_ESTIMATE_CHARS;
+        } else if (part?.type === "file") {
+            characters += FILE_TOKEN_ESTIMATE_CHARS;
+        }
+    }
+
+    return characters;
+};
+
+/** What {@link pathWindow} counted. */
+export interface PathWindow {
+    /** A `portable` divider with a handoff ended the count: everything before it is replaced by that handoff, so no earlier one is needed. */
+    covered: boolean;
+    /** The oldest row counted, or `null` when none was. */
+    oldest: Row | null;
+    tokens: number;
+}
+
 /**
- * Estimated tokens of the stored text of the path ending at `from` (inclusive), counting up toward `cap` and
- * stopping the walk once past it. `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read:
- * a path longer than that many pages counts as past the cap whatever its rows say. `maxRows` counts only that many
- * rows from `from`: the window a reply actually reads.
+ * Estimated tokens of the path ending at `from` (inclusive), counting up toward `cap` and stopping the walk once
+ * past it: the stored text of each row plus a fixed estimate for each image or file part, which have no text.
+ * `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read: a path longer than that many pages
+ * counts as past the cap whatever its rows say. `maxRows` counts only that many rows from `from`: the window a reply
+ * actually reads. With `handoffs`, a divider's stored handoff counts as the text the model is sent, and a `portable`
+ * one ends the count, since it stands in for every row before it.
  */
-export const pathTokens = async (
+export const pathWindow = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row | null,
-    options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
-): Promise<number> => {
+    options: { cap: number; handoffs?: boolean; maxPages?: number; maxRows?: number; stopAtId?: string },
+): Promise<PathWindow> => {
     let characters = 0;
     let cursor = from;
+    let oldest: Row | null = null;
+    let covered = false;
     let pages = 0;
     let rowsLeft = options.maxRows ?? Infinity;
 
-    while (cursor && cursor._id !== options.stopAtId) {
+    while (cursor && cursor._id !== options.stopAtId && !covered) {
         pages += 1;
 
         if (options.maxPages !== undefined && pages > options.maxPages) {
-            return options.cap + 1;
+            return { covered, oldest, tokens: options.cap + 1 };
         }
 
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: Math.min(PAGE_ROWS, rowsLeft), stopAtId: options.stopAtId });
 
         for (const row of rows) {
-            characters += row.text?.length ?? 0;
+            const part = options.handoffs ? agentSwitchOf(row) : undefined;
+
+            if (part?.handoff) {
+                characters += part.handoff.length;
+                covered = part.mode === "portable";
+            }
+
+            oldest = row;
+
+            if (covered) {
+                break;
+            }
+
+            characters += (row.text?.length ?? 0) + mediaCharacters(row);
         }
 
         rowsLeft -= rows.length;
@@ -161,8 +209,16 @@ export const pathTokens = async (
         cursor = next;
     }
 
-    return estimateTokensFromCharacters(characters);
+    return { covered, oldest, tokens: estimateTokensFromCharacters(characters) };
 };
+
+/** Estimated tokens of the path ending at `from`; see {@link pathWindow}. */
+export const pathTokens = async (
+    context: Reader,
+    threadId: Id<"threads">,
+    from: Row | null,
+    options: { cap: number; maxPages?: number; maxRows?: number; stopAtId?: string },
+): Promise<number> => (await pathWindow(context, threadId, from, options)).tokens;
 
 /** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */
 export const rowsSince = async (context: Reader, threadId: Id<"threads">, from: Row, stopAtId: string, cap: number): Promise<number> => {

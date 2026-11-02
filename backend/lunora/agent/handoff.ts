@@ -151,7 +151,7 @@ export interface HandoffPlan {
 }
 
 const tooLarge = (): HandoffTooLargeError =>
-    new HandoffTooLargeError("The latest message in this conversation is too long to hand over to another model. Start a new chat, or keep the full history.");
+    new HandoffTooLargeError("The latest message in this conversation is too long to hand over to another model. Shorten or split it, or switch to a model with a larger context window.");
 
 /**
  * Splits the thread (newest turn first) into the verbatim tail and the older turns. When every turn fits
@@ -246,7 +246,7 @@ export const composeTailHandoff = (
 /** Throws when `text` weighs more than the budget. After {@link capSummary} only a frame larger than planned can do that. */
 export const assertWithinBudget = (text: string, limits: HandoffLimits = DEFAULT_HANDOFF_LIMITS): string => {
     if (handoffTokens(text) > limits.budgetTokens) {
-        throw new HandoffTooLargeError("The handoff came out too large to hand over. Keep the full history instead.", HANDOFF_REFUSED_OVER_BUDGET);
+        throw new HandoffTooLargeError("The handoff came out too large to hand over. Shorten the newest message, or switch to a model with a larger context window.", HANDOFF_REFUSED_OVER_BUDGET);
     }
 
     return text;

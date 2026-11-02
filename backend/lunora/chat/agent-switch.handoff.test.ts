@@ -653,3 +653,74 @@ describe("a switch to a model with a small context window", () => {
         expect(preview.handoffTokens).toBeLessThanOrEqual(handoffLimitsFor(SMALL_WINDOW).budgetTokens);
     });
 });
+
+describe("whether the target is sent the history whole", () => {
+    const SMALL_WINDOW = 6000;
+
+    beforeEach(() => {
+        windows.set(C, SMALL_WINDOW);
+    });
+
+    const addImageRow = async (): Promise<void> => {
+        const index = order;
+
+        order += 0;
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("messages", {
+                    message: { content: [{ image: "storage:an-image", type: "image" as const }], role: "user" },
+                    order: index,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId,
+                    tool: false,
+                    userId: owner,
+                }),
+        );
+        // The next row is a new turn.
+        order += 1;
+    };
+
+    it("counts the stored handoff a short thread is sent in front of its rows", async () => {
+        // A long thread handed over once: its handoff weighs about 10k tokens and stands in for all of it.
+        await longThread(30);
+        await switchTo(B, "click-1", "portable");
+
+        // More rows than a reply reads, so the divider is above the window; each is tiny.
+        for (let index = 0; index < 60; index += 1) {
+            await addTurn(`q${index}`, `a${index}`);
+        }
+
+        await switchTo(C, "click-2", "full");
+
+        const [, toC] = await dividers();
+
+        expect(toC).toMatchObject({ mode: "portable", to: { model: C } });
+    });
+
+    it("counts images and files, which have no text", async () => {
+        for (let index = 0; index < 8; index += 1) {
+            await addImageRow();
+            await addRow("assistant", "a picture");
+        }
+
+        await switchTo(C, "click-1", "full");
+
+        expect(await dividers()).toMatchObject([{ mode: "portable" }]);
+    });
+
+    it("does not restore a model's earlier context as a delta when that context overflows its window", async () => {
+        await addTurn("hello", "hi");
+        await switchTo(C, "click-1", "full");
+        await switchTo(B, "click-2", "full");
+
+        // Under the cold-start threshold, so the history would go whole to a big model, but not to C.
+        for (let index = 0; index < 12; index += 1) {
+            await addTurn(`question ${index} ${"q".repeat(900)}`, `answer ${index} ${"a".repeat(900)}`);
+        }
+
+        await switchTo(C, "click-3");
+
+        expect(await dividers()).toMatchObject([{ mode: "full" }, { mode: "full" }, { mode: "portable", to: { model: C } }]);
+    });
+});

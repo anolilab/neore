@@ -24,7 +24,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
+import { handoffAboveOf, leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
 import { type AgentRef, HANDOFF_MAX_CHARACTERS, type SwitchAgentRef, vAgentRef, vAgentSwitchMode, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import {
@@ -36,13 +36,14 @@ import {
     handoffLimitsFor,
     HANDOFF_SUMMARY_SYSTEM,
     HandoffTooLargeError,
+    handoffTokens,
     planHandoff,
     summaryPromptOf,
     type HandoffKind,
     type HandoffLimits,
     type HandoffTurn,
 } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving, pathTokens, rowsSince } from "../agent/handoff-source";
+import { collectHandoffSource, findDividerLeaving, pathTokens, pathWindow, rowsSince } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -343,9 +344,11 @@ const modeFor = async (
 ): Promise<{ boundaryId?: string; mode: "delta" | "full" | "portable" }> => {
     // Only an unrequested mode needs the size of the path, and only whether it passes the threshold.
     const wanted = requested ?? ((await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf)) ? "portable" : "full");
+    // What the target would be sent whole, as the history or as a delta's restored context, has to fit its window.
+    const fits = await historyFits(ctx, checked);
 
     // The whole history goes only to a model whose window holds it: a small one is handed a summary instead of an overflow.
-    if (wanted === "full" && (await historyFits(ctx, checked))) {
+    if (wanted === "full" && fits) {
         return { mode: "full" };
     }
 
@@ -353,7 +356,7 @@ const modeFor = async (
 
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
-    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+    if (fits && earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
         return { boundaryId: earlier.part.startMessageId, mode: "delta" };
     }
 
@@ -363,13 +366,22 @@ const modeFor = async (
 /** The context window of the model a switch moves to. */
 const windowOf = (checked: Extract<Checked, { kind: "ready" }>): number => getModelContextWindow(checked.to.model);
 
-/** Whether the rows a reply reads fit the target's window with room for the reply. */
+/**
+ * Whether what a reply on the target is sent fits its window with room for the reply: the last DEFAULT_RECENT_MESSAGES
+ * rows (text, and a fixed estimate for each image or file), plus the stored handoff that stands in for the rows
+ * above them when the thread was switched before.
+ */
 const historyFits = async (ctx: QueryCtx, checked: Extract<Checked, { kind: "ready" }>): Promise<boolean> => {
     const cap = fullHistoryCapFor(windowOf(checked));
-    // A reply reads the last DEFAULT_RECENT_MESSAGES rows, so that is what has to fit.
-    const tokens = await pathTokens(ctx, checked.thread._id, checked.leaf, { cap, maxRows: DEFAULT_RECENT_MESSAGES });
+    const { covered, oldest, tokens } = await pathWindow(ctx, checked.thread._id, checked.leaf, { cap, handoffs: true, maxRows: DEFAULT_RECENT_MESSAGES });
 
-    return tokens <= cap;
+    if (tokens > cap || covered || !oldest || oldest.order <= 0) {
+        return tokens <= cap;
+    }
+
+    const above = await handoffAboveOf(ctx, { belowMessageId: oldest._id, threadId: checked.thread._id });
+
+    return tokens + above.reduce((sum, text) => sum + handoffTokens(text), 0) <= cap;
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });

@@ -103,6 +103,16 @@ describe("planHandoff", () => {
         expect(() => planHandoff([huge])).toThrow(TOO_LONG);
     });
 
+    it("refuses with advice that works: no offer of the full history, which would fall back to this handoff", () => {
+        const huge: HandoffTurn = { role: "user", text: "y".repeat(HANDOFF_BUDGET_TOKENS * 4) };
+        const over = () => assertWithinBudget(composeHandoff({ kind: "portable", summary: "x".repeat(HANDOFF_BUDGET_TOKENS * 4), tail: [] }));
+
+        for (const refuse of [() => planHandoff([huge]), over]) {
+            expect(refuse).toThrow(/larger context window/);
+            expect(refuse).not.toThrow(/full history/i);
+        }
+    });
+
     it("cuts a summary that outgrew its allotment at a line, so it fits the room planHandoff left it", () => {
         const { tail } = planHandoff(newestFirst);
         const lines = Array.from({ length: 4000 }, (_, index) => `point ${index}`);

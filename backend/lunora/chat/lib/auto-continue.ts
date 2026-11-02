@@ -20,9 +20,9 @@ import { DROPPED_SUMMARY_NOTE, formatTaintLine, SUMMARY_HEADER } from "./compres
 /** Approximate characters per token for English text */
 const CHARS_PER_TOKEN = 4;
 /** Estimated token cost for image content parts (~1000 tokens) */
-const IMAGE_TOKEN_ESTIMATE_CHARS = 4000;
+export const IMAGE_TOKEN_ESTIMATE_CHARS = 4000;
 /** Estimated token cost for file content parts (~500 tokens) */
-const FILE_TOKEN_ESTIMATE_CHARS = 2000;
+export const FILE_TOKEN_ESTIMATE_CHARS = 2000;
 /** Overhead chars for tool call framing (name, JSON structure) */
 const TOOL_CALL_OVERHEAD_CHARS = 100;
 /** Safety margin applied to token estimates to avoid context overflow */
