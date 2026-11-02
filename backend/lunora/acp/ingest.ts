@@ -120,7 +120,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             // An agent that reported no id of its own leaves the asked-for one on the row, which would send a later switch
             // back to the same session that just failed to load.
             if (open.nativeSessionId === undefined) {
-                await patchRow(ctx.db, existing, { nativeSessionId: undefined });
+                await patchRow(ctx.db, "acpSessions", existing, { nativeSessionId: undefined });
             }
         }
 
@@ -348,7 +348,7 @@ const applyTurnPost = async (
 
         // The agent opened the turn whose prompt carried the handoff: only now does its saved session hold it (`receivedItsHandoff`).
         if (event.kind === "turn_start" && stream.carriesHandoff === true && session.handoffSentAt === undefined) {
-            await ctx.db.patch(session._id, { handoffSentAt: now });
+            await ctx.db.patch("acpSessions", session._id, { handoffSentAt: now });
         }
 
         if (isAgentEvent(event)) {

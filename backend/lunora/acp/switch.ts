@@ -275,7 +275,7 @@ const nativePlanFor = async (
     }
 
     const lastSeenId = ctx.db.normalizeId("messages", departure.part.startMessageId);
-    const lastSeen = lastSeenId ? await ctx.db.get(lastSeenId) : null;
+    const lastSeen = lastSeenId ? await ctx.db.get("messages", lastSeenId) : null;
 
     if (!lastSeen || !(await receivedItsHandoff(ctx, { agent: to, lastSeen, sessions: earlier, threadId: thread._id }))) {
         return undefined;

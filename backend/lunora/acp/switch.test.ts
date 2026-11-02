@@ -992,7 +992,7 @@ describe("native reattach (S4)", () => {
             const { page } = await ctx.db.deviceCalls.findMany({ where: {} });
 
             for (const call of page) {
-                await ctx.db.patch(call._id, { status: "completed" });
+                await ctx.db.patch("deviceCalls", call._id, { status: "completed" });
             }
         });
         await switchAway(device, threadId);
@@ -1170,7 +1170,7 @@ describe("native reattach (S4)", () => {
         await run(async (ctx) => {
             const [session] = (await ctx.db.acpSessions.findMany({ where: { threadId } })).page;
 
-            await ctx.db.patch(session._id, { status: "ended" });
+            await ctx.db.patch("acpSessions", session._id, { status: "ended" });
         });
 
         // Another agent would be handed the conversation, and the newest turn does not fit beside a prompt.
@@ -1198,7 +1198,7 @@ describe("native reattach (S4)", () => {
         await run(async (ctx) => {
             const [session] = (await ctx.db.acpSessions.findMany({ where: { threadId } })).page;
 
-            await ctx.db.patch(session._id, { status: "ended" });
+            await ctx.db.patch("acpSessions", session._id, { status: "ended" });
         });
         await switchTo(threadId, hostTarget(device, CLAUDE));
 
@@ -1428,7 +1428,7 @@ describe("a saved session is reattached only if it received the conversation", (
                 const { page } = await ctx.db.deviceCalls.findMany({ where: { status } });
 
                 for (const call of page) {
-                    await ctx.db.patch(call._id, { status: "completed" });
+                    await ctx.db.patch("deviceCalls", call._id, { status: "completed" });
                 }
             }
         });
@@ -1449,14 +1449,14 @@ describe("a saved session is reattached only if it received the conversation", (
                 const { page } = await ctx.db.persistentStreams.findMany({ where: { producer: "host" } });
 
                 for (const stream of page) {
-                    await ctx.db.patch(stream._id, { hostEndReason: "timeout", hostState: "ended", status: "timeout" });
+                    await ctx.db.patch("persistentStreams", stream._id, { hostEndReason: "timeout", hostState: "ended", status: "timeout" });
                 }
 
                 // The turn ended without the agent opening it: the session is free again.
                 const { page: sessions } = await ctx.db.acpSessions.findMany({ where: { threadId } });
 
                 for (const session of sessions) {
-                    await ctx.db.patch(session._id, { status: "idle" });
+                    await ctx.db.patch("acpSessions", session._id, { status: "idle" });
                 }
             });
         }
