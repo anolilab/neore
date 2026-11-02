@@ -191,11 +191,11 @@ describe("updateDeviceManifest", () => {
             await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt)) as never);
 
         await expect(update(Date.now() + 3 * 60 * 60_000)).rejects.toMatchObject({
-            data: { code: "DEVICE_CLOCK_SKEW" },
+            data: { code: "DEVICE_CLOCK_SKEW", direction: "ahead", minutes: expect.any(Number) },
             message: expect.stringMatching(AHEAD_ERROR),
         });
         await expect(update(Date.now() - 45 * 60_000)).rejects.toMatchObject({
-            data: { code: "DEVICE_CLOCK_SKEW" },
+            data: { code: "DEVICE_CLOCK_SKEW", direction: "behind", minutes: expect.any(Number) },
             message: expect.stringMatching(BEHIND_ERROR),
         });
         // Not a stamped time at all: still the plain malformed refusal, not a clock complaint.
@@ -268,6 +268,34 @@ describe("a computer too old for the backend", () => {
                     ),
             ),
         ).resolves.toHaveProperty("callId");
+    });
+
+    it("treats a protocol that is present but invalid as outdated, never as current", async () => {
+        for (const protocol of ["3", 3.5, 5000, -1, null]) {
+            const { deviceId, secret } = await register(ownerId);
+
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, Date.now(), { protocol })) as never);
+
+            expect(updateRequiredOf(await listed(ownerId), deviceId), String(protocol)).toBe(true);
+        }
+    });
+
+    it("does not list or hand out a call queued before the computer was marked outdated, and fails it as outdated", async () => {
+        const { deviceId, secret } = await register(ownerId);
+        const threadId = await insertThread(ownerId);
+        const send = async (issuedAt: number, protocol: number) =>
+            await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, issuedAt, { protocol })) as never);
+
+        await send(Date.now() - 2000, MIN_DEVICE_PROTOCOL);
+        const { callId } = (await createCall({ deviceId, threadId, userId: ownerId })) as { callId: string };
+        const pendingIds = async () =>
+            ((await as(ownerId).query(functions.listPendingDeviceCalls as never, { deviceId } as never)) as { callId: string }[]).map((call) => call.callId);
+
+        expect(await pendingIds()).toEqual([callId]);
+        await send(Date.now(), MIN_DEVICE_PROTOCOL - 1);
+        expect(await pendingIds()).toEqual([]);
+        await expect(as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never)).resolves.toEqual({ claimed: false });
+        expect(await readCall(callId)).toMatchObject({ error: expect.stringContaining("out of date"), status: "failed" });
     });
 
     it("is served again once an updated build reports the current protocol", async () => {

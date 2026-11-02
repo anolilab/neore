@@ -71,11 +71,18 @@ export const DEVICE_CLOCK_SKEW_CODE = "DEVICE_CLOCK_SKEW";
  * A plain-language sentence for a signed time outside the window, naming the clock and how far off it is. The signature
  * already verified, so the device is the right one and its time is simply wrong.
  */
-export const clockSkewMessage = (deviceTime: number, now: number): string => {
-    const minutes = Math.max(1, Math.round(Math.abs(now - deviceTime) / 60_000));
-    const direction = deviceTime > now ? "ahead of" : "behind";
+export const clockSkewData = (deviceTime: number, now: number): { code: string; direction: "ahead" | "behind"; minutes: number } => {
+    return {
+        code: DEVICE_CLOCK_SKEW_CODE,
+        direction: deviceTime > now ? "ahead" : "behind",
+        minutes: Math.max(1, Math.round(Math.abs(now - deviceTime) / 60_000)),
+    };
+};
 
-    return `This computer's clock is about ${minutes} minutes ${direction} the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
+export const clockSkewMessage = (deviceTime: number, now: number): string => {
+    const { direction, minutes } = clockSkewData(deviceTime, now);
+
+    return `This computer's clock is about ${minutes} minutes ${direction === "ahead" ? "ahead of" : "behind"} the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
 };
 
 const encoder = new TextEncoder();

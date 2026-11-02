@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import DeviceRelay from "./device-relay";
 
 const { bridge, mutations, toastError } = vi.hoisted(() => {
-    const clockSkew = Object.assign(new Error("This computer's clock is about 10 minutes behind the server's."), { data: { code: "DEVICE_CLOCK_SKEW" } });
+    const clockSkew = Object.assign(new Error("Server English"), { data: { code: "DEVICE_CLOCK_SKEW", direction: "behind", minutes: 10 } });
 
     return {
         bridge: { progressListener: undefined as undefined | ((report: Record<string, unknown>) => void) },
@@ -24,6 +24,11 @@ const { bridge, mutations, toastError } = vi.hoisted(() => {
         },
         toastError: vi.fn(),
     };
+});
+
+// The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
+vi.mock("@lingui/core/macro", () => {
+    return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
 });
 
 vi.mock("sonner", () => {
@@ -98,6 +103,6 @@ describe("<DeviceRelay>", () => {
 
         bridge.progressListener?.({ callId: "c1", deviceId: "d1", payload: "{}", signature: "s" });
 
-        await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringContaining("clock"), { id: "device-clock-skew" }));
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringContaining("about 10 minutes behind"), { id: "device-clock-skew" }));
     });
 });

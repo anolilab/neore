@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
@@ -21,10 +22,29 @@ import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/dev
 
 const idsOf = (key: string): string[] => (key === "" ? [] : key.split(","));
 
+/** The sentence for a refused clock, worded here from the error's data so it is translated; the backend's English is the fallback when the data is missing. */
+const clockSkewText = (error: Error & { data?: { direction?: unknown; minutes?: unknown } }): string => {
+    const { direction, minutes } = error.data ?? {};
+
+    if (typeof minutes !== "number") {
+        return error.message;
+    }
+
+    if (direction === "ahead") {
+        return t`This computer's clock is about ${minutes} minutes ahead of the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
+    }
+
+    if (direction === "behind") {
+        return t`This computer's clock is about ${minutes} minutes behind the server's, so its signed messages are refused. Set the date and time to update automatically, then try again.`;
+    }
+
+    return error.message;
+};
+
 /** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
 const toastClockSkew = (error: unknown): void => {
     if ((error as { data?: { code?: unknown } } | null)?.data?.code === "DEVICE_CLOCK_SKEW") {
-        toast.error((error as Error).message, { id: "device-clock-skew" });
+        toast.error(clockSkewText(error as Error), { id: "device-clock-skew" });
     }
 };
 

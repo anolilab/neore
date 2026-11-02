@@ -15,6 +15,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { onAcpCallEnded } from "../acp/lib/calls";
+import { OUTDATED_NOTICE } from "../acp/lib/start";
 import { endHostSessionsOfDevice } from "../acp/lib/revoke";
 import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
@@ -34,15 +35,7 @@ import {
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
-import {
-    capUtf8,
-    clockSkewMessage,
-    DEVICE_CLOCK_SKEW_CODE,
-    generateDeviceSecret,
-    isFreshTimestamp,
-    parseSignedPayload,
-    verifyDevicePayload,
-} from "./lib/signing";
+import { capUtf8, clockSkewData, clockSkewMessage, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
 const vDeviceName = v.string().check((value) => value.trim().length > 0 && value.length <= 80, { message: "Name must be 1-80 characters" });
@@ -336,9 +329,17 @@ export const heartbeatDevice = authMutation
         return { paired: true };
     });
 
-/** The wire protocol a signed manifest reports, or `undefined` when absent or not a small whole number. */
-const parseProtocol = (value: unknown): number | undefined =>
-    typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 1000 ? value : undefined;
+/**
+ * The wire protocol a signed manifest reports: `undefined` only when it is ABSENT (a computer that predates the field).
+ * A present but invalid value (a string, a fraction, out of range) is reported as 0, which reads as outdated, never as current.
+ */
+const parseProtocol = (value: unknown): number | undefined => {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 1000 ? value : 0;
+};
 
 /**
  * Stores the device's tool list. The manifest is SIGNED by the device's Rust
@@ -362,7 +363,7 @@ export const updateDeviceManifest = authMutation
         const issuedAt = manifest?.issuedAt;
 
         if (typeof issuedAt === "number" && Number.isFinite(issuedAt) && !isFreshTimestamp(issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
-            throw new LunoraError("BAD_REQUEST", clockSkewMessage(issuedAt, now), { data: { code: DEVICE_CLOCK_SKEW_CODE } });
+            throw new LunoraError("BAD_REQUEST", clockSkewMessage(issuedAt, now), { data: clockSkewData(issuedAt, now) });
         }
 
         if (
@@ -414,7 +415,9 @@ export const listPendingDeviceCalls = authQuery
         }
 
         const held = await Promise.all((args.hostDeviceIds ?? []).map(async (id) => await ctx.db.devices.findFirst({ where: { _id: id, userId } })));
-        const deviceIds = [args.deviceId, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host._id] : []))];
+        const owned = [primary, ...held.flatMap((host) => (host?.viaDeviceId === args.deviceId ? [host] : []))];
+        const deviceIds = owned.map((device) => device._id);
+        const outdated = new Set<string>(owned.filter((device) => isDeviceOutdated(device)).map((device) => device._id as string));
         const pages = await Promise.all(
             deviceIds.map(
                 async (deviceId) =>
@@ -424,6 +427,7 @@ export const listPendingDeviceCalls = authQuery
 
         return pages
             .flatMap(({ page }) => page)
+            .filter((call) => call.toolName === "acp_cancel" || !outdated.has(call.deviceId as string))
             .toSorted((a, b) => a.createdAt - b.createdAt)
             .slice(0, 10)
             .map((call) => {
@@ -465,7 +469,20 @@ export const claimDeviceCall = authMutation
             return { claimed: false };
         }
 
-        await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
+        const device = await requireOwnDevice(ctx, args.deviceId, userId, args.viaDeviceId);
+
+        // The computer was marked outdated after this call was queued: it would fail the call, so say why instead. A stop is always let through.
+        if (call.toolName !== "acp_cancel" && isDeviceOutdated(device)) {
+            await ctx.db.patch("deviceCalls", call._id, {
+                completedAt: now,
+                error: OUTDATED_NOTICE,
+                status: "failed",
+                ...(isAcpTool(call.toolName) && ACP_CLEARED),
+            });
+            await onAcpCallEnded(ctx, call, { error: OUTDATED_NOTICE, status: "failed" }, now);
+
+            return { claimed: false };
+        }
 
         await ctx.db.patch("deviceCalls", call._id, { claimedAt: now, status: "claimed", ...(args.claimId !== undefined && { claimId: args.claimId }) });
 
@@ -566,7 +583,7 @@ export const reportDeviceCallProgress = authMutation
         const phase = report?.phase;
 
         if (typeof report?.issuedAt === "number" && Number.isFinite(report.issuedAt) && !isFreshTimestamp(report.issuedAt, now, DEVICE_SIGNATURE_WINDOW_MS)) {
-            throw new LunoraError("BAD_REQUEST", clockSkewMessage(report.issuedAt, now), { data: { code: DEVICE_CLOCK_SKEW_CODE } });
+            throw new LunoraError("BAD_REQUEST", clockSkewMessage(report.issuedAt, now), { data: clockSkewData(report.issuedAt, now) });
         }
 
         if (

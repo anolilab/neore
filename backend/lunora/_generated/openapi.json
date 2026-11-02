@@ -48316,6 +48316,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "outdated",
+                              "type": "string"
+                            },
+                            {
                               "const": "rate_limited",
                               "type": "string"
                             },
