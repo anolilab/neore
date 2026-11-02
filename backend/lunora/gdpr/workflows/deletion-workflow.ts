@@ -50,8 +50,10 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         /**
          * Run a batched `{ hasMore }` mutation to exhaustion inside ONE durable step.
-         * Each call is its own transaction; a retried step starts over, which is
-         * safe because every batch step is idempotent.
+         * Each call is its own transaction, keyed per round by `stepDedupId`. A retry
+         * inside the same workflow instance takes the finished rounds from the cache
+         * and continues from the round that failed; a fresh instance runs every round
+         * again, which is safe because every batch step is idempotent.
          */
         const drain = async (name: string, run: (round: number) => Promise<unknown>): Promise<void> => {
             await context.step.do(name, async () => {
@@ -183,8 +185,10 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
-        // A cursor over the user's threads, passed back each round. A retried
-        // step starts the walk over, which is safe: every round only deletes.
+        // A cursor over the user's threads, passed back each round. A retry inside
+        // the same workflow instance takes the finished rounds from the cache (their
+        // `stepDedupId` is per round) and continues from the round that failed; a
+        // fresh instance walks every round again, which is safe: every round only deletes.
         await context.step.do("delete-user-thread-cascade", async () => {
             let cursor: string | null = null;
 
