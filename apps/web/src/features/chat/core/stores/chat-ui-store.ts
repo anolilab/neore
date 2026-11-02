@@ -359,12 +359,16 @@ export const useChatUIStore = create<ChatUIStore>()(
                     // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter.
                     const { removed, text: clean } = stripHiddenText(text);
 
-                    set({ composerHiddenRemoved: clean === "" ? removed : get().composerHiddenRemoved + removed, composerText: clean });
+                    set((state) => {
+                        return { composerHiddenRemoved: clean === "" ? removed : state.composerHiddenRemoved + removed, composerText: clean };
+                    });
                 },
 
                 // Characters taken out of text that never became the draft (a long paste turned into a file).
                 noteComposerHiddenRemoved: (count) => {
-                    set({ composerHiddenRemoved: get().composerHiddenRemoved + count });
+                    set((state) => {
+                        return { composerHiddenRemoved: state.composerHiddenRemoved + count };
+                    });
                 },
 
                 setCopiedMessageId: (id) => {

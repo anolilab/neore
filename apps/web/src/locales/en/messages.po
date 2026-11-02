@@ -936,7 +936,7 @@ msgstr "{handoff} credits"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:438
+#: src/features/chat/thread/composer-input-area.tsx:181
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 
@@ -2080,10 +2080,10 @@ msgstr "Add at least one model — use \"Fetch models\" or type the ids"
 msgid "Add at least one model id"
 msgstr "Add at least one model id"
 
-#: src/features/chat/thread/composer-input-area.tsx:215
-#: src/features/chat/thread/composer-input-area.tsx:249
-#: src/features/chat/thread/composer-input-area.tsx:256
-#: src/features/chat/thread/composer-input-area.tsx:270
+#: src/features/chat/thread/composer-input-area.tsx:221
+#: src/features/chat/thread/composer-input-area.tsx:255
+#: src/features/chat/thread/composer-input-area.tsx:262
+#: src/features/chat/thread/composer-input-area.tsx:276
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Add attachment"
@@ -5313,7 +5313,7 @@ msgstr "Caption"
 msgid "Caption text"
 msgstr "Caption text"
 
-#: src/features/chat/thread/composer-input-area.tsx:244
+#: src/features/chat/thread/composer-input-area.tsx:250
 msgid "Capture screen"
 msgstr "Capture screen"
 
@@ -10153,7 +10153,7 @@ msgstr "Drag files here"
 msgid "Draw an image"
 msgstr "Draw an image"
 
-#: src/features/chat/thread/composer-input-area.tsx:238
+#: src/features/chat/thread/composer-input-area.tsx:244
 msgid "Draw image"
 msgstr "Draw image"
 
@@ -16270,11 +16270,11 @@ msgstr "Intelligent video model that thinks before generating"
 msgid "Intensity"
 msgstr "Intensity"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
+#: src/features/chat/thread/composer-input-area.tsx:336
 msgid "Interrupt and restart"
 msgstr "Interrupt and restart"
 
-#: src/features/chat/thread/composer-input-area.tsx:346
+#: src/features/chat/thread/composer-input-area.tsx:352
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interrupt and restart — stops the current reply and sends this"
 
@@ -24271,11 +24271,11 @@ msgstr "Query usage analytics and costs"
 msgid "Question"
 msgstr "Question"
 
-#: src/features/chat/thread/composer-input-area.tsx:357
+#: src/features/chat/thread/composer-input-area.tsx:363
 msgid "Queue message"
 msgstr "Queue message"
 
-#: src/features/chat/thread/composer-input-area.tsx:376
+#: src/features/chat/thread/composer-input-area.tsx:382
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
@@ -27190,7 +27190,7 @@ msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
 #: src/features/chat/thread/composer-input-area.tsx:176
-#: src/features/chat/thread/composer-input-area.tsx:411
+#: src/features/chat/thread/composer-input-area.tsx:417
 msgid "Send message"
 msgstr "Send message"
 
@@ -28880,11 +28880,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Status Page"
 
-#: src/features/chat/thread/composer-input-area.tsx:347
+#: src/features/chat/thread/composer-input-area.tsx:353
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steer — the current reply reads this at its next step"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
+#: src/features/chat/thread/composer-input-area.tsx:336
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
@@ -28961,8 +28961,8 @@ msgstr "Stop and clear the queue"
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:384
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:390
+#: src/features/chat/thread/composer-input-area.tsx:403
 msgid "Stop generating"
 msgstr "Stop generating"
 
@@ -33060,7 +33060,7 @@ msgstr "Upload failed"
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:233
+#: src/features/chat/thread/composer-input-area.tsx:239
 msgid "Upload file"
 msgstr "Upload file"
 
@@ -34222,10 +34222,10 @@ msgstr "Waiting for the owner to answer"
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
-#: src/features/chat/thread/composer-input-area.tsx:357
-#: src/features/chat/thread/composer-input-area.tsx:376
-#: src/features/chat/thread/composer-input-area.tsx:411
-#: src/features/chat/thread/composer-input-area.tsx:425
+#: src/features/chat/thread/composer-input-area.tsx:363
+#: src/features/chat/thread/composer-input-area.tsx:382
+#: src/features/chat/thread/composer-input-area.tsx:417
+#: src/features/chat/thread/composer-input-area.tsx:431
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 

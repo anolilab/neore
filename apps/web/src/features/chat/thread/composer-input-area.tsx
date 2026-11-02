@@ -174,6 +174,12 @@ const ComposerInputArea = ({
     const { t } = useLingui();
     const sendShortcut = useUIStateStore((state) => sendShortcutLabel(state.preferences.sendBehavior));
     const sendTooltip = sendShortcut ? t`Send message (${sendShortcut})` : t`Send message`;
+    // Inside `t`: a bare `plural()` compiles to the global i18n, which ignores the active locale.
+    const hiddenNotice =
+        hiddenRemoved > 0
+            ? // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+              t`${plural(hiddenRemoved, { one: "# invisible character was removed from your message.", other: "# invisible characters were removed from your message." })}`
+            : "";
     const tiptapRef = useRef<ComposerTiptapEditorRef>(null);
 
     useImperativeHandle(ref, () => {
@@ -434,11 +440,7 @@ const ComposerInputArea = ({
 
             {/* Always mounted so a screen reader announces the change when it appears */}
             <div aria-live="polite" className="text-muted-foreground px-3 text-xs" role="status">
-                {hiddenRemoved > 0 &&
-                    plural(hiddenRemoved, {
-                        one: "# invisible character was removed from your message.",
-                        other: "# invisible characters were removed from your message.",
-                    })}
+                {hiddenNotice}
             </div>
             <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />
         </>

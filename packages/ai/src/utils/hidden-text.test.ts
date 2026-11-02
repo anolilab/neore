@@ -83,6 +83,98 @@ describe("format characters that render", () => {
     });
 });
 
+const tags = (text: string): string => [...text].map((character) => String.fromCodePoint(0xe_00_00 + (character.codePointAt(0) ?? 0))).join("");
+const CANCEL = "\u{E007F}";
+const FLAGS = { england: `\u{1F3F4}${tags("gbeng")}${CANCEL}`, scotland: `\u{1F3F4}${tags("gbsct")}${CANCEL}`, wales: `\u{1F3F4}${tags("gbwls")}${CANCEL}` };
+// A payload one selector per byte: U+FE00 + n for the low 16, U+E0100 + n above.
+const selectors = (count: number): string => Array.from({ length: count }, (_, n) => String.fromCodePoint(n < 16 ? 0xfe_00 + n : 0xe_01_00 + n - 16)).join("");
+
+describe("variation selectors", () => {
+    const heart = "\u{2764}\u{FE0F}";
+    const ideograph = "\u{8FBB}\u{E0100}";
+
+    it("keeps one selector directly after a base character: an emoji with VS16, a text VS15, a CJK ideograph with an IVS", () => {
+        const text = `${heart} \u{2764}\u{FE0E} ${ideograph} 1\u{FE0F}\u{20E3}`;
+
+        expect(stripHiddenText(text)).toEqual({ removed: 0, text });
+        expect(hasHiddenText(text)).toBe(false);
+        expect(showHidden(text)).toBe(text);
+        expect(findHiddenText(text)).toEqual([]);
+    });
+
+    it("strips a run of selectors after a letter but its first, and counts them", () => {
+        const payload = selectors(20);
+
+        expect(stripHiddenText(`a${payload}b`)).toEqual({ removed: 19, text: `a${payload.slice(0, 1)}b` });
+        expect(hasHiddenText(`a${payload}b`)).toBe(true);
+        expect(showHidden(`a${payload}b`)).toBe(`a${payload.slice(0, 1)}${"?".repeat(19)}b`);
+    });
+
+    it("strips a second selector after an emoji's own, in both blocks", () => {
+        expect(stripHiddenText(`${heart}\u{FE0F}\u{E0101}x`)).toEqual({ removed: 2, text: `${heart}x` });
+        expect(stripHiddenText(`${ideograph}\u{E0101}`)).toEqual({ removed: 1, text: ideograph });
+    });
+
+    it("strips a selector that follows no base character", () => {
+        expect(stripHiddenText("\u{FE0F}x")).toEqual({ removed: 1, text: "x" });
+        expect(stripHiddenText("a \u{FE0F}")).toEqual({ removed: 1, text: "a " });
+        expect(stripHiddenText("a\n\u{FE0F}")).toEqual({ removed: 1, text: "a\n" });
+        expect(stripHiddenText("a\u{200D}\u{FE0F}")).toEqual({ removed: 1, text: "a\u{200D}" });
+        expect(stripHiddenText("a\u{200B}\u{FE0F}")).toEqual({ removed: 2, text: "a" });
+        expect(stripHiddenText("a\u{E0041}\u{FE0F}")).toEqual({ removed: 2, text: "a" });
+    });
+
+    it("reports a stripped selector in findHiddenText, an astral one being two units", () => {
+        expect(findHiddenText("a\u{FE00}\u{E0100}")).toEqual([{ index: 2, length: 2 }]);
+    });
+
+    it("counts every selector in the strict form", () => {
+        expect(hasHiddenText(heart)).toBe(false);
+        expect(hasHiddenText(heart, { strict: true })).toBe(true);
+        expect(hasHiddenText(ideograph, { strict: true })).toBe(true);
+        expect(showHidden(`a${heart}`, { strict: true })).toBe("a\u{2764}?");
+    });
+});
+
+describe("subdivision flags", () => {
+    it("keeps the England, Scotland and Wales flags", () => {
+        const text = `${FLAGS.england} ${FLAGS.scotland} ${FLAGS.wales}`;
+
+        expect(stripHiddenText(text)).toEqual({ removed: 0, text });
+        expect(hasHiddenText(text)).toBe(false);
+        expect(showHidden(text)).toBe(text);
+        expect(findHiddenText(text)).toEqual([]);
+    });
+
+    it("strips a tag payload that does not follow the black flag", () => {
+        const payload = `${tags("ignore")}${CANCEL}`;
+
+        expect(stripHiddenText(`a${payload}b`)).toEqual({ removed: 7, text: "ab" });
+        expect(stripHiddenText(`\u{1F3F3}${tags("gbeng")}${CANCEL}`).removed).toBe(6);
+        expect(stripHiddenText(`\u{1F3F4}\u{200B}${tags("gbeng")}${CANCEL}`).removed).toBe(7);
+        expect(hasHiddenText(`a${payload}`)).toBe(true);
+    });
+
+    it("strips an unterminated, empty or overlong sequence after the black flag", () => {
+        expect(stripHiddenText(`\u{1F3F4}${tags("gbeng")}x`)).toEqual({ removed: 5, text: "\u{1F3F4}x" });
+        expect(stripHiddenText(`\u{1F3F4}${CANCEL}`)).toEqual({ removed: 1, text: "\u{1F3F4}" });
+        expect(stripHiddenText(`\u{1F3F4}${tags("abcdefg")}${CANCEL}`)).toEqual({ removed: 8, text: "\u{1F3F4}" });
+    });
+
+    it("strips tag characters that are not letters or digits even inside the sequence", () => {
+        expect(stripHiddenText(`\u{1F3F4}${tags("gb-en")}${CANCEL}`).removed).toBe(6);
+    });
+
+    it("keeps a flag but strips a payload appended after it", () => {
+        expect(stripHiddenText(`${FLAGS.wales}${tags("hi")}`)).toEqual({ removed: 2, text: FLAGS.wales });
+    });
+
+    it("counts every tag in the strict form, the flag's too", () => {
+        expect(hasHiddenText(FLAGS.england, { strict: true })).toBe(true);
+        expect(showHidden(FLAGS.england, { strict: true })).toBe("\u{1F3F4}??????");
+    });
+});
+
 describe("findHiddenText", () => {
     it("reports UTF-16 offsets and lengths, an astral tag character being two units", () => {
         expect(findHiddenText("a\u{E0041}b\u{202E}")).toEqual([
