@@ -71,7 +71,7 @@ export const reserveGuide = async (
     });
 
     // The newest GUIDES_KEPT_PER_PULL stay; this one is among them.
-    await Promise.all(existing.slice(GUIDES_KEPT_PER_PULL - 1).map((guide) => ctx.db.delete(guide._id)));
+    await Promise.all(existing.slice(GUIDES_KEPT_PER_PULL - 1).map((guide) => ctx.db.delete("pullRequestGuides", guide._id)));
 
     return { guideId, status: "started" as const };
 };
@@ -120,7 +120,7 @@ export const saveGuide = internalMutation
             return false;
         }
 
-        await ctx.db.patch(guide._id, {
+        await ctx.db.patch("pullRequestGuides", guide._id, {
             generatedAt: ctx.now,
             // The head the guide was actually written from: the host may have moved on since the run began.
             headSha: args.headSha,
@@ -148,7 +148,7 @@ export const markGuideFailed = async (
         return false;
     }
 
-    await ctx.db.patch(guide._id, { failure, status: "failed", updatedAt: ctx.now });
+    await ctx.db.patch("pullRequestGuides", guide._id, { failure, status: "failed", updatedAt: ctx.now });
 
     return true;
 };
@@ -170,7 +170,7 @@ export const failAbandonedGuide = internalMutation
             return false;
         }
 
-        await ctx.db.patch(guide._id, { failure: "abandoned", status: "failed", updatedAt: ctx.now });
+        await ctx.db.patch("pullRequestGuides", guide._id, { failure: "abandoned", status: "failed", updatedAt: ctx.now });
 
         return true;
     });

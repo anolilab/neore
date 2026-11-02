@@ -73,7 +73,7 @@ describe("a driver without a webhook scheme", () => {
         const issued = await harness.withIdentity({ userId: "user-a" }).mutation(enableWatchWebhook as never, { repository: "octo/hello" } as never);
 
         expect(issued).toEqual({ status: "unsupported" });
-        const stored = await harness.run(async (ctx: any) => await ctx.db.get(row));
+        const stored = await harness.run(async (ctx: any) => await ctx.db.get("watchedRepositories", row));
 
         expect(stored.webhookSecret).toBeUndefined();
     });

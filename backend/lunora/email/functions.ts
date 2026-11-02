@@ -57,7 +57,7 @@ export const handleEmailEvent = internalMutation
                 return null;
             }
 
-            await context.db.delete(email._id);
+            await context.db.delete("emails", email._id);
         }
 
         if (eventType === "email.bounced") {
@@ -65,13 +65,13 @@ export const handleEmailEvent = internalMutation
                 throw new LunoraError("INTERNAL", `Email was bounced but expected to be ${email.expectation}`);
             }
 
-            await context.db.delete(email._id);
+            await context.db.delete("emails", email._id);
         } else if (eventType === "email.complained") {
             if (email.expectation !== "complained") {
                 throw new LunoraError("INTERNAL", `Email was complained but expected to be ${email.expectation}`);
             }
 
-            await context.db.delete(email._id);
+            await context.db.delete("emails", email._id);
         }
 
         return null;

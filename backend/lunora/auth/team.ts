@@ -52,7 +52,7 @@ const requireTeamMemberManager = async (
 const syncTeamMemberCount = async (context: MutationCtx, teamId: string): Promise<void> => {
     const { page: members } = await context.db.teamMember.findMany({ where: { teamId } });
 
-    await context.db.patch(context.db.asId("team", teamId), { memberCount: members.length });
+    await context.db.patch("team", context.db.asId("team", teamId), { memberCount: members.length });
 };
 
 // Create a new team in the active organization
@@ -174,7 +174,7 @@ export const updateTeam = authMutation
             throw new LunoraError("FORBIDDEN", "Team does not belong to your organization");
         }
 
-        await context.db.patch(teamId, {
+        await context.db.patch("team", teamId, {
             ...(args.name && { name: args.name }),
             updatedAt: context.now,
         });
@@ -208,11 +208,11 @@ export const deleteTeam = authMutation
         const { page: members } = await context.db.teamMember.findMany({ where: { teamId: args.teamId } });
 
         for (const member of members) {
-            await context.db.delete(member._id);
+            await context.db.delete("teamMember", member._id);
         }
 
         // Delete the team
-        await context.db.delete(teamId);
+        await context.db.delete("team", teamId);
 
         context.log.event("team.delete", { removedMemberCount: members.length, teamId: args.teamId });
     });
@@ -300,7 +300,7 @@ export const removeTeamMember = authMutation
         }
 
         // Remove team member
-        await context.db.delete(teamMember._id);
+        await context.db.delete("teamMember", teamMember._id);
 
         await syncTeamMemberCount(context, args.teamId);
 
@@ -397,7 +397,7 @@ export const setActiveTeam = authMutation
             if (session.expiresAt > context.now) {
                 // `session.activeTeamId` is `v.optional(v.string())` — clearing it is
                 // `undefined` (field removed), not `null` (which the validator rejects).
-                await patchRow(context.db, session, {
+                await patchRow(context.db, "session", session, {
                     activeTeamId: args.teamId ?? undefined,
                 });
                 break;
@@ -433,7 +433,7 @@ export const leaveTeam = authMutation
         }
 
         // Remove team member
-        await context.db.delete(teamMember._id);
+        await context.db.delete("teamMember", teamMember._id);
 
         await syncTeamMemberCount(context, args.teamId);
 
@@ -475,7 +475,7 @@ export const updateTeamMemberRole = authMutation
         }
 
         // Update the role
-        await context.db.patch(teamMember._id, {
+        await context.db.patch("teamMember", teamMember._id, {
             role: args.role,
         });
 
@@ -566,11 +566,11 @@ export const updateTeamSettings = authMutation
             // Update existing settings
             if (args.allowedModels === null) {
                 // Reset to inherit from organization
-                await patchRow(context.db, existingSettings, {
+                await patchRow(context.db, "teamSettings", existingSettings, {
                     allowedModels: undefined,
                 });
             } else {
-                await context.db.patch(existingSettings._id, {
+                await context.db.patch("teamSettings", existingSettings._id, {
                     allowedModels: args.allowedModels,
                 });
             }

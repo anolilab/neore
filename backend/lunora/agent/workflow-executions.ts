@@ -19,7 +19,7 @@ export const get = query.input({ executionId: v.id("workflowExecutions") }).quer
         return null;
     }
 
-    const execution = await ctx.db.get(args.executionId);
+    const execution = await ctx.db.get("workflowExecutions", args.executionId);
 
     if (!execution || execution.userId !== identity.userId) {
         return null;
@@ -92,7 +92,7 @@ export const create = internalMutation
         });
         const executionId = insertedId as Id<"workflowExecutions">;
 
-        const execution = await ctx.db.get(executionId);
+        const execution = await ctx.db.get("workflowExecutions", executionId);
 
         assert(execution, `Execution ${executionId} not found`);
 
@@ -115,10 +115,11 @@ export const updateStatus = internalMutation
         ),
     })
     .mutation(async ({ args, ctx }): Promise<Doc<"workflowExecutions"> | null> => {
-        const execution = await ctx.db.get(args.executionId);
+        const execution = await ctx.db.get("workflowExecutions", args.executionId);
 
         assert(execution, `Execution ${args.executionId} not found`);
         await ctx.db.patch(
+            "workflowExecutions",
             args.executionId,
             withoutUndefined({
                 completedAt: args.completedAt,
@@ -129,14 +130,14 @@ export const updateStatus = internalMutation
             }),
         );
 
-        return await ctx.db.get(args.executionId);
+        return await ctx.db.get("workflowExecutions", args.executionId);
     });
 
 export const deleteExecution = internalMutation
     .input({ executionId: v.id("workflowExecutions") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const execution = await ctx.db.get(args.executionId);
+        const execution = await ctx.db.get("workflowExecutions", args.executionId);
 
         assert(execution, `Execution ${args.executionId} not found`);
 
@@ -146,10 +147,10 @@ export const deleteExecution = internalMutation
             .withIndex("by_execution_and_node", (q) => q.eq("executionId", args.executionId))
             .collect();
 
-        await Promise.all(nodeExecs.map((nodeExecution) => ctx.db.delete(nodeExecution._id)));
+        await Promise.all(nodeExecs.map((nodeExecution) => ctx.db.delete("nodeExecutions", nodeExecution._id)));
 
         // Delete the execution
-        await ctx.db.delete(args.executionId);
+        await ctx.db.delete("workflowExecutions", args.executionId);
 
         return null;
     });

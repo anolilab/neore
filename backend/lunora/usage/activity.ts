@@ -49,7 +49,7 @@ export const addToRollup = async (ctx: DbCtx, userId: string, increments: Readon
         const existing = await ctx.db.usageDaily.findFirst({ where: { date, skillKey, userId } });
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("usageDaily", existing._id, {
                 costMicrodollars: existing.costMicrodollars + costMicrodollars,
                 replies: existing.replies + replies,
                 tokens: existing.tokens + tokens,

@@ -111,7 +111,7 @@ export const createAcpCall = async (
     });
     const secret = await decryptKey(device.encryptedSecret, "device-secrets");
 
-    await ctx.db.patch(callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
+    await ctx.db.patch("deviceCalls", callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
     // A call nobody claims is expired and its turn ended when the window closes (`acp/calls.ts`).
     await ctx.scheduler.runAfter(ACP_CLAIM_WINDOW_MS + CHECK_SLACK_MS, internal.acp.calls.checkAcpCall, { callId });
 

@@ -96,7 +96,7 @@ const partitionLinks = async (ctx: QueryCtx | MutationCtx, rows: PullRequestThre
     const live: PullRequestThread[] = [];
 
     for (const row of rows) {
-        const thread = await ctx.db.get(row.threadId);
+        const thread = await ctx.db.get("threads", row.threadId);
 
         (thread && thread.deleted !== true ? live : dead).push(row);
     }
@@ -129,7 +129,7 @@ export const startWorkOnPullRequest = authMutation
         const deadAttached = dead.filter((row) => row.kind === "attached");
 
         for (const link of deadAttached) {
-            await ctx.db.delete(link._id);
+            await ctx.db.delete("pullRequestThreads", link._id);
         }
 
         if (attached) {
@@ -148,7 +148,7 @@ export const startWorkOnPullRequest = authMutation
             updatedAt: now,
             userId,
         });
-        const created = await ctx.db.get(threadId);
+        const created = await ctx.db.get("threads", threadId);
 
         // The same audit record any other new thread gets (`chat.createThread`, through `lib/document-history.ts`).
         if (created) {
@@ -249,7 +249,7 @@ export const recordOpenedPullRequest = internalMutation
     .output(v.object({ created: v.boolean(), threadId: v.string() }))
     .mutation(async ({ args, ctx }) => {
         const address = parsePullRequestUrl(args.prUrl);
-        const thread = await ctx.db.get(args.threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
 
         if (!thread || thread.deleted === true) {
             throw new LunoraError("NOT_FOUND", "That thread is not there");

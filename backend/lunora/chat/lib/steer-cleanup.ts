@@ -27,7 +27,7 @@ export const dropQueuedSteersForThread = async (ctx: Pick<MutationCtx, "db">, th
             const queued = stream.steers?.filter((entry) => entry.status === "queued") ?? [];
 
             if (queued.length > 0) {
-                await ctx.db.patch(stream._id, { steers: (stream.steers ?? []).filter((entry) => entry.status !== "queued") });
+                await ctx.db.patch("persistentStreams", stream._id, { steers: (stream.steers ?? []).filter((entry) => entry.status !== "queued") });
                 dropped += queued.length;
             }
         }

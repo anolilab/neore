@@ -204,7 +204,7 @@ describe("collectConversations", () => {
                     userId: "user-b",
                 });
 
-                await context.db.patch(threadId, { activeLeafMessageId: second });
+                await context.db.patch("threads", threadId, { activeLeafMessageId: second });
                 ids.first = String(first);
                 ids.second = String(second);
                 ids.prompt = String(prompt);

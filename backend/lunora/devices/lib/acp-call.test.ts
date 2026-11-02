@@ -121,7 +121,7 @@ describe("createAcpCall taint", () => {
     };
 
     it("signs the taint it is given into the row and the envelope, in the stable order", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(deviceId, { lastSeenAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("devices", deviceId, { lastSeenAt: Date.now() }));
         expect(await send(["mcp", "web"])).toHaveProperty("callId");
 
         const call = await lastCall();
@@ -131,7 +131,7 @@ describe("createAcpCall taint", () => {
     });
 
     it("is untainted when nothing says otherwise", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(deviceId, { lastSeenAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("devices", deviceId, { lastSeenAt: Date.now() }));
         await send();
 
         const call = await lastCall();

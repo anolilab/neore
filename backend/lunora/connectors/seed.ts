@@ -160,7 +160,7 @@ export const seed = internalMutation
                 // A patch brings every field listed here up to date. It cannot drop
                 // an optional field this file stops setting (Lunora refuses
                 // `undefined` in a patch) — that takes a one-off migration.
-                await ctx.db.patch(existing._id, { ...withoutUndefined(entry) });
+                await ctx.db.patch("connectorDefinitions", existing._id, { ...withoutUndefined(entry) });
                 updated += 1;
             } else {
                 await ctx.db.insert("connectorDefinitions", entry);

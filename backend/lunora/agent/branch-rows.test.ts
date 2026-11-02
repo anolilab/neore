@@ -57,7 +57,7 @@ const seed = async (specs: Spec[]) => {
 
         const parentMessageId = parent === BRANCH_ROOT ? BRANCH_ROOT : (ids[parent] ?? parent);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids[spec[0]], { parentMessageId }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids[spec[0]], { parentMessageId }));
     }
 };
 
@@ -65,9 +65,9 @@ const nameOf = (id: string) => names.get(id) ?? id;
 
 /** The active page for a stored leaf: rows newest first, and each row's sibling info — all by name. */
 const pageOf = async (leaf: string) => {
-    await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids[leaf] ?? leaf }));
+    await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids[leaf] ?? leaf }));
 
-    const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+    const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
     const page: any = await harness.run(async (ctx: any) => await listActivePathPage(ctx, thread, { cursor: null, numItems: 1000 }));
     const branches = new Map<string, { count: number; index: number; siblingIds: string[] }>();
 
@@ -95,7 +95,7 @@ const branchesOf = async (leaf: string) => {
 
 const contextOf = async (prompt: string): Promise<string[]> => {
     const contextIds: string[] = await harness.run(async (ctx: any) => {
-        const row = await ctx.db.get(ids[prompt]);
+        const row = await ctx.db.get("messages", ids[prompt]);
 
         return await contextPathIds(ctx, threadId as never, row);
     });

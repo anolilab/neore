@@ -71,7 +71,11 @@ const insertStream = async (thread: Thread, status: string, expiresAt: number): 
 const sweep = async () => await harness.run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
 
 const statusOf = async (id: string): Promise<unknown> =>
-    await harness.run(async (context) => ((await context.db.get(id as never)) as { status?: unknown } | null)?.status);
+    await harness.run(
+        async (context) =>
+            (((await context.db.get("persistentStreams", id as never)) ?? (await context.db.get("threads", id as never))) as { status?: unknown } | null)
+                ?.status,
+    );
 
 describe("cleanupExpiredStreams", () => {
     beforeEach(() => {
@@ -150,7 +154,7 @@ describe("cleanupExpiredStreams", () => {
 
             const thread = await seedThread();
 
-            await harness.run(async (context) => await context.db.patch(thread.threadId as never, { status: "active" }));
+            await harness.run(async (context) => await context.db.patch("threads", thread.threadId as never, { status: "active" }));
 
             const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
 

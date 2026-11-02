@@ -431,7 +431,7 @@ export const updateGroupChat = authMutation
     .output(v.null())
     .mutation(async ({ args: { debateRounds, mode, skillIds, synthesizerSkillId, threadId }, ctx }) => {
         const { userId } = ctx.user;
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (!thread || thread.deleted === true) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
@@ -562,7 +562,7 @@ export const getGroupRunConfig = internalQuery
         ),
     )
     .query(async ({ args: { organizationId, threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId || !thread.groupChat || thread.groupChat.participants.length === 0) {
             return null;
@@ -610,7 +610,7 @@ export const isGroupStopRequested = internalQuery
     .input({ since: v.number(), threadId: v.string() })
     .output(v.boolean())
     .query(async ({ args: { since, threadId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
         const stoppedAt = thread?.groupChat?.stopRequestedAt;
 
         return stoppedAt !== undefined && stoppedAt >= since;
@@ -654,7 +654,7 @@ export const getGroupHistory = internalQuery
         ),
     )
     .query(async ({ args: { threadId, userId }, ctx }): Promise<GroupHistoryRow[]> => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId) {
             return [];
@@ -708,7 +708,7 @@ export const markSpeakerMessages = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { agentName, messageIds, skillId, threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId) {
             return null;
@@ -716,7 +716,7 @@ export const markSpeakerMessages = internalMutation
 
         await Promise.all(
             messageIds.map(async (messageId) => {
-                const row = await ctx.db.get(messageId as Id<"messages">).catch(() => null);
+                const row = await ctx.db.get("messages", messageId as Id<"messages">).catch(() => null);
 
                 if (row && (row.threadId as string) === threadId) {
                     await patchMessage(ctx.db, row._id, { agentName, speakerSkillId: skillId });

@@ -31,7 +31,7 @@ export const getThreadPins = authQuery
         const { userId } = context.user;
 
         // A pin quotes the chat's messages: a locked chat's pins need its proof.
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
             return [];
@@ -60,7 +60,7 @@ export const createPin = authMutation
         const { userId } = context.user;
         const { now } = context;
 
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread && isThreadLocked(thread)) {
             throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
@@ -89,7 +89,7 @@ export const updatePinNote = authMutation
     })
     .mutation(async ({ args: { note, pinId }, ctx: context }) => {
         const { userId } = context.user;
-        const pin = await context.db.get(pinId as Id<"threadPins">);
+        const pin = await context.db.get("threadPins", pinId as Id<"threadPins">);
 
         if (!pin) {
             throw new LunoraError("NOT_FOUND", "Pin not found");
@@ -99,7 +99,7 @@ export const updatePinNote = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot update another user's pin");
         }
 
-        await context.db.patch(pinId as Id<"threadPins">, {
+        await context.db.patch("threadPins", pinId as Id<"threadPins">, {
             note,
             updatedAt: context.now,
         });
@@ -114,7 +114,7 @@ export const updatePinSelectedText = authMutation
     })
     .mutation(async ({ args: { pinId, selectedText }, ctx: context }) => {
         const { userId } = context.user;
-        const pin = await context.db.get(pinId as Id<"threadPins">);
+        const pin = await context.db.get("threadPins", pinId as Id<"threadPins">);
 
         if (!pin) {
             throw new LunoraError("NOT_FOUND", "Pin not found");
@@ -124,7 +124,7 @@ export const updatePinSelectedText = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot update another user's pin");
         }
 
-        await context.db.patch(pinId as Id<"threadPins">, {
+        await context.db.patch("threadPins", pinId as Id<"threadPins">, {
             selectedText,
             updatedAt: context.now,
         });
@@ -138,7 +138,7 @@ export const deletePin = authMutation
     })
     .mutation(async ({ args: { pinId }, ctx: context }) => {
         const { userId } = context.user;
-        const pin = await context.db.get(pinId as Id<"threadPins">);
+        const pin = await context.db.get("threadPins", pinId as Id<"threadPins">);
 
         if (!pin) {
             throw new LunoraError("NOT_FOUND", "Pin not found");
@@ -148,6 +148,6 @@ export const deletePin = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot delete another user's pin");
         }
 
-        await context.db.delete(pinId as Id<"threadPins">);
+        await context.db.delete("threadPins", pinId as Id<"threadPins">);
         context.log.event("chat.delete_pin", { deleted: true });
     });

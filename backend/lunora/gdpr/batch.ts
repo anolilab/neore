@@ -3,6 +3,7 @@
  * `gdpr.ts`: at most {@link BATCH} rows per table per call, `{ hasMore }` back,
  * idempotent on retry. See `steps/residual-deletion-steps.ts`.
  */
+import type { TableName } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
 /** Rows per table per round. */
@@ -30,14 +31,15 @@ type Row = { _id: string };
  * table (`lib/audit-triggers.ts`): each delete fires a trigger, and a batch of them
  * in parallel nests the triggers past the runtime's 50-level limit.
  */
-export const deleteOneByOne = async (context: MutationCtx, rows: ReadonlyArray<Row>): Promise<void> => {
+export const deleteOneByOne = async (context: MutationCtx, table: TableName, rows: ReadonlyArray<Row>): Promise<void> => {
     for (const row of rows) {
-        await context.db.delete(row._id as never);
+        await context.db.delete(table, row._id as never);
     }
 };
 
 export const deleteParentsWithChildren = async <P extends Row>(
     context: MutationCtx,
+    tables: { child: TableName; parent: TableName },
     parents: ReadonlyArray<P>,
     childrenOf: (parent: P) => Promise<Row[]>,
 ): Promise<boolean> => {
@@ -47,7 +49,7 @@ export const deleteParentsWithChildren = async <P extends Row>(
         const children = await childrenOf(parent);
 
         for (const child of children) {
-            await context.db.delete(child._id as never);
+            await context.db.delete(tables.child, child._id as never);
         }
 
         if (children.length >= BATCH) {
@@ -55,7 +57,7 @@ export const deleteParentsWithChildren = async <P extends Row>(
             continue;
         }
 
-        await context.db.delete(parent._id as never);
+        await context.db.delete(tables.parent, parent._id as never);
     }
 
     return hasMore;

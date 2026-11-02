@@ -47,7 +47,7 @@ const pendingRow = async (threadId: string, marker: string, jobId?: string): Pro
         return messages[0]._id;
     });
 
-const read = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const read = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("messages", id));
 
 const sweep = async (): Promise<{ failed: number }> => await harness.run(async (ctx: any) => await ctx.runMutation(failStaleMediaRows, {}));
 

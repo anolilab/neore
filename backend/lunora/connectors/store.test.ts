@@ -75,7 +75,7 @@ const serverRef = (id: string) => {
     return { id, table: "mcpServerGrants" as const };
 };
 
-const rowOf = async (connectorId: string) => await harness.run(async (context: any) => await context.db.get(connectorId));
+const rowOf = async (connectorId: string) => await harness.run(async (context: any) => await context.db.get("userConnectors", connectorId));
 
 describe("grant lifecycle", () => {
     it("applies a refresh only against the ciphertext it was computed from", async () => {

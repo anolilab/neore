@@ -49,7 +49,7 @@ const insertSession = async (fields: Record<string, unknown>): Promise<string> =
             }),
     );
 
-const readSession = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const readSession = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("sandboxSessions", id));
 
 const readStatus = async (id: string): Promise<string> => {
     const session = await readSession(id);
@@ -78,7 +78,7 @@ describe("checkAndTerminateIdle", () => {
 
         const result = await harness.run(async (ctx: any) => await ctx.runMutation(checkAndTerminateIdle, { sessionId }));
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(sessionId, { lastActivityAt: result.decidedAt + 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("sandboxSessions", sessionId, { lastActivityAt: result.decidedAt + 1 }));
 
         await harness.run(async (ctx: any) => await ctx.runMutation(markBotComputerPaused, { decidedAt: result.decidedAt, sessionId }));
 

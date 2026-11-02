@@ -128,7 +128,7 @@ export const beginHostGuide = internalMutation
             throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}${reason}`);
         }
 
-        await ctx.db.patch(reserved.guideId, { threadId: started.threadId });
+        await ctx.db.patch("pullRequestGuides", reserved.guideId, { threadId: started.threadId });
 
         ctx.log.event("source_control.guide_requested", { source: "host" });
 

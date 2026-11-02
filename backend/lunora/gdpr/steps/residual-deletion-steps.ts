@@ -271,8 +271,8 @@ export const deleteUserIntegrations = internalMutation
         ]);
 
         // `gdprConsent` is audited: one delete at a time (`gdpr/batch.ts`).
-        await deleteOneByOne(context, claims);
-        await deleteOneByOne(context, consents);
+        await deleteOneByOne(context, "idempotencyClaims", claims);
+        await deleteOneByOne(context, "gdprConsent", consents);
 
         // The user's system-prompt presets (`system-prompts/gdpr.ts`).
         const presets = await eraseSystemPromptPresetsForUser(context, userId);
@@ -419,7 +419,7 @@ export const purgeUserDocumentHistory = internalMutation
         const { page } = await context.db.documentHistory.findMany({ limit: BATCH, where: { userId } });
 
         for (const row of page) {
-            await context.db.delete(row._id);
+            await context.db.delete("documentHistory", row._id);
         }
 
         return { hasMore: full(page) };
@@ -481,7 +481,7 @@ export const minimiseUserRecords = async (context: MutationCtx, userId: string, 
         }
 
         // `null` clears an optional column; `undefined` is rejected by `patch`.
-        await context.db.patch(request._id, {
+        await context.db.patch("gdprRequests", request._id, {
             downloadUrl: null,
             errorMessage: null,
             storageId: null,
@@ -493,7 +493,7 @@ export const minimiseUserRecords = async (context: MutationCtx, userId: string, 
         const details = minimiseDetails(row.details);
 
         if (details !== row.details) {
-            await context.db.patch(row._id, { details });
+            await context.db.patch("gdprAuditLog", row._id, { details });
         }
     }
 
@@ -509,7 +509,7 @@ export const minimiseUserRecords = async (context: MutationCtx, userId: string, 
 
         for (const limit of page.page) {
             if (limit.key.includes(userId)) {
-                await context.db.delete(limit._id);
+                await context.db.delete("rateLimits", limit._id);
             }
         }
 

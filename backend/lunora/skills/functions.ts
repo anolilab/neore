@@ -531,7 +531,7 @@ export const updateSkill = authMutation
             }
 
             // Update skill
-            await ctx.db.patch(skillId, {
+            await ctx.db.patch("skills", skillId, {
                 ...(category !== undefined && { category }),
                 ...(config !== undefined && { config }),
                 ...(shouldSaveHistory && { currentVersion: newVersion }),
@@ -585,21 +585,21 @@ export const deleteSkillRows = async (context: MutationContext, skillId: Id<"ski
     // Imported additional files (`skills/io.ts`): the rows now, their objects once this commits.
     const { page: files } = await context.db.skillFiles.findMany({ where: { skillId } });
 
-    await Promise.all(files.map((file) => context.db.delete(file._id)));
+    await Promise.all(files.map((file) => context.db.delete("skillFiles", file._id)));
     await scheduleObjectDeletion(
         context,
         files.map((file) => file.storageId),
     );
 
     if (stats) {
-        await context.db.delete(stats._id);
+        await context.db.delete("skillStats", stats._id);
     }
 
     if (userSkill) {
-        await context.db.delete(userSkill._id);
+        await context.db.delete("userSkills", userSkill._id);
     }
 
-    await context.db.delete(skillId);
+    await context.db.delete("skills", skillId);
 
     // Invalidate cache
     await invalidateSkillsCache(context, userId);
@@ -656,7 +656,7 @@ export const setSkillEnabled = authMutation
             .first();
 
         if (userSkill) {
-            await ctx.db.patch(userSkill._id, { enabled });
+            await ctx.db.patch("userSkills", userSkill._id, { enabled });
         } else {
             await ctx.db.insert("userSkills", {
                 addedAt: now,
@@ -695,7 +695,7 @@ export const setSkillAutoRun = authMutation
             .first();
 
         if (userSkill) {
-            await ctx.db.patch(userSkill._id, { autoRun });
+            await ctx.db.patch("userSkills", userSkill._id, { autoRun });
         } else {
             await ctx.db.insert("userSkills", {
                 addedAt: now,
@@ -820,7 +820,7 @@ export const recordSkillInvocation = authMutation
         const stats = await ctx.db.skillStats.findFirst({ where: { skillId } });
 
         if (stats) {
-            await ctx.db.patch(stats._id, {
+            await ctx.db.patch("skillStats", stats._id, {
                 lastUsedAt: now,
                 usageCount: (stats.usageCount || 0) + 1,
             });

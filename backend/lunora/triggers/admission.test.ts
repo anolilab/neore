@@ -157,7 +157,7 @@ describe("admitTriggerRun filter recheck", () => {
         const triggerId = await insertTrigger();
         const { payload } = await deliver(triggerId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: MAIN_ONLY }));
 
         const result = await admit(triggerId, payload);
 
@@ -171,12 +171,12 @@ describe("admitTriggerRun filter recheck", () => {
         const triggerId = await insertTrigger();
         const first = await deliver(triggerId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: MAIN_ONLY }));
 
         expect(first.claim).toBeDefined();
         expect(await admit(triggerId, first.payload, first.claim)).toEqual({ filtered: 'branch equals "main"' });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: [{ op: "equals", path: "branch", value: "dev" }] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: [{ op: "equals", path: "branch", value: "dev" }] }));
 
         // A duplicate would schedule nothing, so `deliver` would return `undefined`.
         const redelivery = await deliver(triggerId);
@@ -194,7 +194,7 @@ describe("admitTriggerRun filter recheck", () => {
         const redelivery = await deliver(triggerId, BODY, { at: NOW + TRIGGER_CLAIM_TTL_MS + 1, native: true });
 
         expect(redelivery.claim).toBeDefined();
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: MAIN_ONLY }));
 
         // The first run starts late; the owner's filters refuse it and it gives back its own (lapsed) claim only.
         expect(await admit(triggerId, first.payload, first.claim)).toEqual({ filtered: 'branch equals "main"' });
@@ -215,7 +215,7 @@ describe("admitTriggerRun filter recheck", () => {
         const triggerId = await insertTrigger();
         const { payload } = await deliver(triggerId);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: [{ op: "equals", path: "branch", value: "dev" }] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: [{ op: "equals", path: "branch", value: "dev" }] }));
 
         expect(await admit(triggerId, payload)).toBeNull();
         expect(charged.rounds).toBe(1);
@@ -229,7 +229,7 @@ describe("admitTriggerRun filter recheck", () => {
 
         expect(delivery.invalidUtf8).toBe(true);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: [{ op: "exists", path: "note" }] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: [{ op: "exists", path: "note" }] }));
 
         // The lossy text alone would pass: the replacement character leaves valid JSON.
         expect(await admit(triggerId, delivery.payload)).toBeNull();
@@ -262,7 +262,7 @@ describe("admitTriggerRun filter recheck", () => {
     it("does not look at filters for a run that passes no delivery payload", async () => {
         const triggerId = await insertTrigger();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { filters: MAIN_ONLY }));
 
         const result = await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { triggerId }));
 

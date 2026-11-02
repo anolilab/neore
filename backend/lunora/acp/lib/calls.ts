@@ -64,7 +64,7 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
         return;
     }
 
-    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
 
     const held = await ctx.db.persistentStreams.findFirst({
         orderBy: [{ _creationTime: "desc" }],

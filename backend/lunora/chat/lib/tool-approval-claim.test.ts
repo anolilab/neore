@@ -131,7 +131,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { streamId: "stream-1" });
+            await ctx.db.patch("toolApprovalRuns", row._id, { streamId: "stream-1" });
         });
 
         const second = await claim(OWNER, "deny");
@@ -145,7 +145,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { status: "denied" });
+            await ctx.db.patch("toolApprovalRuns", row._id, { status: "denied" });
         });
 
         expect(await claim(OWNER)).toStrictEqual({ kind: "already-resolved", status: "denied", streamId: null });
@@ -155,7 +155,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
+            await ctx.db.patch("toolApprovalRuns", row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
         });
 
         await expect(claim(OWNER)).rejects.toThrow("can no longer be resumed");
