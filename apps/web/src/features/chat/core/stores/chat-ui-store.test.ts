@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -57,6 +58,20 @@ describe("setComposerText hidden characters", () => {
 
         expect(useChatUIStore.getState().composerText).toBe("hi there");
         expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
+    });
+
+    it("keeps a Persian ZWNJ typed one character at a time, and sending strips a lone trailing joiner", () => {
+        const word = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
+        let typed = "";
+
+        for (const character of word) {
+            typed += character;
+            useChatUIStore.getState().setComposerText(typed);
+            typed = useChatUIStore.getState().composerText;
+        }
+
+        expect(typed).toBe(word);
+        expect(stripHiddenText("\u{645}\u{6CC}\u{200C}").text).toBe("\u{645}\u{6CC}");
     });
 
     it("forgets the count once the draft is empty", () => {

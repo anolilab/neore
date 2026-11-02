@@ -35,6 +35,14 @@ describe(cleanEditorText, () => {
         expect(editor.getText({ blockSeparator: "\n" })).toBe("hi there\nx");
     });
 
+    it("keeps a joiner at the end of a block, where the next letter will follow it", () => {
+        const editor = editorWith("<p>\u{645}\u{6CC}\u{200C}</p>");
+
+        cleanEditorText(editor);
+
+        expect(editor.getText()).toBe("\u{645}\u{6CC}\u{200C}");
+    });
+
     it("is not an undo step of its own: Undo reverses the person's edit, not the cleanup", () => {
         const editor = editorWith("<p>hi</p>");
 

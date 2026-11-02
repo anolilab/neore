@@ -36,6 +36,43 @@ describe("showHidden", () => {
 });
 
 describe("stripHiddenText", () => {
+    it.each([
+        ["U+034F", "\u{34F}\u{34F}\u{34F}"],
+        ["U+3164", "\u{3164}\u{3164}\u{3164}"],
+        ["the unassigned tag-block range U+E0080", "\u{E0080}\u{E0081}\u{E0082}"],
+        ["the unassigned range U+E01F0", "\u{E01F0}\u{E01F1}\u{E01F2}"],
+        ["the other Default_Ignorable characters", "\u{115F}\u{1160}\u{FFA0}\u{17B4}\u{17B5}\u{180B}\u{FFF0}"],
+    ])("strips a run of %s after a visible letter", (_name, run) => {
+        expect(stripHiddenText(`a${run}b`)).toEqual({ removed: [...run].length, text: "ab" });
+        expect(hasHiddenText(`a${run}`, { strict: true })).toBe(true);
+    });
+
+    it("keeps keycaps, VS16 emoji, ZWJ sequences and a Persian ZWNJ", () => {
+        const kept = "1\u{FE0F}\u{20E3} \u{2764}\u{FE0F} \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467} \u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
+
+        expect(stripHiddenText(kept)).toEqual({ removed: 0, text: kept });
+    });
+
+    it("keeps a trailing joiner only while the text is being typed", () => {
+        const typed = "\u{645}\u{6CC}\u{200C}";
+
+        expect(stripHiddenText(typed, { keepTrailingJoiner: true })).toEqual({ removed: 0, text: typed });
+        expect(stripHiddenText(typed)).toEqual({ removed: 1, text: "\u{645}\u{6CC}" });
+        expect(stripHiddenText("\u{200C}", { keepTrailingJoiner: true }).removed).toBe(1);
+        expect(stripHiddenText("a\u{200C}\u{200D}", { keepTrailingJoiner: true }).removed).toBe(2);
+    });
+
+    it("keeps the ZWNJ of a Persian word typed one character at a time", () => {
+        const word = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
+        let draft = "";
+
+        for (const character of word) {
+            draft = stripHiddenText(draft + character, { keepTrailingJoiner: true }).text;
+        }
+
+        expect(draft).toBe(word);
+    });
+
     it("removes tag characters, bidi controls, separators and C0 controls, and counts them", () => {
         const tagged = [..."ignore"].map((character) => String.fromCodePoint(0xe_00_00 + character.codePointAt(0)!)).join("");
 

@@ -22,13 +22,14 @@
 
 // The format characters that RENDER stay (U+0600 to U+0605 Arabic number signs, U+06DD end of ayah, U+070F Syriac abbreviation
 // mark, U+08E2, U+110BD, U+110CD). Variation selectors and the joiners U+200C and U+200D are matched here and kept by `scan`
-// where they belong. Global expressions: `matchAll` clones them, so no state is shared between calls.
-const HIDDEN =
-    /(?![\u{600}-\u{605}\u{6DD}\u{70F}\u{8E2}\u{110BD}\u{110CD}])[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+// where they belong. `Default_Ignorable_Code_Point` also covers every variation selector and the whole tag block, and adds the other characters that draw nothing (U+034F, the Hangul fillers
+// U+115F, U+1160, U+3164 and U+FFA0, U+17B4 and U+17B5, the Mongolian selectors, U+FFF0 to U+FFF8, the unassigned tag-block
+// ranges); the fillers appear in real Korean only in decomposed jamo sequences, so stripping them is acceptable. Global expressions: `matchAll` clones them, so no state is shared between calls.
+const HIDDEN = /(?![\u{600}-\u{605}\u{6DD}\u{70F}\u{8E2}\u{110BD}\u{110CD}])[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]/gu;
 // The strict form also counts the joiners, the visible format characters and every selector and tag: for text nobody wrote to be read in prose (a repository's names and globs).
 // One hidden character, not global: no `lastIndex` to carry between calls.
 const HIDDEN_ONE = new RegExp(HIDDEN.source, "u");
-const HIDDEN_STRICT = /[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+const HIDDEN_STRICT = /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]/gu;
 // U+1F3F4 BLACK FLAG, the tags of one of the three RGI subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`), CANCEL TAG.
 // Any other code is free text in tag letters, so it is not allowed.
 const SUBDIVISION_FLAG = /\u{1F3F4}\u{E0067}\u{E0062}(?:\u{E0065}\u{E006E}\u{E0067}|\u{E0073}\u{E0063}\u{E0074}|\u{E0077}\u{E006C}\u{E0073})\u{E007F}/gu;
@@ -41,6 +42,12 @@ const SYMBOL = /^[\p{Sm}\p{So}]$/u;
 const COMBINING_ENCLOSING_KEYCAP = 0x20_e3;
 
 type Range = { index: number; length: number };
+
+/**
+ * `keepTrailingJoiner`: for text still being typed, where a joiner at the very end waits for the letter that follows it
+ * (a Persian word is typed one character at a time). Anything sent or stored uses the default, which strips it.
+ */
+type ScanOptions = { keepTrailingJoiner?: boolean; layout?: boolean; strict?: boolean };
 
 const isTagCharacter = (codePoint: number): boolean => codePoint >= 0xe_00_00 && codePoint <= 0xe_00_7f;
 
@@ -78,11 +85,11 @@ const selectorBelongs = (value: string, index: number, codePoint: number): boole
  * A joiner stays only as the ONE joiner between two visible characters (a ZWJ emoji, a Persian word). A run of them,
  * or a joiner beside a hidden character or at an end of the text, can carry a bit per character.
  */
-const joinsVisibleCharacters = (value: string, index: number): boolean => {
+const joinsVisibleCharacters = (value: string, index: number, keepTrailingJoiner: boolean): boolean => {
     const before = characterBefore(value, index);
     const next = value.codePointAt(index + 1);
 
-    if (before === "" || next === undefined || HIDDEN_ONE.test(String.fromCodePoint(next))) {
+    if (before === "" || (next === undefined ? !keepTrailingJoiner : HIDDEN_ONE.test(String.fromCodePoint(next)))) {
         return false;
     }
 
@@ -97,13 +104,13 @@ const joinsVisibleCharacters = (value: string, index: number): boolean => {
 };
 
 /** Whether the hidden-looking character at `index` belongs where it stands (see the top of the file). */
-const belongsInPlace = (value: string, index: number, codePoint: number, inFlag: (index: number) => boolean): boolean => {
+const belongsInPlace = (value: string, index: number, codePoint: number, inFlag: (index: number) => boolean, keepTrailingJoiner: boolean): boolean => {
     if (isTagCharacter(codePoint)) {
         return inFlag(index);
     }
 
     if (isJoiner(codePoint)) {
-        return joinsVisibleCharacters(value, index);
+        return joinsVisibleCharacters(value, index, keepTrailingJoiner);
     }
 
     return isVariationSelector(codePoint) && selectorBelongs(value, index, codePoint);
@@ -131,7 +138,7 @@ const rangeCursor = (ranges: ReadonlyArray<readonly [number, number]>): ((index:
  * Every hidden character in `value`, in order. `layout`: a newline and a tab are not hidden. The selectors and tags
  * that belong where they stand are left out, unless `strict`.
  */
-const scan = (value: string, { layout = false, strict = false }: { layout?: boolean; strict?: boolean } = {}): Range[] => {
+const scan = (value: string, { keepTrailingJoiner = false, layout = false, strict = false }: ScanOptions = {}): Range[] => {
     // The tag characters of each well-formed subdivision flag: from after the black flag to the end of the cancel tag.
     const inFlag = rangeCursor(
         strict ? [] : Array.from(value.matchAll(SUBDIVISION_FLAG), (match) => [match.index + BLACK_FLAG_UNITS, match.index + match[0].length] as const),
@@ -150,7 +157,11 @@ const scan = (value: string, { layout = false, strict = false }: { layout?: bool
 
         const codePoint = character.codePointAt(0) ?? 0;
 
-        if (strict ? isEmojiSelector(codePoint) && selectorBelongs(value, index, codePoint) : belongsInPlace(value, index, codePoint, inFlag)) {
+        if (
+            strict
+                ? isEmojiSelector(codePoint) && selectorBelongs(value, index, codePoint)
+                : belongsInPlace(value, index, codePoint, inFlag, keepTrailingJoiner)
+        ) {
             continue;
         }
 
@@ -186,8 +197,8 @@ export const showHidden = (value: string, options: { strict?: boolean } = {}): s
  * characters, where emoji sequences and Persian, Arabic and Indic text need it to render. A variation selector stays only as the one directly after a
  * character it can select a variant of (see the top of the file), and a tag only as the tail of a subdivision flag.
  */
-export const stripHiddenText = (value: string): { removed: number; text: string } => {
-    const ranges = scan(value, { layout: true });
+export const stripHiddenText = (value: string, options: { keepTrailingJoiner?: boolean } = {}): { removed: number; text: string } => {
+    const ranges = scan(value, { ...options, layout: true });
     let text = "";
     let from = 0;
 
@@ -200,4 +211,5 @@ export const stripHiddenText = (value: string): { removed: number; text: string 
 };
 
 /** Where each hidden character sits in `value` (UTF-16 offset and length, a tag character is 2 units), in order. */
-export const findHiddenText = (value: string): { index: number; length: number }[] => scan(value, { layout: true });
+export const findHiddenText = (value: string, options: { keepTrailingJoiner?: boolean } = {}): { index: number; length: number }[] =>
+    scan(value, { ...options, layout: true });

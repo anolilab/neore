@@ -34,7 +34,10 @@ export const cleanEditorText = (editor: Editor): void => {
         let at = 0;
 
         // The reported ranges come in order, so the node cursor only moves forward.
-        for (const { index, length } of findHiddenText(text)) {
+        // A joiner at the end of the block waits for the letter typed after it (Persian); sending strips it.
+        const hidden = findHiddenText(text, { keepTrailingJoiner: true });
+
+        for (const { index, length } of hidden) {
             while (at + 1 < nodes.length && (nodes[at + 1]?.start ?? Infinity) <= index) {
                 at += 1;
             }

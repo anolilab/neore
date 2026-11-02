@@ -361,8 +361,9 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 // Composer actions - synchronous to preserve cursor position
                 setComposerText: (text) => {
-                    // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter.
-                    const { removed, text: clean } = stripHiddenText(text);
+                    // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter. A joiner at the
+                    // end waits for the next letter (Persian is typed one character at a time); sending strips it.
+                    const { removed, text: clean } = stripHiddenText(text, { keepTrailingJoiner: true });
 
                     set((state) => {
                         return { composerHiddenRemoved: clean === "" ? removed : state.composerHiddenRemoved + removed, composerText: clean };
