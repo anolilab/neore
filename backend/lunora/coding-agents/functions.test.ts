@@ -7,6 +7,7 @@ import {
     beginPullRequest,
     canOpenPullRequest,
     claimPoll,
+    commitAuthorOf,
     completePullRequest,
     createRun,
     expirePullRequest,
@@ -331,5 +332,26 @@ describe("commit identity", () => {
         const prefs = await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").collect());
 
         expect(prefs).toHaveLength(0);
+    });
+});
+
+describe("commit author", () => {
+    const account = { email: "dana@example.com", emailVerified: true, name: "Dana Tester" };
+
+    it("commits as the account when its email is verified", () => {
+        expect(commitAuthorOf(account)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
+    });
+
+    it("keeps the agent as author for an unverified email", () => {
+        expect(commitAuthorOf({ ...account, emailVerified: false })).toBeNull();
+    });
+
+    it("keeps the agent as author when the account has no name or no email", () => {
+        expect(commitAuthorOf({ ...account, name: "" })).toBeNull();
+        expect(commitAuthorOf({ ...account, email: "" })).toBeNull();
+    });
+
+    it("keeps the agent as author when there is no account", () => {
+        expect(commitAuthorOf(null)).toBeNull();
     });
 });

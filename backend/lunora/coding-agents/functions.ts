@@ -26,6 +26,7 @@ import { patchById, patchRow } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { loadTaskAccount } from "../tasks/account";
+import type { CommitAuthor } from "./commands";
 import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { PR_BUDGET_MS } from "./runner";
@@ -640,9 +641,21 @@ export const getRunForFollowUp = internalQuery
 // ─── Internal: pull requests ─────────────────────────────────────────────────
 
 /**
+ * The identity a commit is made as, from the account. `null` keeps the agent as author: an account without a
+ * name, or whose email is not verified, gives `null`, so the commit never carries an empty or guessed identity,
+ * and nobody can have commits attributed to an address they have not proved.
+ */
+export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null): CommitAuthor | null => {
+    if (!user?.email || !user.name || user.emailVerified !== true) {
+        return null;
+    }
+
+    return { email: user.email, name: user.name };
+};
+
+/**
  * The person a pull request's commits are made as, when they opted in (`codingAgentCommitIdentity`).
- * `null` keeps the agent as author. A missing or incomplete account also gives `null`: the commit never
- * carries an empty or guessed identity.
+ * `null` keeps the agent as author (see {@link commitAuthorOf}).
  */
 export const commitAuthorFor = internalQuery
     .input({ userId: v.string() })
@@ -659,11 +672,7 @@ export const commitAuthorFor = internalQuery
 
         const user = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } });
 
-        if (!user?.email || !user.name) {
-            return null;
-        }
-
-        return { email: user.email, name: user.name };
+        return commitAuthorOf(user);
     });
 
 /** Choose who a coding agent's pull request commits are made as. Off (`agent`) is the default. */

@@ -6542,7 +6542,7 @@ msgid "Commits"
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:200
-msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or email."
+msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email."
 msgstr ""
 
 #: src/features/settings/connectors/connector-category.ts:6
