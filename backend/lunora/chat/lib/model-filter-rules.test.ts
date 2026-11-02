@@ -160,12 +160,44 @@ describe("getUtilityModelForUser for a collaborator on the owner's thread", () =
             runQuery.mock.calls
                 .filter(([reference]) => !String(reference).includes(PLAN_REF) && !JSON.stringify(reference).includes(PLAN_REF))
                 .map(([, args]) => (args as { userId: string }).userId),
-        ).toEqual(["owner"]);
+        ).toEqual(["collaborator", "owner"]);
         expect(
             runQuery.mock.calls
                 .filter(([reference]) => String(reference).includes(PLAN_REF) || JSON.stringify(reference).includes(PLAN_REF))
                 .map(([, args]) => (args as { userId: string }).userId),
-        ).toEqual(["collaborator"]);
+        ).toEqual(["collaborator", "collaborator"]);
+    });
+
+    const withRules = (rules: Record<string, object>) =>
+        ({
+            runQuery: vi.fn(async (reference: unknown, args: { userId: string }) =>
+                JSON.stringify(reference).includes(PLAN_REF) ? { isAdmin: false, plan: "premium" } : prefs({ modelFilterRules: rules[args.userId] ?? {} }),
+            ),
+        }) as never;
+
+    const idOf = (model: unknown) => (model as { config: { modelId: string } }).config.modelId;
+
+    it("does not use a model the caller forbids although the owner allows it", async () => {
+        const owner = { allowedModels: ["openai/gpt-4.1-mini", "anthropic/claude-haiku-4.5"] };
+        const gateway = async () => new Response("{}");
+        const alone = await getUtilityModelForUser(withRules({ owner }), gateway, { filterUserId: "owner", userId: "collaborator" });
+        const model = await getUtilityModelForUser(withRules({ collaborator: { blockedModels: ["openai/gpt-4.1-mini"] }, owner }), gateway, {
+            filterUserId: "owner",
+            userId: "collaborator",
+        });
+
+        expect(idOf(alone)).toBe("openai/gpt-4.1-mini");
+        expect(idOf(model)).toBe("anthropic/claude-haiku-4.5");
+    });
+
+    it("answers a BAD_REQUEST when no model satisfies both users", async () => {
+        await expect(
+            getUtilityModelForUser(
+                withRules({ collaborator: { allowedModels: ["openai/gpt-4.1-mini"] }, owner: { allowedModels: ["anthropic/claude-haiku-4.5"] } }),
+                async () => new Response("{}"),
+                { filterUserId: "owner", userId: "collaborator" },
+            ),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });
 

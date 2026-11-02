@@ -57,8 +57,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
-import { isAgentRunError, loadModelFilterRules, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
-import { getUtilityModelForUser, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
+import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import { getUtilityModelForUser, loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,
@@ -343,7 +343,7 @@ export const askAside = authAction
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
                 // An unreadable rules read answers like a refusal, not an internal error.
-                loadModelFilterRules(ctx, userId).catch((error: unknown) => {
+                loadSharedModelFilterRules(ctx, userId, thread?.userId).catch((error: unknown) => {
                     throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
                 }),
                 resolveRunModel(ctx, chosen.model, userId),
