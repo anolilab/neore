@@ -13,7 +13,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import { extendClaim, releaseClaim, retryReleaseKey, TRIGGER_CLAIM_TTL_MS, TRIGGER_DELIVERY_CLAIM_TTL_MS, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { DAILY_LIMIT_MESSAGE } from "../tasks/account";
 import { executeTrigger } from "./execute";
@@ -24,6 +24,7 @@ const world = vi.hoisted(() => {
     return {
         agentRuns: 0,
         chargeOk: true,
+        extendFailures: 0,
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
         registry: new Map<string, unknown>(),
         releaseFailures: 0,
@@ -105,6 +106,22 @@ let harness: Harness;
 beforeAll(async () => {
     registerModule(world.registry, "triggers_functions", await import("./functions"));
     registerModule(world.registry, "lib_claim_once", await import("../lib/claim-once"));
+    // The real extension, failing while `world.extendFailures` lasts.
+    world.registry.set(
+        "lib_claim_once:extendKey",
+        internalMutation
+            .input({ claimedAt: v.number(), key: v.string(), scope: v.string(), ttlMs: v.number() })
+            .output(v.boolean())
+            .mutation(async ({ args: { claimedAt, key, scope, ttlMs }, ctx }) => {
+                if (world.extendFailures > 0) {
+                    world.extendFailures -= 1;
+
+                    throw new Error("database unavailable");
+                }
+
+                return await extendClaim(ctx, scope, key, claimedAt, ttlMs);
+            }),
+    );
     // The real release, failing while `world.releaseFailures` lasts.
     world.registry.set(
         "lib_claim_once:releaseKey",
@@ -133,6 +150,7 @@ beforeEach(() => {
     world.userLookupThrows = false;
     world.failAt = undefined;
     world.releaseFailures = 0;
+    world.extendFailures = 0;
     world.retriesUnschedulable = false;
     harness = lunoraTest(schema as never);
 });
@@ -522,5 +540,55 @@ describe("a gitlab-token claim is kept only for a run that reached the model", (
 
         expect(await claims()).toEqual([expect.objectContaining({ scope: TRIGGER_DELIVERY_SCOPE })]);
         expect(await deliver(triggerId)).toBeUndefined();
+    });
+});
+
+describe("a delivery whose claim cannot be kept does not run", () => {
+    it("when its claim lapsed and a redelivery took the key: only the redelivery runs", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        // The first delivery waited in the queue past the retry window; the sender redelivered meanwhile.
+        vi.setSystemTime(NOW + TRIGGER_CLAIM_TTL_MS + 1);
+
+        const redelivery = (await deliver(triggerId, "native"))!;
+
+        expect(redelivery.claim!.claimedAt).not.toBe(first.claim!.claimedAt);
+
+        await execute(first);
+        expect(world.agentRuns).toBe(0);
+        // The redelivery's claim is untouched.
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt: redelivery.claim!.claimedAt })]);
+
+        await execute(redelivery);
+        expect(world.agentRuns).toBe(1);
+    });
+
+    it("when extending its claim fails twice, and gives the claim back so the redelivery runs", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        world.extendFailures = 2;
+        await execute(first);
+
+        expect(world.agentRuns).toBe(0);
+        expect(await claims()).toEqual([]);
+
+        const redelivery = await deliver(triggerId, "native");
+
+        expect(redelivery).toBeDefined();
+        await execute(redelivery!);
+        expect(world.agentRuns).toBe(1);
+    });
+
+    it("but runs after one failed extension, which is retried once", async () => {
+        const triggerId = await insertTrigger({ webhookSignatureScheme: "native" });
+        const first = (await deliver(triggerId, "native"))!;
+
+        world.extendFailures = 1;
+        await execute(first);
+
+        expect(world.agentRuns).toBe(1);
+        expect(await claims()).toEqual([expect.objectContaining({ expiresAt: NOW + TRIGGER_DELIVERY_CLAIM_TTL_MS })]);
     });
 });

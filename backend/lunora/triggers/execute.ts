@@ -31,6 +31,13 @@ const RELEASE_LOST_NOTE =
 /** A run error only the owner's settings can cure; it repeats until they do, so it counts toward pausing the trigger. */
 export const isUserFixableRunError = (error: unknown): error is AgentRunError => error instanceof AgentRunError && USER_FIXABLE_RUN_ERRORS.has(error.kind);
 
+/** The delivery's replay claim could not be kept, so it must not run: another delivery may hold it. */
+class ClaimNotKeptError extends Error {
+    constructor() {
+        super("This delivery was skipped because its replay claim could not be kept; the sender's redelivery will run it.");
+    }
+}
+
 export const executeTrigger = internalAction
     .input({
         // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
@@ -74,20 +81,33 @@ export const executeTrigger = internalAction
         };
 
         /**
-         * The run reached the model, so its permanent claim is stretched from the retry window it was taken for to
-         * `TRIGGER_DELIVERY_CLAIM_TTL_MS`. Failing to is not worth failing the run over (the claim then lapses with the
-         * retry window, as a timestamped delivery's does), so it is logged.
+         * The run is about to reach the model, so its permanent claim is stretched from the retry window it was taken for
+         * to `TRIGGER_DELIVERY_CLAIM_TTL_MS`. Answers whether the delivery may run: `false` when the claim is no longer
+         * this delivery's (it lapsed, and a redelivery may hold the key now), and also when the extension errors twice, because
+         * a refusal is safer than a second run and the sender's redelivery retries.
          */
-        const keepClaim = async (): Promise<void> => {
+        const keepClaim = async (): Promise<boolean> => {
             if (!claim || !releaseUnlessRun) {
-                return;
+                return true;
             }
 
-            try {
-                await ctx.runMutation(internal.lib.claim_once.extendKey, { ...claim, ttlMs: TRIGGER_DELIVERY_CLAIM_TTL_MS });
-            } catch (error) {
-                console.error(`[Triggers] Could not extend the replay claim of trigger ${triggerId}:`, error);
+            for (let attempt = 1; attempt <= 2; attempt += 1) {
+                try {
+                    if (await ctx.runMutation(internal.lib.claim_once.extendKey, { ...claim, ttlMs: TRIGGER_DELIVERY_CLAIM_TTL_MS })) {
+                        return true;
+                    }
+
+                    console.error(`[Triggers] The replay claim of trigger ${triggerId} is no longer this delivery's; not running it.`);
+
+                    return false;
+                } catch (error) {
+                    console.error(`[Triggers] Could not extend the replay claim of trigger ${triggerId} (attempt ${String(attempt)} of 2):`, error);
+                }
             }
+
+            console.error(`[Triggers] Not running a delivery of trigger ${triggerId} whose replay claim could not be extended.`);
+
+            return false;
         };
 
         // The quiet window this run took (see `windowStart`), and the `lastTriggeredAt` it replaced.
@@ -330,8 +350,12 @@ export const executeTrigger = internalAction
                 memory: true,
                 model,
                 onGenerationStart: async () => {
+                    // Before `started`, so a refused delivery gives its claim back like any that never ran.
+                    if (!(await keepClaim())) {
+                        throw new ClaimNotKeptError();
+                    }
+
                     started = true;
-                    await keepClaim();
                 },
                 onThread: () => {
                     threadCreated = true;
@@ -367,11 +391,12 @@ export const executeTrigger = internalAction
 
             console.info(`[Triggers] Trigger ${trigger.name} executed successfully. Thread: ${threadId}, Response length: ${responseText.length}`);
         } catch (error) {
+            const refused = error instanceof ClaimNotKeptError;
             const userFixable = isUserFixableRunError(error);
             // The owner reads this in the trigger history; the raw error is logged only.
             // A run's own refusal carries a message written for the owner, which says what to fix.
             // A custom model's other failures are the owner's endpoint to fix, so they are worded that way.
-            const errorMessage = userFixable ? error.message : toUserFacingError(error, { customEndpoint: parseCustomModelId(model) !== null });
+            const errorMessage = userFixable || refused ? error.message : toUserFacingError(error, { customEndpoint: parseCustomModelId(model) !== null });
 
             console.error(`[Triggers] Trigger ${trigger.name} failed:`, error);
 
@@ -410,11 +435,14 @@ export const executeTrigger = internalAction
             // the old value when the run posted nothing; any other routine still shows when it last ran.
             const windowRoutine = trigger.quietWhenEmpty === true && canBeQuiet({ botId: bot ? botId : undefined, type: triggerType });
 
-            await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
-                error: errorMessage.slice(0, 500),
-                ...(!takesWindow && (threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
-                triggerId,
-            });
+            // A delivery skipped for its claim is not a failure of the trigger: it must not count toward pausing it.
+            if (!refused) {
+                await ctx.runMutation(internal.triggers.functions.updateTriggerStats, {
+                    error: errorMessage.slice(0, 500),
+                    ...(!takesWindow && (threadCreated || !windowRoutine) && { lastTriggeredAt: threadCreated ? runStartedAt : Date.now() }),
+                    triggerId,
+                });
+            }
 
             if (releaseError !== undefined) {
                 throw releaseError;
