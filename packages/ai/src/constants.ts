@@ -12,6 +12,7 @@ export const DEFAULT_SUMMARIZATION_MODEL = "moonshotai/kimi-k2-0905";
 export const DEFAULT_TITLE_GENERATION_MODEL = "moonshotai/kimi-k2-0905";
 /** Longest user-written instruction for how thread titles are worded (`userSettings.threadTitleInstructions`). */
 export const MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH = 200;
+
 /**
  * Most characters one message may carry. Lunora rejects a JSON request over 1 MiB (413) and a character is up to 4 bytes
  * of UTF-8, so this stays well under it; the public API caps a prompt at the same number. Longer text goes in as a file.

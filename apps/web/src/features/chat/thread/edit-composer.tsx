@@ -17,7 +17,7 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckIcon, PlusIcon, XIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { ChangeEvent, FC, KeyboardEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context";
 import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
@@ -47,6 +47,10 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
     // Local state for the text being edited (initialized from message)
     const [editText, setEditText] = useState(message.text || "");
 
+    // The cap is for what a person sends; an assistant reply is stored text, so a long one stays editable.
+    const isOverCap = message.role === "user" && editText.length > MAX_PROMPT_CHARS;
+    const lengthNoticeId = useId();
+
     // Focus textarea on mount and move cursor to end
     useEffect(() => {
         if (!textareaRef.current) {
@@ -71,7 +75,7 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
     }, [editText]);
 
     const handleSubmit = async () => {
-        if (!editText.trim() || isPending || editText.length > MAX_PROMPT_CHARS) {
+        if (!editText.trim() || isPending || isOverCap) {
             return;
         }
 
@@ -136,6 +140,8 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                         <Separator className="h-6" orientation="vertical" />
                     </div>
                     <textarea
+                        aria-describedby={isOverCap ? lengthNoticeId : undefined}
+                        aria-invalid={isOverCap}
                         className="text-foreground focus-visible:ring-ring/50 ml-1 flex min-h-8 w-full resize-none bg-transparent py-2 outline-none focus-visible:ring-1"
                         onChange={handleTextChange}
                         onKeyDown={handleKeyDown}
@@ -147,14 +153,14 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                 </div>
             </div>
 
-            <ComposerLengthNotice chars={editText.length} />
+            {message.role === "user" && <ComposerLengthNotice chars={editText.length} id={lengthNoticeId} />}
 
             <div className="m-1.5 flex items-center justify-end gap-2 self-end">
                 <Button onClick={handleCancel} size="sm" variant="ghost">
                     <XIcon className="mr-1 h-4 w-4" />
                     {t`Cancel`}
                 </Button>
-                <Button disabled={!editText.trim() || isPending || editText.length > MAX_PROMPT_CHARS} onClick={handleSubmit} size="sm" variant="default">
+                <Button disabled={!editText.trim() || isPending || isOverCap} onClick={handleSubmit} size="sm" variant="default">
                     <CheckIcon className="mr-1 h-4 w-4" />
                     {t`Save`}
                 </Button>

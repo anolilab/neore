@@ -50,7 +50,42 @@ describe("ComposerLengthNotice", () => {
     });
 });
 
+describe("ComposerLengthNotice when the file would not fit either", () => {
+    it("says so and offers no file", () => {
+        render(<ComposerLengthNotice chars={MAX_PROMPT_CHARS + 1} onAttachAsFile={() => {}} tooLongForFile />);
+
+        expect(screen.getByRole("alert").textContent).toContain("too long to send even as a file");
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+});
+
 describe("the composer over the cap", () => {
+    const over = "x".repeat(MAX_PROMPT_CHARS + 5);
+
+    it("disables Send and points it at the notice", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value={over} />);
+
+        const send = screen.getByRole("button", { name: "Send message" });
+
+        expect((send as HTMLButtonElement).disabled).toBe(true);
+        expect(send.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    });
+
+    it("keeps Send enabled at the cap", () => {
+        render(<ComposerInputArea onChange={() => {}} onSubmit={() => {}} value={"x".repeat(MAX_PROMPT_CHARS)} />);
+
+        expect((screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("disables Queue and Steer too while a reply streams", () => {
+        render(
+            <ComposerInputArea canQueueWhileStreaming followUp="steer" isStreaming onChange={() => {}} onSteer={() => {}} onSubmit={() => {}} value={over} />,
+        );
+
+        expect((screen.getByRole("button", { name: "Queue message" }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Steer the reply" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it("shows the cap under the input", () => {
         render(<ComposerInputArea onAttachDraftAsFile={() => {}} onChange={() => {}} onSubmit={() => {}} value={"x".repeat(MAX_PROMPT_CHARS + 5)} />);
 

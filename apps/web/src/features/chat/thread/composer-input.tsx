@@ -30,6 +30,7 @@ import ReferenceStrip from "@/features/chat/components/reference-picker/referenc
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
     ATTACHMENT_ACCEPT,
+    attachmentSizeLimit,
     attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
@@ -59,6 +60,8 @@ import { showError, showInfo } from "@/lib/toast";
 import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
+import type { TextFileResult } from "./composer-draft-file";
+import { draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
@@ -634,6 +637,20 @@ const ComposerInput = ({
         return { estimatedTokens, totalChars };
     }, [text, attachments]);
 
+    // The file the over-the-cap notice offers has to stay inside the attachment and context limits too.
+    const draftFitsFile = useMemo(() => {
+        if (text.length <= MAX_PROMPT_CHARS) {
+            return true;
+        }
+
+        const otherChars = contextStats.totalChars - text.length;
+
+        return draftFitsAsFile(text, otherChars, {
+            contextChars: CONTEXT_ERROR_THRESHOLD,
+            maxFileBytes: attachmentSizeLimit({ name: "pasted-text.txt", type: "text/plain" }).maxBytes,
+        });
+    }, [text, contextStats.totalChars]);
+
     const contextWarning = useMemo(() => {
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return {
@@ -699,9 +716,9 @@ const ComposerInput = ({
         [handleFileSelect],
     );
 
-    // Moves text into a text-file attachment and returns the attachment's id. The paste handler and the over-the-cap notice share it.
+    // Moves text into a text-file attachment. Never throws: a failed upload comes back as `error`, the chip red.
     const attachTextAsFile = useCallback(
-        async (content: string): Promise<string> => {
+        async (content: string): Promise<TextFileResult> => {
             const blob = new Blob([content], { type: "text/plain" });
             const timestamp = new Date().toISOString().split("T", 1)[0];
             const file = new File([blob], `pasted-text-${timestamp}.txt`, { type: "text/plain" });
@@ -724,24 +741,42 @@ const ComposerInput = ({
                 });
             } catch (error) {
                 console.error("Failed to convert pasted text:", error);
-                updateAttachment(attachmentId, {
-                    error: errorMessage(error, t`Conversion failed`, describeUploadError),
-                    status: "error",
-                });
+
+                const message = errorMessage(error, t`Conversion failed`, describeUploadError);
+
+                updateAttachment(attachmentId, { error: message, status: "error" });
+
+                return { attachmentId, error: message };
             }
 
-            return attachmentId;
+            return { attachmentId };
         },
         [addAttachment, attachmentAdapter, updateAttachment, t, describeUploadError],
     );
 
     // The draft is over the cap (voice, an edit, a link): offer to keep all of it as a file instead of failing the send.
+    const attachingDraftRef = useRef(false);
     const handleAttachDraftAsFile = useCallback(() => {
-        const draft = useChatUIStore.getState().composerText;
+        if (attachingDraftRef.current) {
+            return;
+        }
 
-        setText("");
-        void attachTextAsFile(draft);
-    }, [attachTextAsFile, setText]);
+        attachingDraftRef.current = true;
+        void moveDraftToFile({
+            attach: attachTextAsFile,
+            clearDraft: () => setText(""),
+            discard: removeAttachment,
+            getDraft: () => useChatUIStore.getState().composerText,
+            // A recognised failure was toasted where it was worded; the draft is still in the composer.
+            onFailure: (error) => {
+                if (!toastedMessages.has(error)) {
+                    showError(error);
+                }
+            },
+        }).finally(() => {
+            attachingDraftRef.current = false;
+        });
+    }, [attachTextAsFile, removeAttachment, setText]);
 
     // Handle paste - auto-convert long text to attachment
     const handlePaste = useCallback(
@@ -776,15 +811,22 @@ const ComposerInput = ({
             if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
                 e.preventDefault();
 
-                const attachmentId = await attachTextAsFile(pastedText);
+                const { attachmentId } = await attachTextAsFile(pastedText);
 
                 // The paste did not land in the draft, so say where it went and let the person take it back.
                 showInfo(t`Long text was attached as a file.`, {
                     action: {
                         label: t`Undo`,
+                        // The file may have been sent or removed since: then the text is no longer ours to put back.
                         onClick: () => {
-                            removeAttachment(attachmentId);
-                            setText(useChatUIStore.getState().composerText + pastedText);
+                            undoLongPaste({
+                                attachmentId,
+                                getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                                getDraft: () => useChatUIStore.getState().composerText,
+                                pastedText,
+                                removeAttachment,
+                                setDraft: setText,
+                            });
                         },
                     },
                     duration: 8000,
@@ -1379,7 +1421,7 @@ const ComposerInput = ({
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
                 onAddAttachment={compact ? undefined : handleAddAttachment}
-                onAttachDraftAsFile={handleAttachDraftAsFile}
+                onAttachDraftAsFile={draftFitsFile ? handleAttachDraftAsFile : undefined}
                 onCancel={handleCancel}
                 onCaptureScreen={compact || !canCaptureScreen ? undefined : handleCaptureScreen}
                 onChange={handleTextChange}
@@ -1394,6 +1436,7 @@ const ComposerInput = ({
                 placeholder={placeholder ?? t`Type your message...`}
                 ref={inputAreaRef}
                 requestCompletion={compact ? undefined : requestCompletion}
+                tooLongForFile={!draftFitsFile}
                 value={text}
             />
 

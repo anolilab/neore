@@ -16,6 +16,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { FollowUpControl } from "@neore/ai/capabilities";
+import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
 import { buttonVariants } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Separator } from "@neore/ui/components/separator";
@@ -23,7 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import clsx from "clsx";
 import { CornerDownRightIcon, ListPlusIcon, Loader2Icon, MonitorIcon, PencilIcon, PlusIcon, SendIcon, Square, UploadIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useImperativeHandle, useRef } from "react";
+import { lazy, Suspense, useId, useImperativeHandle, useRef } from "react";
 
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -84,7 +85,7 @@ interface ComposerInputAreaProps {
     maxRows?: number;
     /** Called when attachment button is clicked */
     onAddAttachment?: () => void;
-    /** Moves an over-the-cap draft into a text attachment; the length notice offers it */
+    /** Moves an over-the-cap draft into a text attachment; the length notice offers it. Leave out where it would not fit. */
     onAttachDraftAsFile?: () => void;
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
@@ -116,6 +117,8 @@ interface ComposerInputAreaProps {
     placeholder?: string;
     /** Ghost-text autocomplete source; omit to turn it off. See `ComposerTiptapEditor`. */
     requestCompletion?: GhostRequest;
+    /** The over-the-cap draft would not fit even as a file, so the notice offers none. */
+    tooLongForFile?: boolean;
     /** Text value */
     value: string;
 }
@@ -158,6 +161,7 @@ const ComposerInputArea = ({
     placeholder,
     ref,
     requestCompletion,
+    tooLongForFile = false,
     value,
 }: ComposerInputAreaProps & { ref?: React.RefObject<ComposerInputAreaRef | null> }) => {
     const { t } = useLingui();
@@ -174,6 +178,10 @@ const ComposerInputArea = ({
     }, []);
 
     const isEmpty = !value.trim();
+    // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
+    const isOverCap = value.length > MAX_PROMPT_CHARS;
+    const lengthNoticeId = useId();
+    const overCapDescription = isOverCap ? lengthNoticeId : undefined;
 
     return (
         <>
@@ -307,13 +315,14 @@ const ComposerInputArea = ({
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={followUp === "steer-restart" ? t`Interrupt and restart` : t`Steer the reply`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled}
+                                            disabled={disabled || isOverCap}
                                             onClick={onSteer}
                                             type="button"
                                         >
@@ -333,13 +342,14 @@ const ComposerInputArea = ({
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Queue message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading}
+                                            disabled={disabled || isUploading || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
@@ -386,13 +396,14 @@ const ComposerInputArea = ({
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Send message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading}
+                                            disabled={disabled || isUploading || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
@@ -410,7 +421,7 @@ const ComposerInputArea = ({
             {/* Banned word error message */}
             {bannedWordError && <div className="px-3 pb-2 text-sm text-red-600 dark:text-red-400">{bannedWordError}</div>}
 
-            {onAttachDraftAsFile && <ComposerLengthNotice chars={value.length} onAttachAsFile={onAttachDraftAsFile} />}
+            <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />
         </>
     );
 };
