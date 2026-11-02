@@ -141,22 +141,20 @@ describe("createToolRunMarker", () => {
         vi.doUnmock("../../_generated/internal");
     });
 
-    it("stops a tool whose mark is refused, and runs one whose mark merely failed", async () => {
+    it("never runs a tool whose mark failed, whatever the failure", async () => {
         const { calls, ctx, onReplaced, tools } = await setup();
 
         ctx.runMutation.mockRejectedValueOnce(Object.assign(new Error("gone"), { code: "CONFLICT" }));
         await expect(tools.ok!.execute!()).rejects.toThrow("gone");
-        expect(calls).toStrictEqual([]);
 
         ctx.runMutation.mockRejectedValueOnce(Object.assign(new Error("replaced"), { code: "RUN_REPLACED" }));
         await expect(tools.ok!.execute!()).rejects.toThrow("replaced");
         expect(onReplaced).toHaveBeenCalledOnce();
-        expect(calls).toStrictEqual([]);
 
-        // A blip on the shard must not fail the tool.
+        // A blip on the shard stops the tool too: a call without a confirmed mark could be run again by a resume.
         ctx.runMutation.mockRejectedValueOnce(new Error("shard blip"));
-        expect(await tools.ok!.execute!()).toBe("fine");
-        expect(calls).toStrictEqual(["run"]);
+        await expect(tools.ok!.execute!()).rejects.toThrow("shard blip");
+        expect(calls).toStrictEqual([]);
 
         vi.doUnmock("../../_generated/internal");
     });

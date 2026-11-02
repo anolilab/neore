@@ -14,7 +14,14 @@ import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, unknown>; delayMs: number | undefined }[],
-        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, optOut: false, withTools: false },
+        modelState: {
+            builtAgents: 0,
+            groupConfig: null as unknown,
+            model: undefined as unknown,
+            optOut: false,
+            prefsReads: [] as { shardKey: string; userId: string }[],
+            withTools: false,
+        },
         registry: new Map<string, unknown>(),
     };
 });
@@ -37,6 +44,17 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+});
+
+// The person's own shard answers their preferences: the harness is one database, so the read is faked, and its target is recorded.
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: vi.fn(async (_reference: unknown, args: { userId: string }, options: { shardKey: string }) => {
+            modelState.prefsReads.push({ shardKey: options.shardKey, userId: args.userId });
+
+            return { resumeInterruptedRuns: modelState.optOut ? false : undefined };
+        }),
+    };
 });
 
 vi.mock("../lib/job-queue", () => {
@@ -75,7 +93,6 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                     language: undefined,
                     location: undefined,
                     personalization: undefined,
-                    resumeInterruptedRuns: modelState.optOut ? false : undefined,
                     timezone: "Europe/Berlin",
                 },
                 researchDepth: "balanced",
@@ -187,6 +204,7 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.optOut = false;
+    modelState.prefsReads.length = 0;
     modelState.groupConfig = null;
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
@@ -557,13 +575,17 @@ const insertRow = async (fields: Record<string, unknown>) =>
     );
 
 describe("a run the watchdog reads wrongly", () => {
-    it("registers the person's opt-out and the reply's context from the run itself", async () => {
+    it("reads the person's opt-out on their own shard and is then not resumed, with the reply's context stored", async () => {
         modelState.optOut = true;
         await startRunThatDiesInStepTwo();
 
         const stream = await readStream();
 
+        expect(modelState.prefsReads).toStrictEqual([{ shardKey: OWNER, userId: OWNER }]);
         expect(stream.resumable).toBe(false);
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "gone" });
+        expect(enqueued).toHaveLength(0);
         expect(stream.replyContext).toMatchObject({ timeZone: "Europe/Berlin" });
     });
 
@@ -673,7 +695,6 @@ describe("a run a newer one replaced", () => {
         await stale(async () => await mutate(beatRun, { epoch: 0 }));
         await stale(async () => await mutate(markToolRun, { delta: 1, epoch: 0 }));
         await stale(async () => await mutate(markToolRun, { delta: -1, epoch: 0 }));
-        await stale(async () => await mutate(assertRunEpoch, { epoch: 0 }));
 
         const after = await readStream();
 
@@ -686,9 +707,100 @@ describe("a run a newer one replaced", () => {
         // The current run writes as usual.
         await mutate(addChunk, { final: false, runEpoch: 1, text: "fresh" });
         await mutate(beatRun, { epoch: 1 });
-        await mutate(assertRunEpoch, { epoch: 1 });
         const state658 = await readState();
 
         expect(state658.chunkText).toContain("fresh");
+    });
+});
+
+describe("a run judged dead but still alive", () => {
+    it("is fenced from the resume decision on: its marks, chunks and finish are refused before the resume claims", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const mutate = async (ref: any, args: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(ref, { streamId: ids.streamId as never, ...args }));
+
+        await expect(mutate(markToolRun, { delta: 1, epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        await expect(mutate(addChunk, { final: false, runEpoch: 0, text: "late" })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        await expect(mutate(assertRunEpoch, { epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+    });
+
+    it("refuses a tool start and a chunk of the current epoch while the stream is paused", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({
+            pause: {
+                from: ids.messageId,
+                id: "rl-1",
+                reason: "rate_limit",
+                retryAt: Date.now() + 60_000,
+                run: {
+                    messageId: ids.messageId,
+                    streamId: ids.streamId,
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                },
+                status: 429,
+            },
+        });
+
+        const mutate = async (ref: any, args: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(ref, { streamId: ids.streamId as never, ...args }));
+
+        await expect(mutate(markToolRun, { delta: 1, epoch: 0 })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        await expect(mutate(addChunk, { final: false, runEpoch: 0, text: "late" })).rejects.toMatchObject({ code: "RUN_REPLACED" });
+    });
+
+    it("lands no step beside the resume's when its epoch changes before the step is saved", async () => {
+        let call = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async (options) => {
+                call += 1;
+
+                // The resume claims the stream while the old run's model call is still going.
+                await patchStream({ runEpoch: 1 });
+
+                return await scriptedModel([textStep("Too late.")]).doStream(options);
+            },
+        });
+
+        await run().catch(() => undefined);
+
+        const state = await readState();
+
+        expect(call).toBe(1);
+        expect(state.rows.filter((row) => row.role === "assistant" && row.status === "success")).toHaveLength(0);
+        expect(state.chunkText).not.toContain("Error:");
+        expect(state.streamStatus).not.toBe("error");
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+
+    it("records no usage when a replaced run fails", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+
+        vi.mocked(scheduleReplyUsage).mockClear();
+        modelState.model = new MockLanguageModelV3({
+            doStream: async () => {
+                // A still newer run took the stream, and this one's model call then fails.
+                await patchStream({ runEpoch: 9 });
+
+                throw new Error("provider exploded");
+            },
+        });
+
+        await run({ resume: pause!.id }).catch(() => undefined);
+
+        const state = await readState();
+
+        expect(state.chunkText).not.toContain("provider exploded");
+        expect(state.streamStatus).not.toBe("error");
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
     });
 });

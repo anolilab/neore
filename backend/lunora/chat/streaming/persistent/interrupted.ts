@@ -16,7 +16,7 @@ import { internalMutation } from "../../../_generated/server";
 import { patchRow } from "../../../lib/patch";
 import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
-import { assertCurrentRun } from "../../lib/run-epoch";
+import { assertCurrentRun, assertRunHeld, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { endPausedRun, enqueueRunResume, isEmptyPlaceholder, isLiveStream, isSuperseded, removeEmptyPending, STREAM_TTL_MS } from "./library";
@@ -108,6 +108,11 @@ export const markToolRun = internalMutation
 
         assertCurrentRun(stream, args.epoch);
 
+        // A tool starts only on a run that holds the stream: never one that is paused or being resumed.
+        if (args.delta > 0 && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
+        }
+
         const next = Math.max(0, (stream.toolsInFlight ?? 0) + args.delta);
 
         await patchRow(ctx.db, "persistentStreams", stream, { toolsInFlight: next === 0 ? undefined : next });
@@ -116,18 +121,14 @@ export const markToolRun = internalMutation
     });
 
 /**
- * The run is about to finish (stamp, record approvals, close): refused if a newer run holds the stream, before any of
- * that is done. A finish with no epoch (another kind of run) is not asked.
+ * A step is about to be saved: refused if a newer run holds the stream, so a slow old run lands no rows beside the
+ * resume's. Checked right before the save (`beforeStepSave`).
  */
 export const assertRunEpoch = internalMutation
     .input({ epoch: v.number(), streamId: v.id("persistentStreams") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
-
-        if (stream) {
-            assertCurrentRun(stream, args.epoch);
-        }
+        await assertRunHeld(ctx, { epoch: args.epoch, streamId: args.streamId });
 
         return null;
     });
@@ -314,6 +315,8 @@ export const inspectRun = internalMutation
             pause: resume,
             pauseCause: "interrupted" as const,
             pausedRun,
+            // The run judged dead is fenced from this moment, not only once the resume claims: it may be slow, not dead.
+            runEpoch: epochOf(stream) + 1,
             toolsInFlight: undefined,
         });
         await enqueueRunResume(resume, 0);

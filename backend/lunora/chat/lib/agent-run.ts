@@ -465,7 +465,6 @@ export const loadRunContext = async (
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
             personalization: toPersonalization(prefs),
-            resumeInterruptedRuns: prefs.resumeInterruptedRuns,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
@@ -802,10 +801,22 @@ export const createRunSteering = (
     };
 };
 
+/**
+ * Whether the person lets a run of theirs resume after its worker dies (`userSettings.resumeInterruptedRuns`, absent = on).
+ * Read ON THEIR OWN shard: a collaborator's prompt on a shared thread runs on the thread owner's, which holds no
+ * `userSettings` row for them. A failed read leaves it on.
+ */
+export const readResumeInterruptedRuns = async (userId: string): Promise<boolean> =>
+    await callOnShard(internal.auth.functions.getUserPreferencesQuery, { userId }, { shardKey: userId })
+        .then((prefs) => prefs.resumeInterruptedRuns !== false)
+        .catch(() => true);
+
 /** What `stampSavedToolCalls` needs of a run: its labels and auto-approvals, and the rows it saved. */
 export interface SavedToolCallStamp {
     autoApprovals?: AutoApprovals;
     mcpLabels: McpToolLabels;
+    /** The run that stamps (`run-epoch.ts`): a stamp from one a newer run replaced is refused. */
+    run?: { epoch: number; streamId: Id<"persistentStreams"> };
     savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
     userId: string;
 }
@@ -816,11 +827,17 @@ export interface SavedToolCallStamp {
  * call it.
  */
 export const stampSavedToolCalls = async (ctx: Pick<ActionCtx, "runMutation">, stamp: SavedToolCallStamp): Promise<void> => {
-    const { autoApprovals = {}, mcpLabels, savedMessages, userId } = stamp;
+    const { autoApprovals = {}, mcpLabels, run, savedMessages, userId } = stamp;
     const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels, autoApprovals) ? [m._id] : []));
 
     if (labelledIds.length > 0) {
-        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { autoApprovals, labels: mcpLabels, messageIds: labelledIds, userId });
+        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, {
+            autoApprovals,
+            labels: mcpLabels,
+            messageIds: labelledIds,
+            ...(run && { run }),
+            userId,
+        });
     }
 };
 
@@ -877,15 +894,10 @@ export const finishRun = async (
         userId,
     } = args;
 
-    // Before the calls are stamped and the approvals recorded: a replaced run does none of it.
-    if (runEpoch !== undefined) {
-        await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
-            epoch: runEpoch,
-            streamId: streamId as Id<"persistentStreams">,
-        });
-    }
+    // A run a newer one replaced does none of this: each write below checks the epoch in its own mutation.
+    const run = runEpoch === undefined ? undefined : { epoch: runEpoch, streamId: streamId as Id<"persistentStreams"> };
 
-    await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, savedMessages, userId });
+    await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
     const approvalIds = collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
@@ -897,6 +909,7 @@ export const finishRun = async (
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
+            ...(run && { run }),
             ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
             threadId,
             userId,
@@ -1339,7 +1352,7 @@ export const failRun = async (
         threadId: string;
         threadStatus: "active" | "error";
     },
-): Promise<void> => {
+): Promise<{ replaced: boolean }> => {
     const { runEpoch, safeMessage, stamp, streamId, threadId, threadStatus } = args;
 
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
@@ -1361,7 +1374,7 @@ export const failRun = async (
         } catch (error) {
             // A newer run holds the stream: this one's failure is not the reply's, and it ends nothing of theirs.
             if (isRunReplaced(error)) {
-                return;
+                return { replaced: true };
             }
 
             // A stop can land between the read above and the write, which then refuses it. Read again before
@@ -1415,6 +1428,8 @@ export const failRun = async (
     } catch (error) {
         streamLogger.warn("[AgentRun] Could not stamp the saved tool calls:", error);
     }
+
+    return { replaced: false };
 };
 
 export { loadModelFilterRules } from "./model-filter-rules";

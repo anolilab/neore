@@ -19,7 +19,7 @@ import { endActiveGoals } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
-import { assertCurrentRun, epochOf } from "../../lib/run-epoch";
+import { assertCurrentRun, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
@@ -144,6 +144,12 @@ export const addChunk = internalMutation
         }
 
         assertCurrentRun(stream, args.runEpoch);
+
+        // A run that carries an epoch writes only while it holds the stream: a pause (a rate-limit wait, or the resume the
+        // watchdog queued for a run it judged dead) means the writer is, or may be, the old one.
+        if (args.runEpoch !== undefined && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
+        }
 
         // The chunk's position: one past the stream's last chunk, read off
         // `by_streamId_seq` in this same mutation. The counter deliberately
@@ -971,7 +977,8 @@ export const claimRunResume = internalMutation
         }
 
         // The run that held the stream until now, if it is alive after all, is replaced by this one.
-        const epoch = epochOf(stream) + 1;
+        // (The watchdog's resume decision already moved the epoch: `inspectRun` fences the run it judged dead.)
+        const epoch = stream.pauseCause === "interrupted" ? epochOf(stream) : epochOf(stream) + 1;
 
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
         await patchRow(ctx.db, "persistentStreams", stream, {

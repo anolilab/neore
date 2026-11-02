@@ -137,6 +137,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
             steps.push(step);
             const shouldCreatePendingMessage = await willContinue(steps, args.stopWhen);
 
+            await options.beforeStepSave?.();
             await call.save({ step }, shouldCreatePendingMessage);
 
             return args.onStepFinish?.(step);

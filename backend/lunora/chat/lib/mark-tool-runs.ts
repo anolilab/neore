@@ -5,14 +5,13 @@
  * The mark is written BEFORE the tool starts and stays until the step that holds the call has been SAVED (`release`,
  * from the step's `onStepFinish`, which the agent runs after it saved the rows). A tool that has returned but whose
  * rows are not saved yet is still unaccounted for: a death in that window would otherwise look like "not in a tool" and
- * the resume would call the tool again. A refused mark (the stream ended, or a newer run holds it) stops the tool; any
- * other failure of the mark is logged and the tool runs, counted as open all the same.
+ * the resume would call the tool again. A mark that fails for any reason (the stream ended,
+ * a newer run holds it, a shard error) stops the tool: it never runs without a confirmed mark.
  */
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
-import { streamLogger } from "../../lib/logger";
-import { errorCodeOf, isRunReplaced } from "./run-epoch";
+import { isRunReplaced } from "./run-epoch";
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
     typeof value === "object" && value !== null && Symbol.asyncIterator in (value as object);
@@ -29,6 +28,7 @@ export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: {
     let finished = 0;
     const mark = async (delta: number) =>
         await ctx.runMutation(internal.chat.streaming.persistent.interrupted.markToolRun, { delta, epoch, streamId: streamId as Id<"persistentStreams"> });
+    // Any failure of the mark stops the tool: one that ran without a confirmed mark could be run again by a resume after a death.
     const begin = async () => {
         try {
             await mark(1);
@@ -37,13 +37,7 @@ export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: {
                 onReplaced();
             }
 
-            // A stream that ended or was taken over stops the tool; a shard blip must not, and the tool then counts as open
-            // anyway (a mark that never landed is clamped at zero on release).
-            if (isRunReplaced(error) || errorCodeOf(error) === "CONFLICT") {
-                throw error;
-            }
-
-            streamLogger.warn(`[BgAgent] Could not mark a tool call on stream ${streamId}:`, error);
+            throw error;
         }
     };
     const end = () => {

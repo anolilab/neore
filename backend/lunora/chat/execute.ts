@@ -45,6 +45,7 @@ import {
     setResearchDepth,
     setRunStartedBy,
     setThreadStatus,
+    readResumeInterruptedRuns,
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
@@ -482,8 +483,8 @@ export const runStreamingAgent = internalAction
                     await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
                         epoch: runEpoch,
                         reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                        // Read here, from the run's own preferences: the stream may sit on a thread owner's shard, which has no row for a collaborator.
-                        resumable: runContext.prefs.resumeInterruptedRuns !== false,
+                        // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
+                        resumable: await readResumeInterruptedRuns(userId),
                         run: runArgs,
                         streamId: streamId as Id<"persistentStreams">,
                     });
@@ -517,6 +518,21 @@ export const runStreamingAgent = internalAction
 
                 const result = await threadObject.streamText(streamTextArgs, {
                     admittedRun: true,
+                    // The step's rows land only while this run holds the stream.
+                    beforeStepSave: async () => {
+                        try {
+                            await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
+                                epoch: runEpoch,
+                                streamId: streamId as Id<"persistentStreams">,
+                            });
+                        } catch (error) {
+                            if (isRunReplaced(error)) {
+                                onReplaced();
+                            }
+
+                            throw error;
+                        }
+                    },
                     statelessMode: threadStatelessMode,
                     takeSteer: steering.takeSteer,
                 });
@@ -728,7 +744,12 @@ export const runStreamingAgent = internalAction
                     safeMessage = "The custom endpoint for this model was removed or disabled. Pick another model or re-enable it in Settings → API Keys.";
                 }
 
-                await failRun(ctx, { runEpoch, safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
+                const failed = await failRun(ctx, { runEpoch, safeMessage, stamp: stampSavedCalls, streamId, threadId, threadStatus: "error" });
+
+                // A newer run holds the stream: its reply is the one that gets recorded, not this run's partial one.
+                if (failed.replaced) {
+                    return;
+                }
 
                 // A run that failed after its pause still answered with the steps from before it, and with any it saved since: those are its reply.
                 if (priorRows.length > 0) {

@@ -56,6 +56,7 @@ import { ASK_USER_TOOL_NAME } from "./tools/ask-user-constants";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
+import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -536,13 +537,17 @@ export const recordPendingToolApprovals = internalMutation
         // tool calls — they notify as "a question is waiting", not "approve".
         askUserApprovalIds: v.optional(v.array(v.string())),
         config: vToolRunConfig,
+        // The run that records: refused here, in this mutation and before any row or notification, once a newer run holds its stream.
+        run: v.optional(vRunHold),
         // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
         secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         threadId: v.string(),
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, secretApprovalIds, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, run, secretApprovalIds, threadId, userId }, ctx }) => {
+        await assertRunHeld(ctx, run);
+
         const createdAt = ctx.now;
         const thread = await ctx.db.get("threads", threadId as Id<"threads">);
         // The row belongs to the thread OWNER, whoever's turn paused: only the

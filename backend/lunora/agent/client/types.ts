@@ -617,6 +617,12 @@ export type Options = {
     admittedRun?: boolean;
 
     /**
+     * Called at a streamed step's end, right BEFORE its rows are saved. A throw stops the save: the run that was replaced
+     * by a newer one lands nothing beside it (`chat/lib/run-epoch.ts`).
+     */
+    beforeStepSave?: () => Promise<void>;
+
+    /**
      * By default, messages are ordered with context in `fetchContextWithPrompt`,
      * but you can override this by providing a context handler. Here you can
      * filter, modify, or enrich the context messages. If provided, the default
