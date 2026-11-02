@@ -1362,6 +1362,21 @@ export const failRun = async (
 ): Promise<{ replaced: boolean }> => {
     const { runEpoch, safeMessage, stamp, streamId, threadId, threadStatus } = args;
 
+    // A run a newer one replaced ends nothing: not the stream, not the thread, not the goal whose review the newer run may have
+    // queued. Checked first, whatever the stream's status (a newer run may already have closed it).
+    if (runEpoch !== undefined) {
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
+                epoch: runEpoch,
+                streamId: streamId as Id<"persistentStreams">,
+            });
+        } catch (error) {
+            if (isRunReplaced(error)) {
+                return { replaced: true };
+            }
+        }
+    }
+
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
     // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
     const readStatus = async () =>

@@ -177,7 +177,12 @@ export const runStreamingAgent = internalAction
                 }).catch((error: unknown) => {
                     if (isRunReplaced(error)) {
                         onReplaced();
+
+                        return;
                     }
+
+                    // A beat that does not land is not fatal (the next one may), but a run that stops beating is read as dead.
+                    streamLogger.warn(`[BgAgent] Stream ${streamId}: a heartbeat failed:`, error);
                 });
             };
             const startBeat = () => {

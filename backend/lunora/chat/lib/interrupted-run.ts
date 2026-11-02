@@ -85,7 +85,10 @@ export const settleSavedRows = (rows: ReadonlyArray<SavedRow>): SavedRun => {
     }
 
     return {
-        finished: last?.role === "assistant",
+        // A step that is to be followed by another is saved together with the empty row that step will fill (`willContinue`), and
+        // a step whose call was rejected leaves one failed: an assistant row with such a row beside it is mid-answer (a tool the
+        // provider ran itself keeps its call and result in the row, and the answer comes in the next step).
+        finished: last?.role === "assistant" && placeholders.length === 0,
         from: last?.id,
         ok: true,
         placeholders: placeholders.map((row) => row.id),

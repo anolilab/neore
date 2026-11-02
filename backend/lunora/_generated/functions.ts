@@ -823,6 +823,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming:streamRunThread": lunora_chat_streaming_82.streamRunThread as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_83.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted_watch:watchRun": lunora_chat_streaming_persistent_interrupted_watch_84.watchRun as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_interrupted:assertRunEpoch": lunora_chat_streaming_persistent_interrupted_85.assertRunEpoch as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:beatRun": lunora_chat_streaming_persistent_interrupted_85.beatRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:inspectRun": lunora_chat_streaming_persistent_interrupted_85.inspectRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_interrupted:markToolRun": lunora_chat_streaming_persistent_interrupted_85.markToolRun as unknown as RegisteredLunoraFunction,
@@ -4374,6 +4375,13 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["streamId"] !== "string") return DEFER;
 return { "streamId": source["streamId"] };
+});
+installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.assertRunEpoch.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
+if (typeof source["streamId"] !== "string") return DEFER;
+return { "epoch": source["epoch"], "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_interrupted_85.beatRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9050,6 +9058,7 @@ export interface Caller {
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                 };
                 interrupted: {
+                    assertRunEpoch: (args: { epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
                     beatRun: (args: { epoch: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
                     inspectRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ kind: "gone" } | { kind: "fresh" } | { goal: boolean; kind: "finished"; labels?: Record<string, { serverName: string; toolName: string }>; messageId: string; replyRowIds: Array<string>; skill?: { id?: string; name: string }; threadId: string; timeZone?: string; userId: string; userPrompt: string } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
                     markToolRun: (args: { delta: number; epoch: number; setTo?: number; streamId: Id<"persistentStreams"> }) => Promise<null>;
@@ -10951,6 +10960,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                     cleanupExpiredStreams: (args) => callRegistered(context, "chat_streaming_persistent_crons:cleanupExpiredStreams", args),
                 },
                 interrupted: {
+                    assertRunEpoch: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:assertRunEpoch", args),
                     beatRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:beatRun", args),
                     inspectRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:inspectRun", args),
                     markToolRun: (args) => callRegistered(context, "chat_streaming_persistent_interrupted:markToolRun", args),

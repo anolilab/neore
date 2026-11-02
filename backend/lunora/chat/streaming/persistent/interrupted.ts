@@ -19,7 +19,7 @@ import { activeGoalsOf } from "../../goals/rows";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, RUN_WATCH_RETRY, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
-import { assertCurrentRun, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
+import { assertCurrentRun, assertRunHeld, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { endPausedRun, enqueueRunResume, isEmptyPlaceholder, isLiveStream, isSuperseded, removeEmptyPending, STREAM_TTL_MS } from "./library";
@@ -143,6 +143,19 @@ export const markToolRun = internalMutation
         const next = args.setTo === undefined ? Math.max(0, (stream.toolsInFlight ?? 0) + args.delta) : Math.max(0, args.setTo);
 
         await patchRow(ctx.db, "persistentStreams", stream, { toolsInFlight: next === 0 ? undefined : next });
+
+        return null;
+    });
+
+/**
+ * Refused when a newer run holds the stream (`RUN_REPLACED`). For a write that has side effects beyond the stream's own rows
+ * and so must be refused whatever the stream's status is (`failRun` ends goals and sets the thread's status).
+ */
+export const assertRunEpoch = internalMutation
+    .input({ epoch: v.number(), streamId: v.id("persistentStreams") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await assertRunHeld(ctx, { epoch: args.epoch, streamId: args.streamId });
 
         return null;
     });

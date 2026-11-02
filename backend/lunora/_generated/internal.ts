@@ -457,6 +457,7 @@ export interface InternalApiTypes {
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                 };
                 interrupted: {
+                    assertRunEpoch: FunctionReference<"mutation", { epoch: number; streamId: Id<"persistentStreams"> }, null>;
                     beatRun: FunctionReference<"mutation", { epoch: number; streamId: Id<"persistentStreams"> }, null>;
                     inspectRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, { kind: "gone" } | { kind: "fresh" } | { goal: boolean; kind: "finished"; labels?: Record<string, { serverName: string; toolName: string }>; messageId: string; replyRowIds: Array<string>; skill?: { id?: string; name: string }; threadId: string; timeZone?: string; userId: string; userPrompt: string } | { kind: "resumed" } | { kind: "fail"; message: string; threadId: string }>;
                     markToolRun: FunctionReference<"mutation", { delta: number; epoch: number; setTo?: number; streamId: Id<"persistentStreams"> }, null>;
@@ -1661,6 +1662,7 @@ export const internal: InternalApiTypes = {
                     cleanupExpiredStreams: { __lunoraRef: "chat_streaming_persistent_crons:cleanupExpiredStreams" },
                 },
                 interrupted: {
+                    assertRunEpoch: { __lunoraRef: "chat_streaming_persistent_interrupted:assertRunEpoch" },
                     beatRun: { __lunoraRef: "chat_streaming_persistent_interrupted:beatRun" },
                     inspectRun: { __lunoraRef: "chat_streaming_persistent_interrupted:inspectRun" },
                     markToolRun: { __lunoraRef: "chat_streaming_persistent_interrupted:markToolRun" },

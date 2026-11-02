@@ -37,6 +37,12 @@ describe("settleSavedRows", () => {
         });
     });
 
+    it("does not call an assistant row final when the empty row of a next step stands beside it", () => {
+        const saved = settleSavedRows([row("a", { callsTools: false }), row("p", { empty: true, status: "pending", stepOrder: 1 })]);
+
+        expect(saved).toMatchObject({ finished: false, ok: true, placeholders: ["p"] });
+    });
+
     it("refuses a row that is neither finished nor an empty placeholder", () => {
         expect(settleSavedRows([row("a"), row("b", { empty: false, status: "pending", stepOrder: 1 })])).toStrictEqual({
             ok: false,

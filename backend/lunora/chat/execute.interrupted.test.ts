@@ -100,7 +100,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 botId: undefined,
                 contextParts: [],
                 knowledgeSources: [],
-                memoryEnabled: false,
+                memoryEnabled: modelState.memory,
                 prefs: {
                     language: undefined,
                     location: undefined,
@@ -662,8 +662,22 @@ describe("a run the watchdog reads wrongly", () => {
     });
 
     /** The run saved its final assistant row (the content given) and then its worker died before it could close the run. */
-    const dieAfterSavingFinalRow = async (content: unknown[]) => {
+    const dieAfterSavingFinalRow = async (content: unknown[], { withNextStep = false }: { withNextStep?: boolean } = {}) => {
         await startRunThatDiesInStepTwo();
+
+        // A final step is saved with no row for a next step; the hung step two of this scenario left one, so it goes.
+        if (!withNextStep) {
+            await harness.run(async (ctx: any) => {
+                const rows = await ctx.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                    .collect();
+
+                for (const row of rows.filter((candidate: any) => candidate.status === "pending" && candidate.message?.role === "assistant")) {
+                    await ctx.db.delete("messages", row._id);
+                }
+            });
+        }
 
         // The same reply as the saved step: it shares its order.
         const last = await harness.run(async (ctx: any) => {
@@ -736,6 +750,45 @@ describe("a run the watchdog reads wrongly", () => {
         expect(afterRun).toHaveBeenCalledOnce();
     });
 
+    it("runs the after-run work of a resumed reply once, for the whole reply, and stamps the resume's own rows", async () => {
+        modelState.memory = true;
+        modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+
+        // The resume itself calls the tool again, so its OWN row carries a call to be labelled.
+        modelState.model = scriptedModel([toolCallStep("echo", "call-2"), textStep("All done.")]);
+        await run({ resume: pause!.id });
+
+        // The dead invocation never reached its end; the resume's is the only one, and it covers every row of the reply.
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args).toMatchObject({ extractMemory: true, userId: OWNER });
+        expect(args.savedMessages!.length).toBeGreaterThanOrEqual(4);
+
+        const all = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                    .collect(),
+        );
+        const rows = all.filter((row: any) => Array.isArray(row.message?.content) && row.message.content.some((part: any) => part.type === "tool-call"));
+
+        expect(rows.length).toBeGreaterThanOrEqual(2);
+
+        for (const row of rows) {
+            const call = row.message.content.find((part: any) => part.type === "tool-call");
+
+            expect(call.providerOptions.neore).toMatchObject({ mcpServerName: "srv", mcpToolName: "echo" });
+        }
+    });
+
     it("stamps the tool names on the rows an earlier invocation saved, when the resume finishes the reply", async () => {
         modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
         await startRunThatDiesInStepTwo();
@@ -768,6 +821,19 @@ describe("a run the watchdog reads wrongly", () => {
         ]);
 
         expect(await inspect()).toMatchObject({ kind: "finished" });
+    });
+
+    it("does not close a reply whose last row is a provider-run tool step that a next step was to answer", async () => {
+        await dieAfterSavingFinalRow(
+            [
+                { input: { query: "q" }, providerExecuted: true, toolCallId: "ws-1", toolName: "web_search", type: "tool-call" },
+                { output: { value: "found" }, toolCallId: "ws-1", toolName: "web_search", type: "tool-result" },
+            ],
+            { withNextStep: true },
+        );
+
+        // The row was saved with the empty row its next step was to fill: mid-answer, so it resumes instead of closing.
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
     });
 
     it("still refuses a row whose tool call has no result", async () => {
@@ -900,6 +966,43 @@ describe("a run a newer one replaced", () => {
 });
 
 describe("a run judged dead but still alive", () => {
+    it("cannot end the goal a newer run owns: a replaced run's failure touches nothing, even once the stream is closed", async () => {
+        const { failRun } = await import("./lib/agent-run");
+        const goalId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadGoals", {
+                    config: { model: "test-model" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 2_000_000,
+                    maxRounds: 5,
+                    promptMessageId: ids.messageId,
+                    round: 0,
+                    startMessageId: ids.messageId,
+                    status: "active",
+                    text: "Say hello",
+                    threadId: ids.threadId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        // A newer run (epoch 1) has taken the stream, finished and closed it, and queued the goal's review.
+        await patchStream({ runEpoch: 1, status: "done" });
+
+        const outcome = await harness.action(
+            async (ctx: any) =>
+                await failRun(ctx, { runEpoch: 0, safeMessage: "late failure", streamId: ids.streamId, threadId: ids.threadId, threadStatus: "error" }),
+        );
+        const goal = await harness.run(async (ctx: any) => await ctx.db.get("threadGoals", goalId));
+        const state = await readState();
+
+        expect(outcome).toStrictEqual({ replaced: true });
+        expect(goal.status).toBe("active");
+        expect(state.threadStatus).toBe("running");
+    });
+
     it("is fenced from the resume decision on: its marks, chunks and finish are refused before the resume claims", async () => {
         await startRunThatDiesInStepTwo();
         await patchStream({ beatAt: deadBeat() });
@@ -1118,6 +1221,30 @@ describe("a run whose registration for resuming fails", () => {
         await run({ resume: pause!.id }).catch(() => undefined);
 
         expect(modelState.toolCalls).toBe(0);
+    });
+
+    it("logs a heartbeat that fails, and goes on", async () => {
+        const { streamLogger } = await import("../lib/logger");
+        const warn = vi.spyOn(streamLogger, "warn");
+
+        failWith(new Error("shard blip"));
+        registry.set(
+            "chat_streaming_persistent_interrupted:beatRun",
+            internalMutation
+                .input({ epoch: v.number(), streamId: v.string() })
+                .output(v.null())
+                .mutation(async () => {
+                    throw new Error("beat refused");
+                }),
+        );
+
+        await run();
+
+        const state = await readState();
+
+        expect(warn.mock.calls.some((call) => String(call[0]).includes("a heartbeat failed"))).toBe(true);
+        expect(state.streamStatus).toBe("done");
+        warn.mockRestore();
     });
 
     it("stops quietly when a newer run holds the stream", async () => {
