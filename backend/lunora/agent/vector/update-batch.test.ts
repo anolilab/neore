@@ -2,17 +2,21 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { Id } from "../../_generated/dataModel";
 import schema from "../../schema";
 import { updateBatch } from "./index";
+import type { VectorTableName } from "./tables";
 
 const UNSUPPORTED = /Unsupported vector dimension 100/;
 const MISMATCH = /does not fit embeddings_768/;
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const run = <T>(body: (ctx: any) => Promise<T>): Promise<T> => harness.run(body as never);
+type Ctx = Parameters<Parameters<ReturnType<typeof lunoraTest>["run"]>[0]>[0];
+
+const run = <T>(body: (ctx: Ctx) => Promise<T>): Promise<T> => harness.run(body);
 const vector = (length: number, first = 0.5): number[] => Array.from({ length }, (_, index) => (index === 0 ? first : 0.5));
-const update = (vectors: unknown[]) => run(async (ctx) => await ctx.runMutation(updateBatch, { vectors }));
+const update = (vectors: { id: Id<VectorTableName>; model: string; vector: number[] }[]) => run(async (ctx) => await ctx.runMutation(updateBatch, { vectors }));
 const insert768 = () => run(async (ctx) => await ctx.db.insert("embeddings_768", { model: "old", table: "memories", userId: "u", vector: vector(768) }));
 
 beforeEach(() => {
@@ -32,7 +36,7 @@ describe("updateBatch", () => {
         const row = await run(async (ctx) => await ctx.db.get("embeddings_768", id));
 
         expect(row).toMatchObject({ model: "new" });
-        expect(row?.vector[0]).toBe(0.25);
+        expect((row?.vector as number[])[0]).toBe(0.25);
     });
 
     it("rejects a vector whose length is not a supported dimension", async () => {

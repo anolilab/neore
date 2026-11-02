@@ -252,7 +252,7 @@ export interface InternalApiTypes {
         };
         functions: {
             getActiveOrganizationQuery: FunctionReference<"query", { organizationId: string; userId: string }, { id: string; name: string; role: string; slug: string | null } | null>;
-            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean } }>;
+            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }; readFailed?: boolean }>;
             getDecryptedMessengerKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedProviderKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedToolKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
@@ -784,6 +784,7 @@ export interface InternalApiTypes {
             remove: FunctionReference<"mutation", { key: string }, null>;
             removeAll: FunctionReference<"mutation", { name: string }, null>;
             removeByArgs: FunctionReference<"mutation", { args: string; name: string }, null>;
+            removeIfAttempt: FunctionReference<"mutation", { attempt: string; key: string }, null>;
         };
         claim_once: {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
@@ -1978,6 +1979,7 @@ export const internal: InternalApiTypes = {
             remove: { __lunoraRef: "lib_action_cache:remove" },
             removeAll: { __lunoraRef: "lib_action_cache:removeAll" },
             removeByArgs: { __lunoraRef: "lib_action_cache:removeByArgs" },
+            removeIfAttempt: { __lunoraRef: "lib_action_cache:removeIfAttempt" },
         },
         claim_once: {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },

@@ -15,6 +15,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { patchThread } from "../agent/table-writes";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES } from "./taxonomy";
@@ -218,7 +219,11 @@ export const compressThreadMemories = internalAction
         let usage: { inputTokens?: number; outputTokens?: number };
 
         try {
-            const model = await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: args.userId });
+            const model = await getUtilityModel(gatewayFetch(ctx), {
+                rules: await loadModelFilterRules(ctx, args.userId),
+                threadId: args.threadId,
+                userId: args.userId,
+            });
             const result = await generateText({
                 model,
                 output: Output.object({

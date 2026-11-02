@@ -30,8 +30,9 @@ import { getEnabledSearchModes } from "../chat/lib/tool-builder";
 import { fetchCachedRegistryPage } from "../chat/mcp-registry";
 import { authAction, authMutation, rateLimit } from "../lib/crpc";
 import { logger } from "../lib/logger";
-import { gatewayFetch, type ServiceFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import type { ActionCtx } from "../_generated/server";
+import { getUtilityModelForUser } from "../chat/lib/model-filter-rules";
+import { gatewayFetch } from "../lib/services";
 import type { BuilderDraft, BuilderWhitelist, RawBuilderDraft, RawBuilderResponse } from "./builder-logic";
 import {
     applyRefinement,
@@ -218,13 +219,13 @@ const requireText = (value: string, label: string, min: number, max: number): st
 };
 
 const callModel = async <SCHEMA extends z.ZodType>(
-    gateway: ServiceFetch,
+    ctx: ActionCtx,
     userId: string,
     schema: SCHEMA,
     prompt: { prompt: string; system: string },
 ): Promise<z.infer<SCHEMA>> => {
     // Through the LLM gateway, so the call is metered and attributed like every other.
-    const model = await getUtilityModel(gateway, { userId }, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
+    const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId }, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
 
     const result = await generateText({
         maxOutputTokens: 6000,
@@ -306,12 +307,7 @@ export const runBuilderTurn = authAction
         const allowQuestions = answers.length === 0 && args.skipQuestions !== true;
         const whitelist = getWhitelist();
 
-        const raw = await callModel(
-            gatewayFetch(ctx),
-            ctx.user.userId,
-            rawTurnSchema,
-            buildBuilderTurnPrompt({ answers, goal }, whitelist, { allowQuestions }),
-        );
+        const raw = await callModel(ctx, ctx.user.userId, rawTurnSchema, buildBuilderTurnPrompt({ answers, goal }, whitelist, { allowQuestions }));
         const turn = (() => {
             try {
                 return parseBuilderResponse(raw as RawBuilderResponse, whitelist, { allowQuestions });
@@ -399,7 +395,7 @@ export const refineBuilderDraft = authAction
         // whitelist before it is used as the baseline.
         const { draft: current } = applyRefinement(args.draft as BuilderDraft, {}, whitelist);
 
-        const patch = await callModel(gatewayFetch(ctx), ctx.user.userId, rawPatchSchema, buildRefinePrompt({ draft: current, instruction }, whitelist));
+        const patch = await callModel(ctx, ctx.user.userId, rawPatchSchema, buildRefinePrompt({ draft: current, instruction }, whitelist));
 
         ctx.log.event("skills.refine_builder_draft", { instructionLength: instruction.length });
 

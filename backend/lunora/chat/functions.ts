@@ -78,6 +78,7 @@ import { mediaJobStamp } from "./media-abandon";
 import type { FalAudioResponse } from "./lib/fal-media-parsing";
 import { extractFalAudioUrl, resolveFalVideoUrl } from "./lib/fal-media-parsing";
 import { canRunPaidModel, INTERNAL_PREFIX_RE, readRunPlan } from "./lib/agent-run";
+import { resolveBackgroundModel } from "./lib/background-model";
 import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
 import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
@@ -1528,8 +1529,6 @@ export const convertTemporaryToPermanent = authMutation
     });
 
 export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_TITLE_GENERATION_MODEL;
-
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
@@ -1569,7 +1568,17 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         language = threadLanguage;
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // The user's model filters decide the model; when they allow none the thread keeps its default title.
+    const background = await resolveBackgroundModel(context, userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+    if (!background) {
+        context.log.event("chat.thread_title", { skipped: "no-allowed-model" });
+
+        return;
+    }
+
+    const { model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1610,8 +1619,6 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
 const THREAD_CATEGORIES = ["coding", "writing", "research", "analysis", "brainstorming", "math", "learning", "business", "creative", "general"] as const;
 
 export const createCategoryChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_TITLE_GENERATION_MODEL;
-
     // As in `createTitleChat`: a thread that is gone is skipped, not retried.
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -1627,7 +1634,17 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
         return;
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
+    const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+    if (!background) {
+        context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
+
+        return;
+    }
+
+    const { model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: threadData.userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1664,8 +1681,6 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
 });
 
 export const createSummarizeChat = internalAction.input({ threadId: v.string(), userId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_SUMMARIZATION_MODEL;
-
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
@@ -1682,7 +1697,16 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
         throwBadRequest("userId is required for createSummarizeChat");
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // The thread's messages are the OWNER's: a collaborator who asked for the summary does not widen the models they go to.
+    const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_SUMMARIZATION_MODEL, userId);
+
+    // The owner's model filters allow no background model: the thread is left unsummarised.
+    if (!background) {
+        return;
+    }
+
+    const { model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -3645,7 +3669,15 @@ export const getFollowupSuggestions = authAction
         const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
         const language = threadLanguage || userLanguage;
 
-        const agent = await getAgentForUser(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, language);
+        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
+        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
+
+        // The model filters allow no background model: no suggestions, as for a host-run thread.
+        if (!background) {
+            return { suggestions: [] };
+        }
+
+        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
 
         const messagesResult = await agent.listMessages(context, {
             paginationOpts: { cursor: null, numItems: 10 },
@@ -3727,7 +3759,14 @@ export const generateFollowupSuggestionsForThread = internalAction
             const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
             const language = threadLanguage || userLanguage;
 
-            const agent = await getAgentForUser(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, language);
+            // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
+
+            if (!background) {
+                return;
+            }
+
+            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
 
             const messagesResult = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10 },

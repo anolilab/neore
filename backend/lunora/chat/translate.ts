@@ -16,7 +16,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import { getUtilityModelForUser } from "./lib/model-filter-rules";
 import {
     MAX_LANGUAGE_TAG_LENGTH,
     MAX_MESSAGE_ID_LENGTH,
@@ -76,6 +76,9 @@ export const translateMessage = authAction
                             .catch(() => undefined);
                     },
                     translate: async ({ prompt, system }) => {
+                        // The model is resolved first: a user whose filters allow none is refused before anything is charged.
+                        const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId });
+
                         // Only a cache miss reaches here, so only a model call is charged.
                         const charge = await chargeDailyLimit(ctx, { _id: userId, isAnonymous: false, plan: plan ?? null, role: role ?? null }, "Text");
 
@@ -88,7 +91,7 @@ export const translateMessage = authAction
                         const { text } = await generateText({
                             abortSignal: AbortSignal.timeout(TRANSLATE_TIMEOUT_MS),
                             maxOutputTokens: translationOutputTokens(args.text),
-                            model: await getUtilityModel(gatewayFetch(ctx), { userId }),
+                            model,
                             prompt,
                             system,
                             temperature: 0.2,

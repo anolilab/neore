@@ -11,7 +11,7 @@
  * reports once at the end, so everything between is safe to lose.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
 import { generateText } from "ai";
 import { v } from "lunorash/server";
 
@@ -19,6 +19,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { wrapUntrusted } from "../coding-agents/agent-output";
@@ -35,6 +36,8 @@ const verify = async (input: {
     /** The calling action's gateway binding. */
     gateway: ServiceFetch;
     instructions: string;
+    /** The user's model filter rules, which the verifier model must satisfy. */
+    rules: ModelFilterRules;
     successCriteria?: string;
     /** Unset for a coding-agent round, which has no thread. */
     threadId?: string;
@@ -42,7 +45,7 @@ const verify = async (input: {
     userId: string;
 }): Promise<VerifierVerdict> => {
     const { getUtilityModel } = await import("../lib/utility-model");
-    const model = await getUtilityModel(input.gateway, { threadId: input.threadId, userId: input.userId });
+    const model = await getUtilityModel(input.gateway, { rules: input.rules, threadId: input.threadId, userId: input.userId });
     const result = await generateText({
         abortSignal: AbortSignal.timeout(VERIFIER_TIMEOUT_MS),
         model,
@@ -187,7 +190,7 @@ const verifyAndComplete = async (
     let verdict: VerifierVerdict | undefined;
 
     try {
-        verdict = await verify({ ...input, gateway: gatewayFetch(ctx) });
+        verdict = await verify({ ...input, gateway: gatewayFetch(ctx), rules: await loadModelFilterRules(ctx, input.userId) });
     } catch (error) {
         // The answer exists; only the check is missing. A human decides rather
         // than spending repair rounds on a verifier that is down.
