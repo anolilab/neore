@@ -27,6 +27,7 @@
  * connection still verifies its signature and still answers the platform
  * handshakes; it then drops the message with no claim, pairing or reply.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -121,11 +122,20 @@ export const resolveConnectionAndKeys = async <Key extends string>(
 export const acceptInbound = async (
     context: HttpActionCtx,
     connection: Doc<"messengerConnections">,
-    message: InboundMessage,
+    inbound: InboundMessage,
     { delivery, externalThreadId, maxAgeMs, platform }: AcceptOptions,
 ): Promise<"accepted" | "duplicate" | "just_paired" | "rate_limited" | "stale" | "unpaired"> => {
-    if (!isFreshInbound(message, maxAgeMs)) {
+    if (!isFreshInbound(inbound, maxAgeMs)) {
         return "stale";
+    }
+
+    // The text is saved into the thread the model continues, so hidden characters (tag block, bidi controls) leave it
+    // here, once, for every platform. A text that was nothing else is dropped like a duplicate: nothing to save or answer.
+    const { removed, text: cleanText } = stripHiddenText(inbound.text ?? "");
+    const message: InboundMessage = inbound.text === undefined ? inbound : { ...inbound, text: cleanText };
+
+    if (removed > 0 && message.kind === "text" && cleanText.trim() === "") {
+        return "duplicate";
     }
 
     const claimed = await context.runMutation(internal.lib.claim_once.claimKey, {

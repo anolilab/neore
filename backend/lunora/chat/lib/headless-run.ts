@@ -18,7 +18,9 @@
  *
  * The user's own provider keys and custom endpoints apply to every headless run.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { stepCountIs } from "ai";
+import { LunoraError } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
@@ -160,7 +162,26 @@ const headlessSkillTools = (
     return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: config?.disabledTools };
 };
 
-export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptions): Promise<HeadlessRunResult> => {
+/**
+ * Task instructions, trigger templates and webhook bodies, sub-agent briefs, eval cases and messenger texts all arrive
+ * here, so this is the one place that keeps hidden characters (tag block, bidi controls) out of what the agent is told.
+ */
+const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
+    const prompt = options.prompt === undefined ? undefined : stripHiddenText(options.prompt);
+
+    if (prompt && prompt.removed > 0 && prompt.text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
+    }
+
+    return {
+        ...options,
+        ...(prompt && { prompt: prompt.text }),
+        ...(options.system !== undefined && { system: stripHiddenText(options.system).text }),
+    };
+};
+
+export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
+    const options = withoutHiddenText(rawOptions);
     const { model, prompt, skill, userId } = options;
     const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId);
     const [prefs, userProviderKeys] = await Promise.all([

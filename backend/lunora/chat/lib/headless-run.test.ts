@@ -24,6 +24,7 @@ const seen = vi.hoisted(() => {
         filters: [] as unknown[],
         met: [] as boolean[],
         prepareSteps: [] as unknown[],
+        prompts: [] as (string | undefined)[],
         replies: [] as string[],
         system: [] as string[],
         tools: [] as string[][],
@@ -50,8 +51,9 @@ vi.mock("./get-agent", () => {
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
-                generateText: async (args: { prepareStep?: (options: { messages: unknown[] }) => unknown; system?: string }) => {
+                generateText: async (args: { prepareStep?: (options: { messages: unknown[] }) => unknown; prompt?: string; system?: string }) => {
                     seen.prepareSteps.push(args.prepareStep);
+                    seen.prompts.push(args.prompt);
 
                     if (seen.failAt === "generate") {
                         throw new Error("model call failed");
@@ -105,6 +107,8 @@ vi.mock("./agent-tools", () => {
 });
 
 const { runHeadlessAgent } = await import("./headless-run");
+
+const EMPTY_AFTER_STRIPPING = /empty after removing hidden characters/u;
 
 const PREFS = {
     aboutMe: "SECRET-ABOUT-ME lives in Berlin with two cats",
@@ -183,6 +187,36 @@ describe("runHeadlessAgent personalization", () => {
         for (const secret of SECRETS) {
             expect(seen.system[0]).toContain(secret);
         }
+    });
+});
+
+describe("runHeadlessAgent hidden characters", () => {
+    const run = (prompt: string, system?: string) =>
+        runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model: "test-model",
+            origin: "lead",
+            personalization: "none",
+            prompt,
+            system,
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+        });
+
+    it("tells the agent the prompt and system text without tag or bidi characters", async () => {
+        seen.prompts.length = 0;
+        seen.system.length = 0;
+
+        await run("Summarise this\u{E0069}\u{E0067}\u{202E}", "Be brief\u{E0041}");
+
+        expect(seen.prompts.at(-1)).toBe("Summarise this");
+        expect(seen.system.at(-1)).toContain("Be brief");
+        expect(seen.system.at(-1)).not.toContain("\u{E0041}");
+    });
+
+    it("refuses a prompt that was only hidden characters", async () => {
+        await expect(run("\u{E0069}\u{E0067}")).rejects.toThrow(EMPTY_AFTER_STRIPPING);
     });
 });
 

@@ -14,6 +14,7 @@
  * Used by both chat ComposerInput and landing composer.
  */
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { FollowUpControl } from "@neore/ai/capabilities";
 import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
@@ -77,6 +78,8 @@ interface ComposerInputAreaProps {
 
     /** Whether the draft has a finished upload; with one, an empty text can still be sent. */
     hasCompletedAttachments?: boolean;
+    /** Hidden characters taken out of the draft; shown as a notice */
+    hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -143,6 +146,7 @@ const ComposerInputArea = ({
     customVariables,
     disabled = false,
     followUp = "none",
+    hiddenRemoved = 0,
     hasCompletedAttachments = false,
     isStreaming = false,
     isUploading = false,
@@ -170,6 +174,12 @@ const ComposerInputArea = ({
     const { t } = useLingui();
     const sendShortcut = useUIStateStore((state) => sendShortcutLabel(state.preferences.sendBehavior));
     const sendTooltip = sendShortcut ? t`Send message (${sendShortcut})` : t`Send message`;
+    // Inside `t`: a bare `plural()` compiles to the global i18n, which ignores the active locale.
+    const hiddenNotice =
+        hiddenRemoved > 0
+            ? // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+              t`${plural(hiddenRemoved, { one: "# invisible character was removed from your message.", other: "# invisible characters were removed from your message." })}`
+            : "";
     const tiptapRef = useRef<ComposerTiptapEditorRef>(null);
 
     useImperativeHandle(ref, () => {
@@ -428,6 +438,10 @@ const ComposerInputArea = ({
             {/* Banned word error message */}
             {bannedWordError && <div className="px-3 pb-2 text-sm text-red-600 dark:text-red-400">{bannedWordError}</div>}
 
+            {/* Always mounted so a screen reader announces the change when it appears */}
+            <div aria-live="polite" className="text-muted-foreground px-3 text-xs" role="status">
+                {hiddenNotice}
+            </div>
             <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />
         </>
     );
