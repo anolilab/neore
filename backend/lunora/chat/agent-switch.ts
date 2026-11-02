@@ -53,7 +53,7 @@ import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
-import { loadModelFilterRules } from "./lib/model-filter-rules";
+import { loadSharedModelFilterRules } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
@@ -495,11 +495,19 @@ export const beginSwitchSummary = internalMutation
 /** Writes the summary of `older`, or throws a refusal. Costs one utility-model call, metered by the gateway. */
 export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
 
-const summariseWith =
+export const summariseWith =
     (ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "runQuery">, who: { threadId: string; userId: string }): Summarise =>
     async (older, omittedEarlier) => {
         try {
-            const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules: await loadModelFilterRules(ctx, who.userId) });
+            // The history is the owner's and the switch is the caller's, so a model must satisfy both users' rules.
+            const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: who.threadId as Id<"threads"> });
+
+            if (!thread) {
+                throw new Error("thread not found");
+            }
+
+            const rules = await loadSharedModelFilterRules(ctx, who.userId, thread.userId);
+            const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules });
             const { text } = await generateText({
                 maxOutputTokens: HANDOFF_SUMMARY_MAX_TOKENS,
                 model,

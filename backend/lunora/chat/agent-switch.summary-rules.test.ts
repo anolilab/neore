@@ -1,0 +1,70 @@
+/**
+ * The switch summary carries the thread owner's history, so a collaborator's switch must honour BOTH users'
+ * model filter rules, not only the caller's.
+ */
+import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { summariseWith } from "./agent-switch";
+
+const generateText = vi.hoisted(() => vi.fn());
+
+vi.mock("ai", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("ai")>()), generateText };
+});
+vi.mock("@neore/ai/providers", async () => {
+    const { MODEL_REGISTRY } = await import("@neore/ai/models");
+
+    return { buildAgents: () => Object.fromEntries(MODEL_REGISTRY.map((model) => [model.id, { chat: { modelId: model.id } }])) };
+});
+vi.mock("../lib/services", () => {
+    return { gatewayFetch: () => async () => new Response("{}") };
+});
+
+const rulesByUser: Record<string, object> = {};
+const owner = "owner-1";
+const caller = "caller-1";
+
+const ctx = {
+    runQuery: vi.fn(async (reference: unknown, args: { userId?: string }) => {
+        const name = JSON.stringify(reference) + String(reference);
+
+        if (name.includes("getThreadInternal")) {
+            return { userId: owner };
+        }
+
+        if (name.includes("getUserRunPlanQuery")) {
+            return { isAdmin: false, plan: null };
+        }
+
+        return { modelFilterRules: rulesByUser[args.userId ?? ""] ?? {} };
+    }),
+} as never;
+
+const older = [{ role: "user", text: "hello" }] as never;
+
+beforeEach(() => {
+    generateText.mockReset();
+    generateText.mockResolvedValue({ text: "A summary." });
+
+    for (const key of Object.keys(rulesByUser)) {
+        delete rulesByUser[key];
+    }
+});
+
+describe("summariseWith", () => {
+    it("uses the default utility model when neither user restricts it", async () => {
+        await summariseWith(ctx, { threadId: "thread-1", userId: caller })(older, false);
+
+        expect(generateText.mock.calls[0]![0].model.modelId).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+
+    it("does not summarise the owner's history on a model the owner forbids, though the caller allows it", async () => {
+        rulesByUser[owner] = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL] };
+
+        await summariseWith(ctx, { threadId: "thread-1", userId: caller })(older, false);
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(generateText.mock.calls[0]![0].model.modelId).not.toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+});
