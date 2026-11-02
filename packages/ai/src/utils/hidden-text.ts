@@ -1,14 +1,14 @@
 /**
  * Text the person approves must be text they can read. Control characters, format characters (bidi overrides, zero
- * width and joiner characters), the tag block (U+E0000 to U+E007F, which many renderers draw as nothing; most of it is `\p{Cf}`, the rest is spelled out) and the line
- * and paragraph separators render as nothing or reorder what is around them, so none of them is allowed in a hooks
+ * width space, word joiner, byte order mark), the tag block (U+E0000 to U+E007F, which many renderers draw as nothing; most of it is `\p{Cf}`, the rest is spelled out) and the line
+ * and paragraph separators render as nothing or reorder what is around them, so none of them is allowed (U+200C and U+200D excepted: see `stripHiddenText`) in a hooks
  * file's strings, and none reaches the agent in a path.
  */
 
 // Two expressions: a global one keeps state between `.test` calls, so the check and the replacement do not share one.
-const HIDDEN = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
-const HIDDEN_EVERYWHERE = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
-const HIDDEN_EXCEPT_LAYOUT = /(?![\n\t])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+const HIDDEN = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
+const HIDDEN_EVERYWHERE = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+const HIDDEN_EXCEPT_LAYOUT = /(?![\n\t\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
 const LAYOUT = /[\n\t]/gu;
 
 /** `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. */
@@ -20,8 +20,8 @@ export const showHidden = (value: string): string => value.replaceAll(HIDDEN_EVE
 
 /**
  * The text with every hidden character removed, and how many there were. A newline and a tab stay (a prompt has
- * lines); a carriage return does not, so `\r\n` arrives as `\n`. Joiners (U+200D, U+200C) are format characters and
- * go too, which splits an emoji sequence into its parts.
+ * lines); a carriage return does not, so `\r\n` arrives as `\n`. U+200D and U+200C stay: emoji sequences and
+ * Persian, Arabic and Indic text need them to render. Variation selectors are not format characters and stay too.
  */
 export const stripHiddenText = (value: string): { removed: number; text: string } => {
     let removed = 0;

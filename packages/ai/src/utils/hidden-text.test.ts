@@ -37,6 +37,20 @@ describe("stripHiddenText", () => {
         expect(stripHiddenText("Über\n\tprüfe 👍")).toEqual({ removed: 0, text: "Über\n\tprüfe 👍" });
     });
 
+    it("keeps joiners: a ZWJ emoji family, a flag-free VS16 emoji and a Persian word with ZWNJ", () => {
+        const family = "👨\u{200D}👩\u{200D}👧";
+        const heart = "❤\u{FE0F}";
+        const persian = "می\u{200C}خواهم";
+
+        expect(stripHiddenText(`${family} ${heart} ${persian}`)).toEqual({ removed: 0, text: `${family} ${heart} ${persian}` });
+        expect(hasHiddenText(family + persian)).toBe(false);
+        expect(showHidden(family + persian)).toBe(family + persian);
+    });
+
+    it("still removes a tag payload, RLO and ZWSP beside joiners", () => {
+        expect(stripHiddenText("👨\u{200D}👩\u{E0041}\u{202E}\u{200B}x")).toEqual({ removed: 3, text: "👨\u{200D}👩x" });
+    });
+
     it("is stateless across calls", () => {
         for (let call = 0; call < 3; call += 1) {
             expect(stripHiddenText("a\u{E0041}b").removed).toBe(1);
