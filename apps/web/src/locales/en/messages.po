@@ -615,7 +615,7 @@ msgstr "{0} of {maxReferences} selected"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:179
+#: src/features/develop/components/guide-tab.tsx:180
 msgid "{0} on {1}, in {2}"
 msgstr "{0} on {1}, in {2}"
 
@@ -666,7 +666,7 @@ msgstr "{0} tools discovered"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:177
 msgid "{0} tools: {1}"
 msgstr "{0} tools: {1}"
 
@@ -959,7 +959,7 @@ msgid "{hostLabel} is not connected."
 msgstr "{hostLabel} is not connected."
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:222
+#: src/features/develop/components/guide-tab.tsx:223
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr "{hostLabel} lists only part of this change; {0} files are not in the guide."
 
@@ -2035,7 +2035,7 @@ msgstr "Add a note..."
 msgid "Add a note…"
 msgstr "Add a note…"
 
-#: src/features/devices/components/devices-settings.tsx:329
+#: src/features/devices/components/devices-settings.tsx:342
 msgid "Add a server over SSH"
 msgstr "Add a server over SSH"
 
@@ -2349,7 +2349,7 @@ msgstr "Added to the thread"
 msgid "Added to your review"
 msgstr "Added to your review"
 
-#: src/features/develop/components/guide-tab.tsx:128
+#: src/features/develop/components/guide-tab.tsx:129
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr "Added to your review. Nothing is posted until you submit the review."
 
@@ -2363,7 +2363,7 @@ msgstr "Added:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Adding documents… {0} of {1}"
 
-#: src/features/devices/components/devices-settings.tsx:311
+#: src/features/devices/components/devices-settings.tsx:324
 msgid "Adding the server was cancelled on this computer."
 msgstr "Adding the server was cancelled on this computer."
 
@@ -2375,7 +2375,7 @@ msgstr "Adding your earlier replies…"
 msgid "Adding…"
 msgstr "Adding…"
 
-#: src/features/devices/components/devices-settings.tsx:342
+#: src/features/devices/components/devices-settings.tsx:355
 msgid "Address"
 msgstr "Address"
 
@@ -2614,7 +2614,7 @@ msgstr "After activating the connection here, you'll get a webhook URL to set as
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 
-#: src/features/devices/components/devices-settings.tsx:258
+#: src/features/devices/components/devices-settings.tsx:271
 msgid "After outside content"
 msgstr "After outside content"
 
@@ -6280,7 +6280,7 @@ msgid "Coding agent runs"
 msgstr "Coding agent runs"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:80
+#: src/features/devices/components/devices-settings.tsx:87
 msgid "Coding agents you can start on {0}"
 msgstr "Coding agents you can start on {0}"
 
@@ -6878,7 +6878,7 @@ msgstr "Confirm password is required"
 msgid "Confirm your password"
 msgstr "Confirm your password"
 
-#: src/features/devices/components/devices-settings.tsx:127
+#: src/features/devices/components/devices-settings.tsx:135
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6922,7 +6922,7 @@ msgstr "Connect an audio/file node as input"
 msgid "Connect an image node as input"
 msgstr "Connect an image node as input"
 
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:373
 msgid "Connect and add"
 msgstr "Connect and add"
 
@@ -7075,7 +7075,7 @@ msgstr "Connection error. Please check your internet connection and try again."
 msgid "Connection failed"
 msgstr "Connection failed"
 
-#: src/features/devices/components/devices-settings.tsx:176
+#: src/features/devices/components/devices-settings.tsx:189
 msgid "Connection lost"
 msgstr "Connection lost"
 
@@ -7659,7 +7659,7 @@ msgstr "Cost-sensitive applications needing reliable Google AI at the lowest Gem
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:321
+#: src/features/devices/components/devices-settings.tsx:334
 msgid "Could not add the server."
 msgstr "Could not add the server."
 
@@ -7720,7 +7720,7 @@ msgstr "Could not confirm that this was merged. Check on {hostLabel} before you 
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 
-#: src/features/devices/components/devices-settings.tsx:140
+#: src/features/devices/components/devices-settings.tsx:148
 msgid "Could not connect to the server."
 msgstr "Could not connect to the server."
 
@@ -7847,7 +7847,7 @@ msgstr "Could not open as a page"
 msgid "Could not open the pull request."
 msgstr "Could not open the pull request."
 
-#: src/features/devices/components/devices-settings.tsx:425
+#: src/features/devices/components/devices-settings.tsx:438
 msgid "Could not pair this computer. Try again."
 msgstr "Could not pair this computer. Try again."
 
@@ -7874,7 +7874,7 @@ msgstr "Could not pull {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Could not reach the server to start generating. Check your connection and try again."
 
-#: src/features/chat/host/host-send-errors.ts:22
+#: src/features/chat/host/host-send-errors.ts:23
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
@@ -7890,7 +7890,7 @@ msgstr "Could not read that chat. If it is locked, unlock it first."
 msgid "Could not refine the draft. Try again."
 msgstr "Could not refine the draft. Try again."
 
-#: src/features/devices/components/devices-settings.tsx:206
+#: src/features/devices/components/devices-settings.tsx:219
 msgid "Could not remove the device."
 msgstr "Could not remove the device."
 
@@ -7898,7 +7898,7 @@ msgstr "Could not remove the device."
 msgid "Could not remove the participant"
 msgstr "Could not remove the participant"
 
-#: src/features/devices/components/devices-settings.tsx:161
+#: src/features/devices/components/devices-settings.tsx:169
 msgid "Could not rename the device."
 msgstr "Could not rename the device."
 
@@ -9356,7 +9356,7 @@ msgstr "Demanding tasks requiring Z.AI's most powerful and capable frontier GLM 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Demanding tasks where maximum AI capability and refined reasoning matter most"
 
-#: src/features/devices/components/devices-settings.tsx:243
+#: src/features/devices/components/devices-settings.tsx:256
 msgid "Denied"
 msgstr "Denied"
 
@@ -9646,19 +9646,19 @@ msgstr "Developers who need strong coding and general-purpose capabilities from 
 msgid "Development"
 msgstr "Development"
 
-#: src/features/devices/components/devices-settings.tsx:500
+#: src/features/devices/components/devices-settings.tsx:513
 msgid "Device activity"
 msgstr "Device activity"
 
-#: src/features/devices/components/devices-settings.tsx:150
+#: src/features/devices/components/devices-settings.tsx:158
 msgid "Device name"
 msgstr "Device name"
 
-#: src/features/devices/components/devices-settings.tsx:209
+#: src/features/devices/components/devices-settings.tsx:222
 msgid "Device removed"
 msgstr "Device removed"
 
-#: src/features/devices/components/devices-settings.tsx:435
+#: src/features/devices/components/devices-settings.tsx:448
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Devices"
@@ -9765,7 +9765,7 @@ msgstr "Discard comments"
 msgid "Discard the review"
 msgstr "Discard the review"
 
-#: src/features/devices/components/devices-settings.tsx:130
+#: src/features/devices/components/devices-settings.tsx:138
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -9802,7 +9802,7 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:189
+#: src/features/devices/components/devices-settings.tsx:202
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dismiss"
@@ -9949,7 +9949,7 @@ msgstr "Don't have an account?"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:242
+#: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -11780,7 +11780,7 @@ msgid "expired"
 msgstr "expired"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
-#: src/features/devices/components/devices-settings.tsx:244
+#: src/features/devices/components/devices-settings.tsx:257
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "Expired"
@@ -12037,7 +12037,7 @@ msgstr "failed"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:245
+#: src/features/devices/components/devices-settings.tsx:258
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:171
@@ -13611,7 +13611,7 @@ msgstr "For example: \"Focus on Python best practices\", \"Maintain a profession
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 
-#: src/features/develop/components/guide-tab.tsx:159
+#: src/features/develop/components/guide-tab.tsx:160
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "For example: look hard at error handling, skip the generated files."
 
@@ -16712,7 +16712,7 @@ msgstr "Keep the full history"
 msgid "Kenya"
 msgstr "Kenya"
 
-#: src/features/devices/components/devices-settings.tsx:354
+#: src/features/devices/components/devices-settings.tsx:367
 msgid "Key file (optional, absolute path)"
 msgstr "Key file (optional, absolute path)"
 
@@ -17304,11 +17304,11 @@ msgstr "Let a quick check approve low-risk calls"
 msgid "Let replies use tools"
 msgstr "Let replies use tools"
 
-#: src/features/devices/components/devices-settings.tsx:434
+#: src/features/devices/components/devices-settings.tsx:447
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 
-#: src/features/devices/components/devices-settings.tsx:492
+#: src/features/devices/components/devices-settings.tsx:505
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 
@@ -19539,11 +19539,11 @@ msgstr "Mute"
 msgid "my data"
 msgstr "my data"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Linux computer"
 msgstr "My Linux computer"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Mac"
 msgstr "My Mac"
 
@@ -19555,7 +19555,7 @@ msgstr "My MCP Server"
 msgid "My skills"
 msgstr "My skills"
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "My Windows PC"
 msgstr "My Windows PC"
 
@@ -19581,7 +19581,7 @@ msgstr "name"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:338
+#: src/features/devices/components/devices-settings.tsx:351
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -19859,7 +19859,15 @@ msgstr "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat.
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore keeps these up to date and tells you when someone asks for your review."
 
-#: src/features/develop/components/guide-tab.tsx:172
+#: src/features/devices/components/devices-settings.tsx:181
+msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
+msgstr "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
+
+#: src/features/chat/host/host-send-errors.ts:17
+msgid "Neore on your computer is out of date. Update it, then try again."
+msgstr "Neore on your computer is out of date. Update it, then try again."
+
+#: src/features/develop/components/guide-tab.tsx:173
 msgid "Neore, from the diff"
 msgstr "Neore, from the diff"
 
@@ -20385,7 +20393,7 @@ msgstr "No description"
 msgid "No description provided."
 msgstr "No description provided."
 
-#: src/features/devices/components/devices-settings.tsx:486
+#: src/features/devices/components/devices-settings.tsx:499
 msgid "No devices paired."
 msgstr "No devices paired."
 
@@ -20432,7 +20440,7 @@ msgstr "No focal length selected"
 msgid "No goal"
 msgstr "No goal"
 
-#: src/features/develop/components/guide-tab.tsx:208
+#: src/features/develop/components/guide-tab.tsx:209
 msgid "No guide"
 msgstr "No guide"
 
@@ -20803,7 +20811,7 @@ msgstr "No threads yet"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:177
 msgid "No tools shared yet"
 msgstr "No tools shared yet"
 
@@ -21050,7 +21058,7 @@ msgstr "Note: Modules are applied per conversation, not per message. Enable only
 msgid "Nothing found"
 msgstr "Nothing found"
 
-#: src/features/devices/components/devices-settings.tsx:237
+#: src/features/devices/components/devices-settings.tsx:250
 msgid "Nothing has run on a device yet."
 msgstr "Nothing has run on a device yet."
 
@@ -21195,7 +21203,7 @@ msgstr "Official"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:175
+#: src/features/devices/components/devices-settings.tsx:188
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -21398,7 +21406,7 @@ msgstr "One-time password is required"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:175
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Online"
 msgstr "Online"
 
@@ -21617,7 +21625,7 @@ msgstr "Open model picker"
 msgid "Open Model Picker"
 msgstr "Open Model Picker"
 
-#: src/features/devices/components/devices-settings.tsx:439
+#: src/features/devices/components/devices-settings.tsx:452
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 
@@ -21707,7 +21715,7 @@ msgstr "Open Tasks"
 msgid "Open terminal"
 msgstr "Open terminal"
 
-#: src/features/develop/components/guide-tab.tsx:200
+#: src/features/develop/components/guide-tab.tsx:201
 msgid "Open the agent's conversation"
 msgstr "Open the agent's conversation"
 
@@ -22509,11 +22517,11 @@ msgstr "Pair one in Settings"
 msgid "Paired"
 msgstr "Paired"
 
-#: src/features/devices/components/devices-settings.tsx:472
+#: src/features/devices/components/devices-settings.tsx:485
 msgid "Paired devices"
 msgstr "Paired devices"
 
-#: src/features/devices/components/devices-settings.tsx:415
+#: src/features/devices/components/devices-settings.tsx:428
 msgid "Pairing was cancelled on this computer."
 msgstr "Pairing was cancelled on this computer."
 
@@ -23240,7 +23248,7 @@ msgstr "Polished Hollywood look"
 msgid "Popular"
 msgstr "Popular"
 
-#: src/features/devices/components/devices-settings.tsx:350
+#: src/features/devices/components/devices-settings.tsx:363
 msgid "Port"
 msgstr "Port"
 
@@ -24783,7 +24791,7 @@ msgstr "Reconnect"
 msgid "Reconnect {0}"
 msgstr "Reconnect {0}"
 
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Reconnecting"
 msgstr "Reconnecting"
 
@@ -25136,8 +25144,8 @@ msgstr "Remember me"
 #: src/features/chat/thread/composer-input.tsx:338
 #: src/features/chat/thread/composer-input.tsx:392
 #: src/features/chat/thread/composer-input.tsx:401
-#: src/features/devices/components/devices-settings.tsx:193
-#: src/features/devices/components/devices-settings.tsx:199
+#: src/features/devices/components/devices-settings.tsx:206
+#: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -25154,7 +25162,7 @@ msgid "Remove \"{0}\"?"
 msgstr "Remove \"{0}\"?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:216
+#: src/features/devices/components/devices-settings.tsx:229
 msgid "Remove “{0}”?"
 msgstr "Remove “{0}”?"
 
@@ -25813,7 +25821,7 @@ msgstr "retry"
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:311
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:132
+#: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -27251,7 +27259,7 @@ msgstr "Sending your message and waiting for the reply"
 msgid "Sending…"
 msgstr "Sending…"
 
-#: src/features/devices/components/devices-settings.tsx:246
+#: src/features/devices/components/devices-settings.tsx:259
 msgid "Sent"
 msgstr "Sent"
 
@@ -27303,7 +27311,7 @@ msgstr "Serbian (Serbia)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/devices/components/devices-settings.tsx:318
+#: src/features/devices/components/devices-settings.tsx:331
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Server added. Choose which of its folders to share in the desktop app."
 
@@ -27319,7 +27327,7 @@ msgstr "Server error. Please try again later."
 msgid "Server name is required"
 msgstr "Server name is required"
 
-#: src/features/devices/components/devices-settings.tsx:174
+#: src/features/devices/components/devices-settings.tsx:187
 msgid "Server over SSH"
 msgstr "Server over SSH"
 
@@ -27343,7 +27351,7 @@ msgstr "Serverless Postgres database with branching"
 msgid "servers"
 msgstr "servers"
 
-#: src/features/devices/components/devices-settings.tsx:493
+#: src/features/devices/components/devices-settings.tsx:506
 msgid "Servers over SSH"
 msgstr "Servers over SSH"
 
@@ -27494,7 +27502,7 @@ msgstr "shared"
 msgid "Shared conversation"
 msgstr "Shared conversation"
 
-#: src/features/devices/components/devices-settings.tsx:467
+#: src/features/devices/components/devices-settings.tsx:480
 msgid "Shared folders and local servers…"
 msgstr "Shared folders and local servers…"
 
@@ -28662,7 +28670,7 @@ msgstr "Start"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:101
+#: src/features/devices/components/devices-settings.tsx:109
 msgid "Start {0} in {1}"
 msgstr "Start {0} in {1}"
 
@@ -29514,7 +29522,7 @@ msgstr "Suggestion available, press Right Arrow to accept"
 msgid "suggestions"
 msgstr "suggestions"
 
-#: src/features/develop/components/guide-tab.tsx:229
+#: src/features/develop/components/guide-tab.tsx:230
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr "Suggestions"
@@ -30335,7 +30343,7 @@ msgstr "Thailand"
 msgid "Thanks for rating"
 msgstr "Thanks for rating"
 
-#: src/features/develop/components/guide-tab.tsx:108
+#: src/features/develop/components/guide-tab.tsx:109
 msgid "That agent session has ended."
 msgstr "That agent session has ended."
 
@@ -30351,7 +30359,7 @@ msgstr "That computer is busy. Try again in a moment."
 msgid "That computer is not online."
 msgstr "That computer is not online."
 
-#: src/features/develop/components/guide-tab.tsx:144
+#: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr "That did not work. Try again."
 
@@ -30375,7 +30383,7 @@ msgstr "That link could not be read."
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "That message is too long to send from here."
 msgstr "That message is too long to send from here."
 
@@ -30387,11 +30395,11 @@ msgstr "That passcode is not right."
 msgid "That request is no longer waiting."
 msgstr "That request is no longer waiting."
 
-#: src/features/develop/components/guide-tab.tsx:131
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "That suggestion cannot be added any more."
 msgstr "That suggestion cannot be added any more."
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "That suggestion is gone."
 msgstr "That suggestion is gone."
 
@@ -30399,7 +30407,7 @@ msgstr "That suggestion is gone."
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "The {requestNoun} changed while the guide was being written. Write it again."
 
-#: src/features/develop/components/guide-tab.tsx:129
+#: src/features/develop/components/guide-tab.tsx:130
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 
@@ -30407,7 +30415,7 @@ msgstr "The {requestNoun} has a newer commit. Write the guide again before addin
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 
-#: src/features/devices/components/devices-settings.tsx:200
+#: src/features/devices/components/devices-settings.tsx:213
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 
@@ -30415,11 +30423,11 @@ msgstr "The agent can no longer ask this device for anything. Its activity log s
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "The agent finished without giving a guide. Write it again."
 
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "The agent is still opening its session. Try again in a moment."
 msgstr "The agent is still opening its session. Try again in a moment."
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "The agent is still working on the last message."
 msgstr "The agent is still working on the last message."
 
@@ -30435,7 +30443,7 @@ msgstr "The agent loop is always enabled for systematic task execution. These se
 msgid "The agent made no file changes."
 msgstr "The agent made no file changes."
 
-#: src/features/develop/components/guide-tab.tsx:195
+#: src/features/develop/components/guide-tab.tsx:196
 msgid "The agent on your computer is reading the change…"
 msgstr "The agent on your computer is reading the change…"
 
@@ -30643,8 +30651,8 @@ msgstr "The full system prompt to send to the model..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "The goal is removed; its tasks stay, without a goal."
 
-#: src/features/develop/components/guide-tab.tsx:117
-#: src/features/develop/components/guide-tab.tsx:120
+#: src/features/develop/components/guide-tab.tsx:118
+#: src/features/develop/components/guide-tab.tsx:121
 msgid "The guide could not be started."
 msgstr "The guide could not be started."
 
@@ -30797,6 +30805,10 @@ msgstr "The most demanding tasks requiring Anthropic's latest frontier reasoning
 #: src/features/chat/goal/composer-goal.tsx:98
 msgid "The most review rounds before it stops"
 msgstr "The most review rounds before it stops"
+
+#: src/features/develop/components/guide-tab.tsx:107
+msgid "The Neore app on that computer is out of date. Update it, then try again."
+msgstr "The Neore app on that computer is out of date. Update it, then try again."
 
 #. placeholder {0}: data.user.email
 #: src/routes/auth/extension.tsx:135
@@ -31148,7 +31160,7 @@ msgstr "This change is too large to write a guide for."
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr "This change, or your instructions, are too large for that computer to take in one message."
 
-#: src/features/chat/host/host-send-errors.ts:23
+#: src/features/chat/host/host-send-errors.ts:24
 msgid "This chat belongs to a worker. Send it messages from its own message box."
 msgstr "This chat belongs to a worker. Send it messages from its own message box."
 
@@ -31176,7 +31188,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/devices/components/devices-settings.tsx:173
+#: src/features/devices/components/devices-settings.tsx:186
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "This computer"
@@ -31185,22 +31197,30 @@ msgstr "This computer"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr "This computer did not resume its own session, so the conversation was handed over"
 
-#: src/features/devices/components/devices-settings.tsx:444
+#: src/features/devices/components/devices-settings.tsx:457
 msgid "This computer is not paired yet."
 msgstr "This computer is not paired yet."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:460
+#: src/features/devices/components/devices-settings.tsx:473
 msgid "This computer is paired as “{0}”."
 msgstr "This computer is paired as “{0}”."
 
-#: src/features/devices/components/devices-settings.tsx:444
+#: src/features/devices/components/devices-settings.tsx:457
 msgid "This computer is paired with another account."
 msgstr "This computer is paired with another account."
 
-#: src/features/devices/components/devices-settings.tsx:422
+#: src/features/devices/components/devices-settings.tsx:435
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "This computer is paired. Choose which folders to share in the desktop app."
+
+#: src/features/devices/components/device-relay.tsx:34
+msgid "This computer's clock is about {minutes} minutes ahead of the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
+msgstr "This computer's clock is about {minutes} minutes ahead of the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
+
+#: src/features/devices/components/device-relay.tsx:38
+msgid "This computer's clock is about {minutes} minutes behind the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
+msgstr "This computer's clock is about {minutes} minutes behind the server's, so its signed messages are refused. Set the date and time to update automatically, then try again."
 
 #: src/features/settings/connectors/connector-card.tsx:131
 msgid "This connection needs to be renewed."
@@ -31282,7 +31302,7 @@ msgstr "This file is too large ({0} KB) to preview or edit in the browser. Files
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 
-#: src/features/develop/components/guide-tab.tsx:216
+#: src/features/develop/components/guide-tab.tsx:217
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 
@@ -31494,7 +31514,7 @@ msgid "This server's registry entry asks for the values below. They fill in the 
 msgstr "This server's registry entry asks for the values below. They fill in the URL and headers."
 
 #: src/features/chat/host/host-composer.tsx:171
-#: src/features/chat/host/host-send-errors.ts:18
+#: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "This session has ended. Start a new one from the desktop app."
 
@@ -33310,7 +33330,7 @@ msgstr "Use the organization's allowed models"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 
-#: src/features/devices/components/devices-settings.tsx:454
+#: src/features/devices/components/devices-settings.tsx:467
 msgid "Use this computer for agent tools"
 msgstr "Use this computer for agent tools"
 
@@ -33350,7 +33370,7 @@ msgstr "user"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:346
+#: src/features/devices/components/devices-settings.tsx:359
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -34214,7 +34234,7 @@ msgstr "Waiting for {0}."
 msgid "Waiting for {device} to pick this up…"
 msgstr "Waiting for {device} to pick this up…"
 
-#: src/features/devices/components/devices-settings.tsx:241
+#: src/features/devices/components/devices-settings.tsx:254
 msgid "Waiting for approval"
 msgstr "Waiting for approval"
 
@@ -34527,11 +34547,11 @@ msgstr "What should the agent do?"
 msgid "What should the AI call you?"
 msgstr "What should the AI call you?"
 
-#: src/features/develop/components/guide-tab.tsx:152
+#: src/features/develop/components/guide-tab.tsx:153
 msgid "What should the guide pay attention to?"
 msgstr "What should the guide pay attention to?"
 
-#: src/features/devices/components/devices-settings.tsx:500
+#: src/features/devices/components/devices-settings.tsx:513
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "What the agent asked your devices to do in the last 30 days."
 
@@ -34618,7 +34638,7 @@ msgstr "When set, only these providers will be used. Leave empty to allow all."
 msgid "When should the assistant use this skill?"
 msgstr "When should the assistant use this skill?"
 
-#: src/features/develop/components/guide-tab.tsx:164
+#: src/features/develop/components/guide-tab.tsx:165
 msgid "Where the guide is written"
 msgstr "Where the guide is written"
 
@@ -34693,7 +34713,7 @@ msgstr "With email/password"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "With this, it fires when the text starts to contain the phrase, not on every change."
 
-#: src/features/devices/components/devices-settings.tsx:356
+#: src/features/devices/components/devices-settings.tsx:369
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 
@@ -34797,7 +34817,7 @@ msgstr "Write a video description for a product launch"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "Write code with AI, run it in the sandbox, and document results — all in one thread."
 
-#: src/features/develop/components/guide-tab.tsx:185
+#: src/features/develop/components/guide-tab.tsx:186
 msgid "Write it again"
 msgstr "Write it again"
 
@@ -34817,7 +34837,7 @@ msgstr "Write some code for me..."
 msgid "Write something"
 msgstr "Write something"
 
-#: src/features/develop/components/guide-tab.tsx:185
+#: src/features/develop/components/guide-tab.tsx:186
 msgid "Write the guide"
 msgstr "Write the guide"
 
@@ -34831,7 +34851,7 @@ msgstr "Write, or type '/' for commands…"
 msgid "Writing"
 msgstr "Writing"
 
-#: src/features/develop/components/guide-tab.tsx:195
+#: src/features/develop/components/guide-tab.tsx:196
 msgid "Writing the guide…"
 msgstr "Writing the guide…"
 
@@ -34997,7 +35017,7 @@ msgstr "You are offline."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
 
-#: src/features/chat/host/host-send-errors.ts:17
+#: src/features/chat/host/host-send-errors.ts:18
 msgid "You are sending too fast. Wait a moment."
 msgstr "You are sending too fast. Wait a moment."
 
@@ -35240,7 +35260,6 @@ msgstr "Your comments were written on an earlier version of this change. They ar
 msgid "your computer"
 msgstr "your computer"
 
-#: src/features/chat/host/host-composer.tsx:141
 #: src/features/chat/host/host-send-errors.ts:12
 msgid "Your computer is busy. Try again in a moment."
 msgstr "Your computer is busy. Try again in a moment."
@@ -35374,11 +35393,11 @@ msgstr "Your rating"
 msgid "Your review"
 msgstr "Your review"
 
-#: src/features/develop/components/guide-tab.tsx:133
+#: src/features/develop/components/guide-tab.tsx:134
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr "Your review already holds as many comments as {hostLabel} takes in one review."
 
-#: src/features/develop/components/guide-tab.tsx:132
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "Your review is being submitted. Try again when it is done."
 msgstr "Your review is being submitted. Try again when it is done."
 
