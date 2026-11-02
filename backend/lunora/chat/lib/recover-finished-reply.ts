@@ -5,6 +5,7 @@
  * best effort and once, because the stream is closed and nothing looks at it again.
  *
  * - the MCP tool calls are stamped with their real names (`stampSavedToolCalls`), from the labels the run registered;
+ * - the thread's reply stamp and the follow-up suggestions, as a normal finish leaves them (not for a goal's thread);
  * - `afterRun` runs as it does after a normal finish: memory extraction, the nightly-reflection stamp, the thread
  *   summary, the Daily Brief activity. Its usage record is skipped (the close recorded it) and so is the timing (the
  *   start of the dead run is not known).
@@ -20,6 +21,8 @@ import { afterRun, stampSavedToolCalls } from "./agent-run";
 import type { McpToolLabels } from "./mcp-tool-labels";
 
 export interface FinishedReply {
+    /** A goal holds the thread: its review follows, so the thread's reply stamp and follow-ups are left to the goal. */
+    goal: boolean;
     labels?: McpToolLabels;
     messageId: string;
     replyRowIds: string[];
@@ -31,7 +34,7 @@ export interface FinishedReply {
 }
 
 export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery" | "scheduler">, reply: FinishedReply): Promise<void> => {
-    const { labels, messageId, replyRowIds, skill, threadId, timeZone, userId, userPrompt } = reply;
+    const { goal, labels, messageId, replyRowIds, skill, threadId, timeZone, userId, userPrompt } = reply;
     const found = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: replyRowIds as Id<"messages">[] });
     const rows = found.filter((row) => row !== null);
 
@@ -51,6 +54,19 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
     ]);
     // As a normal finish decides it: a locked chat's content and a goal round's instruction are never mined for memory.
     const extractMemory = prefs?.memoryEnabled === true && thread !== null && !isThreadLocked(thread) && prompt[0]?.agentName !== GOAL_CONTINUATION_AGENT;
+
+    // What the normal end settles besides the thread's status (the close did that): the reply is stamped (`lastReplyAt`, which
+    // the home and the activity views read) and follow-up suggestions are queued. A goal's thread is its own until it ends.
+    if (!goal) {
+        const at = Date.now();
+
+        await ctx
+            .runMutation(internal.agent.threads.updateThread, { patch: { lastReplyAt: at, updatedAt: at }, threadId: threadId as Id<"threads"> })
+            .catch((error: unknown) => {
+                streamLogger.warn("[BgAgent] Could not stamp the reply of a recovered thread:", error);
+            });
+        await ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId }).catch(() => undefined);
+    }
 
     await afterRun(ctx, {
         ...(settings?.botId && { botId: settings.botId }),

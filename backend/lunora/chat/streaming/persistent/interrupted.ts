@@ -222,8 +222,10 @@ const vVerdict = v.union(
     v.object({ kind: v.literal("gone") }),
     v.object({ kind: v.literal("fresh") }),
     v.object({
-        kind: v.literal("finished"),
         /** What the run's own end would have done with the reply (`recoverFinishedReply`). */
+        /** A goal holds the thread (its review follows), so the reply's end leaves the thread and its follow-ups to it. */
+        goal: v.boolean(),
+        kind: v.literal("finished"),
         labels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
         messageId: v.string(),
         replyRowIds: v.array(v.string()),
@@ -328,16 +330,17 @@ export const inspectRun = internalMutation
             // The answer is saved whole: record it once and close the stream, as a run that ended itself would have. A goal's
             // run is handed to its review the way the run's own end would (`handOffToGoalReview`): the review job claims its
             // round, so a repeat does nothing, and the goal keeps the thread's status.
-            const goals = await activeGoalsOf(ctx, threadId);
-            const ownGoal = goals.find((goal) => goal.promptMessageId === stream.messageId);
+            const finishedGoals = await activeGoalsOf(ctx, threadId);
+            const ownGoal = finishedGoals.find((goal) => goal.promptMessageId === stream.messageId);
 
-            await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: goals.length > 0 });
+            await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: finishedGoals.length > 0 });
 
             if (ownGoal) {
                 await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });
             }
 
             return {
+                goal: finishedGoals.length > 0,
                 kind: "finished" as const,
                 ...(stream.toolLabels && { labels: stream.toolLabels }),
                 messageId: stream.messageId,

@@ -561,6 +561,19 @@ export const runStreamingAgent = internalAction
 
                 // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
                 const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                    // The rows an earlier invocation of this reply saved (before a pause or a death) were never stamped with their
+                    // tool names: this run's labels are the same ones. Idempotent, and never masks how the run ended.
+                    if (priorRows.length > 0) {
+                        await stampSavedToolCalls(ctx, {
+                            autoApprovals: toolResult.autoApprovals,
+                            mcpLabels: toolResult.mcpLabels,
+                            savedMessages: priorRows,
+                            userId,
+                        }).catch((error: unknown) => {
+                            streamLogger.warn("[BgAgent] Could not stamp the tool calls of the reply's earlier rows:", error);
+                        });
+                    }
+
                     await afterRun(ctx, {
                         knowledgeSources: runContext.knowledgeSources,
                         retrievedMemories: runContext.retrievedMemories,

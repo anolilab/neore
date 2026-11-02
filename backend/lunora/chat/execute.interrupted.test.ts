@@ -684,6 +684,11 @@ describe("a run the watchdog reads wrongly", () => {
 
         expect(args).toMatchObject({ extractMemory: true, prompt: "Say hello", recordUsage: false, userId: OWNER });
         expect(args.savedMessages).toHaveLength(3);
+
+        // The thread carries the reply stamp a normal finish leaves.
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", ids.threadId as never));
+
+        expect(thread.lastReplyAt).toBeGreaterThan(0);
         // The usage record is the close's, once.
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
 
@@ -703,6 +708,30 @@ describe("a run the watchdog reads wrongly", () => {
         // Closed: another look does nothing, so nothing is recorded twice.
         await watch();
         expect(afterRun).toHaveBeenCalledOnce();
+    });
+
+    it("stamps the tool names on the rows an earlier invocation saved, when the resume finishes the reply", async () => {
+        modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+
+        modelState.model = scriptedModel([textStep("All done.")]);
+        await run({ resume: pause!.id });
+
+        const labelled = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+
+            return rows.find((row: any) => Array.isArray(row.message?.content) && row.message.content.some((part: any) => part.type === "tool-call"));
+        });
+        const call = labelled.message.content.find((part: any) => part.type === "tool-call");
+
+        expect(call.providerOptions.neore).toMatchObject({ mcpServerName: "srv", mcpToolName: "echo" });
     });
 
     it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {
