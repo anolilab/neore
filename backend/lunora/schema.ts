@@ -212,6 +212,9 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        // Servers whose tools the quick check may judge (chat/lib/low-risk-trust.ts): an MCP server by name AND url, a connector by slug.
+        // Absent = none, bounded by `MAX_TRUSTED_SERVERS`. Server-written only (`chat_tool_permissions.setLowRiskTrustedServer`); `auth/fields.ts` omits it.
+        lowRiskTrustedServers: v.optional(v.array(v.string())),
         /**
          * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
          * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from

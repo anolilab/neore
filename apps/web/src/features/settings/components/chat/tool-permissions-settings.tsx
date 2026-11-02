@@ -243,7 +243,7 @@ const QuickCheckSetting: FC<QuickCheckProps> = ({ checked, isSaving, onChange })
                             <Label htmlFor={switchId}>{t`Let a quick check approve low-risk calls`}</Label>
                         </CardTitle>
                         <CardDescription id={detailsId}>
-                            {t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}
+                            {t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}
                         </CardDescription>
                     </div>
                     <Switch aria-describedby={detailsId} checked={checked} disabled={isSaving} id={switchId} onCheckedChange={onChange} />
@@ -251,7 +251,7 @@ const QuickCheckSetting: FC<QuickCheckProps> = ({ checked, isSaving, onChange })
             </CardHeader>
             <CardContent>
                 <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                    <li>{t`Covers only MCP and connector tools you have left at their default Ask, in chats only you can write to.`}</li>
+                    <li>{t`Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust.`}</li>
                     <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
                     <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
                     <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>

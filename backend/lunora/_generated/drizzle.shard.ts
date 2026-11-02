@@ -47,6 +47,7 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     enableKnowledge: integer("enableKnowledge", { mode: "boolean" }),
     enablePlanner: integer("enablePlanner", { mode: "boolean" }),
     generalProviders: text("generalProviders"),
+    lowRiskTrustedServers: text("lowRiskTrustedServers", { mode: "json" }).$type<Array<string>>(),
     mcpSecretHeaders: text("mcpSecretHeaders", { mode: "json" }).$type<Array<{ encryptedValue: string; header: string; server: string; url: string }>>(),
     mcpServers: text("mcpServers", { mode: "json" }).$type<Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>(),
     messengerKeys: text("messengerKeys"),

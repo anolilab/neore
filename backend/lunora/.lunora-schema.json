@@ -2962,6 +2962,18 @@
           "optional": true,
           "unique": false
         },
+        "lowRiskTrustedServers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "mcpSecretHeaders": {
           "kind": "array",
           "nullable": false,
