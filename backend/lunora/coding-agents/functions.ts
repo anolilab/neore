@@ -642,6 +642,9 @@ export const getRunForFollowUp = internalQuery
 
 const GIT_NAME_CHARACTER = /[\p{L}\p{N}]/u;
 
+/** Control characters (a newline, a NUL) and angle brackets, which Git or the script that writes the identity will not carry. */
+const UNSAFE_IDENTITY_CHARACTER = /[\p{Cc}<>]/u;
+
 /**
  * The identity a commit is made as, from the account. `null` keeps the agent as author: an account without a
  * name, or whose email is not verified, gives `null`, so the commit never carries an empty or guessed identity,
@@ -651,6 +654,10 @@ const GIT_NAME_CHARACTER = /[\p{L}\p{N}]/u;
 export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null, deletionUnderway: boolean): CommitAuthor | null => {
     // Git refuses a name made only of spaces, control characters or punctuation, so one with no letter or digit keeps the agent as author.
     if (deletionUnderway || !user?.email || !user.name || !GIT_NAME_CHARACTER.test(user.name) || user.emailVerified !== true) {
+        return null;
+    }
+
+    if (UNSAFE_IDENTITY_CHARACTER.test(user.name) || UNSAFE_IDENTITY_CHARACTER.test(user.email)) {
         return null;
     }
 

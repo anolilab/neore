@@ -357,6 +357,12 @@ describe("commit author", () => {
         expect(commitAuthorOf({ ...account, name: " ..  " }, false)).toBeNull();
     });
 
+    it("keeps the agent as author for a name or email carrying a control character or angle bracket", () => {
+        expect(commitAuthorOf({ ...account, name: "Dana\nTester" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, name: "Dana\u{0}" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, email: "dana<x>@example.com" }, false)).toBeNull();
+    });
+
     it("keeps the agent as author while the account is being deleted, even when it is verified", () => {
         expect(commitAuthorOf(account, true)).toBeNull();
     });
