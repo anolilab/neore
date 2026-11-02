@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The composer of a thread a coding agent runs on the user's own computer (prisis/plans/neore/acp-agent-host.md §3, §4.4, §4.6).
+ * The composer of a thread a coding agent runs on the user's own computer (acp-agent-host.md §3, §4.4, §4.6).
  * Everything here is a request to that computer, not a cloud run: the message goes to `POST /hosts/send`, Stop and
  * the permission answers are procedures that queue signed commands, and what the agent is doing is read from the
  * thread's stream like any other viewer's. Chat text never answers a permission request: only the buttons do, and

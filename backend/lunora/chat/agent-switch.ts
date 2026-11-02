@@ -1,5 +1,5 @@
 /**
- * Switching a thread's agent mid-conversation (prisis/plans/neore/harness-switch.md, slices S1 and S2: cloud models).
+ * Switching a thread's agent mid-conversation (harness-switch.md, slices S1 and S2: cloud models).
  *
  * `switchThreadAgent` records the change as one divider row in the transcript
  * (`agent/agent-switch-logic.ts`); the next turn runs on the model the active path ends on

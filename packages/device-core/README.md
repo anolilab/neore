@@ -8,7 +8,7 @@ and run shell commands, and that decides whether it may. Not published
 Every security decision on the paired side lives here: envelope signatures,
 approval rules, root confinement of paths, the shell sandbox, output caps and
 the audit log. The page is a relay only; it cannot invent, alter or replay a
-call. The design is in `prisis/plans/neore/ssh-environments.md`; the user-facing view is `docs/devices.mdx`.
+call. The design is in `ssh-environments.md`; the user-facing view is `docs/devices.mdx`.
 
 Consumers: `packages/device-core-node` wraps it as a N-API addon for the
 Electron shell (`apps/desktop`), and the `neore-host` binary in this crate is

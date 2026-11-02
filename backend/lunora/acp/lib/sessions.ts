@@ -7,7 +7,7 @@ type SessionStatus = Session["status"];
 
 /**
  * The session a host thread runs in now: its newest. A thread has one when it is made (`session_open`), and a switch
- * to another host agent in the same thread (prisis/plans/neore/harness-switch.md, S3) ends it and opens the next, so a thread's
+ * to another host agent in the same thread (harness-switch.md, S3) ends it and opens the next, so a thread's
  * earlier sessions stay as `ended` rows and only the newest can be written into.
  */
 export const sessionOfThread = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<Session | null> =>
@@ -16,7 +16,7 @@ export const sessionOfThread = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"t
 /**
  * Writes the session only when something it shows changed; `lastEventAt` moves at most every {@link SESSION_TOUCH_MS}.
  * A `starting` session is left `starting`: only its agent opening it (`session_open`) or the start failing leaves
- * that state, and a message held for it (prisis/plans/neore/acp-agent-host.md §4.6) must not skip either.
+ * that state, and a message held for it (acp-agent-host.md §4.6) must not skip either.
  */
 export const touchSession = async (ctx: Pick<MutationCtx, "db">, session: Session, status: SessionStatus | undefined, now: number): Promise<void> => {
     const statusChanged = status !== undefined && status !== session.status && session.status !== "ended" && session.status !== "starting";

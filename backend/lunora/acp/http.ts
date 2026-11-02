@@ -1,6 +1,6 @@
 /**
  * `POST /hosts/ingest` — where a paired computer's main process posts a coding agent's turn output
- * (prisis/plans/neore/acp-agent-host.md §4.2). Body `{ payload, signature }`; the payload is a JSON string signed with the
+ * (acp-agent-host.md §4.2). Body `{ payload, signature }`; the payload is a JSON string signed with the
  * device secret under the `turn` domain (`devices/lib/signing.ts`):
  *
  *   { v: 1, kind: "turn", deviceId, issuedAt, sessionId, threadId?, turnId?, firstSeq?, events: [...] }

@@ -1,6 +1,6 @@
 /**
  * The speech models the desktop can download, pinned. The checksum ships in the build and is never
- * fetched: a model is used only if its bytes hash to the value here (prisis/plans/neore/desktop-dictation.md §3, §5).
+ * fetched: a model is used only if its bytes hash to the value here (desktop-dictation.md §3, §5).
  * Sizes and checksums are from the benchmark in the plan's Appendix A.
  */
 export interface ModelSpec {
@@ -44,7 +44,7 @@ export const SMALL: ModelSpec = {
 /**
  * Where on-device dictation is offered: the platforms whose speech helper is built, packaged and tested in CI (S2 to S4).
  * Anywhere else settings says so and dictation stays off, whatever else is on the machine. A platform joins when its default model
- * is inside the speed budget in prisis/plans/neore/desktop-dictation.md (S4): Windows on ARM did once the clang-cl build measured 0.64 times the clip.
+ * is inside the speed budget in desktop-dictation.md (S4): Windows on ARM did once the clang-cl build measured 0.64 times the clip.
  */
 const SUPPORTED = new Set(["darwin-arm64", "linux-arm64", "linux-x64", "win32-arm64", "win32-x64"]);
 

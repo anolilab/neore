@@ -42,7 +42,7 @@ packages/
 services/               # Workers: llm-gateway, document-parser, browser-renderer,
                         #   embeddings, nsfw-checker
 docs/                   # User-facing documentation
-# Feature and design plans: private, in prisis/plans/neore/
+# Feature and design plans: kept private, outside this repository
 ```
 
 ## Getting started

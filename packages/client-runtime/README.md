@@ -57,7 +57,7 @@ connectLiveQueries(lunora, queryClient, createWsTicketMinter(env.VITE_LUNORA_URL
   The registry here is filled by the app (`useThreadShard`, `usePageShard`,
   invite-accept results); any hook that calls the Lunora client directly must
   spread `shardOptionsFor(args)` (`apps/web/src/AGENTS.md`,
-  `prisis/plans/neore/per-user-sharding.md`).
+  `per-user-sharding.md`).
 - **A failed session read is "unknown", never "signed out".** Use the retry
   policy in `session-read`; a 429 must not read as no session.
 - **Unlock proofs live in memory only**, never in storage or a cookie, so a

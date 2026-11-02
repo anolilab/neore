@@ -1,4 +1,4 @@
-# Dictation spike (prisis/plans/neore/desktop-dictation.md S1): measures on-device speech models on the
+# Dictation spike (desktop-dictation.md S1): measures on-device speech models on the
 # platforms the desktop ships to. Run by hand, or by a pull request that changes the benchmark
 # itself; nothing else depends on it.
 

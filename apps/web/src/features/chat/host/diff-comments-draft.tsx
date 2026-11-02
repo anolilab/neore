@@ -2,7 +2,7 @@
 
 /**
  * The comments drafted on a thread's diffs, with the one action that sends them to the coding agent as a message
- * (prisis/plans/neore/acp-agent-host.md §4.9). Shown under the diff and above the composer; renders nothing but its (empty)
+ * (acp-agent-host.md §4.9). Shown under the diff and above the composer; renders nothing but its (empty)
  * live region while there is no draft, so the count is announced when the first comment is added.
  */
 

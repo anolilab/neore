@@ -1,7 +1,7 @@
 /**
  * What a handoff is built from: the thread's active path read upward from the leaf, a page at a time, as
  * turns. Bounded on purpose — a switch on a 5,000-row thread reads what the tail and the summary can use, not
- * the thread (prisis/plans/neore/harness-switch.md, S2).
+ * the thread (harness-switch.md, S2).
  */
 import { CHARACTERS_PER_TOKEN, estimateTokensFromCharacters } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
