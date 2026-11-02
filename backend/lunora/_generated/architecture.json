@@ -5581,11 +5581,6 @@
       "to": "table:outcomeEmails"
     },
     {
-      "from": "function:pages_agent:proposePageEdit",
-      "kind": "call",
-      "to": "function:pages_agent:getPageForAgent"
-    },
-    {
       "from": "function:pages_comments:createPageComment",
       "kind": "read",
       "to": "table:pageComments"
@@ -19521,49 +19516,55 @@
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 557,
+      "line": 503,
+      "reason": "\"summariseWith\" is not a registered function"
+    },
+    {
+      "file": "chat/agent-switch",
+      "kind": "call",
+      "line": 565,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 576,
+      "line": 584,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 577,
+      "line": 585,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 586,
+      "line": 594,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 597,
+      "line": 605,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 616,
+      "line": 624,
       "reason": "\"runAgentSwitch\" is not a registered function"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 639,
+      "line": 647,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/agent-switch",
       "kind": "call",
-      "line": 640,
+      "line": 648,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19713,127 +19714,127 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 334,
+      "line": 346,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 334,
+      "line": 346,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 355,
+      "line": 367,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 355,
+      "line": 367,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 538,
+      "line": 550,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 538,
+      "line": 550,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 547,
+      "line": 559,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 547,
+      "line": 559,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 579,
+      "line": 591,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 579,
+      "line": 591,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 589,
+      "line": 601,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 589,
+      "line": 601,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 620,
+      "line": 632,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 620,
+      "line": 632,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 621,
+      "line": 633,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 621,
+      "line": 633,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 672,
+      "line": 684,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 770,
+      "line": 782,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 788,
+      "line": 800,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 798,
+      "line": 810,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 827,
+      "line": 839,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -20277,13 +20278,13 @@
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 111,
+      "line": 123,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
       "file": "chat/lib/low-risk-check",
       "kind": "call",
-      "line": 130,
+      "line": 142,
       "reason": "\"createRunLowRiskCheck\" is not a registered function"
     },
     {
@@ -22385,6 +22386,12 @@
       "kind": "schedule",
       "line": 139,
       "reason": "\"notify\" is not a registered function"
+    },
+    {
+      "file": "pages/agent",
+      "kind": "call",
+      "line": 76,
+      "reason": "\"proposePageEditHandler\" is not a registered function"
     },
     {
       "file": "pages/functions",

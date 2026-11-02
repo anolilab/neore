@@ -931,7 +931,7 @@ export interface InternalApiTypes {
     };
     pages: {
         agent: {
-            getPageForAgent: FunctionReference<"query", { pageId: Id<"pages">; userId: string }, { content: string; title: string }>;
+            getPageForAgent: FunctionReference<"query", { pageId: Id<"pages">; userId: string }, { content: string; ownerId: string; title: string }>;
         };
         gdpr: {
             collectPagesForExport: FunctionReference<"query", { userId: string }, { comments: Array<unknown>; favorites: Array<unknown>; grants: Array<unknown>; pages: Array<unknown> }>;
