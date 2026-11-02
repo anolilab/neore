@@ -1,5 +1,7 @@
 /**
- * What a thread's context summaries carry into a device call (`devices/internal.ts#createDeviceCall`).
+ * What a thread's context summaries carry into a device call. It is merged twice (`devices/internal.ts`): as a snapshot when the
+ * run's tool set is built (`getDeviceToolContext`) and again in `createDeviceCall`, which unions the two. The queries that load
+ * the summary into the prompt run after the snapshot, so only the later re-read can cover a summary committed in between.
  *
  * The model reads a summary as notes in its system prompt, so it was shaped by every row the summary folded in,
  * tool output and attachments included. The call's own `taintedBy` (`devices/lib/taint.ts`) only sees the

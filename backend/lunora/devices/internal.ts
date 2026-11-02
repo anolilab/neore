@@ -59,6 +59,8 @@ export const getDeviceToolContext = internalQuery
             v.null(),
             v.object({
                 devices: v.array(v.object({ deviceId: v.string(), name: v.string(), tools: v.array(vDeviceManifestTool) })),
+                // What the thread's summaries and takeover already carried when the run's context was built.
+                taintedBy: v.array(vDeviceTaintSource),
             }),
         ),
     )
@@ -85,6 +87,7 @@ export const getDeviceToolContext = internalQuery
                 .map((device) => {
                     return { deviceId: device._id as string, name: device.name, tools: device.manifest ?? [] };
                 }),
+            taintedBy: mergeTaint(await threadSummaryTaint(ctx, args.threadId), await threadHandoffTaint(ctx, args.threadId)),
         };
     });
 
@@ -149,8 +152,9 @@ export const createDeviceCall = internalMutation
             return { error: "rate_limited" as const };
         }
 
-        // The model may have read untrusted content that only a summary of the thread's older turns still holds, or
-        // that a coding agent read before this thread took over from it.
+        // Taint only grows. `args.taintedBy` is what the run saw when its context was built plus its messages for this step,
+        // but the queries that load the summary and takeover into the prompt run after that snapshot, so a summary committed
+        // in between reaches the model unseen by it. The fresh read is unioned in; a row the model never saw only over-asks.
         const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId), await threadHandoffTaint(ctx, threadId));
         const deadline = now + DEVICE_CALL_DEADLINE_MS;
         const callId = await ctx.db.insert("deviceCalls", {
