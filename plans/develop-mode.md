@@ -1,7 +1,7 @@
 # Develop mode: pull requests across Git hosts
 
 Status: plan, 2026-10-28. Builds on [acp-agent-host.md](acp-agent-host.md) (host agents, turn
-changes), [device-execution.md](device-execution.md) (signed device calls),
+changes), signed device calls,
 [provider-capabilities.md](provider-capabilities.md) (capability rules) and the coding agents
 (`backend/lunora/coding-agents/`). S1 has no dependency on open work.
 
