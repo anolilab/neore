@@ -71,6 +71,40 @@ describe("archiveIfStillIdle and live streams", () => {
     });
 });
 
+describe("archiveIfStillIdle and requests waiting on the owner", () => {
+    const archiveWithApproval = (status: "approved" | "pending") =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "approval-1",
+                config: {
+                    autoMediaEnrichment: false,
+                    mcpServerNames: [],
+                    model: "test-model",
+                    researchDepth: "balanced",
+                    searchMode: "chat",
+                    shouldAutoContinue: false,
+                    toolNames: [],
+                },
+                createdAt: 1,
+                status,
+                threadId,
+                userId: OWNER,
+            });
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+    it("keeps a thread with a pending approval, question or secret card", async () => {
+        expect(await archiveWithApproval("pending")).toBe(false);
+    });
+
+    it("archives a thread whose request was answered", async () => {
+        expect(await archiveWithApproval("approved")).toBe(true);
+    });
+});
+
 describe("autoArchiveContinue cursor", () => {
     it("refuses a cursor longer than the cursor bound", async () => {
         await expect(
