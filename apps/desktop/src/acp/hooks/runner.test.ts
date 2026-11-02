@@ -319,6 +319,18 @@ describe("file events", () => {
         expect(sent[0]).not.toMatch(HIDDEN_IN_PROMPT);
     });
 
+    it("shows a zero width joiner in a file name as a mark", async () => {
+        await setup([{ ...review, glob: "**" }]);
+
+        const name = "src/a\u{200D}b.ts";
+
+        fs.write(name);
+        fs.emit("change", name);
+        await settle();
+
+        expect(sent[0]).toContain("\"src/a?b.ts\"");
+    });
+
     it("cannot be closed early by a file name that looks like a fence", async () => {
         await setup([{ ...review, glob: "**" }]);
 

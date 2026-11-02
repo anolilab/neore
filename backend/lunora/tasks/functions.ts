@@ -9,6 +9,7 @@
  * cannot be probed.
  */
 import { MODEL_LOOKUP } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
@@ -150,7 +151,8 @@ const requireOwnedGoal = async (ctx: QueryCtx, goalId: Id<"goals">, userId: stri
 
 /** Trims, and turns an empty optional into `undefined` so it clears the column. */
 const optionalText = (value: string | undefined, max: number, label: string): string | undefined => {
-    const trimmed = value?.trim();
+    // Hidden characters (tag block, bidi controls) can carry instructions nobody reads; a task never stores them.
+    const trimmed = value === undefined ? undefined : stripHiddenText(value).text.trim();
 
     if (!trimmed) {
         return undefined;

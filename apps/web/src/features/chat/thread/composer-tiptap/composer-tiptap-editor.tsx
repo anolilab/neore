@@ -32,6 +32,7 @@ import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 import type { ChatReference } from "../chat-reference";
+import { cleanEditorText } from "./clean-editor-text";
 import { composerEditorAttributes } from "./editor-attributes";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
@@ -309,8 +310,10 @@ const ComposerTiptapEditor = ({
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {
             isInternalUpdate.current = true;
+            // Reads the raw text (the store counts what it removes), then cleans the document itself.
             const text = ed.getText({ blockSeparator: "\n" });
 
+            cleanEditorText(ed);
             onChange(text);
             // Reset flag after microtask
             queueMicrotask(() => {

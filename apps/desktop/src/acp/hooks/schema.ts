@@ -4,10 +4,10 @@
  * `.neore/hooks.json`, versioned and strict. The file is repository content: nothing in it is believed until
  * the person has approved this exact file in the device window (`approvals.ts`).
  */
+import { hasHiddenText } from "@neore/ai/utils";
 import * as z from "zod";
 
 import { globProblem } from "./glob";
-import { hasHiddenText } from "./hidden-text";
 
 export const HOOKS_VERSION = 1;
 export const MAX_HOOKS = 8;
@@ -23,17 +23,17 @@ const nameSchema = z
     .trim()
     .min(1)
     .max(MAX_NAME)
-    .refine((value) => !hasHiddenText(value), "a name has no control or invisible characters");
+    .refine((value) => !hasHiddenText(value, { strict: true }), "a name has no control or invisible characters");
 const promptSchema = z
     .string()
     .max(MAX_PROMPT)
     .refine((value) => value.trim() !== "", "a prompt is not empty")
-    .refine((value) => !hasHiddenText(value, { layout: true }), "a prompt has no control or invisible characters (a newline and a tab are fine)");
+    .refine((value) => !hasHiddenText(value, { layout: true, strict: true }), "a prompt has no control or invisible characters (a newline and a tab are fine)");
 
 const fileHook = <Event extends "created" | "deleted" | "saved">(on: Event) =>
     z.strictObject({
         glob: z.string().superRefine((value, context) => {
-            const problem = hasHiddenText(value) ? "a glob has no control or invisible characters" : globProblem(value);
+            const problem = hasHiddenText(value, { strict: true }) ? "a glob has no control or invisible characters" : globProblem(value);
 
             if (problem !== null) {
                 context.addIssue({ code: "custom", message: problem });
