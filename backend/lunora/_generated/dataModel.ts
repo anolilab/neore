@@ -1194,6 +1194,7 @@ export interface Doc_persistentStreams {
     stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
+    toolLabels?: Record<string, { serverName: string; toolName: string }>;
     toolsInFlight?: number;
     userId: string;
 }
@@ -4181,6 +4182,7 @@ export interface Insert_persistentStreams {
     stoppedAt?: number;
     streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean };
     threadId: string;
+    toolLabels?: Record<string, { serverName: string; toolName: string }>;
     toolsInFlight?: number;
     userId: string;
 }

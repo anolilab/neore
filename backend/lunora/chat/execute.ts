@@ -183,7 +183,9 @@ export const runStreamingAgent = internalAction
                 }, RUN_BEAT_MS);
             };
             // Every tool call is marked on the stream until its step is saved: a worker that dies inside one is not resumed.
-            const toolRuns = createToolRunMarker(ctx, { epoch: runEpoch, onReplaced, streamId });
+            // Whether a worker death would be answered by a resume: only then must a tool refuse to run without a confirmed mark.
+            let resumableRun = false;
+            const toolRuns = createToolRunMarker(ctx, { epoch: runEpoch, isResumable: () => resumableRun, onReplaced, streamId });
 
             try {
                 streamLogger.debug(`[BgAgent] Starting background agent execution`, {
@@ -483,14 +485,18 @@ export const runStreamingAgent = internalAction
                 // A stateless run keeps no rows, so it is not.
                 if (!threadStatelessMode) {
                     try {
+                        // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
+                        const resumable = await readResumeInterruptedRuns(userId);
+
                         await ctx.runMutation(internal.chat.streaming.persistent.interrupted.registerResumableRun, {
                             epoch: runEpoch,
+                            labels: toolResult.mcpLabels,
                             reply: { ...(skill && { skill }), ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }) },
-                            // Read on the person's own shard: this one may be a thread owner's, which has no row for a collaborator.
-                            resumable: await readResumeInterruptedRuns(userId),
+                            resumable,
                             run: runArgs,
                             streamId: streamId as Id<"persistentStreams">,
                         });
+                        resumableRun = resumable;
                         startBeat();
                     } catch (error) {
                         // A newer run holds the stream: this one stops.

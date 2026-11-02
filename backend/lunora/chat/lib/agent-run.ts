@@ -538,6 +538,8 @@ export const afterRun = async (
         /** From `loadRunContext`; recorded on the reply's first row as citation sources. */
         knowledgeSources?: ReadonlyArray<KnowledgeSource>;
         prompt: string;
+        /** `false` when the caller records the reply's usage itself (the watchdog's close does, inside its transaction). */
+        recordUsage?: boolean;
         /** From `loadRunContext`; recorded on the reply's first row, the id its UI message carries. */
         retrievedMemories?: ReadonlyArray<RetrievedMemoryRef>;
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
@@ -553,7 +555,8 @@ export const afterRun = async (
         threadId: string;
         /** The user's IANA zone, so the usage heatmap files the reply under their calendar day. */
         timeZone?: string;
-        timingStart: number;
+        /** Absent for a reply recovered after its worker died: when it started is not known, so no timing is recorded. */
+        timingStart?: number;
         userId: string;
     },
 ): Promise<void> => {
@@ -562,16 +565,17 @@ export const afterRun = async (
 
     // Started first so it runs beside the scheduling below, awaited last so a
     // returning action never leaves it in flight. A failed patch only loses a timing.
-    const timing = lastAssistantMessage
-        ? (async () =>
-              ctx.runMutation(internal.agent.messages.patchMessageTiming, {
-                  durationMs: Date.now() - timingStart,
-                  messageId: lastAssistantMessage._id as Id<"messages">,
-                  ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
-              }))().catch((error: unknown) => {
-              streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
-          })
-        : undefined;
+    const timing =
+        lastAssistantMessage && timingStart !== undefined
+            ? (async () =>
+                  ctx.runMutation(internal.agent.messages.patchMessageTiming, {
+                      durationMs: Date.now() - timingStart,
+                      messageId: lastAssistantMessage._id as Id<"messages">,
+                      ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
+                  }))().catch((error: unknown) => {
+                  streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
+              })
+            : undefined;
 
     try {
         const results = await scheduleAfterRun(ctx, args);
@@ -642,12 +646,14 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
     // One record per reply: a steered run saved two (`repliesByOrder`).
-    scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
-        at: Date.now(),
-        userId,
-        ...(args.skill && { skill: args.skill }),
-        ...(args.timeZone && { timeZone: args.timeZone }),
-    });
+    if (args.recordUsage !== false) {
+        scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
+            at: Date.now(),
+            userId,
+            ...(args.skill && { skill: args.skill }),
+            ...(args.timeZone && { timeZone: args.timeZone }),
+        });
+    }
 
     if (!args.extractMemory || !prompt) {
         return await Promise.allSettled(scheduled);

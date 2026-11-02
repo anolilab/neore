@@ -47,6 +47,8 @@ const beatExpiry = (stream: Doc<"persistentStreams">, now: number): number => {
 export const registerResumableRun = internalMutation
     .input({
         epoch: v.number(),
+        /** The run's MCP tool labels, for stamping a reply the watchdog recovers. */
+        labels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
         reply: v.object({ skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })), timeZone: v.optional(v.string()) }),
         resumable: v.boolean(),
         run: v.object({ ...runStreamingAgentFields }),
@@ -70,6 +72,7 @@ export const registerResumableRun = internalMutation
             replyContext: args.reply,
             resumable: args.resumable,
             runArgs: run,
+            ...(args.labels && Object.keys(args.labels).length > 0 && { toolLabels: args.labels }),
         });
 
         if (stream.runArgs === undefined) {
@@ -218,7 +221,18 @@ const savedRowsOf = async (
 const vVerdict = v.union(
     v.object({ kind: v.literal("gone") }),
     v.object({ kind: v.literal("fresh") }),
-    v.object({ kind: v.literal("finished") }),
+    v.object({
+        kind: v.literal("finished"),
+        /** What the run's own end would have done with the reply (`recoverFinishedReply`). */
+        labels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
+        messageId: v.string(),
+        replyRowIds: v.array(v.string()),
+        skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })),
+        threadId: v.string(),
+        timeZone: v.optional(v.string()),
+        userId: v.string(),
+        userPrompt: v.string(),
+    }),
     v.object({ kind: v.literal("resumed") }),
     v.object({ kind: v.literal("fail"), message: v.string(), threadId: v.string() }),
 );
@@ -323,7 +337,17 @@ export const inspectRun = internalMutation
                 await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });
             }
 
-            return { kind: "finished" as const };
+            return {
+                kind: "finished" as const,
+                ...(stream.toolLabels && { labels: stream.toolLabels }),
+                messageId: stream.messageId,
+                replyRowIds: pausedRun.replyRowIds,
+                ...(pausedRun.skill && { skill: pausedRun.skill }),
+                threadId: stream.threadId,
+                ...(pausedRun.timeZone && { timeZone: pausedRun.timeZone }),
+                userId: stream.userId,
+                userPrompt: stream.runArgs.userPrompt ?? "",
+            };
         }
 
         if (plan.action === "fail") {

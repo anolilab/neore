@@ -9,6 +9,7 @@ import { internal } from "../../../_generated/internal";
 import { internalAction } from "../../../_generated/server";
 import { streamLogger } from "../../../lib/logger";
 import { failRun } from "../../lib/agent-run";
+import { recoverFinishedReply } from "../../lib/recover-finished-reply";
 import { RUN_WATCH_MS, RUN_WATCH_RETRY } from "../../lib/interrupted-run";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 
@@ -27,6 +28,10 @@ export const watchRun = internalAction
 
             if (verdict.kind === "finished") {
                 streamLogger.warn(`[BgAgent] Stream ${args.streamId} lost its worker after saving the whole answer; closed`);
+                // The stream is closed: nothing looks at it again, so the rest of the run's end is done here, once, and not retried.
+                await recoverFinishedReply(ctx, verdict).catch((error: unknown) => {
+                    streamLogger.warn(`[BgAgent] Stream ${args.streamId}: the after-run work of a recovered reply failed:`, error);
+                });
 
                 return null;
             }

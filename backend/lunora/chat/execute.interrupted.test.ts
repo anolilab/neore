@@ -17,6 +17,8 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
         modelState: {
             builtAgents: 0,
             groupConfig: null as unknown,
+            mcpLabels: {} as Record<string, { serverName: string; toolName: string }>,
+            memory: false,
             model: undefined as unknown,
             optOut: false,
             prefsFail: false,
@@ -58,7 +60,7 @@ vi.mock("../lib/cross-shard", () => {
                 throw new Error("shard unreachable");
             }
 
-            return { resumeInterruptedRuns: modelState.optOut ? false : undefined };
+            return { memoryEnabled: modelState.memory, resumeInterruptedRuns: modelState.optOut ? false : undefined, threadSummariesEnabled: false };
         }),
     };
 });
@@ -87,8 +89,11 @@ vi.mock("../usage/schedule", async (importOriginal) => {
 });
 
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...original,
+        afterRun: vi.fn(original.afterRun),
         loadRunContext: vi.fn(async () => {
             return {
                 botId: undefined,
@@ -118,7 +123,7 @@ vi.mock("./lib/agent-tools", () => {
         buildAgentTools: vi.fn(async () => {
             return {
                 mcpClients: [],
-                mcpLabels: {},
+                mcpLabels: modelState.mcpLabels,
                 mcpServerNames: [],
                 permissionKeys: {},
                 tools: { echo: tool({ description: "Echo", execute: async () => "echoed", inputSchema: z.object({}) }) },
@@ -151,6 +156,7 @@ vi.mock("./lib/get-agent", () => {
 });
 
 const { scheduleReplyUsage } = await import("../usage/schedule");
+const { afterRun } = await import("./lib/agent-run");
 const { runStreamingAgent } = await import("./execute");
 const { addChunk, claimRunResume } = await import("./streaming/persistent/library");
 const { addMessages } = await import("../agent/messages");
@@ -174,6 +180,11 @@ beforeAll(async () => {
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
     registerModule(registry, "chat_streaming_persistent_interrupted", await import("./streaming/persistent/interrupted"));
     registerModule(registry, "chat_streaming_persistent_interrupted_watch", await import("./streaming/persistent/interrupted-watch"));
+    registerModule(registry, "chat_mcp_tool_labels", await import("./mcp-tool-labels"));
+    registry.set(
+        "chat_functions:getThreadSettings",
+        internalQuery.input({ threadId: v.string() }).query(async () => null),
+    );
 
     registry.set(
         "chat_group_functions:getGroupRunConfig",
@@ -211,6 +222,9 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.optOut = false;
+    modelState.memory = false;
+    modelState.mcpLabels = {};
+    vi.mocked(afterRun).mockClear();
     modelState.prefsFail = false;
     modelState.threadStateless = false;
     modelState.prefsReads.length = 0;
@@ -642,12 +656,53 @@ describe("a run the watchdog reads wrongly", () => {
     it("closes a reply whose answer was saved whole instead of asking the model again", async () => {
         await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
 
-        expect(await inspect()).toStrictEqual({ kind: "finished" });
+        expect(await inspect()).toMatchObject({ kind: "finished" });
         expect(enqueued).toHaveLength(0);
         const state230 = await readState();
 
         expect(state230.streamStatus).toBe("done");
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+    });
+
+    it("gives a recovered reply the rest of its end: memory, activity, tool names; usage once", async () => {
+        modelState.memory = true;
+        modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        const stream = await readStream();
+
+        await patchStream({ runArgs: { ...stream.runArgs, userPrompt: "Say hello" } });
+        expect(stream.toolLabels).toStrictEqual({ echo: { serverName: "srv", toolName: "echo" } });
+
+        const watch = async () => await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        await watch();
+
+        // As a normal finish: the after-run work runs once, for the whole reply, with the memory switch the person's setting gives.
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args).toMatchObject({ extractMemory: true, prompt: "Say hello", recordUsage: false, userId: OWNER });
+        expect(args.savedMessages).toHaveLength(3);
+        // The usage record is the close's, once.
+        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
+
+        // The tool call the dead worker saved shows the MCP tool's real name.
+        const labelled = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+
+            return rows.find((row: any) => Array.isArray(row.message?.content) && row.message.content.some((part: any) => part.type === "tool-call"));
+        });
+        const call = labelled.message.content.find((part: any) => part.type === "tool-call");
+
+        expect(call.providerOptions.neore).toMatchObject({ mcpServerName: "srv", mcpToolName: "echo" });
+
+        // Closed: another look does nothing, so nothing is recorded twice.
+        await watch();
+        expect(afterRun).toHaveBeenCalledOnce();
     });
 
     it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {
@@ -657,7 +712,7 @@ describe("a run the watchdog reads wrongly", () => {
             { text: "All done.", type: "text" },
         ]);
 
-        expect(await inspect()).toStrictEqual({ kind: "finished" });
+        expect(await inspect()).toMatchObject({ kind: "finished" });
     });
 
     it("still refuses a row whose tool call has no result", async () => {
@@ -688,7 +743,7 @@ describe("a run the watchdog reads wrongly", () => {
                 }),
         );
 
-        expect(await inspect()).toStrictEqual({ kind: "finished" });
+        expect(await inspect()).toMatchObject({ kind: "finished" });
         expect(enqueued).toHaveLength(1);
         expect(enqueued[0]!.args).toStrictEqual({ goalId, round: 1 });
 

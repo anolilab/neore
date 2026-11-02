@@ -1911,6 +1911,9 @@ export const schema = defineSchema({
             statelessMode: v.optional(v.boolean()),
         }),
         threadId: v.string(),
+        // The real server and tool names of the run's MCP tools (`McpToolLabels`), kept so a reply recovered after its
+        // worker died is stamped like one that finished (`registerResumableRun`, `recoverFinishedReply`).
+        toolLabels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
         // Tool calls started and not yet finished (`markToolRun`). A worker that dies with one open may have paid for or
         // changed something, so such a run is never resumed.
         toolsInFlight: v.optional(v.number()),

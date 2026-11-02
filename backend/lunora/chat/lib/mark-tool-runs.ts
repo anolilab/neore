@@ -6,12 +6,15 @@
  * from the step's `onStepFinish`, which the agent runs after it saved the rows). A tool that has returned but whose
  * rows are not saved yet is still unaccounted for: a death in that window would otherwise look like "not in a tool" and
  * the resume would call the tool again. A mark that fails for any reason (the stream ended,
- * a newer run holds it, a shard error) stops the tool: it never runs without a confirmed mark.
+ * a newer run holds it, a shard error) stops the tool: it never runs without a confirmed mark. The one exception is a shard
+ * error on a run that cannot be resumed (stateless, opted out, not registered): a death then ends the run for good, so
+ * there is no second run for a tool to be repeated by, and the tool runs with the error logged.
  */
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
-import { isRunReplaced } from "./run-epoch";
+import { streamLogger } from "../../lib/logger";
+import { errorCodeOf, isRunReplaced } from "./run-epoch";
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
     typeof value === "object" && value !== null && Symbol.asyncIterator in (value as object);
@@ -22,8 +25,17 @@ export interface ToolRunMarker {
     wrap: <T extends Record<string, unknown>>(tools: T) => T;
 }
 
-export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: { epoch: number; onReplaced: () => void; streamId: string }): ToolRunMarker => {
-    const { epoch, onReplaced, streamId } = args;
+export const createToolRunMarker = (
+    ctx: Pick<ActionCtx, "runMutation">,
+    args: {
+        epoch: number;
+        /** Whether a death of this run would be answered by a resume. Only then does a failed mark stop a tool. */
+        isResumable: () => boolean;
+        onReplaced: () => void;
+        streamId: string;
+    },
+): ToolRunMarker => {
+    const { epoch, isResumable, onReplaced, streamId } = args;
     // Tools marked and not yet released, and of those the ones that returned (or threw) and wait for their step to be saved.
     let open = 0;
     let finished = 0;
@@ -44,11 +56,24 @@ export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: {
         } catch (error) {
             if (isRunReplaced(error)) {
                 onReplaced();
-            } else {
-                uncertain = true;
+
+                throw error;
             }
 
-            throw error;
+            // A stream that is no longer live stops the tool whatever else is true.
+            if (errorCodeOf(error) === "CONFLICT") {
+                throw error;
+            }
+
+            // A hiccup on the shard: with a resume possible the tool must not run unmarked (a resume could run it twice); a run
+            // that cannot be resumed has nothing to protect, so the tool runs and the hiccup is only logged.
+            if (isResumable()) {
+                uncertain = true;
+
+                throw error;
+            }
+
+            streamLogger.warn(`[BgAgent] Could not mark a tool call on stream ${streamId}; the run cannot be resumed, so the tool runs:`, error);
         }
     };
     const end = () => {

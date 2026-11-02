@@ -84,7 +84,7 @@ describe("planInterruption", () => {
 });
 
 describe("createToolRunMarker", () => {
-    const setup = async () => {
+    const setup = async (resumable = true) => {
         vi.resetModules();
         vi.doMock("../../_generated/internal", () => {
             return {
@@ -100,7 +100,7 @@ describe("createToolRunMarker", () => {
                 calls.push(args.setTo === undefined ? `mark+${args.delta}@${args.epoch}` : `set${args.setTo}@${args.epoch}`);
             }),
         };
-        const marker = createToolRunMarker(ctx as never, { epoch: 2, onReplaced, streamId: "stream-1" });
+        const marker = createToolRunMarker(ctx as never, { epoch: 2, isResumable: () => resumable, onReplaced, streamId: "stream-1" });
         const tools = marker.wrap({
             boom: {
                 execute: async () => {
@@ -165,6 +165,22 @@ describe("createToolRunMarker", () => {
         await marker.release();
 
         expect(calls).toStrictEqual(["set0@2"]);
+
+        vi.doUnmock("../../_generated/internal");
+    });
+
+    it("lets a tool run through a hiccup when the run cannot be resumed anyway, but never through a lost stream", async () => {
+        const { calls, ctx, tools } = await setup(false);
+
+        ctx.runMutation.mockRejectedValueOnce(new Error("shard blip"));
+        expect(await tools.ok!.execute!()).toBe("fine");
+        expect(calls).toStrictEqual(["run"]);
+
+        // A stream that ended or was taken over still stops it.
+        ctx.runMutation.mockRejectedValueOnce(Object.assign(new Error("gone"), { code: "CONFLICT" }));
+        await expect(tools.ok!.execute!()).rejects.toThrow("gone");
+        ctx.runMutation.mockRejectedValueOnce(Object.assign(new Error("replaced"), { code: "RUN_REPLACED" }));
+        await expect(tools.ok!.execute!()).rejects.toThrow("replaced");
 
         vi.doUnmock("../../_generated/internal");
     });

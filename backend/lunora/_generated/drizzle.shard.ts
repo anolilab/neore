@@ -1081,6 +1081,7 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     stoppedAt: real("stoppedAt"),
     streamingConfig: text("streamingConfig", { mode: "json" }).$type<{ contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }>().notNull(),
     threadId: text("threadId").notNull(),
+    toolLabels: text("toolLabels", { mode: "json" }).$type<Record<string, { serverName: string; toolName: string }>>(),
     toolsInFlight: real("toolsInFlight"),
     userId: text("userId").notNull(),
 }, (t) => ({
