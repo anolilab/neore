@@ -7,6 +7,7 @@
  * This is separate from the thread/message data which comes directly from Lunora.
  */
 
+import { stripHiddenText } from "@neore/ai/utils";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
@@ -97,6 +98,8 @@ interface ChatUIStore {
 
     // Banned content error returned by the server — restores composer text + shows inline error
     composerBannedContent: { message: string; words: string[] } | null;
+    /** Hidden characters (tag block, bidi controls, ...) taken out of the draft since it was last empty; drives the composer's notice. */
+    composerHiddenRemoved: number;
     // Composer state
     composerText: string;
     copiedMessageId: string | null;
@@ -185,6 +188,7 @@ const initialState = {
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
+    composerHiddenRemoved: 0,
     composerText: "",
     copiedMessageId: null as string | null,
     editAttachments: [] as PendingAttachment[],
@@ -246,6 +250,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                         attachedReferences: [],
                         composerAttachments: [],
                         composerBannedContent: null,
+                        composerHiddenRemoved: 0,
                         composerText: "",
                     });
                 },
@@ -350,7 +355,10 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 // Composer actions - synchronous to preserve cursor position
                 setComposerText: (text) => {
-                    set({ composerText: text });
+                    // The one way text enters the draft (typing, paste, voice, links), so no path skips the filter.
+                    const { removed, text: clean } = stripHiddenText(text);
+
+                    set({ composerHiddenRemoved: clean === "" ? 0 : get().composerHiddenRemoved + removed, composerText: clean });
                 },
 
                 setCopiedMessageId: (id) => {

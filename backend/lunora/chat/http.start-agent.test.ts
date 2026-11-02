@@ -12,6 +12,8 @@ import { gateThreadActionHandler } from "./functions";
 import { switchThreadAgentHandler } from "./agent-switch";
 import { runChatStart } from "./http";
 
+const savedPrompts: unknown[] = [];
+
 vi.mock("../auth/lib/helper", () => {
     return {
         getCurrentUserInternal: async () => {
@@ -39,7 +41,9 @@ vi.mock("./lib/get-agent", () => {
     return {
         default: async () => {
             return {
-                saveMessage: async () => {
+                saveMessage: async (_ctx: unknown, args: unknown) => {
+                    savedPrompts.push(args);
+
                     return { messageId: "saved-prompt" };
                 },
             };
@@ -134,6 +138,7 @@ const switchTo = async (model: string) =>
     );
 
 beforeEach(async () => {
+    savedPrompts.length = 0;
     streamingConfigs = [];
     agentModelQueries = 0;
     activeLeafCalls = [];
@@ -198,5 +203,16 @@ describe("/chat/start after a switch", () => {
 
         expect(response.status).toBe(200);
         expect(streamingConfigs.at(-1)?.model).toBe(A);
+    });
+});
+
+describe("/chat/start hidden characters", () => {
+    it("saves and runs the prompt without tag characters, bidi controls or C0 controls", async () => {
+        const tagged = [..."steal"].map((character) => String.fromCodePoint(0xe_00_00 + character.codePointAt(0)!)).join("");
+
+        const response = await start({ prompt: `hel${tagged}lo\u{202E} wor\u{7}ld\nsecond` });
+
+        expect(response.status).toBe(200);
+        expect(JSON.stringify(savedPrompts)).toContain(String.raw`hello world\nsecond`);
     });
 });

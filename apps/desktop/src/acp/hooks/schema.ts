@@ -4,10 +4,10 @@
  * `.neore/hooks.json`, versioned and strict. The file is repository content: nothing in it is believed until
  * the person has approved this exact file in the device window (`approvals.ts`).
  */
+import { hasHiddenText } from "@neore/ai/utils";
 import * as z from "zod";
 
 import { globProblem } from "./glob";
-import { hasHiddenText } from "./hidden-text";
 
 export const HOOKS_VERSION = 1;
 export const MAX_HOOKS = 8;

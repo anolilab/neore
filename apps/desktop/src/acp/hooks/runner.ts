@@ -19,11 +19,12 @@
  */
 import path from "node:path";
 
+import { showHidden } from "@neore/ai/utils";
+
 import type { HookApprovals } from "./approvals";
 import { HOOKS_PATH, loadHooksFile } from "./file";
 import type { HookFs } from "./fs";
 import { compileGlob } from "./glob";
-import { showHidden } from "./hidden-text";
 import type { Hook } from "./schema";
 import type { HooksView, HookView } from "./types";
 

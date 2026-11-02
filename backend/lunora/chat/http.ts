@@ -1,6 +1,7 @@
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import { enabledModelOf, MODEL_LOOKUP } from "@neore/ai/models";
 import type { CinemaSettings } from "@neore/ai/types/cinema";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { HttpActionCtx } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
@@ -406,16 +407,27 @@ const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED
  * runs the SAME path — same limits, same thread creation, same stream — with
  * an API-key identity instead of the gateway's HMAC plus forwarded JWT.
  */
+const withoutHiddenText = (body: ChatStartBody): ChatStartBody => {
+    const prompt = body.prompt === undefined ? undefined : stripHiddenText(body.prompt).text;
+    const goal = body.goal === undefined ? undefined : { ...body.goal, text: stripHiddenText(body.goal.text).text };
+
+    return { ...body, ...(prompt !== undefined && { prompt }), ...(goal !== undefined && { goal }) };
+};
+
 const hostRunThreadResponse = (): Response =>
     Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
 
 export const runChatStart = async (
     context: HttpActionCtx,
-    body: ChatStartBody,
+    rawBody: ChatStartBody,
     signingSecret: string,
     /** `outside_agent` for the public API's key callers; the user's own chat when unset. */
     origin?: "outside_agent",
 ): Promise<Response> => {
+    // Characters that render as nothing (tag block, bidi controls) can carry instructions the person never sees. The
+    // composer removes them too; this is the check no client can skip, and it covers the public API.
+    const body = withoutHiddenText(rawBody);
+
     // The gateway forwards this field without looking at it, so this is the
     // only place its shape and size are checked.
     const pageContext = parsePageContext(body.pageContext);

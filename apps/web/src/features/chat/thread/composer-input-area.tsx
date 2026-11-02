@@ -14,6 +14,7 @@
  * Used by both chat ComposerInput and landing composer.
  */
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { FollowUpControl } from "@neore/ai/capabilities";
 import { buttonVariants } from "@neore/ui/components/button";
@@ -57,6 +58,7 @@ interface ComposerInputAreaProps {
      * submit handler decides what queuing means; Enter already reaches it.
      */
     canQueueWhileStreaming?: boolean;
+
     /** Show compact version */
     compact?: boolean;
     /** The chat being typed into; the @ popup does not offer it as a reference */
@@ -71,6 +73,9 @@ interface ComposerInputAreaProps {
      * shows the button; omitted, it reads as "none", so a runner that did not say hides it.
      */
     followUp?: FollowUpControl;
+
+    /** Hidden characters taken out of the draft; shown as a notice */
+    hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
@@ -132,6 +137,7 @@ const ComposerInputArea = ({
     customVariables,
     disabled = false,
     followUp = "none",
+    hiddenRemoved = 0,
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -403,6 +409,15 @@ const ComposerInputArea = ({
 
             {/* Banned word error message */}
             {bannedWordError && <div className="px-3 pb-2 text-sm text-red-600 dark:text-red-400">{bannedWordError}</div>}
+
+            {/* Always mounted so a screen reader announces the change when it appears */}
+            <div aria-live="polite" className="text-muted-foreground px-3 text-xs" role="status">
+                {hiddenRemoved > 0 &&
+                    plural(hiddenRemoved, {
+                        one: "# invisible character was removed from your message.",
+                        other: "# invisible characters were removed from your message.",
+                    })}
+            </div>
         </>
     );
 };

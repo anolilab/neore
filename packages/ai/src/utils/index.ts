@@ -1,3 +1,5 @@
+export { hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
+
 /**
  * Utility exports
  */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasHiddenText, showHidden } from "./hidden-text";
+import { hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
 
 describe("hasHiddenText", () => {
     it("is stateless across calls", () => {
@@ -23,5 +23,23 @@ describe("hasHiddenText", () => {
 describe("showHidden", () => {
     it("replaces each hidden character with a visible mark", () => {
         expect(showHidden("a\u{202E}b\u{E0041}c\nd")).toBe("a?b?c?d");
+    });
+});
+
+describe("stripHiddenText", () => {
+    it("removes tag characters, bidi controls, separators and C0 controls, and counts them", () => {
+        const tagged = [..."ignore"].map((character) => String.fromCodePoint(0xe_00_00 + character.codePointAt(0)!)).join("");
+
+        expect(stripHiddenText(`a${tagged}b\u{202E}c\u{2028}d\u{7}e\u{200B}f`)).toEqual({ removed: 6 + 4, text: "abcdef" });
+    });
+
+    it("keeps newlines, tabs, accents and emoji", () => {
+        expect(stripHiddenText("Über\n\tprüfe 👍")).toEqual({ removed: 0, text: "Über\n\tprüfe 👍" });
+    });
+
+    it("is stateless across calls", () => {
+        for (let call = 0; call < 3; call += 1) {
+            expect(stripHiddenText("a\u{E0041}b").removed).toBe(1);
+        }
     });
 });

@@ -8,10 +8,28 @@
 // Two expressions: a global one keeps state between `.test` calls, so the check and the replacement do not share one.
 const HIDDEN = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
 const HIDDEN_EVERYWHERE = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+const HIDDEN_EXCEPT_LAYOUT = /(?![\n\t])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
 const LAYOUT = /[\n\t]/gu;
 
 /** `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. */
-export const hasHiddenText = (value: string, options: { layout?: boolean } = {}): boolean => HIDDEN.test(options.layout === true ? value.replaceAll(LAYOUT, "") : value);
+export const hasHiddenText = (value: string, options: { layout?: boolean } = {}): boolean =>
+    HIDDEN.test(options.layout === true ? value.replaceAll(LAYOUT, "") : value);
 
 /** The text with every hidden character shown as `?`. */
 export const showHidden = (value: string): string => value.replaceAll(HIDDEN_EVERYWHERE, "?");
+
+/**
+ * The text with every hidden character removed, and how many there were. A newline and a tab stay (a prompt has
+ * lines); a carriage return does not, so `\r\n` arrives as `\n`. Joiners (U+200D, U+200C) are format characters and
+ * go too, which splits an emoji sequence into its parts.
+ */
+export const stripHiddenText = (value: string): { removed: number; text: string } => {
+    let removed = 0;
+    const text = value.replaceAll(HIDDEN_EXCEPT_LAYOUT, () => {
+        removed += 1;
+
+        return "";
+    });
+
+    return { removed, text };
+};

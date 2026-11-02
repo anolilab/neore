@@ -39,3 +39,23 @@ describe("restoreComposer", () => {
         expect(after.attachedReferences).toBe(before.attachedReferences);
     });
 });
+
+describe("setComposerText hidden characters", () => {
+    beforeEach(() => {
+        useChatUIStore.getState().reset();
+    });
+
+    it("keeps tag characters out of the draft and counts what it removed", () => {
+        useChatUIStore.getState().setComposerText("hi\u{E0041}\u{E0042} there\u{202E}");
+
+        expect(useChatUIStore.getState().composerText).toBe("hi there");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
+    });
+
+    it("forgets the count once the draft is empty", () => {
+        useChatUIStore.getState().setComposerText("a\u{E0041}");
+        useChatUIStore.getState().setComposerText("");
+
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(0);
+    });
+});

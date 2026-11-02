@@ -15,6 +15,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { followUpControl } from "@neore/ai/capabilities";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { isThreadLockedError } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
@@ -516,6 +517,7 @@ const ComposerInput = ({
     // isSubmitting / setIsSubmitting / setComposerBannedContent are only read inside callbacks
     // so we access them via getState() to avoid unnecessary re-renders (rerender-defer-reads).
     const bannedContent = useChatUIStore((state) => state.composerBannedContent);
+    const hiddenRemoved = useChatUIStore((state) => state.composerHiddenRemoved);
 
     // Compute word-highlight positions from server-returned banned words using cheap indexOf.
     // This avoids running the expensive 16k-pattern regex on the client.
@@ -725,7 +727,7 @@ const ComposerInput = ({
             }
 
             // Check for long text content
-            const pastedText = e.clipboardData.getData("text/plain");
+            const pastedText = stripHiddenText(e.clipboardData.getData("text/plain")).text;
 
             if (pastedText) {
                 const lines = pastedText.split("\n").length;
@@ -1338,6 +1340,7 @@ const ComposerInput = ({
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
                 followUp={followUp}
+                hiddenRemoved={hiddenRemoved}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}

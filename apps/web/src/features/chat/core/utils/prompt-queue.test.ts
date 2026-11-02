@@ -356,3 +356,18 @@ describe(settleQueuedSteer, () => {
         expect(restored?.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
     });
 });
+
+describe("hidden characters in queued prompts", () => {
+    const tagged = "a\u{E0041}b\u{202E}c";
+
+    it("never queues them", () => {
+        expect(enqueuePrompt(EMPTY_PROMPT_QUEUE, { attachments: [], id: "1", text: tagged }).items[0]?.text).toBe("abc");
+        expect(prependPrompt(EMPTY_PROMPT_QUEUE, { attachments: [], id: "1", text: tagged }).items[0]?.text).toBe("abc");
+    });
+
+    it("drops them from a queue restored after a reload", () => {
+        const restored = restorePromptQueue(JSON.stringify({ items: [{ id: "1", text: tagged }] }));
+
+        expect(restored?.items[0]?.text).toBe("abc");
+    });
+});
