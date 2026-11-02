@@ -131,7 +131,7 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
         const row = await censusRow(ctx, shardKey);
 
         if (row) {
-            await ctx.db.patch(row._id, { lastActiveAt: now });
+            await ctx.db.patch("shardActivity", row._id, { lastActiveAt: now });
         } else {
             await ctx.db.insert("shardActivity", { lastActiveAt: now, shardKey });
         }
@@ -157,7 +157,7 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
         }
 
         if (row.nextDueAt === undefined || dueAt < row.nextDueAt) {
-            await ctx.db.patch(row._id, { nextDueAt: dueAt });
+            await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
         }
     });
 };
@@ -187,7 +187,7 @@ export const dispatchDueShards = internalMutation
         for (const row of due) {
             await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardTick, {}, row.shardKey);
             // Cleared here, re-armed by the shard tick — so a slow tick is not dispatched twice.
-            await patchRow(ctx.db, row, { nextDueAt: undefined });
+            await patchRow(ctx.db, "shardActivity", row, { nextDueAt: undefined });
         }
 
         return { dispatched: due.length };
@@ -208,7 +208,7 @@ export const dispatchShardHousekeeping = internalMutation
 
         for (const row of due) {
             await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardHousekeeping, {}, row.shardKey);
-            await ctx.db.patch(row._id, { housekeptAt: now });
+            await ctx.db.patch("shardActivity", row._id, { housekeptAt: now });
         }
 
         return { dispatched: due.length };

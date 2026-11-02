@@ -97,7 +97,7 @@ describe("persistent stream cost", () => {
             await harness.run(async (context: any) => {
                 const thread = await context.db.threads.findFirst({ where: { userId: "u1" } });
 
-                await context.db.patch(thread._id, { lockedAt: Date.now() + 60_000 });
+                await context.db.patch("threads", thread._id, { lockedAt: Date.now() + 60_000 });
             });
 
             const { result } = await poll(harness, streamId, 0);

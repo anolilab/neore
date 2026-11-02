@@ -49,12 +49,10 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
             case "deleteShardRows": {
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
 
-                for (const [tableName, rows] of shard) {
-                    shard.set(
-                        tableName,
-                        rows.filter((row) => !(args.ids as string[]).includes(row._id)),
-                    );
-                }
+                shard.set(
+                    table,
+                    (shard.get(table) ?? []).filter((row) => !(args.ids as string[]).includes(row._id)),
+                );
 
                 return null as never;
             }

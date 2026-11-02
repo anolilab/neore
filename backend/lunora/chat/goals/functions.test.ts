@@ -75,13 +75,13 @@ describe("getThreadGoal", () => {
     });
 
     it("shows nothing for a chat in the trash", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true, deletedAt: 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true, deletedAt: 1 }));
 
         expect(await as(OWNER).query(getThreadGoal as never, { threadId } as never)).toBeNull();
     });
 
     it("shows nothing once the chat is gone, whatever rows are left behind", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.delete(threadId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("threads", threadId));
 
         expect(await as(OWNER).query(getThreadGoal as never, { threadId } as never)).toBeNull();
     });

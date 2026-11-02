@@ -36,7 +36,7 @@ export const checkJobCancelled = internalQuery
     .input({ jobId: v.id("chatImportJobs") })
     .output(v.boolean())
     .query(async ({ args, ctx: context }) => {
-        const job = await context.db.get(args.jobId);
+        const job = await context.db.get("chatImportJobs", args.jobId);
 
         return !job || job.status === "failed";
     });
@@ -175,10 +175,10 @@ const addJobCounts = async (
         return;
     }
 
-    const job = await context.db.get(jobId);
+    const job = await context.db.get("chatImportJobs", jobId);
 
     if (job) {
-        await context.db.patch(jobId, {
+        await context.db.patch("chatImportJobs", jobId, {
             failedConversations: (job.failedConversations ?? 0) + counts.failed,
             importedConversations: job.importedConversations + counts.imported,
         });
@@ -271,7 +271,7 @@ export const importCounts = internalQuery
     .input({ jobId: v.id("chatImportJobs") })
     .output(v.object({ failed: v.number(), imported: v.number(), total: v.number() }))
     .query(async ({ args, ctx: context }) => {
-        const job = await context.db.get(args.jobId);
+        const job = await context.db.get("chatImportJobs", args.jobId);
 
         return { failed: job?.failedConversations ?? 0, imported: job?.importedConversations ?? 0, total: job?.totalConversations ?? 0 };
     });
@@ -280,7 +280,7 @@ export const importCounts = internalQuery
 export const importJobExists = internalQuery
     .input({ jobId: v.id("chatImportJobs") })
     .output(v.boolean())
-    .query(async ({ args, ctx: context }) => (await context.db.get(args.jobId)) !== null);
+    .query(async ({ args, ctx: context }) => (await context.db.get("chatImportJobs", args.jobId)) !== null);
 
 /**
  * Copy an import's staged file under its kept key before it is processed, so the
@@ -332,14 +332,14 @@ export const reapRestartableImport = internalMutation
     .input({ failedAt: v.number(), jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        const job = await context.db.get(args.jobId);
+        const job = await context.db.get("chatImportJobs", args.jobId);
 
         if (job && (job.status !== "failed" || job.completedAt !== args.failedAt || job.r2Key !== args.r2Key)) {
             return null;
         }
 
         if (job) {
-            await context.db.patch(args.jobId, { r2Key: "" });
+            await context.db.patch("chatImportJobs", args.jobId, { r2Key: "" });
         }
 
         await scheduleObjectDeletion(context, [args.r2Key]);
@@ -390,7 +390,7 @@ export const updateImportProgress = internalMutation
             patch.totalConversations = updates.totalConversations;
         }
 
-        await context.db.patch(jobId, withoutUndefined(patch));
+        await context.db.patch("chatImportJobs", jobId, withoutUndefined(patch));
 
         return null;
     });
@@ -416,7 +416,7 @@ export const finalizeImport = internalMutation
         const keptKey = keptImportKeyFor(args.userId, args.jobId);
         // The staging object goes unless it is the kept copy itself, which a restart reads.
         const doomed: (string | undefined)[] = [args.r2Key === keptKey ? undefined : args.r2Key];
-        const job = await context.db.get(args.jobId);
+        const job = await context.db.get("chatImportJobs", args.jobId);
 
         if (!job) {
             // Erased while the import ran: nothing refers to these objects any more.
@@ -456,6 +456,7 @@ export const finalizeImport = internalMutation
 
         // Note: set r2Key to "" (empty string) to clear it — `undefined` in a patch does not clear a field
         await context.db.patch(
+            "chatImportJobs",
             args.jobId,
             withoutUndefined({
                 completedAt: context.now,

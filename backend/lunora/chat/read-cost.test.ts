@@ -244,7 +244,7 @@ describe("thread list and thread page cost", () => {
                     tool: false,
                     userId: OWNER,
                 });
-                await context.db.patch(thread, { activeLeafMessageId: leaf });
+                await context.db.patch("threads", thread, { activeLeafMessageId: leaf });
 
                 return thread;
             });

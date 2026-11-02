@@ -108,7 +108,7 @@ describe(saveLocalTurnHandler, () => {
         await seedEndpoint(OWNER, "local-browser");
 
         const result = await save(OWNER, { prompt: "Explain CSP in one line" });
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(result.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", result.threadId));
         const saved = await rowsOf(result.threadId);
         const rows = saved.toSorted((a: any, b: any) => a.stepOrder - b.stepOrder);
 
@@ -140,10 +140,10 @@ describe(saveLocalTurnHandler, () => {
         const first = await save(OWNER, {});
         const agent = { kind: "model", model: "openai/gpt-4.1-mini" };
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
         await save(OWNER, { prompt: "again", threadId: first.threadId });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", first.threadId));
 
         expect(thread).toMatchObject({ activeAgent: agent, model: "google/gemini-2.0-flash-001" });
     });
@@ -192,7 +192,7 @@ describe(saveLocalTurnHandler, () => {
 describe("regenerate and edit on the local path", () => {
     /** The displayed path, oldest first, with the switcher position of each row that has siblings. */
     const activePath = async (threadId: string) => {
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
         const page: any = await harness.run(async (ctx: any) => await listActivePathPage(ctx, thread, { cursor: null, numItems: 50 }));
         const rows = [...page.page].toSorted((a: any, b: any) => a.order - b.order || a.stepOrder - b.stepOrder);
 
@@ -285,7 +285,7 @@ describe("regenerate and edit on the local path", () => {
 
         await save(OWNER, { ...(kind && { branch: { kind, messageId: first.userMessageId } }), prompt: "hi again", threadId: first.threadId });
 
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("threadGoals", goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 
     it("gives the thread back when it ends a goal that was mid-review", async () => {
@@ -294,7 +294,7 @@ describe("regenerate and edit on the local path", () => {
         const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(first.threadId, { status: "running" });
+            await ctx.db.patch("threads", first.threadId, { status: "running" });
             await ctx.db.insert("threadGoals", {
                 config: { model: "m" },
                 costMicrodollars: 0,
@@ -314,7 +314,7 @@ describe("regenerate and edit on the local path", () => {
         });
         await save(OWNER, { prompt: "hi again", threadId: first.threadId });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", first.threadId));
 
         expect(thread.status).toBe("active");
     });
@@ -350,7 +350,7 @@ describe("temporary new chats on the local path", () => {
         const before = Date.now();
         const { threadId } = await save(OWNER, { temporary: true });
         const [record] = await temporaryRowsOf(threadId);
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
 
         expect(record).toMatchObject({ retentionHours: 48, threadId, userId: OWNER });
         expect(record.expiresAt).toBeGreaterThanOrEqual(before + 48 * 3_600_000);

@@ -73,7 +73,7 @@ export const updateSession = internalMutation
 
         if (updates.cleanupFnId !== undefined) patch.cleanupFnId = updates.cleanupFnId;
 
-        await ctx.db.patch(sessionId, withoutUndefined(patch));
+        await ctx.db.patch("sandboxSessions", sessionId, withoutUndefined(patch));
     });
 
 export const logAction = internalMutation
@@ -109,6 +109,7 @@ export const closeSession = internalMutation
     })
     .mutation(async ({ args: { errorMessage, sessionId, status }, ctx }) => {
         await ctx.db.patch(
+            "sandboxSessions",
             sessionId,
             withoutUndefined({
                 completedAt: ctx.now,
@@ -134,7 +135,7 @@ export const checkAndTerminateIdle = internalMutation
         }),
     )
     .mutation(async ({ args: { sessionId }, ctx }) => {
-        const session = await ctx.db.get(sessionId);
+        const session = await ctx.db.get("sandboxSessions", sessionId);
 
         if (!session || session.status !== "active") {
             return { shouldTerminate: false };
@@ -155,7 +156,7 @@ export const checkAndTerminateIdle = internalMutation
             return { decidedAt: ctx.now, pause: true, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
         }
 
-        await ctx.db.patch(sessionId, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+        await ctx.db.patch("sandboxSessions", sessionId, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
 
         return { pause: false, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
     });
@@ -168,13 +169,13 @@ export const markBotComputerPaused = internalMutation
     .input({ decidedAt: v.number(), sessionId: v.id("sandboxSessions") })
     .output(v.null())
     .mutation(async ({ args: { decidedAt, sessionId }, ctx }) => {
-        const session = await ctx.db.get(sessionId);
+        const session = await ctx.db.get("sandboxSessions", sessionId);
 
         if (!session || session.status !== "active" || session.lastActivityAt > decidedAt) {
             return null;
         }
 
-        await ctx.db.patch(sessionId, { status: "paused" });
+        await ctx.db.patch("sandboxSessions", sessionId, { status: "paused" });
 
         return null;
     });
@@ -222,7 +223,7 @@ export const claimBotComputer = internalMutation
         }
 
         if (starting) {
-            await ctx.db.patch(starting._id, { completedAt: ctx.now, errorMessage: "Abandoned while starting", status: "failed" });
+            await ctx.db.patch("sandboxSessions", starting._id, { completedAt: ctx.now, errorMessage: "Abandoned while starting", status: "failed" });
         }
 
         const sessionId = await ctx.db.insert("sandboxSessions", {
@@ -254,7 +255,7 @@ export const retireBotComputersIn = async (ctx: MutationCtx, botId: Id<"bots">):
             .take(50);
 
         for (const session of sessions) {
-            await ctx.db.patch(session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+            await ctx.db.patch("sandboxSessions", session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
 
             if (session.sandboxId) {
                 await ctx.scheduler.runAfter(0, internal.sandbox.cleanup.killSandboxById, { sandboxId: session.sandboxId });
@@ -281,7 +282,7 @@ export const activateBotComputer = internalMutation
     .input({ sandboxId: v.string().max(MAX_LENGTH.id), sessionId: v.id("sandboxSessions") })
     .output(v.boolean())
     .mutation(async ({ args: { sandboxId, sessionId }, ctx }) => {
-        const session = await ctx.db.get(sessionId);
+        const session = await ctx.db.get("sandboxSessions", sessionId);
 
         if (!session) {
             return false;
@@ -290,13 +291,13 @@ export const activateBotComputer = internalMutation
         const stillOurs = session.status === "starting" || session.status === "paused" || (session.status === "active" && session.sandboxId === sandboxId);
 
         // A claim that landed after the bot was retired, or was deleted, is refused even though its row is fresh.
-        const botStillExists = session.botId !== undefined && (await ctx.db.get(session.botId)) !== null;
+        const botStillExists = session.botId !== undefined && (await ctx.db.get("bots", session.botId)) !== null;
 
         if (!stillOurs || !botStillExists) {
             return false;
         }
 
-        await ctx.db.patch(sessionId, { lastActivityAt: ctx.now, sandboxId, status: "active" });
+        await ctx.db.patch("sandboxSessions", sessionId, { lastActivityAt: ctx.now, sandboxId, status: "active" });
 
         return true;
     });

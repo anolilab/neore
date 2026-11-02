@@ -53,10 +53,11 @@ export const deleteUserNotifications = internalMutation
             ctx.db.dailyBriefState.findMany({ limit: BATCH, where: { userId } }),
             ctx.db.outcomeEmails.findMany({ limit: BATCH, where: { userId } }),
         ]);
-        const rows = [...notifications.page, ...briefState.page, ...outbox.page];
 
         await Promise.all([
-            ...rows.map(async (row) => await ctx.db.delete(row._id)),
+            ...notifications.page.map(async (row) => await ctx.db.delete("notifications", row._id)),
+            ...briefState.page.map(async (row) => await ctx.db.delete("dailyBriefState", row._id)),
+            ...outbox.page.map(async (row) => await ctx.db.delete("outcomeEmails", row._id)),
             ...devices.map(async (device) => await ctx.push.unregister(device.id, { userId })),
         ]);
 

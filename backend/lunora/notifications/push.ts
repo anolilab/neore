@@ -150,7 +150,7 @@ export const loadPushNotification = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const notification = await ctx.db.get(args.notificationId);
+        const notification = await ctx.db.get("notifications", args.notificationId);
 
         if (notification?.userId !== args.userId) {
             return null;

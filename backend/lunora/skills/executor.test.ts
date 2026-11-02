@@ -56,7 +56,7 @@ const fakeContext = (skills: SkillRow[], userSkills: UserSkillRow[] = []): Query
 
     return {
         db: {
-            get: async (id: string) => skills.find((skill) => skill._id === id) ?? null,
+            get: async (_table: string, id: string) => skills.find((skill) => skill._id === id) ?? null,
             query: userSkillsQuery,
             skills: {
                 findFirst: async ({ where }: { where: Record<string, unknown> }) => skills.find((skill) => matches(skill, where)) ?? null,

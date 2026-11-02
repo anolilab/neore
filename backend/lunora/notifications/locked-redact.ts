@@ -75,7 +75,7 @@ const redactPendingMail = async (ctx: MutationCtx, notificationId: Id<"notificat
 
     for (const mail of page) {
         if (mail.status !== "sent" && mail.title !== LOCKED_THREAD_TITLE) {
-            await ctx.db.patch(mail._id, { title: LOCKED_THREAD_TITLE });
+            await ctx.db.patch("outcomeEmails", mail._id, { title: LOCKED_THREAD_TITLE });
         }
     }
 };
@@ -104,7 +104,7 @@ export const redactLockedLinks = internalMutation
             }
 
             // Same shape as `redactForLockedThread`: `undefined` removes the body.
-            await patchRow(ctx.db, row, { body: undefined, title: LOCKED_THREAD_TITLE });
+            await patchRow(ctx.db, "notifications", row, { body: undefined, title: LOCKED_THREAD_TITLE });
             await redactPendingMail(ctx, row._id);
         }
 

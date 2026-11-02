@@ -522,7 +522,7 @@ export const updateTrigger = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -647,7 +647,7 @@ export const updateTrigger = authMutation
         const filters = checkedFilters(args.filters, trigger.type);
 
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
-        await patchRow(context.db, trigger, {
+        await patchRow(context.db, "triggers", trigger, {
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
@@ -689,7 +689,7 @@ export const setTriggerEnabled = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -714,7 +714,7 @@ export const setTriggerEnabled = authMutation
             throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
         }
 
-        await context.db.patch(args.triggerId as Id<"triggers">, {
+        await context.db.patch("triggers", args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
             // Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over. Enabling one that is already on changes nothing.
@@ -744,10 +744,10 @@ export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"tri
 
     // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
     // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
-    await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
+    await Promise.allSettled(executions.map((row) => context.db.delete("triggerExecutions", row._id)));
 
     // Delete the trigger
-    await context.db.delete(triggerId);
+    await context.db.delete("triggers", triggerId);
 
     const deliveryPrefix = `${triggerId}:`;
 
@@ -768,7 +768,7 @@ export const deleteTrigger = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -801,7 +801,7 @@ export const getTriggerExecutions = authQuery
         const { userId } = context.user;
 
         // Verify trigger ownership
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -884,7 +884,7 @@ export const testRunTrigger = authAction
 
 export const getTriggerInternal = internalQuery
     .input({ triggerId: v.id("triggers") })
-    .query(async ({ args: { triggerId }, ctx }): Promise<Doc<"triggers"> | null> => await ctx.db.get(triggerId));
+    .query(async ({ args: { triggerId }, ctx }): Promise<Doc<"triggers"> | null> => await ctx.db.get("triggers", triggerId));
 
 export const getDueScheduleTriggers = internalQuery
     .input({ now: v.number() })
@@ -915,7 +915,7 @@ export const updateTriggerStats = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { error, lastTriggeredAt, nextTriggerAt, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger) {
             return null;
@@ -928,7 +928,7 @@ export const updateTriggerStats = internalMutation
         // "Run now" over a scheduled run) must not pull a quiet routine's window back over what was already reported.
         const advancesWindow = lastTriggeredAt !== undefined && lastTriggeredAt > (trigger.lastTriggeredAt ?? -Infinity);
 
-        await patchRow(ctx.db, trigger, {
+        await patchRow(ctx.db, "triggers", trigger, {
             lastError: error,
             triggerCount: (trigger.triggerCount ?? 0) + 1,
             updatedAt: ctx.now,
@@ -948,13 +948,13 @@ export const reserveQuietWindow = internalMutation
     .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
     .output(v.boolean())
     .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger || trigger.lastTriggeredAt !== expected) {
             return false;
         }
 
-        await patchRow(ctx.db, trigger, { lastTriggeredAt: windowStart });
+        await patchRow(ctx.db, "triggers", trigger, { lastTriggeredAt: windowStart });
 
         return true;
     });
@@ -969,10 +969,10 @@ export const releaseQuietWindow = internalMutation
     .input({ expected: v.optional(v.number()), triggerId: v.id("triggers") })
     .output(v.null())
     .mutation(async ({ args: { expected, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (trigger?.lastTriggeredAt !== undefined && (expected === undefined || expected < trigger.lastTriggeredAt)) {
-            await patchRow(ctx.db, trigger, { lastTriggeredAt: expected });
+            await patchRow(ctx.db, "triggers", trigger, { lastTriggeredAt: expected });
         }
 
         return null;
@@ -987,7 +987,7 @@ export const releaseQuietWindow = internalMutation
  */
 const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">, firing: number | undefined): Promise<void> => {
     if (firing !== undefined && trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt === firing) {
-        await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
+        await ctx.db.patch("triggers", trigger._id, { enabled: false, updatedAt: ctx.now });
     }
 };
 
@@ -1005,7 +1005,7 @@ export const switchOffConsumedMoment = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { firing, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (trigger) {
             await switchOffFiredMoment(ctx, trigger, firing);
@@ -1018,7 +1018,7 @@ export const switchOffConsumedMoment = internalMutation
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string, firing: number | undefined): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
-    const trigger = await ctx.db.get(triggerId);
+    const trigger = await ctx.db.get("triggers", triggerId);
 
     if (!trigger) {
         return;
@@ -1032,7 +1032,7 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
         .first();
 
     if (latest) {
-        await patchRow(ctx.db, latest, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
+        await patchRow(ctx.db, "triggerExecutions", latest, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
 
         return;
     }
@@ -1096,7 +1096,7 @@ export const admitTriggerRun = internalMutation
 
             return reason;
         };
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger) {
             return await refused("Trigger not found");
@@ -1105,10 +1105,10 @@ export const admitTriggerRun = internalMutation
         if (requireEnabled === true && trigger.enabled !== true) {
             // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
             // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
-            const running = executionId ? await ctx.db.get(executionId) : null;
+            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
 
             if (running && running.triggerId === triggerId && running.status === "running") {
-                await ctx.db.delete(running._id);
+                await ctx.db.delete("triggerExecutions", running._id);
             }
 
             if (claim) {
@@ -1126,10 +1126,10 @@ export const admitTriggerRun = internalMutation
 
                 await recordFiltered(ctx, triggerId, reason, undefined);
 
-                const running = executionId ? await ctx.db.get(executionId) : null;
+                const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
 
                 if (running && running.triggerId === triggerId && running.status === "running") {
-                    await ctx.db.delete(running._id);
+                    await ctx.db.delete("triggerExecutions", running._id);
                 }
 
                 if (claim) {
@@ -1149,7 +1149,7 @@ export const admitTriggerRun = internalMutation
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
-        const bot = trigger.botId ? await ctx.db.get(trigger.botId) : null;
+        const bot = trigger.botId ? await ctx.db.get("bots", trigger.botId) : null;
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
@@ -1231,12 +1231,12 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
     const { pause, streak } = advanceStreak(current, outcome);
 
     if (pause) {
-        await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
+        await patchRow(ctx.db, "triggers", trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
         console.info(`[Triggers] Trigger ${trigger._id} paused after ${streak} consecutive failures its owner can fix`);
     } else if (outcome === "success") {
-        await patchRow(ctx.db, trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
+        await patchRow(ctx.db, "triggers", trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
     } else if (streak !== current) {
-        await patchRow(ctx.db, trigger, { failureStreak: streak });
+        await patchRow(ctx.db, "triggers", trigger, { failureStreak: streak });
     }
 
     return pause;
@@ -1258,7 +1258,7 @@ export const updateExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
-        const execution = await ctx.db.get(executionId);
+        const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
             return null;
@@ -1269,7 +1269,7 @@ export const updateExecution = internalMutation
         const settled = settling ? { error, status, threadId } : { error: execution.error, status: execution.status, threadId: execution.threadId };
 
         if (settling) {
-            await ctx.db.patch(executionId, {
+            await ctx.db.patch("triggerExecutions", executionId, {
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
@@ -1281,7 +1281,7 @@ export const updateExecution = internalMutation
             return null;
         }
 
-        const trigger = await ctx.db.get(execution.triggerId);
+        const trigger = await ctx.db.get("triggers", execution.triggerId);
 
         if (!trigger) {
             return null;
@@ -1294,7 +1294,7 @@ export const updateExecution = internalMutation
             paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
 
             if (paused) {
-                await ctx.db.patch(executionId, { pausedTrigger: true });
+                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
             }
         }
 
@@ -1327,11 +1327,11 @@ export const setTriggerEnabledInternal = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { enabled, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
         const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
         const eventArm = enabled && trigger?.type === "event" && trigger.enabled !== true ? armEventTrigger(trigger, ctx.now) : undefined;
 
-        await ctx.db.patch(triggerId, {
+        await ctx.db.patch("triggers", triggerId, {
             enabled,
             updatedAt: ctx.now,
             ...(enabled && trigger && trigger.enabled !== true && { enabledAt: ctx.now, failureStreak: 0 }),

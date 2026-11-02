@@ -91,7 +91,7 @@ describe("trusted servers in the saved MCP server list", () => {
                 .withIndex("by_userId", (q: any) => q.eq("userId", USER))
                 .unique();
 
-            await ctx.db.patch(row._id, { lowRiskTrustedServers: [mcpTrustId("Files", URL), "connector:notion"] });
+            await ctx.db.patch("aiUserPreferences", row._id, { lowRiskTrustedServers: [mcpTrustId("Files", URL), "connector:notion"] });
         });
 
         await saveServers([SERVER]);

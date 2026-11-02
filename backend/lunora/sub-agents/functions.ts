@@ -194,7 +194,7 @@ const admitCommon = async (
 
     // The child runs with the caller's tools and keys in a thread of theirs, so
     // only the parent thread's owner may delegate from it — not a collaborator.
-    const parent = await ctx.db.get(args.parentThreadId as Id<"threads">);
+    const parent = await ctx.db.get("threads", args.parentThreadId as Id<"threads">);
 
     if (!parent || parent.deleted || parent.userId !== args.userId) {
         return { error: "Only the owner of this conversation can delegate to sub-agents." };
@@ -387,7 +387,7 @@ const startQueuedRun = async (ctx: MutationCtx, run: Pick<RunDoc, "_id" | "mode"
 const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThreadId" | "runner" | "userId">): Promise<boolean> => {
     const deviceId = run.runner?.kind === "host" ? ctx.db.normalizeId("devices", run.runner.deviceId) : null;
     const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId: run.userId } }) : null;
-    const lead = await systemDb(ctx).get(run.parentThreadId as Id<"threads">);
+    const lead = await systemDb(ctx).get("threads", run.parentThreadId as Id<"threads">);
 
     return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
 };
@@ -446,9 +446,9 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
 const putHostRunBack = async (ctx: MutationCtx, run: RunDoc, attempts: number, delayMs: number): Promise<void> => {
     const now = Date.now();
 
-    await patchById(ctx.db, run._id, { hostStartAttempts: attempts, startedAt: undefined, status: "queued", updatedAt: now });
+    await patchById(ctx.db, "subAgentRuns", run._id, { hostStartAttempts: attempts, startedAt: undefined, status: "queued", updatedAt: now });
 
-    const worker = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+    const worker = run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
     // The claim marked the thread running; a reply the person started there meanwhile keeps it so.
     if (worker?.status === "running" && !(await isThreadStreaming(ctx, worker._id))) {
@@ -610,7 +610,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     let child: Doc<"threads"> | null = null;
 
     if (args.childThreadId !== undefined) {
-        child = await ctx.db.get(args.childThreadId as Id<"threads">);
+        child = await ctx.db.get("threads", args.childThreadId as Id<"threads">);
         origin = await workerOrigin(ctx, args.childThreadId);
 
         if (!child || child.deleted || child.userId !== args.userId || !origin || origin.parentThreadId !== parent._id) {
@@ -859,7 +859,7 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
     }
 
     // A host run starts (or fails) inside the start itself, so the receipt reads the row, not the snapshot admission took.
-    const started = admitted.run.runner?.kind === "host" ? await ctx.db.get(admitted.run._id) : null;
+    const started = admitted.run.runner?.kind === "host" ? await ctx.db.get("subAgentRuns", admitted.run._id) : null;
     const state = started?.status ?? admitted.run.status;
 
     return { runId: admitted.run._id, state, workerId: admitted.run.childThreadId! };
@@ -949,14 +949,14 @@ export const messageWorker = internalMutation
  * {@link finishRun} starts it in its turn.
  */
 export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<RunDoc | null> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || run.status !== "queued") {
         return null;
     }
 
     // A worker's thread exists already, so the link `linkChildThread` makes for a one-shot run is not made again.
-    const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+    const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
     if (run.mode === "worker") {
         // Archived, deleted or locked after this run was queued: it ends cancelled and uncharged, the
@@ -985,7 +985,7 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
 
     const now = Date.now();
 
-    await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
+    await patchById(ctx.db, "subAgentRuns", run._id, { startedAt: now, status: "running", updatedAt: now });
 
     if (run.mode === "worker") {
         // Tied to this claim: a busy computer puts the run back and claims it again, and the earlier claim's
@@ -1032,7 +1032,7 @@ export const claimRun = internalMutation
             return null;
         }
 
-        const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+        const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
         return {
             ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
@@ -1053,7 +1053,7 @@ export const claimRun = internalMutation
 
 /** See {@link attachChildThread}. Returns whether this call linked it. */
 export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, childThreadId: string): Promise<boolean> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || run.childThreadId !== undefined || !isActiveSubAgentStatus(run.status)) {
         return false;
@@ -1061,10 +1061,10 @@ export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
 
     const now = Date.now();
 
-    await patchById(ctx.db, run._id, { childThreadId, updatedAt: now });
+    await patchById(ctx.db, "subAgentRuns", run._id, { childThreadId, updatedAt: now });
 
     // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
-    const child = await ctx.db.get(childThreadId as Id<"threads">);
+    const child = await ctx.db.get("threads", childThreadId as Id<"threads">);
 
     if (child?.status === "active") {
         await patchThread(ctx.db, child._id, { status: "running", updatedAt: now });
@@ -1105,7 +1105,7 @@ const GONE_PARENT_REASON = "The conversation that started this run is gone.";
 const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc): boolean => !thread || thread.deleted === true || thread.userId !== run.userId;
 
 const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<{ reason: string; retry: boolean } | undefined> => {
-    const thread = await ctx.db.get(run.parentThreadId as Id<"threads">);
+    const thread = await ctx.db.get("threads", run.parentThreadId as Id<"threads">);
 
     if (!thread || isGoneParent(thread, run)) {
         return { reason: GONE_PARENT_REASON, retry: false };
@@ -1129,7 +1129,7 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
         userId: run.userId,
     });
 
-    await patchById(ctx.db, thread._id, { updatedAt: Date.now() });
+    await patchById(ctx.db, "threads", thread._id, { updatedAt: Date.now() });
 
     return undefined;
 };
@@ -1150,12 +1150,12 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
  * for any other run, and for a stopped one already marked gone.
  */
 const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     if (run?.mode === "worker" && isWorkerLoopLive(run) && run.status === "cancelled" && run.childThreadId !== undefined) {
         const now = Date.now();
 
-        await patchById(ctx.db, run._id, { loopExitedAt: now, updatedAt: now });
+        await patchById(ctx.db, "subAgentRuns", run._id, { loopExitedAt: now, updatedAt: now });
         await startNextWorkerRun(ctx, run.childThreadId);
     }
 };
@@ -1187,15 +1187,15 @@ export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cance
  * this call posted.
  */
 export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined || run.postFailed !== undefined || !postsBack(run)) {
         return false;
     }
 
     // A parent that is gone cannot take the post, whatever stream it left behind.
-    if (isGoneParent(await ctx.db.get(run.parentThreadId as Id<"threads">), run)) {
-        await patchById(ctx.db, run._id, { postFailed: GONE_PARENT_REASON });
+    if (isGoneParent(await ctx.db.get("threads", run.parentThreadId as Id<"threads">), run)) {
+        await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
 
         return false;
     }
@@ -1223,13 +1223,13 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     );
 
     if (refusal === undefined) {
-        await patchById(ctx.db, run._id, { resultPostedAt: Date.now() });
+        await patchById(ctx.db, "subAgentRuns", run._id, { resultPostedAt: Date.now() });
 
         return true;
     }
 
     if (!refusal.retry || failures + 1 >= SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS) {
-        await patchById(ctx.db, run._id, { postFailed: refusal.reason });
+        await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: refusal.reason });
     } else {
         await ctx.scheduler.runAfter(postRetryDelayMs(failures), internal.sub_agents.functions.postResult, { attempt, failures: failures + 1, runId });
     }
@@ -1248,7 +1248,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
  * ended it is the one who would read the notification.
  */
 export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, outcome: SubAgentOutcome): Promise<boolean> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || !isActiveSubAgentStatus(run.status)) {
         return false;
@@ -1269,7 +1269,14 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // A host run has no loop that lingers after a stop: the turn is ended below, before anything else reads the line.
     const loopGone = hostRun && wasRunning && outcome.kind === "cancelled";
 
-    await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now, ...(loopGone && { loopExitedAt: now }) });
+    await patchById(ctx.db, "subAgentRuns", run._id, {
+        completedAt: now,
+        error,
+        result,
+        status: outcome.kind,
+        updatedAt: now,
+        ...(loopGone && { loopExitedAt: now }),
+    });
 
     // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
     // its turn's own end finds the stream over already.
@@ -1279,7 +1286,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
     // The child thread was marked "running" when it was linked (`linkChildThread`). A chat reply
     // the user started there meanwhile holds that status too, so it stays while one is live.
-    const child = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+    const child = run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
     // Ending a worker's queued run leaves the one going alone: only the run that was going frees the thread.
     if (child?.status === "running" && (run.mode !== "worker" || wasRunning) && !(await isThreadStreaming(ctx, child._id))) {
@@ -1365,7 +1372,7 @@ const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "
  * error, like any failed run it asked for), and a queued one is left to a stop or the queue.
  */
 export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number, claimedAt?: number): Promise<void> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     // A reaper of an earlier claim of a worker run that was put back and claimed again: the newer claim has its own.
     if (claimedAt !== undefined && run?.startedAt !== claimedAt) {
@@ -1402,7 +1409,7 @@ export const reapRun = internalMutation
  * owner cancelled it, the reaper failed it, or it is gone.
  */
 export const runShouldStop = async (ctx: Pick<MutationCtx | QueryCtx, "db">, runId: Id<"subAgentRuns">): Promise<boolean> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("subAgentRuns", runId);
 
     return !run || run.status !== "running";
 };
@@ -1554,8 +1561,8 @@ export const getRunByToolCall = authQuery
  * probed. Returns whether this call ended the run.
  */
 export const cancelOwnedSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, userId: string): Promise<boolean> => {
-    const run = await ctx.db.get(runId);
-    const parent = run ? await ctx.db.get(run.parentThreadId as Id<"threads">) : null;
+    const run = await ctx.db.get("subAgentRuns", runId);
+    const parent = run ? await ctx.db.get("threads", run.parentThreadId as Id<"threads">) : null;
 
     if (!run || !parent || parent.userId !== userId || run.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Run not found");
@@ -1625,7 +1632,7 @@ export const createWorker = authMutation
             await threadGateOutcome(ctx, { level: "write", threadId: args.leadThreadId, unlockProof: args.unlockProof, userId: ctx.user.userId }),
         );
 
-        const lead = await ctx.db.get(args.leadThreadId);
+        const lead = await ctx.db.get("threads", args.leadThreadId);
 
         return await dispatchOrThrow(ctx, {
             clientId: args.clientId,
@@ -1706,7 +1713,7 @@ export const setWorkerPolicy = authMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const lead = await ctx.db.get(args.leadThreadId);
+        const lead = await ctx.db.get("threads", args.leadThreadId);
 
         if (!lead || lead.deleted || lead.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Conversation not found.");
@@ -1918,7 +1925,7 @@ export const listWorkers = authQuery
 
         for (const group of newest) {
             const run = group[0]!;
-            const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+            const thread = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
 
             if (!thread || thread.deleted || thread.userId !== ctx.user.userId) {
                 continue;
@@ -1949,7 +1956,7 @@ export const getWorker = authQuery
     .input({ workerId: v.id("threads") })
     .output(v.union(vWorkerView, v.null()))
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.workerId);
+        const thread = await ctx.db.get("threads", args.workerId);
         const origin = thread ? await workerOrigin(ctx, args.workerId) : null;
 
         if (!thread || thread.deleted || thread.userId !== ctx.user.userId || !origin || origin.userId !== ctx.user.userId) {
@@ -2007,7 +2014,7 @@ export const listActiveWorkerRuns = authQuery
                     continue;
                 }
 
-                const thread = await ctx.db.get(run.childThreadId as Id<"threads">);
+                const thread = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
 
                 views.push({
                     createdAt: run.createdAt,

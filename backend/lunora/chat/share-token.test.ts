@@ -113,7 +113,7 @@ describe("getThreadShareToken", () => {
         const threadId = await newThread();
 
         await setPublic(threadId, true);
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { deleted: true }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
 
         await expect(tokenFor(STRANGER, threadId)).resolves.toBeNull();
     });

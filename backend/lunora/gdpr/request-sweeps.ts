@@ -66,7 +66,7 @@ export const cleanupExpiredExports = internalMutation
 
                 // `undefined` removes the field: `expiresAt` is what puts a row in the
                 // index, so removing it is what makes this sweep terminal.
-                await patchRow(context.db, request, {
+                await patchRow(context.db, "gdprRequests", request, {
                     downloadUrl: undefined,
                     errorMessage: "Export expired and has been deleted",
                     expiresAt: undefined,
@@ -118,7 +118,7 @@ export const handleGdprRequestTimeouts = internalMutation
         const timedOutRequests = [...pendingTimedOut, ...processingTimedOut];
 
         for (const request of timedOutRequests) {
-            await context.db.patch(request._id, {
+            await context.db.patch("gdprRequests", request._id, {
                 errorMessage: "Request timed out after 30 days (GDPR Article 12 requirement)",
                 status: "failed",
             });

@@ -83,7 +83,7 @@ export const statusMap = (tasks: ReadonlyArray<Doc<"tasks">>): Map<string, TaskS
 export const queueCycle = async (ctx: MutationCtx, task: Doc<"tasks">, origin: TaskRunOrigin, now: number): Promise<void> => {
     const cycle = crypto.randomUUID();
 
-    await patchById(ctx.db, task._id, { activeCycle: cycle, lastError: undefined, status: "queued", updatedAt: now });
+    await patchById(ctx.db, "tasks", task._id, { activeCycle: cycle, lastError: undefined, status: "queued", updatedAt: now });
     // Jobs queue, not the scheduler (`lib/job-queue.ts`); a redelivery is refused by `claimRound`.
     await enqueueJob(internal.tasks.execute.runTaskRound, { cycle, origin, round: 0, taskId: task._id });
 };
@@ -107,7 +107,7 @@ export const startTask = async (
     }
 
     if (target === "blocked") {
-        await patchById(ctx.db, task._id, { activeCycle: undefined, status: "blocked", updatedAt: now });
+        await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "blocked", updatedAt: now });
 
         return "blocked";
     }
@@ -147,7 +147,7 @@ const summarise = (answer: string | undefined): string | undefined => {
 
 /** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
 const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
-    await patchById(ctx.db, task._id, { activeCycle: undefined, lastError, status: "failed", updatedAt: Date.now() });
+    await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError, status: "failed", updatedAt: Date.now() });
 };
 
 const vClaim = v.union(
@@ -186,7 +186,7 @@ export const claimRound = internalMutation
     .input({ cycle: v.string(), origin: vTaskRunOrigin, round: v.number(), taskId: v.id("tasks") })
     .output(vClaim)
     .mutation(async ({ args: { cycle, origin, round, taskId }, ctx }) => {
-        const task = await ctx.db.get(taskId);
+        const task = await ctx.db.get("tasks", taskId);
 
         if (!task || task.activeCycle !== cycle) {
             return null;
@@ -208,7 +208,7 @@ export const claimRound = internalMutation
         }
 
         if (await isAccountDeletionUnderway(ctx, task.userId)) {
-            await patchById(ctx.db, task._id, { activeCycle: undefined, status: "todo", updatedAt: ctx.now });
+            await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "todo", updatedAt: ctx.now });
 
             return null;
         }
@@ -258,9 +258,9 @@ export const claimRound = internalMutation
             userId: task.userId,
         });
 
-        await ctx.db.patch(taskId, { attemptCount: task.attemptCount + 1, status: "running", updatedAt: now });
+        await ctx.db.patch("tasks", taskId, { attemptCount: task.attemptCount + 1, status: "running", updatedAt: now });
 
-        const goal = task.goalId ? await ctx.db.get(task.goalId) : null;
+        const goal = task.goalId ? await ctx.db.get("goals", task.goalId) : null;
 
         return {
             ...(task.codingAgent && { codingAgent: task.codingAgent }),
@@ -286,7 +286,7 @@ export const isRoundRunning = internalQuery
     .input({ runId: v.id("taskRuns") })
     .output(v.boolean())
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("taskRuns", args.runId);
 
         return run?.status === "running";
     });
@@ -296,7 +296,7 @@ export const getTaskForVerification = internalQuery
     .input({ taskId: v.id("tasks") })
     .output(v.union(v.object({ instructions: v.string(), successCriteria: v.optional(v.string()), title: v.string(), userId: v.string() }), v.null()))
     .query(async ({ args, ctx }) => {
-        const task = await ctx.db.get(args.taskId);
+        const task = await ctx.db.get("tasks", args.taskId);
 
         if (!task) {
             return null;
@@ -365,7 +365,7 @@ export const completeRound = internalMutation
     })
     .output(v.union(v.null(), v.union(v.literal("done"), v.literal("repair"), v.literal("needs_review"), v.literal("failed"), v.literal("cancelled"))))
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("taskRuns", args.runId);
 
         if (!run || run.status !== "running") {
             return null;
@@ -376,10 +376,10 @@ export const completeRound = internalMutation
         const finalAnswer = outcome.kind === "error" ? undefined : outcome.finalAnswer.slice(0, FINAL_ANSWER_MAX);
         // What every outcome records on the run row; absent values stay absent.
         const runResult = withoutUndefined({ completedAt: now, finalAnswer, threadId: args.threadId });
-        const task = await ctx.db.get(run.taskId);
+        const task = await ctx.db.get("tasks", run.taskId);
 
         if (!task || task.activeCycle !== run.cycle) {
-            await ctx.db.patch(run._id, { ...runResult, status: "cancelled" });
+            await ctx.db.patch("taskRuns", run._id, { ...runResult, status: "cancelled" });
 
             return "cancelled";
         }
@@ -389,8 +389,8 @@ export const completeRound = internalMutation
         if (outcome.kind === "error") {
             const error = outcome.error.slice(0, 2000);
 
-            await ctx.db.patch(run._id, { ...runResult, error, status: "error" });
-            await patchById(ctx.db, task._id, { activeCycle: undefined, lastError: error, lastRunThreadId, status: "failed", updatedAt: now });
+            await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
+            await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: error, lastRunThreadId, status: "failed", updatedAt: now });
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -400,7 +400,7 @@ export const completeRound = internalMutation
 
         if (outcome.kind === "unverified") {
             // The answer is kept; the run says it is the check that failed.
-            await ctx.db.patch(run._id, { ...runResult, error: UNVERIFIED_MESSAGE, status: "error" });
+            await ctx.db.patch("taskRuns", run._id, { ...runResult, error: UNVERIFIED_MESSAGE, status: "error" });
             next = "needs_review";
         } else {
             const verdict = {
@@ -409,12 +409,12 @@ export const completeRound = internalMutation
                 ...(outcome.verdict.repairInstructions && { repairInstructions: outcome.verdict.repairInstructions }),
             };
 
-            await ctx.db.patch(run._id, { ...runResult, status: verdict.pass ? "passed" : "failed", verdict });
+            await ctx.db.patch("taskRuns", run._id, { ...runResult, status: verdict.pass ? "passed" : "failed", verdict });
             next = decideAfterVerdict(verdict, run.round, task.maxRepairRounds);
         }
 
         if (next === "repair") {
-            await ctx.db.patch(task._id, withoutUndefined({ lastRunThreadId, updatedAt: now }));
+            await ctx.db.patch("tasks", task._id, withoutUndefined({ lastRunThreadId, updatedAt: now }));
             await enqueueJob(internal.tasks.execute.runTaskRound, {
                 cycle: run.cycle,
                 origin: "repair",
@@ -426,7 +426,7 @@ export const completeRound = internalMutation
         }
 
         if (next === "needs_review") {
-            await patchById(ctx.db, task._id, {
+            await patchById(ctx.db, "tasks", task._id, {
                 activeCycle: undefined,
                 lastRunThreadId,
                 resultSummary: summarise(finalAnswer),
@@ -440,7 +440,7 @@ export const completeRound = internalMutation
 
         const done = { ...task, status: "done" as const };
 
-        await patchById(ctx.db, task._id, {
+        await patchById(ctx.db, "tasks", task._id, {
             activeCycle: undefined,
             lastError: undefined,
             lastRunThreadId,
@@ -552,7 +552,7 @@ export const checkDueTasks = internalMutation
             // Advance first, whatever happens next, so a task that cannot start
             // now is not re-examined every minute. `updatedAt` is left alone: only a
             // task that really starts changes, and a quiet routine reads it as activity.
-            await ctx.db.patch(task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now) });
+            await ctx.db.patch("tasks", task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now) });
 
             if (!shouldRecurNow(task.status)) {
                 continue;
@@ -589,12 +589,12 @@ export const checkDueTasks = internalMutation
 
                     for (const run of runs) {
                         if (run.status === "running") {
-                            await ctx.db.patch(run._id, { completedAt: now, error: message, status: "error" });
+                            await ctx.db.patch("taskRuns", run._id, { completedAt: now, error: message, status: "error" });
                         }
                     }
                 }
 
-                await patchById(ctx.db, task._id, { activeCycle: undefined, lastError: message, status: "failed", updatedAt: now });
+                await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: message, status: "failed", updatedAt: now });
             }
         };
 

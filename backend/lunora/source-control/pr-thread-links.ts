@@ -17,6 +17,6 @@ export const deletePullRequestLinksOfThread = async (ctx: Pick<MutationCtx, "db"
         .collect();
 
     for (const link of links) {
-        await ctx.db.delete(link._id);
+        await ctx.db.delete("pullRequestThreads", link._id);
     }
 };

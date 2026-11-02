@@ -276,8 +276,8 @@ interface RunState {
 
 const readState = async (): Promise<RunState> =>
     await harness.run(async (ctx: any) => {
-        const thread = await ctx.db.get(ids.threadId as never);
-        const stream = await ctx.db.get(ids.streamId as never);
+        const thread = await ctx.db.get("threads", ids.threadId as never);
+        const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
         const chunks = await ctx.db
             .query("persistentChunks")
             .withIndex("by_streamId_seq", (q: any) => q.eq("streamId", ids.streamId))
@@ -503,7 +503,7 @@ describe("the caps", () => {
     });
 
     it("fails the run on a fourth pause", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { pausedSteps: ["step-a", "step-b", "step-c"] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { pausedSteps: ["step-a", "step-b", "step-c"] }));
         modelState.model = planned([rateLimited()]);
 
         await run();
@@ -517,7 +517,7 @@ describe("the caps", () => {
     });
 
     it("allows the third pause", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { pausedSteps: ["step-a", "step-b"] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { pausedSteps: ["step-a", "step-b"] }));
         modelState.model = planned([rateLimited()]);
 
         await run();
@@ -863,9 +863,9 @@ describe("Retry now and the step's one pause", () => {
 describe("a pause whose resume never came", () => {
     const overdueBy = async (ms: number) =>
         await harness.run(async (ctx: any) => {
-            const stream = await ctx.db.get(ids.streamId as never);
+            const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
 
-            await ctx.db.patch(ids.streamId as never, { pause: { ...stream.pause, retryAt: Date.now() - ms } });
+            await ctx.db.patch("persistentStreams", ids.streamId as never, { pause: { ...stream.pause, retryAt: Date.now() - ms } });
         });
 
     it("can be resumed with Retry now once it is more than 30 seconds overdue, and that is not an early resume", async () => {
@@ -928,7 +928,7 @@ describe("a pause that never resumes", () => {
 
         // A follow-up typed during the pause is still queued on the stream, and nothing will ever take it.
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(ids.streamId, { steers: [{ id: "steer-1", status: "queued", text: "also add a joke" }] });
+            await ctx.db.patch("persistentStreams", ids.streamId, { steers: [{ id: "steer-1", status: "queued", text: "also add a joke" }] });
         });
         // A later reply to the same prompt got its own stream, and has finished since.
         await harness.run(async (ctx: any) => {
@@ -1051,7 +1051,7 @@ describe("a pause that never resumes", () => {
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
         // Four turns before this one, already finished.
         await harness.run(async (ctx: any) => {
-            await ctx.db.delete(ids.streamId as never);
+            await ctx.db.delete("persistentStreams", ids.streamId as never);
         });
         await seedStreams(4, "done");
         // The paused run's stream is created later, as it would be: a stream made in the same millisecond cannot be ordered.
@@ -1090,7 +1090,7 @@ describe("a pause that never resumes", () => {
     it("resumes when only older streams exist, however many", async () => {
         modelState.model = planned([rateLimited(), textStep("Hello there.")]);
         await harness.run(async (ctx: any) => {
-            await ctx.db.delete(ids.streamId as never);
+            await ctx.db.delete("persistentStreams", ids.streamId as never);
         });
         await seedStreams(5, "done");
         // The paused run's stream is created later, as it would be: a stream made in the same millisecond cannot be ordered.
@@ -1130,7 +1130,7 @@ describe("a pause that never resumes", () => {
 
         const paused = await readState();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { expiresAt: Date.now() - 1000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { expiresAt: Date.now() - 1000 }));
 
         const { cleanupExpiredStreams } = await import("./streaming/persistent/crons");
 
@@ -1153,7 +1153,7 @@ describe("a pause that never resumes", () => {
 
         const paused = await readState();
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(paused.pause!.from as never));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", paused.pause!.from as never));
         await run({ resume: paused.pause!.id });
 
         const state = await readState();

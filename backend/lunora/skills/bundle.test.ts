@@ -420,7 +420,7 @@ describe("exportBundle", () => {
         const threadId = await createGroup(OWNER, [first, second]);
 
         await run(async (context) => {
-            await context.db.patch(second as never, { userId: OTHER } as never);
+            await context.db.patch("skills", second as never, { userId: OTHER } as never);
         });
         await expect(exportBundle(OWNER, { groupChatIds: [threadId] })).rejects.toThrow(RE_NOT_AVAILABLE);
     });
@@ -437,9 +437,9 @@ describe("exportBundle", () => {
         const threadId = await createGroup(OWNER, [skillId, second]);
 
         await run(async (context) => {
-            await context.db.patch(hookId, { organizationId: "org_secret_42", webhookSecret: SECRET_CIPHERTEXT });
-            await context.db.patch(scheduleId, { botId: "bot_secret_9", organizationId: "org_secret_42" });
-            await context.db.patch(threadId, { organizationId: "org_secret_42" });
+            await context.db.patch("triggers", hookId, { organizationId: "org_secret_42", webhookSecret: SECRET_CIPHERTEXT });
+            await context.db.patch("triggers", scheduleId, { botId: "bot_secret_9", organizationId: "org_secret_42" });
+            await context.db.patch("threads", threadId, { organizationId: "org_secret_42" });
         });
 
         const { markdown } = await exportBundle(OWNER, { groupChatIds: [threadId], skillIds: [skillId, second], triggerIds: [hookId, scheduleId] });
@@ -572,7 +572,7 @@ describe("listBundleCandidates", () => {
         expect(before.groupChats[0]?.exportable).toBe(true);
 
         await run(async (context) => {
-            await context.db.delete(second);
+            await context.db.delete("skills", second);
         });
 
         const after = await pickCandidates(OWNER);

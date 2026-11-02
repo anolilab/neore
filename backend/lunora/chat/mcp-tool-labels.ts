@@ -26,7 +26,7 @@ export const labelToolCalls = internalMutation
         const uniqueIds = new Set(messageIds);
 
         for (const messageId of uniqueIds) {
-            const doc = await ctx.db.get(messageId as Id<"messages">);
+            const doc = await ctx.db.get("messages", messageId as Id<"messages">);
 
             if (!doc || doc.userId !== userId || (doc.message as { role?: string } | undefined)?.role !== "assistant") {
                 continue;

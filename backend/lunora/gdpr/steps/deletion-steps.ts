@@ -137,6 +137,7 @@ export const deleteUserDocuments = internalMutation
 
         const hasMore = await deleteParentsWithChildren(
             context,
+            { child: "documentVersions", parent: "documents" },
             documents,
             async (documentRow) =>
                 await context.db

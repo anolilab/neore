@@ -151,7 +151,7 @@ export const listUserImages = authQuery
         // empty result. Verifying ownership keeps the contract honest and
         // gives the picker a clear NOT_FOUND signal for typos.
         if (scope === "thread" && threadId) {
-            const thread = await context.db.get(threadId as Id<"threads">);
+            const thread = await context.db.get("threads", threadId as Id<"threads">);
 
             if (!thread || (thread as { userId?: string }).userId !== userId) {
                 throw new LunoraError("NOT_FOUND", "Thread not found");
@@ -221,7 +221,7 @@ export const listUserImages = authQuery
 
         await Promise.all(
             [...threadIds].map(async (tid) => {
-                const thread = await context.db.get(tid as Id<"threads">);
+                const thread = await context.db.get("threads", tid as Id<"threads">);
 
                 threadTitleById.set(tid, (thread as { title?: string } | null)?.title ?? null);
             }),

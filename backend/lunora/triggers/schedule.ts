@@ -65,7 +65,7 @@ export const checkDueTriggers = internalMutation
             const step = dueScheduleStep(trigger.cronExpression, now, trigger.timezone);
 
             if (step.kind === "switchOff") {
-                await ctx.db.patch(triggerId, { enabled: false, lastError: step.reason, updatedAt: now });
+                await ctx.db.patch("triggers", triggerId, { enabled: false, lastError: step.reason, updatedAt: now });
 
                 continue;
             }
@@ -79,14 +79,14 @@ export const checkDueTriggers = internalMutation
                 });
             } catch (error) {
                 console.error(`[Triggers] Could not schedule trigger ${triggerId}; it stays due for the next tick`, error);
-                await ctx.db.patch(triggerId, { lastError: "Could not schedule this run; it will be retried", updatedAt: now });
+                await ctx.db.patch("triggers", triggerId, { lastError: "Could not schedule this run; it will be retried", updatedAt: now });
 
                 continue;
             }
 
             // Compute next trigger time
             if (step.nextTime !== undefined) {
-                await ctx.db.patch(triggerId, {
+                await ctx.db.patch("triggers", triggerId, {
                     nextTriggerAt: step.nextTime,
                     updatedAt: now,
                 });

@@ -38,7 +38,7 @@ const pendingRow = async (threadId: string, jobId: string | undefined, text = "_
 const fail = async (claimKey: string, threadId: string): Promise<boolean> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(failAbandonedMediaJob, { claimKey, threadId }));
 
-const read = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const read = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("messages", id));
 
 describe("mediaJobStamp", () => {
     it("stamps queue jobs only", () => {

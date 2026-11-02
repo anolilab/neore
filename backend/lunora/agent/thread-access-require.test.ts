@@ -30,7 +30,7 @@ const grant = async (threadId: string, userId: string, permission: ThreadPermiss
 const missingThread = async (): Promise<any> => {
     const threadId = await newThread(OWNER);
 
-    await run(async (ctx) => await ctx.db.delete(threadId));
+    await run(async (ctx) => await ctx.db.delete("threads", threadId));
 
     return threadId;
 };

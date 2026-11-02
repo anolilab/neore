@@ -77,7 +77,7 @@ export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number
         return { error: REFUSALS[queued.error], retry: queued.error === "busy" };
     }
 
-    await ctx.db.patch(run._id, { hostTurnId: queued.turnId, updatedAt: now });
+    await ctx.db.patch("subAgentRuns", run._id, { hostTurnId: queued.turnId, updatedAt: now });
 
     return { turnId: queued.turnId };
 };
