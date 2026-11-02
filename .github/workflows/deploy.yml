@@ -276,9 +276,17 @@ jobs:
                         pnpm --workspace-root run build:packages
                         pnpm --dir apps/web build
 
-
                   - name: "Build the document-parser Worker"
                     run: "pnpm --filter document-parser run build:worker"
+
+                  # Alchemy bundles `backend/src/server.ts` -> `_generated/app.ts`, which imports
+                  # the untracked `_generated/architecture.js`. Codegen writes it, and nothing
+                  # above does (`apps/web build` is vite + tsc, not the backend's codegen), so a
+                  # clean checkout would fail to bundle the backend. After the packages build:
+                  # without their `dist/`, a return type imported from `@neore/service-sdk`
+                  # degrades to `unknown` with codegen still exiting 0.
+                  - name: "Generate the backend"
+                    run: "pnpm --filter @neore/backend run codegen"
 
             # `vite build` writes a source map for every client and server chunk
             # (`sourcemap: "hidden"`): 2,700 files and ~118 MiB in dist/client alone, about
