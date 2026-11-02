@@ -13,9 +13,20 @@ const AgentSwitchDivider: FC<{ part: AgentSwitchPart }> = ({ part }) => {
     const models = useFeatureFlaggedModels();
     const nameOf = (model: string): string => models.find((candidate) => candidate.id === model)?.name ?? model;
     const label = t`Switched from ${switchAgentName(part.from, nameOf)} to ${switchAgentName(part.to, nameOf)}`;
+    // Worded here rather than in a helper handed `t`: the extractor only reads `t` from this scope.
+    const reattachFailureNotes = {
+        load_failed: t`Could not resume its own session, so the conversation was handed over`,
+        load_unsupported: t`This agent cannot resume its own session, so the conversation was handed over`,
+        not_reattached: t`This computer did not resume its own session, so the conversation was handed over`,
+        other_session: t`It opened a different session than its own, so the conversation was handed over`,
+    } satisfies Record<NonNullable<AgentSwitchPart["fallbackReason"]>, string>;
     let note: string | null = null;
 
-    if (part.mode !== "full") {
+    if (part.mode === "native") {
+        note = t`Resumed its own session`;
+    } else if (part.fallbackReason) {
+        note = reattachFailureNotes[part.fallbackReason];
+    } else if (part.mode !== "full") {
         note = part.summarized ? t`Older messages were summarised` : t`Handed over`;
     }
 

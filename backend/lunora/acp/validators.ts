@@ -47,6 +47,9 @@ export const vHostEvent = v.union(
         folderLabel: v.string().max(200),
         kind: v.literal("session_open"),
         nativeSessionId: v.optional(v.string().max(256)),
+        // For a session started with a saved session id (harness switch S4): whether the agent loaded it, and why not (`load_failed`, or
+        // `load_unsupported` for an agent that does not load saved sessions; any other text is read as `load_failed`).
+        reattach: v.optional(v.object({ loaded: v.boolean(), reason: v.optional(v.string().max(500)) })),
     }),
     // An import (S6) of an agent's saved session: `import_open` finds or makes the thread, each `import_turn` is one
     // prompt and its reply, `import_end` closes the transcript. Posted as session-level (`import_open`) or turn-level posts.

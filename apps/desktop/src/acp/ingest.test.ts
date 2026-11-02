@@ -348,14 +348,16 @@ describe("opening a session", () => {
         expect(first?.signature).toMatch(SIGNED);
     });
 
-    it("carries the agent's own session id and what it advertised, cut to what the backend takes", async () => {
+    it("carries the agent's own session id and what it advertised, and leaves out an id the core would refuse", async () => {
         const host = poster();
         const capabilities = { groups: { sessions: { load: { degradation: "none", supported: true } } }, reportedAt: 5, version: 1 } as const;
 
-        host.sessionOpened("s1", { ...INFO, capabilities, nativeSessionId: "n".repeat(300) });
+        host.sessionOpened("s1", { ...INFO, capabilities, nativeSessionId: "n".repeat(256) });
+        host.sessionOpened("s2", { ...INFO, capabilities, nativeSessionId: "n".repeat(300) });
         await settle();
 
         expect(backend.posts[0]?.post.events[0]).toMatchObject({ capabilities, kind: "session_open", nativeSessionId: "n".repeat(256) });
+        expect(backend.posts[1]?.post.events[0]).not.toHaveProperty("nativeSessionId");
     });
 
     it("leaves out an id the agent did not give", async () => {
