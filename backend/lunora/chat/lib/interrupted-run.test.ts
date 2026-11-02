@@ -158,4 +158,43 @@ describe("createToolRunMarker", () => {
 
         vi.doUnmock("../../_generated/internal");
     });
+
+    it("keeps `this`, so a tool that reads its context off itself still gets the one `wrapTools` attaches", async () => {
+        const { marker } = await setup();
+        const wrapped = marker.wrap({
+            reads: {
+                ctx: undefined as unknown,
+                execute(this: { ctx: unknown }) {
+                    return this.ctx;
+                },
+            },
+        } as never) as Record<string, { execute: () => Promise<unknown> }>;
+
+        // What `wrapTools` does with a tool that accepts a context: a copy carrying `ctx`.
+        const withContext = { ...wrapped.reads!, ctx: "the run context" };
+
+        expect(await withContext.execute()).toBe("the run context");
+
+        vi.doUnmock("../../_generated/internal");
+    });
+
+    it("leaves a createTool tool working through wrapTools: it keeps every tool and still runs with its context", async () => {
+        const { marker } = await setup();
+        const { z } = await import("zod");
+        const { createTool, wrapTools } = await import("../../agent/client/create-tool");
+        const createDocument = createTool({
+            description: "Create a document",
+            execute: async (context: { label: string }, input: { title: string }) => `${context.label}:${input.title}`,
+            inputSchema: z.object({ title: z.string() }),
+        } as never);
+        const tools = wrapTools({ label: "ctx" } as never, marker.wrap({ createDocument }) as never) as Record<
+            string,
+            { execute: (input: unknown, options: unknown) => Promise<unknown> }
+        >;
+
+        expect(Object.keys(tools)).toStrictEqual(["createDocument"]);
+        expect(await tools.createDocument!.execute({ title: "T" }, {})).toBe("ctx:T");
+
+        vi.doUnmock("../../_generated/internal");
+    });
 });

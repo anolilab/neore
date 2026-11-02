@@ -73,13 +73,15 @@ export const createToolRunMarker = (ctx: Pick<ActionCtx, "runMutation">, args: {
 
                 marked[name] = {
                     ...(definition as object),
-                    execute: async (...executeArgs: unknown[]) => {
+                    // `this`, not the definition: a tool made by `createTool` reads its `ctx` off `this`, and `wrapTools` attaches
+                    // that `ctx` to a COPY of whatever object it is given, which is this wrapper.
+                    execute: async function markedExecute(this: unknown, ...executeArgs: unknown[]) {
                         await begin();
 
                         let output: unknown;
 
                         try {
-                            output = await execute.apply(definition, executeArgs);
+                            output = await execute.apply(this, executeArgs);
                         } catch (error) {
                             end();
 
