@@ -52,10 +52,10 @@ const run = async (classify: () => Promise<unknown>, untrusted = false) => {
     const { tools } = applyToolPermissions(
         { [NAME]: tool({ description: "forecast", execute: executed, inputSchema: z.object({ city: z.string() }) }) },
         () => {
-            return { key: toolPermissionKey("mcp", "get_forecast", "Weather"), source: "mcp" };
+            return { key: toolPermissionKey("mcp", "get_forecast", "Weather"), source: "mcp", trustId: "trusted-weather" };
         },
         {},
-        { lowRiskCheck: check },
+        { lowRiskCheck: check, lowRiskTrusted: new Set(["trusted-weather"]) },
     );
     let call = 0;
     const result = streamText({
