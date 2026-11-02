@@ -33,6 +33,7 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
+import { composerEditorAttributes } from "./editor-attributes";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
 import type { FileMentionMatch } from "./extensions/file-mention";
@@ -67,8 +68,12 @@ export interface ComposerTiptapEditorProps {
     currentThreadId?: string;
     /** Custom variables for {{variable}} autocomplete */
     customVariables?: PromptVariable[];
+    /** Id of the element that describes the field (aria-describedby) */
+    describedBy?: string;
     /** Whether input is disabled */
     disabled?: boolean;
+    /** Marks the field aria-invalid */
+    invalid?: boolean;
     /** Whether a recalled prompt is showing; insert-mode Escape then restores the draft instead of leaving insert mode. */
     isHistoryRecalled?: () => boolean;
     /** Whether streaming is active */
@@ -146,7 +151,9 @@ const ComposerTiptapEditor = ({
     currentThreadId,
     bannedWordMatches = EMPTY_BANNED_MATCHES,
     customVariables = EMPTY_VARIABLES,
+    describedBy,
     disabled = false,
+    invalid = false,
     isStreaming = false,
     maxRows = 5,
     onCancel,
@@ -244,16 +251,7 @@ const ComposerTiptapEditor = ({
         autofocus: autoFocus ? "end" : false,
         editable: !disabled,
         editorProps: {
-            attributes: {
-                class: clsx(
-                    "min-h-10 w-full resize-none border-none bg-transparent text-base outline-none",
-                    "text-gray-900 dark:text-gray-100",
-                    "focus:ring-0",
-                ),
-                // Hebrew or Arabic typed into an LTR app lays out right to left. One direction for the whole message (the
-                // first strong character decides), not per paragraph.
-                dir: "auto",
-            },
+            attributes: composerEditorAttributes({ describedBy, invalid }),
         },
         extensions: [
             StarterKitExtension.configure({
@@ -391,6 +389,13 @@ const ComposerTiptapEditor = ({
             editor.setEditable(!disabled);
         }
     }, [disabled, editor]);
+
+    // The editor reads its attributes once, at creation: push a changed description or validity to the live element.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            editor.setOptions({ editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid }) } });
+        }
+    }, [editor, describedBy, invalid]);
 
     // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
     useEffect(() => {

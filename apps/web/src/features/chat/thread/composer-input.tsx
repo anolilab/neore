@@ -15,6 +15,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { followUpControl } from "@neore/ai/capabilities";
+import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
 import { stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { isThreadLockedError } from "@neore/client-runtime";
@@ -30,6 +31,7 @@ import ReferenceStrip from "@/features/chat/components/reference-picker/referenc
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
     ATTACHMENT_ACCEPT,
+    attachmentSizeLimit,
     attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
@@ -54,11 +56,13 @@ import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { showError } from "@/lib/toast";
+import { showError, showInfo } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
+import type { TextFileResult } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
@@ -69,6 +73,7 @@ import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
+import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
 // Context window limits (in characters, roughly 4 chars per token)
@@ -473,6 +478,8 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
+
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
 
@@ -635,6 +642,20 @@ const ComposerInput = ({
         return { estimatedTokens, totalChars };
     }, [text, attachments]);
 
+    // The file the over-the-cap notice offers has to stay inside the attachment and context limits too.
+    const draftFitsFile = useMemo(() => {
+        if (text.length <= MAX_PROMPT_CHARS) {
+            return true;
+        }
+
+        const otherChars = contextStats.totalChars - text.length;
+
+        return draftFitsAsFile(text, otherChars, {
+            contextChars: CONTEXT_ERROR_THRESHOLD,
+            maxFileBytes: attachmentSizeLimit({ name: "pasted-text.txt", type: "text/plain" }).maxBytes,
+        });
+    }, [text, contextStats.totalChars]);
+
     const contextWarning = useMemo(() => {
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return {
@@ -700,6 +721,118 @@ const ComposerInput = ({
         [handleFileSelect],
     );
 
+    // Moves text into a text-file attachment. Never throws: a failed upload comes back as `error`, the chip red.
+    const attachTextAsFile = useCallback(
+        async (content: string): Promise<TextFileResult> => {
+            const blob = new Blob([content], { type: "text/plain" });
+            const timestamp = new Date().toISOString().split("T", 1)[0];
+            const file = new File([blob], `pasted-text-${timestamp}.txt`, { type: "text/plain" });
+            const attachmentId = addAttachment(file);
+
+            try {
+                updateAttachment(attachmentId, { status: "uploading" });
+
+                const result = await attachmentAdapter.upload({
+                    file,
+                    onProgress: (progress) => {
+                        updateAttachment(attachmentId, { progress });
+                    },
+                });
+
+                updateAttachment(attachmentId, {
+                    ...uploadedAttachment(result),
+                    progress: 100,
+                    status: "complete",
+                });
+            } catch (error) {
+                console.error("Failed to convert pasted text:", error);
+
+                const message = errorMessage(error, t`Conversion failed`, describeUploadError);
+
+                updateAttachment(attachmentId, { error: message, status: "error" });
+
+                return { attachmentId, error: message };
+            }
+
+            return { attachmentId };
+        },
+        [addAttachment, attachmentAdapter, updateAttachment, t, describeUploadError],
+    );
+
+    // The draft is over the cap (voice, an edit, a link): offer to keep all of it as a file instead of failing the send.
+    const attachingDraftRef = useRef(false);
+    const handleAttachDraftAsFile = useCallback(() => {
+        if (attachingDraftRef.current) {
+            return;
+        }
+
+        attachingDraftRef.current = true;
+        void moveDraftToFile({
+            attach: attachTextAsFile,
+            clearDraft: () => setText(""),
+            discard: removeAttachment,
+            getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+            getDraft: () => useChatUIStore.getState().composerText,
+            // A recognised failure was toasted where it was worded; the draft is still in the composer.
+            onFailure: (error) => {
+                if (!toastedMessages.has(error)) {
+                    showError(error);
+                }
+            },
+        }).finally(() => {
+            attachingDraftRef.current = false;
+        });
+    }, [attachTextAsFile, removeAttachment, setText]);
+
+    // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
+    const pasteSelection = useCallback((): { end: number; start: number } => {
+        const editor = inputAreaRef.current?.getEditor()?.getEditor();
+
+        if (!editor || editor.isDestroyed) {
+            const { length } = useChatUIStore.getState().composerText;
+
+            return { end: length, start: length };
+        }
+
+        const { doc, selection } = editor.state;
+
+        return {
+            end: doc.textBetween(0, selection.to, "\n").length,
+            start: doc.textBetween(0, selection.from, "\n").length,
+        };
+    }, []);
+
+    // The paste did not land in the draft, so say where it went and let the person take it back.
+    const announcePasteAttached = useCallback(
+        (attachmentId: string, pastedText: string) => {
+            const toastId = showInfo(t`Long text was attached as a file.`, {
+                action: {
+                    label: t`Undo`,
+                    // The file may have been sent or removed since: then the text is no longer ours to put back.
+                    onClick: () => {
+                        // The composer is gone (another chat is open): the draft and files now are not this paste's.
+                        if (!isMounted()) {
+                            return;
+                        }
+
+                        undoLongPaste({
+                            attachmentId,
+                            getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                            getDraft: () => useChatUIStore.getState().composerText,
+                            pastedText,
+                            removeAttachment,
+                            setDraft: setText,
+                        });
+                    },
+                },
+                duration: 8000,
+            });
+
+            trackToast(toastId);
+        },
+        [isMounted, removeAttachment, setText, t, trackToast],
+    );
+
     // Handle paste - auto-convert long text to attachment
     const handlePaste = useCallback(
         async (e: React.ClipboardEvent) => {
@@ -729,52 +862,42 @@ const ComposerInput = ({
             // Check for long text content
             const { removed: pasteRemoved, text: pastedText } = stripHiddenText(e.clipboardData.getData("text/plain"));
 
-            if (pastedText) {
-                const lines = pastedText.split("\n").length;
-                const chars = pastedText.length;
+            // Auto-convert if text is long (>500 chars or >10 lines)
+            if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
+                e.preventDefault();
 
-                // Auto-convert if text is long (>500 chars or >10 lines)
-                if (chars > 500 || lines > 10) {
-                    e.preventDefault();
+                // Read before the upload: the caret moves while it runs.
+                const selection = pasteSelection();
 
-                    if (pasteRemoved > 0) {
-                        useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
-                    }
-
-                    // Create text file attachment
-                    const blob = new Blob([pastedText], { type: "text/plain" });
-                    const timestamp = new Date().toISOString().split("T", 1)[0];
-                    const file = new File([blob], `pasted-text-${timestamp}.txt`, { type: "text/plain" });
-
-                    // Add as attachment
-                    const attachmentId = addAttachment(file);
-
-                    try {
-                        updateAttachment(attachmentId, { status: "uploading" });
-
-                        const result = await attachmentAdapter.upload({
-                            file,
-                            onProgress: (progress) => {
-                                updateAttachment(attachmentId, { progress });
-                            },
-                        });
-
-                        updateAttachment(attachmentId, {
-                            ...uploadedAttachment(result),
-                            progress: 100,
-                            status: "complete",
-                        });
-                    } catch (error) {
-                        console.error("Failed to convert pasted text:", error);
-                        updateAttachment(attachmentId, {
-                            error: errorMessage(error, t`Conversion failed`, describeUploadError),
-                            status: "error",
-                        });
-                    }
+                if (pasteRemoved > 0) {
+                    useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
                 }
+
+                await attachLongPaste({
+                    attach: attachTextAsFile,
+                    discard: removeAttachment,
+                    getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                    getChatKey,
+                    getDraft: () => useChatUIStore.getState().composerText,
+                    onAttached: (attachmentId) => {
+                        announcePasteAttached(attachmentId, pastedText);
+                    },
+                    onNotInserted: () => {
+                        showError(t`The pasted text could not be attached and was not inserted.`);
+                    },
+                    // A recognised failure was toasted where it was worded; the text is back in the composer.
+                    onFailure: (error) => {
+                        if (!toastedMessages.has(error)) {
+                            showError(error);
+                        }
+                    },
+                    pastedText,
+                    selection,
+                    setDraft: setText,
+                });
             }
         },
-        [handleFileSelect, addAttachment, attachmentAdapter, updateAttachment, t, describeUploadError],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.
@@ -806,7 +929,15 @@ const ComposerInput = ({
         const streamId = sseStreamState;
         const steerText = text;
 
-        if (!canSteer || (followUp !== "steer" && followUp !== "steer-restart") || !threadId || !streamId || !steerText.trim() || disabled) {
+        if (
+            !canSteer ||
+            (followUp !== "steer" && followUp !== "steer-restart") ||
+            !threadId ||
+            !streamId ||
+            !steerText.trim() ||
+            steerText.length > MAX_PROMPT_CHARS ||
+            disabled
+        ) {
             return;
         }
 
@@ -849,6 +980,11 @@ const ComposerInput = ({
         const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
 
         if (!draftText.trim() && draftAttachments.length === 0) {
+            return;
+        }
+
+        // The notice under the input says why; the server would answer with its size limit.
+        if (draftText.length > MAX_PROMPT_CHARS) {
             return;
         }
 
@@ -1230,6 +1366,7 @@ const ComposerInput = ({
     );
 
     const hasAttachments = attachments.length > 0;
+    const hasCompletedAttachments = attachments.some((a) => a.status === "complete");
     const hasAttachedReferences = attachedReferences.length > 0;
     const editingAttachment = editingAttachmentId ? attachments.find((a) => a.id === editingAttachmentId) : null;
 
@@ -1344,12 +1481,14 @@ const ComposerInput = ({
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
                 followUp={followUp}
+                hasCompletedAttachments={hasCompletedAttachments}
                 hiddenRemoved={hiddenRemoved}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
                 onAddAttachment={compact ? undefined : handleAddAttachment}
+                onAttachDraftAsFile={draftFitsFile ? handleAttachDraftAsFile : undefined}
                 onCancel={handleCancel}
                 onCaptureScreen={compact || !canCaptureScreen ? undefined : handleCaptureScreen}
                 onChange={handleTextChange}
@@ -1364,6 +1503,7 @@ const ComposerInput = ({
                 placeholder={placeholder ?? t`Type your message...`}
                 ref={inputAreaRef}
                 requestCompletion={compact ? undefined : requestCompletion}
+                tooLongForFile={!draftFitsFile}
                 value={text}
             />
 

@@ -24,8 +24,13 @@ export const cleanEditorText = (editor: Editor): void => {
     }
 
     // From the end, so an earlier range keeps its position; the transaction maps the selection itself.
-    for (const { from, to } of ranges.toReversed()) {
-        tr.delete(from, to);
+    // An index loop: `toReversed` is ES2023 and missing in browsers the ES2022 target supports.
+    for (let index = ranges.length - 1; index >= 0; index -= 1) {
+        const range = ranges[index];
+
+        if (range) {
+            tr.delete(range.from, range.to);
+        }
     }
 
     // Not undoable on its own: Undo must reverse the person's edit, not this cleanup.

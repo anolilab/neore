@@ -17,6 +17,7 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { FollowUpControl } from "@neore/ai/capabilities";
+import { MAX_PROMPT_CHARS } from "@neore/ai/constants";
 import { buttonVariants } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Separator } from "@neore/ui/components/separator";
@@ -24,13 +25,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import clsx from "clsx";
 import { CornerDownRightIcon, ListPlusIcon, Loader2Icon, MonitorIcon, PencilIcon, PlusIcon, SendIcon, Square, UploadIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useImperativeHandle, useRef } from "react";
+import { lazy, Suspense, useId, useImperativeHandle, useRef } from "react";
 
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 
 import type { ChatReference } from "./chat-reference";
+import { ComposerLengthNotice } from "./composer-length-notice";
 import ComposerTextCounter from "./composer-text-counter";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
 import { ComposerTiptapEditor } from "./composer-tiptap/composer-tiptap-editor";
@@ -74,6 +76,8 @@ interface ComposerInputAreaProps {
      */
     followUp?: FollowUpControl;
 
+    /** Whether the draft has a finished upload; with one, an empty text can still be sent. */
+    hasCompletedAttachments?: boolean;
     /** Hidden characters taken out of the draft; shown as a notice */
     hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
@@ -86,6 +90,8 @@ interface ComposerInputAreaProps {
     maxRows?: number;
     /** Called when attachment button is clicked */
     onAddAttachment?: () => void;
+    /** Moves an over-the-cap draft into a text attachment; the length notice offers it. Leave out where it would not fit. */
+    onAttachDraftAsFile?: () => void;
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
     /** Called when "Capture screen" is chosen; omit where screen capture is unsupported */
@@ -116,6 +122,8 @@ interface ComposerInputAreaProps {
     placeholder?: string;
     /** Ghost-text autocomplete source; omit to turn it off. See `ComposerTiptapEditor`. */
     requestCompletion?: GhostRequest;
+    /** The over-the-cap draft would not fit even as a file, so the notice offers none. */
+    tooLongForFile?: boolean;
     /** Text value */
     value: string;
 }
@@ -131,6 +139,7 @@ const ComposerInputArea = ({
     autoFocus = true,
     bannedWordError,
     bannedWordMatches,
+    onAttachDraftAsFile,
     beforeInput,
     canQueueWhileStreaming = false,
     compact = false,
@@ -138,6 +147,7 @@ const ComposerInputArea = ({
     disabled = false,
     followUp = "none",
     hiddenRemoved = 0,
+    hasCompletedAttachments = false,
     isStreaming = false,
     isUploading = false,
     maxRows = 5,
@@ -158,6 +168,7 @@ const ComposerInputArea = ({
     placeholder,
     ref,
     requestCompletion,
+    tooLongForFile = false,
     value,
 }: ComposerInputAreaProps & { ref?: React.RefObject<ComposerInputAreaRef | null> }) => {
     const { t } = useLingui();
@@ -174,6 +185,12 @@ const ComposerInputArea = ({
     }, []);
 
     const isEmpty = !value.trim();
+    // A draft with only a finished attachment is sendable, so it needs the send control as much as typed text does.
+    const canSend = !isEmpty || hasCompletedAttachments;
+    // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
+    const isOverCap = value.length > MAX_PROMPT_CHARS;
+    const lengthNoticeId = useId();
+    const overCapDescription = isOverCap ? lengthNoticeId : undefined;
 
     return (
         <>
@@ -268,7 +285,9 @@ const ComposerInputArea = ({
                         bannedWordMatches={bannedWordMatches}
                         currentThreadId={currentThreadId}
                         customVariables={customVariables}
+                        describedBy={overCapDescription}
                         disabled={disabled}
+                        invalid={isOverCap}
                         isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}
@@ -302,18 +321,19 @@ const ComposerInputArea = ({
                     survive when transcribed text makes the input non-empty. */}
                 {isStreaming ? (
                     <>
-                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && !isEmpty && !isUploading && (
+                        {onSteer && (followUp === "steer" || followUp === "steer-restart") && canSend && !isUploading && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={followUp === "steer-restart" ? t`Interrupt and restart` : t`Steer the reply`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled}
+                                            disabled={disabled || isOverCap}
                                             onClick={onSteer}
                                             type="button"
                                         >
@@ -328,18 +348,19 @@ const ComposerInputArea = ({
                                 </TooltipContent>
                             </Tooltip>
                         )}
-                        {canQueueWhileStreaming && (!isEmpty || isUploading) && (
+                        {canQueueWhileStreaming && (canSend || isUploading) && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Queue message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "outline" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading}
+                                            disabled={disabled || isUploading || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
@@ -381,18 +402,19 @@ const ComposerInputArea = ({
                         <Suspense fallback={null}>
                             <ComposerVoiceInput compact={compact} disabled={disabled} hidden={!isEmpty || isUploading} />
                         </Suspense>
-                        {(!isEmpty || isUploading) && (
+                        {(canSend || isUploading) && (
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
                                         <button
+                                            aria-describedby={overCapDescription}
                                             aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Send message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading}
+                                            disabled={disabled || isUploading || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
@@ -418,6 +440,7 @@ const ComposerInputArea = ({
                         other: "# invisible characters were removed from your message.",
                     })}
             </div>
+            <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />
         </>
     );
 };

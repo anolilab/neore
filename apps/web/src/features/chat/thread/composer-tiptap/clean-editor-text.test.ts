@@ -100,4 +100,19 @@ describe(cleanEditorText, () => {
         expect(editor.getText()).toBe("abc");
         expect(editor.state.selection.from).toBe(3);
     });
+
+    it("works where Array.prototype.toReversed does not exist (Safari < 16, Chrome < 110)", () => {
+        const saved = Array.prototype.toReversed;
+        const editor = editorWith("<p>a\u{E0041}b\u{202E}c</p>");
+
+        Reflect.deleteProperty(Array.prototype, "toReversed");
+
+        try {
+            cleanEditorText(editor);
+        } finally {
+            Reflect.defineProperty(Array.prototype, "toReversed", { configurable: true, value: saved, writable: true });
+        }
+
+        expect(editor.getText()).toBe("abc");
+    });
 });
