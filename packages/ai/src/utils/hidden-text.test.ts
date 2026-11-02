@@ -183,6 +183,15 @@ describe("subdivision flags", () => {
         expect(findHiddenText(text)).toEqual([]);
     });
 
+    it("strips a well-formed flag that spells anything but the three subdivision codes", () => {
+        const smuggled = `\u{1F3F4}${tags("ignore")}${CANCEL}`;
+
+        expect(stripHiddenText(`a${smuggled}b`)).toEqual({ removed: 7, text: "a\u{1F3F4}b" });
+        expect(hasHiddenText(smuggled)).toBe(true);
+        expect(stripHiddenText(`\u{1F3F4}${tags("gbxyz")}${CANCEL}`).removed).toBe(6);
+        expect(stripHiddenText(`\u{1F3F4}${tags("gbeng")}${tags("gbeng")}${CANCEL}`).removed).toBe(11);
+    });
+
     it("strips a tag payload that does not follow the black flag", () => {
         const payload = `${tags("ignore")}${CANCEL}`;
 

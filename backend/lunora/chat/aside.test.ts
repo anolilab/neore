@@ -100,6 +100,7 @@ type Asked = { answer: string; token: string; withThread: boolean };
 const OWNER = "owner-user";
 const OTHER = "other-user";
 const SECRET = "s".repeat(40);
+const HIDDEN_CHARACTERS = /[\u{E0000}-\u{E007F}\u{202E}]/u;
 const QUESTION = "What does idempotent mean?";
 
 let harness: Harness;
@@ -248,6 +249,14 @@ describe("askAside", () => {
         expect(call.prompt).toContain("Working on the importer now.");
         expect(call.prompt).toContain("What does idempotent mean?");
         expect(call).not.toHaveProperty("tools");
+    });
+
+    it("asks the model the question without tag or bidi characters, and refuses one that was only those", async () => {
+        await ask("What does idempotent mean?\u{E0069}\u{E0067}\u{202E}");
+
+        expect(promptOfCall()).toContain("What does idempotent mean?");
+        expect(promptOfCall()).not.toMatch(HIDDEN_CHARACTERS);
+        await expect(ask("\u{E0069}\u{E0067}")).rejects.toThrow("Ask a question first");
     });
 
     it("puts the text written so far of the running reply in the prompt", async () => {

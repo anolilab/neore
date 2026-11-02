@@ -14,8 +14,8 @@
  * - the joiners U+200C and U+200D stay only as the ONE joiner between two visible characters (a ZWJ emoji, a Persian
  *   word): a run of them, alternating, is a binary payload, and one at an end of the text or beside a hidden character
  *   renders nothing;
- * - the tag letters, digits and CANCEL TAG of a subdivision flag (England, Scotland, Wales) stay when they directly
- *   follow U+1F3F4 and are well formed: 1 to 6 tag characters, then U+E007F.
+ * - the tag letters and CANCEL TAG of the three subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`)
+ *   stay when they directly follow U+1F3F4 and spell exactly one of those codes, then U+E007F; any other tag sequence is text.
  * The `strict` form treats every selector and tag as hidden.
  */
 
@@ -28,8 +28,9 @@ const HIDDEN =
 // One hidden character, not global: no `lastIndex` to carry between calls.
 const HIDDEN_ONE = new RegExp(HIDDEN.source, "u");
 const HIDDEN_STRICT = /[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
-// U+1F3F4 BLACK FLAG, 1 to 6 tag digits or letters (a subdivision code such as `gbeng`), CANCEL TAG.
-const SUBDIVISION_FLAG = /\u{1F3F4}[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]{1,6}\u{E007F}/gu;
+// U+1F3F4 BLACK FLAG, the tags of one of the three RGI subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`), CANCEL TAG.
+// Any other code is free text in tag letters, so it is not allowed.
+const SUBDIVISION_FLAG = /\u{1F3F4}\u{E0067}\u{E0062}(?:\u{E0065}\u{E006E}\u{E0067}|\u{E0073}\u{E0063}\u{E0074}|\u{E0077}\u{E006C}\u{E0073})\u{E007F}/gu;
 const BLACK_FLAG_UNITS = 2;
 // What each kind of selector can modify. Another selector, a mark, a space or a control is no base for any of them.
 const EMOJI_BASE = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}]$/u;

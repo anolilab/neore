@@ -22,6 +22,13 @@ describe("restoreComposer", () => {
         expect({ attachedReferences, composerAttachments, composerText }).toStrictEqual(draft);
     });
 
+    it("filters hidden characters out of the restored draft and counts them once", () => {
+        useChatUIStore.getState().restoreComposer({ ...draft, composerText: "hi\u{E0041}\u{E0042}\u{202E}" });
+
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
+    });
+
     it.each([
         ["text", { composerText: "new draft" }],
         ["attachments", { composerAttachments: [{ ...attachment, id: "a2" }] }],

@@ -27,6 +27,7 @@
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
@@ -160,7 +161,8 @@ const admitCommon = async (
     ctx: MutationCtx,
     args: Pick<CreateSubAgentRunArgs, "parentThreadId" | "skillSlug" | "task" | "toolAllowlist" | "userId">,
 ): Promise<CommonAdmission | { error: string }> => {
-    const task = args.task.trim();
+    // Hidden characters can carry instructions nobody reads; the worker's prompt never has them. Every dispatch (a person's, a lead's tool call) passes here.
+    const task = stripHiddenText(args.task).text.trim();
 
     if (task.length === 0 || task.length > SUB_AGENT_TASK_MAX) {
         return { error: `The task must be between 1 and ${String(SUB_AGENT_TASK_MAX)} characters` };

@@ -35,6 +35,7 @@
  *   reply across branches.
  */
 import { isCustomModelId, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage } from "ai";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
@@ -314,7 +315,7 @@ export const askAside = authAction
     )
     .action(async ({ args: { entryId, question: rawQuestion, threadId, unlockProof }, ctx }) => {
         const { plan, role, userId } = ctx.user;
-        const question = rawQuestion.trim();
+        const question = stripHiddenText(rawQuestion).text.trim();
 
         if (!question || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "Ask a question first");

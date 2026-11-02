@@ -317,7 +317,10 @@ export const useChatUIStore = create<ChatUIStore>()(
                         return;
                     }
 
-                    set(draft);
+                    // The draft may be raw text from a failed send: it goes through the same filter as typing.
+                    const { removed, text: clean } = stripHiddenText(draft.composerText);
+
+                    set({ ...draft, composerHiddenRemoved: get().composerHiddenRemoved + removed, composerText: clean });
                 },
 
                 setActiveDocumentId: (documentId) => {
