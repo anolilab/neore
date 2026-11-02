@@ -38,10 +38,21 @@ export const createRunLowRiskCheck = (
     // Resolved once per run, and ahead of the budget: a user whose model filters refuse the classifier spends none of it.
     // Strict, because the model that judged is stamped on every approval it grants.
     let modelPromise: ReturnType<typeof getUtilityModel> | undefined;
+    // Set when a lookup outlasted the deadline: later checks go to the person at once instead of waiting it out again.
+    // A lookup that does finish late clears it.
+    let stalled = false;
     const resolveModel = (): ReturnType<typeof getUtilityModel> => {
-        modelPromise ??= loadModelFilterRules(ctx, userId).then(
-            async (rules) => await getUtilityModel(gatewayFetch(ctx), { rules, threadId, userId }, LOW_RISK_MODEL, { strict: true }),
-        );
+        if (stalled) {
+            return Promise.reject(new Error("The quick check's model lookup is stalled"));
+        }
+
+        modelPromise ??= loadModelFilterRules(ctx, userId)
+            .then(async (rules) => await getUtilityModel(gatewayFetch(ctx), { rules, threadId, userId }, LOW_RISK_MODEL, { strict: true }))
+            .then((model) => {
+                stalled = false;
+
+                return model;
+            });
         // A failed attempt is not kept: the next call asks again.
         modelPromise.catch(() => {
             modelPromise = undefined;
@@ -100,6 +111,7 @@ export const createRunLowRiskCheck = (
                     .catch(() => false),
                 new Promise<boolean>((resolve) => {
                     timer = setTimeout(() => {
+                        stalled = true;
                         resolve(false);
                     }, LOW_RISK_DEADLINE_MS);
                 }),

@@ -53,6 +53,13 @@ const PAID_PLAN_GRANT = Symbol("neore.utilityPaidPlanGrant");
 export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): ModelFilterRules =>
     granted ? ({ ...rules, [PAID_PLAN_GRANT]: true } as ModelFilterRules) : rules;
 
+/** Whether the gateway will serve this candidate from its EU endpoint: it pins an OpenRouter call only for exactly `["EU"]`. */
+const routedToEuEndpoint = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+    const allowed = rules?.allowedRegions;
+
+    return definition.provider === "openrouter" && allowed?.length === 1 && allowed[0] === "EU" && deriveModelRegions(definition).includes("EU");
+};
+
 /**
  * Whether a candidate can honour the user's blocked regions. The gateway does not turn `blockedRegions` into a
  * routing restriction, so a model reachable in a blocked region could be served from it: with any region blocked,
@@ -61,7 +68,38 @@ export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): Mo
 export const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
     const blocked = rules?.blockedRegions;
 
-    return !blocked || blocked.length === 0 || deriveModelRegions(definition).every((region) => !blocked.includes(region));
+    if (!blocked || blocked.length === 0) {
+        return true;
+    }
+
+    // The gateway's EU-pinned endpoint serves the call from the EU alone, whatever other regions the model has.
+    if (routedToEuEndpoint(definition, rules) && !blocked.includes("EU")) {
+        return true;
+    }
+
+    return deriveModelRegions(definition).every((region) => !blocked.includes(region));
+};
+
+/**
+ * Whether a candidate can honour the user's allowed regions. The shared predicate accepts a model when ANY of its
+ * regions is allowed, but the gateway pins an OpenRouter call to a region only for exactly `["EU"]` (the EU endpoint);
+ * otherwise it may be served from any of the model's regions. So a candidate qualifies when EVERY region of it is
+ * allowed, or when the gateway will route it to the one allowed endpoint.
+ */
+const staysInAllowedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+    const allowed = rules?.allowedRegions;
+
+    if (!allowed || allowed.length === 0) {
+        return true;
+    }
+
+    const regions = deriveModelRegions(definition);
+
+    if (regions.every((region) => allowed.includes(region))) {
+        return true;
+    }
+
+    return routedToEuEndpoint(definition, rules);
 };
 
 /**
@@ -86,6 +124,7 @@ export const pickUtilityModelId = (
             definition.enabled !== false &&
             (paidPlan || !requiresPaidPlan(definition)) &&
             avoidsBlockedRegions(definition, rules) &&
+            staysInAllowedRegions(definition, rules) &&
             backupFilterRejection(definition, rules) === null
         );
     });

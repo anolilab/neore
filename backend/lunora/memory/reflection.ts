@@ -589,6 +589,9 @@ export const runMemoryReflection = internalAction
     .input({ userId: v.string() })
     .output(v.null())
     .action(async ({ args: { userId }, ctx }) => {
+        // Read BEFORE the day is claimed: a settings read that fails throws here and leaves the day unclaimed, so the
+        // job can run again. Run with no rules instead, the user's filters would be ignored and the day would be spent.
+        const rules = await loadModelFilterRules(ctx, userId);
         const claim = await ctx.runMutation(internal.memory.reflection.claimReflectionRun, { userId });
 
         if (!claim.claimed) {
@@ -603,7 +606,7 @@ export const runMemoryReflection = internalAction
         let model: UtilityModel | undefined;
 
         try {
-            model = await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId });
+            model = await getUtilityModel(gatewayFetch(ctx), { rules, userId });
         } catch (error) {
             console.warn("[memory/reflection] Utility model unavailable, applying the deterministic plan only:", error);
         }
