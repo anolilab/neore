@@ -19,11 +19,12 @@
                 "{workspaceRoot}/pnpm-lock.yaml"
             ],
             "outputs": ["{projectRoot}/lunora/_generated/**"],
+            "dependsOn": ["^build"],
             "cache": true
         },
         "lint:types": {
-            "//": "`tsc` compiles `_generated/app.ts`, which imports the git-ignored `architecture.ts`; codegen writes it, so it must run first (cached on the sources).",
-            "dependsOn": ["^build", "codegen"]
+            "//": "`tsc` compiles `_generated/app.ts`, which imports the git-ignored `architecture.ts`; codegen writes it, so it must run first (cached on the sources). `codegen` itself depends on `^build`: without the packages' declarations it infers `unknown` return types and still exits 0.",
+            "dependsOn": ["codegen"]
         },
         "test": {
             "//": "`src/server.ts` (and its tests) load `_generated/app.ts`, which imports the git-ignored `architecture.ts`.",
