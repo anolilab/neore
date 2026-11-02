@@ -78,7 +78,14 @@ const sourceFiles = (directory: string): string[] =>
 
 describe("row-level security wiring", () => {
     it("guards every client-reachable query and mutation", async () => {
-        const { LUNORA_FUNCTIONS } = await import("../../_generated/functions");
+        const { loadAllFunctions, LUNORA_FUNCTIONS } = await import("../../_generated/functions");
+
+        // The registry is lazy: an entry carries only its metadata until its module is evaluated, and `rls` comes from the builder chain.
+        const { checked, failures } = await loadAllFunctions();
+
+        expect(failures, "every function module evaluates").toEqual([]);
+        expect(checked).toBeGreaterThan(300);
+
         const reachable = Object.entries(LUNORA_FUNCTIONS).filter(
             ([, function_]) =>
                 function_.visibility !== "internal" && (function_.kind === "query" || function_.kind === "mutation") && function_.lifecycle === undefined,

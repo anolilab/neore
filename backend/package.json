@@ -50,18 +50,18 @@
         "./workflow/mentions": "./lunora/workflow/mentions.ts"
     },
     "scripts": {
-        "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
+        "build": "node scripts/run-then-codegen.mjs lunora build --lazy-functions --emit-bindings lunora-bindings.json",
         "clean": "rimraf node_modules dist .eslintcache lunora/_generated",
-        "codegen": "lunora codegen && node scripts/check-generated.mjs",
+        "codegen": "lunora codegen --lazy-functions && node scripts/check-generated.mjs",
         "deploy": "lunora deploy",
-        "dev": "lunora dev --inspector-port 9235",
+        "dev": "lunora dev --lazy-functions --inspector-port 9235",
         "lint:eslint": "eslint .",
         "lint:eslint:fix": "eslint . --fix",
         "lint:prettier": "prettier --check . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
         "lunora:advise": "lunora advisor",
-        "prepare:deploy": "node scripts/run-then-codegen.mjs lunora prepare",
+        "prepare:deploy": "node scripts/run-then-codegen.mjs lunora prepare --lazy-functions",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary",
         "test:watch": "vitest"

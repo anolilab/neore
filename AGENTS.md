@@ -1368,6 +1368,16 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
   it is a regression check for a `.pnpm` store-path import codegen once emitted
   (which came back once after an unrelated change). If generated output does not
   compile, the fix goes in a `.d.ts`, in our own source, or upstream.
+- **Functions load lazily** (`--lazy-functions` on the backend's `codegen`,
+  `build`, `prepare:deploy` and `dev` scripts; there is no config key, only the
+  flag or `LUNORA_LAZY_FUNCTIONS=1`). `LUNORA_FUNCTIONS` holds metadata stubs and
+  each module under `_generated/fn/` is evaluated on first call, which is what
+  keeps the Worker's startup CPU down. Codegen must read every procedure's
+  builder chain statically back to a `_generated/server` factory (a `const`
+  alias is followed, an `export { … } from` re-export is not — hence the const
+  aliases in `lib/crpc.ts`), and `.expose()`/`.x402()` need literal arguments.
+  A test that inspects the registry (`rls.guard.test.ts`) must `loadAllFunctions()`
+  first, or it sees stubs with no `rls`.
 - **One cold pass is reproducible.** `rm -rf lunora/_generated && pnpm codegen`
   reproduces the committed output byte-for-byte.
 - **A cold pass breaks a running vite.** While `_generated/` is gone, the app's

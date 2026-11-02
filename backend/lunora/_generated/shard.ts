@@ -21,7 +21,7 @@ import { paymentsFromContext } from "@lunora/payment";
 import { sensitiveArgumentNames } from "lunorash/values";
 
 import schema from "../schema.js";
-import { LUNORA_FUNCTIONS, LUNORA_LIFECYCLE_HOOKS, LUNORA_MIGRATIONS, LUNORA_IP_READER_PATHS } from "./functions.js";
+import { LUNORA_FUNCTIONS, LUNORA_LIFECYCLE_HOOKS, LUNORA_MIGRATIONS, getLoadedFunction, loadFunction, LUNORA_IP_READER_PATHS } from "./functions.js";
 
 type FunctionKind = "action" | "mutation" | "query";
 
@@ -367,6 +367,7 @@ const dispatchRun = async (
     // `undefined` for a ctx built outside a registered function (admin, migration).
     callerKind?: "stream" | FunctionKind,
     runTransactional?: (work: () => Promise<unknown>) => Promise<unknown>,
+    captureScope?: () => () => void,
 ): Promise<unknown> => {
     // A query and a stream are read-only: their declared ctx is the query ctx. The
     // ctx object installs `run*` on every kind (one shape, built once), so the
@@ -398,6 +399,24 @@ const dispatchRun = async (
     runDepth += 1;
 
     try {
+        let loaded = getLoadedFunction(functionPath);
+
+        if (loaded === undefined) {
+            const restoreScope = captureScope?.();
+
+            try {
+                loaded = await loadFunction(functionPath);
+            } finally {
+                restoreScope?.();
+            }
+        }
+
+        if (!loaded) {
+            throw new Error(`unknown function: ${functionPath}`);
+        }
+
+        const loadedFunction = loaded;
+
         // A mutation composed from an action (or an http action) is the shape the
         // docs prescribe for atomicity — "do the transactional reads and writes in
         // a mutation and call it from the action". It only holds if the composed
@@ -407,10 +426,10 @@ const dispatchRun = async (
         // inside a mutation rides the enclosing span instead of opening a second
         // one (see `runMutationTransaction`).
         if (runTransactional) {
-            return await runTransactional(async () => registered.handler(ctx, args));
+            return await runTransactional(async () => loadedFunction.handler(ctx, args));
         }
 
-        return await registered.handler(ctx, args);
+        return await loadedFunction.handler(ctx, args);
     } finally {
         runDepth -= 1;
     }
@@ -469,6 +488,20 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
         private blockedUniqueIndexes: readonly string[] = [];
         private migrated = false;
         private migrationRetryAt = 0;
+        protected override prepareFunction(functionPath: string, reason: "rpc" | "subscription" | "stream" | "reactor"): Promise<void> | undefined {
+            const registered = LUNORA_FUNCTIONS[functionPath];
+            const allowsInternal = reason === "reactor" || (reason === "rpc" && this.isSystemDispatch());
+
+            if (registered?.visibility === "internal" && !allowsInternal) {
+                return;
+            }
+
+            if (getLoadedFunction(functionPath) !== undefined) {
+                return;
+            }
+
+            return loadFunction(functionPath).then(() => undefined);
+        }
 
 
         protected override sensitiveArgNames(functionPath: string): ReadonlySet<string> {
@@ -493,6 +526,23 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                     return await this.handleRpc(functionPath, args, headroom, scope, bookmarks, own);
                 } finally {
                     own.clear();
+                }
+            }
+
+            const registeredBeforeLoad = LUNORA_FUNCTIONS[functionPath];
+
+            if (registeredBeforeLoad?.visibility === "internal" && !this.isSystemDispatch()) {
+                throw new LunoraError("FUNCTION_NOT_FOUND", "function not registered: " + functionPath);
+            }
+
+            const requestScope = this.captureRequestScope();
+            const preparation = this.prepareFunction(functionPath, "rpc");
+
+            if (preparation !== undefined) {
+                try {
+                    await preparation;
+                } finally {
+                    this.restoreRequestScope(requestScope);
                 }
             }
 
@@ -703,6 +753,8 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                 return null;
             }
 
+            const preparation = this.prepareFunction(functionPath, "subscription");
+            if (preparation !== undefined) await preparation;
             this.ensureServable();
 
             const footprint = createReadFootprint();
@@ -817,6 +869,17 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
         // would instead run an app's reactor as whichever user happened to write
         // last, which is worse than running it as nobody.
         protected override async runReactor(functionPath: string, previousDigest?: string): Promise<{ digest: string; ran: boolean; tables: readonly string[] } | undefined> {
+            const requestScope = this.captureRequestScope();
+            const preparation = this.prepareFunction(functionPath, "reactor");
+
+            if (preparation !== undefined) {
+                try {
+                    await preparation;
+                } finally {
+                    this.restoreRequestScope(requestScope);
+                }
+            }
+
             const registered = LUNORA_FUNCTIONS[functionPath];
 
             if (!registered || registered.kind !== "mutation") {
@@ -1763,12 +1826,17 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                 ctx.services = services;
             }
 
+            const captureScope = (): (() => void) => {
+                const requestScope = this.captureRequestScope();
+                return () => this.restoreRequestScope(requestScope);
+            };
+
             const installRun = (target: Record<string, unknown>, kind: typeof contextKind): void => {
                 target.runAction = (reference: FunctionReference, fnArgs: Record<string, unknown>) => {
                     // The callee runs inside this invocation, so its marked arguments are scrubbed here too.
                     this.admitSensitiveArgs(options.sensitive, reference.__lunoraRef, fnArgs);
 
-                    return dispatchRun("action", reference.__lunoraRef, fnArgs, target, kind);
+                    return dispatchRun("action", reference.__lunoraRef, fnArgs, target, kind, undefined, captureScope);
                 };
                 // The composed mutation runs under the SAME wrapper the top-level RPC
                 // uses, so "do the transactional work in a mutation and call it from the
@@ -1804,7 +1872,7 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                         installRun(mutationCtx, kind);
                     }
 
-                    return dispatchRun("mutation", reference.__lunoraRef, fnArgs, mutationCtx, kind, async (work) => this.runMutationTransaction(mutationCtx, work));
+                    return dispatchRun("mutation", reference.__lunoraRef, fnArgs, mutationCtx, kind, async (work) => this.runMutationTransaction(mutationCtx, work), captureScope);
                 };
                 // `ctx.runQuery(ref, args, { untracked: true })` runs the sub-query on
                 // its OWN query context, built without the subscription's read-footprint
@@ -1830,6 +1898,8 @@ export const createShardDO = (config: ShardDOConfig = {}): new (state: ShardDOSt
                             ? this.buildCtx({ bookmarks: options.bookmarks, functionPath: options.functionPath, headroom: options.headroom, identity: caller, kind: "query", scope: options.scope, sensitive: options.sensitive })
                             : queryContext(),
                         kind,
+                        undefined,
+                        captureScope,
                     );
                 };
             };
