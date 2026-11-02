@@ -21,6 +21,7 @@ import type { RateLimitName } from "../lib/rate-limiter";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { aiUserPreferencesFields, userSettingsFieldsWithoutUserId } from "./fields";
 import type { McpSecretHeader } from "./lib/mcp-secret-headers";
+import { assertSettingsWritable } from "./lib/preference-writes";
 import { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } from "./lib/mcp-secret-headers";
 import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreferences, type StoredKeyEntry } from "./lib/byok-keys";
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
@@ -287,6 +288,9 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.keyboardShortcuts = { ...storedObject, ...(shortcuts as Record<string, unknown>) };
         }
     }
+
+    // The generic settings write is the other way into a locked key: it takes the same refusal as `preference-writes.ts`.
+    await assertSettingsWritable(context.db, user?.activeOrganization?.id ?? null, toStore);
 
     if (settings) {
         await context.db.patch(tableName, settings._id, withoutUndefined(toStore));

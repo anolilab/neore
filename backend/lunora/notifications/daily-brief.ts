@@ -125,7 +125,7 @@ export const setDailyBriefEnabled = authMutation
 
         const settings = await loadUserSettings(ctx, userId);
 
-        await saveUserSettings(ctx.db, settings, userId, { dailyBriefEnabled: enabled });
+        await saveUserSettings(ctx.db, settings, userId, { dailyBriefEnabled: enabled }, ctx.user.activeOrganization?.id ?? null);
 
         if (enabled) {
             await ensureScheduled(ctx, userId, settings?.timezone);

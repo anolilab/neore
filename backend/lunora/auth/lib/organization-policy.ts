@@ -66,7 +66,7 @@ const show = (key: string): string => JSON.stringify(key.length > 40 ? `${key.sl
 
 const unknownKey = (keys: ReadonlyArray<string>, allowed: ReadonlySet<string>): string | undefined => keys.find((key) => !allowed.has(key));
 
-const isManagedSetting = (key: string): key is ManagedSettingKey => Object.hasOwn(MANAGED_SETTINGS, key);
+export const isManagedSetting = (key: string): key is ManagedSettingKey => Object.hasOwn(MANAGED_SETTINGS, key);
 
 const parseModels = (value: unknown): { error: string } | { models: { allowed: string[] } } => {
     if (!isRecord(value)) {
@@ -285,3 +285,62 @@ export const parseOrganizationPolicy = (text: string): PolicyParseResult => {
 
 /** The text a valid policy is stored as. Key order is fixed by the parser, so equal policies store equal text. */
 export const serializeOrganizationPolicy = (policy: OrganizationPolicy): string => JSON.stringify(policy);
+
+/**
+ * What the organization policy says for one caller: no policy row, a parsed
+ * policy, or a stored document that no longer parses. The three are decided
+ * apart because they fail in different directions: a write fails closed and a
+ * read falls back to the user's own value (plans/org-policy.md, decision 2).
+ */
+export type PolicyState = { kind: "none" } | { kind: "policy"; policy: OrganizationPolicy } | { kind: "unreadable" };
+
+export const NO_POLICY: PolicyState = { kind: "none" };
+
+/** The state for a stored document, or for no row at all (`null` / `undefined`). */
+export const readPolicyState = (document: string | null | undefined): PolicyState => {
+    if (document === null || document === undefined) {
+        return NO_POLICY;
+    }
+
+    const parsed = parseOrganizationPolicy(document);
+
+    return parsed.ok ? { kind: "policy", policy: parsed.policy } : { kind: "unreadable" };
+};
+
+/**
+ * The managed settings a patch would write that the policy locks. `undefined`
+ * means "leave unchanged" (`withoutUndefined`), so it writes nothing; a key that
+ * is not managed is never refused, so a corrupt policy cannot block a timezone
+ * save. When the policy cannot be read, every managed key in the patch is
+ * refused: the write fails closed.
+ */
+export const lockedKeysInPatch = (fields: Readonly<Record<string, unknown>>, state: PolicyState): ManagedSettingKey[] => {
+    if (state.kind === "none") {
+        return [];
+    }
+
+    return Object.keys(fields)
+        .filter((key): key is ManagedSettingKey => fields[key] !== undefined && isManagedSetting(key))
+        .filter((key) => state.kind === "unreadable" || state.policy.settings?.[key]?.locked === true)
+        .toSorted(compareStrings);
+};
+
+/**
+ * The value a read should see: the locked value when the policy locks the key;
+ * otherwise the user's own value, falling back to the policy's default when the
+ * user never chose one. A policy that cannot be read keeps the user's value.
+ * Callers keep their own meaning for `undefined` (`?? false`, `!== false`).
+ */
+export const effectiveSetting = (key: ManagedSettingKey, userValue: boolean | undefined, state: PolicyState): boolean | undefined => {
+    if (state.kind !== "policy") {
+        return userValue;
+    }
+
+    const entry = state.policy.settings?.[key];
+
+    if (entry === undefined) {
+        return userValue;
+    }
+
+    return entry.locked ? entry.value : (userValue ?? entry.value);
+};
