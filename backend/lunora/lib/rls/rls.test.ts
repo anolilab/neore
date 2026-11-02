@@ -29,6 +29,17 @@ const summaryModel = vi.hoisted(() =>
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText: summaryModel };
 });
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+        loadSharedModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
 vi.mock("../utility-model", () => {
     return {
         getUtilityModel: async () => {
@@ -46,6 +57,7 @@ vi.mock("../../_generated/internal", async (importOriginal) => registeredApi(awa
 const MODULES = {
     acp_switch: async () => await import("../../acp/switch"),
     agent_messages: async () => await import("../../agent/messages"),
+    agent_threads: async () => await import("../../agent/threads"),
     chat_agent_switch: async () => await import("../../chat/agent-switch"),
     chat_functions: async () => await import("../../chat/functions"),
     chat_sharing: async () => await import("../../chat/sharing"),

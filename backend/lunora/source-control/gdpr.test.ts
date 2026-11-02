@@ -326,9 +326,17 @@ describe("pull request / thread links in GDPR flows", () => {
     it("is wired into both workflows under explicit ids", () => {
         const workflow = (name: string): string => readFileSync(join(import.meta.dirname, "../gdpr/workflows", name), "utf8");
         const exportSource = workflow("export-workflow.ts");
+        const deletionSource = workflow("deletion-workflow.ts");
+        // Each step is keyed by `stepDedupId(scope, "<name>", …)`: the instance scope plus a literal step name, stable across retries.
+        const dedupNames = (source: string): string[] => [...source.matchAll(/dedupId: stepDedupId\(scope, "([^"]+)"/gu)].map((match) => match[1] as string);
 
-        expect(exportSource).toContain("collect-pull-request-threads:");
+        const exported = dedupNames(exportSource);
+        const deleted = dedupNames(deletionSource);
+
+        expect(exported).toEqual(expect.arrayContaining(["collect-pull-request-guides", "collect-pull-request-threads", "collect-watched-repositories"]));
+        expect(deleted).toEqual(expect.arrayContaining(["delete-pull-request-guides", "delete-pull-request-threads", "delete-watched-repositories"]));
+        expect(new Set(exported).size).toBe(exported.length);
+        expect(new Set(deleted).size).toBe(deleted.length);
         expect(exportSource).toMatch(EXPORT_THREADS_ARGS);
-        expect(workflow("deletion-workflow.ts")).toContain("delete-pull-request-threads:");
     });
 });

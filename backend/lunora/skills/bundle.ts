@@ -63,6 +63,9 @@ const vKind = v.union(v.literal("skill"), v.literal("trigger"), v.literal("group
 
 // ─── Choosing what to export ────────────────────────────────────────────────
 
+/** `getSkill` answers a skill the caller may not read, or that is gone, with these; any other error is a real failure. */
+export const isSkillUnavailable = (error: unknown): boolean => error instanceof LunoraError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND");
+
 /**
  * The skills the groups name that the caller may read: their own, plus the others `exportBundle` would get through
  * `getSkill` (an organization-shared one). A deleted or no-longer-shared participant is not among them.
@@ -444,7 +447,14 @@ export const exportBundle = authAction
                 }
 
                 // `getSkill` is the access check: it returns null or throws FORBIDDEN for a skill the caller may not read.
-                const skill = await ctx.runQuery(api.skills.functions.getSkill, { skillId: skillId as Id<"skills"> }).catch(() => null);
+                const skill = await ctx.runQuery(api.skills.functions.getSkill, { skillId: skillId as Id<"skills"> }).catch((error: unknown) => {
+                    if (isSkillUnavailable(error)) {
+                        return null;
+                    }
+
+                    // A transient failure is not "not available to you": surface it instead of hiding it.
+                    throw error;
+                });
 
                 if (!skill) {
                     throw new LunoraError(
@@ -520,7 +530,7 @@ export const exportBundle = authAction
  */
 export const removeImportedItem = internalMutation
     .input({ id: v.string().max(MAX_LENGTH.id), kind: vKind, userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.null())
+    .output(v.object({ kept: v.boolean() }))
     .mutation(async ({ args: { id, kind, userId }, ctx }) => {
         const forbidden = (): never => {
             throw new LunoraError("FORBIDDEN", "Not authorized to remove this item");
@@ -562,12 +572,16 @@ export const removeImportedItem = internalMutation
 
             // An imported group starts empty. One with a message in it has been used meanwhile (another tab): keep it
             // rather than delete the person's conversation with the rollback.
-            if (thread && !(await ctx.db.messages.findFirst({ where: { threadId: thread._id } }))) {
+            if (thread) {
+                if (await ctx.db.messages.findFirst({ where: { threadId: thread._id } })) {
+                    return { kept: true };
+                }
+
                 await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id });
             }
         }
 
-        return null;
+        return { kept: false };
     });
 
 /** `lib/claim-once.ts` scope of an import's `importId`. */
@@ -641,6 +655,7 @@ export const previewBundle = authAction
                     requires: v.array(v.string()),
                     skill: v.optional(
                         v.object({
+                            baseSlug: v.string(),
                             description: v.string(),
                             disabledTools: v.array(v.string()),
                             droppedTools: v.array(v.string()),
@@ -670,6 +685,8 @@ export const previewBundle = authAction
                     warnings: v.array(v.string()),
                 }),
             ),
+            /** The slugs the caller's skills already use: the review re-derives the new slugs for the current selection from them. */
+            existingSlugs: v.array(v.string()),
             name: v.string(),
             /** Skills a free account may still add; `null` when it has no limit. */
             skillSlotsLeft: v.union(v.number(), v.null()),
@@ -693,6 +710,7 @@ export const previewBundle = authAction
                     ...entry.view,
                 };
             }),
+            existingSlugs: [...env.existingSlugs],
             name: bundle.name,
             skillSlotsLeft: env.skillLimit === undefined ? null : Math.max(0, env.skillLimit - env.existingSkillCount),
         };
@@ -751,7 +769,7 @@ export const importBundle = authAction
         }
 
         const { userId } = ctx.user;
-        const remove = async (kind: "group" | "skill" | "trigger", id: string): Promise<null> =>
+        const remove = async (kind: "group" | "skill" | "trigger", id: string): Promise<{ kept: boolean }> =>
             await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id, kind, userId });
 
         try {

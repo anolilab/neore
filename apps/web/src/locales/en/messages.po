@@ -24,11 +24,11 @@ msgstr " · model: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:581
 msgid "-- INSERT --"
 msgstr "-- INSERT --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:581
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -51,23 +51,23 @@ msgstr "\"{0}\" has variables that need values."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" will start once its dependencies are done"
 
-#: src/features/chat/thread/composer-input.tsx:562
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "\"{fileName}\" cannot be attached: this file type is not supported."
 
-#: src/features/chat/thread/composer-input.tsx:555
+#: src/features/chat/thread/composer-input.tsx:562
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "\"{fileName}\" could not be attached: its contents do not match its file type."
 
-#: src/features/chat/thread/composer-input.tsx:557
+#: src/features/chat/thread/composer-input.tsx:564
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
 
-#: src/features/chat/thread/composer-input.tsx:560
+#: src/features/chat/thread/composer-input.tsx:567
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:561
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 
@@ -520,7 +520,7 @@ msgid "{0} is required"
 msgstr "{0} is required"
 
 #. placeholder {0}: done.items.length
-#: src/features/skills/components/bundle-import-dialog.tsx:223
+#: src/features/skills/components/bundle-import-dialog.tsx:224
 msgid "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 msgstr "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 
@@ -615,7 +615,7 @@ msgstr "{0} of {maxReferences} selected"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:176
+#: src/features/develop/components/guide-tab.tsx:179
 msgid "{0} on {1}, in {2}"
 msgstr "{0} on {1}, in {2}"
 
@@ -821,6 +821,10 @@ msgstr "{count, plural, one {Used # source, toggle to show} other {Used # source
 msgid "{count, plural, one {Used # source} other {Used # sources}}"
 msgstr "{count, plural, one {Used # source} other {Used # sources}}"
 
+#: src/features/chat/thread/composer-length-notice.tsx:42
+msgid "{count} characters now."
+msgstr "{count} characters now."
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:418
 msgid "{count} queued"
 msgstr "{count} queued"
@@ -932,7 +936,7 @@ msgstr "{handoff} credits"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 
-#: src/features/develop/components/guide-tab.tsx:92
+#: src/features/develop/components/guide-tab.tsx:95
 msgid "{hostLabel} could not be reached. Try again in a moment."
 msgstr "{hostLabel} could not be reached. Try again in a moment."
 
@@ -949,21 +953,21 @@ msgstr "{hostLabel} has no batched review: your comments are posted one after an
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 msgstr "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 
-#: src/features/develop/components/guide-tab.tsx:65
-#: src/features/develop/components/guide-tab.tsx:94
+#: src/features/develop/components/guide-tab.tsx:68
+#: src/features/develop/components/guide-tab.tsx:97
 msgid "{hostLabel} is not connected."
 msgstr "{hostLabel} is not connected."
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:219
+#: src/features/develop/components/guide-tab.tsx:222
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr "{hostLabel} lists only part of this change; {0} files are not in the guide."
 
-#: src/features/develop/components/guide-tab.tsx:62
+#: src/features/develop/components/guide-tab.tsx:65
 msgid "{hostLabel} or your computer could not be reached while the guide was written."
 msgstr "{hostLabel} or your computer could not be reached while the guide was written."
 
-#: src/features/develop/components/guide-tab.tsx:90
+#: src/features/develop/components/guide-tab.tsx:93
 msgid "{hostLabel} refused this request."
 msgstr "{hostLabel} refused this request."
 
@@ -1649,7 +1653,7 @@ msgstr "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an
 msgid "A goal groups tasks. Its progress follows from how many of them are done."
 msgstr "A goal groups tasks. Its progress follows from how many of them are done."
 
-#: src/features/develop/components/guide-tab.tsx:98
+#: src/features/develop/components/guide-tab.tsx:101
 msgid "A guide for this {requestNoun} is already being written."
 msgstr "A guide for this {requestNoun} is already being written."
 
@@ -2072,11 +2076,11 @@ msgstr "Add at least one model — use \"Fetch models\" or type the ids"
 msgid "Add at least one model id"
 msgstr "Add at least one model id"
 
-#: src/features/chat/thread/composer-input-area.tsx:192
-#: src/features/chat/thread/composer-input-area.tsx:226
-#: src/features/chat/thread/composer-input-area.tsx:233
-#: src/features/chat/thread/composer-input-area.tsx:247
-#: src/features/chat/thread/edit-composer.tsx:125
+#: src/features/chat/thread/composer-input-area.tsx:211
+#: src/features/chat/thread/composer-input-area.tsx:245
+#: src/features/chat/thread/composer-input-area.tsx:252
+#: src/features/chat/thread/composer-input-area.tsx:266
+#: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Add attachment"
 
@@ -2345,7 +2349,7 @@ msgstr "Added to the thread"
 msgid "Added to your review"
 msgstr "Added to your review"
 
-#: src/features/develop/components/guide-tab.tsx:125
+#: src/features/develop/components/guide-tab.tsx:128
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr "Added to your review. Nothing is posted until you submit the review."
 
@@ -2375,11 +2379,11 @@ msgstr "Adding…"
 msgid "Address"
 msgstr "Address"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:119
+#: src/features/skills/components/bundle-import-dialog.tsx:120
 msgid "Adds no tools."
 msgstr "Adds no tools."
 
-#: src/features/skills/components/bundle-import-dialog.tsx:117
+#: src/features/skills/components/bundle-import-dialog.tsx:118
 msgid "Adds these tools:"
 msgstr "Adds these tools:"
 
@@ -3826,6 +3830,10 @@ msgstr "At {0}"
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 
+#: src/features/chat/thread/composer-length-notice.tsx:45
+msgid "Attach as file"
+msgstr "Attach as file"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Attach files or whole collections for the AI to reference and cite in this conversation."
@@ -4919,7 +4927,7 @@ msgstr "Bulgarian (Bulgaria)"
 msgid "Bulk actions"
 msgstr "Bulk actions"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:222
+#: src/features/skills/components/bundle-import-dialog.tsx:223
 msgid "Bundle imported"
 msgstr "Bundle imported"
 
@@ -5139,7 +5147,7 @@ msgstr "Canada"
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
-#: src/features/chat/thread/edit-composer.tsx:150
+#: src/features/chat/thread/edit-composer.tsx:161
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
@@ -5173,7 +5181,7 @@ msgstr "Canada"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
-#: src/features/skills/components/bundle-import-dialog.tsx:430
+#: src/features/skills/components/bundle-import-dialog.tsx:432
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
 #: src/features/skills/components/skill-import-dialog.tsx:243
@@ -5301,7 +5309,7 @@ msgstr "Caption"
 msgid "Caption text"
 msgstr "Caption text"
 
-#: src/features/chat/thread/composer-input-area.tsx:221
+#: src/features/chat/thread/composer-input-area.tsx:240
 msgid "Capture screen"
 msgstr "Capture screen"
 
@@ -5722,7 +5730,7 @@ msgstr "Choose a unique username"
 msgid "Choose at least one permission"
 msgstr "Choose at least one permission"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:361
+#: src/features/skills/components/bundle-import-dialog.tsx:363
 msgid "Choose bundle file"
 msgstr "Choose bundle file"
 
@@ -6040,7 +6048,7 @@ msgstr "Click the pin icon on any message to save it here."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Click the star on any model in All models to add it here."
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:300
 msgid "Click to edit"
 msgstr "Click to edit"
 
@@ -6150,6 +6158,10 @@ msgstr "Close translation"
 #: src/features/develop/components/pull-request-view.tsx:73
 msgid "Closed"
 msgstr "Closed"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:240
+msgid "Closed — the conversation moved on. Ask again in the chat."
+msgstr "Closed — the conversation moved on. Ask again in the chat."
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:107
 msgid "Cloud hosting for web apps, APIs, and databases"
@@ -7370,8 +7382,8 @@ msgstr "Conversations and pending comments on files this list does not show"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
-#: src/features/chat/thread/composer-input.tsx:764
-#: src/features/chat/thread/composer-input.tsx:1161
+#: src/features/chat/thread/composer-input.tsx:748
+#: src/features/chat/thread/composer-input.tsx:1297
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -7456,7 +7468,7 @@ msgstr "Copied!"
 #: src/features/chat/thread/message-item.tsx:354
 #: src/features/chat/thread/text-selection-menu.tsx:526
 #: src/features/settings/components/chat/trigger-settings.tsx:738
-#: src/features/skills/components/bundle-import-dialog.tsx:206
+#: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
 msgstr "Copy"
 
@@ -7550,7 +7562,7 @@ msgid "Copy the Phone number ID, a permanent (System User) access token, and the
 msgstr "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:721
-#: src/features/skills/components/bundle-import-dialog.tsx:194
+#: src/features/skills/components/bundle-import-dialog.tsx:195
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "Copy this secret now and store it with your webhook sender. It will not be shown again."
 
@@ -7659,7 +7671,7 @@ msgstr "Could not add this to the thread. Try again."
 msgid "Could not answer the question. Try again."
 msgstr "Could not answer the question. Try again."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/request-secret-prompt.tsx:215
 msgid "Could not answer. Please try again."
 msgstr "Could not answer. Please try again."
 
@@ -7667,7 +7679,7 @@ msgstr "Could not answer. Please try again."
 msgid "Could not apply the changes"
 msgstr "Could not apply the changes"
 
-#: src/features/chat/thread/composer-input.tsx:1183
+#: src/features/chat/thread/composer-input.tsx:1319
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -7721,7 +7733,7 @@ msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Could not copy automatically. Public link: {publicLink}"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:614
-#: src/features/skills/components/bundle-import-dialog.tsx:187
+#: src/features/skills/components/bundle-import-dialog.tsx:188
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "Could not copy the secret. Select it and copy it manually."
 
@@ -7862,15 +7874,15 @@ msgstr "Could not pull {0}: {1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "Could not reach the server to start generating. Check your connection and try again."
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1186
+#: src/features/chat/thread/composer-input.tsx:1322
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1187
+#: src/features/chat/thread/composer-input.tsx:1323
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -7897,6 +7909,10 @@ msgstr "Could not rename the page"
 #: src/features/pages/components/page-view.tsx:283
 msgid "Could not restore this version"
 msgstr "Could not restore this version"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Could not resume its own session, so the conversation was handed over"
+msgstr "Could not resume its own session, so the conversation was handed over"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
@@ -8278,7 +8294,7 @@ msgstr "Create your first workflow to automate AI tasks visually."
 msgid "Created"
 msgstr "Created"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:150
+#: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
 msgstr "Created switched off."
 
@@ -8771,7 +8787,7 @@ msgid "Debate rounds"
 msgstr "Debate rounds"
 
 #. placeholder {0}: String(group.debateRounds)
-#: src/features/skills/components/bundle-import-dialog.tsx:157
+#: src/features/skills/components/bundle-import-dialog.tsx:158
 msgid "Debates for {0} rounds."
 msgstr "Debates for {0} rounds."
 
@@ -8780,11 +8796,11 @@ msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
 #: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:267
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Decline"
 msgstr "Decline"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:196
+#: src/features/chat/thread/request-secret-prompt.tsx:234
 msgid "Declined — continuing without it"
 msgstr "Declined — continuing without it"
 
@@ -9496,8 +9512,8 @@ msgstr "Describe your workflow... e.g., 'Generate an image from text, upscale it
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:123
 #: src/features/settings/components/chat/bots-settings.tsx:117
-#: src/features/skills/components/bundle-import-dialog.tsx:114
-#: src/features/skills/components/bundle-import-dialog.tsx:147
+#: src/features/skills/components/bundle-import-dialog.tsx:115
+#: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
 #: src/features/skills/components/skill-builder-review.tsx:157
 #: src/features/skills/components/skill-form-dialog.tsx:255
@@ -9934,7 +9950,7 @@ msgstr "Don't have an account?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:242
-#: src/features/skills/components/bundle-import-dialog.tsx:247
+#: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -10137,7 +10153,7 @@ msgstr "Drag files here"
 msgid "Draw an image"
 msgstr "Draw an image"
 
-#: src/features/chat/thread/composer-input-area.tsx:215
+#: src/features/chat/thread/composer-input-area.tsx:234
 msgid "Draw image"
 msgstr "Draw image"
 
@@ -10159,7 +10175,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1366
+#: src/features/chat/thread/composer-input.tsx:1506
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -10435,8 +10451,8 @@ msgstr "Edit collection"
 msgid "Edit comment"
 msgstr "Edit comment"
 
-#: src/features/chat/thread/composer-input.tsx:302
-#: src/features/chat/thread/composer-input.tsx:314
+#: src/features/chat/thread/composer-input.tsx:307
+#: src/features/chat/thread/composer-input.tsx:319
 msgid "Edit content"
 msgstr "Edit content"
 
@@ -10533,7 +10549,7 @@ msgstr "Edit specific regions of an image with AI"
 msgid "Edit task"
 msgstr "Edit task"
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit the reply..."
 msgstr "Edit the reply..."
 
@@ -10549,7 +10565,7 @@ msgstr "Edit Trigger"
 msgid "edit video"
 msgstr "edit video"
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit your message..."
 msgstr "Edit your message..."
 
@@ -12068,7 +12084,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1023
+#: src/features/chat/thread/composer-input.tsx:1159
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -12465,7 +12481,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1055
+#: src/features/chat/thread/composer-input.tsx:1191
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -13595,7 +13611,7 @@ msgstr "For example: \"Focus on Python best practices\", \"Maintain a profession
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 
-#: src/features/develop/components/guide-tab.tsx:156
+#: src/features/develop/components/guide-tab.tsx:159
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "For example: look hard at error handling, skip the generated files."
 
@@ -14861,7 +14877,7 @@ msgid "Group ({groupableCount})"
 msgstr "Group ({groupableCount})"
 
 #: src/features/chat/group/create-group-chat-button.tsx:168
-#: src/features/skills/components/bundle-import-dialog.tsx:51
+#: src/features/skills/components/bundle-import-dialog.tsx:52
 msgid "Group chat"
 msgstr "Group chat"
 
@@ -14947,7 +14963,7 @@ msgstr "Hand over a summary"
 msgid "Hand over a summary and the recent messages"
 msgstr "Hand over a summary and the recent messages"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr "Handed over"
 
@@ -15525,7 +15541,7 @@ msgid "If this problem persists, please contact support."
 msgstr "If this problem persists, please contact support."
 
 #. placeholder {0}: new Date(trigger.nextRunAt).toLocaleString()
-#: src/features/skills/components/bundle-import-dialog.tsx:137
+#: src/features/skills/components/bundle-import-dialog.tsx:138
 msgid "If you turn it on, the next run is {0}."
 msgstr "If you turn it on, the next run is {0}."
 
@@ -15533,7 +15549,7 @@ msgstr "If you turn it on, the next run is {0}."
 msgid "If your chosen model is unavailable, the reply is retried once on this model"
 msgstr "If your chosen model is unavailable, the reply is retried once on this model"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:122
+#: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Ignored, not available here:"
 msgstr "Ignored, not available here:"
 
@@ -15752,11 +15768,11 @@ msgid "Import"
 msgstr "Import"
 
 #. placeholder {0}: selectedCount(selected, entries)
-#: src/features/skills/components/bundle-import-dialog.tsx:434
+#: src/features/skills/components/bundle-import-dialog.tsx:436
 msgid "Import {0} items"
 msgstr "Import {0} items"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:350
+#: src/features/skills/components/bundle-import-dialog.tsx:352
 msgid "Import a bundle"
 msgstr "Import a bundle"
 
@@ -15844,7 +15860,7 @@ msgid "Imported {added} Notion page(s)."
 msgstr "Imported {added} Notion page(s)."
 
 #. placeholder {0}: skill.slug
-#: src/features/skills/components/bundle-import-dialog.tsx:128
+#: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
 msgstr "Imported as /{0}."
 
@@ -16200,8 +16216,8 @@ msgid "instructions"
 msgstr "instructions"
 
 #: src/features/settings/components/chat/bots-settings.tsx:126
-#: src/features/skills/components/bundle-import-dialog.tsx:115
-#: src/features/skills/components/bundle-import-dialog.tsx:149
+#: src/features/skills/components/bundle-import-dialog.tsx:116
+#: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
@@ -16254,11 +16270,11 @@ msgstr "Intelligent video model that thinks before generating"
 msgid "Intensity"
 msgstr "Intensity"
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:326
 msgid "Interrupt and restart"
 msgstr "Interrupt and restart"
 
-#: src/features/chat/thread/composer-input-area.tsx:320
+#: src/features/chat/thread/composer-input-area.tsx:342
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interrupt and restart — stops the current reply and sends this"
 
@@ -16483,7 +16499,7 @@ msgstr "Issue assigned"
 msgid "Issue tracking and project management"
 msgstr "Issue tracking and project management"
 
-#: src/features/develop/components/guide-tab.tsx:95
+#: src/features/develop/components/guide-tab.tsx:98
 msgid "It does not exist, or your {hostLabel} account cannot see it."
 msgstr "It does not exist, or your {hostLabel} account cannot see it."
 
@@ -16504,7 +16520,11 @@ msgstr "It may have been deleted, or you no longer have access."
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "It may have expired, been revoked, or already been used. Ask for a new link."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/agent-switch-divider.tsx:21
+msgid "It opened a different session than its own, so the conversation was handed over"
+msgstr "It opened a different session than its own, so the conversation was handed over"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:215
 msgid "It was not saved. Paste it again and save."
 msgstr "It was not saved. Paste it again and save."
 
@@ -17746,7 +17766,7 @@ msgstr "Loading statistics…"
 msgid "Loading tasks…"
 msgstr "Loading tasks…"
 
-#: src/features/develop/components/guide-tab.tsx:54
+#: src/features/develop/components/guide-tab.tsx:57
 msgid "Loading the guide"
 msgstr "Loading the guide"
 
@@ -17804,6 +17824,7 @@ msgstr "Loading..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -17956,6 +17977,10 @@ msgstr "Long text detected"
 #: src/features/marketing/data/models-data.ts:169
 msgid "Long text generation in images"
 msgstr "Long text generation in images"
+
+#: src/features/chat/thread/composer-input.tsx:806
+msgid "Long text was attached as a file."
+msgstr "Long text was attached as a file."
 
 #: src/features/marketing/data/models-data.ts:391
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
@@ -18987,7 +19012,7 @@ msgstr "Mode"
 
 #. placeholder {0}: group.mode
 #. placeholder {1}: group.model
-#: src/features/skills/components/bundle-import-dialog.tsx:153
+#: src/features/skills/components/bundle-import-dialog.tsx:154
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr "Mode {0}, on {1}. Nothing starts when it is created."
 
@@ -19273,7 +19298,7 @@ msgstr "More steps = higher quality, longer generation"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "More than a proxy — an intelligent layer between your app and every LLM provider."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:134
+#: src/features/chat/thread/request-secret-prompt.tsx:149
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 
@@ -19834,7 +19859,7 @@ msgstr "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat.
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore keeps these up to date and tells you when someone asks for your review."
 
-#: src/features/develop/components/guide-tab.tsx:169
+#: src/features/develop/components/guide-tab.tsx:172
 msgid "Neore, from the diff"
 msgstr "Neore, from the diff"
 
@@ -20407,7 +20432,7 @@ msgstr "No focal length selected"
 msgid "No goal"
 msgstr "No goal"
 
-#: src/features/develop/components/guide-tab.tsx:205
+#: src/features/develop/components/guide-tab.tsx:208
 msgid "No guide"
 msgstr "No guide"
 
@@ -21219,7 +21244,7 @@ msgstr "old lines {text}"
 msgid "Older"
 msgstr "Older"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr "Older messages were summarised"
 
@@ -21446,7 +21471,7 @@ msgstr "Only use providers that guarantee zero data retention — your prompts a
 msgid "Only when it contains (optional)"
 msgstr "Only when it contains (optional)"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:144
+#: src/features/skills/components/bundle-import-dialog.tsx:145
 msgid "Only when:"
 msgstr "Only when:"
 
@@ -21682,7 +21707,7 @@ msgstr "Open Tasks"
 msgid "Open terminal"
 msgstr "Open terminal"
 
-#: src/features/develop/components/guide-tab.tsx:197
+#: src/features/develop/components/guide-tab.tsx:200
 msgid "Open the agent's conversation"
 msgstr "Open the agent's conversation"
 
@@ -22550,7 +22575,7 @@ msgstr "Participants"
 msgid "Participants take turns, one reply per message."
 msgstr "Participants take turns, one reply per message."
 
-#: src/features/skills/components/bundle-import-dialog.tsx:154
+#: src/features/skills/components/bundle-import-dialog.tsx:155
 msgid "Participants:"
 msgstr "Participants:"
 
@@ -22718,7 +22743,7 @@ msgstr "Paste image URL"
 msgid "Paste image URL..."
 msgstr "Paste image URL..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:292
 msgid "Paste it here — it is not shown in the chat"
 msgstr "Paste it here — it is not shown in the chat"
 
@@ -23340,7 +23365,7 @@ msgid "Preferred model: {0}"
 msgstr "Preferred model: {0}"
 
 #. placeholder {0}: skill.model
-#: src/features/skills/components/bundle-import-dialog.tsx:123
+#: src/features/skills/components/bundle-import-dialog.tsx:124
 msgid "Prefers the model {0}."
 msgstr "Prefers the model {0}."
 
@@ -23405,7 +23430,7 @@ msgstr "Premium-tier reasoning transparency"
 msgid "Preparing a question…"
 msgstr "Preparing a question…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:202
+#: src/features/chat/thread/request-secret-prompt.tsx:242
 msgid "Preparing a request…"
 msgstr "Preparing a request…"
 
@@ -24250,11 +24275,11 @@ msgstr "Query usage analytics and costs"
 msgid "Question"
 msgstr "Question"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
+#: src/features/chat/thread/composer-input-area.tsx:353
 msgid "Queue message"
 msgstr "Queue message"
 
-#: src/features/chat/thread/composer-input-area.tsx:349
+#: src/features/chat/thread/composer-input-area.tsx:372
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
@@ -24481,7 +24506,7 @@ msgstr "Read & Write"
 msgid "Read aloud"
 msgstr "Read aloud"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:383
+#: src/features/skills/components/bundle-import-dialog.tsx:385
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 
@@ -24518,7 +24543,7 @@ msgstr "Read-only preview - Fork to edit"
 msgid "Read-only shared conversation"
 msgstr "Read-only shared conversation"
 
-#: src/features/chat/thread/composer-input.tsx:259
+#: src/features/chat/thread/composer-input.tsx:264
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Reading \"{attachmentName}\"…"
 
@@ -24669,7 +24694,7 @@ msgid "Reasoning effort: {0} of 4"
 msgstr "Reasoning effort: {0} of 4"
 
 #. placeholder {0}: String(skill.reasoningEffort)
-#: src/features/skills/components/bundle-import-dialog.tsx:126
+#: src/features/skills/components/bundle-import-dialog.tsx:127
 msgid "Reasoning effort: {0} of 4."
 msgstr "Reasoning effort: {0} of 4."
 
@@ -25107,10 +25132,10 @@ msgstr "Remember me"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:321
-#: src/features/chat/thread/composer-input.tsx:333
-#: src/features/chat/thread/composer-input.tsx:387
-#: src/features/chat/thread/composer-input.tsx:396
+#: src/features/chat/thread/composer-input.tsx:326
+#: src/features/chat/thread/composer-input.tsx:338
+#: src/features/chat/thread/composer-input.tsx:392
+#: src/features/chat/thread/composer-input.tsx:401
 #: src/features/devices/components/devices-settings.tsx:193
 #: src/features/devices/components/devices-settings.tsx:199
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25743,6 +25768,10 @@ msgstr "Resume import"
 msgid "Resume your latest chat"
 msgstr "Resume your latest chat"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:26
+msgid "Resumed its own session"
+msgstr "Resumed its own session"
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
 msgstr "Resuming your latest chat"
@@ -25782,6 +25811,7 @@ msgid "retry"
 msgstr "retry"
 
 #: src/features/chat/thread/chat-error.tsx:56
+#: src/features/chat/thread/request-secret-prompt.tsx:311
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -25805,11 +25835,11 @@ msgstr "Retry in {retryAfterMinutes}m"
 msgid "Retry now"
 msgstr "Retry now"
 
-#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:415
 msgid "Retry upload"
 msgstr "Retry upload"
 
-#: src/features/chat/thread/composer-input.tsx:405
+#: src/features/chat/thread/composer-input.tsx:410
 msgid "Retry upload of {attachmentName}"
 msgstr "Retry upload of {attachmentName}"
 
@@ -26199,7 +26229,7 @@ msgstr "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations
 #. placeholder {0}: trigger.schedule ?? ""
 #. placeholder {1}: trigger.timezone ? ` (${trigger.timezone})` : " (UTC)"
 #. placeholder {2}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:134
+#: src/features/skills/components/bundle-import-dialog.tsx:135
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr "Runs on the schedule {0}{1}, on {2}."
 
@@ -26208,7 +26238,7 @@ msgid "Runs once, then switches itself off. For a repeating time, use a schedule
 msgstr "Runs once, then switches itself off. For a repeating time, use a schedule."
 
 #. placeholder {0}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:143
+#: src/features/skills/components/bundle-import-dialog.tsx:144
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 
@@ -26303,8 +26333,8 @@ msgstr "Saudi Arabia"
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:263
+#: src/features/chat/thread/edit-composer.tsx:165
+#: src/features/chat/thread/request-secret-prompt.tsx:331
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26411,11 +26441,11 @@ msgstr "Save workflow"
 msgid "Saved"
 msgstr "Saved"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:200
+#: src/features/chat/thread/request-secret-prompt.tsx:238
 msgid "Saved — continuing"
 msgstr "Saved — continuing"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:198
+#: src/features/chat/thread/request-secret-prompt.tsx:236
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr "Saved — the assistant can use it once, in this reply"
 
@@ -26483,7 +26513,7 @@ msgstr "Schedule"
 msgid "Schedule {0}"
 msgstr "Schedule {0}"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:54
+#: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr "Schedule or webhook"
 
@@ -26520,7 +26550,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:982
+#: src/features/chat/thread/composer-input.tsx:1118
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -26662,7 +26692,7 @@ msgid "Search mode: {0}"
 msgstr "Search mode: {0}"
 
 #. placeholder {0}: skill.searchMode
-#: src/features/skills/components/bundle-import-dialog.tsx:124
+#: src/features/skills/components/bundle-import-dialog.tsx:125
 msgid "Search mode: {0}."
 msgstr "Search mode: {0}."
 
@@ -26835,7 +26865,7 @@ msgstr "seat/mo"
 msgid "secret"
 msgstr "secret"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:231
+#: src/features/chat/thread/request-secret-prompt.tsx:277
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr "Secret"
@@ -27167,12 +27197,12 @@ msgid "Send Magic Link"
 msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:159
-#: src/features/chat/thread/composer-input-area.tsx:383
+#: src/features/chat/thread/composer-input-area.tsx:172
+#: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Send message"
 msgstr "Send message"
 
-#: src/features/chat/thread/composer-input-area.tsx:159
+#: src/features/chat/thread/composer-input-area.tsx:172
 msgid "Send message ({sendShortcut})"
 msgstr "Send message ({sendShortcut})"
 
@@ -27337,11 +27367,12 @@ msgstr "Sessions Revoked"
 msgid "Set a password for your account"
 msgstr "Set a password for your account"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:151
+#: src/features/chat/thread/request-secret-prompt.tsx:154
+#: src/features/chat/thread/request-secret-prompt.tsx:171
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr "Set as the {header} header on your {serverName} MCP server"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:141
+#: src/features/chat/thread/request-secret-prompt.tsx:161
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr "Set as the {header} header on your {serverName} MCP server ({address})"
 
@@ -27550,7 +27581,7 @@ msgstr "Show {name} in model picker"
 msgid "Show {remainingCount} more"
 msgstr "Show {remainingCount} more"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:98
+#: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr "Show all"
 
@@ -27600,7 +27631,7 @@ msgstr "Show Labels"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:196
-#: src/features/skills/components/bundle-import-dialog.tsx:98
+#: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "Show less"
 
@@ -27753,7 +27784,7 @@ msgstr "Sign in on another site?"
 msgid "Sign in to {label} again"
 msgstr "Sign in to {label} again"
 
-#: src/features/develop/components/guide-tab.tsx:91
+#: src/features/develop/components/guide-tab.tsx:94
 msgid "Sign in to an account to write a guide."
 msgstr "Sign in to an account to write a guide."
 
@@ -27927,7 +27958,7 @@ msgstr "Size of the text in chat messages. The sidebar and the rest of the app k
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
-#: src/features/skills/components/bundle-import-dialog.tsx:54
+#: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Skill"
 msgstr "Skill"
 
@@ -28857,11 +28888,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Status Page"
 
-#: src/features/chat/thread/composer-input-area.tsx:321
+#: src/features/chat/thread/composer-input-area.tsx:343
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steer — the current reply reads this at its next step"
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:326
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
@@ -28938,8 +28969,8 @@ msgstr "Stop and clear the queue"
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:357
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Stop generating"
 msgstr "Stop generating"
 
@@ -29475,7 +29506,7 @@ msgstr "Suggested"
 msgid "Suggested answers"
 msgstr "Suggested answers"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:459
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion available, press Right Arrow to accept"
 
@@ -29483,7 +29514,7 @@ msgstr "Suggestion available, press Right Arrow to accept"
 msgid "suggestions"
 msgstr "suggestions"
 
-#: src/features/develop/components/guide-tab.tsx:226
+#: src/features/develop/components/guide-tab.tsx:229
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr "Suggestions"
@@ -29537,7 +29568,7 @@ msgid "Summary of the conversation"
 msgstr "Summary of the conversation"
 
 #. placeholder {0}: group.synthesizer
-#: src/features/skills/components/bundle-import-dialog.tsx:155
+#: src/features/skills/components/bundle-import-dialog.tsx:156
 msgid "Summed up by /{0}."
 msgstr "Summed up by /{0}."
 
@@ -29829,7 +29860,7 @@ msgstr "Target language"
 msgid "Target model (optional)"
 msgstr "Target model (optional)"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:148
+#: src/features/skills/components/bundle-import-dialog.tsx:149
 msgid "Task"
 msgstr "Task"
 
@@ -30202,7 +30233,7 @@ msgstr "Text direction set to LTR"
 msgid "Text direction set to RTL"
 msgstr "Text direction set to RTL"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:300
 msgid "Text document"
 msgstr "Text document"
 
@@ -30304,7 +30335,7 @@ msgstr "Thailand"
 msgid "Thanks for rating"
 msgstr "Thanks for rating"
 
-#: src/features/develop/components/guide-tab.tsx:105
+#: src/features/develop/components/guide-tab.tsx:108
 msgid "That agent session has ended."
 msgstr "That agent session has ended."
 
@@ -30312,19 +30343,19 @@ msgstr "That agent session has ended."
 msgid "That comment is already gone."
 msgstr "That comment is already gone."
 
-#: src/features/develop/components/guide-tab.tsx:102
+#: src/features/develop/components/guide-tab.tsx:105
 msgid "That computer is busy. Try again in a moment."
 msgstr "That computer is busy. Try again in a moment."
 
-#: src/features/develop/components/guide-tab.tsx:103
+#: src/features/develop/components/guide-tab.tsx:106
 msgid "That computer is not online."
 msgstr "That computer is not online."
 
-#: src/features/develop/components/guide-tab.tsx:141
+#: src/features/develop/components/guide-tab.tsx:144
 msgid "That did not work. Try again."
 msgstr "That did not work. Try again."
 
-#: src/features/develop/components/guide-tab.tsx:89
+#: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "That folder is not offered for this repository on that computer."
 
@@ -30344,7 +30375,7 @@ msgstr "That link could not be read."
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
 
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "That message is too long to send from here."
 msgstr "That message is too long to send from here."
 
@@ -30356,19 +30387,19 @@ msgstr "That passcode is not right."
 msgid "That request is no longer waiting."
 msgstr "That request is no longer waiting."
 
-#: src/features/develop/components/guide-tab.tsx:128
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "That suggestion cannot be added any more."
 msgstr "That suggestion cannot be added any more."
 
-#: src/features/develop/components/guide-tab.tsx:127
+#: src/features/develop/components/guide-tab.tsx:130
 msgid "That suggestion is gone."
 msgstr "That suggestion is gone."
 
-#: src/features/develop/components/guide-tab.tsx:61
+#: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "The {requestNoun} changed while the guide was being written. Write it again."
 
-#: src/features/develop/components/guide-tab.tsx:126
+#: src/features/develop/components/guide-tab.tsx:129
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 
@@ -30380,11 +30411,15 @@ msgstr "The 43-character EncodingAESKey (message encryption must be set to safe 
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 
-#: src/features/develop/components/guide-tab.tsx:64
+#: src/features/develop/components/guide-tab.tsx:67
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "The agent finished without giving a guide. Write it again."
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:19
+msgid "The agent is still opening its session. Try again in a moment."
+msgstr "The agent is still opening its session. Try again in a moment."
+
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "The agent is still working on the last message."
 msgstr "The agent is still working on the last message."
 
@@ -30400,7 +30435,7 @@ msgstr "The agent loop is always enabled for systematic task execution. These se
 msgid "The agent made no file changes."
 msgstr "The agent made no file changes."
 
-#: src/features/develop/components/guide-tab.tsx:192
+#: src/features/develop/components/guide-tab.tsx:195
 msgid "The agent on your computer is reading the change…"
 msgstr "The agent on your computer is reading the change…"
 
@@ -30429,7 +30464,7 @@ msgstr "The assistant has a question"
 msgid "The assistant is asking for a secret"
 msgstr "The assistant is asking for a secret"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:213
+#: src/features/chat/thread/request-secret-prompt.tsx:259
 msgid "The assistant needs a secret"
 msgstr "The assistant needs a secret"
 
@@ -30453,7 +30488,7 @@ msgstr "The builder could not answer. Try again."
 msgid "The bundle could not be exported."
 msgstr "The bundle could not be exported."
 
-#: src/features/skills/components/bundle-import-dialog.tsx:339
+#: src/features/skills/components/bundle-import-dialog.tsx:341
 msgid "The bundle could not be imported."
 msgstr "The bundle could not be imported."
 
@@ -30556,7 +30591,7 @@ msgid "The extension will be able to read and send chats as {0}. You can disconn
 msgstr "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 
 #. placeholder {0}: MAX_BUNDLE_BYTES / 1024
-#: src/features/skills/components/bundle-import-dialog.tsx:308
+#: src/features/skills/components/bundle-import-dialog.tsx:310
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "The file is larger than {0} KB, which is more than a bundle can be."
 
@@ -30608,16 +30643,16 @@ msgstr "The full system prompt to send to the model..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "The goal is removed; its tasks stay, without a goal."
 
-#: src/features/develop/components/guide-tab.tsx:114
 #: src/features/develop/components/guide-tab.tsx:117
+#: src/features/develop/components/guide-tab.tsx:120
 msgid "The guide could not be started."
 msgstr "The guide could not be started."
 
-#: src/features/develop/components/guide-tab.tsx:63
+#: src/features/develop/components/guide-tab.tsx:66
 msgid "The guide could not be written. Try again in a moment."
 msgstr "The guide could not be written. Try again in a moment."
 
-#: src/features/develop/components/guide-tab.tsx:60
+#: src/features/develop/components/guide-tab.tsx:63
 msgid "The guide did not finish. Write it again."
 msgstr "The guide did not finish. Write it again."
 
@@ -30784,6 +30819,10 @@ msgstr "The page now shows the other version. Copy anything you want to keep fro
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 
+#: src/features/chat/thread/composer-input.tsx:880
+msgid "The pasted text could not be attached and was not inserted."
+msgstr "The pasted text could not be attached and was not inserted."
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -30887,7 +30926,7 @@ msgstr "The two passcodes do not match."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "The unified LLM gateway for modern AI applications."
 
-#: src/features/chat/thread/composer-input.tsx:556
+#: src/features/chat/thread/composer-input.tsx:563
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
@@ -31072,6 +31111,10 @@ msgstr "This action cannot be undone. All team members will be removed."
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "This action cannot be undone. This will permanently delete the organization and all associated data."
 
+#: src/features/chat/thread/agent-switch-divider.tsx:19
+msgid "This agent cannot resume its own session, so the conversation was handed over"
+msgstr "This agent cannot resume its own session, so the conversation was handed over"
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "This branch has conflicts with its base branch."
@@ -31084,11 +31127,11 @@ msgstr "This branch is behind its base branch."
 msgid "This browser cannot receive push notifications here."
 msgstr "This browser cannot receive push notifications here."
 
-#: src/features/skills/components/bundle-import-dialog.tsx:381
+#: src/features/skills/components/bundle-import-dialog.tsx:383
 msgid "This bundle came from someone else"
 msgstr "This bundle came from someone else"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:392
+#: src/features/skills/components/bundle-import-dialog.tsx:394
 msgid "This bundle has no items."
 msgstr "This bundle has no items."
 
@@ -31097,15 +31140,15 @@ msgstr "This bundle has no items."
 msgid "This cannot be added to this chat."
 msgstr "This cannot be added to this chat."
 
-#: src/features/develop/components/guide-tab.tsx:67
+#: src/features/develop/components/guide-tab.tsx:70
 msgid "This change is too large to write a guide for."
 msgstr "This change is too large to write a guide for."
 
-#: src/features/develop/components/guide-tab.tsx:87
+#: src/features/develop/components/guide-tab.tsx:90
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr "This change, or your instructions, are too large for that computer to take in one message."
 
-#: src/features/chat/host/host-send-errors.ts:22
+#: src/features/chat/host/host-send-errors.ts:23
 msgid "This chat belongs to a worker. Send it messages from its own message box."
 msgstr "This chat belongs to a worker. Send it messages from its own message box."
 
@@ -31137,6 +31180,10 @@ msgstr "This command name is reserved"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "This computer"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:20
+msgid "This computer did not resume its own session, so the conversation was handed over"
+msgstr "This computer did not resume its own session, so the conversation was handed over"
 
 #: src/features/devices/components/devices-settings.tsx:444
 msgid "This computer is not paired yet."
@@ -31199,7 +31246,7 @@ msgstr "This diff is cut short."
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 
-#: src/features/skills/components/bundle-import-dialog.tsx:327
+#: src/features/skills/components/bundle-import-dialog.tsx:329
 msgid "This file could not be read as a bundle."
 msgstr "This file could not be read as a bundle."
 
@@ -31235,7 +31282,7 @@ msgstr "This file is too large ({0} KB) to preview or edit in the browser. Files
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 
-#: src/features/develop/components/guide-tab.tsx:213
+#: src/features/develop/components/guide-tab.tsx:216
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 
@@ -31278,7 +31325,7 @@ msgstr "This is already in the thread."
 msgid "This is how your organization appears to members"
 msgstr "This is how your organization appears to members"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:257
+#: src/features/chat/thread/request-secret-prompt.tsx:325
 msgid "This is too long: up to {valueMax} characters."
 msgstr "This is too long: up to {valueMax} characters."
 
@@ -31300,6 +31347,42 @@ msgstr "This memory has since been deleted."
 #: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
 msgstr "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:25
+#~ msgid "This message has {0} characters; the limit is {1}. Shorten it, or attach it as a file."
+#~ msgstr "This message has {0} characters; the limit is {1}. Shorten it, or attach it as a file."
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:26
+#~ msgid "This message has {0} characters; the limit is {1}. Shorten it."
+#~ msgstr "This message has {0} characters; the limit is {1}. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+#~ msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgstr "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+#~ msgstr "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it."
+#~ msgstr "This message has {count} characters; the limit is {limit}. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
+msgstr "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+msgid "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
+msgstr "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+msgid "This message is over the limit of {limit} characters. Shorten it."
+msgstr "This message is over the limit of {limit} characters. Shorten it."
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -31401,6 +31484,10 @@ msgstr "This selection is too large to import at once. Import fewer files at a t
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "This server requires sign-in. Save it, then choose Sign in."
+
+#: src/features/chat/thread/request-secret-prompt.tsx:209
+msgid "This server's address changed. Check the address below and save again."
+msgstr "This server's address changed. Check the address below and save again."
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
@@ -31864,7 +31951,7 @@ msgstr "too many files"
 msgid "Too many requests right now. Try again in a moment."
 msgstr "Too many requests right now. Try again in a moment."
 
-#: src/features/develop/components/guide-tab.tsx:86
+#: src/features/develop/components/guide-tab.tsx:89
 msgid "Too many requests. Try again in a few minutes."
 msgstr "Too many requests. Try again in a few minutes."
 
@@ -32316,7 +32403,7 @@ msgstr "Turn on Daily Brief"
 msgid "Turn on run until done"
 msgstr "Turn on run until done"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:121
+#: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
 msgstr "Turns these tools off:"
 
@@ -32403,8 +32490,8 @@ msgstr "Type to search"
 msgid "Type your answer…"
 msgstr "Type your answer…"
 
-#: src/features/chat/thread/composer-input.tsx:1357
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
+#: src/features/chat/thread/composer-input.tsx:1496
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:173
 msgid "Type your message..."
 msgstr "Type your message..."
 
@@ -32566,6 +32653,7 @@ msgstr "Under the Hood"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
+#: src/features/chat/thread/composer-input.tsx:808
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Undo"
@@ -32793,7 +32881,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1218
+#: src/features/chat/thread/composer-input.tsx:1354
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -32940,7 +33028,7 @@ msgstr "upload"
 msgid "Upload"
 msgstr "Upload"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:351
+#: src/features/skills/components/bundle-import-dialog.tsx:353
 msgid "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
 msgstr "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
 
@@ -32981,18 +33069,18 @@ msgstr "Upload CSVs, run Python analysis, and export charts — no Jupyter setup
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 
-#: src/features/chat/thread/composer-input.tsx:402
-#: src/features/chat/thread/composer-input.tsx:601
-#: src/features/chat/thread/composer-input.tsx:1139
+#: src/features/chat/thread/composer-input.tsx:407
+#: src/features/chat/thread/composer-input.tsx:608
+#: src/features/chat/thread/composer-input.tsx:1275
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1132
+#: src/features/chat/thread/composer-input.tsx:1268
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:210
+#: src/features/chat/thread/composer-input-area.tsx:229
 msgid "Upload file"
 msgstr "Upload file"
 
@@ -33038,7 +33126,7 @@ msgstr "Uploaded"
 msgid "Uploaded {fileName}"
 msgstr "Uploaded {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:339
+#: src/features/chat/thread/composer-input.tsx:344
 msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
@@ -34142,7 +34230,7 @@ msgstr "Waiting for output…"
 msgid "Waiting for the agent…"
 msgstr "Waiting for the agent…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:244
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
 
@@ -34154,14 +34242,14 @@ msgstr "Waiting for the owner to answer"
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
-#: src/features/chat/thread/composer-input-area.tsx:349
-#: src/features/chat/thread/composer-input-area.tsx:383
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:372
+#: src/features/chat/thread/composer-input-area.tsx:407
+#: src/features/chat/thread/composer-input-area.tsx:421
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:244
 msgid "Waiting for you"
 msgstr "Waiting for you"
 
@@ -34272,11 +34360,11 @@ msgid "Webhook secret"
 msgstr "Webhook secret"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:612
-#: src/features/skills/components/bundle-import-dialog.tsx:185
+#: src/features/skills/components/bundle-import-dialog.tsx:186
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook secret copied to clipboard"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:193
+#: src/features/skills/components/bundle-import-dialog.tsx:194
 msgid "Webhook secret for \"{title}\""
 msgstr "Webhook secret for \"{title}\""
 
@@ -34439,7 +34527,7 @@ msgstr "What should the agent do?"
 msgid "What should the AI call you?"
 msgstr "What should the AI call you?"
 
-#: src/features/develop/components/guide-tab.tsx:149
+#: src/features/develop/components/guide-tab.tsx:152
 msgid "What should the guide pay attention to?"
 msgstr "What should the guide pay attention to?"
 
@@ -34530,7 +34618,7 @@ msgstr "When set, only these providers will be used. Leave empty to allow all."
 msgid "When should the assistant use this skill?"
 msgstr "When should the assistant use this skill?"
 
-#: src/features/develop/components/guide-tab.tsx:161
+#: src/features/develop/components/guide-tab.tsx:164
 msgid "Where the guide is written"
 msgstr "Where the guide is written"
 
@@ -34585,7 +34673,7 @@ msgstr "Widely trusted for production workloads"
 msgid "Width"
 msgstr "Width"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:128
+#: src/features/chat/thread/request-secret-prompt.tsx:143
 msgid "Will be saved as your {provider} API key"
 msgstr "Will be saved as your {provider} API key"
 
@@ -34709,7 +34797,7 @@ msgstr "Write a video description for a product launch"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "Write code with AI, run it in the sandbox, and document results — all in one thread."
 
-#: src/features/develop/components/guide-tab.tsx:182
+#: src/features/develop/components/guide-tab.tsx:185
 msgid "Write it again"
 msgstr "Write it again"
 
@@ -34729,7 +34817,7 @@ msgstr "Write some code for me..."
 msgid "Write something"
 msgstr "Write something"
 
-#: src/features/develop/components/guide-tab.tsx:182
+#: src/features/develop/components/guide-tab.tsx:185
 msgid "Write the guide"
 msgstr "Write the guide"
 
@@ -34743,7 +34831,7 @@ msgstr "Write, or type '/' for commands…"
 msgid "Writing"
 msgstr "Writing"
 
-#: src/features/develop/components/guide-tab.tsx:192
+#: src/features/develop/components/guide-tab.tsx:195
 msgid "Writing the guide…"
 msgstr "Writing the guide…"
 
@@ -34918,7 +35006,7 @@ msgid "You are watching as many repositories as is allowed."
 msgstr "You are watching as many repositories as is allowed."
 
 #. placeholder {0}: review.skillSlotsLeft ?? 0
-#: src/features/skills/components/bundle-import-dialog.tsx:422
+#: src/features/skills/components/bundle-import-dialog.tsx:424
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "You can add {0} more skills on this plan. Untick some skills or upgrade."
 
@@ -34974,7 +35062,7 @@ msgstr "You have no indexed knowledge files yet."
 msgid "You have no projects yet."
 msgstr "You have no projects yet."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:146
+#: src/features/chat/thread/request-secret-prompt.tsx:166
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 
@@ -35080,7 +35168,7 @@ msgstr "You've reached the rate limit. Please try again in {minutes, plural, one
 msgid "You've successfully joined the thread. Redirecting..."
 msgstr "You've successfully joined the thread. Redirecting..."
 
-#: src/features/develop/components/guide-tab.tsx:93
+#: src/features/develop/components/guide-tab.tsx:96
 msgid "Your {hostLabel} sign-in has expired. Connect it again."
 msgstr "Your {hostLabel} sign-in has expired. Connect it again."
 
@@ -35177,8 +35265,8 @@ msgstr "Your current anonymous session will be converted to a permanent account.
 msgid "Your daily brief"
 msgstr "Your daily brief"
 
-#: src/features/develop/components/guide-tab.tsx:66
-#: src/features/develop/components/guide-tab.tsx:96
+#: src/features/develop/components/guide-tab.tsx:69
+#: src/features/develop/components/guide-tab.tsx:99
 msgid "Your daily limit for AI requests is used up."
 msgstr "Your daily limit for AI requests is used up."
 
@@ -35199,12 +35287,12 @@ msgid "Your First Chat"
 msgstr "Your First Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:647
+#: src/features/chat/thread/composer-input.tsx:668
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:661
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 
@@ -35286,11 +35374,11 @@ msgstr "Your rating"
 msgid "Your review"
 msgstr "Your review"
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr "Your review already holds as many comments as {hostLabel} takes in one review."
 
-#: src/features/develop/components/guide-tab.tsx:129
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "Your review is being submitted. Try again when it is done."
 msgstr "Your review is being submitted. Try again when it is done."
 
@@ -35306,6 +35394,10 @@ msgstr "Your review is kept."
 #: src/features/notifications/lib/notification-labels.ts:57
 msgid "Your review was requested"
 msgstr "Your review was requested"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:301
+msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
+msgstr "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 
 #: src/lib/toast.ts:248
 msgid "Your session has expired"

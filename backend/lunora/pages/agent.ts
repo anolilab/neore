@@ -15,10 +15,11 @@ import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalQuery } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { type ActionCtx, internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { getUtilityModelForUser } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
 import { requirePageAccess } from "./access";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -48,55 +49,68 @@ export const unwrapMarkdown = (text: string): string => {
 
 export const getPageForAgent = internalQuery
     .input({ pageId: v.id("pages"), userId: v.string() })
-    .output(v.object({ content: v.string(), title: v.string() }))
+    .output(v.object({ content: v.string(), ownerId: v.string(), title: v.string() }))
     .query(async ({ args, ctx }) => {
         const { page } = await requirePageAccess(ctx, args.pageId, args.userId, "write");
 
-        return { content: page.content ?? "", title: page.title };
+        return { content: page.content ?? "", ownerId: page.userId, title: page.title };
     });
 
 export const proposePageEdit = authAction
     .use(rateLimit("pages/agent"))
     .input({ instruction: v.string().max(MAX_LENGTH.text), pageId: v.id("pages") })
     .output(v.object({ proposedMarkdown: v.string() }))
-    .action(async ({ args, ctx }) => {
-        const instruction = args.instruction.trim();
+    .action(async ({ args, ctx }) => await proposePageEditHandler(ctx, args));
 
-        if (instruction.length === 0 || instruction.length > INSTRUCTION_MAX) {
-            throw new LunoraError("BAD_REQUEST", `Describe the change in 1 to ${String(INSTRUCTION_MAX)} characters`);
-        }
+/** The action's body. Exported so a test can drive it without the gateway. */
+export const proposePageEditHandler = async (
+    ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "log" | "runQuery"> & { user: { userId: string } },
+    args: { instruction: string; pageId: Id<"pages"> },
+): Promise<{ proposedMarkdown: string }> => {
+    const instruction = args.instruction.trim();
 
-        const page = (await ctx.runQuery(internal.pages.agent.getPageForAgent, { pageId: args.pageId, userId: ctx.user.userId })) as {
-            content: string;
-            title: string;
-        };
+    if (instruction.length === 0 || instruction.length > INSTRUCTION_MAX) {
+        throw new LunoraError("BAD_REQUEST", `Describe the change in 1 to ${String(INSTRUCTION_MAX)} characters`);
+    }
 
-        if (page.content.length > AGENT_PAGE_MAX) {
-            throw new LunoraError("BAD_REQUEST", "This page is too long for the page agent");
-        }
+    const page = (await ctx.runQuery(internal.pages.agent.getPageForAgent, { pageId: args.pageId, userId: ctx.user.userId })) as {
+        content: string;
+        ownerId: string;
+        title: string;
+    };
 
-        // Through the LLM gateway, so the call is metered and attributed like every other.
-        const model = await getUtilityModel(gatewayFetch(ctx), { userId: ctx.user.userId }, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
-        const result = await generateText({
-            maxOutputTokens: 16_000,
-            model,
-            prompt: JSON.stringify({ document: page.content, instruction, title: page.title }),
-            system: PAGE_AGENT_SYSTEM_PROMPT,
-            temperature: 0.3,
-        });
+    if (page.content.length > AGENT_PAGE_MAX) {
+        throw new LunoraError("BAD_REQUEST", "This page is too long for the page agent");
+    }
 
-        const proposedMarkdown = unwrapMarkdown(result.text);
-
-        if (proposedMarkdown.length === 0) {
-            throw new LunoraError("BAD_REQUEST", "The page agent returned nothing; try rephrasing");
-        }
-
-        ctx.log.event("pages.propose_edit", {
-            inputTokens: result.usage.inputTokens,
-            model: DEFAULT_PROMPT_IMPROVEMENT_MODEL,
-            outputTokens: result.usage.outputTokens,
-            proposedChars: proposedMarkdown.length,
-        });
-
-        return { proposedMarkdown };
+    // Through the LLM gateway, so the call is metered and attributed like every other.
+    // The page is the owner's and the instruction the caller's, so a model must satisfy both users' rules.
+    const model = await getUtilityModelForUser(
+        ctx,
+        gatewayFetch(ctx),
+        { filterUserId: page.ownerId, userId: ctx.user.userId },
+        DEFAULT_PROMPT_IMPROVEMENT_MODEL,
+    );
+    const result = await generateText({
+        maxOutputTokens: 16_000,
+        model,
+        prompt: JSON.stringify({ document: page.content, instruction, title: page.title }),
+        system: PAGE_AGENT_SYSTEM_PROMPT,
+        temperature: 0.3,
     });
+
+    const proposedMarkdown = unwrapMarkdown(result.text);
+
+    if (proposedMarkdown.length === 0) {
+        throw new LunoraError("BAD_REQUEST", "The page agent returned nothing; try rephrasing");
+    }
+
+    ctx.log.event("pages.propose_edit", {
+        inputTokens: result.usage.inputTokens,
+        model: DEFAULT_PROMPT_IMPROVEMENT_MODEL,
+        outputTokens: result.usage.outputTokens,
+        proposedChars: proposedMarkdown.length,
+    });
+
+    return { proposedMarkdown };
+};

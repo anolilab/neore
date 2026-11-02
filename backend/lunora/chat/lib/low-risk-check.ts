@@ -13,6 +13,7 @@ import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { gatewayFetch } from "../../lib/services";
 import { getUtilityModel } from "../../lib/utility-model";
+import { loadModelFilterRules } from "./model-filter-rules";
 import type { AutoApprovals, LowRiskCheck } from "./low-risk-approval";
 import { createLowRiskApprover, LOW_RISK_DEADLINE_MS, LOW_RISK_SYSTEM_PROMPT } from "./low-risk-approval";
 
@@ -34,8 +35,33 @@ export const createRunLowRiskCheck = (
     // No prototype: a provider's tool-call id is stored as an own key, `__proto__` and `constructor` included.
     const approvals: AutoApprovals = Object.create(null) as AutoApprovals;
 
+    // Resolved once per run, and ahead of the budget: a user whose model filters refuse the classifier spends none of it.
+    // Strict, because the model that judged is stamped on every approval it grants.
+    let modelPromise: ReturnType<typeof getUtilityModel> | undefined;
+    // Set when a lookup outlasted the deadline: later checks go to the person at once instead of waiting it out again.
+    // A lookup that does finish late clears it.
+    let stalled = false;
+    const resolveModel = (): ReturnType<typeof getUtilityModel> => {
+        if (stalled) {
+            return Promise.reject(new Error("The quick check's model lookup is stalled"));
+        }
+
+        modelPromise ??= loadModelFilterRules(ctx, userId)
+            .then(async (rules) => await getUtilityModel(gatewayFetch(ctx), { rules, threadId, userId }, LOW_RISK_MODEL, { strict: true }))
+            .then((model) => {
+                stalled = false;
+
+                return model;
+            });
+        // A failed attempt is not kept: the next call asks again.
+        modelPromise.catch(() => {
+            modelPromise = undefined;
+        });
+
+        return modelPromise;
+    };
+
     const classify = async (prompt: string): Promise<unknown> => {
-        const model = await getUtilityModel(gatewayFetch(ctx), { threadId, userId }, LOW_RISK_MODEL);
         const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<never>((_resolve, reject) => {
@@ -44,14 +70,21 @@ export const createRunLowRiskCheck = (
                 reject(new Error("The quick check ran out of time"));
             }, LOW_RISK_DEADLINE_MS);
         });
-        const run = generateText({
-            abortSignal: controller.signal,
-            maxRetries: 0,
-            model,
-            output: Output.object({ schema: verdictSchema }),
-            prompt,
-            system: LOW_RISK_SYSTEM_PROMPT,
-        });
+        // One deadline covers resolving the utility model as well as asking it.
+        const run = (async () => {
+            const model = await resolveModel();
+
+            controller.signal.throwIfAborted();
+
+            return await generateText({
+                abortSignal: controller.signal,
+                maxRetries: 0,
+                model,
+                output: Output.object({ schema: verdictSchema }),
+                prompt,
+                system: LOW_RISK_SYSTEM_PROMPT,
+            });
+        })();
 
         // Aborted after the deadline won the race, it rejects with nobody listening.
         run.catch(() => {});
@@ -68,7 +101,28 @@ export const createRunLowRiskCheck = (
     const check = createLowRiskApprover({
         classify,
         // Re-reads the setting and the thread's sharing, so switching the setting off or sharing the thread mid-run holds from the next call.
-        consumeBudget: async () => await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }),
+        consumeBudget: async () => {
+            // No allowed model: nothing will be asked, so none of the budget is spent.
+            // Bounded by the same deadline as the call itself: a model that never resolves must leave the call with the person.
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const modelAvailable = await Promise.race([
+                resolveModel()
+                    .then(() => true)
+                    .catch(() => false),
+                new Promise<boolean>((resolve) => {
+                    timer = setTimeout(() => {
+                        stalled = true;
+                        resolve(false);
+                    }, LOW_RISK_DEADLINE_MS);
+                }),
+            ]).finally(() => {
+                clearTimeout(timer);
+            });
+
+            return (
+                modelAvailable && (await ctx.runMutation(internal.chat.tool_permissions.consumeLowRiskCheck, { threadId: threadId as Id<"threads">, userId }))
+            );
+        },
         model: LOW_RISK_MODEL,
         now: () => Date.now(),
         // An approval is also stamped on the saved call at `finishRun`; this is the trace a run that never gets there leaves.

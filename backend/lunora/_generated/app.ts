@@ -20,6 +20,7 @@ import notifyConfig from "../notify.js";
 import { LUNORA_CRONS } from "./crons.js";
 import { LUNORA_FUNCTIONS } from "./functions.js";
 import { createQueueCaptureSink, dispatchQueueBatch, shouldCaptureQueue } from "@lunora/queue";
+import { LUNORA_QUEUE_REGISTRY } from "./queues.js";
 import { createShardDO } from "./shard.js";
 import { LUNORA_VECTOR_INDEXES } from "./vectors.js";
 
@@ -612,8 +613,8 @@ class AppBuilder<Env extends object> {
             functions: LUNORA_FUNCTIONS,
             architecture: deferred.architecture,
             openApiSpec: deferred.openApiSpec,
-            queue: async (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
-                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], (await import("./queues.js")).LUNORA_QUEUE_REGISTRY, {
+            queue: (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
+                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], LUNORA_QUEUE_REGISTRY, {
                     capture: shouldCaptureQueue(queueEnv as Record<string, unknown>)
                         ? createQueueCaptureSink(queueEnv as Record<string, unknown>)
                         : undefined,

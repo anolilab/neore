@@ -23,6 +23,15 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
 
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
+
 vi.mock("../lib/utility-model", () => {
     return {
         getUtilityModel: async () => {

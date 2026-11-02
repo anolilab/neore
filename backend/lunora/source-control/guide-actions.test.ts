@@ -12,13 +12,14 @@ import { generateGuide } from "./guide-functions";
 import { finalizeHostGuide } from "./guide-host";
 import { runCloudGuide } from "./guide-job";
 
-const { charge, enqueue, generateObject, hostRead, registry, sessionFrom, users } = vi.hoisted(() => {
+const { charge, enqueue, generateObject, hostRead, registry, rulesFlag, sessionFrom, users } = vi.hoisted(() => {
     return {
         charge: vi.fn(),
         enqueue: vi.fn(),
         generateObject: vi.fn(),
         hostRead: vi.fn(),
         registry: new Map<string, unknown>(),
+        rulesFlag: { noModel: false, unreadable: false },
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
@@ -34,10 +35,30 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateObject };
 });
 
-vi.mock("../lib/utility-model", () => {
+vi.mock("../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../lib/utility-model")>()),
         getUtilityModel: async () => {
             return {};
+        },
+    };
+});
+
+vi.mock("../chat/lib/model-filter-rules", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../chat/lib/model-filter-rules")>();
+
+    return {
+        ...original,
+        loadModelFilterRules: async (...args: Parameters<typeof original.loadModelFilterRules>) => {
+            if (rulesFlag.unreadable) {
+                throw new original.ModelFilterRulesUnavailableError();
+            }
+
+            if (rulesFlag.noModel) {
+                return { allowedModels: ["some/other-model"] };
+            }
+
+            return await original.loadModelFilterRules(...args);
         },
     };
 });
@@ -179,6 +200,8 @@ beforeEach(() => {
 afterEach(() => {
     harness.close();
     users.clear();
+    rulesFlag.unreadable = false;
+    rulesFlag.noModel = false;
 
     for (const mock of [charge, enqueue, generateObject, hostRead]) {
         mock.mockReset();
@@ -193,6 +216,26 @@ describe("generateGuide", () => {
         expect(await guides()).toEqual([]);
         expect(charge).not.toHaveBeenCalled();
         expect(enqueue).not.toHaveBeenCalled();
+    });
+
+    it("refuses before it reserves a row or spends the quota when the user's model settings cannot be read", async () => {
+        rulesFlag.unreadable = true;
+
+        await expect(generate(MEMBER)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await guides()).toEqual([]);
+        expect(enqueue).not.toHaveBeenCalled();
+        expect(charge).not.toHaveBeenCalled();
+    });
+
+    it("refuses before it reserves a row or spends the quota when the user's filters allow no background model", async () => {
+        rulesFlag.noModel = true;
+
+        await expect(generate(MEMBER)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await guides()).toEqual([]);
+        expect(enqueue).not.toHaveBeenCalled();
+        expect(charge).not.toHaveBeenCalled();
     });
 
     it("hands a host failure back as it is, with nothing reserved or charged", async () => {

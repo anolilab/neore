@@ -3,6 +3,7 @@ import type { QueryCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
 import { agentSwitchOf } from "../../agent/agent-switch-logic";
 import { walkPath } from "../../agent/branch-rows";
+import { sessionOfThread } from "./sessions";
 
 /**
  * The most a handoff to a coding agent may weigh, in UTF-8 bytes as the signed call carries it. The call's whole input
@@ -16,7 +17,8 @@ const SCAN_ROWS = 20;
 /**
  * The handoff a coding agent has not been sent yet: the newest divider on the thread's path that carries one, when no
  * prompt of the user's follows it. The first prompt after a switch carries it (`/hosts/send`), and it is the prompt
- * row that ends the wait, so a later prompt, and a retry once the first was saved, send none.
+ * row that ends the wait, so a later prompt sends none. The exception is a prompt that carried it and was withdrawn
+ * (Stop, or the reaper, before the computer acknowledged it): the agent never saw the handoff, so the wait goes on.
  *
  * Derived from the path rather than flagged on the session, so a switch back to a branch that had its handoff sent
  * does not send it again. A prompt typed into the computer's own window is a prompt too: it did not carry the handoff,
@@ -30,18 +32,68 @@ export const pendingHandoffOf = async (ctx: QueryCtx, thread: Doc<"threads">): P
     }
 
     const { rows } = await walkPath(ctx, thread._id, leaf, { limit: SCAN_ROWS });
+    const session = await sessionOfThread(ctx, thread._id);
 
     for (const row of rows) {
         const part = agentSwitchOf(row);
+
+        // A `native` divider stores the handoff for a reattach that fails; until then the agent has its own session, and
+        // no earlier divider's handoff is for it. What it lacks is what happened while it was away (`catchUp`).
+        if (part?.mode === "native") {
+            return part.catchUp;
+        }
 
         if (part?.handoff) {
             return part.handoff;
         }
 
-        if ((row.message as { role?: string } | undefined)?.role === "user") {
+        if ((row.message as { role?: string } | undefined)?.role === "user" && !(await carriedUnreceivedHandoff(ctx, row, session))) {
             return undefined;
         }
     }
 
     return undefined;
+};
+
+/**
+ * A prompt of the app that carried a handoff and whose turn is over without the agent ever opening it (`handoffSentAt` is
+ * set by that `turn_start`): it was withdrawn. A turn still in flight has the handoff on its way, so the wait is over.
+ */
+const carriedUnreceivedHandoff = async (ctx: QueryCtx, row: Doc<"messages">, session: Doc<"acpSessions"> | null): Promise<boolean> => {
+    if (!session || session.handoffSentAt !== undefined) {
+        return false;
+    }
+
+    const stream = await ctx.db.persistentStreams.findFirst({ where: { messageId: row._id, threadId: row.threadId } });
+
+    return stream?.carriesHandoff === true && stream.hostState === "ended";
+};
+
+/**
+ * Whether the thread is waiting for a coding agent to say if it loaded the saved session the newest divider asked for.
+ * Until it does, nobody knows whether the first prompt must carry the handoff, and a prompt sent now would be saved
+ * (ending the wait for one) before the answer: so none is taken (`/hosts/send`).
+ */
+export const awaitingReattach = async (ctx: QueryCtx, thread: Doc<"threads">): Promise<boolean> => {
+    const leaf = await leafRowOf(ctx, thread);
+
+    if (!leaf) {
+        return false;
+    }
+
+    const { rows } = await walkPath(ctx, thread._id, leaf, { limit: SCAN_ROWS });
+
+    for (const row of rows) {
+        const part = agentSwitchOf(row);
+
+        if (part) {
+            return part.mode === "native";
+        }
+
+        if ((row.message as { role?: string } | undefined)?.role === "user") {
+            return false;
+        }
+    }
+
+    return false;
 };

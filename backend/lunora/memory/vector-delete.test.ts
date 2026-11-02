@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { deleteVectorRow } from "../agent/table-writes";
@@ -52,10 +53,12 @@ vi.mock("../agent/vector/tables", async (importOriginal) => {
 const OWNER = "owner-user";
 
 let harness: ReturnType<typeof lunoraTest>;
-let memoryId: string;
-let embeddingId: string;
+let memoryId: Id<"memories">;
+let embeddingId: Id<"embeddings_768">;
 
-const run = <T>(body: (ctx: any) => Promise<T>): Promise<T> => harness.run(body as never);
+type Ctx = Parameters<Parameters<ReturnType<typeof lunoraTest>["run"]>[0]>[0];
+
+const run = <T>(body: (ctx: Ctx) => Promise<T>): Promise<T> => harness.run(body);
 const asOwner = () => harness.withIdentity({ userId: OWNER } as never);
 const jobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("retryMemoryVectorDelete") === true);
 
@@ -73,7 +76,7 @@ beforeEach(async () => {
         });
         const memory = await ctx.db.insert("memories", { embeddingId: embedding, memory: "likes tea", type: "preference", userId: OWNER });
 
-        return { embeddingId: embedding as string, memoryId: memory as string };
+        return { embeddingId: embedding, memoryId: memory };
     }));
 });
 
@@ -89,6 +92,8 @@ describe("memory vector deletion", () => {
         expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
         expect(await run(async (ctx) => await ctx.db.get("embeddings_768", embeddingId))).toBeNull();
         expect(jobs()).toHaveLength(0);
+        // The table `getVectorIdInfo` found is handed down, so the delete does not probe for it again.
+        expect(deleteVectorRow).toHaveBeenCalledWith(expect.anything(), embeddingId, "embeddings_768");
     });
 
     it("keeps the row delete, logs and schedules a retry when the vector delete fails", async () => {

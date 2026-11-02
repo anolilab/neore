@@ -22,7 +22,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
@@ -52,7 +52,8 @@ import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
+import { loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
@@ -183,6 +184,17 @@ export const assertNotStreaming = async (ctx: QueryCtx, thread: Doc<"threads">):
     }
 };
 
+/** Refuses a switch while the path ends on a prompt whose reply has not started. */
+export const assertReplyStarted = async (ctx: QueryCtx, thread: Doc<"threads">, leaf: Doc<"messages">): Promise<void> => {
+    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
+    // reply then hangs off, past the divider. A prompt whose run already started, and was stopped or failed
+    // before a reply, is no gap, or the user could never leave the model that is not answering. A regenerate's
+    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.
+    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+};
+
 /** Everything that decides whether a switch may happen, before anything is claimed or written. */
 const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> => {
     // The right a collaborator already has to pick the model of a send.
@@ -231,13 +243,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         return { agent: from, kind: "same" };
     }
 
-    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
-    // reply then hangs off, past the divider. A prompt whose run already started — and was stopped or failed
-    // before a reply — is no gap, or the user could never leave the model that is not answering. (A regenerate's
-    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.)
-    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
-        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
+    await assertReplyStarted(ctx, thread, leaf);
 
     return { from, kind: "ready", leaf, thread, to };
 };
@@ -494,11 +500,19 @@ export const beginSwitchSummary = internalMutation
 /** Writes the summary of `older`, or throws a refusal. Costs one utility-model call, metered by the gateway. */
 export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
 
-const summariseWith =
-    (ctx: Parameters<typeof gatewayFetch>[0], who: { threadId: string; userId: string }): Summarise =>
+export const summariseWith =
+    (ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "runQuery">, who: { threadId: string; userId: string }): Summarise =>
     async (older, omittedEarlier) => {
         try {
-            const model = await getUtilityModel(gatewayFetch(ctx), who);
+            // The history is the owner's and the switch is the caller's, so a model must satisfy both users' rules.
+            const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: who.threadId as Id<"threads"> });
+
+            if (!thread) {
+                throw new Error("thread not found");
+            }
+
+            const rules = await loadSharedModelFilterRules(ctx, who.userId, thread.userId);
+            const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules });
             const { text } = await generateText({
                 maxOutputTokens: HANDOFF_SUMMARY_MAX_TOKENS,
                 model,
@@ -512,7 +526,16 @@ const summariseWith =
             }
 
             return text;
-        } catch {
+        } catch (error) {
+            // The user's own settings said no: a refusal they can read and act on, not a server fault.
+            if (error instanceof ModelFilterRulesUnavailableError) {
+                throw new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
+            }
+
+            if (error instanceof NoAllowedUtilityModelError) {
+                throw new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE);
+            }
+
             throw new LunoraError("INTERNAL_SERVER_ERROR", "Could not summarise the conversation. Try again, or keep the full history.", {
                 data: { code: AGENT_SWITCH_SUMMARY_FAILED },
             });

@@ -161,6 +161,9 @@ export const schema = defineSchema({
         deviceId: v.id("devices"),
         folderId: v.string(),
         folderLabel: v.string(),
+        // When a prompt sent from the app carried the handoff this session was opened for (`acp/lib/send-turn.ts`). A prompt typed
+        // in the computer's own window is a turn too but carries none, so a turn alone does not show the agent got it. Unset: not yet.
+        handoffSentAt: v.optional(v.number()),
         hostSessionId: v.string(),
         // An imported session (S6) takes its transcript from the host a turn at a time: `importedTurns` is how many the backend
         // holds, `importState` whether the host has sent the end. Unset on a session that ran here.
@@ -1799,6 +1802,8 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // The turn's prompt carried a handoff; `turn_start` is the proof the agent received it (`acpSessions.handoffSentAt`).
+        carriesHandoff: v.optional(v.boolean()),
         // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
         // such a step may pause once more. It still counts toward the cap on pauses.
         earlySteps: v.optional(v.array(v.string())),
@@ -2181,7 +2186,7 @@ export const schema = defineSchema({
         ref: v.string(),
         // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
         replyKey: v.optional(v.string()),
-        status: v.union(v.literal("saved"), v.literal("used")),
+        status: v.union(v.literal("saved"), v.literal("used"), v.literal("abandoned")),
         threadId: v.string(),
         use: v.union(
             v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
@@ -3068,6 +3073,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
+        // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
+        // existed, which `discardPausedThreadSecrets` classifies from the saved messages instead.
+        secretRequest: v.optional(v.boolean()),
         status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
         streamId: v.optional(v.string()),
         threadId: v.string(),
@@ -3076,6 +3084,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_approvalId", ["approvalId"])
         .index("by_threadId", ["threadId"])
+        // Auto-archive's "does this thread still wait on a person" (`agent/auto-archive.ts`).
+        .index("by_threadId_status_createdAt", ["threadId", "status", "createdAt"])
         .index("by_status_createdAt", ["status", "createdAt"])
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).

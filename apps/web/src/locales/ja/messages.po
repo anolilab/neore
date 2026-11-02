@@ -25,11 +25,11 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:581
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:581
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
@@ -52,23 +52,23 @@ msgstr "「{0}」には値の入力が必要な変数があります。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "「{0}」は依存タスクの完了後に開始されます"
 
-#: src/features/chat/thread/composer-input.tsx:562
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "「{fileName}」は添付できません。このファイル形式はサポートされていません。"
 
-#: src/features/chat/thread/composer-input.tsx:555
+#: src/features/chat/thread/composer-input.tsx:562
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "「{fileName}」を添付できませんでした。内容がファイル形式と一致しません。"
 
-#: src/features/chat/thread/composer-input.tsx:557
+#: src/features/chat/thread/composer-input.tsx:564
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "「{fileName}」をアップロードできませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:560
+#: src/features/chat/thread/composer-input.tsx:567
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {maxMegabytes} MB までです。"
 
-#: src/features/chat/thread/composer-input.tsx:561
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
@@ -521,7 +521,7 @@ msgid "{0} is required"
 msgstr "{0} は必須です"
 
 #. placeholder {0}: done.items.length
-#: src/features/skills/components/bundle-import-dialog.tsx:223
+#: src/features/skills/components/bundle-import-dialog.tsx:224
 msgid "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 msgstr ""
 
@@ -616,7 +616,7 @@ msgstr "{0} / {maxReferences} 個を選択中"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:176
+#: src/features/develop/components/guide-tab.tsx:179
 msgid "{0} on {1}, in {2}"
 msgstr ""
 
@@ -822,6 +822,10 @@ msgstr "{count, plural, other {# 件のソースを使用、切り替えて表�
 msgid "{count, plural, one {Used # source} other {Used # sources}}"
 msgstr "{count, plural, other {# 件のソースを使用}}"
 
+#: src/features/chat/thread/composer-length-notice.tsx:42
+msgid "{count} characters now."
+msgstr ""
+
 #: src/features/chat/thread/composer-prompt-queue.tsx:418
 msgid "{count} queued"
 msgstr "{count} 件待機中"
@@ -933,7 +937,7 @@ msgstr ""
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:92
+#: src/features/develop/components/guide-tab.tsx:95
 msgid "{hostLabel} could not be reached. Try again in a moment."
 msgstr ""
 
@@ -950,21 +954,21 @@ msgstr ""
 msgid "{hostLabel} has rules this {requestNoun} does not meet yet. You can still try: {hostLabel} will say what is missing."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:65
-#: src/features/develop/components/guide-tab.tsx:94
+#: src/features/develop/components/guide-tab.tsx:68
+#: src/features/develop/components/guide-tab.tsx:97
 msgid "{hostLabel} is not connected."
 msgstr ""
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:219
+#: src/features/develop/components/guide-tab.tsx:222
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:62
+#: src/features/develop/components/guide-tab.tsx:65
 msgid "{hostLabel} or your computer could not be reached while the guide was written."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:90
+#: src/features/develop/components/guide-tab.tsx:93
 msgid "{hostLabel} refused this request."
 msgstr ""
 
@@ -1650,7 +1654,7 @@ msgstr ""
 msgid "A goal groups tasks. Its progress follows from how many of them are done."
 msgstr "目標はタスクをまとめるものです。進捗は完了したタスクの数で決まります。"
 
-#: src/features/develop/components/guide-tab.tsx:98
+#: src/features/develop/components/guide-tab.tsx:101
 msgid "A guide for this {requestNoun} is already being written."
 msgstr ""
 
@@ -2073,11 +2077,11 @@ msgstr "モデルを 1 つ以上追加してください（「モデルを取得
 msgid "Add at least one model id"
 msgstr "モデル ID を 1 つ以上追加してください"
 
-#: src/features/chat/thread/composer-input-area.tsx:192
-#: src/features/chat/thread/composer-input-area.tsx:226
-#: src/features/chat/thread/composer-input-area.tsx:233
-#: src/features/chat/thread/composer-input-area.tsx:247
-#: src/features/chat/thread/edit-composer.tsx:125
+#: src/features/chat/thread/composer-input-area.tsx:211
+#: src/features/chat/thread/composer-input-area.tsx:245
+#: src/features/chat/thread/composer-input-area.tsx:252
+#: src/features/chat/thread/composer-input-area.tsx:266
+#: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "添付ファイルを追加"
 
@@ -2346,7 +2350,7 @@ msgstr ""
 msgid "Added to your review"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:125
+#: src/features/develop/components/guide-tab.tsx:128
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr ""
 
@@ -2376,11 +2380,11 @@ msgstr ""
 msgid "Address"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:119
+#: src/features/skills/components/bundle-import-dialog.tsx:120
 msgid "Adds no tools."
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:117
+#: src/features/skills/components/bundle-import-dialog.tsx:118
 msgid "Adds these tools:"
 msgstr ""
 
@@ -3827,6 +3831,10 @@ msgstr ""
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr ""
 
+#: src/features/chat/thread/composer-length-notice.tsx:45
+msgid "Attach as file"
+msgstr ""
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "この会話で AI が参照・引用できるように、ファイルまたはコレクション全体を添付します。"
@@ -4920,7 +4928,7 @@ msgstr "ブルガリア語（ブルガリア）"
 msgid "Bulk actions"
 msgstr "一括操作"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:222
+#: src/features/skills/components/bundle-import-dialog.tsx:223
 msgid "Bundle imported"
 msgstr ""
 
@@ -5140,7 +5148,7 @@ msgstr "カナダ"
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
-#: src/features/chat/thread/edit-composer.tsx:150
+#: src/features/chat/thread/edit-composer.tsx:161
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:162
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
@@ -5174,7 +5182,7 @@ msgstr "カナダ"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
-#: src/features/skills/components/bundle-import-dialog.tsx:430
+#: src/features/skills/components/bundle-import-dialog.tsx:432
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
 #: src/features/skills/components/skill-import-dialog.tsx:243
@@ -5302,7 +5310,7 @@ msgstr "キャプション"
 msgid "Caption text"
 msgstr "キャプションテキスト"
 
-#: src/features/chat/thread/composer-input-area.tsx:221
+#: src/features/chat/thread/composer-input-area.tsx:240
 msgid "Capture screen"
 msgstr "画面をキャプチャ"
 
@@ -5723,7 +5731,7 @@ msgstr "一意のユーザー名を選んでください"
 msgid "Choose at least one permission"
 msgstr "権限を 1 つ以上選択してください"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:361
+#: src/features/skills/components/bundle-import-dialog.tsx:363
 msgid "Choose bundle file"
 msgstr ""
 
@@ -6041,7 +6049,7 @@ msgstr "メッセージのピンアイコンをクリックすると、ここに
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:300
 msgid "Click to edit"
 msgstr "クリックして編集"
 
@@ -6151,6 +6159,10 @@ msgstr "翻訳を閉じる"
 #: src/features/develop/components/pull-request-view.tsx:73
 msgid "Closed"
 msgstr "クローズ"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:240
+msgid "Closed — the conversation moved on. Ask again in the chat."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:107
 msgid "Cloud hosting for web apps, APIs, and databases"
@@ -7371,8 +7383,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:764
-#: src/features/chat/thread/composer-input.tsx:1161
+#: src/features/chat/thread/composer-input.tsx:748
+#: src/features/chat/thread/composer-input.tsx:1297
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -7457,7 +7469,7 @@ msgstr "コピーしました！"
 #: src/features/chat/thread/message-item.tsx:354
 #: src/features/chat/thread/text-selection-menu.tsx:526
 #: src/features/settings/components/chat/trigger-settings.tsx:738
-#: src/features/skills/components/bundle-import-dialog.tsx:206
+#: src/features/skills/components/bundle-import-dialog.tsx:207
 msgid "Copy"
 msgstr "コピー"
 
@@ -7551,7 +7563,7 @@ msgid "Copy the Phone number ID, a permanent (System User) access token, and the
 msgstr "Phone number ID、永続的な（System User）アクセストークン、App Secret（App settings > Basic）をコピーしてください。Verify token は任意の値を指定できます。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:721
-#: src/features/skills/components/bundle-import-dialog.tsx:194
+#: src/features/skills/components/bundle-import-dialog.tsx:195
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "このシークレットは今すぐコピーして、Webhook の送信元に保存してください。再表示はされません。"
 
@@ -7660,7 +7672,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/request-secret-prompt.tsx:215
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -7668,7 +7680,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1183
+#: src/features/chat/thread/composer-input.tsx:1319
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -7722,7 +7734,7 @@ msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "自動コピーできませんでした。公開リンク：{publicLink}"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:614
-#: src/features/skills/components/bundle-import-dialog.tsx:187
+#: src/features/skills/components/bundle-import-dialog.tsx:188
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "シークレットをコピーできませんでした。選択して手動でコピーしてください。"
 
@@ -7863,15 +7875,15 @@ msgstr "{0} を取得できませんでした：{1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1186
+#: src/features/chat/thread/composer-input.tsx:1322
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1187
+#: src/features/chat/thread/composer-input.tsx:1323
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -7898,6 +7910,10 @@ msgstr "ページの名前を変更できませんでした"
 #: src/features/pages/components/page-view.tsx:283
 msgid "Could not restore this version"
 msgstr "このバージョンを復元できませんでした"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:18
+msgid "Could not resume its own session, so the conversation was handed over"
+msgstr ""
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
@@ -8279,7 +8295,7 @@ msgstr "最初のワークフローを作成して、AI タスクを視覚的に
 msgid "Created"
 msgstr "作成日"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:150
+#: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
 msgstr ""
 
@@ -8772,7 +8788,7 @@ msgid "Debate rounds"
 msgstr "ディベートのラウンド数"
 
 #. placeholder {0}: String(group.debateRounds)
-#: src/features/skills/components/bundle-import-dialog.tsx:157
+#: src/features/skills/components/bundle-import-dialog.tsx:158
 msgid "Debates for {0} rounds."
 msgstr ""
 
@@ -8781,11 +8797,11 @@ msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
 #: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:267
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:196
+#: src/features/chat/thread/request-secret-prompt.tsx:234
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -9497,8 +9513,8 @@ msgstr "ワークフローを説明してください...例：「テキストか
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:123
 #: src/features/settings/components/chat/bots-settings.tsx:117
-#: src/features/skills/components/bundle-import-dialog.tsx:114
-#: src/features/skills/components/bundle-import-dialog.tsx:147
+#: src/features/skills/components/bundle-import-dialog.tsx:115
+#: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
 #: src/features/skills/components/skill-builder-review.tsx:157
 #: src/features/skills/components/skill-form-dialog.tsx:255
@@ -9935,7 +9951,7 @@ msgstr "アカウントをお持ちでないですか？"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:242
-#: src/features/skills/components/bundle-import-dialog.tsx:247
+#: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
 #: src/features/tasks/components/task-status.tsx:16
@@ -10138,7 +10154,7 @@ msgstr "ここにファイルをドラッグ"
 msgid "Draw an image"
 msgstr "画像を描く"
 
-#: src/features/chat/thread/composer-input-area.tsx:215
+#: src/features/chat/thread/composer-input-area.tsx:234
 msgid "Draw image"
 msgstr "画像を描く"
 
@@ -10160,7 +10176,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1366
+#: src/features/chat/thread/composer-input.tsx:1506
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -10436,8 +10452,8 @@ msgstr "コレクションを編集"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:302
-#: src/features/chat/thread/composer-input.tsx:314
+#: src/features/chat/thread/composer-input.tsx:307
+#: src/features/chat/thread/composer-input.tsx:319
 msgid "Edit content"
 msgstr "内容を編集"
 
@@ -10534,7 +10550,7 @@ msgstr "AI で画像の特定の領域を編集"
 msgid "Edit task"
 msgstr "タスクを編集"
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit the reply..."
 msgstr ""
 
@@ -10550,7 +10566,7 @@ msgstr "トリガーを編集"
 msgid "edit video"
 msgstr ""
 
-#: src/features/chat/thread/edit-composer.tsx:139
+#: src/features/chat/thread/edit-composer.tsx:148
 msgid "Edit your message..."
 msgstr "メッセージを編集..."
 
@@ -12069,7 +12085,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1023
+#: src/features/chat/thread/composer-input.tsx:1159
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -12466,7 +12482,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1055
+#: src/features/chat/thread/composer-input.tsx:1191
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -13596,7 +13612,7 @@ msgstr "例：「Python のベストプラクティスを重視する」「プ�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:156
+#: src/features/develop/components/guide-tab.tsx:159
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr ""
 
@@ -14862,7 +14878,7 @@ msgid "Group ({groupableCount})"
 msgstr ""
 
 #: src/features/chat/group/create-group-chat-button.tsx:168
-#: src/features/skills/components/bundle-import-dialog.tsx:51
+#: src/features/skills/components/bundle-import-dialog.tsx:52
 msgid "Group chat"
 msgstr "グループチャット"
 
@@ -14948,7 +14964,7 @@ msgstr ""
 msgid "Hand over a summary and the recent messages"
 msgstr ""
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Handed over"
 msgstr ""
 
@@ -15526,7 +15542,7 @@ msgid "If this problem persists, please contact support."
 msgstr "問題が解決しない場合は、サポートにお問い合わせください。"
 
 #. placeholder {0}: new Date(trigger.nextRunAt).toLocaleString()
-#: src/features/skills/components/bundle-import-dialog.tsx:137
+#: src/features/skills/components/bundle-import-dialog.tsx:138
 msgid "If you turn it on, the next run is {0}."
 msgstr ""
 
@@ -15534,7 +15550,7 @@ msgstr ""
 msgid "If your chosen model is unavailable, the reply is retried once on this model"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:122
+#: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Ignored, not available here:"
 msgstr ""
 
@@ -15753,11 +15769,11 @@ msgid "Import"
 msgstr "インポート"
 
 #. placeholder {0}: selectedCount(selected, entries)
-#: src/features/skills/components/bundle-import-dialog.tsx:434
+#: src/features/skills/components/bundle-import-dialog.tsx:436
 msgid "Import {0} items"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:350
+#: src/features/skills/components/bundle-import-dialog.tsx:352
 msgid "Import a bundle"
 msgstr ""
 
@@ -15845,7 +15861,7 @@ msgid "Imported {added} Notion page(s)."
 msgstr "Notion のページを {added} 件インポートしました。"
 
 #. placeholder {0}: skill.slug
-#: src/features/skills/components/bundle-import-dialog.tsx:128
+#: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
 msgstr ""
 
@@ -16201,8 +16217,8 @@ msgid "instructions"
 msgstr ""
 
 #: src/features/settings/components/chat/bots-settings.tsx:126
-#: src/features/skills/components/bundle-import-dialog.tsx:115
-#: src/features/skills/components/bundle-import-dialog.tsx:149
+#: src/features/skills/components/bundle-import-dialog.tsx:116
+#: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
@@ -16255,11 +16271,11 @@ msgstr "生成前に考えるインテリジェントな動画モデル"
 msgid "Intensity"
 msgstr "強度"
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:326
 msgid "Interrupt and restart"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:320
+#: src/features/chat/thread/composer-input-area.tsx:342
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
@@ -16484,7 +16500,7 @@ msgstr ""
 msgid "Issue tracking and project management"
 msgstr "課題管理とプロジェクト管理"
 
-#: src/features/develop/components/guide-tab.tsx:95
+#: src/features/develop/components/guide-tab.tsx:98
 msgid "It does not exist, or your {hostLabel} account cannot see it."
 msgstr ""
 
@@ -16505,7 +16521,11 @@ msgstr "削除されたか、アクセス権がなくなった可能性があり
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "有効期限切れ、取り消し済み、または使用済みの可能性があります。新しいリンクを依頼してください。"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:177
+#: src/features/chat/thread/agent-switch-divider.tsx:21
+msgid "It opened a different session than its own, so the conversation was handed over"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:215
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -17747,7 +17767,7 @@ msgstr ""
 msgid "Loading tasks…"
 msgstr "タスクを読み込んでいます…"
 
-#: src/features/develop/components/guide-tab.tsx:54
+#: src/features/develop/components/guide-tab.tsx:57
 msgid "Loading the guide"
 msgstr ""
 
@@ -17805,6 +17825,7 @@ msgstr "読み込んでいます..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -17957,6 +17978,10 @@ msgstr "長いテキストが検出されました"
 #: src/features/marketing/data/models-data.ts:169
 msgid "Long text generation in images"
 msgstr "画像内の長文テキスト生成"
+
+#: src/features/chat/thread/composer-input.tsx:806
+msgid "Long text was attached as a file."
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:391
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
@@ -18988,7 +19013,7 @@ msgstr "モード"
 
 #. placeholder {0}: group.mode
 #. placeholder {1}: group.model
-#: src/features/skills/components/bundle-import-dialog.tsx:153
+#: src/features/skills/components/bundle-import-dialog.tsx:154
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr ""
 
@@ -19274,7 +19299,7 @@ msgstr "ステップ数が多い = 高品質、生成に時間がかかる"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "単なるプロキシではなく、アプリとすべての LLM プロバイダーの間にあるインテリジェントなレイヤーです。"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:134
+#: src/features/chat/thread/request-secret-prompt.tsx:149
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -19835,7 +19860,7 @@ msgstr "Neore には 30 以上のモデルが含まれています。チャッ�
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:169
+#: src/features/develop/components/guide-tab.tsx:172
 msgid "Neore, from the diff"
 msgstr ""
 
@@ -20408,7 +20433,7 @@ msgstr "焦点距離が選択されていません"
 msgid "No goal"
 msgstr "目標なし"
 
-#: src/features/develop/components/guide-tab.tsx:205
+#: src/features/develop/components/guide-tab.tsx:208
 msgid "No guide"
 msgstr ""
 
@@ -21220,7 +21245,7 @@ msgstr ""
 msgid "Older"
 msgstr "それ以前"
 
-#: src/features/chat/thread/agent-switch-divider.tsx:19
+#: src/features/chat/thread/agent-switch-divider.tsx:30
 msgid "Older messages were summarised"
 msgstr ""
 
@@ -21447,7 +21472,7 @@ msgstr "データを一切保持しないことを保証するプロバイダー
 msgid "Only when it contains (optional)"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:144
+#: src/features/skills/components/bundle-import-dialog.tsx:145
 msgid "Only when:"
 msgstr ""
 
@@ -21683,7 +21708,7 @@ msgstr "タスクを開く"
 msgid "Open terminal"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:197
+#: src/features/develop/components/guide-tab.tsx:200
 msgid "Open the agent's conversation"
 msgstr ""
 
@@ -22551,7 +22576,7 @@ msgstr "参加者"
 msgid "Participants take turns, one reply per message."
 msgstr "参加者が順番に、1 メッセージにつき 1 件ずつ返信します。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:154
+#: src/features/skills/components/bundle-import-dialog.tsx:155
 msgid "Participants:"
 msgstr ""
 
@@ -22719,7 +22744,7 @@ msgstr "画像 URL を貼り付け"
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:292
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23341,7 +23366,7 @@ msgid "Preferred model: {0}"
 msgstr "推奨モデル：{0}"
 
 #. placeholder {0}: skill.model
-#: src/features/skills/components/bundle-import-dialog.tsx:123
+#: src/features/skills/components/bundle-import-dialog.tsx:124
 msgid "Prefers the model {0}."
 msgstr ""
 
@@ -23406,7 +23431,7 @@ msgstr "プレミアムクラスの推論の透明性"
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:202
+#: src/features/chat/thread/request-secret-prompt.tsx:242
 msgid "Preparing a request…"
 msgstr ""
 
@@ -24251,11 +24276,11 @@ msgstr "使用状況の分析とコストを照会"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:330
+#: src/features/chat/thread/composer-input-area.tsx:353
 msgid "Queue message"
 msgstr "メッセージを待機列に追加"
 
-#: src/features/chat/thread/composer-input-area.tsx:349
+#: src/features/chat/thread/composer-input-area.tsx:372
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
@@ -24482,7 +24507,7 @@ msgstr "読み取りと書き込み"
 msgid "Read aloud"
 msgstr "読み上げ"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:383
+#: src/features/skills/components/bundle-import-dialog.tsx:385
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr ""
 
@@ -24519,7 +24544,7 @@ msgstr "読み取り専用プレビュー - 編集するにはフォークして
 msgid "Read-only shared conversation"
 msgstr "読み取り専用の共有会話"
 
-#: src/features/chat/thread/composer-input.tsx:259
+#: src/features/chat/thread/composer-input.tsx:264
 msgid "Reading \"{attachmentName}\"…"
 msgstr "「{attachmentName}」を読み込んでいます…"
 
@@ -24670,7 +24695,7 @@ msgid "Reasoning effort: {0} of 4"
 msgstr "推論レベル：{0} / 4"
 
 #. placeholder {0}: String(skill.reasoningEffort)
-#: src/features/skills/components/bundle-import-dialog.tsx:126
+#: src/features/skills/components/bundle-import-dialog.tsx:127
 msgid "Reasoning effort: {0} of 4."
 msgstr ""
 
@@ -25108,10 +25133,10 @@ msgstr "サインイン状態を保持"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:321
-#: src/features/chat/thread/composer-input.tsx:333
-#: src/features/chat/thread/composer-input.tsx:387
-#: src/features/chat/thread/composer-input.tsx:396
+#: src/features/chat/thread/composer-input.tsx:326
+#: src/features/chat/thread/composer-input.tsx:338
+#: src/features/chat/thread/composer-input.tsx:392
+#: src/features/chat/thread/composer-input.tsx:401
 #: src/features/devices/components/devices-settings.tsx:193
 #: src/features/devices/components/devices-settings.tsx:199
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25744,6 +25769,10 @@ msgstr "インポートを再開"
 msgid "Resume your latest chat"
 msgstr "最新のチャットを再開"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:26
+msgid "Resumed its own session"
+msgstr ""
+
 #: src/features/settings/components/account/account-settings.tsx:458
 msgid "Resuming your latest chat"
 msgstr "最新のチャットを再開しています"
@@ -25783,6 +25812,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
+#: src/features/chat/thread/request-secret-prompt.tsx:311
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -25806,11 +25836,11 @@ msgstr "{retryAfterMinutes} 分後に再試行"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:415
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:405
+#: src/features/chat/thread/composer-input.tsx:410
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26200,7 +26230,7 @@ msgstr "Cloudflare Workers で動作 — コールドスタート 50ms 未満、
 #. placeholder {0}: trigger.schedule ?? ""
 #. placeholder {1}: trigger.timezone ? ` (${trigger.timezone})` : " (UTC)"
 #. placeholder {2}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:134
+#: src/features/skills/components/bundle-import-dialog.tsx:135
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr ""
 
@@ -26209,7 +26239,7 @@ msgid "Runs once, then switches itself off. For a repeating time, use a schedule
 msgstr ""
 
 #. placeholder {0}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:143
+#: src/features/skills/components/bundle-import-dialog.tsx:144
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr ""
 
@@ -26304,8 +26334,8 @@ msgstr "サウジアラビア"
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/chat/thread/edit-composer.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:263
+#: src/features/chat/thread/edit-composer.tsx:165
+#: src/features/chat/thread/request-secret-prompt.tsx:331
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26412,11 +26442,11 @@ msgstr "ワークフローを保存"
 msgid "Saved"
 msgstr "保存済み"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:200
+#: src/features/chat/thread/request-secret-prompt.tsx:238
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:198
+#: src/features/chat/thread/request-secret-prompt.tsx:236
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -26484,7 +26514,7 @@ msgstr "スケジュール"
 msgid "Schedule {0}"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:54
+#: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr ""
 
@@ -26521,7 +26551,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:982
+#: src/features/chat/thread/composer-input.tsx:1118
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -26663,7 +26693,7 @@ msgid "Search mode: {0}"
 msgstr "検索モード：{0}"
 
 #. placeholder {0}: skill.searchMode
-#: src/features/skills/components/bundle-import-dialog.tsx:124
+#: src/features/skills/components/bundle-import-dialog.tsx:125
 msgid "Search mode: {0}."
 msgstr ""
 
@@ -26836,7 +26866,7 @@ msgstr "シート/月"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:231
+#: src/features/chat/thread/request-secret-prompt.tsx:277
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27168,12 +27198,12 @@ msgid "Send Magic Link"
 msgstr "マジックリンクを送信"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:159
-#: src/features/chat/thread/composer-input-area.tsx:383
+#: src/features/chat/thread/composer-input-area.tsx:172
+#: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Send message"
 msgstr "メッセージを送信"
 
-#: src/features/chat/thread/composer-input-area.tsx:159
+#: src/features/chat/thread/composer-input-area.tsx:172
 msgid "Send message ({sendShortcut})"
 msgstr ""
 
@@ -27338,11 +27368,12 @@ msgstr "セッションを取り消しました"
 msgid "Set a password for your account"
 msgstr "アカウントのパスワードを設定します"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:151
+#: src/features/chat/thread/request-secret-prompt.tsx:154
+#: src/features/chat/thread/request-secret-prompt.tsx:171
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:141
+#: src/features/chat/thread/request-secret-prompt.tsx:161
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr ""
 
@@ -27551,7 +27582,7 @@ msgstr ""
 msgid "Show {remainingCount} more"
 msgstr "さらに {remainingCount} 件表示"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:98
+#: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show all"
 msgstr ""
 
@@ -27601,7 +27632,7 @@ msgstr "ラベルを表示"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:196
-#: src/features/skills/components/bundle-import-dialog.tsx:98
+#: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "表示を減らす"
 
@@ -27754,7 +27785,7 @@ msgstr "別のサイトでサインインしますか？"
 msgid "Sign in to {label} again"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:91
+#: src/features/develop/components/guide-tab.tsx:94
 msgid "Sign in to an account to write a guide."
 msgstr ""
 
@@ -27928,7 +27959,7 @@ msgstr ""
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
-#: src/features/skills/components/bundle-import-dialog.tsx:54
+#: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Skill"
 msgstr "スキル"
 
@@ -28858,11 +28889,11 @@ msgstr "ステータス"
 msgid "Status Page"
 msgstr "ステータスページ"
 
-#: src/features/chat/thread/composer-input-area.tsx:321
+#: src/features/chat/thread/composer-input-area.tsx:343
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:304
+#: src/features/chat/thread/composer-input-area.tsx:326
 msgid "Steer the reply"
 msgstr ""
 
@@ -28939,8 +28970,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:357
-#: src/features/chat/thread/composer-input-area.tsx:370
+#: src/features/chat/thread/composer-input-area.tsx:380
+#: src/features/chat/thread/composer-input-area.tsx:393
 msgid "Stop generating"
 msgstr "生成を停止"
 
@@ -29476,7 +29507,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:459
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -29484,7 +29515,7 @@ msgstr "候補があります。右矢印キーで確定します"
 msgid "suggestions"
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:226
+#: src/features/develop/components/guide-tab.tsx:229
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr ""
@@ -29538,7 +29569,7 @@ msgid "Summary of the conversation"
 msgstr "会話の要約"
 
 #. placeholder {0}: group.synthesizer
-#: src/features/skills/components/bundle-import-dialog.tsx:155
+#: src/features/skills/components/bundle-import-dialog.tsx:156
 msgid "Summed up by /{0}."
 msgstr ""
 
@@ -29830,7 +29861,7 @@ msgstr "翻訳先の言語"
 msgid "Target model (optional)"
 msgstr "対象モデル（任意）"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:148
+#: src/features/skills/components/bundle-import-dialog.tsx:149
 msgid "Task"
 msgstr ""
 
@@ -30203,7 +30234,7 @@ msgstr "テキストの方向を LTR に設定しました"
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
-#: src/features/chat/thread/composer-input.tsx:295
+#: src/features/chat/thread/composer-input.tsx:300
 msgid "Text document"
 msgstr "テキストドキュメント"
 
@@ -30305,7 +30336,7 @@ msgstr "タイ"
 msgid "Thanks for rating"
 msgstr "評価ありがとうございます"
 
-#: src/features/develop/components/guide-tab.tsx:105
+#: src/features/develop/components/guide-tab.tsx:108
 msgid "That agent session has ended."
 msgstr ""
 
@@ -30313,19 +30344,19 @@ msgstr ""
 msgid "That comment is already gone."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:102
+#: src/features/develop/components/guide-tab.tsx:105
 msgid "That computer is busy. Try again in a moment."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:103
+#: src/features/develop/components/guide-tab.tsx:106
 msgid "That computer is not online."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:141
+#: src/features/develop/components/guide-tab.tsx:144
 msgid "That did not work. Try again."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:89
+#: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr ""
 
@@ -30345,7 +30376,7 @@ msgstr ""
 msgid "That message could not be found in this conversation."
 msgstr "そのメッセージはこの会話内に見つかりませんでした。"
 
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "That message is too long to send from here."
 msgstr ""
 
@@ -30357,19 +30388,19 @@ msgstr ""
 msgid "That request is no longer waiting."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:128
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "That suggestion cannot be added any more."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:127
+#: src/features/develop/components/guide-tab.tsx:130
 msgid "That suggestion is gone."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:61
+#: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:126
+#: src/features/develop/components/guide-tab.tsx:129
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr ""
 
@@ -30381,11 +30412,15 @@ msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モー
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
-#: src/features/develop/components/guide-tab.tsx:64
+#: src/features/develop/components/guide-tab.tsx:67
 msgid "The agent finished without giving a guide. Write it again."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:19
+msgid "The agent is still opening its session. Try again in a moment."
+msgstr ""
+
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "The agent is still working on the last message."
 msgstr ""
 
@@ -30401,7 +30436,7 @@ msgstr "エージェントループは体系的なタスク実行のため常に
 msgid "The agent made no file changes."
 msgstr "エージェントはファイルを変更しませんでした。"
 
-#: src/features/develop/components/guide-tab.tsx:192
+#: src/features/develop/components/guide-tab.tsx:195
 msgid "The agent on your computer is reading the change…"
 msgstr ""
 
@@ -30430,7 +30465,7 @@ msgstr "アシスタントから質問があります"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:213
+#: src/features/chat/thread/request-secret-prompt.tsx:259
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -30454,7 +30489,7 @@ msgstr "ビルダーが応答できませんでした。もう一度お試しく
 msgid "The bundle could not be exported."
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:339
+#: src/features/skills/components/bundle-import-dialog.tsx:341
 msgid "The bundle could not be imported."
 msgstr ""
 
@@ -30557,7 +30592,7 @@ msgid "The extension will be able to read and send chats as {0}. You can disconn
 msgstr "拡張機能は {0} としてチャットを読み取り・送信できるようになります。拡張機能でサインアウトするか、アカウント設定でセッションを終了すれば、いつでも切断できます。"
 
 #. placeholder {0}: MAX_BUNDLE_BYTES / 1024
-#: src/features/skills/components/bundle-import-dialog.tsx:308
+#: src/features/skills/components/bundle-import-dialog.tsx:310
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr ""
 
@@ -30609,16 +30644,16 @@ msgstr "モデルに送信する完全なシステムプロンプト..."
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目標は削除されます。タスクは目標なしの状態で残ります。"
 
-#: src/features/develop/components/guide-tab.tsx:114
 #: src/features/develop/components/guide-tab.tsx:117
+#: src/features/develop/components/guide-tab.tsx:120
 msgid "The guide could not be started."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:63
+#: src/features/develop/components/guide-tab.tsx:66
 msgid "The guide could not be written. Try again in a moment."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:60
+#: src/features/develop/components/guide-tab.tsx:63
 msgid "The guide did not finish. Write it again."
 msgstr ""
 
@@ -30785,6 +30820,10 @@ msgstr "ページには相手のバージョンが表示されています。残
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "ページ、すべてのサブページ、コメント、バージョン履歴が削除されます。この操作は元に戻せません。"
 
+#: src/features/chat/thread/composer-input.tsx:880
+msgid "The pasted text could not be attached and was not inserted."
+msgstr ""
+
 #. placeholder {0}: records.length
 #. placeholder {1}: problems.length
 #: ../../packages/ui/src/components/file-renderers/jsonl-viewer.tsx:69
@@ -30888,7 +30927,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "モダンな AI アプリケーションのための統合 LLM ゲートウェイ。"
 
-#: src/features/chat/thread/composer-input.tsx:556
+#: src/features/chat/thread/composer-input.tsx:563
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
@@ -31073,6 +31112,10 @@ msgstr "この操作は元に戻せません。チームメンバーは全員削
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "この操作は元に戻せません。組織と関連するすべてのデータが完全に削除されます。"
 
+#: src/features/chat/thread/agent-switch-divider.tsx:19
+msgid "This agent cannot resume its own session, so the conversation was handed over"
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr ""
@@ -31085,11 +31128,11 @@ msgstr ""
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:381
+#: src/features/skills/components/bundle-import-dialog.tsx:383
 msgid "This bundle came from someone else"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:392
+#: src/features/skills/components/bundle-import-dialog.tsx:394
 msgid "This bundle has no items."
 msgstr ""
 
@@ -31098,15 +31141,15 @@ msgstr ""
 msgid "This cannot be added to this chat."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:67
+#: src/features/develop/components/guide-tab.tsx:70
 msgid "This change is too large to write a guide for."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:87
+#: src/features/develop/components/guide-tab.tsx:90
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:22
+#: src/features/chat/host/host-send-errors.ts:23
 msgid "This chat belongs to a worker. Send it messages from its own message box."
 msgstr ""
 
@@ -31138,6 +31181,10 @@ msgstr "このコマンド名は予約されています"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
+
+#: src/features/chat/thread/agent-switch-divider.tsx:20
+msgid "This computer did not resume its own session, so the conversation was handed over"
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:444
 msgid "This computer is not paired yet."
@@ -31200,7 +31247,7 @@ msgstr ""
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "このエンドポイントは Ollama ではありません。モデル管理は Ollama でのみ利用できます。LM Studio ではアプリ内でモデルをダウンロードしてください。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:327
+#: src/features/skills/components/bundle-import-dialog.tsx:329
 msgid "This file could not be read as a bundle."
 msgstr ""
 
@@ -31236,7 +31283,7 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/develop/components/guide-tab.tsx:213
+#: src/features/develop/components/guide-tab.tsx:216
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr ""
 
@@ -31279,7 +31326,7 @@ msgstr ""
 msgid "This is how your organization appears to members"
 msgstr "メンバーに表示される組織の名前です"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:257
+#: src/features/chat/thread/request-secret-prompt.tsx:325
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
 
@@ -31300,6 +31347,42 @@ msgstr "このメモリはその後削除されました。"
 #. placeholder {1}: methodLabels[method]
 #: src/features/develop/components/merge-panel.tsx:132
 msgid "This merges the commit {0} into the base branch with “{1}” on {hostLabel}. If the branch has changed since you opened this page, {hostLabel} refuses."
+msgstr ""
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:25
+#~ msgid "This message has {0} characters; the limit is {1}. Shorten it, or attach it as a file."
+#~ msgstr ""
+
+#. placeholder {0}: formatNumber(chars, i18n.locale)
+#. placeholder {1}: formatNumber(MAX_PROMPT_CHARS, i18n.locale)
+#: src/features/chat/thread/composer-length-notice.tsx:26
+#~ msgid "This message has {0} characters; the limit is {1}. Shorten it."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+#~ msgid "This message has {count} characters; the limit is {limit}. It is too long to send even as a file. Shorten it."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it, or attach it as a file."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+#~ msgid "This message has {count} characters; the limit is {limit}. Shorten it."
+#~ msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:30
+msgid "This message is over the limit of {limit} characters. It is too long to send even as a file. Shorten it."
+msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:32
+msgid "This message is over the limit of {limit} characters. Shorten it, or attach it as a file."
+msgstr ""
+
+#: src/features/chat/thread/composer-length-notice.tsx:27
+msgid "This message is over the limit of {limit} characters. Shorten it."
 msgstr ""
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
@@ -31402,6 +31485,10 @@ msgstr "この選択はサイズが大きすぎて一度にインポートでき
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "このサーバーにはサインインが必要です。保存してから「サインイン」を選択してください。"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:209
+msgid "This server's address changed. Check the address below and save again."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
@@ -31865,7 +31952,7 @@ msgstr "ファイルが多すぎます"
 msgid "Too many requests right now. Try again in a moment."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:86
+#: src/features/develop/components/guide-tab.tsx:89
 msgid "Too many requests. Try again in a few minutes."
 msgstr ""
 
@@ -32317,7 +32404,7 @@ msgstr "Daily Brief をオンにする"
 msgid "Turn on run until done"
 msgstr ""
 
-#: src/features/skills/components/bundle-import-dialog.tsx:121
+#: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
 msgstr ""
 
@@ -32404,8 +32491,8 @@ msgstr "入力して検索"
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
-#: src/features/chat/thread/composer-input.tsx:1357
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
+#: src/features/chat/thread/composer-input.tsx:1496
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:173
 msgid "Type your message..."
 msgstr "メッセージを入力..."
 
@@ -32567,6 +32654,7 @@ msgstr "内部の仕組み"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
+#: src/features/chat/thread/composer-input.tsx:808
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "元に戻す"
@@ -32794,7 +32882,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1218
+#: src/features/chat/thread/composer-input.tsx:1354
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -32941,7 +33029,7 @@ msgstr ""
 msgid "Upload"
 msgstr "アップロード"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:351
+#: src/features/skills/components/bundle-import-dialog.tsx:353
 msgid "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
 msgstr ""
 
@@ -32982,18 +33070,18 @@ msgstr "CSV をアップロードし、Python で分析してグラフをエク�
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "ドキュメントをナレッジベースにアップロードし、コレクションにまとめます。AI は関連するコンテキストを検索し、使用したパッセージを引用します。"
 
-#: src/features/chat/thread/composer-input.tsx:402
-#: src/features/chat/thread/composer-input.tsx:601
-#: src/features/chat/thread/composer-input.tsx:1139
+#: src/features/chat/thread/composer-input.tsx:407
+#: src/features/chat/thread/composer-input.tsx:608
+#: src/features/chat/thread/composer-input.tsx:1275
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1132
+#: src/features/chat/thread/composer-input.tsx:1268
 msgid "Upload failed: {0}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:210
+#: src/features/chat/thread/composer-input-area.tsx:229
 msgid "Upload file"
 msgstr "ファイルをアップロード"
 
@@ -33039,7 +33127,7 @@ msgstr "アップロード済み"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} をアップロードしました"
 
-#: src/features/chat/thread/composer-input.tsx:339
+#: src/features/chat/thread/composer-input.tsx:344
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
@@ -34143,7 +34231,7 @@ msgstr "出力を待っています…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:244
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -34155,14 +34243,14 @@ msgstr "オーナーの回答を待っています"
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
-#: src/features/chat/thread/composer-input-area.tsx:330
-#: src/features/chat/thread/composer-input-area.tsx:349
-#: src/features/chat/thread/composer-input-area.tsx:383
-#: src/features/chat/thread/composer-input-area.tsx:397
+#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:372
+#: src/features/chat/thread/composer-input-area.tsx:407
+#: src/features/chat/thread/composer-input-area.tsx:421
 msgid "Waiting for uploads to complete…"
 msgstr "アップロードの完了を待っています…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:204
+#: src/features/chat/thread/request-secret-prompt.tsx:244
 msgid "Waiting for you"
 msgstr ""
 
@@ -34273,11 +34361,11 @@ msgid "Webhook secret"
 msgstr "Webhook シークレット"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:612
-#: src/features/skills/components/bundle-import-dialog.tsx:185
+#: src/features/skills/components/bundle-import-dialog.tsx:186
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook シークレットをクリップボードにコピーしました"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:193
+#: src/features/skills/components/bundle-import-dialog.tsx:194
 msgid "Webhook secret for \"{title}\""
 msgstr ""
 
@@ -34440,7 +34528,7 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/develop/components/guide-tab.tsx:149
+#: src/features/develop/components/guide-tab.tsx:152
 msgid "What should the guide pay attention to?"
 msgstr ""
 
@@ -34531,7 +34619,7 @@ msgstr "設定すると、これらのプロバイダーのみ使用されます
 msgid "When should the assistant use this skill?"
 msgstr "アシスタントはどんなときにこのスキルを使うべきですか？"
 
-#: src/features/develop/components/guide-tab.tsx:161
+#: src/features/develop/components/guide-tab.tsx:164
 msgid "Where the guide is written"
 msgstr ""
 
@@ -34586,7 +34674,7 @@ msgstr "本番ワークロードで広く信頼されている"
 msgid "Width"
 msgstr "幅"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:128
+#: src/features/chat/thread/request-secret-prompt.tsx:143
 msgid "Will be saved as your {provider} API key"
 msgstr ""
 
@@ -34710,7 +34798,7 @@ msgstr "製品発表用の動画の説明文を書く"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "AI でコードを書き、サンドボックスで実行し、結果をドキュメント化 — すべて 1 つのスレッドで。"
 
-#: src/features/develop/components/guide-tab.tsx:182
+#: src/features/develop/components/guide-tab.tsx:185
 msgid "Write it again"
 msgstr ""
 
@@ -34730,7 +34818,7 @@ msgstr "コードを書いて..."
 msgid "Write something"
 msgstr "何か書いてください"
 
-#: src/features/develop/components/guide-tab.tsx:182
+#: src/features/develop/components/guide-tab.tsx:185
 msgid "Write the guide"
 msgstr ""
 
@@ -34744,7 +34832,7 @@ msgstr "入力するか、「/」でコマンドを表示…"
 msgid "Writing"
 msgstr "ライティング"
 
-#: src/features/develop/components/guide-tab.tsx:192
+#: src/features/develop/components/guide-tab.tsx:195
 msgid "Writing the guide…"
 msgstr ""
 
@@ -34919,7 +35007,7 @@ msgid "You are watching as many repositories as is allowed."
 msgstr ""
 
 #. placeholder {0}: review.skillSlotsLeft ?? 0
-#: src/features/skills/components/bundle-import-dialog.tsx:422
+#: src/features/skills/components/bundle-import-dialog.tsx:424
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr ""
 
@@ -34975,7 +35063,7 @@ msgstr "インデックス済みのナレッジファイルはまだありませ
 msgid "You have no projects yet."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:146
+#: src/features/chat/thread/request-secret-prompt.tsx:166
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 
@@ -35081,7 +35169,7 @@ msgstr "レート制限に達しました。{minutes, plural, other {# 分}}後�
 msgid "You've successfully joined the thread. Redirecting..."
 msgstr "スレッドに参加しました。リダイレクトしています..."
 
-#: src/features/develop/components/guide-tab.tsx:93
+#: src/features/develop/components/guide-tab.tsx:96
 msgid "Your {hostLabel} sign-in has expired. Connect it again."
 msgstr ""
 
@@ -35178,8 +35266,8 @@ msgstr "現在の匿名セッションは永続的なアカウントに変換さ
 msgid "Your daily brief"
 msgstr "あなたの Daily Brief"
 
-#: src/features/develop/components/guide-tab.tsx:66
-#: src/features/develop/components/guide-tab.tsx:96
+#: src/features/develop/components/guide-tab.tsx:69
+#: src/features/develop/components/guide-tab.tsx:99
 msgid "Your daily limit for AI requests is used up."
 msgstr ""
 
@@ -35200,12 +35288,12 @@ msgid "Your First Chat"
 msgstr "はじめてのチャット"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:647
+#: src/features/chat/thread/composer-input.tsx:668
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "入力が大きく（約 {0} トークン）、モデルのコンテキストウィンドウのかなりの部分を消費します。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:661
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "入力が大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。送信するには、メッセージを短くするか添付ファイルを削除してください。"
 
@@ -35287,11 +35375,11 @@ msgstr "あなたの評価"
 msgid "Your review"
 msgstr "あなたのレビュー"
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr ""
 
-#: src/features/develop/components/guide-tab.tsx:129
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "Your review is being submitted. Try again when it is done."
 msgstr ""
 
@@ -35306,6 +35394,10 @@ msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:57
 msgid "Your review was requested"
+msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:301
+msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 
 #: src/lib/toast.ts:248

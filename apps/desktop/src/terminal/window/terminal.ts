@@ -10,6 +10,7 @@ import { Terminal } from "@xterm/xterm";
 import { SCROLLBACK_LINES } from "../scrollback";
 import { MAX_COPY_CHARS, MAX_INPUT_CHARS } from "../validate";
 import type { TerminalExit } from "./api";
+import { createInputHold } from "./input-hold";
 
 const $ = (id: string): HTMLElement => {
     const element = document.querySelector<HTMLElement>(`#${id}`);
@@ -149,6 +150,9 @@ const showEnded = (text: string): void => {
     $("restart").focus();
 };
 
+/** What xterm answers to the shell's own queries while it starts (see `input-hold.ts`). */
+const startupInput = createInputHold(MAX_INPUT_CHARS);
+
 const start = async (): Promise<void> => {
     // A second request while one is pending would be refused by the main process and report a failure for a shell that started.
     if (state.starting) {
@@ -158,6 +162,7 @@ const start = async (): Promise<void> => {
     state.starting = true;
     state.generation += 1;
     state.ended = false;
+    startupInput.clear();
     $("ended").hidden = true;
     // A new shell starts on an empty screen and an empty buffer.
     term.reset();
@@ -168,6 +173,13 @@ const start = async (): Promise<void> => {
 
         if (!state.ended) {
             state.running = true;
+
+            const held = startupInput.take();
+
+            if (held.length > 0) {
+                await quietly(api.input(held));
+            }
+
             // The window may have been resized while the shell was starting.
             await quietly(api.resize(term.cols, term.rows));
             term.focus();
@@ -183,6 +195,8 @@ term.attachCustomKeyEventHandler(handleKey);
 term.onData((data) => {
     if (state.running) {
         quietly(api.input(data));
+    } else if (state.starting) {
+        startupInput.hold(data);
     }
 });
 term.onResize(({ cols, rows }) => {

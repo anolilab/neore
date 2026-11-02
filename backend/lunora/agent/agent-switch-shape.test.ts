@@ -21,7 +21,7 @@ describe("readAgentSwitch", () => {
 
     it("reads nothing from a row that is not a switch or has the wrong shape", () => {
         expect(readAgentSwitch({})).toBeUndefined();
-        expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, mode: "native" } } })).toBeUndefined();
+        expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, mode: "restart" } } })).toBeUndefined();
         expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: { ...part, to: { kind: "host", model: 3 } } } })).toBeUndefined();
         expect(readAgentSwitch({ providerMetadata: { neoreAgentSwitch: "x" } })).toBeUndefined();
     });

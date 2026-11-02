@@ -95,7 +95,7 @@ const progressProbe = vi.hoisted(() => {
     return { on: false };
 });
 const routerScript = vi.hoisted(() => {
-    return { calls: 0, speakers: [] as string[] };
+    return { calls: 0, failRulesReadAt: 0, rulesReads: 0, speakers: [] as string[] };
 });
 
 vi.mock("../lib/get-agent", () => {
@@ -139,8 +139,9 @@ vi.mock("../lib/agent-tools", () => {
     };
 });
 
-vi.mock("../../lib/utility-model", () => {
+vi.mock("../../lib/utility-model", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("../../lib/utility-model")>()),
         getUtilityModel: async () => {
             routerScript.calls += 1;
 
@@ -173,6 +174,12 @@ const fakeProcedures = () => {
         return { language: undefined, location: undefined, memoryEnabled: false, timezone: undefined };
     });
     const agentPrefs = internalQuery.input({ userId: v.string() }).query(async () => {
+        routerScript.rulesReads += 1;
+
+        if (routerScript.rulesReads === routerScript.failRulesReadAt) {
+            throw new Error("D1 unavailable");
+        }
+
         return { autoMediaEnrichment: false };
     });
     const keys = internalQuery.input({ userId: v.string() }).query(async () => {
@@ -332,6 +339,8 @@ beforeEach(async () => {
     speakerTools.clear();
     progressProbe.on = false;
     routerScript.calls = 0;
+    routerScript.failRulesReadAt = 0;
+    routerScript.rulesReads = 0;
     routerScript.speakers = [];
     replyCharges.allow = Infinity;
     replyCharges.calls = 0;
@@ -373,6 +382,19 @@ afterEach(() => {
 });
 
 describe("runGroupTurn — supervisor with two routed speakers", () => {
+    it("falls back to the rotation, without asking the router, when the model filter rules cannot be read", async () => {
+        await setGroup("supervisor", ["writer", "checker", "reviewer"]);
+        routerScript.speakers = ["p2", "p1"];
+        // The turn context reads the rules first; the routing read is the second, and only it fails.
+        routerScript.failRulesReadAt = 2;
+
+        await runTurn();
+
+        expect(routerScript.calls).toBe(0);
+        expect(await speakersSaid()).toStrictEqual(["WRITER"]);
+        expect(await streamStatus()).toBe("done");
+    });
+
     it("saves both replies in order, labelled, the second continuing the first on the same branch", async () => {
         await setGroup("supervisor", ["writer", "checker", "reviewer"]);
         routerScript.speakers = ["p2", "p1"];
@@ -654,6 +676,46 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect((speakerModels.get("INSTR:checker") as ScriptedModel).doStreamCalls).toHaveLength(0);
         // The pause closes the stream; the continuation opens its own.
         expect(await streamStatus()).toBe("done");
+    });
+
+    it("drops the paused turn's saved references, and leaves its plain tool approval answerable, when a new message moves the conversation on", async () => {
+        await setUpPausingWriter();
+
+        await runTurn();
+
+        const { storeRequestedSecret } = await import("../lib/secret-requests");
+        const { createStreamWithMessage } = await import("../streaming/index");
+        const row = await approvalRow();
+        const ref = await harness.run(
+            async (ctx: any) =>
+                await storeRequestedSecret(ctx, {
+                    approvalId: "other-approval",
+                    label: "L",
+                    now: Date.now(),
+                    replyKey: row.config.replyKey ?? row.streamId,
+                    threadId: threadId as never,
+                    use: { kind: "provider_key", provider: "openai" },
+                    userId: OWNER,
+                    value: "sk-live-0123456789-supersecret",
+                }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStreamWithMessage, {
+                    messageId: "next",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const stored = await harness.run(async (ctx: any) => await ctx.db.query("requestedSecrets").collect());
+        const secret = stored.find((r: { ref: string }) => r.ref === ref);
+
+        expect(secret).toMatchObject({ status: "abandoned" });
+        expect(secret.encryptedValue).toBeUndefined();
+        expect(await approvalRow()).toMatchObject({ status: "pending" });
     });
 
     it("keeps what started the turn in the snapshot, so a person's answer does not turn an outside agent's turn into the lead's", async () => {

@@ -161,6 +161,15 @@ written here is what is not.
   stream tokens). Billing: 1 credit = 1,000 microdollars, via
   `deductCreditsFromGateway`.
 
+- **Background model calls follow the user's model filter rules.** `getUtilityModel`
+  (`backend/lunora/lib/utility-model.ts`) takes the user's `modelFilterRules` in its
+  context (`loadModelFilterRules`; the type refuses a `userId` without them), picks the
+  first candidate the same predicate as the backup model allows, and hands the rules to the
+  gateway (where `requireZDR` / `denyDataCollection` route). When none is allowed it throws
+  `NoAllowedUtilityModelError` and the step is skipped (the low-risk classifier, which is
+  `strict`, fails closed = ask). Titles, categories, summaries and follow-ups build their own
+  agent: use `resolveBackgroundModel` there, never a bare `getAgent(DEFAULT_…)`.
+
 - **Knowledge rerank** — `POST /internal/rerank` on the gateway wraps Workers AI
   `bge-reranker-base`; `retrieve.ts` blends its order with the RRF order instead of
   replacing it (the model is English/Chinese). `AI` is unbound in dev, so the route
@@ -688,7 +697,16 @@ written here is what is not.
   headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
   a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
   snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
-  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run — and when a
+  paused reply is ABANDONED: `stopActiveForThread` (also while another reply is live; a live reply keeps its own) or a
+  stopped stream that never started or was waiting out a limit, and `createStreamWithMessage` (a new message moves past the
+  request), all through `discardPausedThreadSecrets` (a group turn's pause is the same snapshot, so the same path). That
+  call skips reply keys that still have a live stream (a pause with several requests shares one key), clears the thread's
+  references in one pass, DENIES the reply's pending SECRET requests (`resolvedBy: "abandoned"`; answering one is refused with
+  `TOOL_REQUEST_ABANDONED`; other pending approvals stay answerable, and a Stop denies them even when a claimed run keeps its
+  ciphertext until it settles) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
+  only that prompt's reply.
+  The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
@@ -1437,7 +1455,13 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   devices, evals, pages, tasks … do), wired into the deletion workflow, so it
   draws none. Any `cross_module_table_write` outside `gdpr/steps/` is a
   regression.
-- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`
+- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`,
+  which are GIT-IGNORED (they changed on nearly every backend PR and caused the
+  merge conflicts). `_generated/app.ts` imports `architecture.js`, so anything
+  that compiles or runs it needs codegen first: backend `lint:types`, `test` and
+  `test:coverage` `dependsOn: codegen` in `backend/project.json`; `lunora build`
+  and `lunora dev` run it themselves. A new job running bare `tsc`/`vitest` in
+  `backend/` on a fresh checkout must run `pnpm codegen` first (TS2307 else).
   (Studio → Functions → Architecture; admin-gated
   `GET /_lunora/admin/architecture`). ~1,900 edges and ~510 "call sites could not
   be drawn" — mostly by design: refs held in variables
