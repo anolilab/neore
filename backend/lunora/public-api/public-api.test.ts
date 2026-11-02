@@ -261,6 +261,13 @@ describe("idempotency", () => {
             return Response.json({ id: "t1" });
         });
         const first = withIdempotency(store, { ...options, claim }, handler);
+
+        // Hashing the key is real async work, so which call reaches the claim first is not up to call order: only start the
+        // second attempt once the first holds the key, or the two can swap roles and the test hangs on the wrong one.
+        await vi.waitFor(() => {
+            expect(held.size).toBe(1);
+        });
+
         const second = withIdempotency(store, { ...options, claim }, handler);
 
         await expect(second).rejects.toMatchObject({ code: "idempotency_outcome_unknown" });
