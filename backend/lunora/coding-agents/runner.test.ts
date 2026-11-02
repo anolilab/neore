@@ -556,6 +556,10 @@ describe("the pull request goes through the host adapter", () => {
 
         expect(source).toContain("linkOpenedPullRequest(ctx, run)");
         expect(source).toContain("else if (prUrl !== undefined)");
-        expect(source).toContain("could not link the opened pull request");
+        expect(source).toContain("recordOpenedPullRequestWithRetry(ctx");
+
+        const retrySource = await readFile(decodeURIComponent(new URL("../source-control/pr-link-retry.ts", import.meta.url).pathname), "utf8");
+
+        expect(retrySource).toContain("could not link the opened pull request");
     });
 });

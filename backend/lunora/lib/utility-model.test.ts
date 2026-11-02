@@ -74,6 +74,16 @@ describe("pickUtilityModelId", () => {
         expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
     });
 
+    it("admits a multi-region candidate under blocked regions when the gateway pins it to the EU endpoint and EU is not blocked", () => {
+        // Allowed exactly ["EU"]: the call is served from the EU alone, so the US block does not reach it.
+        const rules = { allowedRegions: ["EU"], blockedRegions: ["US"] };
+
+        expect(pickUtilityModelId(rules, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // EU itself blocked: nothing is left; and without the EU pin the US stays reachable.
+        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+    });
+
     it("answers nothing when the rules exclude every candidate", () => {
         expect(pickUtilityModelId({ allowedModels: ["some/other-model"] })).toBeUndefined();
     });

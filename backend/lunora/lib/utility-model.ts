@@ -53,6 +53,13 @@ const PAID_PLAN_GRANT = Symbol("neore.utilityPaidPlanGrant");
 export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): ModelFilterRules =>
     granted ? ({ ...rules, [PAID_PLAN_GRANT]: true } as ModelFilterRules) : rules;
 
+/** Whether the gateway will serve this candidate from its EU endpoint: it pins an OpenRouter call only for exactly `["EU"]`. */
+const routedToEuEndpoint = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
+    const allowed = rules?.allowedRegions;
+
+    return definition.provider === "openrouter" && allowed?.length === 1 && allowed[0] === "EU" && deriveModelRegions(definition).includes("EU");
+};
+
 /**
  * Whether a candidate can honour the user's blocked regions. The gateway does not turn `blockedRegions` into a
  * routing restriction, so a model reachable in a blocked region could be served from it: with any region blocked,
@@ -61,7 +68,16 @@ export const withPaidPlanGrant = (rules: ModelFilterRules, granted: boolean): Mo
 const avoidsBlockedRegions = (definition: ModelDefinition, rules: ModelFilterRules | undefined): boolean => {
     const blocked = rules?.blockedRegions;
 
-    return !blocked || blocked.length === 0 || deriveModelRegions(definition).every((region) => !blocked.includes(region));
+    if (!blocked || blocked.length === 0) {
+        return true;
+    }
+
+    // The gateway's EU-pinned endpoint serves the call from the EU alone, whatever other regions the model has.
+    if (routedToEuEndpoint(definition, rules) && !blocked.includes("EU")) {
+        return true;
+    }
+
+    return deriveModelRegions(definition).every((region) => !blocked.includes(region));
 };
 
 /**
@@ -83,7 +99,7 @@ const staysInAllowedRegions = (definition: ModelDefinition, rules: ModelFilterRu
         return true;
     }
 
-    return definition.provider === "openrouter" && allowed.length === 1 && allowed[0] === "EU" && regions.includes("EU");
+    return routedToEuEndpoint(definition, rules);
 };
 
 /**

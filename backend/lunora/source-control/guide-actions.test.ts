@@ -19,7 +19,7 @@ const { charge, enqueue, generateObject, hostRead, registry, rulesFlag, sessionF
         generateObject: vi.fn(),
         hostRead: vi.fn(),
         registry: new Map<string, unknown>(),
-        rulesFlag: { unreadable: false },
+        rulesFlag: { noModel: false, unreadable: false },
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
@@ -52,6 +52,10 @@ vi.mock("../chat/lib/model-filter-rules", async (importOriginal) => {
         loadModelFilterRules: async (...args: Parameters<typeof original.loadModelFilterRules>) => {
             if (rulesFlag.unreadable) {
                 throw new original.ModelFilterRulesUnavailableError();
+            }
+
+            if (rulesFlag.noModel) {
+                return { allowedModels: ["some/other-model"] };
             }
 
             return await original.loadModelFilterRules(...args);
@@ -197,6 +201,7 @@ afterEach(() => {
     harness.close();
     users.clear();
     rulesFlag.unreadable = false;
+    rulesFlag.noModel = false;
 
     for (const mock of [charge, enqueue, generateObject, hostRead]) {
         mock.mockReset();
@@ -215,6 +220,16 @@ describe("generateGuide", () => {
 
     it("refuses before it reserves a row or spends the quota when the user's model settings cannot be read", async () => {
         rulesFlag.unreadable = true;
+
+        await expect(generate(MEMBER)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await guides()).toEqual([]);
+        expect(enqueue).not.toHaveBeenCalled();
+        expect(charge).not.toHaveBeenCalled();
+    });
+
+    it("refuses before it reserves a row or spends the quota when the user's filters allow no background model", async () => {
+        rulesFlag.noModel = true;
 
         await expect(generate(MEMBER)).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
