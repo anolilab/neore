@@ -22613,6 +22613,7 @@
                     },
                     "required": [
                       "approvalId",
+                      "expectedUrl",
                       "threadId",
                       "value"
                     ],

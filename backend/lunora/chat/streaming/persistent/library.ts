@@ -253,10 +253,14 @@ export const stopActiveForThread = internalMutation
         // Replies that stay live share a reply key with a stopped continuation when one pause started several: its
         // references are theirs too, so they are not discarded under them.
         const stopping = new Set(streams.map((stream) => stream._id));
+        // A selected stream that is claimed and executing keeps its key too: its run drops the references at its own end.
         const keptKeys = new Set(
             await Promise.all(
                 live
-                    .filter((stream) => !stopping.has(stream._id))
+                    .filter(
+                        (stream) =>
+                            !stopping.has(stream._id) || (stream.runClaimedAt !== undefined && stream.pausedRun === undefined && stream.producer !== "host"),
+                    )
                     .map(async (stream) => await replyKeyOfStream(ctx, { streamId: stream._id, threadId: stream.threadId as Id<"threads"> })),
             ),
         );

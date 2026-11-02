@@ -391,6 +391,19 @@ describe("a paused reply that is abandoned", () => {
         expect(await holdsValue(ref)).toBe(true);
     });
 
+    it("keeps the ciphertext until a claimed continuation settles when Stop ends every continuation of one pause", async () => {
+        const unclaimed = String(await insertStream("streaming", undefined, "prompt-A"));
+        const claimed = String(await insertStream("streaming", Date.now(), "prompt-B"));
+        const ref = await storeSecret("stream-A");
+
+        await insertSnapshot("approved", "stream-A", unclaimed, "one");
+        await insertSnapshot("approved", "stream-A", claimed, "two");
+
+        await run(async (ctx) => await ctx.runMutation(stopActiveForThread, { threadId }));
+
+        expect(await holdsValue(ref)).toBe(true);
+    });
+
     it("finds an old pending secret request below more than 40 newer rows", async () => {
         const ref = await storeSecret("stream-A");
 

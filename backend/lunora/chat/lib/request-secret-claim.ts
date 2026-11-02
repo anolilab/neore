@@ -55,7 +55,7 @@ const asUse = (value: unknown): SecretUse | undefined => {
 };
 
 /** The destination with the address of the server it names, which must be exactly one of the owner's saved ones. */
-const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use: SecretUse, expectedUrl?: string): Promise<SecretUse> => {
+const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use: SecretUse, expectedUrl: string | undefined): Promise<SecretUse> => {
     if (use.kind !== "mcp_header") {
         return use;
     }
@@ -77,7 +77,7 @@ const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use:
     const { url } = matches[0]!;
 
     // The card showed an address; the value goes to that one or nowhere, never to what the name points at by now.
-    if (expectedUrl !== undefined && expectedUrl !== url) {
+    if (expectedUrl === undefined || expectedUrl !== url) {
         throw new LunoraError(
             "BAD_REQUEST",
             `The address of the MCP server "${use.server}" changed since this request was shown. Reload the request and check it again`,
@@ -93,8 +93,8 @@ export const claimSecretAnswer = async (
     args: {
         approvalId: string;
         callerId: string;
-        /** The server address the card displayed; a header save is refused when the saved server is no longer there. */
-        expectedUrl?: string;
+        /** The server address the card displayed; a header save without it, or with one the saved server no longer has, is refused. */
+        expectedUrl: string | undefined;
         now: number;
         reply: SecretReply;
         threadId: Id<"threads">;

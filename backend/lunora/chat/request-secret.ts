@@ -56,7 +56,7 @@ export const answerSecretRequest = authMutation
     .input({
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         /** The address of the MCP server the card displayed; the save is refused when that server now lives elsewhere. */
-        expectedUrl: v.optional(v.string().max(MAX_LENGTH.url)),
+        expectedUrl: v.string().max(MAX_LENGTH.url),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         /**

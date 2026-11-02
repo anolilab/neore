@@ -184,8 +184,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             return;
         }
 
-        // The address the card displayed: the server refuses the save if the saved server has moved since.
-        const expectedUrl = value !== null && server?.kind === "found" ? server.url : undefined;
+        // The address the card displayed: the server refuses a header save if the saved server has moved since (empty when there is no server to name).
+        const expectedUrl = value !== null && server?.kind === "found" ? server.url : "";
 
         // Cleared before the call returns: the value lives in this component for no longer than the keystrokes.
         setDraft("");
@@ -193,7 +193,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
-            { approvalId, ...(expectedUrl !== undefined && { expectedUrl }), threadId: threadId as Id<"threads">, value },
+            { approvalId, expectedUrl, threadId: threadId as Id<"threads">, value },
             {
                 onError: (error) => {
                     setSubmitted(null);

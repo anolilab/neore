@@ -109,7 +109,7 @@ const save = async (value: string | null, options: { approvalId?: string; caller
             await claimSecretAnswer(ctx, {
                 approvalId: options.approvalId ?? "sec-1",
                 callerId: options.callerId ?? OWNER,
-                ...(options.expectedUrl !== undefined && { expectedUrl: options.expectedUrl }),
+                expectedUrl: options.expectedUrl,
                 now: Date.now(),
                 reply: value === null ? { kind: "decline" } : { kind: "save", value },
                 threadId: threadId as never,
@@ -346,7 +346,7 @@ describe("claimSecretAnswer", () => {
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
 
-        await save("t".repeat(2000), { approvalId: "sec-2" });
+        await save("t".repeat(2000), { approvalId: "sec-2", expectedUrl: FILES_URL });
 
         expect(await secretRows()).toHaveLength(1);
     });
@@ -938,7 +938,7 @@ describe("answering for an MCP server", () => {
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
 
-        return await save(value, { approvalId: "sec-2" });
+        return await save(value, { approvalId: "sec-2", expectedUrl: FILES_URL });
     };
 
     const servers = async (...mcpServers: { name: string; url: string }[]) =>
@@ -966,7 +966,7 @@ describe("answering for an MCP server", () => {
         expect(await secretRows()).toHaveLength(0);
 
         await servers({ name: "Files", url: FILES_URL }, { name: "Files", url: "https://dup.example.com/mcp" });
-        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(AMBIGUOUS_SERVER);
+        await expect(save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL })).rejects.toThrow(AMBIGUOUS_SERVER);
         expect(await secretRows()).toHaveLength(0);
         expect(await statuses()).toStrictEqual(["pending", "pending"]);
     });
@@ -997,6 +997,17 @@ describe("answering for an MCP server", () => {
         });
 
         await expect(save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL })).rejects.toThrow(ADDRESS_CHANGED);
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+    });
+
+    it("refuses a header save that names no address, storing nothing and keeping the claim", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(ADDRESS_CHANGED);
         expect(await secretRows()).toHaveLength(0);
         expect(await statuses()).toStrictEqual(["pending", "pending"]);
     });

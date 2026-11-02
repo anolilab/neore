@@ -118,10 +118,8 @@ const insertRequest = async (approvalId: string, input: unknown, order = 1, conf
     });
 };
 
-const answer = async (userId: string, value: string | null, approvalId = "sec-1", expectedUrl?: string) =>
-    await harness
-        .withIdentity({ userId } as never)
-        .mutation(answerSecretRequest as never, { approvalId, ...(expectedUrl !== undefined && { expectedUrl }), threadId, value } as never);
+const answer = async (userId: string, value: string | null, approvalId = "sec-1", expectedUrl = FILES_URL) =>
+    await harness.withIdentity({ userId } as never).mutation(answerSecretRequest as never, { approvalId, expectedUrl, threadId, value } as never);
 
 const RATE_LIMITED = /rate limit/iu;
 const CHANGED = /changed/iu;
@@ -276,6 +274,23 @@ describe("answerSecretRequest", () => {
         expect(await rows("requestedSecrets")).toHaveLength(0);
         expect(await runStatuses()).toStrictEqual(["pending", "pending"]);
         expect(queued).toHaveLength(0);
+    });
+
+    it("refuses a header save that names no address, so a moved server cannot take the value", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+        await insertRequest("sec-2", { label: "Files token", use: { header: "Authorization", kind: "mcp_header", server: "Files" } }, 3);
+
+        await expect(
+            harness.withIdentity({ userId: OWNER } as never).mutation(answerSecretRequest as never, { approvalId: "sec-2", threadId, value: SECRET } as never),
+        ).rejects.toThrow();
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+        expect(await runStatuses()).toStrictEqual(["pending", "pending"]);
     });
 
     it("refuses to answer a request whose pause was abandoned, and stores nothing", async () => {
