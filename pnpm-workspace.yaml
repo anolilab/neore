@@ -274,25 +274,25 @@ catalogs:
     tailwind-csstree: 0.4.1
     typescript-eslint: 8.72.0
   lunora:
-    "@lunora/auth": 1.0.0-alpha.252
-    "@lunora/bindings": 1.0.0-alpha.146
-    "@lunora/client": 1.0.0-alpha.278
-    "@lunora/cli": 1.0.0-alpha.466
-    "@lunora/d1": 1.0.0-alpha.227
-    "@lunora/mail": 1.0.0-alpha.134
-    "@lunora/notify": 1.0.0-alpha.106
-    "@lunora/payment": 1.0.0-alpha.263
-    "@lunora/queue": 1.0.0-alpha.138
-    "@lunora/ratelimit": 1.0.0-alpha.191
-    "@lunora/react": 1.0.0-alpha.289
-    "@lunora/scheduler": 1.0.0-alpha.163
-    "@lunora/seed": 1.0.0-alpha.276
-    "@lunora/server": 1.0.0-alpha.261
-    "@lunora/storage": 1.0.0-alpha.166
-    "@lunora/studio": 1.0.0-alpha.369
-    "@lunora/testing": 1.0.0-alpha.325
-    "@lunora/workflow": 1.0.0-alpha.106
-    lunorash: 1.0.0-alpha.464
+    "@lunora/auth": 1.0.0-alpha.253
+    "@lunora/bindings": 1.0.0-alpha.148
+    "@lunora/client": 1.0.0-alpha.280
+    "@lunora/cli": 1.0.0-alpha.468
+    "@lunora/d1": 1.0.0-alpha.229
+    "@lunora/mail": 1.0.0-alpha.136
+    "@lunora/notify": 1.0.0-alpha.108
+    "@lunora/payment": 1.0.0-alpha.265
+    "@lunora/queue": 1.0.0-alpha.140
+    "@lunora/ratelimit": 1.0.0-alpha.193
+    "@lunora/react": 1.0.0-alpha.290
+    "@lunora/scheduler": 1.0.0-alpha.165
+    "@lunora/seed": 1.0.0-alpha.277
+    "@lunora/server": 1.0.0-alpha.263
+    "@lunora/storage": 1.0.0-alpha.168
+    "@lunora/studio": 1.0.0-alpha.371
+    "@lunora/testing": 1.0.0-alpha.326
+    "@lunora/workflow": 1.0.0-alpha.108
+    lunorash: 1.0.0-alpha.466
   markdown:
     "@streamdown/cjk": 1.0.4
     "@streamdown/math": 1.0.3

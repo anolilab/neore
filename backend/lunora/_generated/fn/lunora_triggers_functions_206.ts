@@ -70,6 +70,19 @@ if (typeof source["triggerId"] !== "string") return DEFER;
 if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
 });
+installCompiledValidatorMap(lunora_triggers_functions_206.rotateWebhookSecret.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["keepOldFor24h"] !== undefined) {
+if (typeof source["keepOldFor24h"] !== "boolean") return DEFER;
+__val1 = source["keepOldFor24h"];
+__has1 = true;
+}
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { ...(__has1 ? { "keepOldFor24h": __val1 } : {}), "triggerId": source["triggerId"] };
+});
 installCompiledValidatorMap(lunora_triggers_functions_206.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
