@@ -83,3 +83,7 @@ backend/lunora.advisor.map.json
 
 # Test coverage output
 coverage/
+
+# Written by `lunora codegen`; every consumer runs codegen first (vis `codegen` target).
+backend/lunora/_generated/architecture.json
+backend/lunora/_generated/architecture.ts
