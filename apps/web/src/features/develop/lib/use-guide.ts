@@ -29,42 +29,84 @@ export const useGuide = (address: PullRequestAddress, headSha: string, enabled: 
     return useQuery(crpc.source_control.guide_functions.getGuide.queryOptions(enabled ? { ...address, headSha } : skipToken));
 };
 
+/** What one guide head has cost so far: reads started, whether one succeeded, whether one is running. */
+interface RefreshRecord {
+    attempts: number;
+    done: boolean;
+    running: boolean;
+}
+
+/** A refresh that failed, or came back without a head, is tried again on a later visit, this many times in all. */
+const MAX_REFRESH_ATTEMPTS = 3;
+
 /** Guide heads already refreshed, per query client (the cache), so they survive the tab unmounting. */
-const refreshedGuideHeads = new WeakMap<QueryClient, Set<string>>();
+const refreshedGuideHeads = new WeakMap<QueryClient, Map<string, RefreshRecord>>();
+
+const isPullHeadKnown = (data: unknown): boolean => {
+    const pull = data as { detail?: { headSha?: unknown }; status?: unknown } | undefined;
+
+    return pull?.status === "ok" && typeof pull.detail?.headSha === "string";
+};
 
 /**
  * A guide is reserved under the head the host reported when it was started, which can be newer than the head this page
- * loaded. A guide for another head than the page's is therefore a reason to read the pull request again, once per such
- * head: if the page's head moves it matches and the guide reads as current, and if it does not the guide is older.
+ * loaded. A guide for another head than the page's is therefore a reason to read the pull request again: if the page's
+ * head moves it matches and the guide reads as current, and if it does not the guide is older.
  * The files and commits are read again with it: they are keyed by address alone, and the merge and review panels act on
  * the pull's head, so a head that moved under a diff loaded for the old one would let a reviewer act on a commit they never saw.
  * Remembered per user and pull request, so the same guide head on another pull request refreshes that one too. The record
  * belongs to the query client, not to the component, so leaving the tab and coming back to the same stale guide does not
- * read the pull request, files and commits a second time.
+ * read the pull request, files and commits a second time. A head counts as refreshed only once the reads came back and the
+ * pull request's head is known; a failed read is tried again on a later visit, at most `MAX_REFRESH_ATTEMPTS` times, so a
+ * guide that is simply older than the pull request does not read the host on every visit.
  */
 export const useRefreshPullForOtherGuideHead = (address: PullRequestAddress, guideHeadSha: string | undefined, pageHeadSha: string): void => {
     const queryClient = useQueryClient();
     const userId = useDevelopUser();
 
     useEffect(() => {
-        const seen = `${String(userId)}|${address.repository}#${String(address.number)}|${String(guideHeadSha)}`;
+        if (guideHeadSha === undefined || guideHeadSha === pageHeadSha) {
+            return;
+        }
+
+        const seen = `${String(userId)}|${address.repository}#${String(address.number)}|${guideHeadSha}`;
 
         let refreshed = refreshedGuideHeads.get(queryClient);
 
         if (!refreshed) {
-            refreshed = new Set<string>();
+            refreshed = new Map<string, RefreshRecord>();
             refreshedGuideHeads.set(queryClient, refreshed);
         }
 
-        if (guideHeadSha === undefined || guideHeadSha === pageHeadSha || refreshed.has(seen)) {
+        let record = refreshed.get(seen);
+
+        if (!record) {
+            record = { attempts: 0, done: false, running: false };
+            refreshed.set(seen, record);
+        }
+
+        if (record.done || record.running || record.attempts >= MAX_REFRESH_ATTEMPTS) {
             return;
         }
 
-        refreshed.add(seen);
+        const current = record;
+        const pullKey = [DEVELOP_QUERY_ROOT, userId, "pull", address];
+        const keys = [pullKey, ...["files", "commits"].map((kind) => [DEVELOP_QUERY_ROOT, userId, kind, address])];
 
-        for (const kind of ["pull", "files", "commits"]) {
-            void queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, kind, address] });
-        }
+        current.attempts += 1;
+        current.running = true;
+
+        void Promise.allSettled(keys.map(async (queryKey) => await queryClient.invalidateQueries({ queryKey })))
+            .then(() => {
+                const failed = keys.some((queryKey) => queryClient.getQueryState(queryKey)?.status === "error");
+
+                current.done = !failed && isPullHeadKnown(queryClient.getQueryData(pullKey));
+
+                return undefined;
+            })
+            .finally(() => {
+                current.running = false;
+            });
     }, [address, guideHeadSha, pageHeadSha, queryClient, userId]);
 };
 
