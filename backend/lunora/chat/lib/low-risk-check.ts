@@ -51,7 +51,6 @@ export const createRunLowRiskCheck = (
     };
 
     const classify = async (prompt: string): Promise<unknown> => {
-        const model = await resolveModel();
         const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<never>((_resolve, reject) => {
@@ -60,14 +59,21 @@ export const createRunLowRiskCheck = (
                 reject(new Error("The quick check ran out of time"));
             }, LOW_RISK_DEADLINE_MS);
         });
-        const run = generateText({
-            abortSignal: controller.signal,
-            maxRetries: 0,
-            model,
-            output: Output.object({ schema: verdictSchema }),
-            prompt,
-            system: LOW_RISK_SYSTEM_PROMPT,
-        });
+        // One deadline covers resolving the utility model as well as asking it.
+        const run = (async () => {
+            const model = await resolveModel();
+
+            controller.signal.throwIfAborted();
+
+            return await generateText({
+                abortSignal: controller.signal,
+                maxRetries: 0,
+                model,
+                output: Output.object({ schema: verdictSchema }),
+                prompt,
+                system: LOW_RISK_SYSTEM_PROMPT,
+            });
+        })();
 
         // Aborted after the deadline won the race, it rejects with nobody listening.
         run.catch(() => {});
