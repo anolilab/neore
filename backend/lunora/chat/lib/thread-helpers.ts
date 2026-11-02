@@ -86,6 +86,7 @@ export const validateThreadAccessWithData = async (
  * @param model The agent model to use
  * @param threadLanguage Optional thread-specific language (overrides user default)
  * @param modelFilterRules The user's model filter rules, for a background call that must follow them
+ * @param billedUserId Who the gateway meters the call to, for a background call that would otherwise run as the system
  * @returns An agent instance configured with user preferences
  */
 export const getAgentForUser = async (
@@ -94,6 +95,7 @@ export const getAgentForUser = async (
     model: string,
     threadLanguage?: string,
     modelFilterRules?: ModelFilterRules,
+    billedUserId?: string,
 ): Promise<ReturnType<typeof getAgent>> => {
     const {
         aboutMe,
@@ -113,5 +115,5 @@ export const getAgentForUser = async (
 
     // The gateway binding exists only on an action's ctx; from a query or mutation
     // this agent can read and save messages but never generate.
-    return await getAgent(model, { gateway: gatewayFetchFor(context), language, location, modelFilterRules, personalization, timezone });
+    return await getAgent(model, { gateway: gatewayFetchFor(context), language, location, modelFilterRules, personalization, timezone, userId: billedUserId });
 };

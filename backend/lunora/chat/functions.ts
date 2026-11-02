@@ -1580,7 +1580,7 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
     }
 
     const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules });
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1646,7 +1646,7 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
     }
 
     const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules });
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: threadData.userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1708,7 +1708,7 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
     }
 
     const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules });
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -3679,7 +3679,7 @@ export const getFollowupSuggestions = authAction
             return { suggestions: [] };
         }
 
-        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules);
+        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
 
         const messagesResult = await agent.listMessages(context, {
             paginationOpts: { cursor: null, numItems: 10 },
@@ -3768,7 +3768,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules);
+            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
 
             const messagesResult = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10 },

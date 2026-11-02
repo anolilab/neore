@@ -80,4 +80,13 @@ describe.each([
 
         expect(getAgent).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ modelFilterRules: { requireZDR: true } }));
     });
+
+    it("meters the call to the caller whose plan authorized the model, not the system identity", async () => {
+        state.rules = { [COLLABORATOR]: {}, [OWNER]: {} };
+
+        await run().catch((error: unknown) => expect(String(error)).toContain(REACHED));
+
+        // The owner's rules still pick the model; the caller is who pays.
+        expect(getAgent).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ userId: COLLABORATOR }));
+    });
 });
