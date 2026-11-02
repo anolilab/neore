@@ -147,4 +147,15 @@ describe("memory vector deletion", () => {
         expect(deleteVectorRow).not.toHaveBeenCalled();
         expect(jobs()).toHaveLength(0);
     });
+
+    it("returns quietly, without an error log, when the vector is already gone", async () => {
+        await run(async (ctx) => await ctx.db.delete("embeddings_768", embeddingId));
+
+        await asOwner().mutation(deleteMemory as never, { memoryId } as never);
+
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
+        expect(memoryLogger.error).not.toHaveBeenCalled();
+        expect(deleteVectorRow).not.toHaveBeenCalled();
+        expect(jobs()).toHaveLength(0);
+    });
 });

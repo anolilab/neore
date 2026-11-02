@@ -10,11 +10,13 @@ import { mergedStream, stream } from "../../lib/streams";
 import { deleteVectorRow } from "../table-writes";
 import {
     type EmbeddingsWithoutDenormalizedFields,
+    findVectorTable,
     getVectorIndexName,
     getVectorTableName,
     type VectorDimension,
     type VectorTableId,
     type VectorTableName,
+    validateVectorDimension,
     vVectorDimension,
     vVectorId,
 } from "./tables";
@@ -181,12 +183,22 @@ export const updateBatch = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await Promise.all(
-            args.vectors.map((embedding) =>
-                ctx.db.patch(getVectorTableName(embedding.vector.length as VectorDimension), embedding.id, {
-                    model: embedding.model,
-                    vector: embedding.vector,
-                }),
-            ),
+            args.vectors.map(async (embedding) => {
+                validateVectorDimension(embedding.vector.length);
+
+                const table = await findVectorTable(ctx.db, embedding.id);
+
+                // The row is gone (deleted since the re-embed was queued): nothing to update.
+                if (table === null) {
+                    return;
+                }
+
+                if (table !== getVectorTableName(embedding.vector.length)) {
+                    throw new Error(`Cannot update ${embedding.id}: a ${embedding.vector.length}-dimension vector does not fit ${table}`);
+                }
+
+                await ctx.db.patch(table, embedding.id as Id<VectorTableName>, { model: embedding.model, vector: embedding.vector });
+            }),
         );
 
         return null;

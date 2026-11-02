@@ -79,11 +79,12 @@ export const findVectorTable = async (db: { get: (table: never, id: never) => Pr
     return null;
 };
 
+/** The table and dimension of vector row `id`, or `null` when no `embeddings_*` table holds it (already deleted). */
 export const getVectorIdInfo = async (context: QueryContext, id: VectorTableId) => {
     const tableName = await findVectorTable(context.db, id);
 
     if (tableName === null) {
-        throw new Error(`Unknown vector table id: ${id}`);
+        return null;
     }
 
     return { dimension: Number(tableName.slice("embeddings_".length)) as VectorDimension, tableName };

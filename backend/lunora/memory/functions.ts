@@ -158,10 +158,15 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
     let vectorTable: VectorTableName;
 
     try {
-        const { tableName } = await getVectorIdInfo(context, orphan.embeddingId as VectorTableId);
+        const info = await getVectorIdInfo(context, orphan.embeddingId as VectorTableId);
 
-        vectorTable = tableName;
-        vectorId = context.db.asId(tableName, orphan.embeddingId);
+        // In no embeddings table: the vector is already gone (deleted with its thread, or a retried delete landed).
+        if (info === null) {
+            return;
+        }
+
+        vectorTable = info.tableName;
+        vectorId = context.db.asId(info.tableName, orphan.embeddingId);
     } catch (error) {
         memoryLogger.error(`Memory ${orphan.memoryId} of user ${orphan.userId} points at embedding ${orphan.embeddingId}, which is not a vector row id`, error);
 
