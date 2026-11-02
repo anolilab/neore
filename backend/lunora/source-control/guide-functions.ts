@@ -7,13 +7,15 @@
  * - A proposal is a SUGGESTION. `applyGuideProposal` writes a comment into the user's review DRAFT through the same
  *   path as the Files tab, and nothing reaches the host until the user submits that review.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { chargeDailyLimit } from "../chat/lib/daily-limit";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "../chat/lib/model-filter-rules";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
+import { NO_ALLOWED_UTILITY_MODEL_MESSAGE, pickUtilityModelId } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { effectiveStatus, pickGuide } from "./guide-logic";
@@ -93,6 +95,18 @@ export const generateGuide = authAction
 
         if (flags.isAnonymous) {
             return { status: "guest" as const };
+        }
+
+        // The job needs a model the user's filters allow. Settled here, before the quota is charged: there is no way to
+        // give a unit back, so a settings read that fails (or filters that allow no model) must not cost one.
+        const rules = await loadModelFilterRules(ctx, userId).catch(() => undefined);
+
+        if (rules === undefined) {
+            throw new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
+        }
+
+        if (pickUtilityModelId(rules) === undefined) {
+            throw new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE);
         }
 
         const token = await resolveGithubToken(ctx, userId);

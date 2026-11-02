@@ -52,8 +52,8 @@ import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
-import { loadSharedModelFilterRules } from "./lib/model-filter-rules";
+import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
+import { loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
@@ -521,7 +521,16 @@ export const summariseWith =
             }
 
             return text;
-        } catch {
+        } catch (error) {
+            // The user's own settings said no: a refusal they can read and act on, not a server fault.
+            if (error instanceof ModelFilterRulesUnavailableError) {
+                throw new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
+            }
+
+            if (error instanceof NoAllowedUtilityModelError) {
+                throw new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE);
+            }
+
             throw new LunoraError("INTERNAL_SERVER_ERROR", "Could not summarise the conversation. Try again, or keep the full history.", {
                 data: { code: AGENT_SWITCH_SUMMARY_FAILED },
             });

@@ -6,6 +6,7 @@ import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { summariseWith } from "./agent-switch";
+import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
 const generateText = vi.hoisted(() => vi.fn());
 
@@ -66,5 +67,29 @@ describe("summariseWith", () => {
 
         expect(generateText).toHaveBeenCalledOnce();
         expect(generateText.mock.calls[0]![0].model.modelId).not.toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+    });
+
+    it("answers a readable BAD_REQUEST, not an internal error, when the rules allow no model", async () => {
+        rulesByUser[caller] = { allowedModels: ["some/other-model"] };
+
+        await expect(summariseWith(ctx, { threadId: "thread-1", userId: caller })(older, false)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("answers a readable BAD_REQUEST when the settings could not be read", async () => {
+        const failing = {
+            runQuery: vi.fn(async (reference: unknown) => {
+                if (String(reference).includes("getThreadInternal") || JSON.stringify(reference).includes("getThreadInternal")) {
+                    return { userId: owner };
+                }
+
+                return { readFailed: true };
+            }),
+        } as never;
+
+        await expect(summariseWith(failing, { threadId: "thread-1", userId: caller })(older, false)).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+            message: MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE,
+        });
     });
 });

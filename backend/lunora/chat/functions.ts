@@ -1577,8 +1577,8 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         return;
     }
 
-    const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1643,8 +1643,8 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
         return;
     }
 
-    const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: threadData.userId });
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1705,8 +1705,8 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
         return;
     }
 
-    const { model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId });
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -3670,14 +3670,14 @@ export const getFollowupSuggestions = authAction
         const language = threadLanguage || userLanguage;
 
         // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
-        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
+        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
 
         // The model filters allow no background model: no suggestions, as for a host-run thread.
         if (!background) {
             return { suggestions: [] };
         }
 
-        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
+        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
         const messagesResult = await agent.listMessages(context, {
             paginationOpts: { cursor: null, numItems: 10 },
@@ -3760,13 +3760,13 @@ export const generateFollowupSuggestionsForThread = internalAction
             const language = threadLanguage || userLanguage;
 
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
-            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId);
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
 
             if (!background) {
                 return;
             }
 
-            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, userId);
+            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
             const messagesResult = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10 },
