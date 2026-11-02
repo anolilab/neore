@@ -640,11 +640,6 @@ export const getRunForFollowUp = internalQuery
 // ─── Internal: pull requests ─────────────────────────────────────────────────
 
 /**
- * Claim the right to open this run's PR: the owner's, finished, with a complete
- * diff, not already opened or in flight. Marks it `pending`, which is also what
- * makes a double click (or the auto-PR racing the button) start only one.
- */
-/**
  * The person a pull request's commits are made as, when they opted in (`codingAgentCommitIdentity`).
  * `null` keeps the agent as author. A missing or incomplete account also gives `null`: the commit never
  * carries an empty or guessed identity.
@@ -677,6 +672,10 @@ export const setCodingAgentCommitIdentity = authMutation
     .input({ identity: v.union(v.literal("agent"), v.literal("user")) })
     .output(v.null())
     .mutation(async ({ args: { identity }, ctx }) => {
+        if (await isAccountDeletionUnderway(ctx, ctx.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "This account is being deleted.");
+        }
+
         const prefs = await ctx.db
             .query("aiUserPreferences")
             .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
@@ -689,6 +688,11 @@ export const setCodingAgentCommitIdentity = authMutation
         return null;
     });
 
+/**
+ * Claim the right to open this run's PR: the owner's, finished, with a complete
+ * diff, not already opened or in flight. Marks it `pending`, which is also what
+ * makes a double click (or the auto-PR racing the button) start only one.
+ */
 export const beginPullRequest = internalMutation
     .input({ followUp: v.boolean(), runId: v.id("codingAgentRuns"), userId: v.string() })
     .output(

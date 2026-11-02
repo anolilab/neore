@@ -1,5 +1,5 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import {
@@ -11,9 +11,34 @@ import {
     createRun,
     expirePullRequest,
     isPullRequestStale,
+    setCodingAgentCommitIdentity,
     setPullRequestSandbox,
 } from "./functions";
 import { PR_BUDGET_MS } from "./runner";
+
+// The session comes off the harness identity; the rate limiter is not under test.
+const { sessionFrom } = vi.hoisted(() => {
+    return {
+        sessionFrom: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+    };
+});
+
+vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/crpc-auth-helpers")>()),
+        getSessionUser: sessionFrom,
+        getSessionUserForQuery: sessionFrom,
+        getSessionUserForQueryLite: sessionFrom,
+    };
+});
+
+vi.mock("../lib/rate-limiter", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        rateLimitGuard: async () => undefined,
+    };
+});
 
 describe("appendToLog", () => {
     it("appends while under the cap", () => {
@@ -264,5 +289,47 @@ describe("createRun hidden characters", () => {
         );
 
         expect(result).toStrictEqual({ error: expect.stringMatching(TASK_LENGTH_ERROR) });
+    });
+});
+
+describe("commit identity", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const as = (userId: string) => harness.withIdentity({ userId } as never);
+
+    it("stores the choice for an account that is not being deleted", async () => {
+        await expect(as(USER).mutation(setCodingAgentCommitIdentity as never, { identity: "user" } as never)).resolves.toBeNull();
+
+        const prefs = await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").collect());
+
+        expect(prefs).toHaveLength(1);
+        expect(prefs[0].codingAgentCommitIdentity).toBe("user");
+    });
+
+    it("refuses to write a preference while the account is being deleted", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", {
+                    requestedAt: 1,
+                    requestType: "deletion",
+                    status: "pending",
+                    userEmail: "user-a@example.com",
+                    userId: USER,
+                }),
+        );
+
+        await expect(as(USER).mutation(setCodingAgentCommitIdentity as never, { identity: "user" } as never)).rejects.toThrow("This account is being deleted.");
+
+        const prefs = await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").collect());
+
+        expect(prefs).toHaveLength(0);
     });
 });

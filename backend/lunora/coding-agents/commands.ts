@@ -412,9 +412,9 @@ export const prBranchName = (runId: string): string => `neore/agent-${runId.repl
 const NO_HOOKS = ["-c", "core.hooksPath=/dev/null"];
 
 /** The agent's own identity: the fixed bot author, and the co-author when a person is the author. */
-export const AGENT_IDENTITY = { email: "agent@users.noreply.neore.chat", name: "Neore Agent" } as const;
+const AGENT_IDENTITY = { email: "agent@users.noreply.neore.chat", name: "Neore Agent" } as const;
 
-/** The person a commit is made as (opt-in). Absent: the agent is the author, as before. */
+/** The person a commit is made as (opt-in). Absent: the agent is the author. */
 export type CommitAuthor = { email: string; name: string };
 
 /**
