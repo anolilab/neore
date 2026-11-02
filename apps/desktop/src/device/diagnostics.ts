@@ -85,6 +85,9 @@ const platformText = (platform: string | null, home: string): string => {
     return clean === "" ? "unknown" : clean;
 };
 
+/** An ssh user or address the person typed, redacted and cut down to the characters a login or host name can hold. */
+const routeText = (value: string, home: string): string => redact(value, home).replaceAll(/[^\w.:@[\]-]/gu, "").slice(0, 255);
+
 /** The clock as a person comparing two computers can read it: UTC time and this computer's offset from UTC. */
 const clockLine = (now: Date): string => {
     const minutes = -now.getTimezoneOffset();
@@ -101,8 +104,8 @@ const header = (title: string, context: DiagnosticsContext): string[] => [
     `Clock: ${clockLine(context.now)}`,
 ];
 
-const routeLine = (host: HostView): string =>
-    `Route: ${host.user}@${host.address}:${String(host.port)}, ${host.multiplexed ? "one shared ssh connection" : "one ssh process of its own"}, agent forwarding ${host.forwardAgent ? "on" : "off"}, ${host.identityFile === null ? "default keys" : "a chosen identity file"}`;
+const routeLine = (host: HostView, home: string): string =>
+    `Route: ${routeText(host.user, home)}@${routeText(host.address, home)}:${String(host.port)}, ${host.multiplexed ? "one shared ssh connection" : "one ssh process of its own"}, agent forwarding ${host.forwardAgent ? "on" : "off"}, ${host.identityFile === null ? "default keys" : "a chosen identity file"}`;
 
 const agentsLine = (supported: boolean | null): string => {
     if (supported === null) {
@@ -122,7 +125,7 @@ const hostLines = (host: HostView, context: DiagnosticsContext): string[] => {
     const { home, now } = context;
     const lines = [
         `Server: ${redact(host.name, home)} (${host.deviceId})`,
-        routeLine(host),
+        routeLine(host, home),
         `Connection: ${host.connected ? "connected" : "not connected"}`,
         `Server platform: ${platformText(host.platform, home)}`,
         `Coding agents: ${agentsLine(host.agentsSupported)}`,

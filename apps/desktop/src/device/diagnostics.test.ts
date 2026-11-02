@@ -184,3 +184,20 @@ describe("the server platform", () => {
         expect(line.length).toBeLessThanOrEqual("Server platform: ".length + 64);
     });
 });
+
+describe("the ssh route", () => {
+    it("keeps a normal route and drops token-shaped users and addresses", () => {
+        const token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789";
+        const blob = "A".repeat(60);
+        const odd: SettingsView = { ...view, hosts: [{ ...host, address: `${blob}.example.com`, user: token }] };
+        const text = serverDiagnostics(odd, "dev_123", context) ?? "";
+
+        expect(text).not.toContain(token);
+        expect(text).not.toContain(blob);
+        expect(text).toContain("Route: [tokenremoved]@");
+
+        const plain: SettingsView = { ...view, hosts: [{ ...host, address: "example.com", port: 2222, user: "deploy" }] };
+
+        expect(serverDiagnostics(plain, "dev_123", context)).toContain("Route: deploy@example.com:2222");
+    });
+});
