@@ -197,7 +197,7 @@ const AgentSettings: FC = () => {
                                     {t`Commit as me`}
                                 </Label>
                                 <p className="text-muted-foreground text-sm" id="commitAsMeDescription">
-                                    {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author.`}
+                                    {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or email.`}
                                 </p>
                             </div>
                             <Switch

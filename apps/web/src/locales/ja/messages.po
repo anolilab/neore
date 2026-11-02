@@ -1347,15 +1347,15 @@ msgstr "トークン使用量で OpenRouter 第 1 位"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:223
+#: src/features/settings/components/chat/agent-settings.tsx:224
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ データソース: 約 2,700 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:222
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ ナレッジ: 約 2,600 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:221
+#: src/features/settings/components/chat/agent-settings.tsx:222
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ タスク計画: 約 2,500 トークン（+200）"
 
@@ -4308,7 +4308,7 @@ msgstr "利用停止"
 msgid "Base"
 msgstr "ベース"
 
-#: src/features/settings/components/chat/agent-settings.tsx:220
+#: src/features/settings/components/chat/agent-settings.tsx:221
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "ベース（エージェントループのみ）: 約 2,300 トークン"
 
@@ -6542,7 +6542,7 @@ msgid "Commits"
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:200
-msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author."
+msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or email."
 msgstr ""
 
 #: src/features/settings/connectors/connector-category.ts:6
@@ -11429,7 +11429,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "推定プロバイダーコスト {display}（ご自身の API キーに課金）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:216
+#: src/features/settings/components/chat/agent-settings.tsx:217
 msgid "Estimated token cost per conversation"
 msgstr "会話あたりの推定トークンコスト"
 
@@ -21096,7 +21096,7 @@ msgstr "メモ（任意）"
 msgid "Note for the next run (optional)"
 msgstr "次回の実行へのメモ（任意）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:226
+#: src/features/settings/components/chat/agent-settings.tsx:227
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注: モジュールはメッセージ単位ではなく会話単位で適用されます。トークン使用量を最適化するため、必要なモジュールだけを有効にしてください。"
 
@@ -32000,7 +32000,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "トークン予算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:215
+#: src/features/settings/components/chat/agent-settings.tsx:216
 msgid "Token Cost Impact"
 msgstr "トークンコストへの影響"
 

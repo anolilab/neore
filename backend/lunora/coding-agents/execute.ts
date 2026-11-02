@@ -14,6 +14,7 @@ import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { E2B_API_KEY } from "../env";
+import { callOnShard } from "../lib/cross-shard";
 import { authAction, rateLimit } from "../lib/crpc";
 import { isHostCapabilityAvailable } from "../source-control/capabilities";
 import { DEVELOP_DRIVER } from "../source-control/develop-driver";
@@ -331,8 +332,11 @@ const startPullRequestForRun = async (
         return await fail(problem ?? "not available");
     }
 
-    // Read outside the sandbox; only an opted-in person's details come back.
-    const person = (await ctx.runQuery(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId })) ?? undefined;
+    // Read on the person's own shard: a collaborator's run on a shared thread executes on the owner's, which holds no
+    // preferences row for them. A failed read keeps the agent as author, the default that never guesses an identity.
+    const person =
+        (await callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }).catch(() => null)) ??
+        undefined;
 
     const started = await startPullRequest(
         { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, person, repo, runId, title: pullRequestTitle(claim.prompt) },

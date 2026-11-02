@@ -1347,15 +1347,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:223
+#: src/features/settings/components/chat/agent-settings.tsx:224
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:222
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:221
+#: src/features/settings/components/chat/agent-settings.tsx:222
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -4308,7 +4308,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:220
+#: src/features/settings/components/chat/agent-settings.tsx:221
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -6542,7 +6542,7 @@ msgid "Commits"
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:200
-msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author."
+msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or email."
 msgstr ""
 
 #: src/features/settings/connectors/connector-category.ts:6
@@ -11429,7 +11429,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:216
+#: src/features/settings/components/chat/agent-settings.tsx:217
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -21096,7 +21096,7 @@ msgstr "备注（可选）"
 msgid "Note for the next run (optional)"
 msgstr "给下次运行的备注（可选）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:226
+#: src/features/settings/components/chat/agent-settings.tsx:227
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -32000,7 +32000,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:215
+#: src/features/settings/components/chat/agent-settings.tsx:216
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 

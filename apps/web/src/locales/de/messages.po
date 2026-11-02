@@ -1347,15 +1347,15 @@ msgstr "#1 auf OpenRouter nach Token-Nutzung"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# Favorit} other {# Favoriten}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:223
+#: src/features/settings/components/chat/agent-settings.tsx:224
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Datenquelle: ~2.700 Tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:222
+#: src/features/settings/components/chat/agent-settings.tsx:223
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Wissen: ~2.600 Tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:221
+#: src/features/settings/components/chat/agent-settings.tsx:222
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Aufgabenplanung: ~2.500 Tokens (+200)"
 
@@ -4308,7 +4308,7 @@ msgstr "Sperren"
 msgid "Base"
 msgstr "Basis"
 
-#: src/features/settings/components/chat/agent-settings.tsx:220
+#: src/features/settings/components/chat/agent-settings.tsx:221
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Basis (nur Agent-Loop): ~2.300 Tokens"
 
@@ -6542,7 +6542,7 @@ msgid "Commits"
 msgstr ""
 
 #: src/features/settings/components/chat/agent-settings.tsx:200
-msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author."
+msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or email."
 msgstr ""
 
 #: src/features/settings/connectors/connector-category.ts:6
@@ -11429,7 +11429,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Geschätzte Anbieterkosten {display}, abgerechnet über deinen eigenen API-Schlüssel"
 
-#: src/features/settings/components/chat/agent-settings.tsx:216
+#: src/features/settings/components/chat/agent-settings.tsx:217
 msgid "Estimated token cost per conversation"
 msgstr "Geschätzte Token-Kosten pro Unterhaltung"
 
@@ -21096,7 +21096,7 @@ msgstr "Notiz (optional)"
 msgid "Note for the next run (optional)"
 msgstr "Notiz für den nächsten Durchlauf (optional)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:226
+#: src/features/settings/components/chat/agent-settings.tsx:227
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Hinweis: Module werden pro Unterhaltung angewendet, nicht pro Nachricht. Aktiviere nur die Module, die du brauchst, um den Token-Verbrauch zu optimieren."
 
@@ -32000,7 +32000,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "Token-Budget"
 
-#: src/features/settings/components/chat/agent-settings.tsx:215
+#: src/features/settings/components/chat/agent-settings.tsx:216
 msgid "Token Cost Impact"
 msgstr "Auswirkung auf Token-Kosten"
 
