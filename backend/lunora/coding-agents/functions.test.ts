@@ -7,6 +7,7 @@ import {
     beginPullRequest,
     canOpenPullRequest,
     claimPoll,
+    commitAuthorFor,
     commitAuthorOf,
     completePullRequest,
     createRun,
@@ -339,19 +340,61 @@ describe("commit author", () => {
     const account = { email: "dana@example.com", emailVerified: true, name: "Dana Tester" };
 
     it("commits as the account when its email is verified", () => {
-        expect(commitAuthorOf(account)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
+        expect(commitAuthorOf(account, false)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
     });
 
     it("keeps the agent as author for an unverified email", () => {
-        expect(commitAuthorOf({ ...account, emailVerified: false })).toBeNull();
+        expect(commitAuthorOf({ ...account, emailVerified: false }, false)).toBeNull();
     });
 
     it("keeps the agent as author when the account has no name or no email", () => {
-        expect(commitAuthorOf({ ...account, name: "" })).toBeNull();
-        expect(commitAuthorOf({ ...account, email: "" })).toBeNull();
+        expect(commitAuthorOf({ ...account, name: "" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, email: "" }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author for a name Git would refuse", () => {
+        expect(commitAuthorOf({ ...account, name: "<>" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, name: " ..  " }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author while the account is being deleted, even when it is verified", () => {
+        expect(commitAuthorOf(account, true)).toBeNull();
     });
 
     it("keeps the agent as author when there is no account", () => {
-        expect(commitAuthorOf(null)).toBeNull();
+        expect(commitAuthorOf(null, false)).toBeNull();
+    });
+});
+
+describe("commit author lookup", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const lookup = async (): Promise<unknown> => await harness.run(async (ctx: any) => await ctx.runQuery(commitAuthorFor, { userId: USER }));
+
+    const optIn = async (identity: "agent" | "user") =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    codingAgentCommitIdentity: identity,
+                    userId: USER,
+                }),
+        );
+
+    it("returns null when the person has no preference row", async () => {
+        expect(await lookup()).toBeNull();
+    });
+
+    it("returns null when the opted-in person has no account row", async () => {
+        await optIn("user");
+
+        expect(await lookup()).toBeNull();
     });
 });

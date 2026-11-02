@@ -640,13 +640,17 @@ export const getRunForFollowUp = internalQuery
 
 // ─── Internal: pull requests ─────────────────────────────────────────────────
 
+const GIT_NAME_CHARACTER = /[\p{L}\p{N}]/u;
+
 /**
  * The identity a commit is made as, from the account. `null` keeps the agent as author: an account without a
  * name, or whose email is not verified, gives `null`, so the commit never carries an empty or guessed identity,
- * and nobody can have commits attributed to an address they have not proved.
+ * and nobody can have commits attributed to an address they have not proved. While the account is being deleted
+ * the identity is refused too: the preference is removed only at the last deletion steps.
  */
-export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null): CommitAuthor | null => {
-    if (!user?.email || !user.name || user.emailVerified !== true) {
+export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null, deletionUnderway: boolean): CommitAuthor | null => {
+    // Git refuses a name made only of spaces, control characters or punctuation, so one with no letter or digit keeps the agent as author.
+    if (deletionUnderway || !user?.email || !user.name || !GIT_NAME_CHARACTER.test(user.name) || user.emailVerified !== true) {
         return null;
     }
 
@@ -672,7 +676,7 @@ export const commitAuthorFor = internalQuery
 
         const user = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } });
 
-        return commitAuthorOf(user);
+        return commitAuthorOf(user, await isAccountDeletionUnderway(ctx, args.userId));
     });
 
 /** Choose who a coding agent's pull request commits are made as. Off (`agent`) is the default. */

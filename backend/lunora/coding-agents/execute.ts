@@ -67,6 +67,9 @@ export const POLL_INTERVAL_MS = 4000;
 /** A run still unfinished this long after it started is over, whatever the sandbox says. */
 const POLL_DEADLINE_MS = RUN_TIMEOUT_MS + 60_000;
 
+/** The commit identity read gives up after this long, and the agent is the author, so a stalled shard cannot hold a pull request pending. */
+const COMMIT_IDENTITY_READ_MS = 5000;
+
 type RunnerCtx = Pick<ActionCtx, "log" | "runMutation" | "runQuery" | "scheduler">;
 
 /** The user's provider key for `agent`, or `undefined`. */
@@ -334,15 +337,23 @@ const startPullRequestForRun = async (
 
     // Read on the person's own shard: a collaborator's run on a shared thread executes on the owner's, which holds no
     // preferences row for them. A failed read keeps the agent as author, the default that never guesses an identity.
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+        deadlineTimer = setTimeout(() => reject(new Error("the commit identity read timed out")), COMMIT_IDENTITY_READ_MS);
+    });
     const person =
-        (await callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }).catch((error: unknown) => {
-            ctx.log.event("coding_agents.commit_identity_unreadable", {
-                message: error instanceof Error ? error.message : "unknown",
-                runId,
-            });
+        (await Promise.race([callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }), deadline])
+            .catch((error: unknown) => {
+                ctx.log.event("coding_agents.commit_identity_unreadable", {
+                    message: error instanceof Error ? error.message : "unknown",
+                    runId,
+                });
 
-            return null;
-        })) ?? undefined;
+                return null;
+            })
+            .finally(() => {
+                clearTimeout(deadlineTimer);
+            })) ?? undefined;
 
     const started = await startPullRequest(
         { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, person, repo, runId, title: pullRequestTitle(claim.prompt) },
