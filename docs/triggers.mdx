@@ -59,6 +59,7 @@ Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.)
 - **GitLab secret token (`X-Gitlab-Token`)**: see [Provider presets](#provider-presets)
 - The scheme is chosen when the trigger is created, together with its secret, and cannot be changed afterwards
 - Requests without a valid signature are rejected
+- **Rotating the secret**: the key button on a webhook trigger issues a new secret, shown once. The old secret stops working at once; tick "Keep accepting the old secret for 24 hours" to update the sender without a gap. The webhook URL does not change
 
 **Payload handling:**
 - The webhook body is passed to the AI as context

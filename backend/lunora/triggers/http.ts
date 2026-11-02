@@ -56,7 +56,9 @@ import type { HttpActionCtx } from "lunorash/server";
  *                 started) gives the claim back so a redelivery runs. A claim keyed on
  *                 the token would swallow every delivery after the first.
  *
- * A missing or empty secret is refused for every scheme (fail closed).
+ * A missing or empty secret is refused for every scheme (fail closed). A rotation (`rotateWebhookSecret`)
+ * replaces the secret at once; if the owner opted into an overlap, the previous secret is also accepted until its
+ * `webhookPreviousSecretExpiresAt`, for every scheme. Replay claims are keyed on the signed bytes or the delivery, never the secret or the signature.
  */
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -84,7 +86,10 @@ const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
  * at the call site, instead of re-casting at every field access — and keeps the field
  * types (the `type` union, `enabled: boolean`) from the generated `Doc<"triggers">`.
  */
-type WebhookTrigger = Pick<Doc<"triggers">, "enabled" | "filters" | "type" | "userId" | "webhookSecret" | "webhookSignatureScheme">;
+type WebhookTrigger = Pick<
+    Doc<"triggers">,
+    "enabled" | "filters" | "type" | "userId" | "webhookPreviousSecret" | "webhookPreviousSecretExpiresAt" | "webhookSecret" | "webhookSignatureScheme"
+>;
 
 /**
  * Handle an incoming webhook request for a trigger.
@@ -200,10 +205,14 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
-        // Decrypt the stored secret (supports both encrypted v1: and legacy plaintext)
-        const plaintextSecret = encryptedSecret.startsWith("v1:") ? await decryptKey(encryptedSecret, "tool-keys") : encryptedSecret;
+        // The stored secret, and the one a rotation replaced while the owner's opt-in overlap lasts.
+        const stored = [encryptedSecret];
 
-        if (!(await scheme.verify(delivery, plaintextSecret))) {
+        if (trigger.webhookPreviousSecret && (trigger.webhookPreviousSecretExpiresAt ?? 0) > Date.now()) {
+            stored.push(trigger.webhookPreviousSecret);
+        }
+
+        if (!(await verifiesWithAny(scheme, delivery, stored))) {
             return Response.json({ error: "Invalid signature" }, { headers: { "Content-Type": "application/json" }, status: 401 });
         }
 
@@ -431,7 +440,9 @@ const takeReplayGuard = async (
         claimKey = { key: `${triggerId}:sig:${normalizeSignature(delivery.presented)}`, scope: TRIGGER_DELIVERY_SCOPE };
         ttlMs = TRIGGER_DELIVERY_CLAIM_TTL_MS;
     } else {
-        claimKey = { key: `${triggerId}:${normalizeSignature(delivery.presented)}`, scope: "trigger-webhook" };
+        // Keyed on the signed bytes, not the signature: during a rotation overlap the same delivery signed with the
+        // old and the new secret carries two signatures but ONE payload, and must run once.
+        claimKey = { key: `${triggerId}:${await sha256Hex(delivery.signedPayload)}`, scope: "trigger-webhook" };
     }
 
     const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claimKey, ttlMs, userId: trigger.userId });
@@ -474,6 +485,19 @@ const carriesForeignHeader = (headers: Headers, scheme: WebhookSignatureScheme):
  */
 const readDelivery = (headers: Headers, body: Uint8Array, scheme: WebhookSignatureScheme): Delivery | { error: string } =>
     carriesForeignHeader(headers, scheme) ? { error: MISSING_SIGNATURE } : SCHEMES[scheme].read(headers, body);
+
+/** Whether the delivery proves knowledge of any of the stored secrets (encrypted `v1:` or legacy plaintext). Every candidate is tried, so timing does not tell which one matched. */
+const verifiesWithAny = async (scheme: SchemeHandler, delivery: Delivery, stored: string[]): Promise<boolean> => {
+    let matched = false;
+
+    for (const secret of stored) {
+        const plaintext = secret.startsWith("v1:") ? await decryptKey(secret, "tool-keys") : secret;
+
+        matched = (await scheme.verify(delivery, plaintext)) || matched;
+    }
+
+    return matched;
+};
 
 /** `sha256=<hex>` or bare hex, lower-cased — also the dedupe key. */
 const normalizeSignature = (signature: string): string => (signature.startsWith("sha256=") ? signature.slice(7) : signature).toLowerCase();
