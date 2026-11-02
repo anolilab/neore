@@ -30,6 +30,7 @@ import {
     ExternalLink,
     Filter,
     Globe,
+    KeyRound,
     Loader2,
     Pencil,
     Play,
@@ -43,12 +44,14 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
+import { useShownWebhookSecrets } from "@/features/settings/hooks/use-shown-webhook-secrets";
 import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import type { EventFormState, EventSource } from "./event-trigger-fields";
 import EventTriggerFields, { EMPTY_EVENT, eventFormFromSource, eventIsIncomplete, eventSourceFromForm, useDescribeEventSource } from "./event-trigger-fields";
+import RotateWebhookSecretDialog from "./rotate-webhook-secret-dialog";
 import TriggerTypePicker from "./trigger-type-picker";
 import type { WebhookFormState } from "./webhook-trigger-fields";
 import {
@@ -120,6 +123,7 @@ interface TriggerRow {
     triggerCount: number;
     type: string;
     updatedAt: number;
+    webhookPreviousSecretExpiresAt: number | null;
     webhookSignatureScheme: WebhookSignatureScheme | null;
 }
 
@@ -461,8 +465,9 @@ const TriggerSettings: FC = () => {
     const [editStartZone, setEditStartZone] = useState("");
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
     // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
-    const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
+    const { dismiss: dismissWebhookSecret, secrets: shownWebhookSecrets, show: showWebhookSecret } = useShownWebhookSecrets();
     const [deletingTrigger, setDeletingTrigger] = useState<TriggerRow | null>(null);
+    const [rotatingTrigger, setRotatingTrigger] = useState<TriggerRow | null>(null);
 
     // Queries
     const { data: triggers, isLoading, refetch } = useQuery(crpc.triggers.functions.getTriggers.queryOptions({}));
@@ -480,10 +485,12 @@ const TriggerSettings: FC = () => {
     const updateMutation = useMutation(crpc.triggers.functions.updateTrigger.mutationOptions());
     const deleteMutation = useMutation(crpc.triggers.functions.deleteTrigger.mutationOptions());
     const enableMutation = useMutation(crpc.triggers.functions.setTriggerEnabled.mutationOptions());
+    const rotateMutation = useMutation(crpc.triggers.functions.rotateWebhookSecret.mutationOptions());
     const { mutate: createTrigger } = createMutation;
     const { mutate: updateTrigger } = updateMutation;
     const { mutate: deleteTrigger } = deleteMutation;
     const { mutate: setTriggerEnabled } = enableMutation;
+    const { mutate: rotateSecret } = rotateMutation;
 
     // Test run action (uses useAction since it's a Lunora action, not a mutation)
     const testRunAction = useAction(api.triggers.functions.testRunTrigger);
@@ -521,11 +528,11 @@ const TriggerSettings: FC = () => {
                     setFormData(EMPTY_FORM);
                     void refetch();
 
-                    setNewWebhookSecret(data.webhookSecret ?? null);
+                    if (data.webhookSecret) showWebhookSecret({ id: String(data.triggerId), name: formData.name, secret: data.webhookSecret });
                 },
             },
         );
-    }, [createTrigger, formData, refetch, t]);
+    }, [createTrigger, formData, refetch, showWebhookSecret, t]);
 
     const handleUpdate = useCallback(() => {
         if (!editingTriggerId || !editFormData.name.trim()) return;
@@ -604,16 +611,37 @@ const TriggerSettings: FC = () => {
         );
     }, [deleteTrigger, deletingTrigger, refetch, expandedTriggerId, editingTriggerId, t]);
 
-    const handleCopyWebhookSecret = useCallback(async () => {
-        if (!newWebhookSecret) return;
+    const handleConfirmRotate = useCallback(
+        (keepOldFor24h: boolean) => {
+            if (!rotatingTrigger) return;
 
-        try {
-            await navigator.clipboard.writeText(newWebhookSecret);
-            toast.success(t`Webhook secret copied to clipboard`);
-        } catch {
-            toast.error(t`Could not copy the secret. Select it and copy it manually.`);
-        }
-    }, [newWebhookSecret, t]);
+            rotateSecret(
+                { keepOldFor24h, triggerId: rotatingTrigger._id },
+                {
+                    onError: () => toast.error(t`Failed to rotate the secret`),
+                    onSuccess: (data) => {
+                        toast.success(t`Secret rotated`);
+                        setRotatingTrigger(null);
+                        showWebhookSecret({ id: rotatingTrigger._id, name: rotatingTrigger.name, secret: data.webhookSecret });
+                        void refetch();
+                    },
+                },
+            );
+        },
+        [rotateSecret, rotatingTrigger, refetch, showWebhookSecret, t],
+    );
+
+    const handleCopyWebhookSecret = useCallback(
+        async (secret: string) => {
+            try {
+                await navigator.clipboard.writeText(secret);
+                toast.success(t`Webhook secret copied to clipboard`);
+            } catch {
+                toast.error(t`Could not copy the secret. Select it and copy it manually.`);
+            }
+        },
+        [t],
+    );
 
     const handleTestRun = useCallback(
         async (triggerId: Id<"triggers">) => {
@@ -711,25 +739,25 @@ const TriggerSettings: FC = () => {
                     />
                 )}
 
-                {newWebhookSecret && (
-                    <Card className="border-amber-500/50">
+                {shownWebhookSecrets.map((shown) => (
+                    <Card className="border-amber-500/50" key={shown.id}>
                         <CardContent className="space-y-2 p-4">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <CardHeading className="font-medium">{t`Webhook secret`}</CardHeading>
+                                    <CardHeading className="font-medium">{t`Webhook secret for "${shown.name}"`}</CardHeading>
                                     <p className="text-muted-foreground text-sm">
                                         {t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}
                                     </p>
                                 </div>
-                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => setNewWebhookSecret(null)} size="sm" variant="ghost">
+                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => dismissWebhookSecret(shown.id)} size="sm" variant="ghost">
                                     <X aria-hidden="true" className="size-4" />
                                 </Button>
                             </div>
                             <div className="flex items-center gap-2">
-                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{newWebhookSecret}</code>
+                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{shown.secret}</code>
                                 <Button
                                     onClick={() => {
-                                        void handleCopyWebhookSecret();
+                                        void handleCopyWebhookSecret(shown.secret);
                                     }}
                                     size="sm"
                                     variant="outline"
@@ -740,7 +768,7 @@ const TriggerSettings: FC = () => {
                             </div>
                         </CardContent>
                     </Card>
-                )}
+                ))}
 
                 {/* Trigger List */}
                 {triggers && triggers.length > 0 ? (
@@ -832,6 +860,11 @@ const TriggerSettings: FC = () => {
                                                         </button>
                                                     </div>
                                                 )}
+                                                {trigger.type === "webhook" && trigger.webhookPreviousSecretExpiresAt !== null && (
+                                                    <p className="text-muted-foreground mt-1 text-xs">
+                                                        {t`The previous secret is still accepted until ${formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)}.`}
+                                                    </p>
+                                                )}
                                                 {trigger.type === "webhook" && (
                                                     <div className="text-xs">
                                                         <WebhookSigningInstructions scheme={trigger.webhookSignatureScheme ?? "timestamped"} />
@@ -877,6 +910,18 @@ const TriggerSettings: FC = () => {
                                                     onCheckedChange={(checked: boolean) => handleToggleEnabled(trigger._id, checked)}
                                                     size="sm"
                                                 />
+
+                                                {/* Rotate the webhook secret */}
+                                                {trigger.type === "webhook" && (
+                                                    <Button
+                                                        aria-label={t`Rotate webhook secret`}
+                                                        onClick={() => setRotatingTrigger(trigger)}
+                                                        size="sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <KeyRound aria-hidden="true" className="size-4" />
+                                                    </Button>
+                                                )}
 
                                                 {/* Delete */}
                                                 <Button
@@ -1015,6 +1060,14 @@ const TriggerSettings: FC = () => {
                     </CardContent>
                 </Card>
             </HeadingSection>
+
+            <RotateWebhookSecretDialog
+                loading={rotateMutation.isPending}
+                name={rotatingTrigger?.name ?? ""}
+                onConfirm={handleConfirmRotate}
+                onOpenChange={(open) => !open && !rotateMutation.isPending && setRotatingTrigger(null)}
+                open={rotatingTrigger !== null}
+            />
 
             <ConfirmDialog
                 confirmLabel={t`Delete`}
