@@ -20,6 +20,15 @@ describe("hasHiddenText", () => {
     });
 });
 
+describe("strict", () => {
+    it("counts and shows the joiners that the lenient forms let through", () => {
+        expect(hasHiddenText("a\u{200D}b")).toBe(false);
+        expect(hasHiddenText("a\u{200D}b", { strict: true })).toBe(true);
+        expect(hasHiddenText("a\u{200C}b", { strict: true })).toBe(true);
+        expect(showHidden("a\u{200D}b", { strict: true })).toBe("a?b");
+    });
+});
+
 describe("showHidden", () => {
     it("replaces each hidden character with a visible mark", () => {
         expect(showHidden("a\u{202E}b\u{E0041}c\nd")).toBe("a?b?c?d");

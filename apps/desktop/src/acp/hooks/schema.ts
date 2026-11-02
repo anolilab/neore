@@ -23,7 +23,7 @@ const nameSchema = z
     .trim()
     .min(1)
     .max(MAX_NAME)
-    .refine((value) => !hasHiddenText(value), "a name has no control or invisible characters");
+    .refine((value) => !hasHiddenText(value, { strict: true }), "a name has no control or invisible characters");
 const promptSchema = z
     .string()
     .max(MAX_PROMPT)
@@ -33,7 +33,7 @@ const promptSchema = z
 const fileHook = <Event extends "created" | "deleted" | "saved">(on: Event) =>
     z.strictObject({
         glob: z.string().superRefine((value, context) => {
-            const problem = hasHiddenText(value) ? "a glob has no control or invisible characters" : globProblem(value);
+            const problem = hasHiddenText(value, { strict: true }) ? "a glob has no control or invisible characters" : globProblem(value);
 
             if (problem !== null) {
                 context.addIssue({ code: "custom", message: problem });

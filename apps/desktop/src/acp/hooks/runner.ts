@@ -86,7 +86,7 @@ const ignored = (relative: string): boolean => {
 };
 
 /** One name as a quoted string, hidden characters shown as `?` and the length capped: a line that can only be data. */
-const listedPath = (relative: string): string => JSON.stringify(showHidden(relative).slice(0, MAX_PATH_CHARS));
+const listedPath = (relative: string): string => JSON.stringify(showHidden(relative, { strict: true }).slice(0, MAX_PATH_CHARS));
 
 /** A fence longer than any run of `~` in the content, so nothing inside can close it. */
 const fenceFor = (lines: string[]): string => {

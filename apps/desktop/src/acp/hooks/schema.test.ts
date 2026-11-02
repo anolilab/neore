@@ -106,6 +106,14 @@ describe("parseHooks", () => {
             expect(parseHooks(textOf("name", String.raw`\t`)).ok).toBe(false);
         });
 
+        it("refuses a zero width joiner or non-joiner in a name or a glob, which a prompt may keep", () => {
+            for (const joiner of [String.raw`\u200d`, String.raw`\u200c`]) {
+                expect(parseHooks(textOf("name", joiner)).ok).toBe(false);
+                expect(parseHooks(textOf("glob", joiner)).ok).toBe(false);
+                expect(parseHooks(textOf("prompt", joiner)).ok).toBe(true);
+            }
+        });
+
         it("refuses them in a manual hook too", () => {
             const text = JSON.stringify({ hooks: [{ id: "m", name: "M", on: "manual", prompt: "x@@" }], version: 1 }).replace("@@", String.raw`\u202e`);
 

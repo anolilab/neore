@@ -8,15 +8,22 @@
 // Two expressions: a global one keeps state between `.test` calls, so the check and the replacement do not share one.
 const HIDDEN = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
 const HIDDEN_EVERYWHERE = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+// The strict forms also count U+200C and U+200D: for text nobody wrote to be read in prose (a repository's names and globs).
+const HIDDEN_STRICT = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
+const HIDDEN_STRICT_EVERYWHERE = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
 const HIDDEN_EXCEPT_LAYOUT = /(?![\n\t\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
 const LAYOUT = /[\n\t]/gu;
 
-/** `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. */
-export const hasHiddenText = (value: string, options: { layout?: boolean } = {}): boolean =>
-    HIDDEN.test(options.layout === true ? value.replaceAll(LAYOUT, "") : value);
+/**
+ * `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. `strict`: the joiners U+200C
+ * and U+200D count as hidden too (prompts allow them for emoji and Persian; a name or glob has no use for them).
+ */
+export const hasHiddenText = (value: string, options: { layout?: boolean; strict?: boolean } = {}): boolean =>
+    (options.strict === true ? HIDDEN_STRICT : HIDDEN).test(options.layout === true ? value.replaceAll(LAYOUT, "") : value);
 
-/** The text with every hidden character shown as `?`. */
-export const showHidden = (value: string): string => value.replaceAll(HIDDEN_EVERYWHERE, "?");
+/** The text with every hidden character shown as `?`; `strict` marks the joiners too. */
+export const showHidden = (value: string, options: { strict?: boolean } = {}): string =>
+    value.replaceAll(options.strict === true ? HIDDEN_STRICT_EVERYWHERE : HIDDEN_EVERYWHERE, "?");
 
 /**
  * The text with every hidden character removed, and how many there were. A newline and a tab stay (a prompt has
