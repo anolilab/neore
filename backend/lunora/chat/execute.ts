@@ -170,21 +170,23 @@ export const runStreamingAgent = internalAction
             };
             const wasReplaced = (error: unknown) => replaced || isRunReplaced(error);
             // The beat of a run that may be resumed after its worker dies (`streaming/persistent/interrupted.ts`). Idempotent.
+            const beatOnce = () => {
+                ctx.runMutation(internal.chat.streaming.persistent.interrupted.beatRun, {
+                    epoch: runEpoch,
+                    streamId: streamId as Id<"persistentStreams">,
+                }).catch((error: unknown) => {
+                    if (isRunReplaced(error)) {
+                        onReplaced();
+                    }
+                });
+            };
             const startBeat = () => {
-                beat ??= setInterval(() => {
-                    ctx.runMutation(internal.chat.streaming.persistent.interrupted.beatRun, {
-                        epoch: runEpoch,
-                        streamId: streamId as Id<"persistentStreams">,
-                    }).catch((error: unknown) => {
-                        if (isRunReplaced(error)) {
-                            onReplaced();
-                        }
-                    });
-                }, RUN_BEAT_MS);
+                beat ??= setInterval(beatOnce, RUN_BEAT_MS);
             };
             // Every tool call is marked on the stream until its step is saved: a worker that dies inside one is not resumed.
             // Whether a worker death would be answered by a resume: only then must a tool refuse to run without a confirmed mark.
-            let resumableRun = false;
+            // A resumed run is resumable by definition (its watchdog chain exists); a first run becomes so when it registers.
+            let resumableRun = resume !== undefined;
             const toolRuns = createToolRunMarker(ctx, { epoch: runEpoch, isResumable: () => resumableRun, onReplaced, streamId });
 
             try {
@@ -496,7 +498,7 @@ export const runStreamingAgent = internalAction
                             run: runArgs,
                             streamId: streamId as Id<"persistentStreams">,
                         });
-                        resumableRun = resumable;
+                        resumableRun = resumable || resume !== undefined;
                         startBeat();
                     } catch (error) {
                         // A newer run holds the stream: this one stops.
@@ -506,9 +508,14 @@ export const runStreamingAgent = internalAction
                             return;
                         }
 
-                        // Any other failure (a busy shard, a timeout) costs this run its resume protection, not its reply. It does
-                        // not beat: nothing watches it (a resume's watchdog chain already exists and its beat already runs).
-                        streamLogger.warn(`[BgAgent] Stream ${streamId} could not be registered for resuming; running without it:`, error);
+                        // Any other failure (a busy shard, a timeout) must not cost the reply. But the answer may have been lost AFTER the
+                        // registration committed, and then a watchdog is already looking at this run: it must keep beating (or it
+                        // would be read as dead while it runs), and its tools must keep refusing to run unmarked. Beating a run that
+                        // was not registered is harmless.
+                        streamLogger.warn(`[BgAgent] Stream ${streamId} may not be registered for resuming; treating it as registered:`, error);
+                        resumableRun = true;
+                        beatOnce();
+                        startBeat();
                     }
                 }
 

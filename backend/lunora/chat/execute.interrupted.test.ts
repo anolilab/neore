@@ -24,6 +24,7 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
             prefsFail: false,
             prefsReads: [] as { shardKey: string; userId: string }[],
             threadStateless: false,
+            toolCalls: 0,
             withTools: false,
         },
         registry: new Map<string, unknown>(),
@@ -126,7 +127,17 @@ vi.mock("./lib/agent-tools", () => {
                 mcpLabels: modelState.mcpLabels,
                 mcpServerNames: [],
                 permissionKeys: {},
-                tools: { echo: tool({ description: "Echo", execute: async () => "echoed", inputSchema: z.object({}) }) },
+                tools: {
+                    echo: tool({
+                        description: "Echo",
+                        execute: async () => {
+                            modelState.toolCalls += 1;
+
+                            return "echoed";
+                        },
+                        inputSchema: z.object({}),
+                    }),
+                },
             };
         }),
     };
@@ -222,6 +233,7 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.optOut = false;
+    modelState.toolCalls = 0;
     modelState.memory = false;
     modelState.mcpLabels = {};
     vi.mocked(afterRun).mockClear();
@@ -380,6 +392,20 @@ describe("a run whose worker dies mid-step", () => {
         expect(stream.runArgs).not.toHaveProperty("resume");
         expect(stream.beatAt).toBeGreaterThan(0);
         expect(stream.toolsInFlight).toBeUndefined();
+    });
+
+    it("never resumes or fails a run whose beat is fresh, whatever else its row looks like", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: Date.now() - 60_000, interruptions: 3, toolsInFlight: 2 });
+
+        expect(await inspect()).toStrictEqual({ kind: "fresh" });
+        expect(enqueued).toHaveLength(0);
+
+        const state = await readState();
+
+        expect(state.pause).toBeUndefined();
+        expect(state.streamStatus).not.toBe("done");
+        expect(state.threadStatus).toBe("running");
     });
 
     it("waits while the beat is fresh", async () => {
@@ -1053,7 +1079,7 @@ describe("a run whose registration for resuming fails", () => {
         registerModule(registry, "chat_streaming_persistent_interrupted", await import("./streaming/persistent/interrupted"));
     });
 
-    it("still runs the model and finishes the reply, unprotected and unbeaten", async () => {
+    it("still runs the model and finishes the reply, and keeps beating in case the registration did land", async () => {
         failWith(new Error("shard blip"));
 
         await run();
@@ -1066,7 +1092,32 @@ describe("a run whose registration for resuming fails", () => {
         expect(state.streamStatus).toBe("done");
         expect(state.threadStatus).toBe("active");
         expect(stream.runArgs).toBeUndefined();
-        expect(stream.beatAt).toBeUndefined();
+        // The answer may have been lost after the registration committed, and a watchdog would then be looking: the run beats.
+        expect(stream.beatAt).toBeGreaterThan(0);
+    });
+
+    it("never lets a RESUMED run run a tool without a confirmed mark, even if the person opted out meanwhile", async () => {
+        await startRunThatDiesInStepTwo();
+        await patchStream({ beatAt: deadBeat() });
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+
+        const { pause } = await readState();
+
+        modelState.toolCalls = 0;
+        modelState.optOut = true;
+        registry.set(
+            "chat_streaming_persistent_interrupted:markToolRun",
+            internalMutation
+                .input({ delta: v.number(), epoch: v.number(), setTo: v.optional(v.number()), streamId: v.string() })
+                .output(v.null())
+                .mutation(async () => {
+                    throw new Error("shard blip");
+                }),
+        );
+        modelState.model = scriptedModel([toolCallStep("echo", "call-2"), textStep("All done.")]);
+        await run({ resume: pause!.id }).catch(() => undefined);
+
+        expect(modelState.toolCalls).toBe(0);
     });
 
     it("stops quietly when a newer run holds the stream", async () => {
