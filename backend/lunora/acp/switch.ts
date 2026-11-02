@@ -28,7 +28,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import { leafRowOf, resolvePathAgent } from "../agent/agent-switch";
 import { agentKeyOf, sameAgent } from "../agent/agent-switch-logic";
 import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agent/agent-switch-validators";
-import { composeHandoff, composeTailHandoff, HANDOFF_BUDGET_TOKENS, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
+import { composeHandoff, composeTailHandoff, handoffLimitsFor, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
 import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -51,6 +51,7 @@ import {
     type SwitchResult,
     vSwitchTarget,
 } from "../chat/agent-switch";
+import { getModelContextWindow } from "../chat/lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
@@ -167,7 +168,8 @@ const handoffFor = async (
 
     // A cloud thread is sent its handoff as a message of its own, with the room a cloud handoff has anywhere; a computer is
     // sent it in front of the prompt, inside the signed call.
-    const maxBytes = target.kind === "host" ? HOST_HANDOFF_MAX_BYTES : HANDOFF_BUDGET_TOKENS * CHARACTERS_PER_TOKEN;
+    const maxBytes =
+        target.kind === "host" ? HOST_HANDOFF_MAX_BYTES : handoffLimitsFor(getModelContextWindow(target.model)).budgetTokens * CHARACTERS_PER_TOKEN;
 
     if (source.turns.length === 0) {
         // A thread that took over and has said nothing since holds the conversation only in its own handoff: pass that on.
