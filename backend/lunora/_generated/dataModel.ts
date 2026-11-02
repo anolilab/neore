@@ -1361,7 +1361,7 @@ export interface Doc_requestedSecrets {
     label: string;
     ref: string;
     replyKey?: string;
-    status: "saved" | "used";
+    status: "saved" | "used" | "abandoned";
     threadId: string;
     use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;
@@ -1884,6 +1884,7 @@ export interface Doc_toolApprovalRuns {
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
+    secretRequest?: boolean;
     status: "pending" | "approved" | "denied";
     streamId?: string;
     threadId: string;
@@ -4333,7 +4334,7 @@ export interface Insert_requestedSecrets {
     label: string;
     ref: string;
     replyKey?: string;
-    status: "saved" | "used";
+    status: "saved" | "used" | "abandoned";
     threadId: string;
     use: { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
     userId: string;
@@ -4856,6 +4857,7 @@ export interface Insert_toolApprovalRuns {
     createdAt: number;
     resolvedAt?: number;
     resolvedBy?: string;
+    secretRequest?: boolean;
     status: "pending" | "approved" | "denied";
     streamId?: string;
     threadId: string;
