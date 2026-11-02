@@ -253,7 +253,7 @@ const toResultRow = (result: Doc<"evalResults">): Infer<typeof vResultRow> => {
 };
 
 const requireOwnedDataset = async (ctx: QueryCtx, datasetId: Id<"evalDatasets">, userId: string): Promise<Doc<"evalDatasets">> => {
-    const dataset = await ctx.db.get(datasetId);
+    const dataset = await ctx.db.get("evalDatasets", datasetId);
 
     if (!dataset || dataset.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Dataset not found");
@@ -263,7 +263,7 @@ const requireOwnedDataset = async (ctx: QueryCtx, datasetId: Id<"evalDatasets">,
 };
 
 const requireOwnedCase = async (ctx: QueryCtx, caseId: Id<"evalCases">, userId: string): Promise<Doc<"evalCases">> => {
-    const evalCase = await ctx.db.get(caseId);
+    const evalCase = await ctx.db.get("evalCases", caseId);
 
     if (!evalCase || evalCase.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Case not found");
@@ -273,7 +273,7 @@ const requireOwnedCase = async (ctx: QueryCtx, caseId: Id<"evalCases">, userId: 
 };
 
 const requireOwnedRun = async (ctx: QueryCtx, runId: Id<"evalRuns">, userId: string): Promise<Doc<"evalRuns">> => {
-    const run = await ctx.db.get(runId);
+    const run = await ctx.db.get("evalRuns", runId);
 
     if (!run || run.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Run not found");
@@ -332,7 +332,7 @@ const requireDraft = (raw: Parameters<typeof normalizeCaseDraft>[0]): CaseDraft 
 };
 
 const touchDataset = async (ctx: MutationCtx, dataset: Doc<"evalDatasets">, caseCountDelta: number): Promise<void> => {
-    await ctx.db.patch(dataset._id, { caseCount: Math.max(0, dataset.caseCount + caseCountDelta), updatedAt: Date.now() });
+    await ctx.db.patch("evalDatasets", dataset._id, { caseCount: Math.max(0, dataset.caseCount + caseCountDelta), updatedAt: Date.now() });
 };
 
 /** Validates a run target against what the caller may use; returns it with free text trimmed. */
@@ -387,7 +387,7 @@ const resolveTarget = async (
     }
 
     for (const fileId of fileIds) {
-        const file = await ctx.db.get(fileId);
+        const file = await ctx.db.get("knowledgeFiles", fileId);
 
         if (!file || file.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
@@ -490,7 +490,7 @@ export const updateDataset = authMutation
     .mutation(async ({ args, ctx }) => {
         await requireOwnedDataset(ctx, args.datasetId, ctx.user.userId);
 
-        await patchById(ctx.db, args.datasetId, {
+        await patchById(ctx.db, "evalDatasets", args.datasetId, {
             description: optionalText(args.description, DATASET_DESCRIPTION_MAX, "Description"),
             judgeEnabled: args.judgeEnabled,
             name: requiredText(args.name, DATASET_NAME_MAX, "Name"),
@@ -517,7 +517,7 @@ export const deleteDataset = authMutation
             throw new LunoraError("CONFLICT", "Unfreeze this dataset's frozen cases before deleting the dataset");
         }
 
-        await ctx.db.delete(dataset._id);
+        await ctx.db.delete("evalDatasets", dataset._id);
         await ctx.scheduler.runAfter(0, internal.evals.functions.purgeDataset, { datasetId: dataset._id, userId: dataset.userId });
 
         ctx.log.event("evals.delete_dataset", { deleted: true });
@@ -546,14 +546,14 @@ export const purgeDataset = internalMutation
                 .withIndex("by_run_and_index", (q) => q.eq("runId", run._id))
                 .take(PURGE_BATCH - removed);
 
-            await Promise.all(results.map((result) => ctx.db.delete(result._id)));
+            await Promise.all(results.map((result) => ctx.db.delete("evalResults", result._id)));
             removed += results.length;
 
             if (removed >= PURGE_BATCH) {
                 break;
             }
 
-            await ctx.db.delete(run._id);
+            await ctx.db.delete("evalRuns", run._id);
             removed += 1;
         }
 
@@ -563,7 +563,7 @@ export const purgeDataset = internalMutation
                 .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", args.datasetId))
                 .take(PURGE_BATCH - removed);
 
-            await Promise.all(cases.map((evalCase) => ctx.db.delete(evalCase._id)));
+            await Promise.all(cases.map((evalCase) => ctx.db.delete("evalCases", evalCase._id)));
             removed += cases.length;
         }
 
@@ -636,7 +636,7 @@ export const updateCase = authMutation
 
         const draft = requireDraft(args);
 
-        await patchById(ctx.db, evalCase._id, {
+        await patchById(ctx.db, "evalCases", evalCase._id, {
             checks: draft.checks,
             expectedAnswer: draft.expectedAnswer,
             expectedSources: draft.expectedSources,
@@ -645,7 +645,7 @@ export const updateCase = authMutation
             updatedAt: ctx.now,
         });
 
-        const dataset = await ctx.db.get(evalCase.datasetId);
+        const dataset = await ctx.db.get("evalDatasets", evalCase.datasetId);
 
         if (dataset) {
             await touchDataset(ctx, dataset, 0);
@@ -664,11 +664,11 @@ export const setCaseFrozen = authMutation
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
 
         // A deleted dataset's cases are being purged: freezing one now would protect a row the purge then removes.
-        if (args.frozen && !(await ctx.db.get(evalCase.datasetId))) {
+        if (args.frozen && !(await ctx.db.get("evalDatasets", evalCase.datasetId))) {
             throw new LunoraError("NOT_FOUND", "Dataset not found");
         }
 
-        await patchById(ctx.db, evalCase._id, { frozen: args.frozen, updatedAt: ctx.now });
+        await patchById(ctx.db, "evalCases", evalCase._id, { frozen: args.frozen, updatedAt: ctx.now });
 
         ctx.log.event("evals.set_case_frozen", { frozen: args.frozen });
 
@@ -687,9 +687,9 @@ export const deleteCase = authMutation
             throw new LunoraError("CONFLICT", "This case is frozen; unfreeze it before deleting");
         }
 
-        await ctx.db.delete(evalCase._id);
+        await ctx.db.delete("evalCases", evalCase._id);
 
-        const dataset = await ctx.db.get(evalCase.datasetId);
+        const dataset = await ctx.db.get("evalDatasets", evalCase.datasetId);
 
         if (dataset) {
             await touchDataset(ctx, dataset, -1);
@@ -869,8 +869,8 @@ export const deleteRun = authMutation
         const run = await requireOwnedRun(ctx, args.runId, ctx.user.userId);
         const results = await loadRunResults(ctx, run._id);
 
-        await Promise.all(results.map((result) => ctx.db.delete(result._id)));
-        await ctx.db.delete(run._id);
+        await Promise.all(results.map((result) => ctx.db.delete("evalResults", result._id)));
+        await ctx.db.delete("evalRuns", run._id);
 
         ctx.log.event("evals.delete_run", { resultCount: results.length });
 

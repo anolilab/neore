@@ -179,7 +179,7 @@ describe("the shared gate outcome", () => {
                 userId: OWNER,
             });
 
-            await context.db.patch(threadId, { botId: id });
+            await context.db.patch("threads", threadId, { botId: id });
 
             return id;
         });

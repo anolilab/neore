@@ -36,7 +36,7 @@ export const resolvePageAccess = async (ctx: Pick<QueryCtx, "db">, pageId: Id<"p
     // `resolveThreadReadAccess`. `acceptPageInvite` asks about the INVITER; a
     // decision about someone else admits nothing.
     const db = systemDb(ctx);
-    const page = await db.get(pageId);
+    const page = await db.get("pages", pageId);
 
     if (!page) {
         return null;
@@ -80,7 +80,7 @@ export const requirePageAccess = async (
 
 /** Structural operations — the tree, favorites, delete — belong to the owner alone. */
 export const requireOwnedPage = async (ctx: Pick<QueryCtx, "db">, pageId: Id<"pages">, userId: string): Promise<Doc<"pages">> => {
-    const page = await ctx.db.get(pageId);
+    const page = await ctx.db.get("pages", pageId);
 
     if (!page || page.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Page not found");

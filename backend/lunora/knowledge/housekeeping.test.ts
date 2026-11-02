@@ -69,13 +69,13 @@ describe("drainDeletingFiles", () => {
 
         expect(first.more).toBe(true);
         expect(await chunksOf(big)).toBe(10);
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(big))).not.toBeNull();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("knowledgeFiles", big))).not.toBeNull();
 
         const second = (await harness.run(async (ctx: any) => await ctx.runMutation(drainDeletingFiles, {}))) as { more: boolean };
 
         expect(second.more).toBe(false);
         expect(await chunksOf(big)).toBe(0);
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(big))).toBeNull();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("knowledgeFiles", big))).toBeNull();
         expect(await chunksOf(kept)).toBe(3);
     }, 30_000);
 });
@@ -92,9 +92,9 @@ describe("sweepKnowledgeFiles", () => {
         expect(result.reaped).toBe(2);
 
         const [stuckRow, runningRow, lostRow] = await harness.run(async (ctx: any) => [
-            await ctx.db.get(stuck),
-            await ctx.db.get(running),
-            await ctx.db.get(lost),
+            await ctx.db.get("knowledgeFiles", stuck),
+            await ctx.db.get("knowledgeFiles", running),
+            await ctx.db.get("knowledgeFiles", lost),
         ]);
 
         expect(stuckRow.status).toBe("failed");
@@ -113,7 +113,7 @@ describe("an ingest racing a removal", () => {
         const marked = await newFile({ status: DELETING_STATUS });
         const gone = await newFile();
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(gone));
+        await harness.run(async (ctx: any) => await ctx.db.delete("knowledgeFiles", gone));
 
         for (const fileId of [marked, gone]) {
             await expect(harness.run(async (ctx: any) => await ctx.runMutation(updateFileStatus, { fileId, status: "indexed" }))).resolves.toBe(false);
@@ -123,7 +123,7 @@ describe("an ingest racing a removal", () => {
         }
 
         expect(await chunksOf(marked)).toBe(0);
-        const markedRow = await harness.run(async (ctx: any) => await ctx.db.get(marked));
+        const markedRow = await harness.run(async (ctx: any) => await ctx.db.get("knowledgeFiles", marked));
 
         expect(markedRow.status).toBe(DELETING_STATUS);
     });

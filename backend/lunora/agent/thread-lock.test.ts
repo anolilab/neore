@@ -82,7 +82,7 @@ describe("admission on a locked thread", () => {
                 .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
                 .first();
 
-            await ctx.db.patch(row._id, { epoch });
+            await ctx.db.patch("threadPasscodes", row._id, { epoch });
         });
 
         expect(await resolve(OWNER, old)).toMatchObject({ kind: "locked" });
@@ -128,7 +128,7 @@ describe("editing a reply in a locked thread", () => {
                 .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
                 .first();
 
-            await ctx.db.patch(row._id, { epoch: newPasscodeEpoch() });
+            await ctx.db.patch("threadPasscodes", row._id, { epoch: newPasscodeEpoch() });
         });
 
         await expect(edit(old)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });

@@ -72,7 +72,12 @@ const promptStopProcedure = (): never => registry.get("chat_functions:abortStrea
 
 /** One field of the row at `id`, read in its own run. */
 const fieldOf = async (id: string, key: string): Promise<unknown> => {
-    const row = await run(async (context) => await context.db.get(id));
+    const row = await run(
+        async (context) =>
+            (await context.db.get("persistentStreams", id as never)) ??
+            (await context.db.get("threads", id as never)) ??
+            (await context.db.get("streamingMessages", id as never)),
+    );
 
     return (row as Record<string, unknown> | null)?.[key];
 };

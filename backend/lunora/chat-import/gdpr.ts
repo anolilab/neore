@@ -19,7 +19,7 @@ export const eraseImportJobsForUser = async (ctx: MutationCtx, userId: string): 
         ctx,
         importJobs.flatMap((j) => [j.r2Key, keptImportKeyFor(userId, j._id)]),
     );
-    await Promise.all(importJobs.map((j) => ctx.db.delete(j._id)));
+    await Promise.all(importJobs.map((j) => ctx.db.delete("chatImportJobs", j._id)));
 
     return { hasMore: full(importJobs) };
 };

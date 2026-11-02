@@ -75,13 +75,13 @@ export const purgeFinishedStreams = internalMutation
                 const drained = batch.length < remaining;
 
                 for (const chunk of batch) {
-                    await ctx.db.delete(chunk._id);
+                    await ctx.db.delete("persistentChunks", chunk._id);
                     chunks += 1;
                 }
 
                 // The stream goes once none of its chunks are left; otherwise it resumes next run.
                 if (drained) {
-                    await ctx.db.delete(stream._id);
+                    await ctx.db.delete("persistentStreams", stream._id);
                     streams += 1;
                 }
             }

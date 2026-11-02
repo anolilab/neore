@@ -39,7 +39,7 @@ export const setShardRoute = async (context: Pick<MutationCtx, "db">, kind: Shar
 
     if (existing) {
         if (existing.ownerId !== ownerId) {
-            await context.db.patch(existing._id, { ownerId });
+            await context.db.patch("shardRoutes", existing._id, { ownerId });
         }
 
         return;
@@ -53,7 +53,7 @@ export const deleteShardRoute = async (context: Pick<MutationCtx, "db">, kind: S
     const existing = await context.db.shardRoutes.findFirst({ where: { key: shardRouteKey(kind, value) } });
 
     if (existing) {
-        await context.db.delete(existing._id);
+        await context.db.delete("shardRoutes", existing._id);
     }
 };
 
@@ -90,8 +90,12 @@ export const deleteShardRoutesOf = async (context: Pick<MutationCtx, "db">, owne
         context.db.shardActivity.findMany({ where: { shardKey: ownerId } }),
     ]);
 
-    for (const row of [...routes, ...census]) {
-        await context.db.delete(row._id);
+    for (const row of routes) {
+        await context.db.delete("shardRoutes", row._id);
+    }
+
+    for (const row of census) {
+        await context.db.delete("shardActivity", row._id);
     }
 };
 

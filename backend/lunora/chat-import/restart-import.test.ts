@@ -112,7 +112,7 @@ describe("restartImportJob", () => {
 
         await harness.withIdentity({ userId: OWNER }).mutation(restartImportJob as never, { jobId } as never);
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.status).toBe("processing");
         expect(job.completedAt).toBeUndefined();
@@ -132,7 +132,7 @@ describe("reapRestartableImport", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(reapRestartableImport, { failedAt: FAILED_AT, jobId, r2Key: KEPT }));
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.r2Key).toBe("");
     });
@@ -143,7 +143,7 @@ describe("reapRestartableImport", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(reapRestartableImport, { failedAt: FAILED_AT, jobId, r2Key: KEPT }));
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.r2Key).toBe(KEPT);
     });
@@ -154,7 +154,7 @@ describe("reapRestartableImport", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(reapRestartableImport, { failedAt: FAILED_AT, jobId, r2Key: KEPT }));
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.r2Key).toBe(KEPT);
     });
@@ -211,7 +211,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "1 conversations failed to import", failed: 1, imported: 3, status: "failed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.r2Key).toBe(keptImportKeyFor(OWNER, jobId));
         expect(job.status).toBe("failed");
@@ -223,7 +223,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "Import file contains no conversations", status: "failed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.r2Key).toBe("");
     });
@@ -247,7 +247,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "boom", failed: 1, imported: 3, runId: "run-1", status: "failed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
         const rows = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
 
         expect(job.status).toBe("processing");
@@ -261,7 +261,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { failed: 0, imported: 5, status: "completed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.status).toBe("completed");
         expect(job.r2Key).toBe("");
@@ -280,7 +280,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "2 conversations failed to import", failed: 2, imported: 3, status: "failed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.errorMessage).toBe(CANCELLED_IMPORT_MESSAGE);
         expect(job.r2Key).toBe("");
@@ -299,7 +299,7 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "boom", status: "failed" });
 
-        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const job = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", jobId));
 
         expect(job.importedConversations).toBe(2);
         expect(job.failedConversations).toBe(1);
@@ -312,15 +312,15 @@ describe("releaseSupersededImportFiles", () => {
         const failedJobId = await insertJob(harness);
 
         // Finalize keeps a file under the job's own key; the release matches on exactly that key.
-        await harness.run(async (ctx: any) => await ctx.db.patch(failedJobId, { r2Key: keptImportKeyFor(OWNER, failedJobId) }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("chatImportJobs", failedJobId, { r2Key: keptImportKeyFor(OWNER, failedJobId) }));
         const otherUserJobId = await insertJob(harness, { userId: "someone-else" });
         const completedJobId = await insertJob(harness, { completedAt: FAILED_AT, errorMessage: undefined, r2Key: "", status: "completed" });
 
         await harness.run(async (ctx: any) => await releaseSupersededImportFiles(ctx, OWNER));
 
-        const failed = await harness.run(async (ctx: any) => await ctx.db.get(failedJobId));
-        const other = await harness.run(async (ctx: any) => await ctx.db.get(otherUserJobId));
-        const completed = await harness.run(async (ctx: any) => await ctx.db.get(completedJobId));
+        const failed = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", failedJobId));
+        const other = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", otherUserJobId));
+        const completed = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", completedJobId));
 
         expect(failed.r2Key).toBe("");
         expect(failed.status).toBe("failed");
@@ -335,7 +335,7 @@ describe("releaseSupersededImportFiles", () => {
 
         await harness.run(async (ctx: any) => await releaseSupersededImportFiles(ctx, OWNER));
 
-        const cancelled = await harness.run(async (ctx: any) => await ctx.db.get(cancelledJobId));
+        const cancelled = await harness.run(async (ctx: any) => await ctx.db.get("chatImportJobs", cancelledJobId));
 
         expect(cancelled.r2Key).toBe(stagingKey);
     });

@@ -102,7 +102,7 @@ export const updateBot = authMutation
     .output(v.null())
     .mutation(async ({ args: { botId, patch }, ctx: context }) => {
         const { userId } = context.user;
-        const bot = await context.db.get(botId as Id<"bots">);
+        const bot = await context.db.get("bots", botId as Id<"bots">);
 
         if (!bot || bot.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
@@ -116,7 +116,7 @@ export const updateBot = authMutation
             throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
         }
 
-        await patchRow(context.db, bot, withoutUndefined({ ...patch, updatedAt: context.now }));
+        await patchRow(context.db, "bots", bot, withoutUndefined({ ...patch, updatedAt: context.now }));
 
         context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled });
 
@@ -131,7 +131,7 @@ export const deleteBot = authMutation
     .output(v.null())
     .mutation(async ({ args: { botId }, ctx: context }) => {
         const { userId } = context.user;
-        const bot = await context.db.get(botId as Id<"bots">);
+        const bot = await context.db.get("bots", botId as Id<"bots">);
 
         if (!bot || bot.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
@@ -142,7 +142,7 @@ export const deleteBot = authMutation
 
         // Threads, routines and memories that name this bot keep the id. Readers
         // treat a missing bot as the plain assistant, so nothing is rewritten here.
-        await context.db.delete(bot._id);
+        await context.db.delete("bots", bot._id);
 
         context.log.event("bots.delete_bot", {});
 
@@ -171,7 +171,7 @@ export const getBotForRun = internalQuery
     .input({ botId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.object({ computerEnabled: v.boolean(), instructions: v.string(), model: v.string(), name: v.string() }), v.null()))
     .query(async ({ args: { botId, userId }, ctx }) => {
-        const bot = await ctx.db.get(botId as Id<"bots">);
+        const bot = await ctx.db.get("bots", botId as Id<"bots">);
 
         if (!bot || bot.userId !== userId) {
             return null;

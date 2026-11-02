@@ -160,6 +160,7 @@ export const createConnection = authMutation
             const pairing = existing.platformUserId ? null : await newPairingCode();
 
             await context.db.patch(
+                "messengerConnections",
                 existing._id,
                 withoutUndefined({
                     connectedAt: context.now,
@@ -209,7 +210,7 @@ export const regeneratePairingCode = authMutation
     .input({ connectionId: v.id("messengerConnections") })
     .output(vPairingCodeOutput)
     .mutation(async ({ args: { connectionId }, ctx: context }) => {
-        const connection = await context.db.get(connectionId);
+        const connection = await context.db.get("messengerConnections", connectionId);
 
         if (!connection || connection.userId !== context.user.userId) {
             throw new LunoraError("NOT_FOUND", "Connection not found");
@@ -217,7 +218,7 @@ export const regeneratePairingCode = authMutation
 
         const pairing = await newPairingCode();
 
-        await patchRow(context.db, connection, {
+        await patchRow(context.db, "messengerConnections", connection, {
             pairingCodeExpiresAt: pairing.expiresAt,
             pairingCodeHash: pairing.hash,
             platformChatId: undefined,
@@ -240,7 +241,7 @@ export const updateConnectionStatus = authMutation
     .mutation(async ({ args: { connectionId, status }, ctx: context }) => {
         const { userId } = context.user;
 
-        const connection = await context.db.get(connectionId as Id<"messengerConnections">);
+        const connection = await context.db.get("messengerConnections", connectionId as Id<"messengerConnections">);
 
         if (!connection) {
             throw new LunoraError("NOT_FOUND", "Connection not found");
@@ -250,7 +251,7 @@ export const updateConnectionStatus = authMutation
             throw new LunoraError("FORBIDDEN", "Not your connection");
         }
 
-        await context.db.patch(connection._id, { status });
+        await context.db.patch("messengerConnections", connection._id, { status });
 
         context.log.event("messenger.update_connection_status", { status });
     });
@@ -271,13 +272,13 @@ export const updateConnectionReplyTools = authMutation
     })
     .output(v.null())
     .mutation(async ({ args: { connectionId, enabled, groups }, ctx: context }) => {
-        const connection = await context.db.get(connectionId);
+        const connection = await context.db.get("messengerConnections", connectionId);
 
         if (!connection || connection.userId !== context.user.userId) {
             throw new LunoraError("NOT_FOUND", "Connection not found");
         }
 
-        await context.db.patch(connection._id, { replyTools: { enabled, groups: normalizeReplyToolGroups(groups) } });
+        await context.db.patch("messengerConnections", connection._id, { replyTools: { enabled, groups: normalizeReplyToolGroups(groups) } });
 
         context.log.event("messenger.update_connection_reply_tools", { enabled, groupCount: groups.length });
 
@@ -293,7 +294,7 @@ export const deleteConnection = authMutation
     .mutation(async ({ args: { connectionId }, ctx: context }) => {
         const { userId } = context.user;
 
-        const connection = await context.db.get(connectionId as Id<"messengerConnections">);
+        const connection = await context.db.get("messengerConnections", connectionId as Id<"messengerConnections">);
 
         if (!connection) {
             throw new LunoraError("NOT_FOUND", "Connection not found");
@@ -303,7 +304,7 @@ export const deleteConnection = authMutation
             throw new LunoraError("FORBIDDEN", "Not your connection");
         }
 
-        await context.db.delete(connection._id);
+        await context.db.delete("messengerConnections", connection._id);
         await deleteShardRoute(context, "messenger", connection._id);
 
         context.log.event("messenger.delete_connection", { platform: connection.platform });
@@ -334,7 +335,7 @@ export const getConnectionById = internalQuery
     .input({
         connectionId: v.id("messengerConnections"),
     })
-    .query(async ({ args: { connectionId }, ctx }) => ctx.db.get(connectionId));
+    .query(async ({ args: { connectionId }, ctx }) => ctx.db.get("messengerConnections", connectionId));
 
 export const getConnectionByPlatformChat = internalQuery
     .input({
@@ -391,7 +392,7 @@ export const pairConnection = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args: { codeHash, connectionId, displayName, platformChatId, platformUserId, platformUsername }, ctx }) => {
-        const connection = await ctx.db.get(connectionId);
+        const connection = await ctx.db.get("messengerConnections", connectionId);
 
         if (
             !connection ||
@@ -404,7 +405,7 @@ export const pairConnection = internalMutation
             return false;
         }
 
-        await patchRow(ctx.db, connection, {
+        await patchRow(ctx.db, "messengerConnections", connection, {
             pairingCodeExpiresAt: undefined,
             pairingCodeHash: undefined,
             platformChatId,
@@ -421,7 +422,7 @@ export const touchConnection = internalMutation
         connectionId: v.id("messengerConnections"),
     })
     .mutation(async ({ args: { connectionId }, ctx }) => {
-        await ctx.db.patch(connectionId, { lastMessageAt: ctx.now });
+        await ctx.db.patch("messengerConnections", connectionId, { lastMessageAt: ctx.now });
     });
 
 export const findOrCreateMessengerThread = internalMutation
@@ -533,7 +534,7 @@ export const completeMessengerMessage = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args: { fileIds, messageId, parts, text }, ctx }) => {
-        const row = await ctx.db.get(messageId);
+        const row = await ctx.db.get("messages", messageId);
 
         if (!row) {
             return false;
@@ -595,7 +596,7 @@ export const claimThreadReply = internalMutation
     .output(v.union(v.object({ claimed: v.literal(true), newestUserMessageId: v.string() }), v.object({ claimed: v.literal(false) })))
     .mutation(async ({ args: { threadId, userId }, ctx }) => {
         // A locked chat is never answered from a messenger: no reply, no claim, no read.
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (!thread || isThreadLocked(thread)) {
             return { claimed: false as const };
@@ -768,13 +769,13 @@ export const getReplyToolSetting = internalQuery
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.union(v.null(), v.object({ enabled: v.boolean(), groups: v.optional(v.array(v.string())) })))
     .query(async ({ args: { threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (!thread || thread.userId !== userId || !thread.messengerConnectionId) {
             return null;
         }
 
-        const connection = await ctx.db.get(thread.messengerConnectionId);
+        const connection = await ctx.db.get("messengerConnections", thread.messengerConnectionId);
 
         if (!connection || connection.userId !== userId || !connection.replyTools) {
             return null;

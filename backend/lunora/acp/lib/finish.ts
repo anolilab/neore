@@ -141,7 +141,7 @@ const saveHostReply = async (
     changes: HostChanges | undefined,
 ): Promise<string> => {
     const threadId = stream.threadId as Id<"threads">;
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
     // What the agent wrote is read first: the worker run waiting on this turn is told it, whether or not there is a row to save.
     const transcript = await readHostTranscript(ctx, stream._id);
 
@@ -152,7 +152,7 @@ const saveHostReply = async (
 
     // The prompt the reply answers is gone (a deleted message): saving would assert, and the reaper would
     // fail the whole shard tick on it.
-    if (stream.messageId && !(await ctx.db.get(stream.messageId as Id<"messages">))) {
+    if (stream.messageId && !(await ctx.db.get("messages", stream.messageId as Id<"messages">))) {
         return hostResultText(transcript, false);
     }
 

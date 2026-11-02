@@ -45,7 +45,10 @@ export const deleteUserDevices = internalMutation
             ctx.db.deviceCalls.findMany({ limit: BATCH, where: { userId } }),
         ]);
 
-        await Promise.all([...devices.page, ...calls.page].map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all([
+            ...devices.page.map(async (row) => await ctx.db.delete("devices", row._id)),
+            ...calls.page.map(async (row) => await ctx.db.delete("deviceCalls", row._id)),
+        ]);
 
         // The host ingest finds a device's owner through its route (`registerDevice`); it must not outlive the device.
         for (const device of devices.page) {

@@ -12,7 +12,9 @@ import type { MessageBranch } from "./branch-tree";
 import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
 import { endActiveGoals } from "../chat/goals/rows";
 import { addMessagesHandler, getMaxMessage } from "./messages";
+import { deleteVectorRow } from "./table-writes";
 import { requireOwnedThread } from "./thread-read-access";
+import type { VectorTableName } from "./vector/tables";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { type ReplyContent, rewriteReplyText } from "./reply-edit";
 import { extractText } from "./shared";
@@ -169,13 +171,13 @@ export const getContextPathIds = internalQuery
     .input({ promptMessageId: v.id("messages"), threadId: v.id("threads") })
     .output(v.union(v.null(), v.array(v.string())))
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread?.activeLeafMessageId) {
             return null;
         }
 
-        const prompt = await ctx.db.get(args.promptMessageId);
+        const prompt = await ctx.db.get("messages", args.promptMessageId);
 
         if (!prompt || prompt.threadId !== args.threadId) {
             return null;
@@ -197,7 +199,7 @@ const loadForkPath = async (
     context: QueryContext,
     args: { index?: number; messageId?: string; threadId: Id<"threads"> },
 ): Promise<{ index: number; rows: Doc<"messages">[] }> => {
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     if (!thread) {
         return { index: -1, rows: [] };
@@ -285,10 +287,10 @@ export const setActiveLeafHandler = async (
     ctx: MutationContext,
     args: { messageId: Id<"messages">; runModel?: string; threadId: Id<"threads"> },
 ): Promise<void> => {
-    const thread = await ctx.db.get(args.threadId);
+    const thread = await ctx.db.get("threads", args.threadId);
     const leafId = thread ? await regenerateParentOf(ctx, thread, args.messageId, args.runModel) : args.messageId;
 
-    await ctx.db.patch(args.threadId, { activeLeafMessageId: leafId });
+    await ctx.db.patch("threads", args.threadId, { activeLeafMessageId: leafId });
     await syncActiveAgent(ctx, args.threadId, leafId);
 };
 
@@ -311,7 +313,7 @@ export const saveEditedSiblingHandler = async (
     ctx: MutationContext,
     args: { fileIds?: Id<"chatFiles">[]; message: Message; originalMessageId: Id<"messages">; userId: string },
 ): Promise<Id<"messages">> => {
-    const original = await ctx.db.get(args.originalMessageId);
+    const original = await ctx.db.get("messages", args.originalMessageId);
 
     if (!original) {
         return throwBadRequest("Message not found");
@@ -338,7 +340,7 @@ export const saveEditedSiblingHandler = async (
 
     const savedId = saved._id as Id<"messages">;
 
-    await ctx.db.patch(threadId, { activeLeafMessageId: savedId });
+    await ctx.db.patch("threads", threadId, { activeLeafMessageId: savedId });
     await syncActiveAgent(ctx, threadId, savedId);
 
     return savedId;
@@ -371,7 +373,7 @@ export const editAssistantReplyHandler = async (
     ctx: MutationContext,
     args: { messageId: string; text: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
 ): Promise<null> => {
-    const thread = await ctx.db.get(args.threadId);
+    const thread = await ctx.db.get("threads", args.threadId);
 
     if (!thread) {
         return throwThreadNotFound();
@@ -433,11 +435,11 @@ export const editAssistantReplyHandler = async (
 
         // The stored vector embeds the old text, so it would surface the old reply in search.
         if (row.embeddingId) {
-            await ctx.db.delete(row.embeddingId as Id<"embeddings_1536">);
+            await deleteVectorRow(ctx.db, row.embeddingId as Id<VectorTableName>);
             patch.embeddingId = undefined;
         }
 
-        await patchRow(ctx.db, row, patch);
+        await patchRow(ctx.db, "messages", row, patch);
     }
 
     // A summary covering the edited turns may quote the old text, and a run under way has read it (`thread-summaries.ts`).
@@ -459,7 +461,7 @@ export const switchBranch = authMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread) {
             return throwThreadNotFound();
@@ -479,7 +481,7 @@ export const switchBranch = authMutation
 
         const leaf = await descendFrom(ctx, args.threadId, target);
 
-        await ctx.db.patch(args.threadId, { activeLeafMessageId: leaf._id });
+        await ctx.db.patch("threads", args.threadId, { activeLeafMessageId: leaf._id });
         await syncActiveAgent(ctx, args.threadId, leaf._id);
 
         ctx.log.event("agent.switch_branch", { leafFound: true, threadId: args.threadId });

@@ -63,7 +63,7 @@ beforeEach(async () => {
             threadId,
             userId: OWNER,
         });
-        await ctx.db.delete(missingStreamId);
+        await ctx.db.delete("streamingMessages", missingStreamId);
     }) as never);
 });
 
@@ -99,7 +99,7 @@ describe("listDeltas cursor cap", () => {
 
             await listDeltasHandler(ctx, { cursors: cursorsOf(MAX_CURSORS_PER_REQUEST * 3) as never, threadId: threadId as never });
 
-            return get.mock.calls.filter(([id]) => id === missingStreamId).length;
+            return get.mock.calls.filter(([, id]) => id === missingStreamId).length;
         }) as never);
 
         expect(reads).toBe(MAX_CURSORS_PER_REQUEST);

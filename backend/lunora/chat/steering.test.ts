@@ -94,7 +94,7 @@ const insertStream = async (fields: Record<string, unknown> = {}): Promise<strin
             }),
     );
 
-const streamRow = async () => await harness.run(async (ctx: any) => await ctx.db.get(streamId));
+const streamRow = async () => await harness.run(async (ctx: any) => await ctx.db.get("persistentStreams", streamId));
 
 const userRows = async (): Promise<{ order: number; text?: string }[]> => {
     const rows = await harness.run(async (ctx: any) => await ctx.db.query("messages").collect());
@@ -179,7 +179,8 @@ describe("steerRun", () => {
 
     it("refuses a group chat, whose runs take no steers", async () => {
         await harness.run(
-            async (ctx: any) => await ctx.db.patch(threadId, { groupChat: { mode: "round-robin", participants: [{ addedAt: 0, skillId: "skill-1" }] } }),
+            async (ctx: any) =>
+                await ctx.db.patch("threads", threadId, { groupChat: { mode: "round-robin", participants: [{ addedAt: 0, skillId: "skill-1" }] } }),
         );
 
         await expect(steer("hi")).rejects.toThrow("group chat");
@@ -265,7 +266,7 @@ describe("deliverSteers and withdrawSteer", () => {
         const ended = await insertStream({ status: "done" });
 
         await as(OWNER).mutation(withdrawSteer as never, { steerId: "after-end", streamId: ended, threadId } as never);
-        const endedRow = await harness.run(async (ctx: any) => await ctx.db.get(ended));
+        const endedRow = await harness.run(async (ctx: any) => await ctx.db.get("persistentStreams", ended));
 
         expect(endedRow.steers).toBeUndefined();
     });
@@ -274,7 +275,7 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(await deliver()).toBeNull();
 
         await steer("use the other file");
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
         expect(await deliver()).toBeNull();
         expect(await steersOnStream()).toMatchObject([{ status: "queued" }]);
@@ -282,7 +283,7 @@ describe("deliverSteers and withdrawSteer", () => {
 
     it("keeps a steer queued when the chat was locked after the run started", async () => {
         await steer("use the other file");
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() + 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: Date.now() + 1 }));
 
         expect(await deliver()).toBeNull();
         expect(await userRows()).toHaveLength(1);
@@ -305,7 +306,7 @@ describe("deliverSteers and withdrawSteer", () => {
         const { steerId } = await steer("use the other file");
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(threadId, { lockedAt: Date.now() });
+            await ctx.db.patch("threads", threadId, { lockedAt: Date.now() });
             await ctx.db.insert("threadPasscodes", {
                 createdAt: 1,
                 epoch,
@@ -338,7 +339,7 @@ describe("a deleted thread", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }));
 
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(threadId))).toBeNull();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).toBeNull();
 
         const remaining = await steersOnStream();
 
@@ -416,7 +417,7 @@ describe("a steer delivered before its step started", () => {
 describe("a stop after a steered message", () => {
     // What `endStoppedRun` passes: the run's FIRST order and prompt, from the agent's result metadata.
     const stop = async (pendingText: string) => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(streamId, { status: "done" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", streamId, { status: "done" }));
 
         return await harness.run(
             async (ctx: any) =>
@@ -431,7 +432,8 @@ describe("a stop after a steered message", () => {
         );
     };
 
-    const rowById = async (id: string) => await harness.run(async (ctx: any) => await ctx.db.get(id));
+    const rowById = async (id: string) =>
+        await harness.run(async (ctx: any) => (await ctx.db.get("messages", id as never)) ?? (await ctx.db.get("threads", id as never)));
 
     it("saves the owed text below the steered message, into the moved pending row", async () => {
         await steer("use the other file");
@@ -455,7 +457,7 @@ describe("a stop after a steered message", () => {
         const delivered = await deliver();
         const steerRow = await rowById(delivered!.messageId);
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", delivered!.messageId));
 
         const result = await stop("Reading the other");
 
@@ -468,7 +470,7 @@ describe("a stop after a steered message", () => {
 
         const delivered = await deliver();
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", delivered!.messageId));
         await stop("");
 
         expect(await rowById(pendingId)).toBeNull();
@@ -481,7 +483,7 @@ describe("a stop after a steered message", () => {
         const { _creationTime, _id, ...pendingRow } = await rowById(pendingId);
         const otherId = await harness.run(async (ctx: any) => await ctx.db.insert("messages", { ...pendingRow, order: pendingRow.order + 5 }));
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", delivered!.messageId));
         await stop("");
 
         expect(await rowById(pendingId)).toBeNull();

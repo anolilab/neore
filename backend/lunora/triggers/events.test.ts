@@ -80,7 +80,7 @@ const insertWatcher = async (overrides: Record<string, unknown> = {}): Promise<s
 
 const nextCheckOf = (trigger: { nextTriggerAt: number }): number => trigger.nextTriggerAt;
 
-const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("triggers", id));
 
 /** The runs a check scheduled for its firings: they are sent to the queue only after the claiming mutation committed. */
 const scheduledRuns = (): any[] =>
@@ -230,7 +230,7 @@ describe("a page watcher", () => {
     it("drops the answer of a check that finished after the watcher was switched off", async () => {
         const id = await insertWatcher();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(id, { enabled: false }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", id, { enabled: false }));
         await harness.run(
             async (ctx: any) => await ctx.runMutation(recordEventCheck, { fire: { key: "k", summary: "x" }, read: { source: PAGE }, state: {}, triggerId: id }),
         );
@@ -364,7 +364,8 @@ describe("a time watcher", () => {
         const next = AT + 120_000;
 
         await harness.run(
-            async (ctx: any) => await ctx.db.patch(id, { enabled: true, eventSource: { at: next, kind: "time" }, eventState: {}, nextTriggerAt: next }),
+            async (ctx: any) =>
+                await ctx.db.patch("triggers", id, { enabled: true, eventSource: { at: next, kind: "time" }, eventState: {}, nextTriggerAt: next }),
         );
         vi.setSystemTime(next);
         await check(id, "", next);
@@ -537,7 +538,7 @@ describe("a send that fails", () => {
 
         const again = await fireMoment();
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(again.id, { eventState: { armedAt: NOW } }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", again.id, { eventState: { armedAt: NOW } }));
         enqueueJob.mockClear();
         await send(again.args);
 
@@ -646,7 +647,9 @@ describe("a check that finishes after the watcher was edited", () => {
         const stale = await readTrigger(id);
 
         // The owner points the watcher at another page while the check of the first one is in flight.
-        await harness.run(async (ctx: any) => await ctx.db.patch(id, { eventSource: { ...PAGE, url: "https://example.com/other" }, eventState: {} }));
+        await harness.run(
+            async (ctx: any) => await ctx.db.patch("triggers", id, { eventSource: { ...PAGE, url: "https://example.com/other" }, eventState: {} }),
+        );
 
         const checkContext: EventCheckContext = {
             fetchPage: async () => {
@@ -986,7 +989,7 @@ describe("the thread scan", () => {
         expect(first).toEqual({ accessible: true, baseline: { order: 24, stepOrder: 0 } });
 
         // The reply that was being written settles: it, and every reply before the newest row, was there when the watch began.
-        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[5], { status: "success" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", rowIds[5], { status: "success" }));
 
         const later = await scan(threadId, first.baseline);
 

@@ -20,7 +20,10 @@ export const eraseWorkflowVersionsAndPresenceForUser = async (ctx: MutationCtx, 
             .take(BATCH),
     ]);
 
-    await Promise.all([...versions, ...presence].map((row) => ctx.db.delete(row._id)));
+    await Promise.all([
+        ...versions.map((row) => ctx.db.delete("workflowVersions", row._id)),
+        ...presence.map((row) => ctx.db.delete("workflowPresence", row._id)),
+    ]);
 
     return { hasMore: full(versions) || full(presence) };
 };
@@ -38,7 +41,10 @@ export const eraseWorkflowVersionsAndPresenceForProject = async (ctx: MutationCt
             .take(BATCH),
     ]);
 
-    await Promise.all([...versions, ...presence].map((row) => ctx.db.delete(row._id)));
+    await Promise.all([
+        ...versions.map((row) => ctx.db.delete("workflowVersions", row._id)),
+        ...presence.map((row) => ctx.db.delete("workflowPresence", row._id)),
+    ]);
 
     return { hasMore: full(versions) || full(presence) };
 };

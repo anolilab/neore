@@ -33,7 +33,7 @@ const patchState = async (fields: Record<string, unknown>) =>
     await harness.run(async (ctx: any) => {
         const row = await ctx.db.memoryReflectionState.findFirst({ where: { userId: USER } });
 
-        await ctx.db.patch(row._id, fields);
+        await ctx.db.patch("memoryReflectionState", row._id, fields);
     });
 
 // Nothing else schedules in these tests, and a by-reference job carries no path in the harness.
@@ -91,7 +91,7 @@ describe("a reflection claim outside the night window", () => {
         await harness.run(async (ctx: any) => {
             const settings = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(settings._id, { memoryEnabled: false });
+            await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
         });
         await patchState({ scheduledFor: LATE - 1000, scheduledJobId: "job-old" });
 

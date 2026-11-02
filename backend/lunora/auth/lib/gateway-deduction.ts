@@ -53,7 +53,7 @@ export const applyGatewayDeduction = async (context: MutationContext, args: Gate
         return "no-credit-record";
     }
 
-    await context.db.patch(existingCredits._id, {
+    await context.db.patch("memberCredits", existingCredits._id, {
         usedCredits: (existingCredits.usedCredits ?? 0) + creditsToDeduct,
     });
 

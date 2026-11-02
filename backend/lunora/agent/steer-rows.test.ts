@@ -62,7 +62,7 @@ const pendingRow = { message: { content: [], role: "assistant" }, status: "pendi
 
 /** The path the incremental walk serves, top first, for the thread's stored leaf. */
 const walkedPath = async (): Promise<string[]> => {
-    const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+    const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
     const page: any = await harness.run(async (ctx: any) => await listActivePathPage(ctx, thread, { cursor: null, numItems: 100 }));
 
     return page.page.map((row: { _id: string }) => row._id).toReversed();
@@ -150,7 +150,7 @@ describe("insertSteerRow in a thread that never branched", () => {
     });
 
     it("refuses a run whose pending row has already settled", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.pending, { status: "failed" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.pending, { status: "failed" }));
 
         expect(await steer(ids.pending!)).toBeNull();
         expect(await allRows()).toHaveLength(6);
@@ -182,12 +182,12 @@ describe("insertSteerRow in a branched thread", () => {
         // a1's prompt, and THAT reply is the run being steered.
         await harness.run(async (ctx: any) => {
             for (const name of ["u2", "call", "result", "pending"]) {
-                await ctx.db.delete(ids[name]);
+                await ctx.db.delete("messages", ids[name]);
             }
         });
         await insertRow("u3", 1, 0, { content: "thanks", role: "user" });
         await insertRow("a3", 1, 1, assistantText("you're welcome"));
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.u1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: ids.u1 }));
 
         const regenerated = await addMessages({
             failPendingSteps: true,
@@ -222,7 +222,7 @@ describe("insertSteerRow in a branched thread", () => {
             promptMessageId: steered!.messageId,
         });
         const tree = buildBranchTree(await allRows());
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
         const leaf = await harness.run(async (ctx: any) => await resolveLeafRow(ctx, threadId as never, thread.activeLeafMessageId));
         const expected = [ids.u1, ids.call, ids.result, steered!.messageId, ids.pending];
 
@@ -236,7 +236,7 @@ describe("insertSteerRow in a branched thread", () => {
         const steered = await steer(ids.pending!);
 
         await addMessages({ messages: [{ message: assistantText("Done.") }], pendingMessageId: ids.pending, promptMessageId: steered!.messageId });
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: steered!.messageId }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: steered!.messageId }));
 
         const again = await addMessages({
             failPendingSteps: true,
@@ -269,7 +269,7 @@ describe("insertSteerRow in a branched thread", () => {
 describe("insertSteerRow in a tool-approval continuation", () => {
     it("moves the continuation's pending row out of its override order, and later saves follow the steer", async () => {
         // The first run paused on an approval instead of going on: no pending row.
-        await harness.run(async (ctx: any) => await ctx.db.delete(ids.pending));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", ids.pending));
 
         // The continuation owns a fresh order and saves into it (`forceNewOrder`).
         const order = continuationOrder(1, await maxOrderOf());

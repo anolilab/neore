@@ -19,7 +19,7 @@ const requireOwnedPresentation = async (
     presentationId: Id<"presentations">,
     userId: string,
 ): Promise<Doc<"presentations">> => {
-    const presentation = await context.db.get(presentationId);
+    const presentation = await context.db.get("presentations", presentationId);
 
     if (!presentation || presentation.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Presentation not found");
@@ -29,7 +29,7 @@ const requireOwnedPresentation = async (
 };
 
 const requireOwnedSlide = async (context: Pick<QueryContext, "db">, slideId: Id<"presentationSlides">, userId: string): Promise<Doc<"presentationSlides">> => {
-    const slide = await context.db.get(slideId);
+    const slide = await context.db.get("presentationSlides", slideId);
 
     if (!slide) {
         throw new LunoraError("NOT_FOUND", "Slide not found");
@@ -52,7 +52,7 @@ const requirePresentationUnlocked = async (
     userId: string,
     unlockProof: string | null | undefined,
 ): Promise<void> => {
-    const thread = await context.db.get(presentation.threadId as Id<"threads">);
+    const thread = await context.db.get("threads", presentation.threadId as Id<"threads">);
 
     if (thread && isThreadLocked(thread)) {
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId: presentation.threadId as Id<"threads">, unlockProof, userId }));
@@ -126,7 +126,7 @@ export const getThreadPresentations = authQuery
             .collect();
 
         // A locked chat's decks are its content: none are listed without its proof.
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
             return [];
@@ -171,7 +171,7 @@ export const getGeneratingPresentation = authQuery
         }
 
         // A generating deck in a locked chat is not shown without the proof.
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (
             thread &&
@@ -239,7 +239,7 @@ export const createPresentation = authMutation
     .output(v.object({ presentationId: v.string() }))
     .mutation(async ({ args: { description, lastCompletedSlide, name, status, styleName, threadId, title, totalSlides, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (!thread || thread.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
@@ -295,7 +295,7 @@ export const createSlide = authMutation
         let slideId: string;
 
         if (existing) {
-            await context.db.patch(existing._id, {
+            await context.db.patch("presentationSlides", existing._id, {
                 htmlContent,
                 title,
                 updatedAt: now,
@@ -315,7 +315,7 @@ export const createSlide = authMutation
         }
 
         // Update presentation timestamp
-        await context.db.patch(presentationId as Id<"presentations">, { updatedAt: now });
+        await context.db.patch("presentations", presentationId as Id<"presentations">, { updatedAt: now });
 
         context.log.event("chat.create_slide", { created: !existing });
 
@@ -333,7 +333,7 @@ export const updateSlide = authMutation
     .output(v.object({ success: v.boolean() }))
     .mutation(async ({ args: { htmlContent, slideId, title, unlockProof }, ctx: context }) => {
         const slide = await requireOwnedSlide(context, slideId as Id<"presentationSlides">, context.user.userId);
-        const slidePresentation = await context.db.get(slide.presentationId);
+        const slidePresentation = await context.db.get("presentations", slide.presentationId);
 
         if (slidePresentation) {
             await requirePresentationUnlocked(context, slidePresentation, context.user.userId, unlockProof);
@@ -350,10 +350,10 @@ export const updateSlide = authMutation
             patch.htmlContent = htmlContent;
         }
 
-        await context.db.patch(slideId as Id<"presentationSlides">, withoutUndefined(patch));
+        await context.db.patch("presentationSlides", slideId as Id<"presentationSlides">, withoutUndefined(patch));
 
         // Update presentation timestamp
-        await context.db.patch(slide.presentationId, { updatedAt: now });
+        await context.db.patch("presentations", slide.presentationId, { updatedAt: now });
 
         context.log.event("chat.update_slide", { htmlChanged: htmlContent !== undefined, titleChanged: title !== undefined });
 
@@ -369,12 +369,12 @@ export const deleteSlide = authMutation
     .mutation(async ({ args: { slideId }, ctx: context }) => {
         const slide = await requireOwnedSlide(context, slideId as Id<"presentationSlides">, context.user.userId);
 
-        await context.db.delete(slideId as Id<"presentationSlides">);
+        await context.db.delete("presentationSlides", slideId as Id<"presentationSlides">);
 
         // Update presentation timestamp
         const { now } = context;
 
-        await context.db.patch(slide.presentationId, { updatedAt: now });
+        await context.db.patch("presentations", slide.presentationId, { updatedAt: now });
 
         context.log.event("chat.delete_slide", { deleted: true });
 
@@ -397,11 +397,11 @@ export const deletePresentation = authMutation
             .collect();
 
         for (const slide of slides) {
-            await context.db.delete(slide._id);
+            await context.db.delete("presentationSlides", slide._id);
         }
 
         // Delete presentation
-        await context.db.delete(presentationId as Id<"presentations">);
+        await context.db.delete("presentations", presentationId as Id<"presentations">);
 
         context.log.event("chat.delete_presentation", { slideCount: slides.length });
 

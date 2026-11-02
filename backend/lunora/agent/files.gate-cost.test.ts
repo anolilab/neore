@@ -22,7 +22,7 @@ const fakeContext = (
     const tables: string[] = [];
     let lookup: { table: string; threadId?: string } = { table: "" };
     const db = {
-        get: async (id: string) => threads[id] ?? null,
+        get: async (_table: string, id: string) => threads[id] ?? null,
         query: (table: string) => {
             tables.push(table);
 

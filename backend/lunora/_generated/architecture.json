@@ -283,11 +283,6 @@
     {
       "from": "function:agent_messages:finalizeMessage",
       "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_messages:finalizeMessage",
-      "kind": "write",
       "to": "table:messages"
     },
     {
@@ -314,11 +309,6 @@
       "from": "function:agent_messages:textSearch",
       "kind": "read",
       "to": "table:messages"
-    },
-    {
-      "from": "function:agent_messages:updateMessage",
-      "kind": "write",
-      "to": "table:embeddings_1536"
     },
     {
       "from": "function:agent_node_executions:create",
@@ -966,39 +956,19 @@
       "to": "table:threads"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_1024"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_128"
     },
     {
-      "from": "function:agent_vector:deleteBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_1408"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_256"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_512"
-    },
-    {
-      "from": "function:agent_vector:deleteBatch",
-      "kind": "write",
-      "to": "table:embeddings_768"
     },
     {
       "from": "function:agent_vector:deleteBatchForThread",
@@ -1006,44 +976,24 @@
       "to": "table:embeddings_1536"
     },
     {
-      "from": "function:agent_vector:insertBatch",
-      "kind": "write",
-      "to": "table:messages"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1024"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_128"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1408"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
-      "kind": "write",
-      "to": "table:embeddings_1536"
-    },
-    {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_256"
     },
     {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_512"
     },
     {
-      "from": "function:agent_vector:updateBatch",
+      "from": "function:agent_vector:deleteBatchForThread",
       "kind": "write",
       "to": "table:embeddings_768"
+    },
+    {
+      "from": "function:agent_vector:insertBatch",
+      "kind": "write",
+      "to": "table:messages"
     },
     {
       "from": "function:agent_workflow_executions:create",
@@ -6048,6 +5998,11 @@
     {
       "from": "function:saas_notification_functions:markNotificationsRead",
       "kind": "read",
+      "to": "table:gatewayNotifications"
+    },
+    {
+      "from": "function:saas_notification_functions:markNotificationsRead",
+      "kind": "write",
       "to": "table:gatewayNotifications"
     },
     {
@@ -18340,20 +18295,14 @@
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 291,
+      "line": 293,
       "reason": "\"setActiveLeafHandler\" is not a registered function"
     },
     {
       "file": "agent/branches",
       "kind": "write",
-      "line": 341,
+      "line": 343,
       "reason": "\"saveEditedSiblingHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/branches",
-      "kind": "write",
-      "line": 436,
-      "reason": "\"editAssistantReplyHandler\" is not a registered function"
     },
     {
       "file": "agent/client/files",
@@ -18717,128 +18666,122 @@
     },
     {
       "file": "agent/gdpr",
-      "kind": "write",
-      "line": 25,
-      "reason": "\"eraseEmbeddingRow\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
       "kind": "read",
-      "line": 39,
+      "line": 42,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 44,
+      "line": 47,
       "reason": "\"eraseEmbeddingsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 53,
+      "line": 56,
       "reason": "\"eraseStreamingMessagesForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 58,
+      "line": 61,
       "reason": "\"eraseStreamingMessagesForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 70,
+      "line": 73,
       "reason": "\"eraseChatFileAccessForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 77,
+      "line": 80,
       "reason": "\"eraseChatFileThreadsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 82,
+      "line": 85,
       "reason": "\"eraseChatFileThreadsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 90,
+      "line": 93,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 94,
+      "line": 97,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 106,
+      "line": 109,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 107,
+      "line": 110,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 108,
+      "line": 111,
       "reason": "\"eraseThreadMetadataForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 115,
+      "line": 118,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 119,
+      "line": 122,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 126,
+      "line": 130,
       "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "write",
-      "line": 135,
+      "line": 131,
+      "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 132,
+      "reason": "\"eraseThreadSuggestionsAndInvites\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 142,
       "reason": "\"eraseProjectsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 143,
+      "line": 150,
       "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 143,
-      "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
-      "kind": "write",
-      "line": 148,
-      "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
-    },
-    {
-      "file": "agent/gdpr",
-      "kind": "write",
-      "line": 148,
+      "line": 150,
       "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
     },
     {
@@ -18855,74 +18798,74 @@
     },
     {
       "file": "agent/gdpr",
-      "kind": "read",
-      "line": 163,
+      "kind": "write",
+      "line": 162,
+      "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "write",
+      "line": 162,
       "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
     },
     {
       "file": "agent/gdpr",
       "kind": "read",
-      "line": 175,
+      "line": 170,
+      "reason": "\"eraseWorkflowExecutionsForUser\" is not a registered function"
+    },
+    {
+      "file": "agent/gdpr",
+      "kind": "read",
+      "line": 182,
       "reason": "\"eraseWorkflowExecutionsForProject\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 57,
-      "reason": "\"deleteMessage\" is not a registered function"
-    },
-    {
-      "file": "agent/messages",
-      "kind": "write",
-      "line": 60,
+      "line": 58,
       "reason": "\"deleteMessage\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 222,
+      "line": 223,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 234,
+      "line": 374,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 373,
+      "line": 391,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 390,
-      "reason": "\"addMessagesHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/messages",
-      "kind": "write",
-      "line": 407,
+      "line": 408,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 456,
+      "line": 457,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 466,
+      "line": 467,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 472,
+      "line": 473,
       "reason": "\"pinFollowingRowParent\" is not a registered function"
     },
     {
@@ -19066,8 +19009,8 @@
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 195,
-      "reason": "\"deleteVectorRow\" is not a registered function"
+      "line": 198,
+      "reason": "the written table is not a string literal"
     },
     {
       "file": "agent/thread-lock",
@@ -19168,19 +19111,25 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1524,
+      "line": 1525,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
       "file": "agent/vector/index",
       "kind": "read",
-      "line": 41,
+      "line": 45,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "agent/vector/index",
       "kind": "write",
-      "line": 133,
+      "line": 137,
+      "reason": "the written table is not a string literal"
+    },
+    {
+      "file": "agent/vector/index",
+      "kind": "write",
+      "line": 200,
       "reason": "the written table is not a string literal"
     },
     {
@@ -19234,67 +19183,67 @@
     {
       "file": "auth/gdpr",
       "kind": "read",
-      "line": 56,
+      "line": 57,
       "reason": "\"anonymiseGatewayUsage\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 61,
+      "line": 62,
       "reason": "\"anonymiseGatewayUsage\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 94,
+      "line": 95,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 98,
+      "line": 99,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 102,
+      "line": 103,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 106,
+      "line": 107,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 110,
+      "line": 111,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 114,
+      "line": 115,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 118,
+      "line": 119,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 122,
+      "line": 123,
       "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",
       "kind": "write",
-      "line": 131,
+      "line": 132,
       "reason": "\"deleteUserRecord\" is not a registered function"
     },
     {
@@ -19457,7 +19406,7 @@
       "file": "chat-import/functions",
       "kind": "write",
       "line": 107,
-      "reason": "the written table is not a string literal"
+      "reason": "\"releaseSupersededImportFiles\" is not a registered function"
     },
     {
       "file": "chat-import/gdpr",
@@ -19600,25 +19549,37 @@
     {
       "file": "chat/gdpr",
       "kind": "write",
-      "line": 65,
+      "line": 66,
+      "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 67,
+      "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
+    },
+    {
+      "file": "chat/gdpr",
+      "kind": "write",
+      "line": 68,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 71,
+      "line": 76,
       "reason": "\"erasePersistentStreamsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 82,
+      "line": 87,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {
       "file": "chat/gdpr",
       "kind": "read",
-      "line": 91,
+      "line": 97,
       "reason": "\"erasePresentationsForUser\" is not a registered function"
     },
     {
@@ -21148,20 +21109,20 @@
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 35,
-      "reason": "the written table is not a string literal"
+      "line": 36,
+      "reason": "\"deleteOneByOne\" is not a registered function"
     },
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 50,
-      "reason": "the written table is not a string literal"
+      "line": 52,
+      "reason": "\"deleteParentsWithChildren\" is not a registered function"
     },
     {
       "file": "gdpr/batch",
       "kind": "write",
-      "line": 58,
-      "reason": "the written table is not a string literal"
+      "line": 60,
+      "reason": "\"deleteParentsWithChildren\" is not a registered function"
     },
     {
       "file": "gdpr/deletion-guard",
@@ -21760,13 +21721,19 @@
     {
       "file": "knowledge/file-removal",
       "kind": "write",
-      "line": 69,
+      "line": 70,
       "reason": "\"deleteKnowledgeFile\" is not a registered function"
     },
     {
       "file": "knowledge/file-removal",
       "kind": "write",
       "line": 71,
+      "reason": "\"deleteKnowledgeFile\" is not a registered function"
+    },
+    {
+      "file": "knowledge/file-removal",
+      "kind": "write",
+      "line": 74,
       "reason": "\"deleteKnowledgeFile\" is not a registered function"
     },
     {
@@ -21802,49 +21769,61 @@
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 58,
+      "line": 59,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 61,
-      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
-    },
-    {
-      "file": "knowledge/gdpr",
-      "kind": "read",
-      "line": 65,
+      "line": 60,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 75,
+      "line": 64,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "read",
-      "line": 79,
+      "line": 68,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 85,
+      "line": 78,
       "reason": "\"eraseKnowledgeForUser\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "read",
-      "line": 92,
+      "line": 82,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "write",
+      "line": 89,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "write",
+      "line": 90,
+      "reason": "\"eraseKnowledgeForUser\" is not a registered function"
+    },
+    {
+      "file": "knowledge/gdpr",
+      "kind": "read",
+      "line": 98,
       "reason": "\"eraseProjectKnowledgeForProject\" is not a registered function"
     },
     {
       "file": "knowledge/gdpr",
       "kind": "write",
-      "line": 97,
+      "line": 103,
       "reason": "\"eraseProjectKnowledgeForProject\" is not a registered function"
     },
     {
@@ -22036,13 +22015,13 @@
     {
       "file": "lib/patch",
       "kind": "write",
-      "line": 54,
+      "line": 62,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "lib/patch",
       "kind": "write",
-      "line": 64,
+      "line": 71,
       "reason": "the written table is not a string literal"
     },
     {
@@ -22133,6 +22112,12 @@
       "file": "lib/shard-routes",
       "kind": "write",
       "line": 94,
+      "reason": "\"deleteShardRoutesOf\" is not a registered function"
+    },
+    {
+      "file": "lib/shard-routes",
+      "kind": "write",
+      "line": 98,
       "reason": "\"deleteShardRoutesOf\" is not a registered function"
     },
     {
@@ -22372,67 +22357,97 @@
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 312,
+      "line": 313,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 325,
+      "line": 326,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 338,
+      "line": 340,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 350,
+      "line": 352,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 357,
+      "line": 359,
       "reason": "\"writeContent\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 364,
+      "line": 366,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 368,
+      "line": 370,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 375,
+      "line": 377,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "read",
-      "line": 379,
+      "line": 381,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 389,
+      "line": 391,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
       "file": "pages/functions",
       "kind": "write",
-      "line": 394,
+      "line": 395,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 399,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 403,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 407,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 411,
+      "reason": "\"deletePageRows\" is not a registered function"
+    },
+    {
+      "file": "pages/functions",
+      "kind": "write",
+      "line": 416,
       "reason": "\"deletePageRows\" is not a registered function"
     },
     {
@@ -22646,27 +22661,21 @@
       "reason": "\"eraseGatewayNotificationsForUser\" is not a registered function"
     },
     {
-      "file": "saas/notification-functions",
-      "kind": "write",
-      "line": 97,
-      "reason": "the written table is not a string literal"
-    },
-    {
       "file": "sandbox/functions",
       "kind": "read",
-      "line": 251,
+      "line": 252,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
       "file": "sandbox/functions",
       "kind": "write",
-      "line": 257,
+      "line": 258,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
       "file": "sandbox/functions",
       "kind": "schedule",
-      "line": 260,
+      "line": 261,
       "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
@@ -23194,13 +23203,13 @@
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 1385,
+      "line": 1392,
       "reason": "\"reapSubAgentRun\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 1447,
+      "line": 1454,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
@@ -23404,13 +23413,7 @@
     {
       "file": "usage/gdpr",
       "kind": "write",
-      "line": 16,
-      "reason": "\"eraseUsageForUser\" is not a registered function"
-    },
-    {
-      "file": "usage/gdpr",
-      "kind": "read",
-      "line": 29,
+      "line": 20,
       "reason": "\"eraseUsageForUser\" is not a registered function"
     },
     {
@@ -23427,8 +23430,14 @@
     },
     {
       "file": "usage/gdpr",
+      "kind": "read",
+      "line": 41,
+      "reason": "\"eraseUsageForUser\" is not a registered function"
+    },
+    {
+      "file": "usage/gdpr",
       "kind": "write",
-      "line": 63,
+      "line": 67,
       "reason": "\"pruneUsageDaysBefore\" is not a registered function"
     },
     {
@@ -23494,25 +23503,37 @@
     {
       "file": "workflow/gdpr",
       "kind": "write",
-      "line": 23,
+      "line": 24,
+      "reason": "\"eraseWorkflowVersionsAndPresenceForUser\" is not a registered function"
+    },
+    {
+      "file": "workflow/gdpr",
+      "kind": "write",
+      "line": 25,
       "reason": "\"eraseWorkflowVersionsAndPresenceForUser\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "read",
-      "line": 31,
+      "line": 34,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "read",
-      "line": 35,
+      "line": 38,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {
       "file": "workflow/gdpr",
       "kind": "write",
-      "line": 41,
+      "line": 45,
+      "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
+    },
+    {
+      "file": "workflow/gdpr",
+      "kind": "write",
+      "line": 46,
       "reason": "\"eraseWorkflowVersionsAndPresenceForProject\" is not a registered function"
     },
     {

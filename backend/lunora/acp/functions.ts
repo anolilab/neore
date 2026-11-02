@@ -84,7 +84,7 @@ export const deleteSessionsOfThread = internalMutation
         const { page } = threadId ? await ctx.db.acpSessions.findMany({ where: { threadId } }) : { page: [] };
 
         for (const session of page) {
-            await ctx.db.delete(session._id);
+            await ctx.db.delete("acpSessions", session._id);
         }
 
         return null;

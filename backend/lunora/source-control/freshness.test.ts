@@ -407,7 +407,7 @@ describe("a review request", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("watchedRepositories").collect();
 
-            await ctx.db.patch(row._id, { seeded: true });
+            await ctx.db.patch("watchedRepositories", row._id, { seeded: true });
         });
 
         const request = { authorLogin: "alice", number: 4, title: "T", updatedAt: 77, url: "https://github.com/octo/hello/pull/4" };
@@ -432,7 +432,7 @@ describe("a review request", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("watchedRepositories").collect();
 
-            await ctx.db.patch(row._id, { requested: [] });
+            await ctx.db.patch("watchedRepositories", row._id, { requested: [] });
         });
         expect((await record(NOW + POLL_INTERVAL_MS)).notified).toBe(0);
         expect(await notices()).toHaveLength(1);
@@ -578,7 +578,7 @@ describe("a webhook", () => {
         expect((await deliver(id, "{}", signature)).status).toBe(202);
 
         // A poll clears the mark; the replay must not set it again.
-        await harness.run(async (ctx: any) => await ctx.db.patch(id, { dirtyAt: 0 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("watchedRepositories", id, { dirtyAt: 0 }));
         advance(NOW + 1000);
 
         const replay = await deliver(id, "{}", signature);
@@ -790,7 +790,7 @@ describe("refresh on open", () => {
 
         await tick(host, NOW);
         advance(NOW + 1000);
-        await harness.run(async (ctx: any) => await ctx.db.patch(id, { dirtyAt: NOW + 900 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("watchedRepositories", id, { dirtyAt: NOW + 900 }));
 
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(leaseWatchedRepositoriesForRefresh, { userId: USER }))).toHaveLength(1);
     });

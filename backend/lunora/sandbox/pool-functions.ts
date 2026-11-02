@@ -36,7 +36,7 @@ export const claimWarmSandbox = internalMutation
             return null;
         }
 
-        await ctx.db.patch(session._id, {
+        await ctx.db.patch("sandboxSessions", session._id, {
             lastActivityAt: ctx.now,
             status: "active",
             threadId,

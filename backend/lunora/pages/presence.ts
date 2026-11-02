@@ -38,13 +38,13 @@ export const heartbeatPagePresence = authMutation
         const stale = rows.filter((row) => now - row.lastHeartbeat >= STALE_THRESHOLD_MS);
 
         for (const row of stale) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("pagePresence", row._id);
         }
 
         const own = rows.find((row) => row.sessionId === sessionId && row.userId === userId);
 
         if (own) {
-            await ctx.db.patch(own._id, { isEditing: args.isEditing, lastHeartbeat: now });
+            await ctx.db.patch("pagePresence", own._id, { isEditing: args.isEditing, lastHeartbeat: now });
 
             // Logged on the first beat of a session only: a beat every 10 s per
             // open tab would otherwise log ~8,600 events a day per tab.
@@ -81,7 +81,7 @@ export const leavePagePresence = authMutation
         const own = rows.filter((candidate) => candidate.userId === ctx.user.userId);
 
         for (const row of own) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("pagePresence", row._id);
         }
 
         ctx.log.event("pages.leave_page_presence", { removed: own.length });

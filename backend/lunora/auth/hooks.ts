@@ -80,7 +80,7 @@ export const promoteVerifiedAdmin = internalMutation.input({ userId: v.id("user"
     }
 
     if (adminEmails().includes(user.email.toLowerCase())) {
-        await ctx.db.patch(args.userId, { role: "admin" });
+        await ctx.db.patch("user", args.userId, { role: "admin" });
     }
 });
 
@@ -92,7 +92,7 @@ export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }
         .first();
 
     if (settings) {
-        await ctx.db.delete(settings._id);
+        await ctx.db.delete("userSettings", settings._id);
     }
 
     const preferences = await ctx.db
@@ -101,7 +101,7 @@ export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }
         .first();
 
     if (preferences) {
-        await ctx.db.delete(preferences._id);
+        await ctx.db.delete("aiUserPreferences", preferences._id);
     }
 
     // better-auth may already have removed these; the sweep is belt-and-braces
@@ -118,27 +118,27 @@ export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }
     const memberships = await ctx.db.member.findMany({ where: { userId } }).then((result) => result.page);
 
     for (const row of sessions) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("session", row._id);
     }
 
     for (const row of accounts) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("account", row._id);
     }
 
     for (const row of memberships) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("member", row._id);
     }
 
     const twoFactorDocument = await ctx.db.twoFactor.findFirst({ where: { userId: args.userId as Id<"user"> } });
 
     if (twoFactorDocument) {
-        await ctx.db.delete(twoFactorDocument._id);
+        await ctx.db.delete("twoFactor", twoFactorDocument._id);
     }
 
     const { page: passkeys } = await ctx.db.passkey.findMany({ where: { userId: args.userId as string } });
 
     for (const row of passkeys) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("passkey", row._id);
     }
 
     // `.global()` pointers at this user's shard: webhook/public-link routes and
@@ -155,7 +155,7 @@ export const deleteUserRecord = internalMutation
     .input({ userDocId: v.id("user") })
     .output(v.null())
     .mutation(async ({ args: { userDocId }, ctx }) => {
-        await ctx.db.delete(userDocId);
+        await ctx.db.delete("user", userDocId);
 
         return null;
     });

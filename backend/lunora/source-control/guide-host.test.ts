@@ -277,7 +277,7 @@ describe("readHostGuideAnswer", () => {
         await expect(read("someone-else")).resolves.toBeNull();
 
         await run(async (ctx) => {
-            await ctx.db.patch(guide!._id, { status: "ready" });
+            await ctx.db.patch("pullRequestGuides", guide!._id, { status: "ready" });
         });
 
         await expect(read(ownerId)).resolves.toBeNull();

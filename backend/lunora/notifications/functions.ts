@@ -82,10 +82,10 @@ export const markNotificationRead = authMutation
     .input({ notificationId: v.id("notifications") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.notificationId);
+        const row = await ctx.db.get("notifications", args.notificationId);
 
         if (row?.userId === ctx.user.userId && row.readAt === undefined) {
-            await ctx.db.patch(row._id, { readAt: ctx.now });
+            await ctx.db.patch("notifications", row._id, { readAt: ctx.now });
         }
 
         ctx.log.event("notifications.mark_notification_read", { marked: row?.userId === ctx.user.userId });
@@ -102,7 +102,7 @@ export const markAllNotificationsRead = authMutation
         const { now } = ctx;
         const unread = await loadUnread(ctx, ctx.user.userId, WRITE_BATCH + 1);
 
-        await Promise.all(unread.slice(0, WRITE_BATCH).map(async (row) => await ctx.db.patch(row._id, { readAt: now })));
+        await Promise.all(unread.slice(0, WRITE_BATCH).map(async (row) => await ctx.db.patch("notifications", row._id, { readAt: now })));
 
         ctx.log.event("notifications.mark_all_notifications_read", { batchSize: Math.min(unread.length, WRITE_BATCH) });
 
@@ -157,7 +157,7 @@ export const pruneOldNotifications = internalMutation
             where: { createdAt: { lt: cutoff } },
         });
 
-        await Promise.all(expired.map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all(expired.map(async (row) => await ctx.db.delete("notifications", row._id)));
 
         return null;
     });

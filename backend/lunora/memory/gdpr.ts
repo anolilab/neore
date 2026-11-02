@@ -64,7 +64,7 @@ export const eraseMemoriesForUser = async (ctx: MutationCtx, userId: string): Pr
                 await eraseEmbeddingRow(ctx, m.embeddingId, `embedding for memory ${m._id}`);
             }
 
-            await ctx.db.delete(m._id);
+            await ctx.db.delete("memories", m._id);
         }),
     );
 
@@ -94,7 +94,10 @@ export const deleteUserMemoryReflectionData = internalMutation
             }
         }
 
-        await Promise.all([...digests, ...states].map((row) => ctx.db.delete(row._id)));
+        await Promise.all([
+            ...digests.map((row) => ctx.db.delete("memoryDigests", row._id)),
+            ...states.map((row) => ctx.db.delete("memoryReflectionState", row._id)),
+        ]);
 
         return { hasMore: digests.length >= BATCH || states.length >= BATCH };
     });

@@ -295,7 +295,7 @@ describe("submitting", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("reviewDrafts").collect();
 
-            await ctx.db.patch(row._id, { submittingAt: Date.now() - SUBMIT_LEASE_MS - 1000 });
+            await ctx.db.patch("reviewDrafts", row._id, { submittingAt: Date.now() - SUBMIT_LEASE_MS - 1000 });
         });
 
         expect(await submitDraft(portsFor(A, confirmed).value)).toMatchObject({ status: "ok" });
@@ -313,7 +313,7 @@ describe("submitting", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("reviewDrafts").collect();
 
-            await ctx.db.patch(row._id, {
+            await ctx.db.patch("reviewDrafts", row._id, {
                 comments: [...row.comments, { body: "late", createdAt: 1, id: "late", line: 3, path: "z.ts", side: "new", startLine: null }],
                 revision: row.revision + 1,
             });
@@ -349,7 +349,7 @@ describe("submitting", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("reviewDrafts").collect();
 
-            await ctx.db.patch(row._id, {
+            await ctx.db.patch("reviewDrafts", row._id, {
                 body: "rewritten summary",
                 comments: row.comments.map((entry: { body: string }, index: number) => (index === 0 ? { ...entry, body: "rewritten" } : entry)),
                 revision: row.revision + 1,
@@ -388,7 +388,7 @@ describe("submitting", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("reviewDrafts").collect();
 
-            await ctx.db.patch(row._id, { submittingAt: Date.now() - SUBMIT_LEASE_MS - 1000 });
+            await ctx.db.patch("reviewDrafts", row._id, { submittingAt: Date.now() - SUBMIT_LEASE_MS - 1000 });
         });
 
         const fresh = await value.claim();

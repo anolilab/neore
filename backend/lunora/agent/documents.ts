@@ -62,7 +62,7 @@ export const getDocument = query
             return null;
         }
 
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         if (!documentRow || documentRow.userId !== identity.userId) {
             return null;
@@ -80,7 +80,7 @@ export const getDocumentInternal = internalQuery
     .input({ documentId: v.id("documents"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         if (!documentRow || (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof))) {
             return null;
@@ -99,7 +99,7 @@ export const getDocumentsByThread = query
             return [];
         }
 
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.userId !== identity.userId) {
             return [];
@@ -161,7 +161,7 @@ export const createDocument = internalMutation
         });
         const documentId = insertedId as Id<"documents">;
 
-        const documentRow = await ctx.db.get(documentId);
+        const documentRow = await ctx.db.get("documents", documentId);
 
         assert(documentRow, `Document ${documentId} not found after creation`);
 
@@ -189,7 +189,7 @@ export const updateDocument = authMutation
             throw new LunoraError("UNAUTHORIZED", "Not authenticated");
         }
 
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         assert(documentRow, `Document ${args.documentId} not found`);
 
@@ -235,8 +235,8 @@ export const updateDocument = authMutation
             patch.version = documentRow.version + 1;
         }
 
-        await ctx.db.patch(args.documentId, withoutUndefined(patch));
-        const updated = await ctx.db.get(args.documentId);
+        await ctx.db.patch("documents", args.documentId, withoutUndefined(patch));
+        const updated = await ctx.db.get("documents", args.documentId);
 
         assert(updated, `Document ${args.documentId} not found after update`);
 
@@ -265,7 +265,7 @@ export const updateDocumentInternal = internalMutation
     })
     .output(v.from(vDocumentDoc))
     .mutation(async ({ args, ctx }) => {
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         assert(documentRow, `Document ${args.documentId} not found`);
 
@@ -314,8 +314,8 @@ export const updateDocumentInternal = internalMutation
             patch.version = documentRow.version + 1;
         }
 
-        await ctx.db.patch(args.documentId, withoutUndefined(patch));
-        const updated = await ctx.db.get(args.documentId);
+        await ctx.db.patch("documents", args.documentId, withoutUndefined(patch));
+        const updated = await ctx.db.get("documents", args.documentId);
 
         assert(updated, `Document ${args.documentId} not found after update`);
 
@@ -334,10 +334,10 @@ export const deleteDocument = internalMutation
     .input({ documentId: v.id("documents") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const documentRow = await ctx.db.get(args.documentId);
+        const documentRow = await ctx.db.get("documents", args.documentId);
 
         assert(documentRow, `Document ${args.documentId} not found`);
-        await ctx.db.delete(args.documentId);
+        await ctx.db.delete("documents", args.documentId);
 
         return null;
     });

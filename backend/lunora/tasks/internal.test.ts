@@ -63,7 +63,8 @@ const insertTask = async (overrides: Record<string, unknown> = {}): Promise<stri
             }),
     );
 
-const getTask = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const getTask = async (id: string): Promise<any> =>
+    await harness.run(async (ctx: any) => (await ctx.db.get("tasks", id as never)) ?? (await ctx.db.get("taskRuns", id as never)));
 
 /** The owner's inbox (`notifications/notify.ts`), as type/outcome/title. */
 const inbox = async (): Promise<{ outcome?: string; title: string; type: string }[]> =>
@@ -219,7 +220,7 @@ describe("completion", () => {
         const claimed = await claim(taskId, 0);
 
         // What `cancelTask` does.
-        await harness.run(async (ctx: any) => await patchById(ctx.db, taskId, { activeCycle: undefined, status: "todo" }));
+        await harness.run(async (ctx: any) => await patchById(ctx.db, "tasks", taskId as never, { activeCycle: undefined, status: "todo" }));
 
         expect(await verified(claimed.runId, "late", PASS)).toBe("cancelled");
         expect(await statusOf(taskId)).toBe("todo");
@@ -249,7 +250,7 @@ describe("checkDueTasks", () => {
         const taskId = await insertTask({ activeCycle: "c1", status: "queued", updatedAt: 1 });
         const claimed = await claim(taskId, 0);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(taskId, { updatedAt: 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("tasks", taskId, { updatedAt: 1 }));
         await runInternal(checkDueTasks, {});
 
         const task = await getTask(taskId);

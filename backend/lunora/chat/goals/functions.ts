@@ -37,7 +37,7 @@ export const getThreadGoal = authQuery
     )
     .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         // A goal belongs to its chat: with the chat gone nothing of it is shown.
         if (!thread || thread.deleted) {

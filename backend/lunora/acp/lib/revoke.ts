@@ -17,7 +17,7 @@ export const endHostSessionsOfDevice = async (ctx: MutationCtx, deviceId: Id<"de
 
         for (const session of sessions) {
             if (session.status !== "ended") {
-                await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+                await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
             }
 
             await endLiveHostTurns(ctx, session.threadId, { reason: "revoked" }, now);

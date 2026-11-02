@@ -55,7 +55,7 @@ export const setCachedChangelogs = internalMutation
         const existing = await ctx.db.changelogCache.findFirst({});
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("changelogCache", existing._id, {
                 entries: args.entries,
                 fetchedAt: args.fetchedAt,
                 total: args.total,

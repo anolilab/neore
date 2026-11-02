@@ -77,19 +77,19 @@ const loadPageComments = async (ctx: Pick<QueryCtx, "db">, pageId: Id<"pages">):
 /** The root row of the thread `commentRowId` belongs to, with the caller's page access. */
 const loadThreadRoot = async (ctx: MutationCtx, commentRowId: Id<"pageComments">, userId: string) => {
     // Admit the page first: another author's comment is invisible until then.
-    const pageId = await parentKeyOf(ctx, commentRowId, "pageId");
+    const pageId = await parentKeyOf(ctx, "pageComments", commentRowId, "pageId");
 
     if (pageId) {
         await resolvePageAccess(ctx, pageId as Id<"pages">, userId);
     }
 
-    const row = await ctx.db.get(commentRowId);
+    const row = await ctx.db.get("pageComments", commentRowId);
 
     if (!row) {
         throw new LunoraError("NOT_FOUND", "Comment not found");
     }
 
-    const root = row.parentId ? await ctx.db.get(row.parentId) : row;
+    const root = row.parentId ? await ctx.db.get("pageComments", row.parentId) : row;
 
     if (!root) {
         throw new LunoraError("NOT_FOUND", "Comment not found");
@@ -255,6 +255,7 @@ export const setPageCommentStatus = authMutation
 
         await patchRow(
             ctx.db,
+            "pageComments",
             root,
             args.status === "resolved"
                 ? { resolvedAt: ctx.now, resolvedBy: userId, status: "resolved" }
@@ -277,7 +278,7 @@ export const editPageComment = authMutation
             throw new LunoraError("FORBIDDEN", "Only the author can edit a comment");
         }
 
-        await ctx.db.patch(row._id, { body: requireBody(args.body), editedAt: ctx.now });
+        await ctx.db.patch("pageComments", row._id, { body: requireBody(args.body), editedAt: ctx.now });
 
         ctx.log.event("pages.edit_page_comment", { edited: true });
 
@@ -308,11 +309,11 @@ export const deletePageComment = authMutation
             const replies = rows.filter((reply) => reply.parentId === root._id);
 
             for (const reply of replies) {
-                await ctx.db.delete(reply._id);
+                await ctx.db.delete("pageComments", reply._id);
             }
         }
 
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("pageComments", row._id);
 
         if (row._id !== root._id || !collectCommentAnchors(access.page.contentJson).has(root.commentId)) {
             return { revision: null };

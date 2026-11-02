@@ -43,7 +43,7 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
         userId: ownerId,
     });
 
-    await ctx.db.patch(runId, { streamId });
+    await ctx.db.patch("toolApprovalRuns", runId, { streamId });
 
     // On the jobs queue, like the run it resumes (`lib/job-queue.ts`); it claims its stream first.
     await enqueueJob(internal.chat.execute.continueAfterToolApproval, {
