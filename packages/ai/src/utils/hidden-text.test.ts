@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
+import { findHiddenText, hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
 
 describe("hasHiddenText", () => {
     it("is stateless across calls", () => {
@@ -64,5 +64,30 @@ describe("stripHiddenText", () => {
         for (let call = 0; call < 3; call += 1) {
             expect(stripHiddenText("a\u{E0041}b").removed).toBe(1);
         }
+    });
+});
+
+describe("format characters that render", () => {
+    const citation = "\u{600}12 \u{6DD}\u{FD3E}\u{6F1}\u{FD3F} \u{70F}x \u{8E2}1 \u{110BD}2 \u{110CD}3";
+
+    it("keeps a Quranic citation and the other visible format characters", () => {
+        expect(hasHiddenText(citation)).toBe(false);
+        expect(showHidden(citation)).toBe(citation);
+        expect(stripHiddenText(citation)).toEqual({ removed: 0, text: citation });
+        expect(findHiddenText(citation)).toEqual([]);
+    });
+
+    it("still removes the hidden ones beside them, and the strict forms still count them", () => {
+        expect(stripHiddenText(`\u{6DD}1\u{200B}`)).toEqual({ removed: 1, text: "\u{6DD}1" });
+        expect(hasHiddenText("\u{6DD}", { strict: true })).toBe(true);
+    });
+});
+
+describe("findHiddenText", () => {
+    it("reports UTF-16 offsets and lengths, an astral tag character being two units", () => {
+        expect(findHiddenText("a\u{E0041}b\u{202E}")).toEqual([
+            { index: 1, length: 2 },
+            { index: 4, length: 1 },
+        ]);
     });
 });

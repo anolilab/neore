@@ -1131,17 +1131,6 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             }
         }
 
-        // An edit regenerates the reply, so it spends the same daily message quota
-        // as `/chat/start` — it used to be an uncounted way to generate.
-        const editLimit = await chargeDailyLimit(context, user, "Text");
-
-        if (!editLimit.ok) {
-            return Response.json(
-                { error: "DAILY_MESSAGE_LIMIT_REACHED", message: "You've reached your daily message limit.", retryAfter: editLimit.retryAfter },
-                { headers: { "Content-Type": "application/json" }, status: 403 },
-            );
-        }
-
         // Convert content to message format
         const messageContent: any[] = [];
 
@@ -1231,6 +1220,18 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         // after it stay in the thread, one switch away. This used to delete them.
         if (message.message?.role !== "user") {
             return Response.json({ error: "Only user messages can be edited" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+        }
+
+        // An edit regenerates the reply, so it spends the same daily message quota
+        // as `/chat/start` — it used to be an uncounted way to generate.
+        // Charged after every refusal above (hidden-only text, a missing file, a non-prompt), so a refused edit costs nothing.
+        const editLimit = await chargeDailyLimit(context, user, "Text");
+
+        if (!editLimit.ok) {
+            return Response.json(
+                { error: "DAILY_MESSAGE_LIMIT_REACHED", message: "You've reached your daily message limit.", retryAfter: editLimit.retryAfter },
+                { headers: { "Content-Type": "application/json" }, status: 403 },
+            );
         }
 
         const editedMessageId = await context.runMutation(internal.agent.branches.saveEditedSibling, {

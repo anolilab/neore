@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
     return {
+        charges: 0,
         enqueued: [] as { prompt?: string }[],
         saved: [] as { message: { content: { text?: string; type: string }[] } }[],
     };
@@ -28,6 +29,8 @@ vi.mock("../lib/job-queue", () => {
 vi.mock("./lib/daily-limit", () => {
     return {
         chargeDailyLimit: async () => {
+            state.charges += 1;
+
             return { ok: true };
         },
     };
@@ -82,6 +85,7 @@ const edit = async (text: string): Promise<Response> =>
     );
 
 beforeEach(() => {
+    state.charges = 0;
     state.enqueued = [];
     state.saved = [];
 });
@@ -93,6 +97,7 @@ describe("editMessageHttpAction hidden characters", () => {
         expect(response.status).toBe(200);
         expect(state.saved[0]?.message.content).toStrictEqual([{ text: "fix this", type: "text" }]);
         expect(state.enqueued[0]?.prompt).toBe("fix this");
+        expect(state.charges).toBe(1);
     });
 
     it("refuses an edit made only of hidden characters and saves nothing", async () => {
@@ -101,5 +106,6 @@ describe("editMessageHttpAction hidden characters", () => {
         expect(response.status).toBe(400);
         expect(state.saved).toStrictEqual([]);
         expect(state.enqueued).toStrictEqual([]);
+        expect(state.charges).toBe(0);
     });
 });

@@ -1,4 +1,4 @@
-export { hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
+export { findHiddenText, hasHiddenText, showHidden, stripHiddenText } from "./hidden-text";
 
 /**
  * Utility exports

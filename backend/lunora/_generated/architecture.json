@@ -19907,25 +19907,25 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1236,
+      "line": 1237,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1244,
+      "line": 1245,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1385,
+      "line": 1386,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1411,
+      "line": 1412,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {

@@ -6,12 +6,16 @@
  */
 
 // Two expressions: a global one keeps state between `.test` calls, so the check and the replacement do not share one.
-const HIDDEN = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
-const HIDDEN_EVERYWHERE = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
-// The strict forms also count U+200C and U+200D: for text nobody wrote to be read in prose (a repository's names and globs).
+// Format characters that RENDER stay (U+0600 to U+0605 Arabic number signs, U+06DD end of ayah, U+070F Syriac abbreviation
+// mark, U+08E2, U+110BD, U+110CD), with the joiners U+200C and U+200D: prose needs them.
+const HIDDEN = /(?![\u{600}-\u{605}\u{6DD}\u{70F}\u{8E2}\u{110BD}\u{110CD}\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
+const HIDDEN_EVERYWHERE =
+    /(?![\u{600}-\u{605}\u{6DD}\u{70F}\u{8E2}\u{110BD}\u{110CD}\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+// The strict forms also count the joiners and the visible format characters: for text nobody wrote to be read in prose (a repository's names and globs).
 const HIDDEN_STRICT = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/u;
 const HIDDEN_STRICT_EVERYWHERE = /[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
-const HIDDEN_EXCEPT_LAYOUT = /(?![\n\t\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
+const HIDDEN_EXCEPT_LAYOUT =
+    /(?![\n\t\u{600}-\u{605}\u{6DD}\u{70F}\u{8E2}\u{110BD}\u{110CD}\u{200C}\u{200D}])[\p{Cc}\p{Cf}\u{E0000}\u{E0002}-\u{E001F}\u{2028}\u{2029}]/gu;
 const LAYOUT = /[\n\t]/gu;
 
 /**
@@ -40,3 +44,12 @@ export const stripHiddenText = (value: string): { removed: number; text: string 
 
     return { removed, text };
 };
+
+/** Where each hidden character sits in `value` (UTF-16 offset and length, a tag character is 2 units), in order. */
+export const findHiddenText = (value: string): { index: number; length: number }[] =>
+    value
+        .matchAll(HIDDEN_EXCEPT_LAYOUT)
+        .map((match) => {
+            return { index: match.index, length: match[0].length };
+        })
+        .toArray();

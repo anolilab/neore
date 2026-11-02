@@ -1,23 +1,32 @@
-import { stripHiddenText } from "@neore/ai/utils";
+import { findHiddenText } from "@neore/ai/utils";
 import type { Editor } from "@tiptap/core";
-
-import { plainTextToHtml } from "./plain-text";
 
 /**
  * Takes the hidden characters (`@neore/ai/utils`) out of the editor's document itself, so what the person sees, what
- * the draft holds and what is sent are the same text. The replacement emits no update (the caller is already inside
- * one), so a character is counted once, by whoever read the text before this call.
+ * the draft holds and what is sent are the same text. Only those characters are deleted, in place: spaces, tabs and
+ * the caret stay exactly where they were (the selection is mapped through the deletions). The transaction emits no
+ * update (the caller is already inside one), so a character is counted once, by whoever read the text before this call.
  */
 export const cleanEditorText = (editor: Editor): void => {
-    const text = editor.getText({ blockSeparator: "\n" });
-    const { removed, text: clean } = stripHiddenText(text);
+    const { doc, tr } = editor.state;
+    const ranges: { from: number; to: number }[] = [];
 
-    if (removed === 0) {
+    doc.descendants((node, position) => {
+        if (node.isText && node.text !== undefined) {
+            for (const { index, length } of findHiddenText(node.text)) {
+                ranges.push({ from: position + index, to: position + index + length });
+            }
+        }
+    });
+
+    if (ranges.length === 0) {
         return;
     }
 
-    const { from } = editor.state.selection;
+    // From the end, so an earlier range keeps its position; the transaction maps the selection itself.
+    for (const { from, to } of ranges.toReversed()) {
+        tr.delete(from, to);
+    }
 
-    editor.commands.setContent(clean === "" ? "" : plainTextToHtml(clean), { emitUpdate: false });
-    editor.commands.setTextSelection(Math.min(Math.max(from - removed, 1), editor.state.doc.content.size));
+    editor.view.dispatch(tr.setMeta("preventUpdate", true));
 };
