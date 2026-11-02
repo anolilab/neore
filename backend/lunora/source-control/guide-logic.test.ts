@@ -252,6 +252,24 @@ describe("extractJsonObject", () => {
         expect(extractJsonObject(`Done:\n${answer}`)).toEqual(JSON.parse(answer));
     });
 
+    it("prefers the enclosing answer when it is longer than the allowance for unmatched braces", () => {
+        const stops = Array.from({ length: 40 }, (_, index) => {
+            return {
+                explanation: "x".repeat(3500),
+                files: [{ path: `src/f${String(index)}.ts`, ranges: [{ end: 2, side: "new", start: 1 }] }],
+                title: `Stop ${String(index)}`,
+            };
+        });
+        const answer = JSON.stringify({ metadata: { stops: [] }, stops, summary: "outer summary" });
+
+        expect(answer.length).toBeGreaterThan(100_000);
+
+        const found = extractJsonObject(`Done:\n${answer}`) as { stops: unknown[]; summary: string };
+
+        expect(found.summary).toBe("outer summary");
+        expect(found.stops).toHaveLength(40);
+    });
+
     it("takes the later answer over an earlier echoed one", () => {
         const echoed = '{"summary":"echo","stops":[{"title":"e"}],"metadata":{"stops":[]}}';
         const real = '{"summary":"real","stops":[{"title":"r"}],"metadata":{"stops":[]}}';

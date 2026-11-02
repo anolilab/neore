@@ -428,8 +428,11 @@ export const pickGuide = <T extends Pickable>(guides: ReadonlyArray<T>, headSha:
 /** The characters of a reply read in looking for the answer, summed over every candidate start. */
 const MAX_JSON_SCAN_CHARS = 4_000_000;
 
-/** What is still read once an answer is found, looking for an object that encloses it: a wrapper sits next to its answer, an echoed diff does not. */
-const ENCLOSING_SCAN_CHARS = 100_000;
+/**
+ * The longest answer the search can return, and what unmatched braces may cost once an answer is found. An object longer than
+ * this is not read as closed, so a reply full of unmatched braces costs this much once, not once per brace.
+ */
+const MAX_ANSWER_CHARS = 300_000;
 
 const BRACE_STEP: Readonly<Record<string, number>> = { "{": 1, "}": -1 };
 
@@ -468,17 +471,26 @@ const hasStops = (value: unknown): boolean => typeof value === "object" && value
  * object that has a `stops` array. The transcript can echo text a pull request planted, and an agent that echoes a diff
  * has any number of braces before its answer, so the scan runs from the end and the first hit is the agent's last word.
  * An object nested in the answer that also has `stops` is met first, then replaced by the answer enclosing it. `null`
- * when there is none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount.
+ * when there is none. Bounded by the characters read, not by a count of braces: a reply full of unmatched ones costs a fixed amount,
+ * and an answer up to {@link MAX_ANSWER_CHARS} is read whole however much sits inside it.
  */
 export const extractJsonObject = (reply: string, stats?: { scanned: number }): unknown => {
     let budget = MAX_JSON_SCAN_CHARS;
+    // What unmatched braces may still cost once an answer is found. Objects that close are charged to `budget` only: the
+    // enclosing answer and the objects nested in it are read to look for it, and must not eat the allowance meant for strays.
+    let unmatchedBudget = Infinity;
     let found: { end: number; value: unknown } | null = null;
 
-    for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0; from = reply.lastIndexOf("{", from - 1)) {
-        const end = objectEnd(reply, from, from + budget);
-        const read = (end === -1 ? Math.min(reply.length, from + budget) : end + 1) - from;
+    for (let from = reply.lastIndexOf("{"); from !== -1 && budget > 0 && unmatchedBudget > 0; from = reply.lastIndexOf("{", from - 1)) {
+        const reach = Math.min(budget, found === null ? budget : MAX_ANSWER_CHARS);
+        const end = objectEnd(reply, from, from + reach);
+        const read = (end === -1 ? Math.min(reply.length, from + reach) : end + 1) - from;
 
         budget -= read;
+
+        if (end === -1) {
+            unmatchedBudget -= read;
+        }
 
         if (stats) {
             stats.scanned += read;
@@ -492,7 +504,7 @@ export const extractJsonObject = (reply: string, stats?: { scanned: number }): u
 
                 if (hasStops(parsed)) {
                     found = { end, value: parsed };
-                    budget = Math.min(budget, ENCLOSING_SCAN_CHARS);
+                    unmatchedBudget = Math.min(unmatchedBudget, MAX_ANSWER_CHARS);
                 }
             } catch {
                 // Not JSON: try the previous opening brace.
