@@ -796,7 +796,7 @@ written here is what is not.
   `neore://auth/callback`, opt-in in `TRUSTED_EXTENSION_REDIRECT_URIS`) and ends
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
   not add a second grant system. See its README.
-  **Terminal** (`apps/desktop/src/terminal/`, plans/desktop-terminal.md) is the user's
+  **Terminal** (`apps/desktop/src/terminal/`) is the user's
   own interactive shell, outside the device sandbox, so it has NO site-facing
   channel: its window (`terminal-window/`, own preload and in-memory session that
   cancels every request but `file:`) is the only sender `index.ts` admits, and the
@@ -811,7 +811,7 @@ written here is what is not.
   (`scrollback.ts`), main and host hold counters and one batch. Windows is
   unavailable until S4. Quit signals every shell synchronously (`killNow`).
   **Device execution** (`packages/device-core/src/{shell,sandbox}.rs`, `backend/lunora/devices/`,
-  `features/devices`, plans/device-execution.md) is remote code execution
+  `features/devices`) is remote code execution
   on the user's machine, so the page is a RELAY only: the backend signs each
   call (HMAC, domain-prefixed payload STRING — no canonical JSON) with a
   per-device secret, Rust verifies signature/device/expiry/nonce, asks in the

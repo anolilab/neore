@@ -47,7 +47,7 @@ const names = resolveDeviceToolName(part); // null unless `part` is a device too
 
 `resolveDeviceToolName` recognises the `device_<tag>__<tool>` runtime name of a
 tool that runs on the user's own computer; the chat renders those rows
-differently (`plans/device-execution.md`).
+differently.
 
 ## Things to know
 

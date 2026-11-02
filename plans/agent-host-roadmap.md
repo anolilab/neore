@@ -21,7 +21,7 @@ M is two to four weeks for one engineer, L is five to eight.
 | 7 | Harness switch inside a thread | [harness-switch.md](harness-switch.md) | M | capabilities S1; ACP S4 for host switches |
 | 8 | Settings search | [settings-search.md](settings-search.md) | S | none |
 | 9 | Desktop dictation (on-device, opt-in) | [desktop-dictation.md](desktop-dictation.md) | M | none; S1 is a spike with a stop option |
-| 10 | Desktop terminal (local window only) | [desktop-terminal.md](desktop-terminal.md) | L | none for S1–S2; SSH S3 for S3 |
+| 10 | Desktop terminal (local window only) | shipped; plan removed | L | none for S1–S2; SSH S3 for S3 |
 
 Why this order: capabilities are small and every later plan reads them. The ACP
 host is the core user ask and defines the host channel and the "host-run thread"
