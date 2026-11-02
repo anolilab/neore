@@ -17,6 +17,7 @@ import { E2B_API_KEY } from "../env";
 import { authAction, rateLimit } from "../lib/crpc";
 import { isHostCapabilityAvailable } from "../source-control/capabilities";
 import { DEVELOP_DRIVER } from "../source-control/develop-driver";
+import { recordOpenedPullRequestWithRetry } from "../source-control/pr-link-retry";
 import type { CodingAgentId } from "./commands";
 import { CODING_AGENTS, missingKeyMessage, parseRepoUrl, RUN_TIMEOUT_MS } from "./commands";
 import { buildRunResultMessage } from "./result-message";
@@ -242,23 +243,15 @@ export const pollCodingAgentRun = internalAction
 
 /**
  * Both ways: the thread that opened the PR names it, so the pull request lists the thread that worked on it. Best
- * effort, so a link that cannot be recorded never fails the result the user is waiting for, but a failure is logged:
- * nothing retries it. Idempotent, so a run reaching it from two paths records one link.
+ * effort, so a link that cannot be recorded never fails the result the user is waiting for; a failed write is retried
+ * with backoff (`source-control/pr-link-retry.ts`). Idempotent, so a run reaching it from two paths records one link.
  */
 const linkOpenedPullRequest = async (ctx: RunnerCtx, run: { prUrl?: string; threadId?: string; userId: string }): Promise<void> => {
     if (run.prUrl === undefined || run.threadId === undefined) {
         return;
     }
 
-    try {
-        await ctx.runMutation(internal.source_control.pr_threads.recordOpenedPullRequest, {
-            prUrl: run.prUrl,
-            threadId: run.threadId,
-            userId: run.userId,
-        });
-    } catch (error) {
-        console.error(`[coding-agents] could not link the opened pull request to its thread ${run.threadId}:`, error);
-    }
+    await recordOpenedPullRequestWithRetry(ctx, { prUrl: run.prUrl, threadId: run.threadId, userId: run.userId });
 };
 
 /**
