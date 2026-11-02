@@ -202,14 +202,14 @@ export const schema = defineSchema({
         // Opt-in quick check that approves low-risk `ask` tool calls (chat/lib/low-risk-approval.ts). Absent = off.
         // Server-written only (`chat_tool_permissions.setAutoApproveLowRisk`); `auth/fields.ts` deliberately omits it.
         autoApproveLowRisk: v.optional(v.boolean()),
-        // Who a coding-agent pull request's commits are made as: the agent (absent, the default) or the person who
-        // started the run, with the agent as co-author. Server-written only (`coding_agents.functions.setCodingAgentCommitIdentity`).
-        codingAgentCommitIdentity: v.optional(v.union(v.literal("agent"), v.literal("user"))),
         autoDetectComplexity: v.optional(v.boolean()),
         autoMediaEnrichment: v.optional(v.boolean()),
         browserSettings: v.optional(
             v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }),
         ),
+        // Who a coding-agent pull request's commits are made as: the agent (absent, the default) or the person who
+        // started the run, with the agent as co-author. Server-written only (`coding_agents.functions.setCodingAgentCommitIdentity`).
+        codingAgentCommitIdentity: v.optional(v.union(v.literal("agent"), v.literal("user"))),
         customAIProviders: v.optional(v.any()),
         customization: v.optional(v.any()),
         customModels: v.optional(v.any()),
