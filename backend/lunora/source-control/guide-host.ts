@@ -16,6 +16,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { readHostTranscript } from "../acp/lib/finish";
+import { OUTDATED_NOTICE } from "../acp/lib/start";
 import { startHostSessionFor } from "../acp/remote";
 import { sendToHostFor } from "../acp/send";
 import { authAction, rateLimit } from "../lib/crpc";
@@ -39,10 +40,17 @@ const HOST_ROLLBACK = "guide_host:";
 const GUIDE_TAINT: ReadonlyArray<DeviceTaintSource> = ["web"];
 
 /** The refusals of a send that the page words for itself; any other is a "busy" in effect. */
-const REPORTED_OUTCOMES: ReadonlySet<string> = new Set(["busy", "offline", "rate_limited", "session_ended", "too_large"]);
+const REPORTED_OUTCOMES: ReadonlySet<string> = new Set(["busy", "offline", "outdated", "rate_limited", "session_ended", "too_large"]);
 
 const vUnavailable = v.object({
-    reason: v.union(v.literal("busy"), v.literal("offline"), v.literal("rate_limited"), v.literal("session_ended"), v.literal("too_large")),
+    reason: v.union(
+        v.literal("busy"),
+        v.literal("offline"),
+        v.literal("outdated"),
+        v.literal("rate_limited"),
+        v.literal("session_ended"),
+        v.literal("too_large"),
+    ),
     status: v.literal("unavailable"),
 });
 
@@ -103,8 +111,9 @@ export const beginHostGuide = internalMutation
             clientId: crypto.randomUUID(),
             deviceId: args.deviceId,
             folderId: args.folderId,
-        }).catch(() => {
-            throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}busy`);
+        }).catch((error: unknown) => {
+            // A computer too old to start an agent says so, rather than passing for busy.
+            throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}${error instanceof Error && error.message === OUTDATED_NOTICE ? "outdated" : "busy"}`);
         });
 
         if (!started.started || started.threadId === undefined) {
@@ -144,6 +153,7 @@ const unavailableReason = (error: unknown): Unavailable["reason"] | null => {
     switch (reason) {
         case "busy":
         case "offline":
+        case "outdated":
         case "rate_limited":
         case "session_ended":
         case "too_large": {

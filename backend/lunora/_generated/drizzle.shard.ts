@@ -276,6 +276,7 @@ export const devices = sqliteTable("devices", {
     acpOffers: text("acpOffers", { mode: "json" }).$type<Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>>(),
     createdAt: real("createdAt").notNull(),
     encryptedSecret: text("encryptedSecret"),
+    hostProtocol: real("hostProtocol"),
     lastSeenAt: real("lastSeenAt"),
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),
@@ -1668,6 +1669,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
 }, (t) => ({
     by_approvalId: index("by_approvalId").on(t.approvalId),
     by_threadId: index("by_threadId").on(t.threadId),
+    by_threadId_status_createdAt: index("by_threadId_status_createdAt").on(t.threadId, t.status, t.createdAt),
     by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
     by_status_resolvedAt: index("by_status_resolvedAt").on(t.status, t.resolvedAt),
     by_userId_status_createdAt: index("by_userId_status_createdAt").on(t.userId, t.status, t.createdAt),

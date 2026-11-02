@@ -39,6 +39,7 @@ import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
 import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { sessionOfThread } from "../acp/lib/sessions";
+import { startFailureMessage } from "../acp/lib/start";
 import { openHostSession } from "../acp/lib/start-session";
 import { isLiveStream } from "../chat/streaming/persistent/host";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
@@ -809,10 +810,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
             // Thrown, not returned: the thread, the session and the claim are written, and only a throw takes them back.
             if ("error" in opened) {
-                throw new LunoraError(
-                    "BAD_REQUEST",
-                    opened.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
-                );
+                throw new LunoraError("BAD_REQUEST", startFailureMessage(opened.error));
             }
         }
     }

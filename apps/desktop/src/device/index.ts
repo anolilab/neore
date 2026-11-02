@@ -9,11 +9,12 @@
  * which is a separate BrowserWindow with its own preload and a file: URL. The site cannot reach these,
  * and the device window cannot reach the relay (`isTrusted` rejects its frame).
  */
+import { arch, homedir, platform, release } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification } from "electron";
 
 import type { AcpCommand, AppliedCall } from "../acp/commands";
 import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
@@ -32,6 +33,7 @@ import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
+import { deviceDiagnostics, serverDiagnostics } from "./diagnostics";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
 import type { CoreEvent, DeviceCore, Prompt, SettingsView } from "./types";
@@ -852,6 +854,19 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         }
 
         await options.terminal.open(folder);
+    });
+
+    // The text goes to the clipboard only from this window, built from an allow-list (see diagnostics.ts).
+    local(LOCAL_CHANNEL.copyDiagnostics, (deviceId) => {
+        const view = requireTransport().settingsGet();
+        const context = { appVersion: app.getVersion(), arch: arch(), electronVersion: process.versions.electron, home: homedir(), now: new Date(), osRelease: release(), platform: platform() };
+        const text = deviceId === undefined ? deviceDiagnostics(view, context) : serverDiagnostics(view, readDeviceId(deviceId), context);
+
+        if (text === null) {
+            throw new Error("That server is not on this computer.");
+        }
+
+        clipboard.writeText(text);
     });
 
     // A shell on a paired server: connecting it first is what asks to trust its key, so a server that is not trusted

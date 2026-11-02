@@ -684,6 +684,8 @@ export const schema = defineSchema({
         acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
+        // The wire protocol the computer's signed manifest reported (`MIN_DEVICE_PROTOCOL`); unset until a build that reports it has sent one.
+        hostProtocol: v.optional(v.number()),
         lastSeenAt: v.optional(v.number()),
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
@@ -3084,6 +3086,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_approvalId", ["approvalId"])
         .index("by_threadId", ["threadId"])
+        // Auto-archive's "does this thread still wait on a person" (`agent/auto-archive.ts`).
+        .index("by_threadId_status_createdAt", ["threadId", "status", "createdAt"])
         .index("by_status_createdAt", ["status", "createdAt"])
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).

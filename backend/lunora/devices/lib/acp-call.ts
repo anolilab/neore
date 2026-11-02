@@ -20,13 +20,13 @@ import {
     MAX_OPEN_ACP_CANCELS_PER_DEVICE,
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
-import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
+import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./state";
 import type { DeviceTaintSource } from "./taint";
 import { mergeTaint } from "./taint";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
-export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" };
+export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" };
 
 /** Slack past a window, so the check that enforces it runs after the window rather than a tick before. */
 const CHECK_SLACK_MS = 1000;
@@ -50,6 +50,11 @@ export const createAcpCall = async (
 
     if (!device?.encryptedSecret) {
         return { error: "ineligible" };
+    }
+
+    // A computer too old for this backend gets the notice instead of a command it would fail; Stop is not held back by it.
+    if (kind !== "acp_cancel" && isDeviceOutdated(device)) {
+        return { error: "outdated" };
     }
 
     // A cancel is the one command that may wait for a host that is not answering right now.

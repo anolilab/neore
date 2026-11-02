@@ -16,6 +16,7 @@ export type HostSendError =
     | "not_authenticated"
     | "not_found"
     | "offline"
+    | "outdated"
     | "rate_limited"
     | "session_ended"
     | "session_starting"
@@ -32,6 +33,7 @@ const KNOWN: ReadonlySet<string> = new Set([
     "not_authenticated",
     "not_found",
     "offline",
+    "outdated",
     "rate_limited",
     "session_ended",
     "session_starting",

@@ -5636,6 +5636,12 @@
           "optional": true,
           "unique": false
         },
+        "hostProtocol": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "lastSeenAt": {
           "kind": "number",
           "nullable": false,
@@ -26331,6 +26337,14 @@
         "by_threadId": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_threadId_status_createdAt": {
+          "fields": [
+            "threadId",
+            "status",
+            "createdAt"
           ],
           "unique": false
         },
