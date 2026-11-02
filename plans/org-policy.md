@@ -87,7 +87,8 @@ Each slice is one PR with its own tests.
 
 1. **Which organization applies. Decided: the selected organization's policy.** Each organization is its own
    space. The policy loads from the selected organization on every switch, and runs use the policy of the
-   space they run in. Known escape: switching to a space with no policy (another organization, or the
+   space they run in. A space whose organization has no policy uses the user's own settings and rules, and
+   nothing in it is hidden. Known escape: switching to a space with no policy (another organization, or the
    personal space) lifts the locks in that space. Accepted as a risk; the admin view says so. The strictest
    policy across all organizations was the alternative and is not chosen.
 2. **Behaviour when a policy cannot be read.** Default proposed: a write to a locked key fails closed (the
