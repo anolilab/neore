@@ -1,7 +1,7 @@
 # SSH remote hosts
 
 Status: plan, 2026-10-26. Part of [agent-host-roadmap.md](agent-host-roadmap.md).
-Extends device execution ([device-execution.md](device-execution.md)) to a server
+Extends device execution to a server
 the user reaches over SSH, and carries ACP sessions there
 ([acp-agent-host.md](acp-agent-host.md)).
 

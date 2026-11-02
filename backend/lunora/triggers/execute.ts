@@ -22,6 +22,9 @@ import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 
+/** Waits before the admission transaction is tried again after it threw: it is all-or-nothing, so a retry cannot charge twice. */
+const ADMISSION_RETRY_DELAYS_MS = [100, 400];
+
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
 const RELEASE_LOST_NOTE =
@@ -231,24 +234,48 @@ export const executeTrigger = internalAction
             // leaving the execution running.
             // A webhook delivery (not a manual "Run now") has its filters checked again at admission,
             // because the owner may have saved stricter ones since the webhook handler evaluated them.
-            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
+            // A transient failure of the admission transaction (it commits whole or not at all) is tried again after a short wait
+            // rather than failing a delivery the sender was already told was accepted.
+            const admission = {
                 claim,
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? filterTextOf(payload, invalidUtf8) : undefined,
                 releaseUnlessRun,
                 requireEnabled: ignoreDisabled !== true,
                 triggerId,
-            });
+            };
+            const admit = async () => await ctx.runMutation(internal.triggers.functions.admitTriggerRun, admission);
+            let refusal: Awaited<ReturnType<typeof admit>>;
+
+            for (let attempt = 0; ; attempt += 1) {
+                try {
+                    refusal = await admit();
+
+                    break;
+                } catch (error) {
+                    if (attempt >= ADMISSION_RETRY_DELAYS_MS.length) {
+                        throw error;
+                    }
+
+                    console.error(`[Triggers] Admission of trigger ${triggerId} failed (attempt ${String(attempt + 1)}); retrying:`, error);
+                    await new Promise<void>((resolve) => {
+                        setTimeout(resolve, ADMISSION_RETRY_DELAYS_MS[attempt]);
+                    });
+                }
+            }
 
             if (refusal !== null && typeof refusal === "object") {
                 // Recorded as filtered and not charged; the running row was replaced.
                 // The reason quotes the configured filter value (an address, a token), so it stays in the owner's execution history, not the log.
                 // A trigger paused since the check ("skipped") left no row at all and sends nothing.
-                console.info(
-                    "skipped" in refusal
-                        ? `[Triggers] Trigger ${triggerId} was paused before admission, skipping`
-                        : `[Triggers] Trigger ${triggerId} delivery no longer matches its filters, skipping`,
-                );
+                // A delivery another delivery already holds the claim of ("duplicate") ran, or will run, under that one: nothing is recorded or charged.
+                let why = `delivery no longer matches its filters`;
+
+                if ("skipped" in refusal) {
+                    why = refusal.skipped === "duplicate" ? "delivery is held by another delivery" : "was paused before admission";
+                }
+
+                console.info(`[Triggers] Trigger ${triggerId} ${why}, skipping`);
                 await releaseWindow();
 
                 return;

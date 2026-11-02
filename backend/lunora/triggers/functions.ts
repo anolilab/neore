@@ -1,4 +1,5 @@
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -17,7 +18,17 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { CLAIM_PREFIX_BATCH, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import {
+    CLAIM_PREFIX_BATCH,
+    claimOnce,
+    hasClaim,
+    holdClaim,
+    JOB_CLAIM_TTL_MS,
+    releaseClaim,
+    releaseClaimsWithPrefix,
+    TRIGGER_DELIVERY_CLAIM_TTL_MS,
+    TRIGGER_DELIVERY_SCOPE,
+} from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
@@ -356,6 +367,21 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
 });
 
 /** Create a new trigger */
+/** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
+const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+    if (value === undefined) {
+        return value;
+    }
+
+    const { removed, text } = stripHiddenText(value);
+
+    if (removed > 0 && text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", `${label} is empty after removing hidden characters`);
+    }
+
+    return text as T;
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -448,12 +474,12 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: args.inputTemplate,
+            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
-            systemPrompt: args.systemPrompt,
+            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
             timezone,
             triggerCount: 0,
             type: triggerType,
@@ -559,7 +585,7 @@ export const updateTrigger = authMutation
 
         if (args.model !== undefined) patch.model = args.model;
 
-        if (args.systemPrompt !== undefined) patch.systemPrompt = args.systemPrompt;
+        if (args.systemPrompt !== undefined) patch.systemPrompt = cleanPromptField(args.systemPrompt, "The system prompt");
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
@@ -622,7 +648,7 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
+        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;
@@ -1124,6 +1150,16 @@ const giveBackClaim = async (
  * delivery that no longer matches is recorded as filtered (replacing the running
  * row `executionId` names), is never charged, and answers `{ filtered }`.
  */
+/** The scope recording that an execution was admitted and charged, so a retry of its admission does not charge it again. */
+export const TRIGGER_ADMISSION_SCOPE = "trigger-admission";
+
+/** The answers of an admission that removed its execution row. Each is recorded with the removal, so a retry repeats the answer. */
+const ADMISSION_SKIPS = {
+    disabled: { skipped: "disabled" as const },
+    duplicate: { skipped: "duplicate" as const },
+    filtered: { filtered: "Already evaluated against the filters." },
+};
+
 export const admitTriggerRun = internalMutation
     .input({
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
@@ -1137,8 +1173,33 @@ export const admitTriggerRun = internalMutation
         requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.literal("disabled") })))
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.union(v.literal("disabled"), v.literal("duplicate")) })))
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
+        // The caller retries an admission that threw. If the first try committed and only its answer was lost, the charge is
+        // already taken: answer the recorded outcome (a run that may go ahead) instead of charging the same execution again.
+        if (executionId && (await hasClaim(ctx, TRIGGER_ADMISSION_SCOPE, executionId))) {
+            return null;
+        }
+
+        for (const outcome of Object.keys(ADMISSION_SKIPS) as (keyof typeof ADMISSION_SKIPS)[]) {
+            if (executionId && (await hasClaim(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId))) {
+                return ADMISSION_SKIPS[outcome];
+            }
+        }
+
+        /** Removes the running row of an execution that will not run and records why, in the same transaction, so a retry cannot run it. */
+        const dropRunning = async (outcome: keyof typeof ADMISSION_SKIPS, ownerId: string): Promise<void> => {
+            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete("triggerExecutions", running._id);
+            }
+
+            if (executionId) {
+                await claimOnce(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId, JOB_CLAIM_TTL_MS, ownerId);
+            }
+        };
+
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -1155,17 +1216,13 @@ export const admitTriggerRun = internalMutation
         if (requireEnabled === true && trigger.enabled !== true) {
             // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
             // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
-            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
-
-            if (running && running.triggerId === triggerId && running.status === "running") {
-                await ctx.db.delete("triggerExecutions", running._id);
-            }
+            await dropRunning("disabled", trigger.userId);
 
             if (claim) {
                 await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
             }
 
-            return { skipped: "disabled" as const };
+            return ADMISSION_SKIPS.disabled;
         }
 
         if (filterPayload !== undefined) {
@@ -1176,11 +1233,7 @@ export const admitTriggerRun = internalMutation
 
                 await recordFiltered(ctx, triggerId, reason, undefined);
 
-                const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
-
-                if (running && running.triggerId === triggerId && running.status === "running") {
-                    await ctx.db.delete("triggerExecutions", running._id);
-                }
+                await dropRunning("filtered", trigger.userId);
 
                 if (claim) {
                     await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
@@ -1206,8 +1259,22 @@ export const admitTriggerRun = internalMutation
             return await refused(modelUnavailableMessage(model));
         }
 
+        // A permanent claim is stretched from its retry window to its long life HERE, in the transaction that charges the
+        // run, so no refusal after it can leave a thread or a charge behind. It lapsing before this point is no reason to
+        // drop an acknowledged delivery: the key is taken again unless another delivery holds it, and only then is this one a duplicate.
+        if (claim && releaseUnlessRun && !(await holdClaim(ctx, claim.scope, claim.key, claim.claimedAt, TRIGGER_DELIVERY_CLAIM_TTL_MS, trigger.userId))) {
+            await dropRunning("duplicate", trigger.userId);
+
+            return ADMISSION_SKIPS.duplicate;
+        }
+
         if (!(await chargeRound(ctx, trigger.userId, account))) {
             return await refused(DAILY_LIMIT_MESSAGE);
+        }
+
+        // Recorded in the transaction that charged, so the record exists exactly when the charge does.
+        if (executionId) {
+            await claimOnce(ctx, TRIGGER_ADMISSION_SCOPE, executionId, JOB_CLAIM_TTL_MS, trigger.userId);
         }
 
         return null;

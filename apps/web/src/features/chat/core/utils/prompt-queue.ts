@@ -14,6 +14,8 @@
  *   already have taken it, and then it is dropped instead.
  */
 
+import { stripHiddenText } from "@neore/ai/utils";
+
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 
 export interface QueuedPrompt<A> {
@@ -48,13 +50,18 @@ export interface PromptQueueState<A> {
 
 export const EMPTY_PROMPT_QUEUE: PromptQueueState<never> = Object.freeze({ items: [], paused: false }) as PromptQueueState<never>;
 
+/** A queued text is sent later, possibly after a reload, so no hidden character rides along (`@neore/ai/utils`). */
+const withoutHidden = <A>(item: QueuedPrompt<A>): QueuedPrompt<A> => {
+    return { ...item, text: stripHiddenText(item.text).text };
+};
+
 export const enqueuePrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
-    return { ...state, items: [...state.items, item] };
+    return { ...state, items: [...state.items, withoutHidden(item)] };
 };
 
 /** Ahead of everything already queued. */
 export const prependPrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<A>): PromptQueueState<A> => {
-    return { ...state, items: [item, ...state.items] };
+    return { ...state, items: [withoutHidden(item), ...state.items] };
 };
 
 export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): PromptQueueState<A> => {
@@ -270,7 +277,14 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
     for (const candidate of rawItems as unknown[]) {
         const { droppedAttachments, id, steer, text } = (candidate ?? {}) as { droppedAttachments?: unknown; id?: unknown; steer?: unknown; text?: unknown };
 
-        if (typeof id !== "string" || typeof text !== "string" || !text.trim()) {
+        if (typeof id !== "string" || typeof text !== "string") {
+            continue;
+        }
+
+        const clean = stripHiddenText(text).text;
+
+        // A text of nothing but hidden characters is empty once stripped: sending it would be a blank prompt.
+        if (!clean.trim()) {
             continue;
         }
 
@@ -282,7 +296,7 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
             ...(dropped > 0 && { droppedAttachments: dropped }),
             id,
             ...(restoredSteer && { steer: restoredSteer }),
-            text,
+            text: clean,
         });
     }
 

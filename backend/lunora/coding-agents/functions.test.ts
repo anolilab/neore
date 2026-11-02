@@ -8,6 +8,7 @@ import {
     canOpenPullRequest,
     claimPoll,
     completePullRequest,
+    createRun,
     expirePullRequest,
     isPullRequestStale,
     setPullRequestSandbox,
@@ -234,5 +235,34 @@ describe("isPullRequestStale", () => {
         expect(isPullRequestStale({ prStartedAt: 0, prStatus: "pending", updatedAt: 0 }, REAP_AFTER_MS + 1)).toBe(true);
         expect(isPullRequestStale({ prStartedAt: 0, prStatus: "failed", updatedAt: 0 }, REAP_AFTER_MS + 1)).toBe(false);
         expect(isPullRequestStale({ prStatus: "pending", updatedAt: 0 }, REAP_AFTER_MS + 1)).toBe(true);
+    });
+});
+
+const TASK_LENGTH_ERROR = /^The task must be between 1 and/u;
+
+describe("createRun hidden characters", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    it("refuses a task that was only hidden characters, before any other check", async () => {
+        const result = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createRun, {
+                    agent: "claude_code",
+                    openPr: false,
+                    prompt: "\u{E0069}\u{E0067}\u{202E}",
+                    repoUrl: "https://github.com/a/b.git",
+                    userId: USER,
+                }),
+        );
+
+        expect(result).toStrictEqual({ error: expect.stringMatching(TASK_LENGTH_ERROR) });
     });
 });

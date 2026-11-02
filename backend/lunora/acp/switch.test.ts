@@ -19,6 +19,15 @@ vi.mock("../_generated/internal", async (importOriginal) => {
     return registeredApi(await importOriginal(), registry);
 });
 
+// The window of a model a test sets: the registry's models all hold 128k or more, which no budget has to shrink for.
+const windows = vi.hoisted(() => new Map<string, number>());
+
+vi.mock("../chat/lib/auto-continue", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../chat/lib/auto-continue")>();
+
+    return { ...original, getModelContextWindow: (modelId: string) => windows.get(modelId) ?? original.getModelContextWindow(modelId) };
+});
+
 const keyBytes = new Uint8Array(32);
 
 crypto.getRandomValues(keyBytes);
@@ -321,6 +330,7 @@ beforeEach(async () => {
 afterEach(() => {
     vi.useRealTimers();
     harness.close();
+    windows.clear();
 });
 
 describe("cloud to host", () => {
@@ -578,6 +588,24 @@ describe("host to cloud", () => {
         expect(await row(source)).toEqual(before);
         expect(await rows("acpSessions", { threadId: source })).toEqual(sessionBefore);
         expect((await rows("messages", { threadId: source })).filter((message) => agentSwitchOf(message))).toHaveLength(0);
+    });
+
+    it("fits the handoff to the window of a small model it takes over in, with a note of what was left out", async () => {
+        windows.set(OTHER_MODEL, 6000);
+
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device, 0);
+
+        await converse(source, 60, 600);
+
+        const { forkedThreadId } = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+        const [divider] = await dividers(forkedThreadId as string);
+
+        // A quarter of the window, in the 4-characters estimate.
+        expect(jsonBytes(divider?.handoff ?? "")).toBeLessThanOrEqual(1500 * 4);
+        expect(divider?.handoff).toContain("answer 59");
+        expect(divider?.handoff).not.toContain("question 0 ");
+        expect(divider?.handoff).toMatch(OMITTED_NOTE);
     });
 
     it("puts the handoff first in what the new model is sent", async () => {

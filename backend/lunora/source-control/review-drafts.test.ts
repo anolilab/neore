@@ -384,6 +384,13 @@ describe("submitting", () => {
 
         expect(stale.status).toBe("claimed");
 
+        // A lease is its claim's time; a real takeover comes a minute later, never in the same millisecond.
+        const staleLease = stale.status === "claimed" ? stale.lease : 0;
+
+        await vi.waitFor(() => {
+            expect(Date.now()).toBeGreaterThan(staleLease);
+        });
+
         // The first submitter's lease ran out and a second device took the draft over.
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("reviewDrafts").collect();

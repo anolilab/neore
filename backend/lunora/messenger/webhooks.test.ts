@@ -160,6 +160,17 @@ describe("Telegram through acceptInbound", () => {
         expect(await savedTexts()).toStrictEqual(["hello"]);
     });
 
+    it("saves the text without tag or bidi characters, and drops a message that was only those", async () => {
+        const connectionId = await connection("telegram");
+        const { context, replies } = httpContext(KEYS);
+
+        expect(await statusOf(send(context, connectionId, update(1, NOW_SECONDS, "hello\u{E0069}\u{E0067}\u{202E}")))).toBe(200);
+        expect(await statusOf(send(context, connectionId, update(2, NOW_SECONDS, "\u{E0069}\u{E0067}")))).toBe(200);
+
+        expect(await savedTexts()).toStrictEqual(["hello"]);
+        expect(replies()).toHaveLength(1);
+    });
+
     it("saves a photo pending in arrival order, hands it to the reply action, and answers a sticker with the notice", async () => {
         const connectionId = await connection("telegram");
         const { context, replies } = httpContext(KEYS);

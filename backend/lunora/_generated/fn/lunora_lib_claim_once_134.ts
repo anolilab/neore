@@ -74,14 +74,25 @@ __has4 = true;
 }
 if (typeof source["scope"] !== "string") return DEFER;
 if (typeof source["ttlMs"] !== "number" || !Number.isFinite(source["ttlMs"])) return DEFER;
-let __has5 = false;
-let __val5;
+let __has6 = false;
+let __val6;
+if (source["unlessHeld"] !== undefined) {
+if (typeof source["unlessHeld"] !== "object" || source["unlessHeld"] === null || Array.isArray(source["unlessHeld"])) return DEFER;
+if (Object.getPrototypeOf(source["unlessHeld"]) !== Object.prototype && Object.getPrototypeOf(source["unlessHeld"]) !== null) return DEFER;
+if (typeof source["unlessHeld"]["key"] !== "string") return DEFER;
+if (typeof source["unlessHeld"]["scope"] !== "string") return DEFER;
+const __obj5 = { "key": source["unlessHeld"]["key"], "scope": source["unlessHeld"]["scope"] };
+__val6 = __obj5;
+__has6 = true;
+}
+let __has7 = false;
+let __val7;
 if (source["userId"] !== undefined) {
 if (typeof source["userId"] !== "string") return DEFER;
-__val5 = source["userId"];
-__has5 = true;
+__val7 = source["userId"];
+__has7 = true;
 }
-return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has5 ? { "userId": __val5 } : {}) };
+return { "key": source["key"], ...(__has1 ? { "leaseMs": __val1 } : {}), ...(__has4 ? { "onLapse": __val4 } : {}), "scope": source["scope"], "ttlMs": source["ttlMs"], ...(__has6 ? { "unlessHeld": __val6 } : {}), ...(__has7 ? { "userId": __val7 } : {}) };
 });
 installCompiledValidatorMap(lunora_lib_claim_once_134.completeKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

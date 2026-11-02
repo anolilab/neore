@@ -53,6 +53,7 @@ hooks.createTemporaryThread = createTemporaryThread;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
+const HIDDEN_CHARACTERS = /[\u{E0000}-\u{E007F}\u{202E}]/u;
 const NOT_FOUND_RE = /not found or disabled/u;
 const FOREIGN_THREAD_RE = /another user's thread/u;
 const NOT_A_PROMPT_RE = /take a prompt of this thread/u;
@@ -119,6 +120,18 @@ describe(saveLocalTurnHandler, () => {
         ]);
         expect(rows[1]).toMatchObject({ provider: "local-browser", text: "hello" });
         expect(rows[1].usage).toBeUndefined();
+    });
+
+    it("saves the prompt without tag or bidi characters, and refuses one that was only those", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const result = await save(OWNER, { prompt: "Explain CSP\u{E0069}\u{E0067}\u{202E}" });
+        const rows = await rowsOf(result.threadId);
+        const user = rows.find((row: any) => row.message.role === "user");
+
+        expect(JSON.stringify(user.message)).not.toMatch(HIDDEN_CHARACTERS);
+        expect(user.text).toBe("Explain CSP");
+        await expect(save(OWNER, { prompt: "\u{E0069}\u{E0067}" })).rejects.toThrow("The prompt is empty");
     });
 
     it("appends the next turn to an existing thread", async () => {
