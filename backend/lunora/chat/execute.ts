@@ -349,7 +349,7 @@ export const runStreamingAgent = internalAction
                         fallbackModel: thread?.model ?? model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
                         plan: async () => {
-                            autoPlan = await readRunPlan(ctx, userId, organizationId ?? null);
+                            autoPlan = await readRunPlan(ctx, userId, organizationId);
 
                             return autoPlan;
                         },

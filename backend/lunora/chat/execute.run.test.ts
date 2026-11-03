@@ -554,7 +554,7 @@ describe("runStreamingAgent: an Auto thread", () => {
     const MODEL = MODEL_REGISTRY.find((row) => enabledModelOf(row.id, { mode: "text" }))!.id;
 
     const patchThread = async (fields: Record<string, unknown>) =>
-        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { autoModel: true, ...fields }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { autoModel: true, model: MODEL, ...fields }));
 
     it("asks the gateway for a model, on the plan of the run's own organization", async () => {
         await patchThread({});
@@ -564,11 +564,11 @@ describe("runStreamingAgent: an Auto thread", () => {
         expect(autoState.plans).toEqual(["org-1"]);
     });
 
-    it("reads the plan of a personal run as personal, not as any organization the user belongs to", async () => {
+    it("reads the plan of a personal run the way the ordinary model gate does: across the user's organizations", async () => {
         await patchThread({});
         await run({ model: MODEL });
 
-        expect(autoState.plans).toEqual([null]);
+        expect(autoState.plans).toEqual([undefined]);
     });
 
     it("does not route when the invoked skill names a preferred model, even the thread's own", async () => {
