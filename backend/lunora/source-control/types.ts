@@ -162,6 +162,17 @@ export interface MergedPullRequest {
     sha: string | null;
 }
 
+/** The fields a person may change on a pull request; an omitted field is left as it is. */
+export interface PullRequestEdit {
+    body?: string;
+    title?: string;
+}
+
+/** A pull request the host just opened (a revert), in the repository it was opened in. */
+export interface CreatedPullRequest extends PullRequestRef {
+    url: string;
+}
+
 // ─── Review ─────────────────────────────────────────────────────────────────
 
 /** Which side of the diff a line number counts: the file before the change, or after it. */

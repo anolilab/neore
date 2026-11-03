@@ -11,13 +11,13 @@
  * `rejected` with the host's own reason. The token is used for the call and never
  * returned.
  */
-import { LunoraError, v } from "lunorash/server";
+import { v } from "lunorash/server";
 
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
-import type { HostCapabilityKey } from "./capabilities";
 import { isHostCapabilityAvailable } from "./capabilities";
+import { requireCapability } from "./capability-gate";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
 import { vFailed, vMergeMethod, vWriteFailed } from "./validators";
@@ -28,12 +28,6 @@ const vOk = v.object({ status: v.literal("ok") });
 const vRef = {
     number: v.number(),
     repository: v.string().max(MAX_LENGTH.short),
-};
-
-const requireCapability = (key: HostCapabilityKey): void => {
-    if (!isHostCapabilityAvailable(DEVELOP_DRIVER.view.capabilities, key)) {
-        throw new LunoraError("BAD_REQUEST", "This host does not offer that");
-    }
 };
 
 /** What the host says of mergeability, and which merge methods and auto-merge the repository allows. */

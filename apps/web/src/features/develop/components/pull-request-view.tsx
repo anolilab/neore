@@ -22,6 +22,7 @@ import FilesTab from "./files-tab";
 import GuideTab from "./guide-tab";
 import type { HostInfo } from "./host-info";
 import MergePanel from "./merge-panel";
+import PullRequestActionsPanel from "./pull-request-actions-panel";
 import ReviewPanel from "./review-panel";
 import WorkOnPullRequest from "./work-on-pull-request";
 
@@ -117,6 +118,16 @@ const PullRequestView = ({
             {detail.state === "open" && !detail.draft && (
                 <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
             )}
+            <PullRequestActionsPanel
+                address={address}
+                body={detail.body}
+                bodyTruncated={detail.bodyTruncated}
+                capabilities={host.capabilities}
+                hostLabel={host.label}
+                requestNoun={requestNoun}
+                state={detail.state}
+                title={detail.title}
+            />
             <ReviewPanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} />
             {current === undefined ? (
                 <p className="text-muted-foreground text-sm">{t`This host does not offer any view of a ${requestNoun} yet.`}</p>

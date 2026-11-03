@@ -19,6 +19,7 @@ import type {
     CheckState,
     CheckSummary,
     CommitPage,
+    RevertPullRequestResult,
     CursorPage,
     DiffSide,
     FilePage,
@@ -31,6 +32,7 @@ import type {
     MergeState,
     MergeStatus,
     PullRequestDetail,
+    PullRequestEdit,
     PullRequestFile,
     PullRequestRef,
     PullRequestSummary,
@@ -95,7 +97,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, create: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
+        pullRequest: { checks: NATIVE, commits: NATIVE, create: NATIVE, description: NATIVE, diff: NATIVE, edit: NATIVE, files: NATIVE, guide: NATIVE, revert: NATIVE },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,
@@ -107,6 +109,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             verdictRequestChanges: NATIVE,
             viewedMarks: NATIVE,
         },
+        reviewers: { request: NATIVE },
     },
     reportedAt: 0,
     version: 1,
@@ -1257,9 +1260,76 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
     }
 };
 
+const PULL_EDIT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { updatePullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { pullRequest { id title } } }`;
+const REQUEST_REVIEWERS_MUTATION = `mutation ($pullRequestId: ID!, $logins: [String!]!) { requestReviewsByLogin(input: { pullRequestId: $pullRequestId, userLogins: $logins, union: true }) { pullRequest { id } } }`;
+const REVERT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { revertPullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { revertPullRequest { number url } } }`;
+
+/** A GitHub login: alphanumerics and single hyphens, at most 39 characters. */
+const LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/u;
+/** Reviewers one call may add; a longer list is refused rather than split without the person knowing. */
+const MAX_REVIEWERS_PER_CALL = 15;
+
+const editedSchema = z.object({ pullRequest: z.object({ id: z.string(), title: z.string() }).nullable() }).nullable();
+
+const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit): Promise<void> => {
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await graphqlRequest(
+        request,
+        PULL_EDIT_MUTATION,
+        { body: edit.body, pullRequestId, title: edit.title },
+        z.object({ updatePullRequest: editedSchema.optional() }),
+    );
+    const pull = data.updatePullRequest?.pullRequest;
+
+    // A mutation that answers without the pull request did not change it; a title it kept is the one thing we can compare.
+    if (pull == null || (edit.title !== undefined && pull.title !== edit.title)) {
+        throw new HostApiError("The host did not confirm the edit", 0, false, { unconfirmed: true });
+    }
+};
+
+const requestReviewers = async (request: HostRequest, ref: PullRequestRef, reviewerLogins: string[]): Promise<void> => {
+    if (reviewerLogins.length === 0 || reviewerLogins.length > MAX_REVIEWERS_PER_CALL || reviewerLogins.some((login) => !LOGIN.test(login))) {
+        throw new HostApiError("Not a list of logins", 422);
+    }
+
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await graphqlRequest(
+        request,
+        REQUEST_REVIEWERS_MUTATION,
+        { logins: reviewerLogins, pullRequestId },
+        z.object({ requestReviewsByLogin: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).optional() }),
+    );
+
+    if (data.requestReviewsByLogin?.pullRequest == null) {
+        throw new HostApiError("The host did not confirm the review request", 0, false, { unconfirmed: true });
+    }
+};
+
+// The mutation's payload carries the new pull request under its own `revertPullRequest` field.
+const revertedSchema = z.object({
+    revertPullRequest: z
+        .object({ revertPullRequest: z.object({ number: z.int().positive(), url: z.string() }).nullable().optional() })
+        .nullable()
+        .optional(),
+});
+
+const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit): Promise<RevertPullRequestResult> => {
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema);
+    const created = data.revertPullRequest?.revertPullRequest;
+
+    // The host took the revert and answered without a usable link: it must not be posted again.
+    if (created == null || !created.url.startsWith(`${GITHUB_WEB_ORIGIN}/`)) {
+        throw new HostApiError("The host's answer to the revert could not be read", 0, false, { unconfirmed: true });
+    }
+
+    return { number: created.number, repository: ref.repository, url: created.url };
+};
+
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
     createPullRequest,
+    editPullRequest,
     findOpenPullRequest,
     getMergeStatus,
     getPullRequest,
@@ -1275,7 +1345,9 @@ export const githubDriver: HostDriver = {
     normalizeRepository: normalizeRepo,
     pollReviewRequests,
     replyToThread,
+    requestReviewers,
     rerunCheck,
+    revertPullRequest,
     setAutoMerge,
     setThreadResolved,
     setViewed,

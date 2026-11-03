@@ -12,6 +12,7 @@ import type { HostRequest } from "./origin-fetch";
 import type {
     CheckSummary,
     CommitPage,
+    RevertPullRequestResult,
     CursorPage,
     FilePage,
     HostView,
@@ -22,6 +23,7 @@ import type {
     MergeRequest,
     MergeStatus,
     PullRequestDetail,
+    PullRequestEdit,
     PullRequestRef,
     RepoPoll,
     ReviewSubmission,
@@ -48,6 +50,8 @@ export interface CreatedPullRequest {
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
+    /** Changes the title and/or description; a field left out stays as it is. */
+    editPullRequest: (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit) => Promise<void>;
     /**
      * Opens a pull request for an already-pushed branch, and answers its web page.
      * Optional: a driver whose host cannot open one leaves it undeclared, and
@@ -87,8 +91,12 @@ export interface HostDriver {
     pollReviewRequests: (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }) => Promise<RepoPoll>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
+    /** Adds reviewers by login to the ones already requested. */
+    requestReviewers: (request: HostRequest, ref: PullRequestRef, logins: string[]) => Promise<void>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
     rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
+    /** Opens a pull request that reverts a merged one; the host's rules may refuse it. */
+    revertPullRequest: (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit) => Promise<RevertPullRequestResult>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
