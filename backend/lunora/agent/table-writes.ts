@@ -35,6 +35,7 @@ export type ThreadPatch = Partial<
         Doc<"threads">,
         | "activeAgent"
         | "activeLeafMessageId"
+        | "autoModel"
         | "awaitingInput"
         | "groupChat"
         | "hasHandoff"

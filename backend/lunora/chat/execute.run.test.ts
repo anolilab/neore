@@ -14,6 +14,7 @@
  *   that reached the real one would fail, so the suite cannot bill by accident.
  */
 import { lunoraTest } from "@lunora/testing";
+import { enabledModelOf, MODEL_REGISTRY } from "@neore/ai/models";
 import { MockLanguageModelV3 } from "ai/test";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,8 +27,10 @@ import { scriptedModel, textStep } from "./group/test-models";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const { groupState, modelState, prefsState, registry, skillState, toolsState } = vi.hoisted(() => {
+const { autoState, groupState, modelState, prefsState, registry, skillState, toolsState } = vi.hoisted(() => {
     return {
+        /** What `resolveAutoModel` was asked, and the organization the plan read was made for. */
+        autoState: { plans: [] as unknown[], requests: 0 },
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
         /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
@@ -78,8 +81,26 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 userProviderKeys: undefined,
             };
         }),
+        readRunPlan: vi.fn(async (_ctx: unknown, _userId: string, organizationId?: string | null) => {
+            autoState.plans.push(organizationId);
+
+            return { isAdmin: false, plan: null };
+        }),
         resolveRunModel: vi.fn(async () => {
             return { allowTools: toolsState.allowTools, customProvider: undefined };
+        }),
+    };
+});
+
+// The routing call itself has its own suite (`lib/auto-model.test.ts`); here only whether a run asks for it.
+vi.mock("./lib/auto-model", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./lib/auto-model")>()),
+        resolveAutoModel: vi.fn(async (_ctx: unknown, request: { fallbackModel: string; plan: () => Promise<unknown> }) => {
+            autoState.requests += 1;
+            await request.plan();
+
+            return request.fallbackModel;
         }),
     };
 });
@@ -195,6 +216,8 @@ beforeEach(async () => {
     prefsState.readFailed = false;
     modelState.builtAgents = 0;
     modelState.model = scriptedModel([textStep("Hello there.")]);
+    autoState.plans = [];
+    autoState.requests = 0;
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
@@ -231,18 +254,21 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) =>
-    await harness.action(
+const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+    const { model = "test-model", ...rest } = extra;
+
+    return await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
                 messageId: ids.messageId,
                 streamId: ids.streamId,
-                streamingConfig: { contentType: "text", model: "test-model" },
+                streamingConfig: { contentType: "text", model },
                 threadId: ids.threadId,
                 userId: OWNER,
-                ...extra,
+                ...rest,
             }),
     );
+};
 
 const readState = async () =>
     await harness.run(async (ctx: any) => {
@@ -521,5 +547,46 @@ describe("runStreamingAgent: a run that belongs to a goal", () => {
         const state = await readState();
 
         expect(state.threadStatus).toBe("active");
+    });
+});
+
+describe("runStreamingAgent: an Auto thread", () => {
+    const MODEL = MODEL_REGISTRY.find((row) => enabledModelOf(row.id, { mode: "text" }))!.id;
+
+    const patchThread = async (fields: Record<string, unknown>) =>
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { autoModel: true, model: MODEL, ...fields }));
+
+    it("asks the gateway for a model, on the plan of the run's own organization", async () => {
+        await patchThread({});
+        await run({ model: MODEL, organizationId: "org-1" });
+
+        expect(autoState.requests).toBe(1);
+        expect(autoState.plans).toEqual(["org-1"]);
+    });
+
+    it("reads the plan of a personal run the way the ordinary model gate does: across the user's organizations", async () => {
+        await patchThread({});
+        await run({ model: MODEL });
+
+        expect(autoState.plans).toEqual([undefined]);
+    });
+
+    it("does not route when the invoked skill names a preferred model, even the thread's own", async () => {
+        await patchThread({});
+        skillState.answer = {
+            enabledSkills: [],
+            invocation: { config: { preferredModel: MODEL }, instructions: "Summarise.", skillId: undefined, slug: "summarise" },
+        };
+        await run({ model: MODEL, skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "/summarise the thread" });
+
+        expect(autoState.requests).toBe(0);
+    });
+
+    it("does not route a group chat, including an owner's direct skill command", async () => {
+        await patchThread({ groupChat: { mode: "round-robin", participants: [{ addedAt: 1, skillId: "skill-1" }] } });
+        skillState.answer = { enabledSkills: [], invocation: { config: undefined, instructions: "Summarise.", skillId: undefined, slug: "summarise" } };
+        await run({ model: MODEL, skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "/summarise the thread" });
+
+        expect(autoState.requests).toBe(0);
     });
 });

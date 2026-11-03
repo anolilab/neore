@@ -1,5 +1,7 @@
+import type { MutationObserverOptions } from "@tanstack/query-core";
+import { MutationObserver, onlineManager, QueryClient } from "@tanstack/query-core";
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 
@@ -10,9 +12,11 @@ const hoisted = vi.hoisted(() => {
         preview: vi.fn(async (): Promise<unknown> => {
             return { coldStartCostly: false };
         }),
+        mutationOptions: [] as { networkMode?: string; retry?: number }[],
         navigate: vi.fn(async () => {}),
         showError: vi.fn(),
         switchAgent: vi.fn(),
+        updateThread: vi.fn(),
         thread: { current: undefined as unknown },
         trackEvent: vi.fn(),
     };
@@ -27,7 +31,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: {} } } } };
+    return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: { name: "update" } } } } };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -41,7 +45,9 @@ vi.mock("@tanstack/react-router", () => {
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skipToken"),
-        useMutation: (options: { mutationFn: (...args: unknown[]) => Promise<unknown> }) => {
+        useMutation: (options: { mutationFn: (...args: unknown[]) => Promise<unknown>; networkMode?: string; retry?: number }) => {
+            hoisted.mutationOptions.push(options);
+
             return { mutateAsync: options.mutationFn };
         },
         useQuery: () => {
@@ -83,7 +89,9 @@ vi.mock("@/lib/lunora/crpc", () => {
             };
         },
         useLunoraActionOptions: (reference: { name?: string }) => {
-            return { mutationFn: reference.name === "switch" ? hoisted.switchAgent : vi.fn() };
+            const mutationFns: Record<string, unknown> = { switch: hoisted.switchAgent, update: hoisted.updateThread };
+
+            return { mutationFn: mutationFns[reference.name ?? ""] ?? vi.fn() };
         },
     };
 });
@@ -386,5 +394,121 @@ describe("useModelCombobox: the confirmation step", () => {
         });
 
         expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
+});
+
+describe("useModelCombobox: picking a model on an Auto thread", () => {
+    const custom = "custom:endpoint/model";
+
+    beforeEach(() => {
+        hoisted.thread.current = { _id: "t1", autoModel: true, mode: "text", model: A };
+        hoisted.updateThread.mockReset();
+        hoisted.showError.mockReset();
+        useModelStore.getState().loadThreadData({ mode: "text", model: A }, "t1");
+    });
+
+    it("stores the model and ends Auto in one write", async () => {
+        hoisted.updateThread.mockResolvedValue("t1");
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(custom);
+        });
+
+        expect(hoisted.updateThread).toHaveBeenCalledTimes(1);
+        expect(hoisted.updateThread).toHaveBeenCalledWith({ autoModel: false, model: custom, threadId: "t1" });
+    });
+
+    it("restores the earlier selection and reports the error when the write fails", async () => {
+        hoisted.updateThread.mockRejectedValue(new Error("offline"));
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(custom);
+        });
+
+        expect(useModelStore.getState().selectedModel).toBe(A);
+        expect(hoisted.showError).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("useModelCombobox: Auto while the thread is not loaded", () => {
+    beforeEach(() => {
+        hoisted.thread.current = undefined;
+        hoisted.updateThread.mockReset();
+        useModelStore.getState().setPendingSettings({ autoModel: true });
+    });
+
+    it("shows no Auto state of its own and writes nothing for a thread that has not loaded", async () => {
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        expect(result.current.autoModel).toBe(false);
+
+        await act(async () => {
+            await result.current.setAutoModel(true);
+        });
+
+        expect(hoisted.updateThread).not.toHaveBeenCalled();
+        expect(useModelStore.getState().pendingSettings).toEqual({ autoModel: true });
+    });
+
+    it("keeps the new-thread draft for a new thread", async () => {
+        const { result } = renderHook(() => useModelCombobox({ threadId: undefined }));
+
+        expect(result.current.autoModel).toBe(true);
+
+        await act(async () => {
+            await result.current.setAutoModel(false);
+        });
+
+        expect(useModelStore.getState().pendingSettings).toEqual({ autoModel: false });
+    });
+});
+
+describe("useModelCombobox: thread writes while offline", () => {
+    const networkDown = new Error("Failed to fetch");
+
+    /** The mutation options the hook hands TanStack for `updateThread`, as a real mutation observer runs them. */
+    const capturedUpdateOptions = () => {
+        hoisted.thread.current = { _id: "t1", mode: "text", model: A };
+        hoisted.mutationOptions.length = 0;
+        renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        return hoisted.mutationOptions.find((options) => options.networkMode === "always") as MutationObserverOptions<unknown, Error, unknown>;
+    };
+
+    afterEach(() => {
+        onlineManager.setOnline(true);
+    });
+
+    it("rejects at once, once, when the network is down", async () => {
+        const options = capturedUpdateOptions();
+
+        hoisted.updateThread.mockReset().mockRejectedValue(networkDown);
+        onlineManager.setOnline(false);
+
+        const observer = new MutationObserver(new QueryClient(), options);
+
+        await expect(observer.mutate({ autoModel: true, threadId: "t1" })).rejects.toBe(networkDown);
+        expect(hoisted.updateThread).toHaveBeenCalledTimes(1);
+    });
+
+    it("would otherwise sit paused until the browser reconnects", async () => {
+        hoisted.updateThread.mockReset().mockRejectedValue(networkDown);
+        onlineManager.setOnline(false);
+
+        const plain = { ...capturedUpdateOptions(), networkMode: undefined, retry: undefined };
+        const observer = new MutationObserver(new QueryClient(), plain);
+        const settled = vi.fn();
+
+        observer.mutate({ autoModel: true, threadId: "t1" }).then(settled).catch(settled);
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 20);
+        });
+
+        expect(hoisted.updateThread).not.toHaveBeenCalled();
+        expect(settled).not.toHaveBeenCalled();
     });
 });

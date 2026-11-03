@@ -1575,6 +1575,7 @@ export const threads = sqliteTable("threads", {
     _creationTime: integer("_creationTime").notNull(),
     activeAgent: text("activeAgent", { mode: "json" }).$type<{ kind: "model"; model: string }>(),
     activeLeafMessageId: text("activeLeafMessageId"),
+    autoModel: integer("autoModel", { mode: "boolean" }),
     awaitingInput: text("awaitingInput", { mode: "json" }).$type<"approval" | "question">(),
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
     category: text("category"),

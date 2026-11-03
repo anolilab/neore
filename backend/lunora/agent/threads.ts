@@ -232,6 +232,7 @@ export const threadFieldsSupportingPatch = [
     "summary" as const,
     "status" as const,
     "awaitingInput" as const,
+    "autoModel" as const,
     "lastReplyAt" as const,
     "userId" as const,
     "model" as const,
@@ -786,6 +787,7 @@ export const restoreThread = internalMutation
 export const updateThreadSettings = internalMutation
     .input({
         patch: v.object({
+            autoModel: v.optional(v.boolean()),
             customSystemPrompt: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
             enabledFeatures: v.optional(v.array(v.string())),

@@ -46,4 +46,10 @@ describe("resolveRunModel plan gate", () => {
         await expect(resolveRunModel(makeCtx({ isAdmin: true }), PAID_MODEL, "u1")).resolves.toMatchObject({ allowTools: true });
         await expect(resolveRunModel(makeCtx({ keys: { openrouter: "sk-or-test" } }), PAID_MODEL, "u1")).resolves.toMatchObject({ allowTools: true });
     });
+
+    it("checks a pre-resolved plan (an Auto route's organization plan) instead of the user's own", async () => {
+        const premiumOrg = { isAdmin: false, plan: "premium" as const };
+
+        await expect(resolveRunModel(makeCtx({}), PAID_MODEL, "u1", premiumOrg)).resolves.toMatchObject({ allowTools: true });
+    });
 });

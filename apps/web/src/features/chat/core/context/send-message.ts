@@ -301,6 +301,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         if (isCreatingNewThread) {
             // New thread: send all pending settings
             if (pendingSettings) {
+                requestBody.autoModel = pendingSettings.autoModel;
                 requestBody.customSystemPrompt = pendingSettings.customSystemPrompt;
                 requestBody.enabledFeatures = pendingSettings.enabledFeatures;
                 requestBody.reasoningEffort = pendingSettings.reasoningEffort;
@@ -406,6 +407,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
                 // This prevents expensive re-fetches during route loading
                 const optimisticThread = {
                     _id: data.threadId,
+                    autoModel: requestBody.autoModel === true,
                     language: requestBody.language,
                     mode: composerMode,
                     model,

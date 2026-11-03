@@ -348,6 +348,8 @@ export const chatStartHttpAction = async (context: HttpActionCtx, request: Reque
 
 /** The `/chat/start` request body. Also built by the public API's chat route. */
 export interface ChatStartBody {
+    /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
+    autoModel?: boolean;
     cinemaSettings?: CinemaSettings;
     customSystemPrompt?: string;
     duration?: number;
@@ -885,6 +887,8 @@ const runChatStartOnShard = async (
     } else {
         // New thread: batched creation
         const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
+            // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
+            ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
             customSystemPrompt: body.customSystemPrompt,
             enabledFeatures: body.enabledFeatures,
             fileIds: body.fileIds,
