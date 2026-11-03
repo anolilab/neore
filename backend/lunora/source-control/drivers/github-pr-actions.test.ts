@@ -50,7 +50,7 @@ const graphql = (answer: (sent: Sent) => unknown) => {
 describe("editPullRequest", () => {
     it("is ONE mutation that names the node and sends only the fields given", async () => {
         const { request, sent } = graphql(() => {
-            return { data: { updatePullRequest: { pullRequest: { id: "PR_node", title: "New" } } } };
+            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "New" } } } };
         });
 
         await githubDriver.editPullRequest(request, REF, { title: "New" });
@@ -78,6 +78,14 @@ describe("editPullRequest", () => {
 });
 
 describe("requestReviewers", () => {
+    it("accepts a managed-user login with an underscore", async () => {
+        const { request, sent } = graphql(() => ({ data: { requestReviewsByLogin: { pullRequest: { id: "PR_node" } } } }));
+
+        await githubDriver.requestReviewers(request, REF, ["octo_shortcode"]);
+
+        expect(sent.some((call) => String(call.json.query).includes("requestReviewsByLogin"))).toBe(true);
+    });
+
     it("adds the logins to the ones already requested (union) in one mutation", async () => {
         const { request, sent } = graphql(() => {
             return { data: { requestReviewsByLogin: { pullRequest: { id: "PR_node" } } } };
@@ -91,7 +99,7 @@ describe("requestReviewers", () => {
         expect(mutation?.json.variables).toEqual({ logins: ["alice", "bob-2"], pullRequestId: "PR_node" });
     });
 
-    it.each([["-leading"], ["has space"], ["x".repeat(40)], ["a_b"]])("refuses a login the host would not accept: %s", async (login) => {
+    it.each([["-leading"], ["trailing-"], ["a--b"], ["has space"], ["x".repeat(40)]])("refuses a login the host would not accept: %s", async (login) => {
         const { request, sent } = graphql(() => {
             return { data: {} };
         });
@@ -107,6 +115,34 @@ describe("requestReviewers", () => {
         const many = Array.from({ length: 16 }, (_, index) => `user${index}`);
 
         await expect(githubDriver.requestReviewers(request, REF, many)).rejects.toMatchObject({ status: 422 });
+    });
+});
+
+describe("editPullRequest body", () => {
+    it("counts a description the host kept differently as unconfirmed", async () => {
+        const { request } = graphql(() => ({ data: { updatePullRequest: { pullRequest: { body: "kept", id: "PR_node", title: "New" } } } }));
+
+        await expect(githubDriver.editPullRequest(request, REF, { body: "asked" })).rejects.toMatchObject({ unconfirmed: true });
+    });
+
+    it("accepts a description that differs only in line endings", async () => {
+        const { request } = graphql(() => ({ data: { updatePullRequest: { pullRequest: { body: "one\r\ntwo", id: "PR_node", title: "New" } } } }));
+
+        await expect(githubDriver.editPullRequest(request, REF, { body: "one\ntwo" })).resolves.toBeUndefined();
+    });
+});
+
+describe("a host answer that cannot be read after an accepted change", () => {
+    it("is unconfirmed for a revert, never a plain failure a retry would repeat", async () => {
+        const { request } = graphql(() => new HostApiError("unreadable", 0));
+
+        await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ unconfirmed: true });
+    });
+
+    it("keeps a real refusal as a refusal", async () => {
+        const { request } = graphql(() => new HostApiError("refused", 422, false, { detail: "Pull request is not merged" }));
+
+        await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ status: 422, unconfirmed: false });
     });
 });
 

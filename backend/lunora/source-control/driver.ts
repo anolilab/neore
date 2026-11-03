@@ -50,14 +50,14 @@ export interface CreatedPullRequest {
 export interface HostDriver {
     /** The host's API origin: the only place a token for this driver is sent. */
     readonly apiOrigin: string;
-    /** Changes the title and/or description; a field left out stays as it is. */
-    editPullRequest: (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit) => Promise<void>;
     /**
      * Opens a pull request for an already-pushed branch, and answers its web page.
      * Optional: a driver whose host cannot open one leaves it undeclared, and
      * `pullRequest.create` reads as unsupported.
      */
     createPullRequest?: (request: HostRequest, input: CreatePullRequestInput) => Promise<CreatedPullRequest>;
+    /** Changes the title and/or description; a field left out stays as it is. */
+    editPullRequest: (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit) => Promise<void>;
     /**
      * The open pull request already made from `head` (a branch of `repository`), if any. Asked before a create, so a
      * create whose answer was lost and is retried records the pull request the host holds instead of opening another.

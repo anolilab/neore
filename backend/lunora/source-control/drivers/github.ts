@@ -97,7 +97,17 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, create: NATIVE, description: NATIVE, diff: NATIVE, edit: NATIVE, files: NATIVE, guide: NATIVE, revert: NATIVE },
+        pullRequest: {
+            checks: NATIVE,
+            commits: NATIVE,
+            create: NATIVE,
+            description: NATIVE,
+            diff: NATIVE,
+            edit: NATIVE,
+            files: NATIVE,
+            guide: NATIVE,
+            revert: NATIVE,
+        },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,
@@ -1260,29 +1270,58 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
     }
 };
 
-const PULL_EDIT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { updatePullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { pullRequest { id title } } }`;
+const PULL_EDIT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { updatePullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { pullRequest { id title body } } }`;
 const REQUEST_REVIEWERS_MUTATION = `mutation ($pullRequestId: ID!, $logins: [String!]!) { requestReviewsByLogin(input: { pullRequestId: $pullRequestId, userLogins: $logins, union: true }) { pullRequest { id } } }`;
 const REVERT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { revertPullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { revertPullRequest { number url } } }`;
 
-/** A GitHub login: alphanumerics and single hyphens, at most 39 characters. */
-const LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/u;
-/** Reviewers one call may add; a longer list is refused rather than split without the person knowing. */
-const MAX_REVIEWERS_PER_CALL = 15;
+/**
+ * A GitHub login: letters and digits, with single hyphens or underscores between them (managed users have underscores),
+ * at most 39 characters. A trailing or doubled hyphen is not a login.
+ */
+const LOGIN = /^[A-Za-z0-9](?:\w|-\b){0,38}$/u;
+const CRLF = /\r\n/gu;
 
-const editedSchema = z.object({ pullRequest: z.object({ id: z.string(), title: z.string() }).nullable() }).nullable();
+/** Reviewers one call may add; a longer list is refused rather than split without the person knowing. */
+export const MAX_REVIEWERS_PER_CALL = 15;
+
+/**
+ * A mutation the host accepted but whose answer could not be read may have happened, so it is unconfirmed and a retry is
+ * not offered as safe. A real refusal (a status, the host's reason, a rate limit) keeps its own classification.
+ */
+const confirmedOrUnknown = async <T>(mutation: () => Promise<T>): Promise<T> => {
+    try {
+        return await mutation();
+    } catch (error) {
+        if (error instanceof HostApiError && error.status === 0 && !error.unconfirmed && error.detail === undefined && !error.rateLimited) {
+            throw new HostApiError("The host's answer to the change could not be read", 0, false, { unconfirmed: true });
+        }
+
+        throw error;
+    }
+};
+
+const editedSchema = z.object({ pullRequest: z.object({ body: z.string().nullable(), id: z.string(), title: z.string() }).nullable() }).nullable();
 
 const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit): Promise<void> => {
     const pullRequestId = await pullNodeId(request, ref);
-    const data = await graphqlRequest(
-        request,
-        PULL_EDIT_MUTATION,
-        { body: edit.body, pullRequestId, title: edit.title },
-        z.object({ updatePullRequest: editedSchema.optional() }),
+    const data = await confirmedOrUnknown(
+        async () =>
+            await graphqlRequest(
+                request,
+                PULL_EDIT_MUTATION,
+                { body: edit.body, pullRequestId, title: edit.title },
+                z.object({ updatePullRequest: editedSchema.optional() }),
+            ),
     );
     const pull = data.updatePullRequest?.pullRequest;
 
-    // A mutation that answers without the pull request did not change it; a title it kept is the one thing we can compare.
-    if (pull == null || (edit.title !== undefined && pull.title !== edit.title)) {
+    // A mutation that answers without the pull request did not change it. What the host kept must match what was asked
+    // (line endings aside): a title or description it changed is not a confirmed edit.
+    if (
+        pull == null ||
+        (edit.title !== undefined && pull.title !== edit.title) ||
+        (edit.body !== undefined && (pull.body ?? "").replaceAll(CRLF, "\n") !== edit.body.replaceAll(CRLF, "\n"))
+    ) {
         throw new HostApiError("The host did not confirm the edit", 0, false, { unconfirmed: true });
     }
 };
@@ -1293,11 +1332,14 @@ const requestReviewers = async (request: HostRequest, ref: PullRequestRef, revie
     }
 
     const pullRequestId = await pullNodeId(request, ref);
-    const data = await graphqlRequest(
-        request,
-        REQUEST_REVIEWERS_MUTATION,
-        { logins: reviewerLogins, pullRequestId },
-        z.object({ requestReviewsByLogin: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).optional() }),
+    const data = await confirmedOrUnknown(
+        async () =>
+            await graphqlRequest(
+                request,
+                REQUEST_REVIEWERS_MUTATION,
+                { logins: reviewerLogins, pullRequestId },
+                z.object({ requestReviewsByLogin: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).optional() }),
+            ),
     );
 
     if (data.requestReviewsByLogin?.pullRequest == null) {
@@ -1315,7 +1357,9 @@ const revertedSchema = z.object({
 
 const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit): Promise<RevertPullRequestResult> => {
     const pullRequestId = await pullNodeId(request, ref);
-    const data = await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema);
+    const data = await confirmedOrUnknown(
+        async () => await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema),
+    );
     const created = data.revertPullRequest?.revertPullRequest;
 
     // The host took the revert and answered without a usable link: it must not be posted again.

@@ -13,7 +13,12 @@ export const usePullRequestActions = (address: PullRequestAddress) => {
     const edit = useAction(api.source_control.pull_request_actions.editPullRequest);
     const requestReviewers = useAction(api.source_control.pull_request_actions.requestReviewers);
     const revert = useAction(api.source_control.pull_request_actions.revertPullRequest);
-    const refresh = async () => await queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "pull", address] });
+    // The open pull request and the inbox rows of this account both show titles and the list of open requests.
+    const refresh = async () =>
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "pull", address] }),
+            queryClient.invalidateQueries({ queryKey: [DEVELOP_QUERY_ROOT, userId, "inbox"] }),
+        ]);
 
     return {
         edit: useMutation({

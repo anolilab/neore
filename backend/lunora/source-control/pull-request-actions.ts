@@ -11,6 +11,7 @@ import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { requireCapability } from "./capability-gate";
+import { MAX_REVIEWERS_PER_CALL } from "./drivers/github";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { vWriteFailed } from "./validators";
 import { writeToHost } from "./write-host";
@@ -58,6 +59,11 @@ export const requestReviewers = authAction
     .output(v.union(vOk, vWriteFailed))
     .action(async ({ args, ctx }) => {
         requireCapability("reviewers.request");
+
+        // Refused before the token is read, so an oversized list costs nothing.
+        if (args.logins.length === 0 || args.logins.length > MAX_REVIEWERS_PER_CALL) {
+            throw new LunoraError("BAD_REQUEST", `Request between 1 and ${String(MAX_REVIEWERS_PER_CALL)} reviewers at a time`);
+        }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await writeToHost(DEVELOP_DRIVER, token, async (request) => {
