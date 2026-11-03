@@ -877,6 +877,7 @@ const vGetTriggerExecutionsOutput = v.array(
         completedAt: v.union(v.number(), v.null()),
         error: v.union(v.string(), v.null()),
         startedAt: v.number(),
+        prompt: v.union(v.string(), v.null()),
         status: v.string(),
         threadId: v.union(v.string(), v.null()),
     }),
@@ -925,6 +926,7 @@ export const getTriggerExecutions = authQuery
                 completedAt: entry.completedAt ?? null,
                 error: entry.error ?? null,
                 startedAt: entry.startedAt,
+                prompt: entry.prompt ?? null,
                 status: entry.status as string,
                 threadId: entry.threadId ?? null,
             };
@@ -1384,12 +1386,14 @@ export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        // The prompt the run was given, for the run log. Written only by the settle that changes the row.
+        prompt: v.optional(v.string().max(MAX_LENGTH.long)),
         status: v.string(),
         threadId: v.optional(v.string()),
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, prompt, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1405,6 +1409,7 @@ export const updateExecution = internalMutation
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
+                ...(prompt !== undefined && { prompt }),
                 completedAt: ctx.now,
             });
         }

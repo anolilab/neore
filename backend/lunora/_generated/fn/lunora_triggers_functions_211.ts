@@ -97,34 +97,6 @@ if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-installCompiledValidatorMap(lunora_triggers_functions_211.updateExecution.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["error"] !== undefined) {
-if (typeof source["error"] !== "string") return DEFER;
-__val1 = source["error"];
-__has1 = true;
-}
-if (typeof source["executionId"] !== "string") return DEFER;
-if (typeof source["status"] !== "string") return DEFER;
-let __has2 = false;
-let __val2;
-if (source["threadId"] !== undefined) {
-if (typeof source["threadId"] !== "string") return DEFER;
-__val2 = source["threadId"];
-__has2 = true;
-}
-let __has3 = false;
-let __val3;
-if (source["userFixable"] !== undefined) {
-if (typeof source["userFixable"] !== "boolean") return DEFER;
-__val3 = source["userFixable"];
-__has3 = true;
-}
-return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}), ...(__has3 ? { "userFixable": __val3 } : {}) };
-});
 installCompiledValidatorMap(lunora_triggers_functions_211.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

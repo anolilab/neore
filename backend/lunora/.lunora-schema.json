@@ -26723,6 +26723,12 @@
           "optional": true,
           "unique": false
         },
+        "prompt": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "startedAt": {
           "kind": "number",
           "nullable": false,

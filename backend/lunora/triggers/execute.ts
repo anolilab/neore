@@ -26,6 +26,9 @@ import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt } from "./webhoo
 /** Waits before the admission transaction is tried again after it threw: it is all-or-nothing, so a retry cannot charge twice. */
 const ADMISSION_RETRY_DELAYS_MS = [100, 400];
 
+/** The most of a run's prompt the run log keeps; the run itself gets the whole prompt. */
+const MAX_LOGGED_PROMPT_LENGTH = 2_000;
+
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
 const RELEASE_LOST_NOTE =
@@ -228,6 +231,8 @@ export const executeTrigger = internalAction
                     triggerId,
                 }),
         );
+        // The prompt the run was given, for the run log. Set once the input is built; a run that fails before that logs none.
+        let loggedPrompt: string | undefined;
         let started = false;
 
         try {
@@ -321,6 +326,8 @@ export const executeTrigger = internalAction
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }
 
+            loggedPrompt = inputMessage.slice(0, MAX_LOGGED_PROMPT_LENGTH);
+
             // 4. Run the agent in a new thread (auto-continue: up to 25 steps)
             // A scheduled bot routine may use the bot's shell and file tools, and only those.
             // Headless runs drop `ask` tools, so each one still needs the owner's `auto` setting.
@@ -352,6 +359,7 @@ export const executeTrigger = internalAction
             // 5. Update execution as completed
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 executionId,
+                prompt: loggedPrompt,
                 status: "completed",
                 threadId,
             });
@@ -405,6 +413,7 @@ export const executeTrigger = internalAction
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
+                prompt: loggedPrompt,
                 status: "failed",
                 userFixable,
             });

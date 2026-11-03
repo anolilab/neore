@@ -1166,7 +1166,7 @@ export interface InternalApiTypes {
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             switchOffConsumedMoment: FunctionReference<"mutation", { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; prompt?: string; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         quiet_inputs: {

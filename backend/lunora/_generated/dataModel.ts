@@ -1916,6 +1916,7 @@ export interface Doc_triggerExecutions {
     firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
+    prompt?: string;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;
@@ -4909,6 +4910,7 @@ export interface Insert_triggerExecutions {
     firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
+    prompt?: string;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;

@@ -3144,6 +3144,8 @@ export const schema = defineSchema({
         // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
         pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
+        // The prompt the run was given (the rendered Input Template for a webhook), cut to 2,000 characters. Set when the run settles.
+        prompt: v.optional(v.string()),
         startedAt: v.number(),
         // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
         // trigger's filters, or a quiet routine's scheduled run with nothing to report. `error` holds the reason.

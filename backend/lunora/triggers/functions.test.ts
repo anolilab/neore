@@ -22,6 +22,7 @@ import {
     reserveQuietWindow,
     setTriggerEnabled,
     testRunTrigger,
+    updateExecution,
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
@@ -1057,6 +1058,23 @@ describe("getTriggerExecutions", () => {
 
         expect(rows).toHaveLength(100);
         expect(rows[0]?.status).toBe("filtered");
+    });
+
+    it("lists the prompt a run settled with, and keeps the first settlement's prompt", async () => {
+        const triggerId = await seed(0);
+        const executionId = await harness.run(async (ctx: any) => await ctx.db.insert("triggerExecutions", { startedAt: 500, status: "running", triggerId }));
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "Summarise the issue", status: "completed", threadId: "t1" }),
+        );
+        // A second settlement (a redelivered catch path) must not overwrite the row's prompt.
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "other", status: "failed" }));
+
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 5, triggerId } as never)) as { prompt: string | null; status: string }[];
+        const settled = rows.find((row) => row.status === "completed");
+
+        expect(settled?.prompt).toBe("Summarise the issue");
+        expect(rows.find((row) => row.status === "filtered")?.prompt).toBeNull();
     });
 
     it("accepts the bounds 1 and 100 and refuses 0, 101, fractions and non-finite limits", async () => {
