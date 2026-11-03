@@ -1346,15 +1346,15 @@ msgstr "#1 on OpenRouter by token usage"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorite} other {# favorites}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Data Source: ~2,700 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Knowledge: ~2,600 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Task Planning: ~2,500 tokens (+200)"
 
@@ -3540,6 +3540,7 @@ msgstr "Approval"
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
+#: src/routes/auth/device.tsx:233
 msgid "Approve"
 msgstr "Approve"
 
@@ -3558,6 +3559,10 @@ msgstr "Approved and not a draft. Branch protection is not checked."
 #: src/features/chat/thread/tool-auto-approval.tsx:19
 msgid "Approved automatically — low risk"
 msgstr "Approved automatically — low risk"
+
+#: src/routes/auth/device.tsx:150
+msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
+msgstr "Approved. Return to your terminal: the command line is signed in. You can close this tab."
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
 msgid "AppSecret from the same page"
@@ -3943,6 +3948,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4307,7 +4313,7 @@ msgstr "Bans"
 msgid "Base"
 msgstr "Base"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Base (agent loop only): ~2,300 tokens"
 
@@ -5670,6 +5676,10 @@ msgstr "Checked: {0}"
 msgid "Checking image safety..."
 msgstr "Checking image safety..."
 
+#: src/routes/auth/device.tsx:301
+msgid "Checking the code…"
+msgstr "Checking the code…"
+
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:43
 msgid "Checking..."
 msgstr "Checking..."
@@ -6190,6 +6200,8 @@ msgstr "Cloud Provider Accounts"
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
+#: src/routes/auth/device.tsx:96
+#: src/routes/auth/device.tsx:205
 msgid "Code"
 msgstr "Code"
 
@@ -6791,6 +6803,7 @@ msgid "Compressing context..."
 msgstr "Compressing context..."
 
 #: src/features/settings/components/chat/bots-settings.tsx:140
+#: src/routes/auth/device.tsx:201
 msgid "Computer"
 msgstr "Computer"
 
@@ -7290,6 +7303,7 @@ msgstr "Context-aware generation"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
+#: src/routes/auth/device.tsx:109
 msgid "Continue"
 msgstr "Continue"
 
@@ -7720,9 +7734,18 @@ msgstr "Could not cancel the message. It is still queued."
 msgid "Could not cancel the run."
 msgstr "Could not cancel the run."
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr "Could not change Auto. Please try again."
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr "Could not change the model. Please try again."
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8025,7 +8048,7 @@ msgstr "Could not stop the sub-agent."
 msgid "Could not stop the worker."
 msgstr "Could not stop the worker."
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
@@ -9393,6 +9416,10 @@ msgstr "Denied — continuing without it"
 msgid "Denied on {device}"
 msgstr "Denied on {device}"
 
+#: src/routes/auth/device.tsx:151
+msgid "Denied. The command line was not signed in. You can close this tab."
+msgstr "Denied. The command line was not signed in. You can close this tab."
+
 #: src/features/chat/core/utils/language-utilities.ts:346
 msgid "Denmark"
 msgstr "Denmark"
@@ -9406,6 +9433,7 @@ msgid "Density updated"
 msgstr "Density updated"
 
 #: src/features/chat/thread/tool-approval.tsx:125
+#: src/routes/auth/device.tsx:224
 msgid "Deny"
 msgstr "Deny"
 
@@ -11079,6 +11107,10 @@ msgstr "Enlarge table"
 msgid "enter"
 msgstr "enter"
 
+#: src/routes/auth/device.tsx:129
+msgid "Enter a different code"
+msgstr "Enter a different code"
+
 #: src/features/local-models/components/ollama-model-manager.tsx:106
 msgid "Enter a model name such as llama3.2 or qwen3:8b"
 msgstr "Enter a model name such as llama3.2 or qwen3:8b"
@@ -11164,6 +11196,10 @@ msgstr "Enter text..."
 #: src/features/settings/components/chat/native-providers-settings.tsx:151
 msgid "Enter the API key"
 msgstr "Enter the API key"
+
+#: src/routes/auth/device.tsx:94
+msgid "Enter the code that `neore login --device` shows in your terminal."
+msgstr "Enter the code that `neore login --device` shows in your terminal."
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
@@ -11428,7 +11464,7 @@ msgstr "Estimated cost"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Estimated provider cost {display}, billed to your own API key"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "Estimated token cost per conversation"
 
@@ -17873,6 +17909,7 @@ msgstr "Loading..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/routes/auth/device.tsx:272
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Loading…"
@@ -21095,7 +21132,7 @@ msgstr "Note (optional)"
 msgid "Note for the next run (optional)"
 msgstr "Note for the next run (optional)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 
@@ -21463,6 +21500,10 @@ msgstr "Only {0} models can be compared. Clear selection to switch types."
 #: src/features/marketing/data/models-data.ts:1208
 msgid "Only 3B activated per token for efficiency"
 msgstr "Only 3B activated per token for efficiency"
+
+#: src/routes/auth/device.tsx:209
+msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
+msgstr "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
@@ -25872,7 +25913,7 @@ msgstr "retry"
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27835,6 +27876,7 @@ msgstr "Sidebar Right"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/routes/auth/device.tsx:284
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Sign in"
@@ -27857,6 +27899,15 @@ msgstr "Sign in again to send."
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
 msgstr "Sign in on another site?"
+
+#: src/routes/auth/device.tsx:93
+#: src/routes/auth/device.tsx:316
+msgid "Sign in the command line"
+msgstr "Sign in the command line"
+
+#: src/routes/auth/device.tsx:195
+msgid "Sign in the command line?"
+msgstr "Sign in the command line?"
 
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Sign in to {label} again"
@@ -28355,7 +28406,7 @@ msgstr "Something went wrong on our side. Please try again in a moment."
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr "Something went wrong. Nothing was changed. Try again."
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
@@ -30430,6 +30481,10 @@ msgstr "That computer is busy. Try again in a moment."
 msgid "That computer is not online."
 msgstr "That computer is not online."
 
+#: src/routes/auth/device.tsx:185
+msgid "That did not go through. Try again."
+msgstr "That did not go through. Try again."
+
 #: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr "That did not work. Try again."
@@ -30551,7 +30606,7 @@ msgstr "The assistant needs a secret"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
 
@@ -30583,9 +30638,17 @@ msgstr "The change is too large to show in full."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "The chat agent works the task with its tools, optionally following a skill."
 
+#: src/routes/auth/device.tsx:120
+msgid "The code could not be checked right now. Try again in a moment."
+msgstr "The code could not be checked right now. Try again in a moment."
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "The coding agent could not start."
+
+#: src/routes/auth/device.tsx:197
+msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
+msgstr "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 
 #: src/features/evals/components/model-comparison.tsx:62
 msgid "The comparison could not be loaded."
@@ -31255,6 +31318,22 @@ msgstr "This chat is locked. Unlock it to send."
 #: src/features/chat/thread/composer.tsx:585
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
+
+#: src/routes/auth/device.tsx:167
+msgid "This code has already been answered."
+msgstr "This code has already been answered."
+
+#: src/routes/auth/device.tsx:118
+msgid "This code has expired. Run `neore login --device` again to get a new one."
+msgstr "This code has expired. Run `neore login --device` again to get a new one."
+
+#: src/routes/auth/device.tsx:119
+msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
+msgstr "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
+
+#: src/routes/auth/device.tsx:159
+msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
+msgstr "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
@@ -32001,7 +32080,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "Token budget"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Token Cost Impact"
 
@@ -32809,6 +32888,10 @@ msgstr "Unique approach to language modeling"
 #: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "United States"
 msgstr "United States"
+
+#: src/routes/auth/device.tsx:202
+msgid "unknown"
+msgstr "unknown"
 
 #: src/features/admin/components/user-sessions-dialog.tsx:74
 #: src/features/admin/components/user-sessions-dialog.tsx:118
@@ -34875,6 +34958,7 @@ msgstr "Working toward the goal: round {nextRound} of {0}"
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
+#: src/routes/auth/device.tsx:233
 msgid "Working…"
 msgstr "Working…"
 
@@ -35089,6 +35173,10 @@ msgstr "You are adding documents too quickly. Wait a moment and try again."
 #: src/routes/auth/extension.tsx:76
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "You are browsing as a guest. Sign in with your account to connect the extension."
+
+#: src/routes/auth/device.tsx:282
+msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
+msgstr "You are browsing as a guest. Sign in with your account to sign in the command line."
 
 #: src/features/admin/components/impersonation-banner.tsx:55
 msgid "You are currently impersonating a user"

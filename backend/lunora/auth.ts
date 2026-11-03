@@ -27,6 +27,7 @@ import { createShardClient } from "lunorash/runtime";
 import { internal } from "./_generated/internal";
 import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
+import { cliDeviceAuth } from "./auth/cli-device-auth";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
 import { organizationOfMemberChange, queueSeatSync } from "./billing/seats";
@@ -59,6 +60,7 @@ import { parseOidcIssuer } from "./lib/env-validation";
 import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import { enqueueJob } from "./lib/job-queue";
 import { authLogger } from "./lib/logger";
+import type { ApiKeyAuthApi } from "./public-api/identity";
 import { API_KEY_PREFIX } from "./public-api/identity";
 import { DEFAULT_API_SCOPES } from "./public-api/scopes";
 import { INVITATION_EXPIRATION_SECONDS, MEMBERSHIP_LIMIT, ORGANIZATION_LIMIT } from "./lib/constants";
@@ -262,6 +264,19 @@ export const API_KEY_OPTIONS = {
  */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
+    // CLI device-code sign-in (`auth/cli-device-auth.ts`). The window is a QUIET gap, as above.
+    // Polling: the plugin already refuses a code polled faster than its 5 s interval
+    // (`slow_down`). This is the per-address ceiling for everything else. A 3 s window sits
+    // under that interval, so a well-behaved poll (one every 5 s) never accumulates a count,
+    // however long the 30-minute code lives, while a client hammering the route (more than
+    // 10 requests with gaps under 3 s) is answered 429 until it pauses.
+    "/device/key": { max: 10, window: 3 },
+    // Issuing a code: a person runs `login` rarely; ten in a minute is a script.
+    "/device/code": { max: 10, window: 60 },
+    // Approve and deny need a session and a code bound to it, so these only bound a signed-in
+    // account's retries.
+    "/device/approve": { max: 10, window: 10 },
+    "/device/deny": { max: 10, window: 10 },
 };
 
 export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions => {
@@ -324,6 +339,13 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                   ]
                 : []),
             apiKey(API_KEY_OPTIONS),
+            // `neore login --device`: signs the CLI in by code, answered with a read-only API key.
+            ...cliDeviceAuth({
+                mintApiKey: async ({ expiresInSeconds, name, userId }) =>
+                    await (getAuth().api as unknown as ApiKeyAuthApi).createApiKey({
+                        body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
+                    }),
+            }),
             anonymous({
                 // Converting creates a NEW user, and the guest's rows live on the
                 // guest's shard: move them to the new user's (`lib/account-merge.ts`).

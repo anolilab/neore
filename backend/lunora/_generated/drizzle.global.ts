@@ -362,6 +362,25 @@ export const passkey = sqliteTable("passkey", {
     credentialID: index("credentialID").on(t.credentialID),
 }));
 
+export const deviceCode = sqliteTable("deviceCode", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    clientId: text("clientId"),
+    deviceCode: text("deviceCode").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    hostname: text("hostname"),
+    lastPolledAt: real("lastPolledAt"),
+    pollingInterval: real("pollingInterval"),
+    scope: text("scope"),
+    status: text("status").notNull(),
+    userCode: text("userCode").notNull(),
+    userId: text("userId"),
+}, (t) => ({
+    userId: index("userId").on(t.userId),
+    userCode: index("userCode").on(t.userCode),
+    deviceCode: index("deviceCode").on(t.deviceCode),
+}));
+
 export const projects = sqliteTable("projects", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

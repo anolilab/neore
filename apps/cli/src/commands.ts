@@ -10,18 +10,24 @@ import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
 import type { CliConfig } from "./config";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
+import { formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
 export interface Context {
     configFile: string;
     fetch: typeof fetch;
+    /** What this machine calls itself; sent with a sign-in code so the person approving can recognise it. */
+    hostname: string;
     io: Io;
+    /** Epoch ms; injected so the sign-in poll runs without real time in tests. */
+    now: () => number;
     readFile: (path: string) => Promise<Uint8Array>;
     /** One line of user input, or `null` at EOF. `secret` suppresses echo. */
     readLine: (prompt: string, options?: { secret?: boolean }) => Promise<string | null>;
     /** All of stdin, when it is piped; `null` when it is a terminal. */
     readStdin: () => Promise<string | null>;
+    sleep: (ms: number) => Promise<void>;
     stdinIsTTY: boolean;
 }
 
@@ -186,6 +192,28 @@ export const chat = async (context: Context, { args, flags }: ParsedCommand): Pr
 
 // ─── Account ────────────────────────────────────────────────────────────────
 
+/** Show the code, then wait for the person to approve it elsewhere. Resolves with the new key. */
+const deviceLogin = async (context: Context, apiUrl: string): Promise<string> => {
+    const code = await requestDeviceCode(context, apiUrl, context.hostname);
+    const minutes = Math.max(1, Math.round((code.expiresAtMs - context.now()) / 60_000));
+
+    context.io.stderr.write(
+        [
+            "To sign in, open this page in a browser on any device and sign in to your account:",
+            `  ${code.verificationUri}`,
+            "Then enter this code:",
+            `  ${formatUserCode(code.userCode)}`,
+            `Or open this link, which has the code filled in: ${code.verificationUriComplete}`,
+            `Waiting for approval (the code expires in ${String(minutes)} minutes; Ctrl-C cancels)...`,
+            "",
+        ].join("\n"),
+    );
+
+    const key = await pollForKey(context, apiUrl, code);
+
+    return key.apiKey;
+};
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
     const existing = await readConfig(context.configFile);
     const apiUrl = (
@@ -200,7 +228,11 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("An absolute API URL is required (--api-url).");
     }
 
-    let apiKey = flags.key?.trim();
+    if (flags.device && flags.key) {
+        throw new UsageError("--device signs in by code; it does not take a key.");
+    }
+
+    let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
 
     if (!apiKey) {
         const entered = context.stdinIsTTY ? await context.readLine("Paste your API key: ", { secret: true }) : await context.readStdin();

@@ -16,9 +16,10 @@ import { resolveAuthOptions } from "@lunora/auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { anonymous } from "better-auth/plugins";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTH_RATE_LIMIT_CUSTOM_RULES } from "./auth";
+import { cliDeviceAuth } from "./auth/cli-device-auth";
 
 const BASE_URL = "http://localhost:3000";
 
@@ -127,5 +128,82 @@ describe("better-auth rate limit rules", () => {
         const result = await statuses(auth, 101, () => request("/ok", ip));
 
         expect(result.at(-1)).toBe(429);
+    });
+});
+
+describe("CLI device sign-in rate limits", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const buildDeviceAuth = () => {
+        const resolved = resolveAuthOptions({
+            baseURL: BASE_URL,
+            database: memoryAdapter({ account: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] }),
+            plugins: [
+                ...cliDeviceAuth({
+                    mintApiKey: async () => {
+                        return { id: "k", key: "nk_x" };
+                    },
+                }),
+            ],
+            rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
+            secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+        });
+
+        return betterAuth({ ...resolved, rateLimit: { ...resolved.rateLimit, enabled: true, storage: "memory" } });
+    };
+
+    const poll = (ip: string) =>
+        request("/device/key", ip, { body: JSON.stringify({ client_id: "neore-cli", device_code: "not-a-real-code" }), method: "POST" });
+
+    it("never limits a CLI polling every 5 seconds for the whole 30 minutes a code lives", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result: number[] = [];
+
+        for (let index = 0; index < 360; index += 1) {
+            const response = await auth.handler(poll(ip));
+
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 5000);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("limits a client that hammers the poll route", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T15:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 14, () => poll(ip));
+
+        expect(result.slice(0, 10)).not.toContain(429);
+        expect(result.slice(10)).toStrictEqual([429, 429, 429, 429]);
+    });
+
+    it("limits issuing codes to 10 a minute per address", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 12, () =>
+            request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname: "devbox" }), method: "POST" }),
+        );
+
+        expect(result.slice(0, 10).every((status) => status === 200)).toBe(true);
+        expect(result.slice(10)).toStrictEqual([429, 429]);
+    });
+
+    it("limits approve and deny retries", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const approve = await statuses(auth, 12, () => request("/device/approve", ip, { body: JSON.stringify({ userCode: "ABCDEFGH" }), method: "POST" }));
+
+        expect(approve.slice(10)).toStrictEqual([429, 429]);
     });
 });

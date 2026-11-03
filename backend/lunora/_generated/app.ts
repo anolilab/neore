@@ -724,6 +724,7 @@ class AppBuilder<Env extends object> {
             ["pages", { mode: { field: "userId", kind: "shardBy" } }],
             ["pageVersions", { mode: { field: "userId", kind: "shardBy" } }],
             ["passkey", { mode: { kind: "global" } }],
+            ["deviceCode", { mode: { kind: "global" } }],
             ["persistentChunks", { mode: { kind: "root" } }],
             ["persistentStreams", { mode: { field: "userId", kind: "shardBy" } }],
             ["playgroundApiKeys", { mode: { kind: "root" } }],
