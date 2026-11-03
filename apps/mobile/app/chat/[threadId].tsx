@@ -4,13 +4,14 @@ import type { Id } from "@neore/backend/dataModel";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Text, TextInput, View } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { shareableMessageText } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -28,6 +29,15 @@ type Row = MessageRow;
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
+
+/** Opens the system share sheet with the given text. */
+const shareMessage = async (text: string): Promise<void> => {
+    try {
+        await Share.share({ message: text });
+    } catch {
+        // The share sheet has no screen to report to; it simply stays closed.
+    }
+};
 
 /** A chat that reads again is no longer refused; any other message on screen is not this read's to clear. */
 const withoutRefusal = (current: string | null): string | null => {
@@ -390,11 +400,25 @@ const Chat = () => {
                     estimatedItemSize={72}
                     keyExtractor={(row) => row.id}
                     ListHeaderComponent={olderHeader}
-                    renderItem={({ item }) => (
-                        <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
-                            <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
-                        </View>
-                    )}
+                    renderItem={({ item }) => {
+                        const shareText = shareableMessageText(item);
+
+                        return (
+                            <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
+                                <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
+                                {shareText !== undefined && (
+                                    <Pressable
+                                        accessibilityLabel="Share message"
+                                        accessibilityRole="button"
+                                        onPress={() => shareMessage(shareText)}
+                                        style={{ alignSelf: "flex-start", paddingVertical: 4 }}
+                                    >
+                                        <Text style={{ fontSize: 12 }}>Share</Text>
+                                    </Pressable>
+                                )}
+                            </View>
+                        );
+                    }}
                 />
                 {error
                     ? (
