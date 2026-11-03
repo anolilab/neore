@@ -3285,7 +3285,7 @@ export const updateBrowserSettings = authMutation
             .withIndex("by_userId", (q: any) => q.eq("userId", userId))
             .first();
 
-        await saveAiUserPreferences(context.db, prefs, userId, { browserSettings });
+        await saveAiUserPreferences(context.db, prefs, userId, { browserSettings }, context.user.activeOrganization?.id ?? null);
         context.log.event("chat.update_browser_settings", {
             allowlistCount: browserSettings.domainAllowlist?.length ?? 0,
             blocklistCount: browserSettings.domainBlocklist?.length ?? 0,

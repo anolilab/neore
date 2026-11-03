@@ -297,6 +297,18 @@ export const organization = sqliteTable("organization", {
     slug: index("slug").on(t.slug),
 }));
 
+export const organizationPolicies = sqliteTable("organizationPolicies", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    document: text("document").notNull(),
+    organizationId: text("organizationId").notNull(),
+    revision: real("revision").notNull(),
+    schemaVersion: real("schemaVersion").notNull(),
+    updatedAt: real("updatedAt").notNull(),
+}, (t) => ({
+    organizationId: index("organizationId").on(t.organizationId),
+}));
+
 export const pageAccess = sqliteTable("pageAccess", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

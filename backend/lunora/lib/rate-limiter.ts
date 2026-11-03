@@ -366,6 +366,8 @@ export const RATE_LIMIT_CONFIGS = {
     "organization/invite:premium": Ratelimit.fixedWindow(20, MINUTE),
     "organization/leave:free": Ratelimit.fixedWindow(3, MINUTE),
     "organization/leave:premium": Ratelimit.fixedWindow(10, MINUTE),
+    "organization/policy:free": Ratelimit.fixedWindow(10, MINUTE),
+    "organization/policy:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/rejectInvite:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/rejectInvite:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/removeMember:free": Ratelimit.fixedWindow(5, MINUTE),

@@ -236,6 +236,8 @@ for a schema table that is neither policed nor listed:
 | `auth_organization.checkSlug` | query | authQuery | — | none needed (boolean) | ok |
 | `auth_organization.listOrganizations` | query | authQuery | — | org membership/role | ok |
 | `auth_organization.listUserInvitations` | query | authQuery | invitation | caller-scoped (ctx.user) | ok |
+| `auth_organization_policy.getOrganizationPolicy` | query | authQuery | organizationPolicies | org membership/role | ok — new; any member reads the active organization's policy (id from the verified session, never args); `null` for no organization or no policy |
+| `auth_organization_policy.setOrganizationPolicy` | mutation | authMutation + RL | organizationPolicies | org membership/role | ok — new; active-organization owner only (the rule `updateBillingSettings` applies); document parsed by `parseOrganizationPolicy`, nothing invalid is stored |
 | `auth_team.addTeamMember` | mutation | authMutation + RL | member, team, teamMember | caller-scoped (ctx.user) | **fixed** (medium) — org owner/admin or team admin; any org member could add anyone |
 | `auth_team.createTeam` | mutation | authMutation + RL | team | caller-scoped (ctx.user) | ok |
 | `auth_team.deleteTeam` | mutation | authMutation + RL | team, teamMember | caller-scoped (ctx.user) | ok |

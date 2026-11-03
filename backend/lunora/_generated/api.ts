@@ -144,6 +144,10 @@ export interface ApiTypes {
             listOrganizations: FunctionReference<"query", {}, {} & { canCreateOrganization: boolean; organizations: ({ logo?: string | null | undefined; } & { createdAt: number; id: string; isOwner: boolean; name: string; plan: string; slug: string; })[]; }>;
             listUserInvitations: FunctionReference<"query", {}, ({} & { expiresAt: number; id: string; inviterName: string | null; organizationName: string; organizationSlug: string; role: string; })[]>;
         };
+        organization_policy: {
+            getOrganizationPolicy: FunctionReference<"query", {}, { policy: { models?: { allowed: Array<string> }; permissionCap?: "off" | "ask" | "auto"; schemaVersion: 1; settings?: Record<string, { locked: boolean; value: boolean }> }; revision: number; updatedAt: number } | null>;
+            setOrganizationPolicy: FunctionReference<"mutation", { document: string }, { revision: number }>;
+        };
         team: {
             addTeamMember: FunctionReference<"mutation", { teamId: string; userId: string }, void>;
             createTeam: FunctionReference<"mutation", { name: string }, string>;
@@ -1001,6 +1005,10 @@ export const api: ApiTypes = {
             checkSlug: { __lunoraRef: "auth_organization:checkSlug" },
             listOrganizations: { __lunoraRef: "auth_organization:listOrganizations" },
             listUserInvitations: { __lunoraRef: "auth_organization:listUserInvitations" },
+        },
+        organization_policy: {
+            getOrganizationPolicy: { __lunoraRef: "auth_organization_policy:getOrganizationPolicy" },
+            setOrganizationPolicy: { __lunoraRef: "auth_organization_policy:setOrganizationPolicy" },
         },
         team: {
             addTeamMember: { __lunoraRef: "auth_team:addTeamMember" },

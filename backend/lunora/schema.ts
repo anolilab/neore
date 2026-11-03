@@ -1594,6 +1594,20 @@ export const schema = defineSchema({
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
 
+    organizationPolicies: defineTable({
+        // The policy as canonical JSON text, written only after `auth/lib/organization-policy.ts`
+        // accepted it. Text, not a typed object, so the parser stays the one place that knows its shape.
+        document: v.string(),
+        organizationId: v.string(),
+        // Moves on every write, so a reader can tell a newer policy from the one it holds.
+        revision: v.number(),
+        schemaVersion: v.number(),
+        updatedAt: v.number(),
+    })
+        .global()
+        .index("organizationId", ["organizationId"])
+        .triggers((t) => auditTriggersFor(t, "organizationPolicies", AUDIT_TABLES["organizationPolicies"]!)),
+
     // The outbox for opt-in task-outcome mail (`notifications/task-email.ts`): written
     // in `notify()`'s own transaction, one row per inbox row, sent by the housekeeping
     // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
