@@ -13,7 +13,7 @@ import type { R2BucketLike, R2S3Credentials, Storage } from "@lunora/storage";
 import { createBucketStorage, createStorage } from "@lunora/storage";
 import { createWorkflowsRestClient } from "@lunora/workflow";
 import type { ExecutionContextLike, GlobalIntrospector, HttpRouterLike, LunoraWorker, Route, ScheduledControllerLike, ShardingInfo, ShardNamespaceLike, ShardRegistryRpc, TriggerTrace, WorkerOptions } from "lunorash/runtime";
-import { createCrossShardRelationCapabilities, createDynamicShardRegistry, createQueryCoordinator, createWorker, resolveLogArchiveFromEnv, memoizeIdentity } from "lunorash/runtime";
+import { createCrossShardRelationCapabilities, createDynamicShardRegistry, createQueryCoordinator, createWorker, declareAppJurisdiction, resolveLogArchiveFromEnv, memoizeIdentity } from "lunorash/runtime";
 
 import schema from "../schema.js";
 import notifyConfig from "../notify.js";
@@ -50,6 +50,11 @@ const loadDeferredModules = (): Promise<DeferredModules> =>
             openApiSpec: (await import("./openapi.js")).openApiSpec,
         };
     })());
+
+// Module scope, so every isolate loading this script (the worker and each Durable
+// Object class it exports) knows the schema's jurisdiction before a request runs.
+// `@lunora/mail` reads it to pin its shard RPC like every other DO path.
+declareAppJurisdiction("eu");
 
 /** `.storage(...)` declaration — one bucket (required) plus optional extra named buckets and signed-URL config. Backs `ctx.storage` AND the studio file browser. */
 interface StorageDeclaration<Env> {
@@ -499,7 +504,7 @@ class AppBuilder<Env extends object> {
     private resolveScheduler(env: Env): ReturnType<typeof createScheduler> | undefined {
         const namespace = this.schedulerDeclaration?.namespace(env);
 
-        return namespace ? createScheduler({ namespace }) : undefined;
+        return namespace ? createScheduler({ jurisdiction: "eu", namespace }) : undefined;
     }
 
     /**
@@ -618,12 +623,13 @@ class AppBuilder<Env extends object> {
             aiOptInLevel: (env as Record<string, unknown>)["LUNORA_AI_OPT_IN"] as WorkerOptions["aiOptInLevel"],
             cronJobs: LUNORA_CRONS,
             functions: LUNORA_FUNCTIONS,
+            jurisdiction: "eu",
             architecture: deferred.architecture,
             openApiSpec: deferred.openApiSpec,
             queue: async (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
                 dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], (await import("./queues.js")).LUNORA_QUEUE_REGISTRY, {
                     capture: shouldCaptureQueue(queueEnv as Record<string, unknown>)
-                        ? createQueueCaptureSink(queueEnv as Record<string, unknown>)
+                        ? createQueueCaptureSink(queueEnv as Record<string, unknown>, { jurisdiction: "eu" })
                         : undefined,
                     env: queueEnv as Record<string, unknown>,
                     holdSeconds: trigger.holdSeconds,
@@ -796,7 +802,7 @@ class AppBuilder<Env extends object> {
         const shardRegistry = this.shardRegistrySelector?.(env);
 
         if (shardRegistry) {
-            options.queryCoordinator = createQueryCoordinator({ registry: createDynamicShardRegistry({ env, namespace: shardRegistry }) });
+            options.queryCoordinator = createQueryCoordinator({ registry: createDynamicShardRegistry({ jurisdiction: "eu", env, namespace: shardRegistry }) });
         }
 
         const adminRevocations = this.adminRevocationsSelector?.(env);
