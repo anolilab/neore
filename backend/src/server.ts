@@ -15,6 +15,9 @@ import { d1Executor } from "@lunora/auth";
 
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
+import { env as workerEnv } from "cloudflare:workers";
+
+import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
 import { defineApp } from "../lunora/_generated/app.js";
@@ -293,6 +296,12 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
 
     return await resolveSessionIdentity(env, request);
 };
+
+// workerd (`lunora dev`) does not implement Durable Object jurisdictions, and the schema pins the
+// EU; codegen reads that as a literal, so nothing can be left out of the generated code. Module
+// scope, so every entry point of the isolate is covered. Development only.
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- must run before any entry point of the isolate
+allowLocalJurisdiction(workerEnv as Parameters<typeof allowLocalJurisdiction>[0]);
 
 const app = defineApp<Env>()
     .shard((env) => routedShardNamespace(env.SHARD, env))

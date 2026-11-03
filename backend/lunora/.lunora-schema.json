@@ -1,4 +1,5 @@
 {
+  "jurisdiction": "eu",
   "migrationIds": [],
   "tables": {
     "account": {
