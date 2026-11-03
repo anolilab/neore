@@ -22,6 +22,8 @@ export interface ComposerRestorePayload {
     /** Add to what is typed instead of replacing it: text that arrives from outside (dictation) must not cost the user their unsent message. */
     append?: boolean;
     files: ComposerRestoreFile[];
+    /** A quoted reply, added as a quote chip linked to the reply (`text` is then unused). */
+    quote?: { messageId: string; text: string };
     text: string;
 }
 

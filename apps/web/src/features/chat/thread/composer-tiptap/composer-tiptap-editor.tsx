@@ -40,6 +40,7 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import QuoteChip from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
@@ -298,6 +299,9 @@ const ComposerTiptapEditor = ({
                 },
             }),
             BannedWordDecoration,
+            QuoteChip.configure({
+                labels: { goToReply: t`Go to reply`, notOnScreen: t`The quoted reply is not on screen` },
+            }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SlashCommand.configure({
                 onStateChange: handleSlashStateChange,

@@ -74,6 +74,7 @@ import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
+import { insertQuoteChip } from "./composer-tiptap/extensions/quote-chip";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
 import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
@@ -1306,7 +1307,19 @@ const ComposerInput = ({
         () =>
             onComposerRestore((payload) => {
                 promptHistory.reset();
-                setText(textAfterRestore(getComposerText(), payload));
+
+                if (payload.quote) {
+                    // The chip goes into the editor itself, so the draft and the editor agree and the sync leaves it alone.
+                    const editor = inputAreaRef.current?.getEditor()?.getEditor();
+
+                    if (editor) {
+                        insertQuoteChip(editor, payload.quote);
+                        setText(editor.getText({ blockSeparator: "\n" }));
+                    }
+                } else {
+                    setText(textAfterRestore(getComposerText(), payload));
+                }
+
                 void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));
                 inputAreaRef.current?.focus();
             }),
