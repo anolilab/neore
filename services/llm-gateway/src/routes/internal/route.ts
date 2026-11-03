@@ -16,7 +16,7 @@ import { GATEWAY_MODELS } from "../../models.js";
 import { ProviderHealthService } from "../../providers/health.js";
 import { PricingService } from "../../providers/pricing.js";
 import { VerdictCache } from "../../routing/cache.js";
-import { classifyTierWithModel, isClassifierEnabled } from "../../routing/classifier.js";
+import { canClassifyPrompt, classifyTierWithModel, isClassifierEnabled } from "../../routing/classifier.js";
 import { classifyQuery } from "../../routing/classify.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { filterModels, hasActiveFilters } from "../../routing/filters.js";
@@ -106,6 +106,14 @@ const requestSchema = z.object({
      * social_media, email_management, calendar_management, trading.
      */
     categoryPins: z.record(z.string(), z.object({ modelId: z.string(), provider: z.string() })).optional(),
+
+    /**
+     * Size of the conversation the caller holds, when `messages` carries only the latest turn. The larger of this and
+     * the estimate from `messages` feeds the downgrade-cost policy, so a short follow-up in a long thread is not
+     * mistaken for a short thread.
+     */
+    contextTokens: z.int().min(0).optional(),
+
     messages: z.array(z.record(z.string(), z.unknown())),
 
     /**
@@ -124,12 +132,6 @@ const requestSchema = z.object({
             requireZDR: z.boolean().optional(),
         })
         .optional(),
-    /**
-     * Size of the conversation the caller holds, when `messages` carries only the latest turn. The larger of this and
-     * the estimate from `messages` feeds the downgrade-cost policy, so a short follow-up in a long thread is not
-     * mistaken for a short thread.
-     */
-    contextTokens: z.number().int().min(0).optional(),
     preferredModel: z.string().optional(),
     preferredQuality: z.number().min(0).max(1).optional(),
 
@@ -324,7 +326,7 @@ routeRouter.openapi(
                     // is derived from where the score falls inside its band.
                     verdictConfidence = scoreConfidence(score.combined);
 
-                    if (isClassifierEnabled(c.env) && availableTiers.length > 0) {
+                    if (isClassifierEnabled(c.env) && canClassifyPrompt(c.env, rules) && availableTiers.length > 0) {
                         const verdictCache = new VerdictCache(c.env.PRICING_KV);
                         const cacheKey = { availableTiers, hasImages, lastUserMessage, toolCount };
                         const cached = await verdictCache.get(cacheKey);

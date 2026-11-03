@@ -24,7 +24,7 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { autoModel, cancelSwitch, changeModel, confirmSwitch, pendingSwitch, setAutoModel } = useModelCombobox({ threadId });
+    const { autoModel, cancelSwitch, changeModel, confirmSwitch, pendingSwitch, setAutoModel, thread: loadedThread } = useModelCombobox({ threadId });
     const autoLabelId = useId();
     const { isAnonymous } = useIsAnonymous();
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
@@ -60,6 +60,8 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     // Auto routes plain hosted text threads: a bot, a coding agent, a switched thread (its path decides the agent), a
     // custom endpoint, a media mode and a comparison each name their own model.
     const canRouteAuto =
+        (!threadId || (loadedThread !== undefined && loadedThread !== null)) &&
+        !loadedThread?.groupChat &&
         !isAnonymous &&
         !isBotThread &&
         !comparisonMode &&

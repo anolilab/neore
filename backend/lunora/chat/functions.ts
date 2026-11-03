@@ -1447,6 +1447,10 @@ export const updateThread = authAction
             // whichever thread is open).
             const threadLanguage = threadData?.language;
 
+            if (autoModel === true && threadData?.groupChat) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available in a group chat");
+            }
+
             // Use provided model or fall back to thread's existing model
             const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
 

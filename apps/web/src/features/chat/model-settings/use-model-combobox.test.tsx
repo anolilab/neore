@@ -10,6 +10,7 @@ const hoisted = vi.hoisted(() => {
         preview: vi.fn(async (): Promise<unknown> => {
             return { coldStartCostly: false };
         }),
+        mutationOptions: [] as { networkMode?: string; retry?: number }[],
         navigate: vi.fn(async () => {}),
         showError: vi.fn(),
         switchAgent: vi.fn(),
@@ -42,7 +43,9 @@ vi.mock("@tanstack/react-router", () => {
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skipToken"),
-        useMutation: (options: { mutationFn: (...args: unknown[]) => Promise<unknown> }) => {
+        useMutation: (options: { mutationFn: (...args: unknown[]) => Promise<unknown>; networkMode?: string; retry?: number }) => {
+            hoisted.mutationOptions.push(options);
+
             return { mutateAsync: options.mutationFn };
         },
         useQuery: () => {
@@ -426,5 +429,48 @@ describe("useModelCombobox: picking a model on an Auto thread", () => {
 
         expect(useModelStore.getState().selectedModel).toBe(A);
         expect(hoisted.showError).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("useModelCombobox: Auto while the thread is not loaded", () => {
+    beforeEach(() => {
+        hoisted.thread.current = undefined;
+        hoisted.updateThread.mockReset();
+        useModelStore.getState().setPendingSettings({ autoModel: true });
+    });
+
+    it("shows no Auto state of its own and writes nothing for a thread that has not loaded", async () => {
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        expect(result.current.autoModel).toBe(false);
+
+        await act(async () => {
+            await result.current.setAutoModel(true);
+        });
+
+        expect(hoisted.updateThread).not.toHaveBeenCalled();
+        expect(useModelStore.getState().pendingSettings).toEqual({ autoModel: true });
+    });
+
+    it("keeps the new-thread draft for a new thread", async () => {
+        const { result } = renderHook(() => useModelCombobox({ threadId: undefined }));
+
+        expect(result.current.autoModel).toBe(true);
+
+        await act(async () => {
+            await result.current.setAutoModel(false);
+        });
+
+        expect(useModelStore.getState().pendingSettings).toEqual({ autoModel: false });
+    });
+});
+
+describe("useModelCombobox: thread writes while offline", () => {
+    it("rejects at once instead of queueing the write for a reconnect", () => {
+        hoisted.thread.current = { _id: "t1", mode: "text", model: A };
+        hoisted.mutationOptions.length = 0;
+        renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        expect(hoisted.mutationOptions.some((options) => options.networkMode === "always" && options.retry === 0)).toBe(true);
     });
 });

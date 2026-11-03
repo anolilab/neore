@@ -336,7 +336,7 @@ export interface InternalApiTypes {
             readAsideSnapshot: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string; userId: string }, { liveReply?: string; rows: Array<{ role: "assistant" | "user"; text: string }>; running: boolean }>;
         };
         auto_model_context: {
-            getAutoRouteContext: FunctionReference<"query", { threadId: Id<"threads"> }, { contextTokens: number; files: boolean; images: boolean }>;
+            getAutoRouteContext: FunctionReference<"query", { promptMessageId: string; threadId: Id<"threads"> }, { contextTokens: number; files: boolean; images: boolean }>;
         };
         autocomplete: {
             isComposerAutocompleteEnabled: FunctionReference<"query", { userId: string }, boolean>;

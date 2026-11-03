@@ -3319,8 +3319,10 @@ return { "threadId": source["threadId"], "userId": source["userId"] };
 installCompiledValidatorMap(lunora_chat_auto_model_context_58.getAutoRouteContext.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["promptMessageId"] !== "string") return DEFER;
+if (source["promptMessageId"].length > 64) return DEFER;
 if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
+return { "promptMessageId": source["promptMessageId"], "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_chat_autocomplete_59.isComposerAutocompleteEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8869,7 +8871,7 @@ export interface Caller {
             answerAskUser: (args: { answer: string | null; approvalId: string; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyResolved: boolean; streamId: string | null }>;
         };
         auto_model_context: {
-            getAutoRouteContext: (args: { threadId: Id<"threads"> }) => Promise<{ contextTokens: number; files: boolean; images: boolean }>;
+            getAutoRouteContext: (args: { promptMessageId: string; threadId: Id<"threads"> }) => Promise<{ contextTokens: number; files: boolean; images: boolean }>;
         };
         autocomplete: {
             isComposerAutocompleteEnabled: (args: { userId: string }) => Promise<boolean>;

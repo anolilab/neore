@@ -29,7 +29,7 @@ export interface AutoGate {
     isAnonymous: boolean;
     pinnedByBotOrSkill: boolean;
     prompt: string;
-    thread: { activeAgent?: unknown; autoModel?: boolean; botId?: string; runner?: "host"; userId?: string };
+    thread: { activeAgent?: unknown; autoModel?: boolean; botId?: string; groupChat?: unknown; runner?: "host"; userId?: string };
     userId: string;
 }
 
@@ -41,6 +41,7 @@ export const shouldRouteAuto = ({ currentModel, isAnonymous, pinnedByBotOrSkill,
     thread.autoModel === true &&
     !thread.activeAgent &&
     !thread.botId &&
+    !thread.groupChat &&
     thread.runner !== "host" &&
     thread.userId === userId &&
     !isAnonymous &&

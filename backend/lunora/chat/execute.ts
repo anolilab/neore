@@ -325,7 +325,7 @@ export const runStreamingAgent = internalAction
                     shouldRouteAuto({
                         currentModel: model,
                         isAnonymous: isAnonymous === true,
-                        pinnedByBotOrSkill: liveBot !== null || model !== requestedModel,
+                        pinnedByBotOrSkill: liveBot !== null || Boolean(invokedSkill?.config?.preferredModel),
                         prompt,
                         thread,
                         userId,
@@ -333,10 +333,13 @@ export const runStreamingAgent = internalAction
                 ) {
                     routedModel = await resolveAutoModel(ctx, {
                         conversation: async () =>
-                            await ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, { threadId: threadId as Id<"threads"> }),
+                            await ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, {
+                                promptMessageId: messageId,
+                                threadId: threadId as Id<"threads">,
+                            }),
                         fallbackModel: model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
-                        plan: async () => await readRunPlan(ctx, userId),
+                        plan: async () => await readRunPlan(ctx, userId, organizationId ?? null),
                         prompt,
                         threadId,
                         userId,

@@ -50,7 +50,12 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const { data: thread } = useQuery(crpc.chat.functions.getThread.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
 
     // updateThread is an Action, wrapped with TanStack Query for state management
-    const { mutateAsync: updateThreadAction } = useReactQueryMutation(useLunoraActionOptions(api.chat.functions.updateThread));
+    // A write that is not made now must fail now: queued for a reconnect it would land on a choice the user has since changed.
+    const { mutateAsync: updateThreadAction } = useReactQueryMutation({
+        ...useLunoraActionOptions(api.chat.functions.updateThread),
+        networkMode: "always",
+        retry: 0,
+    });
 
     const { mutateAsync: switchAgent } = useReactQueryMutation(useLunoraActionOptions(api.chat.agent_switch.switchThreadAgent));
 
@@ -70,8 +75,9 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const effectiveModel = thread?.activeAgent?.model ?? thread?.model ?? selectedModel;
 
     // A thread that runs on its own model chooses Auto; a switched thread's path decides its agent, so Auto is off there.
+    // An existing thread that has not loaded yet has no Auto state to show, and the new-thread draft is not its own.
     const pendingAuto = useModelStore((state) => state.pendingSettings?.autoModel === true);
-    const autoModel = thread ? thread.autoModel === true && !thread.activeAgent : pendingAuto;
+    const autoModel = threadId ? thread?.autoModel === true && !thread.activeAgent : pendingAuto;
 
     // Update thread settings
     const updateThread = async (data: ThreadUpdateData) => {
@@ -221,6 +227,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             return;
         }
 
+        if (threadId) {
+            return;
+        }
+
         setPendingSettings((previous) => {
             return { ...previous, autoModel: enabled };
         });
@@ -236,7 +246,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // Naming a model is choosing it, so Auto ends with the pick. A new thread holds it in the composer; an existing one
         // ends it in the same write that stores the model, or with the switch itself, so a pick that is cancelled or fails
         // leaves Auto as it was.
-        if (autoModel && !(threadId && thread)) {
+        if (autoModel && !threadId) {
             setPendingSettings((previous) => {
                 return { ...previous, autoModel: false };
             });
