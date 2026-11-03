@@ -28,6 +28,8 @@ import {
     probeNativeHost,
 } from "@/lib/native/bridge";
 
+import { buildDeviceDiagnostics, routeOf, withReconnectReason } from "../lib/device-diagnostics";
+import { useDeviceErrors } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
 import DeviceScope from "./device-scope";
@@ -121,8 +123,42 @@ const DeviceRow: FC<{
     now: number;
     onConnectionChange: () => void;
     reconnect?: NativeHostReconnect;
-}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect }) => {
+    viaName?: string;
+}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect, viaName }) => {
     const { t } = useLingui();
+    const shownErrors = useDeviceErrors(device._id);
+    const errors = withReconnectReason(shownErrors, reconnect?.reason);
+    const lastError = errors.at(-1);
+    const copyDiagnostics = (): void => {
+        const text = buildDeviceDiagnostics({
+            appVersion: navigator.userAgent,
+            clockOffset: errors.findLast((error) => error.clockOffset !== undefined)?.clockOffset,
+            errors: errors.map((error) => error.message),
+            lastSeenAt: device.lastSeenAt,
+            name: device.name,
+            route: routeOf(device.transport, isThisComputer),
+            viaName,
+        });
+        const { clipboard }: { clipboard?: Clipboard } = navigator;
+        const failed = () => {
+            toast.error(t`Could not copy to the clipboard`);
+        };
+
+        if (!clipboard) {
+            failed();
+
+            return;
+        }
+
+        clipboard
+            .writeText(text)
+            .then(() => {
+                toast.success(t`Diagnostics copied`);
+
+                return undefined;
+            })
+            .catch(failed);
+    };
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
     const [confirming, setConfirming] = useState(false);
@@ -181,6 +217,11 @@ const DeviceRow: FC<{
                         {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
                     </p>
                 )}
+                {lastError && (
+                    <p className="text-destructive text-xs" role="status">
+                        {lastError.message}
+                    </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
@@ -202,6 +243,9 @@ const DeviceRow: FC<{
                         {t`Dismiss`}
                     </Button>
                 )}
+                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                    {t`Copy diagnostics`}
+                </Button>
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
                     {t`Remove`}
                 </Button>
@@ -492,6 +536,7 @@ const DevicesSettings: FC = () => {
                                     now={now}
                                     onConnectionChange={refreshNative}
                                     reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                    viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
                                 />
                             ))}
                         </ul>

@@ -16,6 +16,7 @@ import {
     onNativeDeviceProgress,
 } from "@/lib/native/bridge";
 
+import { clearDeviceErrors, recordDeviceError } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";
 import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/device-relay";
@@ -39,6 +40,20 @@ const clockSkewText = (error: Error & { data?: { direction?: unknown; minutes?: 
     }
 
     return error.message;
+};
+
+/** Keeps the text a connection's row shows, with the size of a clock refusal when the error carried one. */
+const rememberDeviceFailure = (id: string, error: unknown): void => {
+    if (!(error instanceof Error) || !error.message) {
+        return;
+    }
+
+    const { data } = error as { data?: { code?: unknown; direction?: unknown; minutes?: unknown } };
+    const offset = data?.direction === "ahead" ? "ahead" : "behind";
+    const isClock = data?.code === "DEVICE_CLOCK_SKEW" && typeof data.minutes === "number";
+    const clock = isClock ? `about ${data.minutes} minutes ${offset}` : undefined;
+
+    recordDeviceError(id, clock ? clockSkewText(error) : error.message, clock);
 };
 
 /** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
@@ -173,22 +188,41 @@ const DeviceRelay: FC = () => {
             return undefined;
         }
 
+        // Sends can overlap (the shell changes again while one is in flight). Only the newest one per device may touch the
+        // remembered errors: an older send refused as stale after a newer one went through is not a failure.
+        const generations = new Map<string, number>();
+        const isLatest = (id: string, generation: number): boolean => generations.get(id) === generation;
         const send = async (id: string): Promise<void> => {
-            const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
+            const generation = (generations.get(id) ?? 0) + 1;
 
-            if (manifest) {
-                await mutations.current.updateManifest({
-                    deviceId: id as Id<"devices">,
-                    viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
-                    ...manifest,
-                });
+            generations.set(id, generation);
+
+            try {
+                const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
+
+                if (manifest) {
+                    await mutations.current.updateManifest({
+                        deviceId: id as Id<"devices">,
+                        viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
+                        ...manifest,
+                    });
+
+                    if (isLatest(id, generation)) {
+                        clearDeviceErrors(id);
+                    }
+                }
+            } catch (error) {
+                if (isLatest(id, generation)) {
+                    rememberDeviceFailure(id, error);
+                    toastClockSkew(error);
+                }
             }
         };
 
         return onNativeDeviceChanged(() => {
-            // A refused manifest leaves the previous tool set in place. A wrong clock is the one cause a person can fix, so it is said.
+            // A refused manifest leaves the previous tool set in place. The reason is kept for the device's row, and a wrong clock, the one cause a person can fix, is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
-                send(id).catch(toastClockSkew);
+                void send(id);
             }
         });
     }, [deviceId, hostKey, paired]);
