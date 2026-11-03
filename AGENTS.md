@@ -1328,10 +1328,11 @@ The same window shipped [#1030](https://github.com/anolilab/lunora/pull/1030):
 `unknown` while codegen exited 0 and no advisory fired; only consumers'
 `lint:types` showed it. After a codegen bump, compare
 `cat backend/lunora/_generated/{api,internal}.ts | grep -c "unknown>"` with the
-previous count (35 on codegen 214, 235, 246 and 279 — the GDPR export
-collectors' untyped arrays; 36 once the bots export collector joined them, its
-`v.array(v.any())` kept on purpose so a new bot column cannot fail the export;
-31 on 207, against 157 on 205). Run codegen twice
+previous count. The count moves when procedures are added: it was 36 when the bots export
+collector joined (its `v.array(v.any())` is kept on purpose so a new bot column cannot fail the
+export), and 40 on main and on codegen 396 (2026-11-03: 10 in `api.ts`, 30 in `internal.ts`). A
+rise is a regression only if a procedure that was typed is now `unknown`, so compare the
+procedure names, not the number. Run codegen twice
 after a change that renames references: inference reads the source, and a
 reference codegen cannot resolve yet types its caller's output `unknown`. When probing
 generated output, run `tsc` per project: `vis run lint:types` re-runs the
