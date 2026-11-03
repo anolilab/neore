@@ -633,6 +633,7 @@ export const createThreadWithInitialMessage = internalMutation
         fileIds: v.optional(v.array(v.string())),
         language: v.optional(v.string()),
         messageContent: v.array(v.record(v.string(), v.any())),
+        autoModel: v.optional(v.boolean()),
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
         model: v.string(),
         reasoningEffort: v.optional(v.number()),
@@ -647,6 +648,7 @@ export const createThreadWithInitialMessage = internalMutation
     .mutation(
         async ({
             args: {
+                autoModel,
                 customSystemPrompt,
                 enabledFeatures,
                 fileIds,
@@ -674,6 +676,7 @@ export const createThreadWithInitialMessage = internalMutation
             // Batch all settings + status update in one mutation (much faster than separate calls)
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
+                    ...(autoModel === true && { autoModel }),
                     customSystemPrompt,
                     enabledFeatures,
                     language,
@@ -1342,6 +1345,7 @@ export const getThreadSettings = internalQuery
 
 export const updateThreadModel = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -1354,7 +1358,10 @@ export const updateThreadModel = internalMutation
     })
     .output(v.null())
     .mutation(
-        async ({ args: { customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId }, ctx: context }) => {
+        async ({
+            args: { autoModel, customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId },
+            ctx: context,
+        }) => {
             const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
                 threadId: threadId as Id<"threads">,
             });
@@ -1369,6 +1376,7 @@ export const updateThreadModel = internalMutation
             // The operations are logically independent (settings vs order), so this is acceptable.
             await context.runMutation(internal.agent.threads.updateThreadSettings, {
                 patch: {
+                    autoModel,
                     customSystemPrompt,
                     dictationLanguage,
                     enabledFeatures,
@@ -1394,6 +1402,7 @@ export const updateThreadModel = internalMutation
 export const updateThread = authAction
     .use(rateLimit("chat/update"))
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         enabledFeatures: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -1409,7 +1418,20 @@ export const updateThread = authAction
     .output(v.string())
     .action(
         async ({
-            args: { customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode, status, summary, threadId, title, unlockProof },
+            args: {
+                autoModel,
+                customSystemPrompt,
+                enabledFeatures,
+                model,
+                order,
+                reasoningEffort,
+                statelessMode,
+                status,
+                summary,
+                threadId,
+                title,
+                unlockProof,
+            },
             ctx: context,
         }) => {
             const { userId } = context.user;
@@ -1461,6 +1483,8 @@ export const updateThread = authAction
             }
 
             await context.runMutation(internal.chat.functions.updateThreadModel, {
+                // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud model to route.
+                autoModel: threadData?.activeAgent || threadData?.runner === "host" ? undefined : autoModel,
                 customSystemPrompt,
                 enabledFeatures,
                 model: effectiveModel,

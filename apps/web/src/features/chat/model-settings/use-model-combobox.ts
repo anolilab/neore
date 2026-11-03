@@ -22,6 +22,7 @@ interface UseModelComboboxProps {
 }
 
 interface ThreadUpdateData {
+    autoModel?: boolean;
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
@@ -67,6 +68,10 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
 
     // Get effective model (the agent of a switched thread, then the thread's model, then the pick)
     const effectiveModel = thread?.activeAgent?.model ?? thread?.model ?? selectedModel;
+
+    // A thread that runs on its own model chooses Auto; a switched thread's path decides its agent, so Auto is off there.
+    const pendingAuto = useModelStore((state) => state.pendingSettings?.autoModel === true);
+    const autoModel = thread ? thread.autoModel === true && !thread.activeAgent : pendingAuto;
 
     // Update thread settings
     const updateThread = async (data: ThreadUpdateData) => {
@@ -208,12 +213,28 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
+    // Auto routes each send to a model the gateway picks. The thread's own model stays the fallback.
+    const setAutoModel = async (enabled: boolean) => {
+        if (threadId && thread) {
+            await updateThreadAction({ autoModel: enabled, model: thread.model, threadId: threadId as Id<"threads"> });
+
+            return;
+        }
+
+        setPendingSettings((previous) => ({ ...previous, autoModel: enabled }));
+    };
+
     // Change model
     const changeModel = async (newModel: string) => {
         const previousModel = useModelStore.getState().selectedModel;
 
         // Always update local store for immediate UI feedback
         setSelectedModel(newModel, threadId);
+
+        // Naming a model is choosing it: Auto ends, before a switch or an edit changes what the thread runs on.
+        if (autoModel) {
+            await setAutoModel(false);
+        }
 
         // A text thread records the change as a switch in its transcript; the thread's own model stays
         // what it was created with, which is what a branch from before the switch runs on.
@@ -237,11 +258,13 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     };
 
     return {
+        autoModel,
         cancelSwitch,
         changeModel,
         confirmSwitch,
         pendingSwitch,
         model: effectiveModel,
+        setAutoModel,
         thread,
         updateThread,
     };

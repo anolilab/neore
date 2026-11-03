@@ -2,8 +2,11 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
+import { enabledModelOf } from "@neore/ai/models";
+import { Switch } from "@neore/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
+import { useId } from "react";
 
 import { ModelPickerButton } from "@/components/model-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
@@ -20,7 +23,8 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { cancelSwitch, changeModel, confirmSwitch, pendingSwitch } = useModelCombobox({ threadId });
+    const { autoModel, cancelSwitch, changeModel, confirmSwitch, pendingSwitch, setAutoModel } = useModelCombobox({ threadId });
+    const autoLabelId = useId();
     const { isAnonymous } = useIsAnonymous();
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
     const isRunning = useChatIsRunning();
@@ -51,6 +55,17 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const setComparisonMode = useModelStore((state) => state.setComparisonMode);
     const setSelectedModelsForComparison = useModelStore((state) => state.setSelectedModelsForComparison);
+
+    // Auto routes plain hosted text threads: a bot, a coding agent, a switched thread (its path decides the agent), a
+    // custom endpoint, a media mode and a comparison each name their own model.
+    const canRouteAuto =
+        !isAnonymous &&
+        !isBotThread &&
+        !comparisonMode &&
+        currentMode === "text" &&
+        thread?.runner !== "host" &&
+        !thread?.activeAgent &&
+        enabledModelOf(model, { mode: "text" }) !== undefined;
 
     const handleSelect = (modelId: string) => {
         // Single model selected — exit comparison mode (also clears selectedModelsForComparison)
@@ -86,6 +101,18 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 }
                 size="sm"
             />
+            {canRouteAuto && (
+                <div className="flex items-center gap-1.5" role="group">
+                    <span className="text-muted-foreground text-xs" id={autoLabelId}>{t`Auto`}</span>
+                    <Switch
+                        aria-labelledby={autoLabelId}
+                        checked={autoModel}
+                        disabled={Boolean(threadId) && isRunning}
+                        onCheckedChange={(checked) => void setAutoModel(checked)}
+                        size="sm"
+                    />
+                </div>
+            )}
             <AgentSwitchConfirmDialog onCancel={cancelSwitch} onConfirm={confirmSwitch} pending={pendingSwitch} />
             {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
         </>

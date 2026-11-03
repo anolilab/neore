@@ -38,6 +38,7 @@ import {
     isAgentRunError,
     loadRunContext,
     memoryToCarry,
+    readRunPlan,
     resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
@@ -59,6 +60,7 @@ import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
@@ -312,6 +314,29 @@ export const runStreamingAgent = internalAction
                 model = liveBot
                     ? requestedModel
                     : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
+
+                // "Auto": this send runs on the one model the gateway's routing picks, named like any other pick below. A bot's or a
+                // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`).
+                if (
+                    shouldRouteAuto({
+                        currentModel: model,
+                        isAnonymous: isAnonymous === true,
+                        pinnedByBotOrSkill: liveBot !== null || model !== requestedModel,
+                        prompt,
+                        thread,
+                        userId,
+                    })
+                ) {
+                    model = await resolveAutoModel(ctx, {
+                        fallbackModel: model,
+                        filterRules: agentModulePrefs.modelFilterRules ?? undefined,
+                        hasAttachments: Boolean(fileIds?.length),
+                        plan: await readRunPlan(ctx, userId, organizationId),
+                        prompt,
+                        threadId,
+                        userId,
+                    });
+                }
 
                 // Auto-detect task complexity
                 let taskAnalysis: TaskAnalysis | undefined;

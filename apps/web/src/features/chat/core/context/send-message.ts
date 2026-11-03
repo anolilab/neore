@@ -301,6 +301,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         if (isCreatingNewThread) {
             // New thread: send all pending settings
             if (pendingSettings) {
+                requestBody.autoModel = pendingSettings.autoModel;
                 requestBody.customSystemPrompt = pendingSettings.customSystemPrompt;
                 requestBody.enabledFeatures = pendingSettings.enabledFeatures;
                 requestBody.reasoningEffort = pendingSettings.reasoningEffort;
