@@ -34,11 +34,19 @@ interface DeviceSearch {
 type Decision = "approved" | "denied";
 
 interface Lookup {
+    /** `neore-host`: a headless machine pairing itself as a device. Anything else is the command line's sign-in. */
+    clientId?: string;
     hostname?: string;
     /** False when another account claimed the code: its details are not shown to this one. */
     isMine: boolean;
+    /** Host codes only: what the machine says it is (untrusted, shown as text). */
+    platform?: string;
     status: "approved" | "denied" | "pending";
+    /** Host codes only: where the machine says it will keep its device secret. */
+    storage?: string;
 }
+
+const HOST_CLIENT_ID = "neore-host";
 
 const CODE_LENGTH = 8;
 
@@ -116,12 +124,23 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
         return <ProblemMessage problem={problem} />;
     }
 
+    const isHost = lookup.clientId === HOST_CLIENT_ID;
+
     if (decision) {
+        let outcome = t`Denied. The command line was not signed in. You can close this tab.`;
+
+        if (isHost) {
+            outcome =
+                decision === "approved"
+                    ? t`Approved. Return to the machine: it is being paired and will say when it is done. You can close this tab.`
+                    : t`Denied. The machine was not paired. You can close this tab.`;
+        } else if (decision === "approved") {
+            outcome = t`Approved. Return to your terminal: the command line is signed in. You can close this tab.`;
+        }
+
         return (
             <p className="text-center text-sm text-gray-700" role="status">
-                {decision === "approved"
-                    ? t`Approved. Return to your terminal: the command line is signed in. You can close this tab.`
-                    : t`Denied. The command line was not signed in. You can close this tab.`}
+                {outcome}
             </p>
         );
     }
@@ -168,6 +187,67 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
             setDecision(next);
         }
     };
+
+    if (isHost) {
+        return (
+            <div className="flex flex-col gap-4">
+                <h1 className="text-center text-xl font-semibold">{t`Pair this machine?`}</h1>
+                <p className="text-center text-sm text-gray-700">
+                    {t`The machine below will be paired as a device of ${email}. It receives its own device secret, once, directly from the server; this page never sees it. Revoke it any time in Settings, Devices.`}
+                </p>
+                <dl className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`Machine`}</dt>
+                        <dd className="font-medium break-all">{lookup.hostname ?? t`unknown`}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`System`}</dt>
+                        <dd className="font-medium break-all">{lookup.platform ?? t`unknown`}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`Secret kept in`}</dt>
+                        <dd className="font-medium">
+                            {lookup.storage === "keychain" ? t`The operating system keychain` : t`A file only its owner can read (no keychain available)`}
+                        </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                        <dt className="text-gray-600">{t`Code`}</dt>
+                        <dd className="font-mono font-medium">{formatCode(userCode)}</dd>
+                    </div>
+                </dl>
+                <p className="text-center text-sm text-gray-700">{t`Only continue if you started this just now by running \`neore-host pair\` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done.`}</p>
+                {error && (
+                    <p className="text-center text-sm text-red-600" role="alert">
+                        {error}
+                    </p>
+                )}
+                <p className="sr-only" role="status">
+                    {pending ? busyMessages[pending] : ""}
+                </p>
+                <div className="flex justify-center gap-2">
+                    <Button
+                        disabled={isBusy}
+                        onClick={() => {
+                            decide("denied").catch(() => undefined);
+                        }}
+                        type="button"
+                        variant="outline"
+                    >
+                        {t`Deny`}
+                    </Button>
+                    <Button
+                        disabled={isBusy}
+                        onClick={() => {
+                            decide("approved").catch(() => undefined);
+                        }}
+                        type="button"
+                    >
+                        {isBusy ? t`Working…` : t`Approve`}
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-4">
@@ -222,7 +302,13 @@ const DeviceApproval = () => {
         enabled: Boolean(userCode && userId && !isAnonymous),
         gcTime: 0,
         queryFn: async (): Promise<Lookup> => {
-            const { data: body, error: failure } = await authClient.$fetch<{ client_id?: string; hostname?: string; status?: Lookup["status"] }>("/device", {
+            const { data: body, error: failure } = await authClient.$fetch<{
+                client_id?: string;
+                hostname?: string;
+                platform?: string;
+                status?: Lookup["status"];
+                storage?: string;
+            }>("/device", {
                 method: "GET",
                 query: { user_code: userCode },
             });
@@ -231,7 +317,14 @@ const DeviceApproval = () => {
                 throw new ProblemError(problemOf(failure));
             }
 
-            return { hostname: asString(body.hostname), isMine: body.client_id !== undefined, status: body.status ?? "pending" };
+            return {
+                clientId: asString(body.client_id),
+                hostname: asString(body.hostname),
+                isMine: body.client_id !== undefined,
+                platform: asString(body.platform),
+                status: body.status ?? "pending",
+                storage: asString(body.storage),
+            };
         },
         queryKey: ["device-code", userCode, userId],
         retry: false,

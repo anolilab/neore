@@ -964,6 +964,20 @@ written here is what is not.
   them in the core (`apply_update`) and the desktop stops those sessions (`reviewApprovals`); removing a server or
   unpairing ends its sessions FIRST (`ServerAgents.remove`), because the end of each turn is signed with a secret the
   core deletes right after. The person's variables can never replace `SSH_AUTH_SOCK`.
+  **A machine that pairs itself by code** (`device-core/src/headless/`, `auth/cli-device-auth.ts` `/device/host`,
+  `devices/internal.ts#registerHeadlessDevice`, plans/coding-workbench.md 7.2) is a `transport: "headless"` device
+  holding its OWN secret — unlike an SSH server, whose secret stays on the desktop. `neore-host pair` (built with the
+  `headless` feature, which links the keyring and an HTTPS client; the SSH-shipped build stays `--no-default-features`)
+  asks for a `neore-host` code on the device-authorization plugin the CLI sign-in uses (same table, rate limits, expiry,
+  one-time claim), announcing `storage: keychain|file` so the approval page says where the secret will live. The owner
+  approves in the web app; the machine's NEXT poll claims the code and only then is the device registered, and the secret
+  is in that one response — never in the approval, never readable again. The backend address must be https (or loopback):
+  the secret crosses it. Storage is the OS keychain when a probe round-trips, else a 0600 file in a 0700 folder
+  (`NEORE_HOST_DIR`; macOS `~/Library/Application Support/Neore Host`, Linux `$XDG_CONFIG_HOME/neore-host` or
+  `~/.config/neore-host`) with a notice; a group-readable file or a keychain that lost its secret is refused at load,
+  never re-paired quietly. `pair` opens no listener; `neore-host run` only DECIDES which signed calls are for this
+  device (`envelope::verify_call`, nonces persisted) over its own stdin. Running them and fetching them from the
+  backend, and the launchd/systemd user service, are the next slice.
   **Chat status** comes from the device too: Rust emits a SIGNED
   `neore:device-progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay

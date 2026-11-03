@@ -205,6 +205,10 @@ describe("CLI device sign-in rate limits", () => {
         expect(result.filter((status) => status === 429)).toHaveLength(0);
     }, 120_000);
 
+    it("gives a headless machine's pairing poll no per-address rule, like the CLI's", () => {
+        expect(AUTH_RATE_LIMIT_CUSTOM_RULES["/device/host"]).toBe(false);
+    });
+
     it("lets two people behind one address both get a code and be answered on their polls", async () => {
         const auth = buildDeviceAuth();
         const ip = nextIp();

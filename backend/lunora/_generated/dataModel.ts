@@ -419,7 +419,7 @@ export interface Doc_devices {
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
-    transport?: "ssh";
+    transport?: "ssh" | "headless";
     userId: string;
     viaDeviceId?: Id<"devices">;
 }
@@ -1178,6 +1178,26 @@ export interface Doc_passkey {
     userId: string;
 }
 
+<<<<<<< HEAD
+=======
+export interface Doc_deviceCode {
+    _id: Id<"deviceCode">;
+    _creationTime: number;
+    clientId?: string;
+    deviceCode: string;
+    expiresAt: number;
+    hostname?: string;
+    lastPolledAt?: number;
+    platform?: string;
+    pollingInterval?: number;
+    scope?: string;
+    status: string;
+    storage?: string;
+    userCode: string;
+    userId?: string;
+}
+
+>>>>>>> 230f90e40 (feat(devices): pair a headless machine by code)
 export interface Doc_persistentChunks {
     _id: Id<"persistentChunks">;
     _creationTime: number;
@@ -3444,7 +3464,7 @@ export interface Insert_devices {
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
-    transport?: "ssh";
+    transport?: "ssh" | "headless";
     userId: string;
     viaDeviceId?: Id<"devices">;
 }
@@ -4203,6 +4223,26 @@ export interface Insert_passkey {
     userId: string;
 }
 
+<<<<<<< HEAD
+=======
+export interface Insert_deviceCode {
+    _id?: Id<"deviceCode">;
+    _creationTime?: number;
+    clientId?: string;
+    deviceCode: string;
+    expiresAt: number;
+    hostname?: string;
+    lastPolledAt?: number;
+    platform?: string;
+    pollingInterval?: number;
+    scope?: string;
+    status: string;
+    storage?: string;
+    userCode: string;
+    userId?: string;
+}
+
+>>>>>>> 230f90e40 (feat(devices): pair a headless machine by code)
 export interface Insert_persistentChunks {
     _id?: Id<"persistentChunks">;
     _creationTime?: number;

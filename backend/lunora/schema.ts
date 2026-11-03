@@ -690,9 +690,12 @@ export const schema = defineSchema({
         expiresAt: v.number(),
         hostname: v.optional(v.string()),
         lastPolledAt: v.optional(v.number()),
+        // A host code (`neore-host`) also names the machine's platform and where it keeps the device secret.
+        platform: v.optional(v.string()),
         pollingInterval: v.optional(v.number()),
         scope: v.optional(v.string()),
         status: v.string(),
+        storage: v.optional(v.string()),
         userCode: v.string(),
         userId: v.optional(v.string()),
     })

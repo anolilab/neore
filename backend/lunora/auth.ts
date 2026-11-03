@@ -27,6 +27,7 @@ import { createShardClient } from "lunorash/runtime";
 import { internal } from "./_generated/internal";
 import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
+import type { HostPairingOptions } from "./auth/cli-device-auth";
 import { cliDeviceAuth } from "./auth/cli-device-auth";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
@@ -198,6 +199,8 @@ const passkeyRelyingParty = (): { origin: string | null; rpID: string } => {
  */
 /** Callbacks `buildAuthOptions` wires into plugins; `buildAuth` supplies them from the Worker env. */
 interface AuthOptionHooks {
+    /** A headless machine pairing itself by code (`auth/cli-device-auth.ts`); both run on the account's shard. */
+    hostPairing?: HostPairingOptions;
     /** An anonymous user converted to a real account (a NEW user). See `lib/account-merge.ts`. */
     onGuestConverted?: (guestId: string, userId: string) => Promise<void>;
 }
@@ -287,6 +290,8 @@ export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number;
     // therefore has no per-address rule: the plugin refuses a code polled faster than its 5 s interval
     // (`slow_down`), which is keyed on the CODE, and a guessed code costs one indexed read.
     "/device/key": false,
+    // A headless machine pairing (`neore-host pair`) polls this exactly as the CLI polls `/device/key`: same reasoning.
+    "/device/host": false,
     // Issuing a code: a person runs `login` rarely. The ceiling is high enough for a shared address to
     // sign in a whole office (the table is cleaned of lapsed codes on every issue), and low enough to stop a loop.
     "/device/code": { max: 60, window: 60 },
@@ -359,6 +364,9 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             apiKey(API_KEY_OPTIONS),
             // `neore login --device`: signs the CLI in by code, answered with a read-only API key.
             ...cliDeviceAuth({
+                // `neore-host pair`: a headless machine pairs itself as a device of the approving account. The
+                // device row lives on that account's shard, so both steps cross to it.
+                ...(hooks.hostPairing && { hostPairing: hooks.hostPairing }),
                 mintApiKey: async ({ expiresInSeconds, name, userId }) =>
                     await (getAuth().api as unknown as ApiKeyAuthApi).createApiKey({
                         body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
@@ -653,6 +661,13 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`).
+            hostPairing: {
+                precheck: async (userId) => {
+                    await shard.call(internal.devices.internal.checkHeadlessPairing, { userId }, { shardKey: userId });
+                },
+                register: async ({ name, platform, userId }) =>
+                    await shard.call(internal.devices.internal.registerHeadlessDevice, { name, platform, userId }, { shardKey: userId }),
+            },
             onGuestConverted: async (guestId, userId) => {
                 try {
                     await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });

@@ -33,7 +33,7 @@ const functions = await import("./functions");
 const internals = await import("./internal");
 const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing");
 const gdpr = await import("./gdpr");
-const { MAX_OPEN_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } = await import("./lib/constants");
+const { MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE, MIN_DEVICE_PROTOCOL } = await import("./lib/constants");
 const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
@@ -1217,5 +1217,102 @@ describe("servers reached over SSH", () => {
         await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: first.desktop.deviceId } as never);
         expect(await ids()).toEqual([second.desktop.deviceId]);
         expect(await readCall(callId)).toMatchObject({ status: "expired" });
+    });
+});
+
+describe("a headless machine paired by code", () => {
+    const pairHeadless = async (userId: string, name = "build-box") =>
+        (await harness.run(async (ctx: any) => await ctx.runMutation(internals.registerHeadlessDevice, { name, platform: "linux", userId }))) as {
+            deviceId: string;
+            secret: string;
+        };
+
+    it("is a device of the approving account with its own secret, which the list never carries", async () => {
+        const headless = await pairHeadless(ownerId);
+
+        expect(headless.secret).toMatch(HEX_SECRET);
+
+        const list = (await as(ownerId).query(functions.listDevices as never, {} as never)) as Record<string, unknown>[];
+
+        expect(list).toHaveLength(1);
+        expect(list[0]).toMatchObject({ _id: headless.deviceId, name: "build-box", platform: "linux", transport: "headless" });
+        expect(JSON.stringify(list)).not.toContain(headless.secret);
+        // It is a direct device: no desktop holds its secret.
+        expect(list[0]).not.toHaveProperty("viaDeviceId");
+    });
+
+    it("accepts what is signed with its secret and refuses what a foreign device signed", async () => {
+        const headless = await pairHeadless(ownerId);
+        const foreign = await register(ownerId);
+
+        await expect(
+            as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never),
+        ).resolves.toEqual({ toolCount: 1 });
+
+        // Another device's secret, even one of the same account, does not speak for this one.
+        const forged = await signManifest(headless.deviceId, foreign.secret, Date.now() + 1000);
+
+        await expect(as(ownerId).mutation(functions.updateDeviceManifest as never, forged as never)).rejects.toThrow(SIGNATURE_ERROR);
+    });
+
+    it("gets calls signed for it: they verify under its secret and under no other device's", async () => {
+        const headless = await pairHeadless(ownerId);
+        const foreign = await register(ownerId);
+
+        await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never);
+
+        const created = await createCall({ deviceId: headless.deviceId, threadId: await insertThread(ownerId), userId: ownerId });
+
+        expect(created).toHaveProperty("callId");
+
+        const call = (await readCall((created as { callId: string }).callId)) as { envelope: string; signature: string };
+
+        expect(await verifyDevicePayload(headless.secret, "call", call.envelope, call.signature)).toBe(true);
+        expect(await verifyDevicePayload(foreign.secret, "call", call.envelope, call.signature)).toBe(false);
+        expect(JSON.parse(call.envelope)).toMatchObject({ deviceId: headless.deviceId, kind: "call" });
+
+        // A result signed by another device's secret does not complete it.
+        const forged = await signedResult(headless.deviceId, foreign.secret, (created as { callId: string }).callId);
+
+        await as(ownerId).mutation(
+            functions.claimDeviceCall as never,
+            { callId: (created as { callId: string }).callId, deviceId: headless.deviceId } as never,
+        );
+        await expect(as(ownerId).mutation(functions.completeDeviceCall as never, forged as never)).rejects.toThrow(SIGNATURE_ERROR);
+    });
+
+    it("is out of reach of another account", async () => {
+        const headless = await pairHeadless(ownerId);
+        const stranger = await insertUser();
+
+        await expect(
+            as(stranger).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never),
+        ).rejects.toThrow(NOT_FOUND_ERROR);
+        expect(await as(stranger).query(functions.listDevices as never, {} as never)).toEqual([]);
+    });
+
+    it("is refused for a guest, and once the account holds its device limit, before the code is spent", async () => {
+        const guest = await insertUser({ isAnonymous: true });
+        const run = async (userId: string) => await harness.run(async (ctx: any) => await ctx.runQuery(internals.checkHeadlessPairing, { userId }));
+
+        await expect(run(guest)).rejects.toThrow(REQUIRES_AN_ACCOUNT_ERROR);
+        await expect(run(ownerId)).resolves.toBeNull();
+
+        for (let index = 0; index < MAX_DEVICES_PER_USER; index += 1) {
+            await pairHeadless(ownerId, `box-${String(index)}`);
+        }
+
+        await expect(run(ownerId)).rejects.toThrow(/At most/u);
+        await expect(pairHeadless(ownerId)).rejects.toThrow(/At most/u);
+    });
+
+    it("can be revoked from the web, which ends its secret", async () => {
+        const headless = await pairHeadless(ownerId);
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId: headless.deviceId } as never);
+
+        await expect(
+            as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(headless.deviceId, headless.secret)) as never),
+        ).rejects.toThrow(NOT_FOUND_ERROR);
     });
 });
