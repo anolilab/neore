@@ -1384,8 +1384,11 @@ describe("a run whose model call is aborted", () => {
         });
 
         let returned = false;
+        let runRejected = false;
         const running = (async () => {
-            await run().catch(() => undefined);
+            await run().catch(() => {
+                runRejected = true;
+            });
             returned = true;
         })();
 
@@ -1407,6 +1410,7 @@ describe("a run whose model call is aborted", () => {
         await running;
 
         expect(returned).toBe(true);
+        expect(runRejected).toBe(false);
 
         const { rows } = await readState();
 
