@@ -51,6 +51,7 @@ import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { closeMCPClients } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { MAX_LENGTH } from "../lib/validators";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
@@ -628,6 +629,8 @@ export const continueAfterToolApproval = internalAction
     .input({
         /** The user's answer to an approved `askUser` call — its tool result (`chat/ask-user.ts`). */
         answer: v.optional(v.string()),
+        /** Images the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
+        answerFileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         approvalId: v.string(),
         approved: v.boolean(),
         config: vToolRunConfig,
@@ -637,7 +640,7 @@ export const continueAfterToolApproval = internalAction
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
+    .action(async ({ args: { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
         // Enqueued on the jobs queue (at-least-once): only the claiming delivery resumes the run.
         if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
             streamLogger.warn(`[ToolApproval] Stream ${streamId} already claimed — ignoring a redelivered continuation`);
@@ -681,7 +684,7 @@ export const continueAfterToolApproval = internalAction
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
             const resumed = await resumeApprovedRun(
                 ctx,
-                { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
 

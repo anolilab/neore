@@ -16,7 +16,7 @@ import { v } from "lunorash/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { claimAskUserAnswer } from "./lib/ask-user-claim";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
-import { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON } from "./tools/ask-user-constants";
+import { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_MAX_FILES } from "./tools/ask-user-constants";
 
 export const answerAskUser = authMutation
     .use(rateLimit("chat/stream"))
@@ -27,11 +27,13 @@ export const answerAskUser = authMutation
             v.null(),
         ),
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
+        /** Files to answer with, checked by the continuation as the owner (`lib/ask-user-files.ts`); none on a dismiss. */
+        fileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id)).check((value) => value.length <= ASK_USER_MAX_FILES, { message: "Too many files" })),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { answer, approvalId, threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { answer, approvalId, fileIds, threadId, unlockProof }, ctx }) => {
         const claim = await claimAskUserAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
@@ -51,7 +53,9 @@ export const answerAskUser = authMutation
             ownerId: claim.ownerId,
             runId: claim.runId,
             threadId,
-            ...(claim.answer === undefined ? { denyReason: ASK_USER_DISMISSED_REASON } : { answer: claim.answer }),
+            ...(claim.answer === undefined
+                ? { denyReason: ASK_USER_DISMISSED_REASON }
+                : { answer: claim.answer, ...(fileIds !== undefined && fileIds.length > 0 && { answerFileIds: fileIds }) }),
         });
 
         ctx.log.event("chat.answer_ask_user", { alreadyResolved: false, dismissed: claim.answer === undefined, resumed: streamId !== null });

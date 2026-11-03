@@ -22,7 +22,7 @@ import z from "zod/v4";
 
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import type { AskUserInput, AskUserOutput } from "./ask-user-constants";
+import type { AskUserFile, AskUserInput, AskUserOutput } from "./ask-user-constants";
 import { ASK_USER_CHOICE_MAX, ASK_USER_MAX_CHOICES, ASK_USER_QUESTION_MAX } from "./ask-user-constants";
 
 const inputSchema = z
@@ -57,19 +57,43 @@ const askUserTool = createTool<AskUserInput, AskUserOutput, ToolContext>({
     title: "Ask User",
 });
 
-/** The same tool for one resumed run, answering with `answer`. */
-export const createAnsweredAskUserTool = (answer: string) =>
-    createTool<AskUserInput, AskUserOutput, ToolContext>({
+/**
+ * The same tool for one resumed run, answering with `answer`. Attached files
+ * go to the model as content parts of this call's result (images as image data,
+ * PDFs as file data); the stored output names them and nothing more.
+ */
+export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<AskUserFile> = []) => {
+    const attachedFiles = files.map(({ filename, mediaType }) => {
+        return { filename, mediaType };
+    });
+
+    return createTool<AskUserInput, AskUserOutput, ToolContext>({
         description: DESCRIPTION,
         execute: async () => {
-            return { answer, answered: true };
+            return { answer, answered: true, ...(attachedFiles.length > 0 && { attachedFiles }) };
         },
         inputSchema,
         needsApproval: true,
         title: "Ask User",
+        ...(files.length > 0 && {
+            toModelOutput: (_context, { output }) => {
+                return {
+                    type: "content" as const,
+                    value: [
+                        { text: JSON.stringify(output), type: "text" as const },
+                        ...files.map((file) =>
+                            file.mediaType === "application/pdf"
+                                ? { data: file.data, filename: file.filename, mediaType: file.mediaType, type: "file-data" as const }
+                                : { data: file.data, mediaType: file.mediaType as `image/${string}`, type: "image-data" as const },
+                        ),
+                    ],
+                };
+            },
+        }),
     });
+};
 
-export type { AskUserInput, AskUserOutput } from "./ask-user-constants";
+export type { AskUserFile, AskUserInput, AskUserOutput } from "./ask-user-constants";
 export { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_TOOL_NAME } from "./ask-user-constants";
 
 export default askUserTool;

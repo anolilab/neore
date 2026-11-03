@@ -6,43 +6,58 @@
  *
  * While the call waits (`approval-requested`) the owner answers here: a
  * suggested choice sends at once, or they type their own answer — Enter sends,
- * Shift+Enter adds a line. Dismissing is permanent, so it is only ever the
- * explicit button: Escape just leaves the field. Either resumes the run
- * server-side (`answerAskUser`), which opens a fresh stream the thread's
- * streaming placeholder picks up. Afterwards it shows the answer read-only.
+ * Shift+Enter adds a line. An answer can carry up to four files, attached with
+ * the composer's upload route; the server reads them for the one model call
+ * that answers. Dismissing is permanent, so it is only ever the explicit
+ * button: Escape just leaves the field. Either resumes the run server-side
+ * (`answerAskUser`), which opens a fresh stream the thread's streaming placeholder
+ * picks up. Afterwards it shows the answer read-only, with the names of the
+ * files it carried.
  *
  * Only the thread owner can answer: the run resumes with the owner's tools and
  * keys. Anyone else sees the question read-only.
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
-import { MessageCircleQuestion, Send, X } from "lucide-react";
-import type { FC, FormEvent, KeyboardEvent } from "react";
+import { MessageCircleQuestion, Paperclip, Send, X } from "lucide-react";
+import type { ChangeEvent, FC, FormEvent, KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+import { uploadFile } from "@/lib/upload/upload-file";
 
 import { normalizeAskUserChoices } from "./ask-user-choices";
 
 /** Mirrors `ASK_USER_ANSWER_MAX` on the server. */
 const ANSWER_MAX = 4000;
 
+/** Mirrors `ASK_USER_MAX_FILES`, `ASK_USER_FILE_TYPES` and `ASK_USER_FILE_MAX_BYTES` on the server. */
+const FILES_MAX = 4;
+const FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+const FILE_MAX_BYTES = 10 * 1024 * 1024;
+
 interface AskUserInput {
     choices?: string[];
     question?: string;
 }
 
-type AskUserOutput = { answer: string; answered: true } | { answered: false; message: string };
+type AskUserOutput = { answer: string; answered: true; attachedFiles?: { filename: string; mediaType: string }[] } | { answered: false; message: string };
 
 type Submitted = { answer: string; kind: "answer" } | { kind: "dismiss" };
+
+interface AttachedFile {
+    fileId: string;
+    name: string;
+}
 
 const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
@@ -50,13 +65,17 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { thread, threadId } = useChatThread();
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
+    const finalizeUpload = useAction(api.file.finalizeChatUpload);
     const headingId = useId();
     const answerId = useId();
     const hintId = useId();
     const [draft, setDraft] = useState("");
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
+    const [files, setFiles] = useState<AttachedFile[]>([]);
+    const [uploading, setUploading] = useState(false);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as AskUserInput;
@@ -76,7 +95,13 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
-            { answer: reply.kind === "answer" ? reply.answer : null, approvalId, threadId: threadId as Id<"threads"> },
+            {
+                answer: reply.kind === "answer" ? reply.answer : null,
+                approvalId,
+                // Dismissing carries no files: the question closes without an answer.
+                ...(reply.kind === "answer" && files.length > 0 && { fileIds: files.map((file) => file.fileId) }),
+                threadId: threadId as Id<"threads">,
+            },
             {
                 onError: (error) => {
                     setSubmitted(null);
@@ -89,7 +114,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const sendDraft = () => {
         const answer = draft.trim();
 
-        if (answer.length > 0 && canAnswer) {
+        if (answer.length > 0 && canAnswer && !uploading) {
             send({ answer, kind: "answer" });
         }
     };
@@ -106,6 +131,39 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             sendDraft();
+        }
+    };
+
+    const attachFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+        const fileInput = event.target;
+        const picked = [...(fileInput.files ?? [])];
+
+        fileInput.value = "";
+
+        const room = FILES_MAX - files.length;
+        const accepted = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= FILE_MAX_BYTES).slice(0, Math.max(room, 0));
+
+        if (accepted.length < picked.length) {
+            showError(t`Only PNG, JPEG, WEBP or GIF images and PDFs up to 10 MB, four at most.`);
+        }
+
+        if (accepted.length === 0) {
+            return;
+        }
+
+        setUploading(true);
+
+        try {
+            for (const file of accepted) {
+                const uploadId = await uploadFile(file, { contentType: file.type });
+                const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
+
+                setFiles((current) => [...current, { fileId, name: file.name }]);
+            }
+        } catch (error) {
+            showError(error instanceof Error ? error : t`Could not attach that file. Please try again.`);
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -132,6 +190,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         answerText = submitted.answer;
     }
 
+    const answeredFiles = output?.answered ? (output.attachedFiles ?? []) : [];
+
     return (
         <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
             <div className="flex items-start gap-2">
@@ -153,12 +213,25 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 </p>
             )}
 
+            {answeredFiles.length > 0 && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                    {t`Attached:`} {answeredFiles.map((file) => file.filename).join(", ")}
+                </p>
+            )}
+
             {canAnswer && (
                 <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
                     {choices.length > 0 && (
                         <div aria-label={t`Suggested answers`} className="flex flex-wrap gap-2" role="group">
                             {choices.map((choice) => (
-                                <Button key={choice} onClick={() => send({ answer: choice, kind: "answer" })} size="sm" type="button" variant="outline">
+                                <Button
+                                    disabled={uploading}
+                                    key={choice}
+                                    onClick={() => send({ answer: choice, kind: "answer" })}
+                                    size="sm"
+                                    type="button"
+                                    variant="outline"
+                                >
                                     {choice}
                                 </Button>
                             ))}
@@ -178,11 +251,48 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         size="sm"
                         value={draft}
                     />
+                    {files.length > 0 && (
+                        <ul aria-label={t`Attached files`} className="flex flex-wrap gap-2">
+                            {files.map((file) => (
+                                <li className="bg-background flex items-center gap-1 rounded-md border px-2 py-1 text-xs" key={file.fileId}>
+                                    <span className="max-w-40 truncate">{file.name}</span>
+                                    <button
+                                        aria-label={t`Remove ${file.name}`}
+                                        className="text-muted-foreground hover:text-foreground"
+                                        onClick={() => setFiles((current) => current.filter((item) => item.fileId !== file.fileId))}
+                                        type="button"
+                                    >
+                                        <X aria-hidden="true" className="size-3" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                     <p className="text-muted-foreground text-xs" id={hintId}>
                         {t`Enter to send, Shift+Enter for a new line.`}
                     </p>
+                    <input
+                        accept={FILE_TYPES.join(",")}
+                        aria-hidden="true"
+                        className="hidden"
+                        multiple
+                        onChange={attachFiles}
+                        ref={fileInputRef}
+                        tabIndex={-1}
+                        type="file"
+                    />
                     <div className="flex flex-wrap gap-2">
-                        <Button disabled={draft.trim().length === 0} size="sm" type="submit">
+                        <Button
+                            disabled={uploading || files.length >= FILES_MAX}
+                            onClick={() => fileInputRef.current?.click()}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                        >
+                            <Paperclip aria-hidden="true" />
+                            {uploading ? t`Attaching…` : t`Attach file`}
+                        </Button>
+                        <Button disabled={uploading || draft.trim().length === 0} size="sm" type="submit">
                             <Send aria-hidden="true" />
                             {t`Send answer`}
                         </Button>

@@ -26,6 +26,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
+import { loadAskUserFiles } from "./ask-user-files";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
@@ -965,6 +966,8 @@ export const resumeApprovedRun = async (
     args: {
         /** An approved `askUser` call's answer, or a saved `requestSecret`'s reference: the resumed tool returns it as its result. */
         answer?: string;
+        /** Files an `askUser` answer carries, read as the owner for this one call (`lib/ask-user-files.ts`). */
+        answerFileIds?: string[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig;
@@ -988,7 +991,7 @@ export const resumeApprovedRun = async (
         steerable?: boolean;
     } = {},
 ): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
-    const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
@@ -1030,8 +1033,9 @@ export const resumeApprovedRun = async (
 
             // Loaded here, not at the top: the tool module pulls in the agent client.
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
+            const files = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
 
-            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
+            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, files) as (typeof toolResult.tools)[string];
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.
