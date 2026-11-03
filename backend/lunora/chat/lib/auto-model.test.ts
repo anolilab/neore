@@ -52,6 +52,7 @@ const request = {
     plan: async () => plan,
     prompt: "hello",
     threadId: "thread-1",
+    toolCount: 3,
     userId: "user-1",
 };
 const route = (modelId: string) => {
@@ -127,6 +128,7 @@ describe("resolveAutoModel", () => {
                 modelFilterRules: { blockedProviders: ["x"] },
                 runnableModels: expect.any(Array),
                 threadId: "thread-1",
+                toolCount: 3,
                 userId: "user-1",
                 userTier: "free",
             },

@@ -106,6 +106,8 @@ export interface RouteRequest {
     /** The (provider, API model) pairs the caller can run: the gateway routes only among these (see the route's schema). */
     runnableModels?: { modelApiId: string; provider: string }[];
     threadId?: string;
+    /** Built-in tools the send would offer. Counted from the tool set when `toolSchemas` is not sent. */
+    toolCount?: number;
     toolSchemas?: Record<string, JSONSchema7>;
     /** Optional W3C `traceparent` for cross-service trace propagation. */
     traceparent?: string;

@@ -148,15 +148,19 @@ const requestSchema = z.object({
      */
     routingProfile: z.enum(["fast", "balanced", "reasoning", "premium"]).optional(),
 
-    /**
-     * The (provider, API model) pairs the caller can run. When set, only those candidates are routed to, and only the
-     * ones whose context window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
-     */
     runnableModels: z
         .array(z.object({ modelApiId: z.string(), provider: z.string() }))
         .max(1000)
         .optional(),
+
     threadId: z.string().optional(),
+
+    /**
+     * The (provider, API model) pairs the caller can run. When set, only those candidates are routed to, and only the
+     * ones whose context window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
+     */
+    /** Number of tools the send would offer, when the caller does not send their schemas (`toolSchemas`). */
+    toolCount: z.int().min(0).optional(),
     toolSchemas: z.record(z.string(), z.unknown()).optional(),
 
     /**
@@ -191,7 +195,7 @@ routeRouter.openapi(
     async (c) => {
         const body = c.req.valid("json");
         const messages = body.messages as ModelMessage[];
-        const toolCount = body.toolSchemas ? Object.keys(body.toolSchemas).length : 0;
+        const toolCount = body.toolCount ?? (body.toolSchemas ? Object.keys(body.toolSchemas).length : 0);
         const hasImages = messages.some((m) => Array.isArray(m.content) && m.content.some((p: { type: string }) => p.type === "image" || p.type === "file"));
         const contextTokens = Math.max(estimateContextTokens(messages), body.contextTokens ?? 0);
 
@@ -293,7 +297,7 @@ routeRouter.openapi(
             messages,
             preferredQuality: body.preferredQuality,
             // Our scorer counts tools rather than inspecting their schemas.
-            toolCount: body.toolSchemas ? Object.keys(body.toolSchemas).length : undefined,
+            toolCount: body.toolCount ?? (body.toolSchemas ? Object.keys(body.toolSchemas).length : undefined),
             userTier: body.userTier,
         });
 

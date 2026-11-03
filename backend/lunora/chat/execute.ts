@@ -14,7 +14,7 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
-import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -63,7 +63,8 @@ import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgress
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
-import type { SearchMode } from "./lib/tool-builder";
+import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
+import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
@@ -338,13 +339,39 @@ export const runStreamingAgent = internalAction
                         userId,
                     })
                 ) {
+                    // The route is sized for what the model will receive: the history, the instructions it is given (the agent's
+                    // own, the loaded context and the skill's), and the built-in tools. MCP tools are added later and not counted.
+                    const fallbackTools = getToolsForModelAndMode(
+                        model,
+                        "chat",
+                        invokedSkill?.config
+                            ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
+                            : undefined,
+                        { autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment },
+                    );
+
                     routedModel = await resolveAutoModel(ctx, {
-                        conversation: async () =>
-                            await ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, {
-                                promptMessageId: messageId,
-                                stateless: thread?.statelessMode ?? statelessMode,
-                                threadId: threadId as Id<"threads">,
-                            }),
+                        conversation: async () => {
+                            const [history, run, fallbackAgent] = await Promise.all([
+                                ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, {
+                                    promptMessageId: messageId,
+                                    stateless: thread?.statelessMode ?? statelessMode,
+                                    threadId: threadId as Id<"threads">,
+                                }),
+                                runContextPromise,
+                                getAgentForUser(ctx, userId, model, thread?.language),
+                            ]);
+                            const systemCharacters =
+                                (fallbackAgent.options.instructions ?? "").length +
+                                run.contextParts.join("\n\n").length +
+                                (invokedSkill?.instructions.length ?? 0);
+
+                            return {
+                                contextTokens: history.contextTokens + Math.ceil(estimateTokensFromCharacters(systemCharacters)),
+                                files: history.files,
+                                images: history.images,
+                            };
+                        },
                         // The thread's own model is the fallback: a send that names another model must not run on it.
                         fallbackModel: thread?.model ?? model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
@@ -355,6 +382,7 @@ export const runStreamingAgent = internalAction
                         },
                         prompt,
                         threadId,
+                        toolCount: Object.keys(fallbackTools).length,
                         userId,
                     });
                     model = routedModel;

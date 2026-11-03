@@ -105,6 +105,8 @@ export interface AutoRequest {
     plan: () => Promise<RunPlan>;
     prompt: string;
     threadId: string;
+    /** The built-in tools the send would offer, counted for the fallback model's tool set. */
+    toolCount: number;
     userId: string;
 }
 
@@ -142,6 +144,7 @@ export const resolveAutoModel = async (ctx: ActionCtx, request: AutoRequest): Pr
                 ...(conversation.contextTokens > 0 && { contextTokens: conversation.contextTokens }),
                 messages: [{ content: prompt, role: "user" }],
                 runnableModels: RUNNABLE_MODELS,
+                toolCount: request.toolCount,
                 ...(filterRules && { modelFilterRules: gatewayRules(filterRules) }),
                 threadId,
                 userId,

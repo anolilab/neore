@@ -917,6 +917,7 @@
                     "contextTokens": { "type": "integer", "minimum": 0 },
                     "routingProfile": { "type": "string", "enum": ["fast", "balanced", "reasoning", "premium"] },
                     "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" },
+                    "toolCount": { "type": "integer", "minimum": 0 },
                     "runnableModels": {
                         "type": "array",
                         "maxItems": 1000,
