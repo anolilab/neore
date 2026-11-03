@@ -2421,13 +2421,11 @@ error")` (any transport, including the SSRF-guarded tool
   comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The Lunora catalog is aligned to the
-  cluster the meta-packages pin (2026-11-03: `lunorash` 473, `cli` 475, `react` 294, `client` 284),
-  not to the newest tags. The branded packages (`client`, `workflow`, `auth`) each resolve to one
-  version, which is what matters for type identity. Three non-branded packages still have two
-  copies (`server` 266 and 267, `agent` 279 and 280, `shard-engine` 185 and 186): `lunorash` 473
-  pins `server` 266 and `ratelimit` 195 pins 267. Extra copies of non-branded packages are
-  structurally interchangeable, so no override is added.
+  beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
+  catalog in `pnpm-workspace.yaml`, aligned to the cluster the meta-packages pin rather than the
+  newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
+  each; a non-branded package may keep two copies when the meta-packages pin different versions,
+  and that is not overridden.
   `pnpm dedupe` also collapsed `@lunora/errors`, whose range dependencies had resolved to two
   versions. A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
