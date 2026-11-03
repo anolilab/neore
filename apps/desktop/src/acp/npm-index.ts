@@ -23,7 +23,7 @@ export interface NpmIndexEntry {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The index address of one version; a scoped name keeps its `@` and encodes the slash. */
-export const npmVersionUrl = (name: string, version: string): string => `${NPM_REGISTRY}/${name.replace("/", "%2F")}/${encodeURIComponent(version)}`;
+export const npmVersionUrl = (name: string, version: string): string => `${NPM_REGISTRY}/${name.replaceAll("/", "%2F")}/${encodeURIComponent(version)}`;
 
 /**
  * Looks up `name@version`. Refuses an answer for another name or version, a version with no SHA-512 integrity
