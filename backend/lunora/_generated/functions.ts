@@ -893,6 +893,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "coding_agents_functions:claimFinish": lunora_coding_agents_functions_98.claimFinish as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:claimPoll": lunora_coding_agents_functions_98.claimPoll as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:claimRun": lunora_coding_agents_functions_98.claimRun as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:commitAuthorFor": lunora_coding_agents_functions_98.commitAuthorFor as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:completePullRequest": lunora_coding_agents_functions_98.completePullRequest as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:completeRun": lunora_coding_agents_functions_98.completeRun as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:createRun": lunora_coding_agents_functions_98.createRun as unknown as RegisteredLunoraFunction,
@@ -908,6 +909,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "coding_agents_functions:hasProviderKey": lunora_coding_agents_functions_98.hasProviderKey as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:postRunResult": lunora_coding_agents_functions_98.postRunResult as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:recordPoll": lunora_coding_agents_functions_98.recordPoll as unknown as RegisteredLunoraFunction,
+    "coding_agents_functions:setCodingAgentCommitIdentity": lunora_coding_agents_functions_98.setCodingAgentCommitIdentity as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:setPullRequestSandbox": lunora_coding_agents_functions_98.setPullRequestSandbox as unknown as RegisteredLunoraFunction,
     "coding_agents_functions:setRunSandbox": lunora_coding_agents_functions_98.setRunSandbox as unknown as RegisteredLunoraFunction,
     "coding_agents_gdpr:cancelUserCodingAgentRuns": lunora_coding_agents_gdpr_99.cancelUserCodingAgentRuns as unknown as RegisteredLunoraFunction,
@@ -4825,6 +4827,12 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
+});
+installCompiledValidatorMap(lunora_coding_agents_functions_98.commitAuthorFor.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_coding_agents_functions_98.completePullRequest.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
