@@ -82,6 +82,7 @@ vi.mock("@/lib/lunora/crpc", async () => {
 });
 
 const { default: HostComposer } = await import("./host-composer");
+const { usePromptQueueStore } = await import("@/features/chat/core/stores/prompt-queue-store");
 
 const ALWAYS = /always/iu;
 const CUT = /too long to show whole/u;
@@ -108,6 +109,8 @@ const session = (fields: Record<string, unknown> = {}) => {
 beforeEach(() => {
     harness.calls = [];
     harness.sendResults = [];
+    usePromptQueueStore.setState({ queues: {} });
+    globalThis.sessionStorage?.clear();
 });
 
 afterEach(() => {
@@ -171,6 +174,33 @@ describe("the coding-agent composer", () => {
 
         await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { threadId: "thread-1" }]));
         expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    });
+
+    it("queues a message typed while a turn runs, and sends nothing until the turn ends", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "then run the tests" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+        expect(await screen.findByText("then run the tests")).toBeTruthy();
+        expect(box.value).toBe("");
+        expect(harness.calls.some(([name]) => name === "send")).toBe(false);
+    });
+
+    it("interrupts the reply with Interrupt and send, and keeps the text queued first", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "use the other fixture" } });
+        fireEvent.click(screen.getByRole("button", { name: "Interrupt and send" }));
+
+        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { threadId: "thread-1" }]));
+        expect(await screen.findByText("use the other fixture")).toBeTruthy();
+        // The turn is still running on the stream, so the text waits for it to end rather than going out now.
+        expect(harness.calls.some(([name]) => name === "send")).toBe(false);
     });
 
     it("says the agent is starting and still takes a message, which goes out once it is up", async () => {

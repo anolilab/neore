@@ -15,17 +15,26 @@ import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldQuestion, Square } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import interruptAndSend from "@/features/chat/thread/interrupt-and-send";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
+import { canInterruptAndSend, canSendQueueHead, shouldQueueMessage } from "./host-queue";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
+
+/**
+ * How long the queue waits, after a send was accepted, for the thread's stream to show that the turn started. Past it the
+ * stream is taken as not coming, and the queue goes on, so a stream that never appears cannot hold the queue for good.
+ */
+const PENDING_START_MS = 5000;
 
 interface PendingRequest {
     command?: string;
@@ -90,7 +99,29 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
     const messages = useHostSendErrorMessages();
 
-    const send = async (prompt: string) => {
+    const queue = usePromptQueueStore(selectThreadQueue(threadId));
+    const enqueue = usePromptQueueStore((state) => state.enqueue);
+    const remove = usePromptQueueStore((state) => state.remove);
+    const setPaused = usePromptQueueStore((state) => state.setPaused);
+    const [pendingStart, setPendingStart] = useState(false);
+
+    useEffect(() => {
+        usePromptQueueStore.getState().hydrate(threadId);
+    }, [threadId]);
+
+    // The hold ends after a timeout: the stream normally takes over before it, and a stream that never comes must not
+    // hold the queue for good.
+    useEffect(() => {
+        if (!pendingStart) {
+            return undefined;
+        }
+
+        const timer = setTimeout(setPendingStart, PENDING_START_MS, false);
+
+        return () => clearTimeout(timer);
+    }, [pendingStart]);
+
+    const send = async (prompt: string, queuedId?: string) => {
         // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
         // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
         // call it a repeat of the first and drop it.
@@ -102,14 +133,30 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
         const result = await sendHostMessage({ requestId: attempt.current.id, text: prompt, threadId });
 
-        setSending(false);
-
         if (result.ok) {
             attempt.current = undefined;
+
+            // The hold is taken before the head leaves the queue: the queue's next message must not see both as clear.
+            if (queuedId !== undefined) {
+                setPendingStart(true);
+                remove(threadId, queuedId);
+            }
+
+            setSending(false);
+
             // Continue sends a fixed prompt: a draft being typed beside it stays.
-            setText((current) => (current.trim() === prompt ? "" : current));
+            if (queuedId === undefined) {
+                setText((current) => (current.trim() === prompt ? "" : current));
+            }
 
             return;
+        }
+
+        setSending(false);
+
+        // A queued message that was refused waits at the head for the person: the queue pauses, and "Send next" retries it.
+        if (queuedId !== undefined) {
+            setPaused(threadId, true);
         }
 
         toast.error(messages[result.error]);
@@ -118,17 +165,54 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const trimmed = text.trim();
     const status = session?.status;
     const blocked = status === "ended";
-    const canSend = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
+    const canWrite = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !blocked;
+    const queueing = shouldQueueMessage({ pendingStart, queued: queue.items.length, running });
+    const head = queue.items[0];
+
+    useEffect(() => {
+        if (head === undefined || !canSendQueueHead({ blocked, paused: queue.paused, pendingStart, queued: queue.items.length, running, sending })) {
+            return;
+        }
+
+        void send(head.text, head.id);
+        // `send` closes over the attempt ref and the store actions only; the head and the gates are what decide a send.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [head, queue.paused, queue.items.length, blocked, pendingStart, running, sending]);
+
+    /** A message typed now goes behind the queue while a turn runs, and is sent at once otherwise. */
+    const submit = (prompt: string) => {
+        if (queueing) {
+            enqueue(threadId, { attachments: [], text: prompt });
+            setText((current) => (current.trim() === prompt ? "" : current));
+
+            return;
+        }
+
+        void send(prompt);
+    };
+
+    // A send in flight takes no new message, so one text cannot be queued twice.
+    const canSubmit = canWrite && !sending;
+
+    /** Interrupt and send: the text goes to the head of the queue, then the running reply is stopped, so it goes next. */
+    const interrupt = () => {
+        interruptAndSend(threadId, trimmed, async () => {
+            await cancel.mutateAsync({ threadId: id }).catch(() => {
+                toast.error(t`Could not stop the reply.`);
+            });
+        });
+        setText("");
+    };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (!(event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && canSend)) {
+        if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || !canSubmit) {
             return;
         }
 
         event.preventDefault();
-        void send(trimmed);
+        submit(trimmed);
     };
 
     const answerRequest = (request: PendingRequest, optionId: string) => {
@@ -187,6 +271,38 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 </div>
             )}
+            {queue.items.length > 0 && (
+                <section aria-label={t`Queued messages`} className="flex flex-col gap-2">
+                    <ol className="flex flex-col gap-1">
+                        {queue.items.map((item, index) => (
+                            <li className="bg-muted flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm" key={item.id}>
+                                <span className="min-w-0 truncate">{item.text}</span>
+                                <span className="flex shrink-0 gap-1">
+                                    {index === 0 && queue.paused && (
+                                        <Button disabled={blocked || sending} onClick={() => setPaused(threadId, false)} size="sm" type="button">
+                                            {t`Send next`}
+                                        </Button>
+                                    )}
+                                    <Button onClick={() => remove(threadId, item.id)} size="sm" type="button" variant="ghost">
+                                        {t`Remove`}
+                                    </Button>
+                                </span>
+                            </li>
+                        ))}
+                    </ol>
+                    {queue.paused ? (
+                        <p className="text-muted-foreground text-xs" role="status">
+                            {t`The queue is paused because a message did not go out. Send next to try again.`}
+                        </p>
+                    ) : (
+                        running && (
+                            <p className="text-muted-foreground text-xs" role="status">
+                                {t`Queued messages go out in order once the reply ends.`}
+                            </p>
+                        )
+                    )}
+                </section>
+            )}
             <div className="flex items-end gap-2">
                 <textarea
                     aria-label={t`Message to the coding agent`}
@@ -199,21 +315,19 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     rows={2}
                     value={text}
                 />
-                {running ? (
+                {running && canInterruptAndSend() && (
+                    <Button disabled={cancel.isPending || !canWrite} onClick={interrupt} type="button" variant="outline">
+                        {t`Interrupt and send`}
+                    </Button>
+                )}
+                {running && (
                     <Button aria-label={t`Stop`} disabled={cancel.isPending} onClick={() => cancel.mutate({ threadId: id })} type="button" variant="outline">
                         <Square aria-hidden="true" className="size-4" />
                     </Button>
-                ) : (
-                    <Button
-                        disabled={!canSend}
-                        onClick={() => {
-                            send(trimmed);
-                        }}
-                        type="button"
-                    >
-                        {t`Send`}
-                    </Button>
                 )}
+                <Button disabled={!canSubmit} onClick={() => submit(trimmed)} type="button">
+                    {queueing ? t`Queue` : t`Send`}
+                </Button>
             </div>
         </div>
     );
