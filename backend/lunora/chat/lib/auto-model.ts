@@ -78,8 +78,11 @@ export interface ConversationShape {
     images: boolean;
 }
 
-/** How long a route may take before the run keeps its fallback model. */
-const AUTO_ROUTE_TIMEOUT_MS = 3000;
+/**
+ * How long a route may take before the run keeps its fallback model. Above the gateway classifier's own deadline (3 s)
+ * plus its KV reads, so a classifier answer that arrives in time is used rather than cut off by this side.
+ */
+const AUTO_ROUTE_TIMEOUT_MS = 4500;
 
 export interface AutoRequest {
     conversation: () => Promise<ConversationShape>;

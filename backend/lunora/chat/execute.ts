@@ -320,8 +320,10 @@ export const runStreamingAgent = internalAction
                 // already has a model: the one recorded in its job arguments below.
                 let routedModel: string | undefined;
 
+                // A goal's continuation round is machine-written and carries the goal's model across its rounds, so it is not routed.
                 if (
                     resume === undefined &&
+                    sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT &&
                     shouldRouteAuto({
                         currentModel: model,
                         isAnonymous: isAnonymous === true,

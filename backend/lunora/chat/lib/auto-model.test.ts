@@ -123,7 +123,7 @@ describe("resolveAutoModel", () => {
                 userId: "user-1",
                 userTier: "free",
             },
-            { timeoutMs: 3000 },
+            { timeoutMs: 4500 },
         );
     });
 
@@ -208,7 +208,7 @@ describe("resolveAutoModel", () => {
             },
         });
 
-        expect(routeViaGateway).toHaveBeenCalledWith(ctx, expect.objectContaining({ contextTokens: 50_000 }), { timeoutMs: 3000 });
+        expect(routeViaGateway).toHaveBeenCalledWith(ctx, expect.objectContaining({ contextTokens: 50_000 }), { timeoutMs: 4500 });
     });
 
     it("sends model lists in both spellings the gateway may know", async () => {
@@ -219,7 +219,7 @@ describe("resolveAutoModel", () => {
         expect(routeViaGateway).toHaveBeenCalledWith(
             ctx,
             expect.objectContaining({ modelFilterRules: { allowedModels: ["anthropic/claude-sonnet-4", "claude-sonnet-4"] } }),
-            { timeoutMs: 3000 },
+            { timeoutMs: 4500 },
         );
     });
 
