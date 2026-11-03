@@ -75,17 +75,17 @@ jobs:
             contents: "read"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
             - name: "Install Rust (stable)"
-              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
                   toolchain: "stable"
                   targets: "${{ matrix.targets }}"
@@ -106,7 +106,7 @@ jobs:
               run: "node apps/desktop/scripts/host-bundle.mjs sign"
 
             - name: "Upload the host binaries"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "neore-host-${{ matrix.name }}"
                   if-no-files-found: "error"
@@ -158,17 +158,17 @@ jobs:
             contents: "read"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
               with:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
@@ -178,7 +178,7 @@ jobs:
             # loaded by the shell at runtime. Without it the installer ships with the
             # addon missing, and the failure is silent until a device call runs.
             - name: "Install Rust (stable)"
-              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
                   toolchain: "stable"
 
@@ -237,7 +237,7 @@ jobs:
                   node -e "const fs = require('node:fs'); const file = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(file, JSON.stringify(pkg, null, 4) + '\n');" "$version"
 
             - name: "Download the host binaries"
-              uses: "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+              uses: "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" # v8.0.2
               with:
                   pattern: "neore-host-*"
                   merge-multiple: true
@@ -312,7 +312,7 @@ jobs:
               run: "pnpm --filter @neore/desktop run smoke:artifacts"
 
             - name: "Upload installers"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "${{ matrix.artifact }}"
                   if-no-files-found: "error"
@@ -342,7 +342,7 @@ jobs:
             TAG: "${{ github.ref_name }}"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
