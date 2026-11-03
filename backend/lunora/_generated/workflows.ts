@@ -10,7 +10,7 @@
  */
 import LunoraWorkflow from "@lunora/workflow/do";
 
-import { accountDeletionWorkflow, chatImportWorkflow, dataExportWorkflow } from "../workflows.js";
+import type { accountDeletionWorkflow, chatImportWorkflow, dataExportWorkflow } from "../workflows.js";
 
 /** Params type carried by a `defineWorkflow` definition (its phantom `__params`), so each entrypoint keeps the authored `ctx.params` type. */
 type WorkflowParamsOf<Definition> = Definition extends { __params?: infer Params }
@@ -25,20 +25,20 @@ type WorkflowOutputOf<Definition> = Definition extends { __output?: infer Output
 /** WorkflowEntrypoint for the `accountDeletionWorkflow` definition, reached as `ctx.exports.AccountDeletionWorkflowWorkflow`. */
 export class AccountDeletionWorkflowWorkflow extends LunoraWorkflow<WorkflowParamsOf<typeof accountDeletionWorkflow>, WorkflowOutputOf<typeof accountDeletionWorkflow>> {
     public constructor(ctx: ConstructorParameters<typeof LunoraWorkflow>[0], env: Record<string, unknown>) {
-        super(ctx, env, accountDeletionWorkflow, "accountDeletionWorkflow");
+        super(ctx, env, async () => (await import("../workflows.js")).accountDeletionWorkflow, "accountDeletionWorkflow");
     }
 }
 
 /** WorkflowEntrypoint for the `chatImportWorkflow` definition, reached as `ctx.exports.ChatImportWorkflowWorkflow`. */
 export class ChatImportWorkflowWorkflow extends LunoraWorkflow<WorkflowParamsOf<typeof chatImportWorkflow>, WorkflowOutputOf<typeof chatImportWorkflow>> {
     public constructor(ctx: ConstructorParameters<typeof LunoraWorkflow>[0], env: Record<string, unknown>) {
-        super(ctx, env, chatImportWorkflow, "chatImportWorkflow");
+        super(ctx, env, async () => (await import("../workflows.js")).chatImportWorkflow, "chatImportWorkflow");
     }
 }
 
 /** WorkflowEntrypoint for the `dataExportWorkflow` definition, reached as `ctx.exports.DataExportWorkflowWorkflow`. */
 export class DataExportWorkflowWorkflow extends LunoraWorkflow<WorkflowParamsOf<typeof dataExportWorkflow>, WorkflowOutputOf<typeof dataExportWorkflow>> {
     public constructor(ctx: ConstructorParameters<typeof LunoraWorkflow>[0], env: Record<string, unknown>) {
-        super(ctx, env, dataExportWorkflow, "dataExportWorkflow");
+        super(ctx, env, async () => (await import("../workflows.js")).dataExportWorkflow, "dataExportWorkflow");
     }
 }

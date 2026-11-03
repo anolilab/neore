@@ -1328,10 +1328,11 @@ The same window shipped [#1030](https://github.com/anolilab/lunora/pull/1030):
 `unknown` while codegen exited 0 and no advisory fired; only consumers'
 `lint:types` showed it. After a codegen bump, compare
 `cat backend/lunora/_generated/{api,internal}.ts | grep -c "unknown>"` with the
-previous count (35 on codegen 214, 235, 246 and 279 — the GDPR export
-collectors' untyped arrays; 36 once the bots export collector joined them, its
-`v.array(v.any())` kept on purpose so a new bot column cannot fail the export;
-31 on 207, against 157 on 205). Run codegen twice
+previous count. The count moves when procedures are added: it was 36 when the bots export
+collector joined (its `v.array(v.any())` is kept on purpose so a new bot column cannot fail the
+export), and 40 on main and on codegen 396 (2026-11-03: 10 in `api.ts`, 30 in `internal.ts`). A
+rise is a regression only if a procedure that was typed is now `unknown`, so compare the
+procedure names, not the number. Run codegen twice
 after a change that renames references: inference reads the source, and a
 reference codegen cannot resolve yet types its caller's output `unknown`. When probing
 generated output, run `tsc` per project: `vis run lint:types` re-runs the
@@ -1404,6 +1405,17 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
   it is a regression check for a `.pnpm` store-path import codegen once emitted
   (which came back once after an unrelated change). If generated output does not
   compile, the fix goes in a `.d.ts`, in our own source, or upstream.
+- **Functions load lazily**, set by `codegen: { lazyFunctions: true }` in
+  `backend/lunora.config.ts`, which every entry point reads (codegen, `dev`, `build`,
+  `prepare`). The `--lazy-functions` flag still works for one run. The vite and rspack
+  plugins no longer take the option. `LUNORA_FUNCTIONS` holds metadata stubs and
+  each module under `_generated/fn/` is evaluated on first call, which is what
+  keeps the Worker's startup CPU down. Codegen must read every procedure's
+  builder chain statically back to a `_generated/server` factory (a `const`
+  alias is followed, an `export { … } from` re-export is not — hence the const
+  aliases in `lib/crpc.ts`), and `.expose()`/`.x402()` need literal arguments.
+  A test that inspects the registry (`rls.guard.test.ts`) must `loadAllFunctions()`
+  first, or it sees stubs with no `rls`.
 - **One cold pass is reproducible.** `rm -rf lunora/_generated && pnpm codegen`
   reproduces the committed output byte-for-byte.
 - **A cold pass breaks a running vite.** While `_generated/` is gone, the app's
@@ -2410,10 +2422,13 @@ error")` (any transport, including the SSRF-guarded tool
   comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags
-  and every `@lunora/*` package resolves to one version (2026-11-01: `lunorash` 464, `cli` 466,
-  `workflow` 106 everywhere; `pnpm dedupe` also collapsed `@lunora/errors`, whose range
-  dependencies had resolved to two versions). A meta-package release lags the package it pins by one release wave
+  beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
+  catalog in `pnpm-workspace.yaml`, aligned to the cluster the meta-packages pin rather than the
+  newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
+  each; a non-branded package may keep two copies when the meta-packages pin different versions,
+  and that is not overridden.
+  `pnpm dedupe` also collapsed `@lunora/errors`, whose range dependencies had resolved to two
+  versions. A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
   fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
   bumping, rather than overriding.
@@ -2459,9 +2474,9 @@ error")` (any transport, including the SSRF-guarded tool
   Since codegen alpha.384 the generated app already loads `@lunora/auth` and the
   OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at
   startup; an evaluation error there now 500s the first request instead of failing the upload.
-  `LUNORA_LAZY_FUNCTIONS=1` (or `--lazy-functions` on codegen/prepare/build/deploy) is the
-  opt-in that also defers the function modules, queue registry, workflow and agent
-  entrypoints (upstream measured -31 % on its synthetic app); it is not enabled here.
+  Lazy function mode (`codegen.lazyFunctions`, see "Functions load lazily") also defers the
+  queue registry, workflow and agent entrypoints (upstream measured -31 % on its synthetic app).
+  The Creem SDK is loaded on first use in `src/server.ts`, not at startup, for the same reason.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

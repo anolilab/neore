@@ -38,7 +38,14 @@ import type { Middleware } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../_generated/server";
-import { action as generatedAction, mutation as generatedMutation, query as generatedQuery } from "../_generated/server";
+import {
+    action as generatedAction,
+    internalAction as generatedInternalAction,
+    internalMutation as generatedInternalMutation,
+    internalQuery as generatedInternalQuery,
+    mutation as generatedMutation,
+    query as generatedQuery,
+} from "../_generated/server";
 import { ENVIRONMENT } from "../env";
 import type { SessionUser } from "./auth-types";
 import { getSessionUser, getSessionUserForQuery, getSessionUserForQueryLite, getSessionUserWithAnonymous } from "./crpc-auth-helpers";
@@ -47,7 +54,13 @@ import { rateLimitGuard } from "./rate-limiter";
 import { rowLevelSecurity } from "./rls/policies";
 import { withRlsScope } from "./rls/scope";
 
-export { internalAction, internalMutation, internalQuery } from "../_generated/server";
+// Const aliases, not `export { … } from`: the lazy function registry resolves a builder chain through
+// const initialisers back to the generated factory, and cannot follow a re-export specifier.
+/* eslint-disable unicorn/prefer-export-from */
+export const internalAction = generatedInternalAction;
+export const internalMutation = generatedInternalMutation;
+export const internalQuery = generatedInternalQuery;
+/* eslint-enable unicorn/prefer-export-from */
 
 /** Context shape any auth-aware middleware can rely on. */
 

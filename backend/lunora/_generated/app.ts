@@ -20,7 +20,6 @@ import notifyConfig from "../notify.js";
 import { LUNORA_CRONS } from "./crons.js";
 import { LUNORA_FUNCTIONS } from "./functions.js";
 import { createQueueCaptureSink, dispatchQueueBatch, shouldCaptureQueue } from "@lunora/queue";
-import { LUNORA_QUEUE_REGISTRY } from "./queues.js";
 import { createShardDO } from "./shard.js";
 import { LUNORA_VECTOR_INDEXES } from "./vectors.js";
 
@@ -114,6 +113,7 @@ interface ComposedApp extends LunoraWorker {
  * first request so per-isolate singletons are built once.
  */
 class AppBuilder<Env extends object> {
+    private adminRevocationsSelector?: Selector<Env, ShardNamespaceLike>;
     private adminToken?: Selector<Env, string>;
     private authDeclaration?: AuthDeclaration<Env>;
     private cdcEnabled = false;
@@ -266,6 +266,13 @@ class AppBuilder<Env extends object> {
     /** The shard Durable Object namespace (typically `env.SHARD`) — required: every app routes RPC + WebSocket traffic through it. */
     public shard(selector: Selector<Env, ShardNamespaceLike>): this {
         this.shardSelector = selector;
+
+        return this;
+    }
+
+    /** The `AdminRevocationDO` namespace (typically `env.ADMIN_REVOCATIONS`). Records revoked named admin tokens where a point-in-time restore of the default shard cannot rewind them. Without it no named admin token can be created and any that exist are refused. */
+    public adminRevocations(selector: Selector<Env, ShardNamespaceLike>): this {
+        this.adminRevocationsSelector = selector;
 
         return this;
     }
@@ -619,8 +626,8 @@ class AppBuilder<Env extends object> {
             jurisdiction: "eu",
             architecture: deferred.architecture,
             openApiSpec: deferred.openApiSpec,
-            queue: (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
-                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], LUNORA_QUEUE_REGISTRY, {
+            queue: async (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
+                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], (await import("./queues.js")).LUNORA_QUEUE_REGISTRY, {
                     capture: shouldCaptureQueue(queueEnv as Record<string, unknown>)
                         ? createQueueCaptureSink(queueEnv as Record<string, unknown>, { jurisdiction: "eu" })
                         : undefined,
@@ -796,6 +803,12 @@ class AppBuilder<Env extends object> {
 
         if (shardRegistry) {
             options.queryCoordinator = createQueryCoordinator({ registry: createDynamicShardRegistry({ jurisdiction: "eu", env, namespace: shardRegistry }) });
+        }
+
+        const adminRevocations = this.adminRevocationsSelector?.(env);
+
+        if (adminRevocations) {
+            options.adminRevocations = adminRevocations;
         }
 
         if (this.schedulerDeclaration) {
@@ -1033,6 +1046,8 @@ class AppBuilder<Env extends object> {
             options.resolveIdentity = memo;
         }
 
+        options.agentWorkflows = [];
+
         for (const fn of this.extendFns) {
             Object.assign(options, fn(env, { ...options }));
         }
@@ -1064,22 +1079,14 @@ class AppBuilder<Env extends object> {
  * deployed; the dashboard's own metric is per-database and can't name the query.
  * The emit is best-effort — instrumentation must never fail a served query.
  */
-const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
+const buildSessionExec = (database: D1DatabaseLike, constraint: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
     // Real D1 always exposes `withSession`; guarded the same way as `batch`
     // below so a hand-rolled test double that omits it keeps working via
-    // `prepare()` straight on the raw binding — today's behaviour. With no
-    // inbound bookmark, `"first-unconstrained"` is the documented no-op
-    // equivalent (lowest latency, may read any replica) — see `D1Client.withSession`.
-    const session = typeof database.withSession === "function" ? database.withSession(bookmark ?? "first-unconstrained") : undefined;
+    // `prepare()` straight on the raw binding — today's behaviour. `constraint`
+    // is the Sessions API constraint the session opens with (see `buildExec`).
+    const session = typeof database.withSession === "function" ? database.withSession(constraint) : undefined;
     const target = session ?? database;
     const batchFn = target.batch;
-    const meter = (sql: string, meta: Record<string, unknown> | undefined): void => {
-        try {
-            emitD1QueryCost(sql, meta);
-        } catch {
-            // Best-effort: never let cost accounting fail the query it measures.
-        }
-    };
 
     return retryingExec({
         all: async (sql, parameters) => {
@@ -1149,6 +1156,56 @@ const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bo
             onBookmark?.(session?.getBookmark() ?? undefined);
         },
     });
+};
+
+const meter = (sql: string, meta: Record<string, unknown> | undefined): void => {
+    try {
+        emitD1QueryCost(sql, meta);
+    } catch {
+        // Best-effort: never let cost accounting fail the query it measures.
+    }
+};
+
+/**
+ * The primary exec, for a read that must see every committed write (a policy check on a write
+ * path). Every statement opens its own `"first-primary"` session, and so does every retry:
+ * that constraint covers only a session's first read, so one session shared by two reads, or by
+ * a retry, can serve the later read from a replica that has not caught up. It reports no
+ * bookmark: the sink keeps the last value it is given, and a later replica read reports an older
+ * one, which would move the client's bookmark backwards.
+ */
+const buildPrimaryExec = (database: D1DatabaseLike): D1Exec => {
+    const statement = (sql: string, parameters: ReadonlyArray<unknown>) =>
+        (typeof database.withSession === "function" ? database.withSession("first-primary") : database).prepare(sql).bind(...parameters);
+
+    return retryingExec({
+        all: async (sql, parameters) => {
+            const result = await statement(sql, parameters).all<Record<string, unknown>>();
+
+            meter(sql, result.meta);
+
+            return result.results;
+        },
+        run: async (sql, parameters) => {
+            const result = await statement(sql, parameters).run();
+
+            meter(sql, result.meta);
+        },
+    });
+};
+
+/**
+ * The replica exec reads at the caller's bookmark, or `"first-unconstrained"` (lowest latency,
+ * any replica) without one. `primary` is the per-statement primary exec (see `buildPrimaryExec`).
+ */
+const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
+    const replica = buildSessionExec(database, bookmark ?? "first-unconstrained", onBookmark);
+
+    if (typeof database.withSession !== "function") {
+        return replica;
+    }
+
+    return { ...replica, primary: buildPrimaryExec(database) };
 };
 
 /** Introspect `.global()` (D1-backed) tables for the studio's global data browser. */
@@ -1280,8 +1337,8 @@ interface LunoraConfig<Env extends object = object> {
     advisor?: { accept?: ReadonlyArray<{ exportName: string; file: string; reason: string; rule: string }>; minSeverity?: "error" | "info" | "warn" };
     /** Receives this project's `defineApp()` builder and returns it — where a Vite-first app makes the builder calls its generated entry cannot derive. */
     app?: (app: AppBuilder<Env>) => AppBuilder<Env>;
-    /** Codegen's source walk. `exclude` adds globs (relative to `lunora/`, e.g. `"seed/**"`) to skip on top of the built-in test-file patterns. A literal array of strings, for the same reason as `target`. */
-    codegen?: { exclude?: string[] };
+    /** Codegen settings. `exclude` adds globs (relative to `lunora/`, e.g. `"seed/**"`) to skip on top of the built-in test-file patterns. `lazyFunctions: true` emits the per-module lazy function registry for every command and bundler plugin that generates or checks `_generated/`. Literals, for the same reason as `target`. */
+    codegen?: { exclude?: string[]; lazyFunctions?: boolean };
     /** Host the shard, scheduler and shard registry in ONE Durable Object class (`merge: true`, plan 462) — before the first deploy only. A literal, for the same reason as `target`. */
     durableObjects?: { merge?: boolean };
     /** Opt into remote-binding dev without `--remote` or `LUNORA_REMOTE` on every run. A literal, for the same reason as `target`. */
