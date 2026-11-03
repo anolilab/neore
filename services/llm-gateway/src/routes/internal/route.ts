@@ -31,6 +31,9 @@ import { loadTierPools } from "../../routing/tier-assignment.js";
 import { isTierAllowedFor, parseTierOverride, permittedTiersFor, TIER_OVERRIDE_HEADER, tierToCombinedScore } from "../../routing/tier-override.js";
 import { classifyTier, QueryTier, scoreConfidence, tierMidpoint } from "../../routing/tiers.js";
 
+/** Room kept free in the context window for the reply, when a route checks that a model holds the conversation. */
+const RESPONSE_RESERVE_TOKENS = 4096;
+
 const routeRouter = new OpenAPIHono<HonoEnv>();
 
 const recordRoutingMetric = (
@@ -132,6 +135,7 @@ const requestSchema = z.object({
             requireZDR: z.boolean().optional(),
         })
         .optional(),
+
     preferredModel: z.string().optional(),
     preferredQuality: z.number().min(0).max(1).optional(),
 
@@ -143,6 +147,15 @@ const requestSchema = z.object({
      * - "balanced": default heuristic scoring (same as omitting)
      */
     routingProfile: z.enum(["fast", "balanced", "reasoning", "premium"]).optional(),
+
+    /**
+     * The (provider, API model) pairs the caller can run. When set, only those candidates are routed to, and only the
+     * ones whose context window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
+     */
+    runnableModels: z
+        .array(z.object({ modelApiId: z.string(), provider: z.string() }))
+        .max(1000)
+        .optional(),
     threadId: z.string().optional(),
     toolSchemas: z.record(z.string(), z.unknown()).optional(),
 
@@ -214,6 +227,19 @@ routeRouter.openapi(
                     },
                     403 as 200,
                 );
+            }
+        }
+
+        if (body.runnableModels) {
+            const runnable = new Set(body.runnableModels.map((model) => `${model.provider}/${model.modelApiId}`));
+            const needed = contextTokens + RESPONSE_RESERVE_TOKENS;
+
+            candidates = candidates.filter(
+                (candidate) => runnable.has(`${candidate.provider}/${candidate.modelApiId}`) && (candidate.contextWindow ?? 0) >= needed,
+            );
+
+            if (candidates.length === 0) {
+                return c.json({ error: { code: "MODEL_BLOCKED", message: "No runnable model has a context window for this conversation." } }, 403 as 200);
             }
         }
 

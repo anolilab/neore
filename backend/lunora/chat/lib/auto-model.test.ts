@@ -125,6 +125,7 @@ describe("resolveAutoModel", () => {
             {
                 messages: [{ content: "hello", role: "user" }],
                 modelFilterRules: { blockedProviders: ["x"] },
+                runnableModels: expect.any(Array),
                 threadId: "thread-1",
                 userId: "user-1",
                 userTier: "free",

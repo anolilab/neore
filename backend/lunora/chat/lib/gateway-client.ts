@@ -103,6 +103,8 @@ export interface RouteRequest {
     modelFilterRules?: ModelFilterRules;
     preferredModel?: string;
     preferredQuality?: number;
+    /** The (provider, API model) pairs the caller can run: the gateway routes only among these (see the route's schema). */
+    runnableModels?: { modelApiId: string; provider: string }[];
     threadId?: string;
     toolSchemas?: Record<string, JSONSchema7>;
     /** Optional W3C `traceparent` for cross-service trace propagation. */

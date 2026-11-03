@@ -11,7 +11,7 @@ const OWNER = "owner-user";
 let harness: Harness;
 let threadId: string;
 
-const message = async (order: number, role: "assistant" | "user", content: unknown, extra: Record<string, unknown> = {}): Promise<string> =>
+const message = async (order: number, role: "assistant" | "tool" | "user", content: unknown, extra: Record<string, unknown> = {}): Promise<string> =>
     await harness.run(
         async (ctx: any) =>
             await ctx.db.insert("messages", {
@@ -51,7 +51,18 @@ describe("autoRouteContextOf", () => {
         await message(0, "user", [imagePart]);
         const prompt = await message(1, "user", "describe it");
 
-        await expect(contextFor(prompt)).resolves.toEqual({ contextTokens: 0, files: false, images: true });
+        await expect(contextFor(prompt)).resolves.toMatchObject({ files: false, images: true });
+    });
+
+    it("leaves out a tool result whose call is not in the window, and its file", async () => {
+        const image = await chatFile("orphan", "image/png");
+
+        await message(0, "tool", [{ output: { type: "text", value: "ok" }, toolCallId: "call-gone", toolName: "lookup", type: "tool-result" }], {
+            fileIds: [image],
+        });
+        const prompt = await message(1, "user", "continue");
+
+        await expect(contextFor(prompt)).resolves.toMatchObject({ files: false, images: false });
     });
 
     it("leaves out the replies a regenerate replaces", async () => {

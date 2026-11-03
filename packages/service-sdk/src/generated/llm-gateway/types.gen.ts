@@ -114,6 +114,14 @@ export type InternalRouteRequest = {
     contextTokens?: number;
     routingProfile?: 'fast' | 'balanced' | 'reasoning' | 'premium';
     modelFilterRules?: ModelFilterRules;
+    /**
+     * The (provider, API model) pairs the caller can run: the route considers only those, and only the ones whose context
+     * window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
+     */
+    runnableModels?: Array<{
+        modelApiId: string;
+        provider: string;
+    }>;
 };
 
 export type InternalRouteResponse = {

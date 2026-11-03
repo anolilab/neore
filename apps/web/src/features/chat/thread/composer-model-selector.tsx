@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import { enabledModelOf } from "@neore/ai/models";
 import { Switch } from "@neore/ui/components/switch";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { useId } from "react";
 
@@ -68,8 +68,10 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
 
     // Auto routes plain hosted text threads: a bot, a coding agent, a switched thread (its path decides the agent), a
     // custom endpoint, a media mode and a comparison each name their own model.
+    // Only an admin may save a thread's settings (`updateThread`), so a collaborator is not offered the switch.
+    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
     const canRouteAuto =
-        (!threadId || (loadedThread !== undefined && loadedThread !== null)) &&
+        (!threadId || (access?.permission === "admin" && loadedThread !== undefined && loadedThread !== null)) &&
         !loadedThread?.groupChat &&
         !isAnonymous &&
         typeof botId !== "string" &&
