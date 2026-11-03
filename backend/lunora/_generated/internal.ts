@@ -1153,8 +1153,8 @@ export interface InternalApiTypes {
             startEventRun: FunctionReference<"action", { attempt?: number; firing: number; payload: string; triggerId: Id<"triggers">; userId: string }, null>;
         };
         execute: {
-            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; webhookPrompt?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; firing?: number; ignoreDisabled?: boolean; invalidUtf8?: boolean; manual?: boolean; payload?: string; webhookPrompt?: string; releaseUnlessRun?: boolean; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; releaseUnlessRun?: boolean; requireEnabled?: boolean; triggerId: Id<"triggers"> }, null | string | { filtered: string } | { skipped: "disabled" | "duplicate" }>;

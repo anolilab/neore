@@ -155,6 +155,25 @@ afterEach(() => {
 });
 
 describe("trigger webhook signing", () => {
+    it("renders the Input Template from the body, a header and the query, and schedules only the rendered prompt", async () => {
+        const { scheduled, statusOf } = await setup({
+            ...SIGNED_TRIGGER,
+            inputTemplate: "Issue {{body.issue.title}} from {{header.x-github-event}}, token {{header.authorization}}: {{payload}}",
+        });
+        const body = '{"issue":{"title":"Login broken"}}';
+        const headers = { ...(await signedHeaders(body)), authorization: "Bearer s3cret", "x-github-event": "issues" };
+
+        expect(await statusOf(body, headers)).toBe(200);
+        expect(scheduled).toHaveLength(1);
+
+        const [args] = scheduled as Array<{ payload: string; webhookPrompt: string }>;
+
+        expect(args?.payload).toBe(body);
+        expect(args?.webhookPrompt).toMatch(/^Issue "Login broken" from "issues", token "": <webhook-data-[\da-f]{12}>\n/u);
+        expect(args?.webhookPrompt).not.toContain("s3cret");
+        expect(args?.webhookPrompt).toMatch(/<webhook-data-[\da-f]{12}>\n\{"issue":\{"title":"Login broken"\}\}\n<\/webhook-data-[\da-f]{12}>$/u);
+    });
+
     it("runs a fresh, correctly signed delivery exactly once — a replay is acknowledged but not run", async () => {
         const { post, scheduled, statusOf } = await setup();
         const body = '{"event":"x"}';

@@ -71,6 +71,7 @@ import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
+import { randomFrameId, renderWebhookPrompt } from "./webhook-template";
 import type { WebhookSignatureScheme } from "./validators";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
@@ -91,8 +92,29 @@ const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
  */
 type WebhookTrigger = Pick<
     Doc<"triggers">,
-    "enabled" | "filters" | "type" | "userId" | "webhookPreviousSecret" | "webhookPreviousSecretExpiresAt" | "webhookSecret" | "webhookSignatureScheme"
+    | "enabled"
+    | "filters"
+    | "inputTemplate"
+    | "type"
+    | "userId"
+    | "webhookPreviousSecret"
+    | "webhookPreviousSecretExpiresAt"
+    | "webhookSecret"
+    | "webhookSignatureScheme"
 >;
+
+/** The request's query parameters, the first value of each name (a credential-looking name is filtered when it is read). */
+const firstQueryValues = (url: string): Record<string, string> => {
+    const query: Record<string, string> = {};
+
+    for (const [name, value] of new URL(url).searchParams) {
+        if (!Object.hasOwn(query, name)) {
+            query[name] = value;
+        }
+    }
+
+    return query;
+};
 
 /**
  * Handle an incoming webhook request for a trigger.
@@ -281,6 +303,18 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
+        // The prompt is rendered here, where the headers and the query are. Only the rendered text is scheduled, so a
+        // credential-looking header or query value never leaves this request. An empty body with no template keeps the
+        // trigger's own fallback text, so nothing is rendered for it.
+        const webhookPrompt =
+            body || trigger.inputTemplate
+                ? renderWebhookPrompt(
+                      trigger.inputTemplate,
+                      { body, headers: Object.fromEntries(request.headers), query: firstQueryValues(request.url) },
+                      randomFrameId(),
+                  )
+                : undefined;
+
         // 5. Schedule trigger execution. The claim is already committed, so a
         //    failure here must give it back — otherwise the sender's retry of
         //    this same delivery reads as a replay, and it never runs at all.
@@ -290,6 +324,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
                 invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,
+                webhookPrompt,
             });
         } catch (error) {
             await taken.giveBack();

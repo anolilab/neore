@@ -361,12 +361,18 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor="trigger-input">{t`Input Template`}</Label>
                     <Textarea
+                        aria-describedby={formData.type === "webhook" ? "trigger-input-hint" : undefined}
                         id="trigger-input"
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, inputTemplate: e.target.value })}
                         placeholder={t`Summarize my inbox and highlight urgent items. Use ${PAYLOAD_TOKEN} for webhook data.`}
                         rows={2}
                         value={formData.inputTemplate}
                     />
+                    {formData.type === "webhook" && (
+                        <p className="text-muted-foreground text-xs" id="trigger-input-hint">
+                            {t`Placeholders: {{payload}} is the body, {{body.field}} a JSON field, {{header.name}} a header and {{query.name}} a query parameter. Each is inserted as quoted data. Headers and the query are not signed, and a credential-looking name is never read.`}
+                        </p>
+                    )}
                 </div>
 
                 {/* Actions */}
