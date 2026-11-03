@@ -9,28 +9,77 @@
  * The result itself is posted to the thread as a separate message. While the
  * run is working the card offers Stop; the child finishes the step it is in
  * (billed) and runs no more.
+ *
+ * A child that needs a tool its owner set to "ask" waits (`awaiting`), and its
+ * request shows here, answered like any approval but on the child's thread.
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Bot, CircleStop, ExternalLink, Loader2 } from "lucide-react";
+import { Bot, CircleStop, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 
+import { useChatThread } from "@/features/chat/core/context/chat-context";
+import { ToolApprovalCard } from "@/features/chat/thread/tool-approval";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-type RunStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+type RunStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 const TASK_PREVIEW_MAX = 200;
+
+/**
+ * The requests a waiting child has open, read only while it waits: one live query per parent conversation, shared by
+ * its cards, each showing its own run's. The query answers the parent's owner alone, so whoever sees a request may answer it.
+ */
+const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ parentThreadId, runId }) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const { data } = useQuery(crpc.sub_agents.functions.listSubAgentApprovals.queryOptions({ parentThreadId: parentThreadId as Id<"threads"> }));
+    const requests = (data ?? []).filter((request) => request.runId === runId);
+
+    return requests.map((request) => {
+        const name = request.skillSlug ? `/${request.skillSlug}` : t`The sub-agent`;
+        const tool = request.toolName ?? t`a tool`;
+
+        return (
+            <div className="mt-2" key={request.approvalId}>
+                <ToolApprovalCard
+                    approvalId={request.approvalId}
+                    canAllowForAPeriod={false}
+                    heading={t`${name} wants to run "${tool}"`}
+                    input={request.input}
+                    isOwner
+                    threadId={request.childThreadId}
+                    tool={tool}
+                />
+            </div>
+        );
+    });
+};
+
+const StatusIcon: FC<{ isActive: boolean; isAwaiting: boolean }> = ({ isActive, isAwaiting }) => {
+    if (isActive) {
+        return <Loader2 aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />;
+    }
+
+    return isAwaiting ? (
+        <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+    ) : (
+        <Bot aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+    );
+};
 
 const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const { threadId } = useChatThread();
     const headingId = useId();
     const isDenied = part.state === "output-denied";
     const { data: run, isPending } = useQuery(
@@ -48,6 +97,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
+        awaiting: t`Needs your approval`,
         cancelled: t`Stopped`,
         failed: t`Failed`,
         queued: t`Queued`,
@@ -71,6 +121,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     }
 
     const isStarting = !run && notice === undefined;
+    const isAwaiting = run?.status === "awaiting";
     const isActive = isStarting || run?.status === "queued" || run?.status === "running";
     let statusLabel = t`Not started`;
 
@@ -85,11 +136,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     return (
         <div aria-labelledby={headingId} className="my-2 rounded-lg border p-3 text-sm" role="group">
             <div className="flex items-start gap-2">
-                {isActive ? (
-                    <Loader2 aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-                ) : (
-                    <Bot aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                )}
+                <StatusIcon isActive={isActive} isAwaiting={isAwaiting} />
                 <div className="min-w-0 flex-1">
                     <p className="font-medium" id={headingId}>
                         {t`Sub-agent`}
@@ -105,7 +152,9 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
 
-            {(run?.status === "running" || run?.status === "queued") && (
+            {isAwaiting && threadId && <SubAgentApprovals parentThreadId={threadId} runId={run._id} />}
+
+            {run && (isActive || isAwaiting) && (
                 <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
                     <CircleStop aria-hidden="true" />
                     {t`Stop`}

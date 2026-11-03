@@ -12,6 +12,10 @@
  * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
  * there.
+ *
+ * A one-shot child below the depth cap that needs a tool its owner set to `ask` stops on the request instead of
+ * losing the tool: the run waits (`awaiting`), the parent's card shows the request, and the answer's continuation
+ * (`continueAfterToolApproval`) ends the run and posts its answer, once.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
@@ -87,7 +91,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             await assertCanRun();
         }
 
-        const { text } = await runHeadlessAgent(ctx, {
+        const { paused, text } = await runHeadlessAgent(ctx, {
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
@@ -112,6 +116,9 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
+            // A one-shot child below the depth cap keeps the tools its owner set to `ask` and pauses on them; the
+            // owner answers from the parent conversation. At the cap, and for a worker, they are removed as before.
+            ...(claim.mode !== "worker" && canNest(claim.depth) && { pauseForApproval: { subAgentRunId: runId } }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.
             prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),
@@ -134,6 +141,13 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 }),
             userId,
         });
+
+        // Stopped on an approval request: the run waits, and the answer's continuation ends it (`chat/execute.ts`).
+        if (paused) {
+            await ctx.runMutation(internal.sub_agents.functions.awaitApproval, { runId });
+
+            return;
+        }
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { kind: "succeeded", result: text }, runId });
     } catch (error) {

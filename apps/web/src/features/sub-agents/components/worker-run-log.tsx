@@ -14,7 +14,7 @@ interface WorkerRunLogRun {
     delivery: "failed" | "none" | "pending" | "posted";
     dispatchedBy: "lead" | "messenger" | "outside_agent" | "trigger" | "user" | null;
     runId: string;
-    state: "cancelled" | "failed" | "queued" | "running" | "succeeded";
+    state: "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
     task: string;
 }
 
@@ -25,7 +25,14 @@ const WorkerRunLog: FC<{ className?: string; runs: WorkerRunLogRun[] }> = ({ cla
         return null;
     }
 
-    const stateLabels = { cancelled: t`Stopped`, failed: t`Failed`, queued: t`Queued`, running: t`Working`, succeeded: t`Done` };
+    const stateLabels = {
+        awaiting: t`Needs your approval`,
+        cancelled: t`Stopped`,
+        failed: t`Failed`,
+        queued: t`Queued`,
+        running: t`Working`,
+        succeeded: t`Done`,
+    };
     const sourceLabels = {
         lead: t`Sent by the lead agent`,
         messenger: t`Sent by a messenger reply`,

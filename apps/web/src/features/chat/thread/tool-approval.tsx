@@ -13,6 +13,9 @@
  *
  * Only the thread owner can answer: the tool runs with the owner's MCP servers
  * and keys. Anyone else sees the request read-only.
+ *
+ * {@link ToolApprovalCard} is the card itself, also shown in a parent conversation
+ * for a sub-agent's request (`features/sub-agents`).
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -35,23 +38,27 @@ type Decision = "always" | "approve" | "deny" | "hour" | "today";
 
 const TOOL_PREFIX_RE = /^tool-/;
 
-const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
+export interface ToolApprovalCardProps {
+    approvalId: string | undefined;
+    /** "Allow for 1 hour" / "for today": not for a device tool (approved again on the device), nor a sub-agent's request. */
+    canAllowForAPeriod: boolean;
+    /** The question the card asks, naming the tool. */
+    heading: string;
+    input: unknown;
+    isOwner: boolean;
+    /** The thread the request is recorded on: the answer is checked on that thread's latest turn. */
+    threadId: string | undefined;
+    /** The tool's name, for the buttons' accessible names. */
+    tool: string;
+}
+
+/** The request and its answers, for a tool call in this thread or a sub-agent's. */
+export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAllowForAPeriod, heading, input, isOwner, threadId, tool }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
     const headingId = useId();
     const [submitted, setSubmitted] = useState<Decision | null>(null);
     const { isPending, mutate } = useMutation(crpc.chat.tool_permissions.respondToToolApproval.mutationOptions());
-
-    const mcp = resolveMcpToolName(part);
-    const server = mcp?.serverName;
-    const tool = mcp?.toolName ?? part.type.replace(TOOL_PREFIX_RE, "");
-    const approvalId = part.approval?.id;
-    // A public viewer's thread copy has no `userId`, so it never matches.
-    const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
-    const canAllowForAPeriod = resolveDeviceToolName(part) === null;
     const isDisabled = !approvalId || !threadId || isPending || submitted !== null;
 
     const respond = (decision: Decision) => {
@@ -81,10 +88,10 @@ const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
 
     let inputPreview = "";
 
-    if (typeof part.input === "string") {
-        inputPreview = part.input;
-    } else if (part.input !== undefined) {
-        inputPreview = JSON.stringify(part.input, null, 2);
+    if (typeof input === "string") {
+        inputPreview = input;
+    } else if (input !== undefined) {
+        inputPreview = JSON.stringify(input, null, 2);
     }
 
     return (
@@ -97,7 +104,7 @@ const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
                 <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-amber-900 dark:text-amber-100" id={headingId}>
-                        {server ? t`Allow "${tool}" from ${server}?` : t`Allow "${tool}"?`}
+                        {heading}
                     </p>
                     <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
                         {statusText}
@@ -143,6 +150,31 @@ const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
                 </div>
             )}
         </div>
+    );
+};
+
+const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
+    const { t } = useLingui();
+    const { thread, threadId } = useChatThread();
+    const { hooks } = useAuth();
+    const { data: sessionData } = hooks.useSession();
+
+    const mcp = resolveMcpToolName(part);
+    const server = mcp?.serverName;
+    const tool = mcp?.toolName ?? part.type.replace(TOOL_PREFIX_RE, "");
+    // A public viewer's thread copy has no `userId`, so it never matches.
+    const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
+
+    return (
+        <ToolApprovalCard
+            approvalId={part.approval?.id}
+            canAllowForAPeriod={resolveDeviceToolName(part) === null}
+            heading={server ? t`Allow "${tool}" from ${server}?` : t`Allow "${tool}"?`}
+            input={part.input}
+            isOwner={isOwner}
+            threadId={threadId}
+            tool={tool}
+        />
     );
 };
 

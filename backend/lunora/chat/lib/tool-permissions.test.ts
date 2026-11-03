@@ -201,6 +201,28 @@ describe("resolveToolPermission", () => {
         expect(resolveToolPermission(mcpWrite, { "mcp:Files:write": "auto" }, { headless: true })).toBe("auto");
         expect(resolveToolPermission(builtin, { "builtin:webSearch": "off" }, { headless: true })).toBe("off");
     });
+
+    it("keeps ask for a headless run that pauses for its owner's answer (a sub-agent child)", () => {
+        expect(resolveToolPermission(mcpWrite, {}, { headless: true, headlessCanAsk: true })).toBe("ask");
+        expect(resolveToolPermission(builtin, { "builtin:webSearch": "ask" }, { headless: true, headlessCanAsk: true })).toBe("ask");
+    });
+
+    it("still removes off tools, device tools and the tools that need a person's own input when the run can ask", () => {
+        const canAsk = { headless: true, headlessCanAsk: true };
+
+        expect(resolveToolPermission(builtin, { "builtin:webSearch": "off" }, canAsk)).toBe("off");
+        expect(resolveToolPermission({ key: "device:dev-1:shell_run", source: "device" }, { "device:dev-1:shell_run": "ask" }, canAsk)).toBe("off");
+        expect(resolveToolPermission({ key: "builtin:askUser", source: "builtin" }, undefined, canAsk)).toBe("off");
+        expect(resolveToolPermission({ key: "builtin:requestSecret", source: "builtin" }, undefined, canAsk)).toBe("off");
+    });
+
+    it("lets an inherited approval win over asking again", () => {
+        const delegate = { key: "builtin:delegateToSubAgent", source: "builtin" as const };
+
+        expect(resolveToolPermission(delegate, undefined, { headless: true, headlessApproved: new Set(["delegateToSubAgent"]), headlessCanAsk: true })).toBe(
+            "auto",
+        );
+    });
 });
 
 describe("applyToolPermissions", () => {

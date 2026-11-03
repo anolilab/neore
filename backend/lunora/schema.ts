@@ -2592,6 +2592,9 @@ export const schema = defineSchema({
         // Why the result never reached the parent thread, once the retries ran out. Terminal: set
         // instead of `resultPostedAt`, never with it.
         postFailed: v.optional(v.string()),
+        // A one-shot run's reaper deadline once it waited on an approval (`awaiting`): the approval's expiry while it
+        // waits, a fresh run window once it resumes. Unset = the window from `createdAt`.
+        reapAt: v.optional(v.number()),
         result: v.optional(v.string()),
         // When the result was written to the parent thread, in the same transaction as the message.
         // The post waits while the parent is still streaming (`sub-agents/functions.ts:postRunResult`).

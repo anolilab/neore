@@ -58,6 +58,8 @@ export interface BuildAgentToolsOptions {
     headless?: boolean;
     /** Headless only: built-ins whose `ask` the run inherited an approval for (`ToolPermissionOptions.headlessApproved`). */
     headlessApproved?: ReadonlyArray<string>;
+    /** Headless only: keep `ask` tools for a run that pauses for its owner's answer (`ToolPermissionOptions.headlessCanAsk`). */
+    headlessCanAsk?: boolean;
     /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
     mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
@@ -119,6 +121,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         deviceThreadId,
         headless,
         headlessApproved,
+        headlessCanAsk,
         mcpProgress,
         mcpServerNames,
         model,
@@ -268,6 +271,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
+        ...(headlessCanAsk && { headlessCanAsk: true }),
         timedGrants,
     });
 

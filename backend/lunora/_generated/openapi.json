@@ -51368,6 +51368,10 @@
                           "type": "string"
                         },
                         {
+                          "const": "awaiting",
+                          "type": "string"
+                        },
+                        {
                           "const": "succeeded",
                           "type": "string"
                         },
@@ -51475,6 +51479,10 @@
                         },
                         {
                           "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "awaiting",
                           "type": "string"
                         },
                         {
@@ -51623,6 +51631,10 @@
                             },
                             {
                               "const": "running",
+                              "type": "string"
+                            },
+                            {
+                              "const": "awaiting",
                               "type": "string"
                             },
                             {
@@ -51784,6 +51796,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "awaiting",
+                              "type": "string"
+                            },
+                            {
                               "const": "succeeded",
                               "type": "string"
                             },
@@ -51889,6 +51905,10 @@
                                   },
                                   {
                                     "const": "running",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "awaiting",
                                     "type": "string"
                                   },
                                   {
@@ -52091,6 +52111,120 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#sub_agents_functions:listSubAgentApprovals": {
+      "post": {
+        "description": "Invoke the `query` `sub_agents_functions:listSubAgentApprovals` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:listSubAgentApprovals",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "parentThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "parentThreadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:listSubAgentApprovals",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "approvalId": {
+                        "type": "string"
+                      },
+                      "childThreadId": {
+                        "type": "string"
+                      },
+                      "input": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
+                      },
+                      "skillSlug": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "task": {
+                        "type": "string"
+                      },
+                      "toolName": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "approvalId",
+                      "childThreadId",
+                      "input",
+                      "runId",
+                      "skillSlug",
+                      "task",
+                      "toolName"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: sub_agents_functions:listSubAgentApprovals",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#sub_agents_functions:listWorkers": {
       "post": {
         "description": "Invoke the `query` `sub_agents_functions:listWorkers` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -52201,6 +52335,10 @@
                             "type": "string"
                           },
                           {
+                            "const": "awaiting",
+                            "type": "string"
+                          },
+                          {
                             "const": "succeeded",
                             "type": "string"
                           },
@@ -52306,6 +52444,10 @@
                                 },
                                 {
                                   "const": "running",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "awaiting",
                                   "type": "string"
                                 },
                                 {

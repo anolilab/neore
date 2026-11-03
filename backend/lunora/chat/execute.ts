@@ -20,6 +20,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { streamLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -893,9 +894,39 @@ export const runStreamingAgent = internalAction
         },
     );
 
+type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" } | { kind: "succeeded"; lastMessageId: string | undefined };
+
+/**
+ * A sub-agent child's continuation hands its end back to the run the snapshot names: paused again, the run waits on
+ * the new request; ended, the run ends once, and its answer reaches the parent. A failed write is logged, never
+ * thrown: the continuation itself is over either way, and the run's reaper ends what is left.
+ */
+const settleSubAgentRun = async (ctx: Pick<ActionCtx, "runMutation">, runId: Id<"subAgentRuns"> | undefined, end: SubAgentEnd): Promise<void> => {
+    if (runId === undefined) {
+        return;
+    }
+
+    try {
+        if (end.kind === "paused") {
+            await ctx.runMutation(internal.sub_agents.functions.awaitApproval, { runId });
+        } else {
+            await ctx.runMutation(internal.sub_agents.functions.completeResumedRun, {
+                ...(end.kind === "succeeded" && end.lastMessageId !== undefined && { lastMessageId: end.lastMessageId }),
+                outcome: end.kind === "failed" ? { error: end.error, kind: "failed" } : { kind: "succeeded" },
+                runId,
+            });
+        }
+    } catch (error) {
+        streamLogger.error(`[ToolApproval] Could not hand the continuation's end to sub-agent run ${runId}:`, error);
+    }
+};
+
 /**
  * Resume a run that paused on a tool-approval request, once
  * `respondToToolApproval` has claimed the snapshot and opened `streamId`.
+ *
+ * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first and hands the run its end
+ * ({@link settleSubAgentRun}), so the answer is posted to the parent once.
  */
 export const continueAfterToolApproval = internalAction
     .input({
@@ -920,7 +951,13 @@ export const continueAfterToolApproval = internalAction
             return;
         }
 
+        const { subAgentRunId } = config;
+
         try {
+            if (subAgentRunId !== undefined) {
+                await ctx.runMutation(internal.sub_agents.functions.resumeAwaitingRun, { runId: subAgentRunId });
+            }
+
             // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
             // Checked AFTER the claim, inside the try: a refusal or a failed read must close the
             // claimed stream and leave the thread out of `running`, not strand both.
@@ -933,6 +970,7 @@ export const continueAfterToolApproval = internalAction
                     threadId,
                     threadStatus: "active",
                 });
+                await settleSubAgentRun(ctx, subAgentRunId, { error: "The sub-agent's conversation can no longer continue.", kind: "failed" });
 
                 return;
             }
@@ -961,6 +999,16 @@ export const continueAfterToolApproval = internalAction
                 { admittedRun: true, steerable: true },
             );
 
+            let subAgentEnd: SubAgentEnd = { kind: "succeeded", lastMessageId: resumed.lastMessageId };
+
+            if (resumed.paused) {
+                subAgentEnd = { kind: "paused" };
+            } else if (resumed.stopped) {
+                subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
+            }
+
+            await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd);
+
             // The run a goal was waiting on ended here, once nothing more is pending (see `runStreamingAgent`).
             if (resumed.paused) {
                 await noteGoalPaused(ctx, threadId);
@@ -986,5 +1034,6 @@ export const continueAfterToolApproval = internalAction
                 : "An error occurred while continuing the response. Please try again.";
 
             await failRun(ctx, { safeMessage, streamId, threadId, threadStatus: "active" });
+            await settleSubAgentRun(ctx, subAgentRunId, { error: safeMessage, kind: "failed" });
         }
     });

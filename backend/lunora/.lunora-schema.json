@@ -23223,6 +23223,12 @@
           "optional": true,
           "unique": false
         },
+        "reapAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "result": {
           "kind": "string",
           "nullable": false,
@@ -23298,6 +23304,13 @@
           "optional": false,
           "unique": false,
           "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"awaiting\""
+            },
             {
               "kind": "literal",
               "nullable": false,
@@ -26531,6 +26544,13 @@
               "optional": true,
               "unique": false,
               "refined": true
+            },
+            "subAgentRunId": {
+              "kind": "id",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "ref": "subAgentRuns"
             },
             "toolNames": {
               "kind": "array",

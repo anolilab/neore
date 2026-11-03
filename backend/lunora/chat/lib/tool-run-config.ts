@@ -55,6 +55,11 @@ export const vToolRunConfig = v.object({
      * the owner's secret. Absent on a snapshot written before it existed, which reads as nobody.
      */
     startedBy: v.optional(v.string().max(MAX_LENGTH.id)),
+    /**
+     * Set when a sub-agent's child run paused (`sub-agents/execute.ts`): the continuation hands the run back to it
+     * (`sub_agents.functions.resumeAwaitingRun`, then the run's end), so the result still reaches the parent once.
+     */
+    subAgentRunId: v.optional(v.id("subAgentRuns")),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they
