@@ -103,3 +103,31 @@ describe("setComposerText hidden characters", () => {
         expect(useChatUIStore.getState().composerHiddenRemoved).toBe(1);
     });
 });
+
+describe("the side-panel PDF preview", () => {
+    const pdf = { filename: "report.pdf", url: "https://files.example.com/report.pdf" };
+
+    beforeEach(() => {
+        useChatUIStore.getState().reset();
+    });
+
+    it("opens the side panel on the PDF, without a document", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+
+        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: true, previewFile: pdf });
+    });
+
+    it("is replaced by a document when one opens", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+        useChatUIStore.getState().openCanvas("doc-1");
+
+        expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", previewFile: null });
+    });
+
+    it("is cleared when the panel closes", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+        useChatUIStore.getState().closeCanvas();
+
+        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: false, previewFile: null });
+    });
+});

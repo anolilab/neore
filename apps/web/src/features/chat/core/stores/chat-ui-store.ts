@@ -53,6 +53,12 @@ const createBatcher = <T>() => {
 const hoveredMessageBatcher = createBatcher<string | null>();
 const isAtBottomBatcher = createBatcher<boolean>();
 
+/** A chat PDF the side panel shows. `url` is the attachment's own (signed) URL. */
+export interface PreviewFile {
+    filename?: string;
+    url: string;
+}
+
 /**
  * Pending attachment before upload completes
  */
@@ -93,6 +99,7 @@ interface ChatUIStore {
     clearTransitioningMessage: (threadId: string) => void;
 
     closeCanvas: () => void;
+    openPreviewFile: (file: PreviewFile) => void;
 
     composerAttachments: PendingAttachment[];
 
@@ -113,6 +120,8 @@ interface ChatUIStore {
     // Scroll state
     isAtBottom: boolean;
     isCanvasOpen: boolean;
+    /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
+    previewFile: PreviewFile | null;
     // Submission state (to prevent suggestions from opening between submit and streaming)
     isSubmitting: boolean;
     // Composer actions
@@ -198,6 +207,7 @@ const initialState = {
     hoveredMessageId: null as string | null,
     isAtBottom: true,
     isCanvasOpen: false,
+    previewFile: null as PreviewFile | null,
     isSubmitting: false,
     transitioningMessage: null as { text: string; threadId: string } | null,
 };
@@ -266,7 +276,10 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 closeCanvas: () => {
-                    set({ canvasDirty: false, isCanvasOpen: false });
+                    set({ canvasDirty: false, isCanvasOpen: false, previewFile: null });
+                },
+                openPreviewFile: (file) => {
+                    set({ canvasDirty: false, isCanvasOpen: true, previewFile: file });
                 },
 
                 // Canvas/Artifact actions
@@ -278,6 +291,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                         canvasHistoryVersions: null,
                         canvasViewMode: "editor",
                         isCanvasOpen: true,
+                        previewFile: null,
                     });
                 },
 
@@ -524,6 +538,8 @@ export const useScrollState = () => {
 export const useCanvasState = () => {
     const activeDocumentId = useChatUIStore((state) => state.activeDocumentId);
     const isCanvasOpen = useChatUIStore((state) => state.isCanvasOpen);
+    const previewFile = useChatUIStore((state) => state.previewFile);
+    const openPreviewFile = useChatUIStore((state) => state.openPreviewFile);
     const canvasEditMode = useChatUIStore((state) => state.canvasEditMode);
     const canvasDirty = useChatUIStore((state) => state.canvasDirty);
     const canvasViewMode = useChatUIStore((state) => state.canvasViewMode);
@@ -539,6 +555,8 @@ export const useCanvasState = () => {
     return {
         activeDocumentId,
         canvasDirty,
+        openPreviewFile,
+        previewFile,
         canvasEditMode,
         canvasHistoryVersions,
         canvasViewMode,

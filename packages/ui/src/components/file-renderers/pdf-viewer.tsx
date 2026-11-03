@@ -11,21 +11,14 @@
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import "./pdf-worker";
 
 import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
 import { ChevronLeft, ChevronRight, Minus, Plus, ZoomIn } from "lucide-react";
-// Emitted by Vite as a hashed asset next to this chunk. `new URL("pdfjs-dist/…",
-// import.meta.url)` resolved RELATIVE to this file (packages/ui/src/…), which does
-// not exist: the worker 404'd at runtime and every PDF failed to load. The
-// `pdfjs-dist` dependency must stay at exactly the version react-pdf depends on,
-// or the API and worker versions disagree and pdf.js refuses to start.
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { FC } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
-
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+import { Document, Page } from "react-pdf";
 
 // A stalled signed-URL request must not leave the spinner up forever.
 const PDF_LOAD_TIMEOUT_MS = 30_000;

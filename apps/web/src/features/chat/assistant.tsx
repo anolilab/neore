@@ -4,9 +4,13 @@
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@neore/ui/components/resizable";
 import { SidebarInset } from "@neore/ui/components/sidebar";
+import type { OpenPdfPreviewDetail } from "@neore/ui/utils/pdf-preview-event";
+import { OPEN_PDF_PREVIEW_EVENT } from "@neore/ui/utils/pdf-preview-event";
 import type { CSSProperties, FC } from "react";
+import { useEffect } from "react";
 
 import CanvasPanel from "@/features/canvas/canvas-panel";
+import PdfPreviewPanel from "@/features/canvas/pdf-preview-panel";
 import { ChatProvider } from "@/features/chat/core/context/chat-context";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import type { ModelId } from "@/features/chat/core/stores/model-store";
@@ -52,8 +56,22 @@ const AssistantContent: FC<{
 }> = ({ initialMessage, promptId, threadId }) => {
     // Load prompt if promptId is provided (must be inside ChatProvider)
     usePromptLoader(promptId);
-    const { isCanvasOpen } = useCanvasState();
+    const { isCanvasOpen, openPreviewFile, previewFile } = useCanvasState();
     const rightSidebarWidth = useUIStateStore((s) => s.rightSidebarWidth);
+
+    // A chat PDF's thumbnail asks for the side panel; this takes the request (see `packages/ui/src/utils/pdf-preview-event.ts`).
+    useEffect(() => {
+        const onOpenPdf = (event: Event) => {
+            const { detail } = event as CustomEvent<OpenPdfPreviewDetail>;
+
+            event.preventDefault();
+            openPreviewFile({ filename: detail.filename, url: detail.url });
+        };
+
+        globalThis.addEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
+
+        return () => globalThis.removeEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
+    }, [openPreviewFile]);
 
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
@@ -67,7 +85,7 @@ const AssistantContent: FC<{
                         </ResizablePanel>
                         <ResizableHandle withHandle />
                         <ResizablePanel defaultSize={50} minSize={25}>
-                            <CanvasPanel />
+                            {previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />}
                         </ResizablePanel>
                     </ResizablePanelGroup>
                 ) : (
