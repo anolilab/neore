@@ -18,9 +18,11 @@ import {
     tasksList,
     tasksRun,
     tasksStatus,
+    threadSend,
     threadsList,
     threadsRm,
     threadsShow,
+    threadStart,
     whoami,
 } from "./commands";
 
@@ -43,6 +45,13 @@ Chat
   models                              List models
 
 Threads
+  thread start <prompt> [-m MODEL] [--wait]
+  thread send <thread-id> <prompt> [-m MODEL] [--wait]
+                                      Without --wait: print the thread id and exit; the run
+                                      continues on the server. With --wait: block (up to 5
+                                      minutes), print the reply (or JSON with --json).
+                                      Exit 0 reply, 1 the run failed, 2 any other error or
+                                      the wait ran out (read it later: threads show <id>).
   threads ls [--limit N] [--cursor C] [--all]
   threads show <thread-id>
   threads rm <thread-id> [--yes]
@@ -74,7 +83,11 @@ Prefer the prompt or stdin over --key: flags end up in shell history.
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth/scope, 4 not found, 5 rate/daily limit, 6 network.
 `;
 
-type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | void>;
+/** A number is the exit code itself; `false` is exit 1. */
+type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | number | void>;
+
+/** Commands whose errors of every kind exit 2, so 1 can mean only "the run failed". */
+const COARSE_EXIT: ReadonlySet<string> = new Set(["thread send", "thread start"]);
 
 const HANDLERS: Record<string, Handler> = {
     chat,
@@ -91,9 +104,11 @@ const HANDLERS: Record<string, Handler> = {
     "tasks ls": tasksList,
     "tasks run": tasksRun,
     "tasks status": tasksStatus,
+    "thread send": threadSend,
     "threads ls": threadsList,
     "threads rm": threadsRm,
     "threads show": threadsShow,
+    "thread start": threadStart,
     whoami,
 };
 
@@ -132,6 +147,10 @@ export const run = async (argv: ReadonlyArray<string>, context: Context): Promis
     try {
         const result = await handler(context, command);
 
+        if (typeof result === "number") {
+            return result;
+        }
+
         return result === false ? EXIT.error : EXIT.ok;
     } catch (error) {
         if (command.flags.json && !(error instanceof UsageError)) {
@@ -144,6 +163,6 @@ export const run = async (argv: ReadonlyArray<string>, context: Context): Promis
 
         reportError(context, error);
 
-        return error instanceof UsageError ? EXIT.usage : exitCodeFor(error);
+        return error instanceof UsageError || COARSE_EXIT.has(command.command) ? EXIT.usage : exitCodeFor(error);
     }
 };
