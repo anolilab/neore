@@ -15,6 +15,7 @@ import { d1Executor } from "@lunora/auth";
 
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
+import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
 import { defineApp } from "../lunora/_generated/app.js";
@@ -461,6 +462,8 @@ export abstract class ShardDO extends app.ShardDO {
     private inFlight = 0;
 
     public override async fetch(request: Request): Promise<Response> {
+        allowLocalJurisdiction((this as unknown as { env?: Parameters<typeof allowLocalJurisdiction>[0] }).env ?? {});
+
         const shardKey = this.shardKeyForContext();
 
         if (!isTimingEnabled((this as unknown as { env?: TimingEnvLike }).env ?? {})) {
@@ -635,6 +638,8 @@ export default {
     async fetch(request: Request, env: Env, context: ExecutionContextLike): Promise<Response> {
         const entered = Date.now();
 
+        allowLocalJurisdiction(env);
+
         // better-auth owns `/api/auth/*`. It must be handled BEFORE the Lunora
         // worker, which would otherwise 404 those paths — Lunora only routes its
         // own RPC surface. This is the `mountAuth` step from the
@@ -751,6 +756,7 @@ export default {
      * codegen read.
      */
     async queue(batch: MessageBatchLike, env: Env, context: ExecutionContextLike): Promise<void> {
+        allowLocalJurisdiction(env);
         await app.queue?.(withoutStage(batch, env.STAGE), env, context);
     },
 
@@ -770,6 +776,7 @@ export default {
     async scheduled(controller: ScheduledControllerLike, env: Env, context: ExecutionContextLike): Promise<void> {
         // Here, not in `crons.ts`: the ws-ticket table is raw D1 that procedures
         // cannot reach (`lib/ws-ticket.ts`). A failure must not cost the tick.
+        allowLocalJurisdiction(env);
         await purgeExpiredWsTickets(env.DB).catch((error: unknown) => {
             console.error("[ws-ticket] purge failed", error);
         });

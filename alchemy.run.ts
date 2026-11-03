@@ -339,7 +339,7 @@ const staged = (name: string): string => `${name}-${stage}`;
 // non-EU test stage out). Cloudflare fixes it when a resource is created, so it is set on every
 // D1 database and R2 bucket below and, through the schema, on the Durable Objects. Queues, KV,
 // Vectorize and the Workers themselves take no jurisdiction.
-const dataJurisdiction = resolveDataJurisdiction();
+const dataJurisdiction = resolveDataJurisdiction(stage);
 
 const COMPATIBILITY_DATE = "2026-09-01";
 
