@@ -49426,6 +49426,331 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#source_control_pr_thread_attach:attachPullRequests": {
+      "post": {
+        "description": "Invoke the `action` `source_control_pr_thread_attach:attachPullRequests` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_thread_attach:attachPullRequests",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "pullRequests": {
+                        "items": {
+                          "properties": {
+                            "number": {
+                              "type": "number"
+                            },
+                            "repository": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "number",
+                            "repository"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pullRequests",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_thread_attach:attachPullRequests",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "results": {
+                      "items": {
+                        "properties": {
+                          "number": {
+                            "type": "number"
+                          },
+                          "repository": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "const": "attached",
+                                "type": "string"
+                              },
+                              {
+                                "const": "already_linked",
+                                "type": "string"
+                              },
+                              {
+                                "const": "forbidden",
+                                "type": "string"
+                              },
+                              {
+                                "const": "host_error",
+                                "type": "string"
+                              },
+                              {
+                                "const": "needs_reconnect",
+                                "type": "string"
+                              },
+                              {
+                                "const": "not_connected",
+                                "type": "string"
+                              },
+                              {
+                                "const": "not_found",
+                                "type": "string"
+                              },
+                              {
+                                "const": "rate_limited",
+                                "type": "string"
+                              },
+                              {
+                                "const": "thread_full",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "number",
+                          "repository",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: source_control_pr_thread_attach:attachPullRequests",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_pr_thread_attach:countsForUser": {
+      "post": {
+        "description": "Invoke the `query` `source_control_pr_thread_attach:countsForUser` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_thread_attach:countsForUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_thread_attach:countsForUser",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "count": {
+                        "type": "number"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "count",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_pr_thread_attach:countsForUser",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#source_control_pr_thread_attach:listForThread": {
+      "post": {
+        "description": "Invoke the `query` `source_control_pr_thread_attach:listForThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_thread_attach:listForThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_thread_attach:listForThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "baseBranch": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "headBranch": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "attached",
+                            "type": "string"
+                          },
+                          {
+                            "const": "opened",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "createdAt",
+                      "kind",
+                      "number",
+                      "repository",
+                      "threadId",
+                      "title",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_pr_thread_attach:listForThread",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#source_control_pr_threads:getForThread": {
       "post": {
         "description": "Invoke the `query` `source_control_pr_threads:getForThread` over the Lunora RPC envelope (POST /_lunora/rpc).",

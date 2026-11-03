@@ -22,11 +22,11 @@ import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
-const MAX_THREADS_PER_PULL_REQUEST = 50;
+export const MAX_THREADS_PER_PULL_REQUEST = 50;
 
 const MAX_TITLE_CHARS = 200;
 
-const vPullRequestThread = v.object({
+export const vPullRequestThread = v.object({
     baseBranch: v.optional(v.string()),
     createdAt: v.number(),
     headBranch: v.optional(v.string()),
@@ -41,7 +41,7 @@ const vPullRequestThread = v.object({
 type PullRequestThread = Doc<"pullRequestThreads">;
 
 /** The row as the client reads it. Never the owner column: it is the caller's own by construction. */
-const toOutput = (row: PullRequestThread) => {
+export const toOutput = (row: PullRequestThread) => {
     return {
         ...(row.baseBranch !== undefined && { baseBranch: row.baseBranch }),
         createdAt: row.createdAt,
@@ -56,7 +56,7 @@ const toOutput = (row: PullRequestThread) => {
 };
 
 /** An address the host's own rules accept: `owner/name` and a whole number from 1. */
-const requireAddress = (repo: string, number: number): { number: number; repository: string } => {
+export const requireAddress = (repo: string, number: number): { number: number; repository: string } => {
     if (!splitGithubRepo(repo)) {
         throw new LunoraError("BAD_REQUEST", "Not a repository address this host serves");
     }
@@ -82,16 +82,19 @@ const requireBranch = (branch: string | undefined): string | undefined => {
 };
 
 /** The pull request's page on the host: built from the host's origin, never taken from a client. */
-const pullRequestUrl = (repo: string, number: number): string => `${GITHUB_WEB_ORIGIN}/${repo}/pull/${String(number)}`;
+export const pullRequestUrl = (repo: string, number: number): string => `${GITHUB_WEB_ORIGIN}/${repo}/pull/${String(number)}`;
 
-const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo: string, number: number): Promise<PullRequestThread[]> =>
+export const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo: string, number: number): Promise<PullRequestThread[]> =>
     await ctx.db
         .query("pullRequestThreads")
         .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId).eq("repository", repo).eq("number", number))
         .take(MAX_THREADS_PER_PULL_REQUEST);
 
 /** The links whose thread is still there and not deleted; a link to one that is not is dead. */
-const partitionLinks = async (ctx: QueryCtx | MutationCtx, rows: PullRequestThread[]): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[] }> => {
+export const partitionLinks = async (
+    ctx: QueryCtx | MutationCtx,
+    rows: PullRequestThread[],
+): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[] }> => {
     const dead: PullRequestThread[] = [];
     const live: PullRequestThread[] = [];
 

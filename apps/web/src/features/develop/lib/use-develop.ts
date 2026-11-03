@@ -150,3 +150,28 @@ export const useThreadPullRequest = (threadId: string | undefined) => {
 
     return useQuery(crpc.source_control.pr_threads.getForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
 };
+
+/** Every pull request a thread is linked to, for the thread's own header. Live: a link made elsewhere shows up here too. */
+export const useThreadPullRequests = (threadId: string | undefined) => {
+    const crpc = useCRPC();
+
+    return useQuery(crpc.source_control.pr_thread_attach.listForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
+};
+
+/** Attaches existing pull requests to a thread by hand. The host reads each one first; a refusal is reported per pull request. */
+export const useAttachPullRequests = () => useAction(api.source_control.pr_thread_attach.attachPullRequests);
+
+/**
+ * How many pull requests one thread is linked to, for its sidebar badge. One shared subscription for every row, and
+ * none until the page has painted, so the sidebar does not add to the queries the first paint waits for.
+ */
+export const useThreadPullRequestCount = (threadId: string, ready: boolean): number => {
+    const crpc = useCRPC();
+    const { data } = useQuery({
+        ...crpc.source_control.pr_thread_attach.countsForUser.queryOptions({}),
+        enabled: ready,
+        select: (rows: { count: number; threadId: string }[]) => rows.find((row) => row.threadId === threadId)?.count ?? 0,
+    });
+
+    return data ?? 0;
+};

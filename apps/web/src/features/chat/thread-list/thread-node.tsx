@@ -29,6 +29,7 @@ import {
     Folder,
     GitBranch,
     GitCompareArrows,
+    GitPullRequestArrow,
     GripVertical,
     HourglassIcon,
     Loader2,
@@ -51,6 +52,8 @@ import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
+import { useThreadPullRequestCount } from "@/features/develop/lib/use-develop";
+import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
@@ -280,6 +283,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Check thread status directly from Lunora - "running" means actively streaming, "error" means failed
     const isStreaming = node.status === "running";
     // Owner-only fields: absent on a thread shared with the caller, so none of the states below can show there.
+    const linkedReady = useAfterFirstPaint();
+    const linkedPullRequests = useThreadPullRequestCount(node.threadId, linkedReady);
     const needsYou = isStreaming ? undefined : node.awaitingInput;
     const isFailed = node.status === "error" && needsYou === undefined;
     const isUnread = hasUnreadReply(node, { isOpen: isActive, isStreaming });
@@ -527,6 +532,15 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
+                            )}
+                            {linkedPullRequests > 0 && (
+                                <span
+                                    aria-label={t`${linkedPullRequests} linked pull requests`}
+                                    className="text-muted-foreground inline-flex shrink-0 items-center gap-0.5 text-xs"
+                                >
+                                    <GitPullRequestArrow aria-hidden className="size-3" />
+                                    {linkedPullRequests}
+                                </span>
                             )}
                         </span>
                     }

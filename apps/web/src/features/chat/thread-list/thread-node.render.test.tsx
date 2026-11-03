@@ -24,6 +24,12 @@ vi.mock("@neore/backend/api", () => {
     return { api: {} };
 });
 
+vi.mock("@/features/develop/lib/use-develop", () => {
+    return {
+        useThreadPullRequestCount: () => 0,
+    };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
         useMutation: () => {
