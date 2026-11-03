@@ -628,12 +628,12 @@ export const createThread = authMutation
 
 export const createThreadWithInitialMessage = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         fileIds: v.optional(v.array(v.string())),
         language: v.optional(v.string()),
         messageContent: v.array(v.record(v.string(), v.any())),
-        autoModel: v.optional(v.boolean()),
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
         model: v.string(),
         reasoningEffort: v.optional(v.number()),

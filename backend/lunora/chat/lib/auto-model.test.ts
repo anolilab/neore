@@ -3,14 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActionCtx } from "../../_generated/server";
 import { regenerateParentOf } from "../../agent/agent-switch";
+import { vThreadDocFields } from "../../agent/validators";
 import type { RunPlan } from "./agent-run";
 import { type AutoGate, registryModelForRoute, resolveAutoModel, shouldRouteAuto } from "./auto-model";
 
 const routeViaGateway = vi.fn();
 const canRunPaidModel = vi.fn();
 
-vi.mock("./gateway-client", () => ({ routeViaGateway: (...args: unknown[]) => routeViaGateway(...args) }));
-vi.mock("./agent-run", () => ({ canRunPaidModel: (...args: unknown[]) => canRunPaidModel(...args) }));
+vi.mock("./gateway-client", () => {return { routeViaGateway: (...args: unknown[]) => routeViaGateway(...args) }});
+vi.mock("./agent-run", () => {return { canRunPaidModel: (...args: unknown[]) => canRunPaidModel(...args) }});
 
 const ctx = {} as ActionCtx;
 const plan: RunPlan = { isAdmin: false, plan: null };
@@ -21,7 +22,7 @@ const target = enabledText.find(
 )!;
 const noImages = enabledText.find((row) => row.id !== fallback.id && row.supportsImages !== true && row.filterCapabilities?.includes("vision") !== true)!;
 
-const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["thread"]> = {}): AutoGate => ({
+const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["thread"]> = {}): AutoGate => {return {
     currentModel: fallback.id,
     isAnonymous: false,
     pinnedByBotOrSkill: false,
@@ -29,7 +30,7 @@ const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["threa
     thread: { autoModel: true, userId: "user-1", ...thread },
     userId: "user-1",
     ...overrides,
-});
+}};
 
 const request = {
     fallbackModel: fallback.id,
@@ -40,7 +41,7 @@ const request = {
     threadId: "thread-1",
     userId: "user-1",
 };
-const route = (modelId: string) => ({
+const route = (modelId: string) => {return {
     confidence: 1,
     estimatedCost: 0,
     modelApiId: modelId,
@@ -48,7 +49,7 @@ const route = (modelId: string) => ({
     provider: "openrouter",
     routingReason: "",
     tier: "standard",
-});
+}};
 
 describe("shouldRouteAuto", () => {
     it("routes a plain hosted text thread that opted in", () => {
@@ -141,5 +142,11 @@ describe("a regenerate on an auto thread", () => {
         const thread = { _id: "thread-1", userId: "user-1" } as Parameters<typeof regenerateParentOf>[1];
 
         await expect(regenerateParentOf({} as Parameters<typeof regenerateParentOf>[0], thread, "prompt-1" as never, target.id)).resolves.toBe("prompt-1");
+    });
+});
+
+describe("the thread row", () => {
+    it("declares autoModel in the doc fields every thread output validator spreads", () => {
+        expect(vThreadDocFields).toHaveProperty("autoModel");
     });
 });

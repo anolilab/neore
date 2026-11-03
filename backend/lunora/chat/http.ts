@@ -348,12 +348,12 @@ export const chatStartHttpAction = async (context: HttpActionCtx, request: Reque
 
 /** The `/chat/start` request body. Also built by the public API's chat route. */
 export interface ChatStartBody {
+    /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
+    autoModel?: boolean;
     cinemaSettings?: CinemaSettings;
     customSystemPrompt?: string;
     duration?: number;
     enabledFeatures?: string[];
-    /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
-    autoModel?: boolean;
     fileIds?: string[];
     /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
     goal?: { maxRounds?: number; text: string };

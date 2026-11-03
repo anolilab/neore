@@ -221,7 +221,9 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
             return;
         }
 
-        setPendingSettings((previous) => ({ ...previous, autoModel: enabled }));
+        setPendingSettings((previous) => {
+            return { ...previous, autoModel: enabled };
+        });
     };
 
     // Change model
@@ -233,7 +235,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
 
         // Naming a model is choosing it: Auto ends, before a switch or an edit changes what the thread runs on.
         if (autoModel) {
-            await setAutoModel(false);
+            try {
+                await setAutoModel(false);
+            } catch (error) {
+                showError(error instanceof Error ? error : t`Could not turn off Auto. Please try again.`);
+            }
         }
 
         // A text thread records the change as a switch in its transcript; the thread's own model stays

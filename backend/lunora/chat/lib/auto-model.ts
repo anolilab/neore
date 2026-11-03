@@ -15,7 +15,13 @@ import { backupCapabilities, backupFilterRejection } from "./backup-model";
 import { routeViaGateway } from "./gateway-client";
 
 /** The gateway's `userTier` strings that open the expensive pools (`routing/tier-override.ts`). */
-const routingTierOf = (plan: RunPlan): "admin" | "free" | "pro" => (plan.isAdmin ? "admin" : plan.plan === "premium" ? "pro" : "free");
+const routingTierOf = (plan: RunPlan): "admin" | "free" | "pro" => {
+    if (plan.isAdmin) {
+        return "admin";
+    }
+
+    return plan.plan === "premium" ? "pro" : "free";
+};
 
 export interface AutoGate {
     /** The run's model after a bot or a skill had its say; auto replaces only the composer's own pick. */

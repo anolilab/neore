@@ -15,6 +15,7 @@ import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/store
 import AgentSwitchConfirmDialog from "@/features/chat/model-settings/agent-switch-confirm-dialog";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 interface ComposerModelSelectorProps {
     className?: string;
@@ -102,13 +103,17 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 size="sm"
             />
             {canRouteAuto && (
-                <div className="flex items-center gap-1.5" role="group">
+                <div aria-labelledby={autoLabelId} className="flex items-center gap-1.5" role="group">
                     <span className="text-muted-foreground text-xs" id={autoLabelId}>{t`Auto`}</span>
                     <Switch
                         aria-labelledby={autoLabelId}
                         checked={autoModel}
                         disabled={Boolean(threadId) && isRunning}
-                        onCheckedChange={(checked) => void setAutoModel(checked)}
+                        onCheckedChange={(checked) => {
+                            setAutoModel(checked).catch((error: unknown) => {
+                                showError(error instanceof Error ? error : t`Could not change Auto. Please try again.`);
+                            });
+                        }}
                         size="sm"
                     />
                 </div>
