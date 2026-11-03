@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -16,7 +16,16 @@ const row = (pid: number, ppid: number, name = "proc", startedAt = "Mon Nov 3 10
 // 1 (app) -> 10 (agent) -> 20 (shell) -> 30 (server, :3000) -> 31 (its worker)
 //                       -> 40 (another server, :4000)
 // 50 (unrelated server, :5000, outside the agent) and 11 (another agent's child)
-const TABLE = [row(1, 0, "app"), row(10, 1, "agent"), row(20, 10, "sh"), row(30, 20, "node"), row(31, 30, "worker"), row(40, 10, "vite"), row(50, 1, "other"), row(60, 50, "x")];
+const TABLE = [
+    row(1, 0, "app"),
+    row(10, 1, "agent"),
+    row(20, 10, "sh"),
+    row(30, 20, "node"),
+    row(31, 30, "worker"),
+    row(40, 10, "vite"),
+    row(50, 1, "other"),
+    row(60, 50, "x"),
+];
 const LISTENING: Listener[] = [
     { address: "127.0.0.1", pid: 30, port: 3000 },
     { address: "*", pid: 40, port: 4000 },
@@ -24,7 +33,7 @@ const LISTENING: Listener[] = [
 ];
 
 class FakeSystem implements PortsSystem {
-    public readonly signals: Array<[number, string]> = [];
+    public readonly signals: [number, string][] = [];
 
     public table: ProcessInfo[] = [...TABLE];
 
@@ -49,12 +58,15 @@ class FakeSystem implements PortsSystem {
         return this.table;
     }
 
+    // eslint-disable-next-line class-methods-use-this -- the fake waits for nothing
     public async sleep(): Promise<void> {}
 }
 
 describe("reading the process table", () => {
     it("parses ps rows and keeps only the command's base name", () => {
-        const rows = parsePs("  123     1 Mon Nov  3 10:00:00 2026 /usr/local/bin/node\n  124   123 Tue Nov 10 09:01:02 2026 /Applications/My App/Helper\nnot a row\n");
+        const rows = parsePs(
+            "  123     1 Mon Nov  3 10:00:00 2026 /usr/local/bin/node\n  124   123 Tue Nov 10 09:01:02 2026 /Applications/My App/Helper\nnot a row\n",
+        );
 
         expect(rows).toEqual([
             { name: "node", pid: 123, ppid: 1, startedAt: "Mon Nov 3 10:00:00 2026" },
@@ -75,11 +87,17 @@ describe("reading the process table", () => {
     });
 
     it("parses ss output", () => {
-        expect(parseSs('LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:(("node",pid=77,fd=19))\nLISTEN 0 4096 [::]:22 [::]:*\n')).toEqual([{ address: "127.0.0.1", pid: 77, port: 3000 }]);
+        expect(parseSs("LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:((\"node\",pid=77,fd=19))\nLISTEN 0 4096 [::]:22 [::]:*\n")).toEqual([
+            { address: "127.0.0.1", pid: 77, port: 3000 },
+        ]);
     });
 
     it("finds only the descendants of a process, never the process", () => {
-        expect(descendantsOf(TABLE, 10).map((entry) => entry.pid).sort((a, b) => a - b)).toEqual([20, 30, 31, 40]);
+        expect(
+            descendantsOf(TABLE, 10)
+                .map((entry) => entry.pid)
+                .toSorted((a, b) => a - b),
+        ).toEqual([20, 30, 31, 40]);
         expect(descendantsOf(TABLE, 999)).toEqual([]);
     });
 
@@ -108,7 +126,7 @@ describe("stopping a server", () => {
         const system = new FakeSystem();
 
         expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(true);
-        expect(system.signals.map(([pid]) => pid).sort((a, b) => a - b)).toEqual([30, 31]);
+        expect(system.signals.map(([pid]) => pid).toSorted((a, b) => a - b)).toEqual([30, 31]);
         expect(system.table.map((entry) => entry.pid)).toEqual([1, 10, 20, 40, 50, 60]);
     });
 
@@ -117,9 +135,7 @@ describe("stopping a server", () => {
         const started = "Mon Nov 3 10:00:00 2026";
 
         // The agent itself, the app, an unrelated server, and a process that is below the agent but listens on nothing.
-        for (const pid of [10, 1, 50, 20]) {
-            await expect(service.stop(10, { pid, startedAt: started })).rejects.toThrow();
-        }
+        await Promise.all([10, 1, 50, 20].map(async (pid) => await expect(service.stop(10, { pid, startedAt: started })).rejects.toThrow()));
 
         expect(await new FakeSystem().processes()).toHaveLength(TABLE.length);
     });
@@ -168,7 +184,9 @@ describe("stopping a server", () => {
     });
 });
 
-const toolsMissing = !portsSupported || firstExisting(["/bin/ps", "/usr/bin/ps"]) === undefined || firstExisting(["/usr/sbin/lsof", "/usr/bin/lsof", "/usr/bin/ss", "/usr/sbin/ss", "/bin/ss"]) === undefined;
+const hasProcessTable = firstExisting(["/bin/ps", "/usr/bin/ps"]) !== undefined;
+const hasListingTool = firstExisting(["/usr/sbin/lsof", "/usr/bin/lsof", "/usr/bin/ss", "/usr/sbin/ss", "/bin/ss"]) !== undefined;
+const toolsMissing = !portsSupported || !hasProcessTable || !hasListingTool;
 
 const SERVER = "require('net').createServer().listen(0,'127.0.0.1',function(){console.log('PORT '+this.address().port)})";
 // An agent stand-in that starts a server and a plain sleeper in ITS OWN process group, as a real agent's tools are.
@@ -179,7 +197,11 @@ describe.skipIf(toolsMissing)(toolsMissing ? "real processes (SKIPPED: needs mac
     const spawned: number[] = [];
 
     afterEach(() => {
-        for (const pid of spawned.splice(0)) {
+        const pids = [...spawned];
+
+        spawned.length = 0;
+
+        for (const pid of pids) {
             try {
                 process.kill(pid, "SIGKILL");
             } catch {
@@ -218,7 +240,7 @@ describe.skipIf(toolsMissing)(toolsMissing ? "real processes (SKIPPED: needs mac
         });
 
         for (const line of lines.split("\n")) {
-            const [key, value] = line.split(" ");
+            const [key, value] = line.split(" ", 2);
 
             if (key !== undefined && value !== undefined) {
                 seen[key] = Number(value);

@@ -52,6 +52,7 @@ import {
     readOptionalDeviceId,
     readOptionId,
     readPairing,
+    readPortTarget,
     readPrompt,
     readPromptAnswer,
     readRequestId,
@@ -59,7 +60,6 @@ import {
     readSearchQuery,
     readSecretAnswer,
     readServerPath,
-    readPortTarget,
     readSessionId,
     readSessionTitle,
     readSettingsUpdate,
@@ -827,7 +827,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpPortStop, (id, pid, startedAt) => requireAcp().stopPort(readSessionId(id), readPortTarget(pid, startedAt)));
 
-    local(LOCAL_CHANNEL.acpSession,(id) => requireAcp().snapshot(readSessionId(id)));
+    local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
 
     local(LOCAL_CHANNEL.acpSend, (id, prompt) => requireAcp().send(readSessionId(id), readPrompt(prompt)));
 

@@ -33,6 +33,10 @@ export interface DeviceWindowApi {
     acpPermissionAnswerBatch: (ids: number[]) => Promise<number>;
     acpPermissionDecline: (id: number) => Promise<void>;
     acpPermissions: () => Promise<PermissionView[]>;
+    /** The ports this session's agent processes listen on. */
+    acpPorts: (sessionId: string) => Promise<PortView[]>;
+    /** Ends one listening server (and its own descendants) of the session, never the agent. Resolves true once all are gone. */
+    acpPortStop: (sessionId: string, pid: number, startedAt: string) => Promise<boolean>;
     acpProbe: (agentKey: string) => Promise<ProbeResult>;
     /** Asks the main process to install a listed agent. It words and shows the confirmation itself; `null` is a "no". */
     acpRegistryInstall: (id: string, version: string) => Promise<AcpView | null>;
@@ -41,10 +45,6 @@ export interface DeviceWindowApi {
     acpReports: () => Promise<Record<string, CapabilityReport>>;
     acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
     acpSession: (sessionId: string) => Promise<SessionSnapshot>;
-    /** The ports this session's agent processes listen on. */
-    acpPorts: (sessionId: string) => Promise<PortView[]>;
-    /** Ends one listening server (and its own descendants) of the session, never the agent. Resolves true once all are gone. */
-    acpPortStop: (sessionId: string, pid: number, startedAt: string) => Promise<boolean>;
     acpSessions: () => Promise<SessionSummary[]>;
     acpStart: (agentKey: string, folder: string) => Promise<string>;
     acpUpdate: (update: AcpUpdate) => Promise<AcpView>;

@@ -221,7 +221,7 @@ export const readPortTarget = (pid: unknown, startedAt: unknown): { pid: number;
     return { pid, startedAt: text(startedAt, "start time", 40) };
 };
 
-export const readOptionId =(value: unknown): string => text(value, "option", 256);
+export const readOptionId = (value: unknown): string => text(value, "option", 256);
 
 export const readRequestIds = (value: unknown): number[] => {
     if (!Array.isArray(value) || value.length === 0 || value.length > 50) {

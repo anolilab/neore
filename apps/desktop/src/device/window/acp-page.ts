@@ -892,9 +892,13 @@ export const initAcp = async (): Promise<void> => {
         renderImport();
     });
 
-    setInterval(() => {
+    setInterval(async () => {
         if (state.selected !== undefined && !document.hidden) {
-            refreshPorts().catch(showError);
+            try {
+                await refreshPorts();
+            } catch (error: unknown) {
+                showError(error);
+            }
         }
     }, PORTS_POLL_MS);
 

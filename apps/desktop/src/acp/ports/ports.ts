@@ -57,17 +57,21 @@ export class PortsService {
         }
 
         const byPid = new Map(below.map((row) => [row.pid, row]));
-        const views = new Map<string, PortView>();
+        const listeners = await this.system.listeners(below.map((row) => row.pid));
+        const seen = new Set<string>();
+        const views: PortView[] = [];
 
-        for (const listener of await this.system.listeners([...byPid.keys()])) {
+        for (const listener of listeners) {
             const row = byPid.get(listener.pid);
+            const key = `${String(listener.pid)}:${listener.address}:${String(listener.port)}`;
 
-            if (row !== undefined) {
-                views.set(`${String(listener.pid)}:${listener.address}:${String(listener.port)}`, { address: listener.address, name: row.name, pid: row.pid, port: listener.port, startedAt: row.startedAt });
+            if (row !== undefined && !seen.has(key)) {
+                seen.add(key);
+                views.push({ address: listener.address, name: row.name, pid: row.pid, port: listener.port, startedAt: row.startedAt });
             }
         }
 
-        return [...views.values()].sort((a, b) => a.port - b.port || a.pid - b.pid);
+        return views.toSorted((a, b) => a.port - b.port || a.pid - b.pid);
     }
 
     /**
@@ -86,7 +90,9 @@ export class PortsService {
             throw new Error("that server is no longer running in this session");
         }
 
-        if ((await this.system.listeners([root.pid])).length === 0) {
+        const rootListeners = await this.system.listeners([root.pid]);
+
+        if (rootListeners.length === 0) {
             throw new Error("that process no longer listens on a port");
         }
 
@@ -98,23 +104,31 @@ export class PortsService {
         }
 
         for (let waited = 0; waited < this.graceMs; waited += POLL_MS) {
-            if ((await this.existing(victims)).length === 0) {
+            // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
+            const alive = await this.existing(victims);
+
+            if (alive.length === 0) {
                 return true;
             }
 
+            // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
             await this.system.sleep(POLL_MS);
         }
 
         // Pid AND start time: a pid the system gave to another process since the check above is not ours to kill.
-        for (const survivor of await this.existing(victims)) {
+        const survivors = await this.existing(victims);
+
+        for (const survivor of survivors) {
             this.system.kill(survivor.pid, "SIGKILL");
         }
 
-        return (await this.existing(victims)).length === 0;
+        const remaining = await this.existing(victims);
+
+        return remaining.length === 0;
     }
 
     /** Descendants of the agent that may ever be signalled: never the agent, never this app. */
-    private below(table: readonly ProcessInfo[], agentPid: number): ProcessInfo[] {
+    private below(table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] {
         return descendantsOf(table, agentPid).filter((row) => row.pid !== agentPid && row.pid !== this.selfPid);
     }
 
@@ -122,8 +136,9 @@ export class PortsService {
      * Which of `victims` still exist as the same process. Not required to sit below the agent any more: a victim
      * whose parent died was reparented, and it is still the process we were told to end.
      */
-    private async existing(victims: readonly ProcessInfo[]): Promise<ProcessInfo[]> {
-        const now = new Map((await this.system.processes()).map((row) => [row.pid, row]));
+    private async existing(victims: ReadonlyArray<ProcessInfo>): Promise<ProcessInfo[]> {
+        const table = await this.system.processes();
+        const now = new Map(table.map((row) => [row.pid, row]));
 
         return victims.filter((victim) => now.get(victim.pid)?.startedAt === victim.startedAt);
     }

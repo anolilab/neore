@@ -21,7 +21,11 @@ export interface Listener {
     port: number;
 }
 
-const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+?)\s*$/u;
+/** `ps` start time after its spaces are squeezed to one: `Tue Nov 3 20:10:49 2026`. */
+const LSTART = /^\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/u;
+const SPACES = /\s+/u;
+const DIGITS = /^\d+$/u;
+const OWNER_PID = /pid=(\d+)/gu;
 
 const baseName = (command: string): string => {
     const slash = command.lastIndexOf("/");
@@ -29,15 +33,33 @@ const baseName = (command: string): string => {
     return (slash === -1 ? command : command.slice(slash + 1)).slice(0, MAX_NAME_CHARS);
 };
 
+/** One `ps` line: pid, ppid, the start time (five words), then the command. Anything else is not a process. */
+const parsePsLine = (line: string): ProcessInfo | undefined => {
+    const [pidText, ppidText, ...rest] = line.trim().split(SPACES);
+
+    if (pidText === undefined || ppidText === undefined || !DIGITS.test(pidText) || !DIGITS.test(ppidText)) {
+        return undefined;
+    }
+
+    const startedAt = rest.slice(0, 5).join(" ");
+    const command = rest.slice(5).join(" ");
+
+    if (command === "" || !LSTART.test(startedAt)) {
+        return undefined;
+    }
+
+    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt };
+};
+
 /** Parses `ps -axo pid=,ppid=,lstart=,comm=` (run with `LC_ALL=C`). Lines that do not fit are dropped. */
 export const parsePs = (output: string): ProcessInfo[] => {
     const rows: ProcessInfo[] = [];
 
     for (const line of output.split("\n")) {
-        const match = PS_LINE.exec(line);
+        const row = parsePsLine(line);
 
-        if (match !== null) {
-            rows.push({ name: baseName(match[4] as string), pid: Number(match[1]), ppid: Number(match[2]), startedAt: (match[3] as string).replaceAll(/\s+/gu, " ") });
+        if (row !== undefined) {
+            rows.push(row);
         }
     }
 
@@ -48,14 +70,14 @@ const splitAddress = (endpoint: string): { address: string; port: number } | und
     const colon = endpoint.lastIndexOf(":");
     const port = Number(endpoint.slice(colon + 1));
 
-    if (colon === -1 || !Number.isInteger(port) || port < 1 || port > 65_535) {
+    if (colon === -1 || !Number.isSafeInteger(port) || port < 1 || port > 65_535) {
         return undefined;
     }
 
     return { address: endpoint.slice(0, colon).replaceAll(/^\[|\]$/gu, ""), port };
 };
 
-/** Parses `lsof -F pn`: a `p<pid>` line, then one `n<address>:<port>` line per listening socket of that process. */
+/** Parses `lsof -F pn`: a line starting with `p` and the pid, then one line starting with `n` and the address and port per listening socket of that process. */
 export const parseLsof = (output: string): Listener[] => {
     const listeners: Listener[] = [];
     let pid: number | undefined;
@@ -63,10 +85,10 @@ export const parseLsof = (output: string): Listener[] => {
     for (const line of output.split("\n")) {
         if (line.startsWith("p")) {
             pid = Number(line.slice(1));
-        } else if (line.startsWith("n") && pid !== undefined && Number.isInteger(pid)) {
+        } else if (pid !== undefined && line.startsWith("n")) {
             const endpoint = splitAddress(line.slice(1));
 
-            if (endpoint !== undefined) {
+            if (endpoint !== undefined && Number.isSafeInteger(pid)) {
                 listeners.push({ ...endpoint, pid });
             }
         }
@@ -80,14 +102,14 @@ export const parseSs = (output: string): Listener[] => {
     const listeners: Listener[] = [];
 
     for (const line of output.split("\n")) {
-        const columns = line.trim().split(/\s+/u);
+        const columns = line.trim().split(SPACES);
         const endpoint = columns[3] === undefined ? undefined : splitAddress(columns[3]);
 
         if (endpoint === undefined) {
             continue;
         }
 
-        for (const owner of line.matchAll(/pid=(\d+)/gu)) {
+        for (const owner of line.matchAll(OWNER_PID)) {
             listeners.push({ ...endpoint, pid: Number(owner[1]) });
         }
     }
@@ -96,7 +118,7 @@ export const parseSs = (output: string): Listener[] => {
 };
 
 /** Every process below `rootPid`, never `rootPid` itself. A table with a cycle (a bad read) still ends. */
-export const descendantsOf = (table: readonly ProcessInfo[], rootPid: number): ProcessInfo[] => {
+export const descendantsOf = (table: ReadonlyArray<ProcessInfo>, rootPid: number): ProcessInfo[] => {
     const children = new Map<number, ProcessInfo[]>();
 
     for (const row of table) {
@@ -108,12 +130,13 @@ export const descendantsOf = (table: readonly ProcessInfo[], rootPid: number): P
     const queue = [rootPid];
 
     for (let pid = queue.shift(); pid !== undefined; pid = queue.shift()) {
-        for (const child of children.get(pid) ?? []) {
-            if (!seen.has(child.pid)) {
-                seen.add(child.pid);
-                found.push(child);
-                queue.push(child.pid);
-            }
+        const kids = children.get(pid) ?? [];
+        const fresh = kids.filter((row) => !seen.has(row.pid));
+
+        for (const child of fresh) {
+            seen.add(child.pid);
+            found.push(child);
+            queue.push(child.pid);
         }
     }
 
