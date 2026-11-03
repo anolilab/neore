@@ -97,6 +97,8 @@ export interface RouteRequest {
      * ≥ 0.9 confidence, the gateway uses the pin and bypasses tier routing.
      */
     categoryPins?: Record<string, { modelId: string; provider: string }>;
+    /** Size of the conversation when `messages` carries only the latest turn. */
+    contextTokens?: number;
     messages: unknown[];
     modelFilterRules?: ModelFilterRules;
     preferredModel?: string;

@@ -111,6 +111,7 @@ export type InternalRouteRequest = {
     userTier?: string;
     preferredModel?: string;
     preferredQuality?: number;
+    contextTokens?: number;
     routingProfile?: 'fast' | 'balanced' | 'reasoning' | 'premium';
     modelFilterRules?: ModelFilterRules;
 };

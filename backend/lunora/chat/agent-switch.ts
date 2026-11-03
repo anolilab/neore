@@ -317,6 +317,8 @@ export const switchThreadAgentHandler = async (
 
     await patchThread(ctx.db, thread._id, {
         activeAgent: to,
+        // A switch names the agent from here on: Auto, which only routes a never-switched thread, ends with it.
+        ...(thread.autoModel && { autoModel: false }),
         ...(args.handoff?.text && { hasHandoff: true }),
         // The row now ends the path the thread displays.
         ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),

@@ -233,13 +233,13 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // Always update local store for immediate UI feedback
         setSelectedModel(newModel, threadId);
 
-        // Naming a model is choosing it: Auto ends, before a switch or an edit changes what the thread runs on.
-        if (autoModel) {
-            try {
-                await setAutoModel(false);
-            } catch (error) {
-                showError(error instanceof Error ? error : t`Could not turn off Auto. Please try again.`);
-            }
+        // Naming a model is choosing it, so Auto ends with the pick. A new thread holds it in the composer; an existing one
+        // ends it in the same write that stores the model, or with the switch itself, so a pick that is cancelled or fails
+        // leaves Auto as it was.
+        if (autoModel && !(threadId && thread)) {
+            setPendingSettings((previous) => {
+                return { ...previous, autoModel: false };
+            });
         }
 
         // A text thread records the change as a switch in its transcript; the thread's own model stays
@@ -251,10 +251,21 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // If existing thread, also persist to Lunora. A switched thread keeps its model: it is the agent of every
         // branch from before the first switch, and a pick the server cannot switch to lives in the composer only.
         if (threadId && thread && !thread.activeAgent) {
-            await updateThreadAction({
-                model: newModel,
-                threadId: threadId as Id<"threads">,
-            });
+            try {
+                await updateThreadAction({
+                    ...(autoModel && { autoModel: false }),
+                    model: newModel,
+                    threadId: threadId as Id<"threads">,
+                });
+            } catch (error) {
+                if (previousModel) {
+                    setSelectedModel(previousModel, threadId);
+                }
+
+                showError(error instanceof Error ? error : t`Could not change the model. Please try again.`);
+
+                return;
+            }
         }
 
         // Switches on a thread are counted by `runSwitch`; this pick changed the model without one.

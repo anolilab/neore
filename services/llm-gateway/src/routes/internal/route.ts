@@ -124,6 +124,12 @@ const requestSchema = z.object({
             requireZDR: z.boolean().optional(),
         })
         .optional(),
+    /**
+     * Size of the conversation the caller holds, when `messages` carries only the latest turn. The larger of this and
+     * the estimate from `messages` feeds the downgrade-cost policy, so a short follow-up in a long thread is not
+     * mistaken for a short thread.
+     */
+    contextTokens: z.number().int().min(0).optional(),
     preferredModel: z.string().optional(),
     preferredQuality: z.number().min(0).max(1).optional(),
 
@@ -172,7 +178,7 @@ routeRouter.openapi(
         const messages = body.messages as ModelMessage[];
         const toolCount = body.toolSchemas ? Object.keys(body.toolSchemas).length : 0;
         const hasImages = messages.some((m) => Array.isArray(m.content) && m.content.some((p: { type: string }) => p.type === "image" || p.type === "file"));
-        const contextTokens = estimateContextTokens(messages);
+        const contextTokens = Math.max(estimateContextTokens(messages), body.contextTokens ?? 0);
 
         // Header-based tier override. Validated against the caller's userTier
         // so a free-plan request cannot self-promote to the reasoning tier.

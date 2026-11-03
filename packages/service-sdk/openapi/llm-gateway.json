@@ -914,6 +914,7 @@
                     "userTier": { "type": "string", "default": "free" },
                     "preferredModel": { "type": "string" },
                     "preferredQuality": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "contextTokens": { "type": "integer", "minimum": 0 },
                     "routingProfile": { "type": "string", "enum": ["fast", "balanced", "reasoning", "premium"] },
                     "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" }
                 }

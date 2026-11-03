@@ -5,13 +5,18 @@ import type { ActionCtx } from "../../_generated/server";
 import { regenerateParentOf } from "../../agent/agent-switch";
 import { vThreadDocFields } from "../../agent/validators";
 import type { RunPlan } from "./agent-run";
+import { backupCapabilities } from "./backup-model";
 import { type AutoGate, registryModelForRoute, resolveAutoModel, shouldRouteAuto } from "./auto-model";
 
 const routeViaGateway = vi.fn();
 const canRunPaidModel = vi.fn();
 
-vi.mock("./gateway-client", () => {return { routeViaGateway: (...args: unknown[]) => routeViaGateway(...args) }});
-vi.mock("./agent-run", () => {return { canRunPaidModel: (...args: unknown[]) => canRunPaidModel(...args) }});
+vi.mock("./gateway-client", () => {
+    return { routeViaGateway: (...args: unknown[]) => routeViaGateway(...args) };
+});
+vi.mock("./agent-run", () => {
+    return { canRunPaidModel: (...args: unknown[]) => canRunPaidModel(...args) };
+});
 
 const ctx = {} as ActionCtx;
 const plan: RunPlan = { isAdmin: false, plan: null };
@@ -22,34 +27,43 @@ const target = enabledText.find(
 )!;
 const noImages = enabledText.find((row) => row.id !== fallback.id && row.supportsImages !== true && row.filterCapabilities?.includes("vision") !== true)!;
 
-const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["thread"]> = {}): AutoGate => {return {
-    currentModel: fallback.id,
-    isAnonymous: false,
-    pinnedByBotOrSkill: false,
-    prompt: "hello",
-    thread: { autoModel: true, userId: "user-1", ...thread },
-    userId: "user-1",
-    ...overrides,
-}};
+const filesOnly = enabledText.find((row) => row.id !== fallback.id && !backupCapabilities(row).images && backupCapabilities(row).files)!;
+const imagesOnly = enabledText.find((row) => row.id !== fallback.id && backupCapabilities(row).images && !backupCapabilities(row).files)!;
+
+const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["thread"]> = {}): AutoGate => {
+    return {
+        currentModel: fallback.id,
+        isAnonymous: false,
+        pinnedByBotOrSkill: false,
+        prompt: "hello",
+        thread: { autoModel: true, userId: "user-1", ...thread },
+        userId: "user-1",
+        ...overrides,
+    };
+};
 
 const request = {
+    conversation: async () => {
+        return { contextTokens: 0, files: false, images: false };
+    },
     fallbackModel: fallback.id,
     filterRules: { blockedProviders: ["x"] },
-    hasAttachments: false,
-    plan,
+    plan: async () => plan,
     prompt: "hello",
     threadId: "thread-1",
     userId: "user-1",
 };
-const route = (modelId: string) => {return {
-    confidence: 1,
-    estimatedCost: 0,
-    modelApiId: modelId,
-    modelId,
-    provider: "openrouter",
-    routingReason: "",
-    tier: "standard",
-}};
+const route = (modelId: string) => {
+    return {
+        confidence: 1,
+        estimatedCost: 0,
+        modelApiId: modelId,
+        modelId,
+        provider: "openrouter",
+        routingReason: "",
+        tier: "standard",
+    };
+};
 
 describe("shouldRouteAuto", () => {
     it("routes a plain hosted text thread that opted in", () => {
@@ -124,10 +138,94 @@ describe("resolveAutoModel", () => {
         await expect(resolveAutoModel(ctx, { ...request, filterRules: { blockedModels: [target.id] } })).resolves.toBe(fallback.id);
     });
 
-    it("keeps the fallback when attachments need a capability the routed model lacks", async () => {
+    it("keeps the fallback when images are in the conversation and the routed model cannot see them", async () => {
         routeViaGateway.mockResolvedValue(route(noImages.id));
 
-        await expect(resolveAutoModel(ctx, { ...request, hasAttachments: true })).resolves.toBe(fallback.id);
+        await expect(
+            resolveAutoModel(ctx, {
+                ...request,
+                conversation: async () => {
+                    return { contextTokens: 0, files: false, images: true };
+                },
+            }),
+        ).resolves.toBe(fallback.id);
+    });
+
+    it("accepts a model that reads files but not images when only files are in the conversation", async () => {
+        routeViaGateway.mockResolvedValue(route(filesOnly.id));
+
+        await expect(
+            resolveAutoModel(ctx, {
+                ...request,
+                conversation: async () => {
+                    return { contextTokens: 0, files: true, images: false };
+                },
+            }),
+        ).resolves.toBe(filesOnly.id);
+    });
+
+    it("accepts a model that sees images but not files when only images are in the conversation", async () => {
+        routeViaGateway.mockResolvedValue(route(imagesOnly.id));
+
+        await expect(
+            resolveAutoModel(ctx, {
+                ...request,
+                conversation: async () => {
+                    return { contextTokens: 0, files: false, images: true };
+                },
+            }),
+        ).resolves.toBe(imagesOnly.id);
+    });
+
+    it("keeps the fallback when files are in the conversation and the routed model cannot read them", async () => {
+        routeViaGateway.mockResolvedValue(route(imagesOnly.id));
+
+        await expect(
+            resolveAutoModel(ctx, {
+                ...request,
+                conversation: async () => {
+                    return { contextTokens: 0, files: true, images: false };
+                },
+            }),
+        ).resolves.toBe(fallback.id);
+    });
+
+    it("passes the size of a long conversation to the gateway", async () => {
+        routeViaGateway.mockResolvedValue(route(target.id));
+
+        await resolveAutoModel(ctx, {
+            ...request,
+            conversation: async () => {
+                return { contextTokens: 50_000, files: false, images: false };
+            },
+        });
+
+        expect(routeViaGateway).toHaveBeenCalledWith(ctx, expect.objectContaining({ contextTokens: 50_000 }));
+    });
+
+    it("sends model lists in both spellings the gateway may know", async () => {
+        routeViaGateway.mockResolvedValue(route(target.id));
+
+        await resolveAutoModel(ctx, { ...request, filterRules: { allowedModels: ["anthropic/claude-sonnet-4"] } });
+
+        expect(routeViaGateway).toHaveBeenCalledWith(
+            ctx,
+            expect.objectContaining({ modelFilterRules: { allowedModels: ["anthropic/claude-sonnet-4", "claude-sonnet-4"] } }),
+        );
+    });
+
+    it("keeps the fallback when the plan cannot be read", async () => {
+        routeViaGateway.mockResolvedValue(route(target.id));
+
+        await expect(
+            resolveAutoModel(ctx, {
+                ...request,
+                plan: async () => {
+                    throw new Error("plan unavailable");
+                },
+            }),
+        ).resolves.toBe(fallback.id);
+        expect(routeViaGateway).not.toHaveBeenCalled();
     });
 
     it("keeps the fallback when the gateway fails", async () => {

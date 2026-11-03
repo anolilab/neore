@@ -13,6 +13,7 @@ const hoisted = vi.hoisted(() => {
         navigate: vi.fn(async () => {}),
         showError: vi.fn(),
         switchAgent: vi.fn(),
+        updateThread: vi.fn(),
         thread: { current: undefined as unknown },
         trackEvent: vi.fn(),
     };
@@ -27,7 +28,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: {} } } } };
+    return { api: { chat: { agent_switch: { switchThreadAgent: { name: "switch" } }, functions: { updateThread: { name: "update" } } } } };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -83,7 +84,9 @@ vi.mock("@/lib/lunora/crpc", () => {
             };
         },
         useLunoraActionOptions: (reference: { name?: string }) => {
-            return { mutationFn: reference.name === "switch" ? hoisted.switchAgent : vi.fn() };
+            const mutationFns: Record<string, unknown> = { switch: hoisted.switchAgent, update: hoisted.updateThread };
+
+            return { mutationFn: mutationFns[reference.name ?? ""] ?? vi.fn() };
         },
     };
 });
@@ -386,5 +389,42 @@ describe("useModelCombobox: the confirmation step", () => {
         });
 
         expect(hoisted.switchAgent).not.toHaveBeenCalled();
+    });
+});
+
+describe("useModelCombobox: picking a model on an Auto thread", () => {
+    const custom = "custom:endpoint/model";
+
+    beforeEach(() => {
+        hoisted.thread.current = { _id: "t1", autoModel: true, mode: "text", model: A };
+        hoisted.updateThread.mockReset();
+        hoisted.showError.mockReset();
+        useModelStore.getState().loadThreadData({ mode: "text", model: A }, "t1");
+    });
+
+    it("stores the model and ends Auto in one write", async () => {
+        hoisted.updateThread.mockResolvedValue("t1");
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(custom);
+        });
+
+        expect(hoisted.updateThread).toHaveBeenCalledTimes(1);
+        expect(hoisted.updateThread).toHaveBeenCalledWith({ autoModel: false, model: custom, threadId: "t1" });
+    });
+
+    it("restores the earlier selection and reports the error when the write fails", async () => {
+        hoisted.updateThread.mockRejectedValue(new Error("offline"));
+
+        const { result } = renderHook(() => useModelCombobox({ threadId: "t1" }));
+
+        await act(async () => {
+            await result.current.changeModel(custom);
+        });
+
+        expect(useModelStore.getState().selectedModel).toBe(A);
+        expect(hoisted.showError).toHaveBeenCalledTimes(1);
     });
 });

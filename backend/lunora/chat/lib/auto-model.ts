@@ -69,27 +69,49 @@ export const registryModelForRoute = (routed: { modelApiId: string; modelId: str
     return matches.length === 1 ? matches[0] : undefined;
 };
 
+/** What the conversation the run sends holds, read from the thread's path (`chat/auto-model-context.ts`). */
+export interface ConversationShape {
+    /** A lower bound on the conversation's size in tokens; `0` when it is short. */
+    contextTokens: number;
+    files: boolean;
+    images: boolean;
+}
+
 export interface AutoRequest {
+    conversation: () => Promise<ConversationShape>;
     fallbackModel: string;
     filterRules: ModelFilterRules | undefined;
-    hasAttachments: boolean;
-    plan: RunPlan;
+    plan: () => Promise<RunPlan>;
     prompt: string;
     threadId: string;
     userId: string;
 }
 
+/** A registry id (`anthropic/claude-sonnet-4`) in both spellings the gateway's candidates may use (`claude-sonnet-4`). */
+const bothSpellings = (ids: string[] | undefined): string[] | undefined => ids && [...new Set(ids.flatMap((id) => [id, id.slice(id.lastIndexOf("/") + 1)]))];
+
+/** The user's model lists in the gateway's namespace; the routed answer is still checked against the originals. */
+const gatewayRules = (rules: ModelFilterRules): ModelFilterRules => {
+    const allowedModels = bothSpellings(rules.allowedModels);
+    const blockedModels = bothSpellings(rules.blockedModels);
+
+    return { ...rules, ...(allowedModels && { allowedModels }), ...(blockedModels && { blockedModels }) };
+};
+
 /**
  * The model this send runs on: the routed one when it is a registry model the user may run (filters, plan, and the
- * capabilities the call needs), else `fallbackModel`. Auto must never fail a send the fallback could serve.
+ * capabilities the conversation needs), else `fallbackModel`. Auto must never fail a send the fallback could serve,
+ * so every read it needs is inside the guard.
  */
 export const resolveAutoModel = async (ctx: ActionCtx, request: AutoRequest): Promise<string> => {
-    const { fallbackModel, filterRules, hasAttachments, plan, prompt, threadId, userId } = request;
+    const { fallbackModel, filterRules, prompt, threadId, userId } = request;
 
     try {
+        const [plan, conversation] = await Promise.all([request.plan(), request.conversation()]);
         const routed = await routeViaGateway(ctx, {
+            ...(conversation.contextTokens > 0 && { contextTokens: conversation.contextTokens }),
             messages: [{ content: prompt, role: "user" }],
-            ...(filterRules && { modelFilterRules: filterRules }),
+            ...(filterRules && { modelFilterRules: gatewayRules(filterRules) }),
             threadId,
             userId,
             userTier: routingTierOf(plan),
@@ -107,7 +129,8 @@ export const resolveAutoModel = async (ctx: ActionCtx, request: AutoRequest): Pr
         if (
             backupFilterRejection(definition, filterRules) !== null ||
             !capabilities.tools ||
-            (hasAttachments && !(capabilities.images && capabilities.files)) ||
+            (conversation.images && !capabilities.images) ||
+            (conversation.files && !capabilities.files) ||
             !(await canRunPaidModel(ctx, userId, definition, plan))
         ) {
             return fallbackModel;

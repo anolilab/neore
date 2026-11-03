@@ -316,8 +316,12 @@ export const runStreamingAgent = internalAction
                     : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 
                 // "Auto": this send runs on the one model the gateway's routing picks, named like any other pick below. A bot's or a
-                // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`).
+                // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`). A resume continues a reply that
+                // already has a model: the one recorded in its job arguments below.
+                let routedModel: string | undefined;
+
                 if (
+                    resume === undefined &&
                     shouldRouteAuto({
                         currentModel: model,
                         isAnonymous: isAnonymous === true,
@@ -327,15 +331,17 @@ export const runStreamingAgent = internalAction
                         userId,
                     })
                 ) {
-                    model = await resolveAutoModel(ctx, {
+                    routedModel = await resolveAutoModel(ctx, {
+                        conversation: async () =>
+                            await ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, { threadId: threadId as Id<"threads"> }),
                         fallbackModel: model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
-                        hasAttachments: Boolean(fileIds?.length),
-                        plan: await readRunPlan(ctx, userId, organizationId),
+                        plan: async () => await readRunPlan(ctx, userId),
                         prompt,
                         threadId,
                         userId,
                     });
+                    model = routedModel;
                 }
 
                 // Auto-detect task complexity
@@ -507,7 +513,7 @@ export const runStreamingAgent = internalAction
                     origin,
                     ...(goalSkill && { skill: goalSkill }),
                     streamId,
-                    streamingConfig,
+                    streamingConfig: routedModel === undefined ? streamingConfig : { ...streamingConfig, model: routedModel },
                     threadId,
                     userId,
                     userPrompt,
