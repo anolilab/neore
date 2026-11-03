@@ -319,6 +319,8 @@ export const runStreamingAgent = internalAction
                 // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`). A resume continues a reply that
                 // already has a model: the one recorded in its job arguments below.
                 let routedModel: string | undefined;
+                // The plan Auto authorized its route with (the run's organization). The model gate checks the same plan.
+                let autoPlan: Awaited<ReturnType<typeof readRunPlan>> | undefined;
 
                 // A goal runs on the model it starts with, every round: its continuation rounds are machine-written and read the
                 // goal's saved model, so routing its first round alone would leave the later rounds on another model.
@@ -345,7 +347,11 @@ export const runStreamingAgent = internalAction
                         // The thread's own model is the fallback: a send that names another model must not run on it.
                         fallbackModel: thread?.model ?? model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
-                        plan: async () => await readRunPlan(ctx, userId, organizationId ?? null),
+                        plan: async () => {
+                            autoPlan = await readRunPlan(ctx, userId, organizationId ?? null);
+
+                            return autoPlan;
+                        },
                         prompt,
                         threadId,
                         userId,
@@ -391,7 +397,7 @@ export const runStreamingAgent = internalAction
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user
                 // said its models support them.
-                const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId);
+                const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId, autoPlan);
 
                 // Built-ins + MCP tools, with the user's per-tool permissions applied
                 // (`off` removed, `ask` gated behind a tool-approval request) — and
