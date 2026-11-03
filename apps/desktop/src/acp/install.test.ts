@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { REGISTRY_FIXTURE, SHA } from "./fixtures/registry";
-import { AgentInstaller, consentText, download } from "./install";
+import { AgentInstaller, consentText, download, npmConsentText } from "./install";
 import { AgentRegistry } from "./registry";
 
 let scratch: string;
@@ -24,12 +24,13 @@ const BYTES = Buffer.from("not really an archive");
 const makeFetch = (body: () => Response | Promise<Response> = () => new Response(BYTES)) =>
     vi.fn(async (url: string | URL | Request, _init?: RequestInit) => String(url).endsWith("registry.json") ? Response.json(REGISTRY_FIXTURE) : body());
 
-const setup = async (options: { accept?: boolean; body?: () => Response | Promise<Response>; install?: (request: string) => string } = {}) => {
+const setup = async (options: { accept?: boolean; body?: () => Response | Promise<Response>; install?: (request: string) => string; installNpm?: (request: string) => string } = {}) => {
     const fetchSpy = makeFetch(options.body);
     const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, platform: "linux" });
     const staged: string[] = [];
     const core = {
         acpInstall: vi.fn(options.install ?? ((): string => JSON.stringify({ agents: [], consents: [], envNames: [] }))),
+        acpInstallNpm: vi.fn(options.installNpm ?? ((): string => JSON.stringify({ agents: [], consents: [], envNames: [] }))),
         acpInstallStage: vi.fn(() => {
             const folder = mkdtempSync(path.join(scratch, "stage-"));
 
@@ -52,7 +53,13 @@ describe("the consent text", () => {
 
         await registry.search("");
 
-        const { detail, message } = consentText(registry.resolve("amp-acp", "0.10.0"));
+        const resolved = registry.resolve("amp-acp", "0.10.0");
+
+        if (resolved.kind !== "binary") {
+            throw new Error("expected a download");
+        }
+
+        const { detail, message } = consentText(resolved);
 
         expect(message).toBe("Install “Amp” 0.10.0 from the ACP registry?");
         expect(detail).toContain("Publisher (as listed in the registry): Ada Lovelace, Grace Hopper");
@@ -200,5 +207,139 @@ describe("AgentInstaller", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("an npm agent", () => {
+    const TARBALL = "https://registry.npmjs.org/thing/-/thing-1.0.0.tgz";
+    const INTEGRITY = `sha512-${"B".repeat(86)}==`;
+    const TOOLS = { node: "/opt/node/bin/node", npm: "/opt/node/bin/npm" };
+    const metadata = { dist: { integrity: INTEGRITY, tarball: TARBALL }, name: "thing", version: "1.0.0" };
+
+    const setupNpm = async (options: { accept?: boolean; index?: () => Response; tools?: typeof TOOLS | null } = {}) => {
+        const fetchSpy = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
+            const text = String(url);
+
+            if (text.endsWith("registry.json")) {
+                return Response.json(REGISTRY_FIXTURE);
+            }
+
+            return text === TARBALL ? new Response(BYTES) : options.index?.() ?? Response.json(metadata);
+        });
+        const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, platform: "linux" });
+        const staged: string[] = [];
+        const core = {
+            acpInstall: vi.fn(() => "{}"),
+            acpInstallNpm: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+            acpInstallStage: vi.fn(() => {
+                const folder = mkdtempSync(path.join(scratch, "stage-"));
+
+                staged.push(folder);
+
+                return folder;
+            }),
+        };
+        const confirm = vi.fn(async (_text: { detail: string; message: string }) => options.accept ?? true);
+        const installer = new AgentInstaller({
+            confirm,
+            core: () => core,
+            fetch: fetchSpy as unknown as typeof fetch,
+            locateTools: () => options.tools === null ? undefined : options.tools ?? TOOLS,
+            registry,
+        });
+
+        await registry.search("");
+
+        return { confirm, core, fetchSpy, installer, staged };
+    };
+
+    const downloads = (fetchSpy: { mock: { calls: unknown[][] } }) => fetchSpy.mock.calls.map(([url]) => String(url)).filter((url) => url === TARBALL);
+
+    it("shows publisher, package, version and the index's hash, and says the hash is the index's own", async () => {
+        const { confirm, installer } = await setupNpm();
+
+        await installer.install("thing", "1.0.0");
+
+        const { detail, message } = confirm.mock.calls[0][0];
+
+        expect(message).toBe("Install “Thing” 1.0.0 from npm (thing)?");
+        expect(detail).toContain("Publisher (as listed in the registry): unknown publisher");
+        expect(detail).toContain("Package: thing");
+        expect(detail).toContain("Version: 1.0.0");
+        expect(detail).toContain(`Hash (SHA-512): ${INTEGRITY}`);
+        expect(detail).toContain("came from the npm package index just now, not from the publisher");
+        expect(detail).toContain("trust on first use");
+        expect(detail).toContain("without running any install script");
+        expect(detail).toContain("Neore will not start the agent");
+        expect(detail).toContain("never updates it on its own");
+    });
+
+    it("looks the hash up before the dialog and downloads nothing on a no", async () => {
+        const { confirm, core, fetchSpy, installer } = await setupNpm({ accept: false });
+
+        await expect(installer.install("thing", "1.0.0")).resolves.toBeNull();
+
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(downloads(fetchSpy)).toHaveLength(0);
+        expect(core.acpInstallStage).not.toHaveBeenCalled();
+        expect(core.acpInstallNpm).not.toHaveBeenCalled();
+    });
+
+    it("hands the core the index's hash as confirmed, the tools it found and the registry's arguments, nothing from the window", async () => {
+        const { core, installer, staged } = await setupNpm();
+
+        await installer.install("thing", "1.0.0");
+
+        expect(JSON.parse(core.acpInstallNpm.mock.calls[0][0])).toEqual({
+            archive: path.join(staged[0], "download"),
+            args: [],
+            env: {},
+            integrity: INTEGRITY,
+            key: "thing",
+            label: "Thing",
+            node: TOOLS.node,
+            npm: TOOLS.npm,
+            package: "thing",
+            publisher: "unknown publisher",
+            source: TARBALL,
+            version: "1.0.0",
+        });
+        expect(core.acpInstall).not.toHaveBeenCalled();
+        expect(existsSync(staged[0])).toBe(false);
+    });
+
+    it("asks nothing and downloads nothing when the index has no hash or node is missing", async () => {
+        const noHash = await setupNpm({ index: () => Response.json({ ...metadata, dist: { tarball: TARBALL } }) });
+
+        await expect(noHash.installer.install("thing", "1.0.0")).rejects.toThrow("no SHA-512 integrity");
+        expect(noHash.confirm).not.toHaveBeenCalled();
+
+        const noNode = await setupNpm({ tools: null });
+
+        await expect(noNode.installer.install("thing", "1.0.0")).rejects.toThrow("Node.js and npm were not found");
+        expect(noNode.confirm).not.toHaveBeenCalled();
+        expect(noNode.fetchSpy.mock.calls.map(([url]) => String(url))).toEqual([expect.stringContaining("registry.json")]);
+    });
+
+    it("removes the staging folder when the download or the core fails", async () => {
+        const failing = await setupNpm();
+
+        failing.core.acpInstallNpm.mockImplementation(() => {
+            throw new Error("The download does not match the hash the package index gave");
+        });
+        await expect(failing.installer.install("thing", "1.0.0")).rejects.toThrow("does not match the hash");
+        expect(existsSync(failing.staged[0])).toBe(false);
+    });
+
+    it("words its text without a hash the registry did not give", () => {
+        const text = npmConsentText(
+            { agent: { binary: {}, description: "", distributions: ["npx"], id: "t", license: "MIT", name: "T", publisher: "Acme", repository: "", version: "1.0.0" }, args: ["--acp"], env: { A: "1" }, kind: "npm", name: "t", version: "1.0.0" },
+            { integrity: INTEGRITY, tarball: TARBALL },
+            TOOLS,
+        );
+
+        expect(text.detail).toContain("Runs: \"/opt/node/bin/node\" \"<the package's program>\" \"--acp\"");
+        expect(text.detail).toContain("Sets: A");
+        expect(text.detail).not.toContain("SHA-256 the registry published");
     });
 });

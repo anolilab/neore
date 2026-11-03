@@ -74,11 +74,19 @@ pub struct AcpAgent {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpInstall {
+    /// The package index's hash (npm `dist.integrity`, `sha512-<base64>`) the download was verified against. Set
+    /// only on an npm install: the trust is the index's, taken when the person confirmed, not the publisher's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_integrity: Option<String>,
     pub publisher: String,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
     pub source: String,
+    /// SHA-256 over every file, folder and link of the installed folder, recorded after the install. An agent
+    /// that has one is hashed again before each start and refused when it differs. npm installs only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree_sha256: Option<String>,
     pub version: String,
 }
 
@@ -382,8 +390,19 @@ impl DeviceState {
                         // The pin describes the installed command: a different one is no longer that.
                         install: existing
                             .filter(|&i| {
-                                settings.acp_agents[i].command == command
-                                    && settings.acp_agents[i].args == args
+                                let before = &settings.acp_agents[i];
+
+                                // An npm install runs `node <program> <arguments>`: the program (the first
+                                // argument) is what was pinned and is still hashed at every start, so the
+                                // arguments after it are the person's to change.
+                                before.command == command
+                                    && (before.args == args
+                                        || before
+                                            .install
+                                            .as_ref()
+                                            .is_some_and(|pin| pin.tree_sha256.is_some())
+                                            && !args.is_empty()
+                                            && before.args.first() == args.first())
                             })
                             .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,
@@ -409,8 +428,11 @@ impl DeviceState {
                             // still points inside them (other arguments, or another program of the same download).
                             if settings.acp_agents[i].install.is_some()
                                 && agent.install.is_none()
-                                && !Path::new(&agent.command)
-                                    .starts_with(install_root.join(&agent.key))
+                                && !std::iter::once(&agent.command)
+                                    .chain(&agent.args)
+                                    .any(|part| {
+                                        Path::new(part).starts_with(install_root.join(&agent.key))
+                                    })
                             {
                                 uninstall = Some(agent.key.clone());
                             }
@@ -531,6 +553,12 @@ impl DeviceState {
             .iter()
             .find(|agent| agent.key == agent_key)
             .ok_or("that agent is not registered")?;
+
+        // An agent run through a package manager is checked against what was recorded at install, every time.
+        if let Some(pin) = &agent.install {
+            self.verify_installed_tree(agent, pin)?;
+        }
+
         let cwd: PathBuf = match folder {
             Some(folder) => {
                 let canonical = validate_roots(&[folder.to_owned()])?

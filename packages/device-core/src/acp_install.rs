@@ -36,7 +36,7 @@ use crate::hmac::to_hex;
 
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
-const UNPACKED_DIR: &str = "unpacked";
+pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
 /// A staging folder left by a crash is removed after this long.
@@ -75,11 +75,11 @@ pub struct InstallRequest {
     pub version: String,
 }
 
-fn has_control(text: &str) -> bool {
+pub(crate) fn has_control(text: &str) -> bool {
     text.chars().any(char::is_control)
 }
 
-fn valid_version(version: &str) -> bool {
+pub(crate) fn valid_version(version: &str) -> bool {
     (1..=40).contains(&version.len())
         && version.starts_with(|c: char| c.is_ascii_digit())
         && !version.contains("..")
@@ -89,7 +89,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// `path` as a relative path of plain names. `.` is dropped; an absolute path, a drive prefix or `..` is refused.
-fn safe_relative(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn safe_relative(path: &Path) -> Result<PathBuf, String> {
     let mut clean = PathBuf::new();
 
     for component in path.components() {
@@ -110,14 +110,27 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
         return Err("the registry gave no usable SHA-256 for this download".into());
     }
 
-    if !valid_version(&request.version) {
+    validate_provenance(
+        &request.version,
+        &request.publisher,
+        &request.source,
+        &request.env,
+    )
+}
+
+/// The registry-supplied text every install shares: a plain version, bounded publisher and source, and variables
+/// that pass the checks of a typed one.
+pub(crate) fn validate_provenance(
+    version: &str,
+    publisher: &str,
+    source: &str,
+    env: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    if !valid_version(version) {
         return Err("the registry's version is not a plain version number".into());
     }
 
-    for (name, text, max) in [
-        ("publisher", &request.publisher, 200),
-        ("source", &request.source, 1000),
-    ] {
+    for (name, text, max) in [("publisher", publisher, 200), ("source", source, 1000)] {
         if text.trim().is_empty() || text.len() > max || has_control(text) {
             return Err(format!("the registry's {name} is empty or too long"));
         }
@@ -125,7 +138,7 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 
     // Every variable goes through the same checks as one the user types, and a name that changes which code runs
     // would make this a different program than the one the approvals were given for.
-    for (name, value) in &request.env {
+    for (name, value) in env {
         validate_env_var(name, value)?;
 
         if changes_program(name) {
@@ -182,7 +195,7 @@ impl DeviceState {
     }
 
     /// The archive's canonical path, which must be a file directly inside one folder made by `acp_install_stage`.
-    fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
+    pub(crate) fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
         let staging = self.install_root().join(STAGING_DIR);
         let staging = fs::canonicalize(&staging)
             .map_err(|_| "no download was staged: start the install again".to_owned())?;
@@ -255,22 +268,50 @@ impl DeviceState {
             command,
             env: EnvVars(request.env.clone()),
             install: Some(AcpInstall {
+                index_integrity: None,
                 publisher: request.publisher.clone(),
                 sha256: actual,
                 source: request.source.clone(),
+                tree_sha256: None,
                 version: request.version.clone(),
             }),
             key: request.key.clone(),
             label: request.label.trim().to_owned(),
         };
 
-        validate_agent(&agent)?;
-        self.check_free(&agent)?;
+        self.commit_install(&mut agent, &unpacked, &final_dir)?;
+
+        self.audit(json!({
+            "at": now_ms(), "decision": "approved", "detail": format!("{} {} by {} sha256 {}", request.label, request.version, request.publisher, request.sha256.to_ascii_lowercase()),
+            "status": "installed", "tool": "acp_install",
+        }));
+        self.emit(Event::Changed);
+
+        Ok(self.acp_view())
+    }
+
+    /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<version>`) and records
+    /// `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
+    /// Installing over an installed key drops its folder approvals unless it is the same program.
+    pub(crate) fn commit_install(
+        &self,
+        agent: &mut AcpAgent,
+        unpacked: &Path,
+        final_dir: &Path,
+    ) -> Result<(), String> {
+        let version = agent
+            .install
+            .as_ref()
+            .map(|pin| pin.version.clone())
+            .ok_or("an install needs a pin")?;
+
+        validate_agent(agent)?;
+        self.check_free(agent)?;
 
         // An explicit reinstall of the same version keeps the old folder until the new one is recorded, so a
         // failure leaves the agent as it was. The name starts with a dot: a version starts with a digit.
-        let key_dir = self.install_root().join(&request.key);
-        let aside = key_dir.join(format!(".{}.old", request.version));
+        let key_dir = self.install_root().join(&agent.key);
+        let aside = key_dir.join(format!(".{version}.old"));
         let replaced = final_dir.exists();
 
         // The agent's folder must be a real folder under app data: through a symlink the cleanup below would
@@ -327,8 +368,11 @@ impl DeviceState {
                         // A launch variable that changed (a registry one the new version adds, drops or sets
                         // differently) is not the program the folders were approved for.
                         || before.env != agent.env
-                        || before.install.as_ref().map(|pin| &pin.sha256)
-                            != agent.install.as_ref().map(|pin| &pin.sha256)
+                        || before.install.as_ref().map(|pin| (&pin.sha256, &pin.tree_sha256))
+                            != agent
+                                .install
+                                .as_ref()
+                                .map(|pin| (&pin.sha256, &pin.tree_sha256))
                     {
                         settings.acp_consents.retain(|c| c.agent_key != agent.key);
                     }
@@ -352,13 +396,7 @@ impl DeviceState {
 
         let _ = fs::remove_dir_all(&aside);
 
-        self.audit(json!({
-            "at": now_ms(), "decision": "approved", "detail": format!("{} {} by {} sha256 {}", request.label, request.version, request.publisher, request.sha256.to_ascii_lowercase()),
-            "status": "installed", "tool": "acp_install",
-        }));
-        self.emit(Event::Changed);
-
-        Ok(self.acp_view())
+        Ok(())
     }
 
     /// Deletes the installed versions of `key` other than the pinned one. The caller runs it after it closed any
@@ -401,11 +439,11 @@ impl DeviceState {
     }
 }
 
-fn already_registered(key: &str) -> String {
+pub(crate) fn already_registered(key: &str) -> String {
     format!("an agent with the key “{key}” is already registered by hand: remove it first")
 }
 
-fn create_private_dir(dir: &Path) -> Result<(), String> {
+pub(crate) fn create_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -457,7 +495,7 @@ fn prune_other_versions(key_dir: &Path, keep: &str) {
     }
 }
 
-fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
+pub(crate) fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 64 * 1024];
 

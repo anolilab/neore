@@ -12,7 +12,11 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import type { DeviceCore } from "../device/types";
-import type { AgentRegistry, ResolvedInstall } from "./registry";
+import type { NodeTools } from "./node-tools";
+import { findNodeTools } from "./node-tools";
+import type { NpmIndexEntry } from "./npm-index";
+import { lookupNpmIntegrity } from "./npm-index";
+import type { AgentRegistry, ResolvedInstall, ResolvedNpmInstall } from "./registry";
 import { fetchHttps } from "./registry";
 import type { AcpView } from "./types";
 
@@ -49,10 +53,42 @@ export const consentText = ({ agent, format, sha256, target }: ResolvedInstall):
     };
 };
 
+/**
+ * What the user is asked for an npm agent. The hash is the package index's, read just now; the registry publishes
+ * none for these agents, and the text says so rather than letting it look like the publisher's.
+ */
+export const npmConsentText = ({ agent, args, env, name, version }: ResolvedNpmInstall, entry: NpmIndexEntry, tools: NodeTools): ConsentText => {
+    return {
+        detail: [
+            `Publisher (as listed in the registry): ${agent.publisher}`,
+            `Package: ${name}`,
+            `Version: ${version}`,
+            `License: ${agent.license}`,
+            agent.repository === "" ? undefined : `Repository: ${agent.repository}`,
+            `Hash (SHA-512): ${entry.integrity}`,
+            `Download: ${entry.tarball}`,
+            // Each part quoted, so an argument with a space is one argument on screen as it is to the core.
+            `Runs: ${[tools.node, `<the package's program>`, ...args].map((part) => JSON.stringify(part)).join(" ")}`,
+            Object.keys(env).length === 0 ? undefined : `Sets: ${Object.keys(env).join(", ")}`,
+            "",
+            "The registry publishes no hash for this agent. This hash came from the npm package index just now, not from the publisher: you are trusting the index as it is today (trust on first use). Neore downloads the package, checks it against this hash and refuses to install it if it differs.",
+            "",
+            "npm installs it into Neore's own app data without running any install script. The files it installs, its dependencies included, are hashed after the install and checked before every start: if one changes, Neore will not start the agent.",
+            "",
+            "The agent runs on this computer with your rights, outside the shell sandbox. Installing approves no folder for it, and Neore never updates it on its own: a newer version is a new install you confirm.",
+        ]
+            .filter((line) => line !== undefined)
+            .join("\n"),
+        message: `Install “${agent.name}” ${version} from npm (${name})?`,
+    };
+};
+
 export interface InstallerOptions {
     confirm: (text: ConsentText) => Promise<boolean>;
-    core: () => Pick<DeviceCore, "acpInstall" | "acpInstallStage">;
+    core: () => Pick<DeviceCore, "acpInstall" | "acpInstallNpm" | "acpInstallStage">;
     fetch?: typeof fetch;
+    /** Where node and npm are; the default searches `PATH` and the usual package-manager folders. */
+    locateTools?: () => NodeTools | undefined;
     registry: AgentRegistry;
 }
 
@@ -106,6 +142,10 @@ export class AgentInstaller {
         try {
             const resolved = this.options.registry.resolve(id, version);
 
+            if (resolved.kind === "npm") {
+                return await this.installNpm(resolved);
+            }
+
             if (!await this.options.confirm(consentText(resolved))) {
                 return null;
             }
@@ -113,6 +153,57 @@ export class AgentInstaller {
             return await this.fetchAndInstall(resolved);
         } finally {
             this.busy = false;
+        }
+    }
+
+    /**
+     * The tools and the index's hash are found BEFORE the dialog, so it shows what will be checked and an install
+     * that cannot happen (no node, no hash) never asks. Nothing is downloaded until the answer is yes.
+     */
+    private async installNpm(resolved: ResolvedNpmInstall): Promise<AcpView | null> {
+        const tools = (this.options.locateTools ?? (() => findNodeTools()))();
+
+        if (tools === undefined) {
+            throw new Error("Node.js and npm were not found. Install Node.js (which includes npm), then try again.");
+        }
+
+        const fetchImpl = this.options.fetch ?? globalThis.fetch;
+        const entry = await lookupNpmIntegrity(fetchImpl, resolved.name, resolved.version);
+
+        if (!await this.options.confirm(npmConsentText(resolved, entry, tools))) {
+            return null;
+        }
+
+        const core = this.options.core();
+        const stage = core.acpInstallStage();
+
+        try {
+            const archive = path.join(stage, "download");
+
+            await download(fetchImpl, entry.tarball, archive);
+
+            // The core checks the file against `integrity` (the index's, as confirmed); whatever it answers, the
+            // staging folder goes below.
+            return JSON.parse(
+                core.acpInstallNpm(
+                    JSON.stringify({
+                        archive,
+                        args: resolved.args,
+                        env: resolved.env,
+                        integrity: entry.integrity,
+                        key: resolved.agent.id,
+                        label: resolved.agent.name,
+                        node: tools.node,
+                        npm: tools.npm,
+                        package: resolved.name,
+                        publisher: resolved.agent.publisher,
+                        source: entry.tarball,
+                        version: resolved.version,
+                    }),
+                ),
+            ) as AcpView;
+        } finally {
+            await rm(stage, { force: true, recursive: true });
         }
     }
 

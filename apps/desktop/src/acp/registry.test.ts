@@ -59,7 +59,7 @@ describe("what can be installed", () => {
         expect(resolveInstall(amp, "darwin-aarch64")).toMatchObject({ format: "tar.gz", sha256: SHA });
         expect(resolveInstall(amp, "windows-aarch64")).toMatch("No download for this platform");
         expect(resolveInstall(cortex, "darwin-aarch64")).toMatch("no checksum");
-        expect(resolveInstall(thing, "darwin-aarch64")).toMatch("npx or uvx");
+        expect(resolveInstall(thing, "darwin-aarch64")).toMatchObject({ kind: "npm", name: "thing", version: "1.0.0" });
         expect(resolveInstall(amp, "windows-x86_64")).toMatch("cannot unpack");
         expect(resolveInstall(amp, undefined)).toMatch("not supported");
     });
@@ -99,6 +99,49 @@ describe("what can be installed", () => {
     });
 });
 
+describe("npm agents", () => {
+    const thing = parseRegistry(REGISTRY_FIXTURE)[2];
+    const withNpx = (npx: Partial<NonNullable<typeof thing.npx>>, agent: Partial<typeof thing> = {}) => resolveInstall({ ...thing, ...agent, npx: { args: [], env: {}, package: "thing@1.0.0", ...npx } }, "linux-x86_64");
+
+    it("pins an npx entry at the exact version it names, scoped names included", () => {
+        expect(withNpx({})).toMatchObject({ args: [], kind: "npm", name: "thing", version: "1.0.0" });
+        expect(withNpx({ package: "@acme/agent-cli@2.3.4-beta.1" })).toMatchObject({ name: "@acme/agent-cli", version: "2.3.4-beta.1" });
+        expect(withNpx({ args: ["--acp"], env: { DEMO_MODE: "acp" } })).toMatchObject({ args: ["--acp"], env: { DEMO_MODE: "acp" } });
+    });
+
+    it("refuses a package that names no exact version, so nothing is resolved on the day it runs", () => {
+        for (const spec of ["thing", "thing@latest", "thing@^1.0.0", "thing@1", "thing@>=1.0.0", "@acme/agent", "thing@1..2", "../x@1.0.0", "Thing@1.0.0"]) {
+            expect(withNpx({ package: spec }), spec).toMatch("exact version");
+        }
+    });
+
+    it("applies the same limits to its arguments and variables as to a download", () => {
+        expect(withNpx({ env: { NODE_OPTIONS: "--require x" } })).toMatch("It sets NODE_OPTIONS");
+        expect(withNpx({ args: ["x".repeat(1001)] })).toMatch("arguments");
+        expect(withNpx({}, { publisher: "x".repeat(201) })).toMatch("publisher");
+    });
+
+    it("prefers a verifiable binary download, and falls back to npm when the binary has no checksum or platform", () => {
+        const [amp, cortex] = parseRegistry(REGISTRY_FIXTURE);
+        const npx = { args: [], env: {}, package: "thing@1.0.0" };
+
+        expect(resolveInstall({ ...amp, npx }, "linux-x86_64")).toMatchObject({ kind: "binary" });
+        expect(resolveInstall({ ...amp, npx }, "linux-riscv64")).toMatchObject({ kind: "npm" });
+        expect(resolveInstall({ ...cortex, npx }, "darwin-aarch64")).toMatchObject({ kind: "npm" });
+    });
+
+    it("is not offered on Windows, and a uvx-only or empty entry keeps its refusal with the reason", () => {
+        expect(resolveInstall({ ...thing, npx: { args: [], env: {}, package: "thing@1.0.0" } }, "windows-x86_64")).toMatch("Windows");
+        expect(resolveInstall({ ...thing, distributions: ["uvx"], npx: undefined }, "linux-x86_64")).toMatch("uvx");
+        expect(resolveInstall({ ...thing, distributions: [], npx: undefined }, "linux-x86_64")).toMatch("no distribution");
+    });
+
+    it("reads the npx distribution from the registry file", () => {
+        expect(thing.npx).toEqual({ args: [], env: {}, package: "thing@1.0.0" });
+        expect(parseRegistry({ agents: [{ distribution: { npx: { package: 7 } }, id: "bad", name: "Bad", version: "1.0.0" }] })[0].npx).toBeUndefined();
+    });
+});
+
 describe("AgentRegistry", () => {
     const registryWith = (respond: () => Response | Promise<Response>, now = () => 0) => {
         const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => respond());
@@ -113,7 +156,7 @@ describe("AgentRegistry", () => {
         expect(fetchSpy).toHaveBeenCalledTimes(1);
         expect(fetchSpy.mock.calls[0][0]).toBe(REGISTRY_URL);
         expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
-        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", false]]);
+        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", true]]);
         expect(listings[0]).toMatchObject({ license: "Apache-2.0", publisher: "Ada Lovelace, Grace Hopper", version: "0.10.0" });
         expect(listings[1].reason).toMatch("no checksum");
     });
@@ -173,7 +216,7 @@ describe("AgentRegistry", () => {
 
         await registry.search("");
 
-        expect(registry.resolve("amp-acp", "0.10.0").sha256).toBe(SHA);
+        expect(registry.resolve("amp-acp", "0.10.0")).toMatchObject({ kind: "binary", sha256: SHA });
         expect(() => registry.resolve("amp-acp", "0.9.0")).toThrow("Search again");
         expect(() => registry.resolve("missing", "1.0.0")).toThrow("Search again");
         expect(() => registry.resolve("cortex-code", "1.0.0")).toThrow("no checksum");

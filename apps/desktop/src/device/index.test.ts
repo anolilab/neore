@@ -214,6 +214,7 @@ const makeCore = () => {
             JSON.stringify({ args: ["--acp"], command: "/opt/agent", cwd: folder, env: {}, scratch: false, secretNames: [] }),
         ),
         acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+        acpInstallNpm: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
         acpInstallPrune: vi.fn(),
         acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),

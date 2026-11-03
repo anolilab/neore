@@ -58,6 +58,14 @@ export interface BinaryTarget {
     sha256?: string;
 }
 
+/** An agent distributed as an npm package: `npx &lt;package> &lt;args>`. */
+export interface NpxDistribution {
+    args: string[];
+    env: Record<string, string>;
+    /** As the registry wrote it, `name@version`. */
+    package: string;
+}
+
 export interface RegistryAgent {
     binary: Record<string, BinaryTarget>;
     description: string;
@@ -66,6 +74,7 @@ export interface RegistryAgent {
     id: string;
     license: string;
     name: string;
+    npx?: NpxDistribution;
     publisher: string;
     repository: string;
     version: string;
@@ -89,8 +98,20 @@ export interface RegistryListing {
 export interface ResolvedInstall {
     agent: RegistryAgent;
     format: ArchiveFormat;
+    kind: "binary";
     sha256: string;
     target: BinaryTarget;
+}
+
+/** An npm package pinned at an exact version. The package index's hash is looked up after this, before the consent. */
+export interface ResolvedNpmInstall {
+    agent: RegistryAgent;
+    args: string[];
+    env: Record<string, string>;
+    kind: "npm";
+    /** `name` or `@scope/name`. */
+    name: string;
+    version: string;
 }
 
 type Fetch = typeof fetch;
@@ -151,6 +172,22 @@ const parseTarget = (value: unknown): BinaryTarget | undefined => {
     return { archive, args, cmd: command, env: env as Record<string, string>, ...sha256 !== undefined && { sha256 } };
 };
 
+const parseNpx = (value: unknown): NpxDistribution | undefined => {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const spec = plainString(value.package, 300);
+    const args = value.args === undefined ? [] : strings(value.args);
+    const env = value.env === undefined ? {} : value.env;
+
+    if (spec === undefined || args === undefined || !isRecord(env) || Object.values(env).some((entry) => typeof entry !== "string")) {
+        return undefined;
+    }
+
+    return { args, env: env as Record<string, string>, package: spec };
+};
+
 /** Who published it: the entry's `authors`, else the owner of its GitHub repository. */
 const publisherOf = (entry: Record<string, unknown>, repo: string): string => {
     const authors = strings(entry.authors)?.filter((author) => author.trim() !== "");
@@ -201,6 +238,7 @@ export const parseRegistry = (json: unknown): RegistryAgent[] => {
         }
 
         const repo = plainString(entry.repository) ?? "";
+        const npx = parseNpx(entry.distribution.npx);
 
         agents.push({
             binary: parseBinaries(entry.distribution.binary),
@@ -209,6 +247,7 @@ export const parseRegistry = (json: unknown): RegistryAgent[] => {
             id,
             license: plainString(entry.license, 100) ?? "not stated",
             name,
+            ...npx !== undefined && { npx },
             publisher: publisherOf(entry, repo),
             repository: repo,
             version,
@@ -237,14 +276,36 @@ const badEnvName = (name: string): boolean => {
 const leavesFolder = (command: string): boolean =>
     command.startsWith("/") || command.startsWith("\\") || WINDOWS_DRIVE.test(command) || command.split(PATH_SEPARATOR).includes("..");
 
-/** Why the core would refuse this entry, if it would. */
-const unfit = ({ name, publisher, version }: RegistryAgent, target: BinaryTarget, format: ArchiveFormat): string | undefined => {
+/** Why the core would refuse the registry's own text for this entry, if it would. */
+const agentUnfit = ({ name, publisher, version }: RegistryAgent): string | undefined => {
     if (!VERSION.test(version) || version.includes("..")) {
         return "The registry's version is not a plain version number.";
     }
 
     if (name.trim() === "" || publisher.trim() === "" || Buffer.byteLength(publisher) > MAX_PUBLISHER || CONTROL_CHARACTER.test(publisher)) {
         return "The registry's name or publisher is empty or too long.";
+    }
+
+    return undefined;
+};
+
+/** Why the core would refuse these start-up arguments or variables, if it would. */
+const launchUnfit = (args: string[], env: Record<string, string>): string | undefined => {
+    if (args.length > MAX_ARGS || args.some((argument) => Buffer.byteLength(argument) > MAX_ARG_BYTES || CONTROL_CHARACTER.test(argument))) {
+        return "Its start-up arguments are longer than Neore accepts.";
+    }
+
+    const offender = Object.entries(env).find(([variable, value]) => badEnvName(variable) || Buffer.byteLength(value) > MAX_ENV_VALUE_BYTES || value.includes("\0"));
+
+    return offender === undefined ? undefined : `It sets ${offender[0]}, which Neore does not allow an install to set.`;
+};
+
+/** Why the core would refuse this entry, if it would. */
+const unfit = (agent: RegistryAgent, target: BinaryTarget, format: ArchiveFormat): string | undefined => {
+    const problem = agentUnfit(agent);
+
+    if (problem !== undefined) {
+        return problem;
     }
 
     if (Buffer.byteLength(target.archive) > MAX_SOURCE) {
@@ -260,31 +321,60 @@ const unfit = ({ name, publisher, version }: RegistryAgent, target: BinaryTarget
         return "The command it starts is not a file inside the download.";
     }
 
-    if (target.args.length > MAX_ARGS || target.args.some((argument) => Buffer.byteLength(argument) > MAX_ARG_BYTES || CONTROL_CHARACTER.test(argument))) {
-        return "Its start-up arguments are longer than Neore accepts.";
-    }
-
-    const offender = Object.entries(target.env).find(([variable, value]) => badEnvName(variable) || Buffer.byteLength(value) > MAX_ENV_VALUE_BYTES || value.includes("\0"));
-
-    return offender === undefined ? undefined : `It sets ${offender[0]}, which Neore does not allow an install to set.`;
+    return launchUnfit(target.args, target.env);
 };
 
-/** The download for `platform`, or the reason there is none. */
-export const resolveInstall = (agent: RegistryAgent, platform: string | undefined): ResolvedInstall | string => {
+/** An exact version: no range, tag (`latest`) or missing version, which npm would resolve on the day it runs. */
+const NPM_PACKAGE = /^((?:@[a-z\d~-][\w.~-]*\/)?[a-z\d~-][\w.~-]*)@(\d+\.\d+\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?)$/u;
+const MAX_NPM_NAME = 214;
+
+/** The package of an `npx` entry pinned at its exact version, or the reason it cannot be. */
+const resolveNpm = (agent: RegistryAgent, platform: string): ResolvedNpmInstall | string => {
+    const { npx } = agent;
+
+    if (npx === undefined) {
+        return "This agent has no npm distribution.";
+    }
+
+    if (platform.startsWith("windows")) {
+        return "Installing an npm agent is not supported on Windows yet.";
+    }
+
+    const match = NPM_PACKAGE.exec(npx.package);
+    const name = match?.[1];
+    const version = match?.[2];
+
+    if (name === undefined || version === undefined || name.length > MAX_NPM_NAME || version.includes("..")) {
+        return "The registry does not name an exact version of the npm package, so Neore would not know what it installs.";
+    }
+
+    return agentUnfit(agent) ?? launchUnfit(npx.args, npx.env) ?? { agent, args: npx.args, env: npx.env, kind: "npm", name, version };
+};
+
+/** The install for `platform`: a verified download, an npm package to pin, or the reason there is none. */
+export const resolveInstall = (agent: RegistryAgent, platform: string | undefined): ResolvedInstall | ResolvedNpmInstall | string => {
     if (platform === undefined) {
         return "Installing agents is not supported on this platform.";
     }
 
     const target = agent.binary[platform];
 
-    if (target === undefined) {
-        return Object.keys(agent.binary).length > 0
-            ? `No download for this platform (${platform}).`
-            : "Runs through npx or uvx, which would fetch unverified code each time. Add it by hand to use it.";
-    }
+    if (target === undefined || target.sha256 === undefined) {
+        if (agent.npx !== undefined) {
+            return resolveNpm(agent, platform);
+        }
 
-    if (target.sha256 === undefined) {
-        return "The publisher lists no checksum for this download, so Neore cannot verify it.";
+        if (target !== undefined) {
+            return "The publisher lists no checksum for this download, so Neore cannot verify it.";
+        }
+
+        if (Object.keys(agent.binary).length > 0) {
+            return `No download for this platform (${platform}).`;
+        }
+
+        return agent.distributions.includes("uvx")
+            ? "Runs through uvx (a Python package), which Neore cannot install pinned and verified yet. Add it by hand to use it."
+            : "It lists no distribution Neore can install. Add it by hand to use it.";
     }
 
     let url: URL;
@@ -307,10 +397,10 @@ export const resolveInstall = (agent: RegistryAgent, platform: string | undefine
 
     const reason = unfit(agent, target, format);
 
-    return reason ?? { agent, format, sha256: target.sha256, target };
+    return reason ?? { agent, format, kind: "binary", sha256: target.sha256, target };
 };
 
-const readCapped = async (response: Response, max: number): Promise<string> => {
+export const readCapped = async (response: Response, max: number): Promise<string> => {
     if (response.body === null) {
         throw new Error("The registry sent no content.");
     }
@@ -414,7 +504,7 @@ export class AgentRegistry {
     }
 
     /** The download for `id` at exactly `version`, from the last search. Anything else asks for a new search. */
-    public resolve(id: string, version: string): ResolvedInstall {
+    public resolve(id: string, version: string): ResolvedInstall | ResolvedNpmInstall {
         if (this.snapshot === undefined || this.now() - this.snapshot.at > SNAPSHOT_MAX_AGE_MS) {
             throw new Error("Search the registry again before installing.");
         }

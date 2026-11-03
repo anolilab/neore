@@ -915,6 +915,12 @@ written here is what is not.
   makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
+  **npm (`npx`) entries** install too (`device-core/src/acp_install_npm.rs`, `acp/npm-index.ts`): pinned to the exact
+  version the registry names, with the package index's `dist.integrity` looked up BEFORE the consent and shown as the
+  index's word (trust on first use), not the publisher's. npm runs with `--ignore-scripts` by absolute node/npm paths and
+  a scrubbed environment; the pin records a hash of the installed folder and the core re-hashes it before EVERY start
+  (`verify_installed_tree`, in `acp_spawn_plan`) and refuses on a mismatch. Binary installs are not re-hashed. `uvx`
+  entries stay listed as not installable.
   **Server lifecycle** (`lifecycle.rs`, `engine/reconnect.rs`, `launch.rs`): a server the person connected is KEPT
   connected until they disconnect it. A 1 s tick (`DeviceState::supervise`, a `Weak` thread started by the napi
   constructor) sees a dead link, closes that session FIRST and `-O exit`s its master only when ssh gave the connection
