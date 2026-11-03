@@ -68,10 +68,10 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
 
     // Auto routes plain hosted text threads: a bot, a coding agent, a switched thread (its path decides the agent), a
     // custom endpoint, a media mode and a comparison each name their own model.
-    // Only an admin may save a thread's settings (`updateThread`), so a collaborator is not offered the switch.
+    // Auto routes only the owner's own sends (`shouldRouteAuto`), so only the owner is offered the switch.
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
     const canRouteAuto =
-        (!threadId || (access?.permission === "admin" && loadedThread !== undefined && loadedThread !== null)) &&
+        (!threadId || (access?.isOwner === true && loadedThread !== undefined && loadedThread !== null)) &&
         !loadedThread?.groupChat &&
         !isAnonymous &&
         typeof botId !== "string" &&

@@ -212,4 +212,25 @@ describe("POST /internal/route (runnable models)", () => {
         expect(res.status).toBe(403);
         expect(((await res.json()) as { error: { code: string } }).error.code).toBe("MODEL_BLOCKED");
     });
+
+    it("never returns a model outside the runnable set, whatever the query's tier", async () => {
+        const prompts = ["hi", "What is 2+2?", "Write a detailed multi-step plan to migrate a database with zero downtime and rollback steps."];
+
+        for (const content of prompts) {
+            const res = await fetchApp(
+                signedRoute({
+                    messages: [{ content, role: "user" }],
+                    runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                    userTier: "pro",
+                }),
+                ENV,
+            );
+
+            if (res.status === 200) {
+                expect(((await res.json()) as { modelApiId: string }).modelApiId).toBe(sized.modelApiId);
+            } else {
+                expect(res.status).toBe(403);
+            }
+        }
+    });
 });

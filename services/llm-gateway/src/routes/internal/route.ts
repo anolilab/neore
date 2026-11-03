@@ -405,6 +405,12 @@ routeRouter.openapi(
         const pricingService = new PricingService(c.env);
         const result = await selectModel(score, candidates, healthService, effectivePreferredModel, pricingService, tierPools);
 
+        // With runnable models supplied, a pick outside them (the selector's fallback to a tier pool no candidate sits in)
+        // is never returned: the caller keeps its own model instead.
+        if (body.runnableModels && candidates.every((candidate) => candidate.modelId !== result.modelId || candidate.provider !== result.provider)) {
+            return c.json({ error: { code: "MODEL_BLOCKED", message: "No runnable model is eligible for this conversation." } }, 403 as 200);
+        }
+
         const classification = classifyQuery(lastUserMessage);
 
         // Record the chosen tier for the next turn's momentum and policy. This
