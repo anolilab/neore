@@ -1,5 +1,7 @@
+import type { MutationObserverOptions } from "@tanstack/query-core";
+import { MutationObserver, onlineManager, QueryClient } from "@tanstack/query-core";
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 
@@ -466,11 +468,47 @@ describe("useModelCombobox: Auto while the thread is not loaded", () => {
 });
 
 describe("useModelCombobox: thread writes while offline", () => {
-    it("rejects at once instead of queueing the write for a reconnect", () => {
+    const networkDown = new Error("Failed to fetch");
+
+    /** The mutation options the hook hands TanStack for `updateThread`, as a real mutation observer runs them. */
+    const capturedUpdateOptions = () => {
         hoisted.thread.current = { _id: "t1", mode: "text", model: A };
         hoisted.mutationOptions.length = 0;
         renderHook(() => useModelCombobox({ threadId: "t1" }));
 
-        expect(hoisted.mutationOptions.some((options) => options.networkMode === "always" && options.retry === 0)).toBe(true);
+        return hoisted.mutationOptions.find((options) => options.networkMode === "always") as MutationObserverOptions<unknown, Error, unknown>;
+    };
+
+    afterEach(() => {
+        onlineManager.setOnline(true);
+    });
+
+    it("rejects at once, once, when the network is down", async () => {
+        const options = capturedUpdateOptions();
+
+        hoisted.updateThread.mockReset().mockRejectedValue(networkDown);
+        onlineManager.setOnline(false);
+
+        const observer = new MutationObserver(new QueryClient(), options);
+
+        await expect(observer.mutate({ autoModel: true, threadId: "t1" })).rejects.toBe(networkDown);
+        expect(hoisted.updateThread).toHaveBeenCalledTimes(1);
+    });
+
+    it("would otherwise sit paused until the browser reconnects", async () => {
+        hoisted.updateThread.mockReset().mockRejectedValue(networkDown);
+        onlineManager.setOnline(false);
+
+        const plain = { ...capturedUpdateOptions(), networkMode: undefined, retry: undefined };
+        const observer = new MutationObserver(new QueryClient(), plain);
+        const settled = vi.fn();
+
+        observer.mutate({ autoModel: true, threadId: "t1" }).then(settled).catch(settled);
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 20);
+        });
+
+        expect(hoisted.updateThread).not.toHaveBeenCalled();
+        expect(settled).not.toHaveBeenCalled();
     });
 });
