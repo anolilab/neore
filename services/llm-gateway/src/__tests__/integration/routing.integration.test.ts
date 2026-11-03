@@ -247,7 +247,10 @@ describe("POST /internal/route (runnable models)", () => {
                 ENV,
             );
 
-        expect((await send(limit - 4096)).status).toBe(200);
-        expect((await send(limit - 4095)).status).toBe(403);
+        const fits = await send(limit - 4096);
+        const overflows = await send(limit - 4095);
+
+        expect(fits.status).toBe(200);
+        expect(overflows.status).toBe(403);
     });
 });
