@@ -79,6 +79,7 @@ export interface Doc_aiUserPreferences {
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };
+    codingAgentCommitIdentity?: "agent" | "user";
     customAIProviders?: unknown;
     customization?: unknown;
     customModels?: unknown;
@@ -3082,6 +3083,7 @@ export interface Insert_aiUserPreferences {
     autoDetectComplexity?: boolean;
     autoMediaEnrichment?: boolean;
     browserSettings?: { domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean };
+    codingAgentCommitIdentity?: "agent" | "user";
     customAIProviders?: unknown;
     customization?: unknown;
     customModels?: unknown;

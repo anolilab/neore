@@ -24,6 +24,7 @@ export type AiUserPreferencesPatch = Partial<
         Doc<"aiUserPreferences">,
         | "autoApproveLowRisk"
         | "browserSettings"
+        | "codingAgentCommitIdentity"
         | "customAIProviders"
         | "lowRiskTrustedServers"
         | "mcpSecretHeaders"

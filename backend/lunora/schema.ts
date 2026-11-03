@@ -207,6 +207,9 @@ export const schema = defineSchema({
         browserSettings: v.optional(
             v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }),
         ),
+        // Who a coding-agent pull request's commits are made as: the agent (absent, the default) or the person who
+        // started the run, with the agent as co-author. Server-written only (`coding_agents.functions.setCodingAgentCommitIdentity`).
+        codingAgentCommitIdentity: v.optional(v.union(v.literal("agent"), v.literal("user"))),
         customAIProviders: v.optional(v.any()),
         customization: v.optional(v.any()),
         customModels: v.optional(v.any()),

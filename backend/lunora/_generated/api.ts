@@ -386,6 +386,7 @@ export interface ApiTypes {
             getLatestRunForTask: FunctionReference<"query", { taskId: Id<"tasks"> }, { _id: Id<"codingAgentRuns">; agent: "claude_code" | "codex"; baseBranch: string | null; canOpenPr: boolean; completedAt: number | null; createdAt: number; diff: string | null; diffStat: string | null; diffTruncated: boolean; error: string | null; log: string; openPr: boolean; prompt: string; prPending: boolean; prUrl: string | null; repoUrl: string; startedAt: number | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; summary: string | null } | null>;
             getRun: FunctionReference<"query", { runId: Id<"codingAgentRuns"> }, { _id: Id<"codingAgentRuns">; agent: "claude_code" | "codex"; baseBranch: string | null; canOpenPr: boolean; completedAt: number | null; createdAt: number; diff: string | null; diffStat: string | null; diffTruncated: boolean; error: string | null; log: string; openPr: boolean; prompt: string; prPending: boolean; prUrl: string | null; repoUrl: string; startedAt: number | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; summary: string | null } | null>;
             getRunByToolCall: FunctionReference<"query", { toolCallId: string }, { _id: Id<"codingAgentRuns">; agent: "claude_code" | "codex"; baseBranch: string | null; canOpenPr: boolean; completedAt: number | null; createdAt: number; diff: string | null; diffStat: string | null; diffTruncated: boolean; error: string | null; log: string; openPr: boolean; prompt: string; prPending: boolean; prUrl: string | null; repoUrl: string; startedAt: number | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; summary: string | null } | null>;
+            setCodingAgentCommitIdentity: FunctionReference<"mutation", { identity: "agent" | "user" }, null>;
         };
     };
     connectors: {
@@ -1248,6 +1249,7 @@ export const api: ApiTypes = {
             getLatestRunForTask: { __lunoraRef: "coding_agents_functions:getLatestRunForTask" },
             getRun: { __lunoraRef: "coding_agents_functions:getRun" },
             getRunByToolCall: { __lunoraRef: "coding_agents_functions:getRunByToolCall" },
+            setCodingAgentCommitIdentity: { __lunoraRef: "coding_agents_functions:setCodingAgentCommitIdentity" },
         },
     },
     connectors: {

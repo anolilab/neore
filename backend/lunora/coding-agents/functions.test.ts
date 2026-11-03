@@ -1,5 +1,5 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import {
@@ -7,13 +7,40 @@ import {
     beginPullRequest,
     canOpenPullRequest,
     claimPoll,
+    commitAuthorFor,
+    commitAuthorOf,
     completePullRequest,
     createRun,
     expirePullRequest,
     isPullRequestStale,
+    setCodingAgentCommitIdentity,
     setPullRequestSandbox,
 } from "./functions";
 import { PR_BUDGET_MS } from "./runner";
+
+// The session comes off the harness identity; the rate limiter is not under test.
+const { sessionFrom } = vi.hoisted(() => {
+    return {
+        sessionFrom: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+    };
+});
+
+vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/crpc-auth-helpers")>()),
+        getSessionUser: sessionFrom,
+        getSessionUserForQuery: sessionFrom,
+        getSessionUserForQueryLite: sessionFrom,
+    };
+});
+
+vi.mock("../lib/rate-limiter", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        rateLimitGuard: async () => undefined,
+    };
+});
 
 describe("appendToLog", () => {
     it("appends while under the cap", () => {
@@ -264,5 +291,152 @@ describe("createRun hidden characters", () => {
         );
 
         expect(result).toStrictEqual({ error: expect.stringMatching(TASK_LENGTH_ERROR) });
+    });
+});
+
+describe("commit identity", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const as = (userId: string) => harness.withIdentity({ userId } as never);
+
+    it("stores the choice for an account that is not being deleted", async () => {
+        await expect(as(USER).mutation(setCodingAgentCommitIdentity as never, { identity: "user" } as never)).resolves.toBeNull();
+
+        const prefs = await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").collect());
+
+        expect(prefs).toHaveLength(1);
+        expect(prefs[0].codingAgentCommitIdentity).toBe("user");
+    });
+
+    it("refuses to write a preference while the account is being deleted", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", {
+                    requestedAt: 1,
+                    requestType: "deletion",
+                    status: "pending",
+                    userEmail: "user-a@example.com",
+                    userId: USER,
+                }),
+        );
+
+        await expect(as(USER).mutation(setCodingAgentCommitIdentity as never, { identity: "user" } as never)).rejects.toThrow("This account is being deleted.");
+
+        const prefs = await harness.run(async (ctx: any) => await ctx.db.query("aiUserPreferences").collect());
+
+        expect(prefs).toHaveLength(0);
+    });
+});
+
+describe("commit author", () => {
+    const account = { email: "dana@example.com", emailVerified: true, name: "Dana Tester" };
+
+    it("commits as the account when its email is verified", () => {
+        expect(commitAuthorOf(account, false)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
+    });
+
+    it("keeps the agent as author for an unverified email", () => {
+        expect(commitAuthorOf({ ...account, emailVerified: false }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author when the account has no name or no email", () => {
+        expect(commitAuthorOf({ ...account, name: "" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, email: "" }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author for a name Git would refuse", () => {
+        expect(commitAuthorOf({ ...account, name: "<>" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, name: " ..  " }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author for a name or email carrying a control character or angle bracket", () => {
+        expect(commitAuthorOf({ ...account, name: "Dana\nTester" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, name: "Dana\u{0}" }, false)).toBeNull();
+        expect(commitAuthorOf({ ...account, email: "dana<x>@example.com" }, false)).toBeNull();
+    });
+
+    it("keeps the agent as author while the account is being deleted, even when it is verified", () => {
+        expect(commitAuthorOf(account, true)).toBeNull();
+    });
+
+    it("keeps the agent as author when there is no account", () => {
+        expect(commitAuthorOf(null, false)).toBeNull();
+    });
+});
+
+describe("commit author lookup", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const lookup = async (userId: string = USER): Promise<unknown> => await harness.run(async (ctx: any) => await ctx.runQuery(commitAuthorFor, { userId }));
+
+    const optIn = async (userId: string, identity: "agent" | "user" = "user") =>
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("aiUserPreferences", { codingAgentCommitIdentity: identity, userId });
+        });
+
+    const addAccount = async (emailVerified: boolean): Promise<string> =>
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("user", { createdAt: 1, email: "dana@example.com", emailVerified, name: "Dana Tester", updatedAt: 1 }),
+        );
+
+    it("returns null when the person has no preference row", async () => {
+        expect(await lookup()).toBeNull();
+    });
+
+    it("returns null when the opted-in person has no account row", async () => {
+        await optIn(USER);
+
+        expect(await lookup()).toBeNull();
+    });
+
+    it("returns the account's name and email for an opted-in person with a verified email", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId);
+
+        expect(await lookup(userId)).toStrictEqual({ email: "dana@example.com", name: "Dana Tester" });
+    });
+
+    it("keeps the agent as author for a verified account that did not opt in", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId, "agent");
+
+        expect(await lookup(userId)).toBeNull();
+    });
+
+    it("returns null for an opted-in person whose email is not verified", async () => {
+        const userId = await addAccount(false);
+
+        await optIn(userId);
+
+        expect(await lookup(userId)).toBeNull();
+    });
+
+    it("returns null for an opted-in, verified person whose account deletion is underway", async () => {
+        const userId = await addAccount(true);
+
+        await optIn(userId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "deletion", status: "processing", userEmail: "dana@example.com", userId });
+        });
+
+        expect(await lookup(userId)).toBeNull();
     });
 });

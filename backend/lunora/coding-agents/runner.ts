@@ -21,7 +21,7 @@
  * the sandbox on every exit path.
  */
 import { formatClaudeStreamLine } from "./agent-output";
-import type { CodingAgentId, ParsedRepo, RunStatus } from "./commands";
+import type { CodingAgentId, CommitAuthor, ParsedRepo, RunStatus } from "./commands";
 import {
     agentEnv,
     BASE_INFO_PATH,
@@ -348,6 +348,8 @@ export interface PullRequestSpec {
     baseBranch: string;
     diff: string;
     githubToken: string;
+    /** The person the commits are made as, when they opted in; absent keeps the agent as author. */
+    person?: CommitAuthor;
     repo: ParsedRepo;
     runId: string;
     title: string;
@@ -392,7 +394,13 @@ export const startPullRequest = async (
 
         await sandbox.writeFile(
             PR_SCRIPT_PATH,
-            buildPullRequestScript({ baseBranch: spec.baseBranch, branch: prBranchName(spec.runId), message: spec.title, repo: spec.repo }),
+            buildPullRequestScript({
+                baseBranch: spec.baseBranch,
+                branch: prBranchName(spec.runId),
+                message: spec.title,
+                person: spec.person,
+                repo: spec.repo,
+            }),
         );
         await sandbox.startDetached(`bash ${PR_SCRIPT_PATH} > ${PR_LOG_PATH} 2>&1 < /dev/null`, { cwd: "/home/user" });
 

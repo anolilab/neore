@@ -40,6 +40,7 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     autoDetectComplexity: integer("autoDetectComplexity", { mode: "boolean" }),
     autoMediaEnrichment: integer("autoMediaEnrichment", { mode: "boolean" }),
     browserSettings: text("browserSettings", { mode: "json" }).$type<{ domainAllowlist?: Array<string>; domainBlocklist?: Array<string>; enabled?: boolean }>(),
+    codingAgentCommitIdentity: text("codingAgentCommitIdentity", { mode: "json" }).$type<"agent" | "user">(),
     customAIProviders: text("customAIProviders"),
     customization: text("customization"),
     customModels: text("customModels"),
