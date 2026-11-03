@@ -212,6 +212,11 @@
                             <button type="button" id="acp-end">End session</button>
                         </div>
                     </form>
+                    <div id="acp-ports">
+                        <h3 id="acp-ports-heading">Servers listening</h3>
+                        <p class="muted">Ports opened by this agent's processes. Stop ends that server and what it started; the agent keeps running.</p>
+                        <ul id="acp-ports-list" aria-labelledby="acp-ports-heading"></ul>
+                    </div>
                     <div id="acp-hooks" hidden>
                         <h3 id="acp-hooks-heading">File-event hooks</h3>
                         <p class="muted">

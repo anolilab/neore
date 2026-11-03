@@ -717,6 +717,36 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
     }
 };
 
+/** How often the open session's listening ports are read again; a server can start without any session event. */
+const PORTS_POLL_MS = 5000;
+
+const refreshPorts = async (): Promise<void> => {
+    const { selected } = state;
+    const ports = selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected);
+
+    // Another session was opened while this one was read.
+    if (state.selected !== selected) {
+        return;
+    }
+
+    $("acp-ports-list").replaceChildren(
+        ...ports.length === 0
+            ? [item("None.")]
+            : ports.map((port) =>
+                item(
+                    `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`,
+                    button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
+                        guarded(async () => {
+                            const ended = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
+
+                            $("acp-notice").textContent = ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end.`;
+                            await refreshPorts();
+                        });
+                    }),
+                )),
+    );
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
@@ -749,6 +779,7 @@ const refreshSessions = async (): Promise<void> => {
     }
 
     renderSession(snapshot);
+    await refreshPorts();
 
     if (snapshot === undefined) {
         clearHooks();
@@ -860,6 +891,12 @@ export const initAcp = async (): Promise<void> => {
         state.importing = undefined;
         renderImport();
     });
+
+    setInterval(() => {
+        if (state.selected !== undefined && !document.hidden) {
+            refreshPorts().catch(showError);
+        }
+    }, PORTS_POLL_MS);
 
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {

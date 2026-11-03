@@ -18,6 +18,9 @@ import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
+import type { PortView, StopTarget } from "./ports/ports";
+import { PortsService } from "./ports/ports";
+import { realPortsSystem } from "./ports/system";
 import type { AgentProcess, Spawner } from "./process";
 import { acpSupported } from "./process";
 import type { Handshake } from "./protocol";
@@ -79,6 +82,8 @@ export class AcpManager {
     private readonly reports = new Map<string, CapabilityReport>();
 
     private readonly sessions = new Map<string, AgentSession>();
+
+    private readonly portsService = new PortsService(realPortsSystem);
 
     public constructor(private readonly options: ManagerOptions) {}
 
@@ -283,6 +288,16 @@ export class AcpManager {
         }
 
         await Promise.all(closing);
+    }
+
+    /** The ports the session's agent processes listen on (`ports/ports.ts`). Empty for a session with no local process. */
+    public async ports(sessionId: string): Promise<PortView[]> {
+        return await this.portsService.list(this.require(sessionId).agentPid);
+    }
+
+    /** Ends one listening server of the session, and its own descendants. Never the agent. */
+    public async stopPort(sessionId: string, target: StopTarget): Promise<boolean> {
+        return await this.portsService.stop(this.require(sessionId).agentPid, target);
     }
 
     /** Forgets an ended session. */

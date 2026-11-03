@@ -2,6 +2,7 @@
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { HooksView } from "../../acp/hooks/types";
+import type { PortView } from "../../acp/ports/ports";
 import type { RegistryListing } from "../../acp/registry";
 import type { AcpUpdate, AcpView, ImportSummary, NativeSessionView, PermissionView, ProbeResult, SessionSnapshot, SessionSummary } from "../../acp/types";
 import type { Availability } from "../../terminal/shell";
@@ -40,6 +41,10 @@ export interface DeviceWindowApi {
     acpReports: () => Promise<Record<string, CapabilityReport>>;
     acpSend: (sessionId: string, prompt: string) => Promise<{ position?: number; status: "queued" | "started" }>;
     acpSession: (sessionId: string) => Promise<SessionSnapshot>;
+    /** The ports this session's agent processes listen on. */
+    acpPorts: (sessionId: string) => Promise<PortView[]>;
+    /** Ends one listening server (and its own descendants) of the session, never the agent. Resolves true once all are gone. */
+    acpPortStop: (sessionId: string, pid: number, startedAt: string) => Promise<boolean>;
     acpSessions: () => Promise<SessionSummary[]>;
     acpStart: (agentKey: string, folder: string) => Promise<string>;
     acpUpdate: (update: AcpUpdate) => Promise<AcpView>;
