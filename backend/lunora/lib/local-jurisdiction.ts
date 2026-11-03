@@ -20,25 +20,34 @@ export interface LocalJurisdictionEnv {
     SHARD_REGISTRY?: unknown;
 }
 
-const shimmed = new WeakSet<object>();
-
 const shim = (namespace: unknown): void => {
-    if (typeof namespace !== "object" || namespace === null || shimmed.has(namespace)) {
+    if (typeof namespace !== "object" || namespace === null) {
         return;
     }
 
-    shimmed.add(namespace);
+    // The class prototype, not the binding: a Durable Object, a service-bound entrypoint and
+    // the Worker each hold their own `env`, and the namespaces in all of them share it.
+    const prototype = Object.getPrototypeOf(namespace) as JurisdictionNamespace | null;
 
-    const target = namespace as JurisdictionNamespace;
-
-    if (typeof target.jurisdiction !== "function") {
+    if (prototype === null || prototype === Object.prototype || typeof prototype.jurisdiction !== "function") {
         return;
     }
 
-    Object.defineProperty(namespace, "jurisdiction", { configurable: true, value: () => namespace });
+    Object.defineProperty(prototype, "jurisdiction", {
+        configurable: true,
+        value(this: unknown) {
+            return this;
+        },
+        writable: true,
+    });
 };
 
-/** Makes `jurisdiction()` on the Durable Object bindings return the binding itself, in development only. */
+/**
+ * Makes `jurisdiction()` on the Durable Object namespaces return the namespace itself, in
+ * development only. Call it once at module scope with the global `env`: every entry point
+ * (fetch, queue, scheduled, a shard's `fetch` and `alarm`, the registry entrypoint) runs in an
+ * isolate that evaluated that module first.
+ */
 export const allowLocalJurisdiction = (env: LocalJurisdictionEnv): void => {
     if (env.ENVIRONMENT !== "development") {
         return;
