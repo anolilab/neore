@@ -550,6 +550,7 @@ export interface InternalApiTypes {
             claimFinish: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { claimed: boolean; wantsPr: boolean }>;
             claimPoll: FunctionReference<"mutation", { prStartedAt?: number; runId: Id<"codingAgentRuns">; seq: number }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"codingAgentRuns"> }, { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; userId: string } | null>;
+            commitAuthorFor: FunctionReference<"query", { userId: string }, null | { email: string; name: string }>;
             completePullRequest: FunctionReference<"mutation", { log: string; prUrl?: string; runId: Id<"codingAgentRuns">; startedAt: number }, { followUp: boolean }>;
             completeRun: FunctionReference<"mutation", { baseBranch?: string; baseSha?: string; diff?: string; diffStat?: string; diffTruncated?: boolean; error?: string; exitCode?: number; runId: Id<"codingAgentRuns">; status: "succeeded" | "failed" | "cancelled"; summary?: string }, null>;
             createRun: FunctionReference<"mutation", { agent: "claude_code" | "codex"; branch?: string; openPr: boolean; prompt: string; repoUrl: string; taskId?: Id<"tasks">; taskRunId?: Id<"taskRuns">; threadId?: string; toolCallId?: string; userId: string }, { runId: Id<"codingAgentRuns"> } | { error: string }>;
@@ -1759,6 +1760,7 @@ export const internal: InternalApiTypes = {
             claimFinish: { __lunoraRef: "coding_agents_functions:claimFinish" },
             claimPoll: { __lunoraRef: "coding_agents_functions:claimPoll" },
             claimRun: { __lunoraRef: "coding_agents_functions:claimRun" },
+            commitAuthorFor: { __lunoraRef: "coding_agents_functions:commitAuthorFor" },
             completePullRequest: { __lunoraRef: "coding_agents_functions:completePullRequest" },
             completeRun: { __lunoraRef: "coding_agents_functions:completeRun" },
             createRun: { __lunoraRef: "coding_agents_functions:createRun" },

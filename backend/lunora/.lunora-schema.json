@@ -2920,6 +2920,28 @@
             }
           }
         },
+        "codingAgentCommitIdentity": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"agent\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"user\""
+            }
+          ]
+        },
         "customAIProviders": {
           "kind": "any",
           "nullable": false,

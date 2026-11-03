@@ -27198,6 +27198,76 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#coding_agents_functions:setCodingAgentCommitIdentity": {
+      "post": {
+        "description": "Invoke the `mutation` `coding_agents_functions:setCodingAgentCommitIdentity` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "coding_agents_functions:setCodingAgentCommitIdentity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "identity": {
+                        "anyOf": [
+                          {
+                            "const": "agent",
+                            "type": "string"
+                          },
+                          {
+                            "const": "user",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "identity"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "coding_agents_functions:setCodingAgentCommitIdentity",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: coding_agents_functions:setCodingAgentCommitIdentity",
+        "tags": [
+          "coding-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#connectors_mcp_servers:listMcpServerSignIns": {
       "post": {
         "description": "Invoke the `query` `connectors_mcp_servers:listMcpServerSignIns` over the Lunora RPC envelope (POST /_lunora/rpc).",

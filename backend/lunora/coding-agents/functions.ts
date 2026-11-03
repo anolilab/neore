@@ -21,10 +21,12 @@ import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchById, patchRow } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { loadTaskAccount } from "../tasks/account";
+import type { CommitAuthor } from "./commands";
 import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { PR_BUDGET_MS } from "./runner";
@@ -637,6 +639,74 @@ export const getRunForFollowUp = internalQuery
     });
 
 // ─── Internal: pull requests ─────────────────────────────────────────────────
+
+const GIT_NAME_CHARACTER = /[\p{L}\p{N}]/u;
+
+/** Control characters (a newline, a NUL) and angle brackets, which Git or the script that writes the identity will not carry. */
+const UNSAFE_IDENTITY_CHARACTER = /[\p{Cc}<>]/u;
+
+/**
+ * The identity a commit is made as, from the account. `null` keeps the agent as author: an account without a
+ * name, or whose email is not verified, gives `null`, so the commit never carries an empty or guessed identity,
+ * and nobody can have commits attributed to an address they have not proved. While the account is being deleted
+ * the identity is refused too: the preference is removed only at the last deletion steps.
+ */
+export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null, deletionUnderway: boolean): CommitAuthor | null => {
+    // Git refuses a name made only of spaces, control characters or punctuation, so one with no letter or digit keeps the agent as author.
+    if (deletionUnderway || !user?.email || !user.name || !GIT_NAME_CHARACTER.test(user.name) || user.emailVerified !== true) {
+        return null;
+    }
+
+    if (UNSAFE_IDENTITY_CHARACTER.test(user.name) || UNSAFE_IDENTITY_CHARACTER.test(user.email)) {
+        return null;
+    }
+
+    return { email: user.email, name: user.name };
+};
+
+/**
+ * The person a pull request's commits are made as, when they opted in (`codingAgentCommitIdentity`).
+ * `null` keeps the agent as author (see {@link commitAuthorOf}).
+ */
+export const commitAuthorFor = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.null(), v.object({ email: v.string(), name: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        if (prefs?.codingAgentCommitIdentity !== "user") {
+            return null;
+        }
+
+        const user = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } });
+
+        return commitAuthorOf(user, await isAccountDeletionUnderway(ctx, args.userId));
+    });
+
+/** Choose who a coding agent's pull request commits are made as. Off (`agent`) is the default. */
+export const setCodingAgentCommitIdentity = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ identity: v.union(v.literal("agent"), v.literal("user")) })
+    .output(v.null())
+    .mutation(async ({ args: { identity }, ctx }) => {
+        if (await isAccountDeletionUnderway(ctx, ctx.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "This account is being deleted.");
+        }
+
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { codingAgentCommitIdentity: identity }, ctx.user.activeOrganization?.id ?? null);
+
+        ctx.log.event("coding_agents.set_commit_identity", { identity });
+
+        return null;
+    });
 
 /**
  * Claim the right to open this run's PR: the owner's, finished, with a complete
