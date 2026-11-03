@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppEnv } from "../env.js";
-import { CLASSIFIER_THRESHOLDS, canClassifyPrompt, classifyTierWithModel, isClassifierEnabled } from "./classifier.js";
+import { canClassifyPrompt, CLASSIFIER_THRESHOLDS, classifyTierWithModel, isClassifierEnabled } from "./classifier.js";
 import { QueryTier } from "./tiers.js";
 
 const mocks = vi.hoisted(() => {
