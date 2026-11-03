@@ -701,7 +701,7 @@ export const setCodingAgentCommitIdentity = authMutation
             .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
             .unique();
 
-        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { codingAgentCommitIdentity: identity });
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { codingAgentCommitIdentity: identity }, ctx.user.activeOrganization?.id ?? null);
 
         ctx.log.event("coding_agents.set_commit_identity", { identity });
 
