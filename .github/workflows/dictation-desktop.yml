@@ -47,12 +47,12 @@ jobs:
                       helper: "linux-arm64"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
                   cp "$RUNNER_TEMP/whisper.cpp/samples/jfk.wav" "$RUNNER_TEMP/stage/jfk.wav"
 
             - name: "Upload the helper"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "speech-helper-${{ matrix.helper }}"
                   if-no-files-found: "error"
@@ -111,12 +111,12 @@ jobs:
             NEORE_DICTATION_EXPECT: "${{ matrix.expect }}"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
@@ -183,7 +183,7 @@ jobs:
 
             - name: "Download the speech helper built on the older runner (Linux)"
               if: "runner.os == 'Linux'"
-              uses: "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+              uses: "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" # v8.0.2
               with:
                   name: "speech-helper-${{ matrix.helper }}"
                   path: "${{ runner.temp }}/stage"
@@ -292,7 +292,7 @@ jobs:
 
             - name: "Upload the Playwright results"
               if: "failure()"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "dictation-desktop-${{ matrix.os }}"
                   if-no-files-found: "ignore"
