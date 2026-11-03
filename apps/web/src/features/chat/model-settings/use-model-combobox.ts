@@ -40,6 +40,8 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     // A switch on a long conversation waits here for the user to see what it costs.
     // It belongs to the thread it was asked on: shown on another one it is gone, and confirming it there switches nothing.
     const [asked, setPendingSwitch] = useState<{ pending: PendingAgentSwitch; threadId: string } | null>(null);
+    // The Auto choice being written to this thread, shown at once and until the write settles.
+    const [autoWrite, setAutoWrite] = useState<{ enabled: boolean; threadId: string } | null>(null);
     const pendingSwitch = asked && asked.threadId === threadId ? asked.pending : null;
 
     useEffect(() => {
@@ -233,7 +235,15 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     // Auto routes each send to a model the gateway picks. The thread's own model stays the fallback.
     const setAutoModel = async (enabled: boolean) => {
         if (threadId && thread) {
-            await writeThread({ autoModel: enabled, threadId: threadId as Id<"threads"> });
+            const token = { enabled, threadId };
+
+            setAutoWrite(token);
+
+            try {
+                await writeThread({ autoModel: enabled, threadId: threadId as Id<"threads"> });
+            } finally {
+                setAutoWrite((current) => (current === token ? null : current));
+            }
 
             return;
         }
@@ -306,8 +316,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
+    const pendingAutoWrite = autoWrite?.threadId === threadId ? autoWrite : null;
+
     return {
-        autoModel,
+        autoModel: pendingAutoWrite ? pendingAutoWrite.enabled : autoModel,
+        autoModelPending: pendingAutoWrite !== null,
         cancelSwitch,
         changeModel,
         confirmSwitch,

@@ -24,7 +24,16 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { autoModel, cancelSwitch, changeModel, confirmSwitch, pendingSwitch, setAutoModel, thread: loadedThread } = useModelCombobox({ threadId });
+    const {
+        autoModel,
+        autoModelPending,
+        cancelSwitch,
+        changeModel,
+        confirmSwitch,
+        pendingSwitch,
+        setAutoModel,
+        thread: loadedThread,
+    } = useModelCombobox({ threadId });
     const autoLabelId = useId();
     const { isAnonymous } = useIsAnonymous();
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
@@ -110,7 +119,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                     <Switch
                         aria-labelledby={autoLabelId}
                         checked={autoModel}
-                        disabled={Boolean(threadId) && isRunning}
+                        disabled={(Boolean(threadId) && isRunning) || autoModelPending}
                         onCheckedChange={(checked) => {
                             setAutoModel(checked).catch((error: unknown) => {
                                 showError(error instanceof Error ? error : t`Could not change Auto. Please try again.`);
