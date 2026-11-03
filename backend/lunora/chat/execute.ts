@@ -335,6 +335,7 @@ export const runStreamingAgent = internalAction
                         conversation: async () =>
                             await ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, {
                                 promptMessageId: messageId,
+                                stateless: thread?.statelessMode ?? statelessMode,
                                 threadId: threadId as Id<"threads">,
                             }),
                         fallbackModel: model,

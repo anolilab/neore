@@ -78,6 +78,9 @@ export interface ConversationShape {
     images: boolean;
 }
 
+/** How long a route may take before the run keeps its fallback model. */
+const AUTO_ROUTE_TIMEOUT_MS = 3000;
+
 export interface AutoRequest {
     conversation: () => Promise<ConversationShape>;
     fallbackModel: string;
@@ -107,35 +110,52 @@ const gatewayRules = (rules: ModelFilterRules): ModelFilterRules => {
 export const resolveAutoModel = async (ctx: ActionCtx, request: AutoRequest): Promise<string> => {
     const { fallbackModel, filterRules, prompt, threadId, userId } = request;
 
+    // Auto is optional and has a fallback ready, so a slow route gives up early rather than delaying the reply.
+    const keepFallback = (reason: string) => {
+        streamLogger.info(`[AutoModel] keeping ${fallbackModel}: ${reason}`);
+
+        return fallbackModel;
+    };
+
     try {
         const [plan, conversation] = await Promise.all([request.plan(), request.conversation()]);
-        const routed = await routeViaGateway(ctx, {
-            ...(conversation.contextTokens > 0 && { contextTokens: conversation.contextTokens }),
-            messages: [{ content: prompt, role: "user" }],
-            ...(filterRules && { modelFilterRules: gatewayRules(filterRules) }),
-            threadId,
-            userId,
-            userTier: routingTierOf(plan),
-        });
+        const routed = await routeViaGateway(
+            ctx,
+            {
+                ...(conversation.contextTokens > 0 && { contextTokens: conversation.contextTokens }),
+                messages: [{ content: prompt, role: "user" }],
+                ...(filterRules && { modelFilterRules: gatewayRules(filterRules) }),
+                threadId,
+                userId,
+                userTier: routingTierOf(plan),
+            },
+            { timeoutMs: AUTO_ROUTE_TIMEOUT_MS },
+        );
         const definition = registryModelForRoute(routed);
 
         if (!definition) {
-            streamLogger.debug(`[AutoModel] ${routed.modelId} is not a registry model; keeping ${fallbackModel}`);
-
-            return fallbackModel;
+            return keepFallback(`${routed.modelId} is not a registry model`);
         }
 
         const capabilities = backupCapabilities(definition);
 
-        if (
-            backupFilterRejection(definition, filterRules) !== null ||
-            !capabilities.tools ||
-            (conversation.images && !capabilities.images) ||
-            (conversation.files && !capabilities.files) ||
-            !(await canRunPaidModel(ctx, userId, definition, plan))
-        ) {
-            return fallbackModel;
+        if (backupFilterRejection(definition, filterRules) !== null) {
+            return keepFallback(`${definition.id} is filtered out`);
         }
+
+        if (!capabilities.tools) {
+            return keepFallback(`${definition.id} has no tool support`);
+        }
+
+        if ((conversation.images && !capabilities.images) || (conversation.files && !capabilities.files)) {
+            return keepFallback(`${definition.id} lacks an attachment kind the run needs`);
+        }
+
+        if (!(await canRunPaidModel(ctx, userId, definition, plan))) {
+            return keepFallback(`${definition.id} is not on the plan`);
+        }
+
+        streamLogger.info(`[AutoModel] routed to ${definition.id} (was ${fallbackModel})`);
 
         return definition.id;
     } catch (error) {

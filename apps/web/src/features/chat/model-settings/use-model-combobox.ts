@@ -219,10 +219,21 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
+    // Thread writes issued from this picker run one after another, in the order the user made them, so an older
+    // toggle cannot commit after a newer pick. Each write names only the fields it changes.
+    const threadWrites = useRef<Promise<unknown>>(Promise.resolve());
+    const writeThread = (args: Parameters<typeof updateThreadAction>[0]) => {
+        const write = threadWrites.current.catch(() => undefined).then(async () => await updateThreadAction(args));
+
+        threadWrites.current = write;
+
+        return write;
+    };
+
     // Auto routes each send to a model the gateway picks. The thread's own model stays the fallback.
     const setAutoModel = async (enabled: boolean) => {
         if (threadId && thread) {
-            await updateThreadAction({ autoModel: enabled, model: thread.model, threadId: threadId as Id<"threads"> });
+            await writeThread({ autoModel: enabled, threadId: threadId as Id<"threads"> });
 
             return;
         }
@@ -254,6 +265,17 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
 
         // A text thread records the change as a switch in its transcript; the thread's own model stays
         // what it was created with, which is what a branch from before the switch runs on.
+        // Naming the model the thread already runs is not a switch: it only ends Auto, with no divider.
+        if (threadId && thread && autoModel && thread.model === newModel) {
+            try {
+                await writeThread({ autoModel: false, threadId: threadId as Id<"threads"> });
+            } catch (error) {
+                showError(error instanceof Error ? error : t`Could not change the model. Please try again.`);
+            }
+
+            return;
+        }
+
         if (threadId && thread && canSwitchAgent(thread, newModel) && (await startSwitch(newModel, threadId, thread))) {
             return;
         }
@@ -262,7 +284,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // branch from before the first switch, and a pick the server cannot switch to lives in the composer only.
         if (threadId && thread && !thread.activeAgent) {
             try {
-                await updateThreadAction({
+                await writeThread({
                     ...(autoModel && { autoModel: false }),
                     model: newModel,
                     threadId: threadId as Id<"threads">,

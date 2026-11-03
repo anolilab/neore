@@ -328,7 +328,7 @@ routeRouter.openapi(
 
                     if (isClassifierEnabled(c.env) && canClassifyPrompt(c.env, rules) && availableTiers.length > 0) {
                         const verdictCache = new VerdictCache(c.env.PRICING_KV);
-                        const cacheKey = { availableTiers, hasImages, lastUserMessage, toolCount };
+                        const cacheKey = { availableTiers, contextTokens, hasImages, lastUserMessage, toolCount };
                         const cached = await verdictCache.get(cacheKey);
 
                         if (cached) {

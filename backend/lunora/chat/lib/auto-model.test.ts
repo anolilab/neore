@@ -110,13 +110,17 @@ describe("resolveAutoModel", () => {
         routeViaGateway.mockResolvedValue(route(target.id));
 
         await expect(resolveAutoModel(ctx, request)).resolves.toBe(target.id);
-        expect(routeViaGateway).toHaveBeenCalledWith(ctx, {
-            messages: [{ content: "hello", role: "user" }],
-            modelFilterRules: { blockedProviders: ["x"] },
-            threadId: "thread-1",
-            userId: "user-1",
-            userTier: "free",
-        });
+        expect(routeViaGateway).toHaveBeenCalledWith(
+            ctx,
+            {
+                messages: [{ content: "hello", role: "user" }],
+                modelFilterRules: { blockedProviders: ["x"] },
+                threadId: "thread-1",
+                userId: "user-1",
+                userTier: "free",
+            },
+            { timeoutMs: 3000 },
+        );
     });
 
     it("keeps the fallback when the routed id is not a registry model", async () => {
@@ -200,7 +204,7 @@ describe("resolveAutoModel", () => {
             },
         });
 
-        expect(routeViaGateway).toHaveBeenCalledWith(ctx, expect.objectContaining({ contextTokens: 50_000 }));
+        expect(routeViaGateway).toHaveBeenCalledWith(ctx, expect.objectContaining({ contextTokens: 50_000 }), { timeoutMs: 3000 });
     });
 
     it("sends model lists in both spellings the gateway may know", async () => {
@@ -211,6 +215,7 @@ describe("resolveAutoModel", () => {
         expect(routeViaGateway).toHaveBeenCalledWith(
             ctx,
             expect.objectContaining({ modelFilterRules: { allowedModels: ["anthropic/claude-sonnet-4", "claude-sonnet-4"] } }),
+            { timeoutMs: 3000 },
         );
     });
 

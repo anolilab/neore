@@ -29,16 +29,21 @@ export interface AutoRouteContext {
  * Throws when a file of the window cannot be classified: an attachment nobody checked must not read as absent, and the
  * caller keeps its fallback model instead.
  */
-export const autoRouteContextOf = async (ctx: QueryCtx, args: { promptMessageId: string; threadId: Id<"threads"> }): Promise<AutoRouteContext> => {
+export const autoRouteContextOf = async (
+    ctx: QueryCtx,
+    args: { promptMessageId: string; stateless?: boolean; threadId: Id<"threads"> },
+): Promise<AutoRouteContext> => {
     const prompt = await getThreadRow(ctx, args.threadId, args.promptMessageId);
 
     if (!prompt) {
         throw new Error("The prompt of the run is not in the thread");
     }
 
-    const { rows } = await walkPath(ctx, args.threadId, prompt, { limit: PATH_ROWS });
-    const found = attachmentsIn(rows.map((row) => row.message));
-    const fileIds = [...new Set(rows.flatMap((row) => row.fileIds ?? []))];
+    // A stateless run sends the prompt alone; a stateful one sends only the successful rows of the window.
+    const walked = args.stateless ? null : await walkPath(ctx, args.threadId, prompt, { limit: PATH_ROWS });
+    const window = walked ? walked.rows.filter((row) => row.status === "success") : [prompt];
+    const found = attachmentsIn(window.map((row) => row.message));
+    const fileIds = [...new Set(window.flatMap((row) => row.fileIds ?? []))];
 
     for (let start = 0; start < fileIds.length; start += FILE_BATCH) {
         const batch = fileIds.slice(start, start + FILE_BATCH) as Id<"chatFiles">[];
@@ -57,12 +62,12 @@ export const autoRouteContextOf = async (ctx: QueryCtx, args: { promptMessageId:
         }
     }
 
-    const long = await pathExceedsColdStart(ctx, args.threadId, prompt);
+    const long = !args.stateless && (await pathExceedsColdStart(ctx, args.threadId, prompt));
 
     return { contextTokens: long ? PROMPT_CACHE_COLD_START_TOKENS + 1 : 0, ...found };
 };
 
 export const getAutoRouteContext = internalQuery
-    .input({ promptMessageId: v.string().max(64), threadId: v.id("threads") })
+    .input({ promptMessageId: v.string().max(64), stateless: v.optional(v.boolean()), threadId: v.id("threads") })
     .output(v.object({ contextTokens: v.number(), files: v.boolean(), images: v.boolean() }))
     .query(async ({ args, ctx }) => await autoRouteContextOf(ctx, args));

@@ -254,7 +254,7 @@ export async function* streamViaGateway(context: ActionContext, request: Gateway
 /**
  * Smart model selection via the gateway.
  */
-export const routeViaGateway = async (context: ActionContext, request: RouteRequest): Promise<RouteResult> => {
+export const routeViaGateway = async (context: ActionContext, request: RouteRequest, options: { timeoutMs?: number } = {}): Promise<RouteResult> => {
     const client = getGatewayClient(context);
     const traceparent = request.traceparent ?? generateTraceparent();
 
@@ -262,7 +262,7 @@ export const routeViaGateway = async (context: ActionContext, request: RouteRequ
         body: request as Parameters<typeof sdkInternalRoute>[0]["body"],
         client,
         headers: { traceparent },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? FETCH_TIMEOUT_MS),
     });
 
     if (error || !response?.ok) {
