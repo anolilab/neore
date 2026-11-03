@@ -438,8 +438,6 @@ const withFilterValues = <T extends { filters?: { op: FilterOp; path: string; va
 
 const WEBHOOK_CRON_MESSAGE = "A webhook trigger has no schedule; `cronExpression` applies to schedule triggers only.";
 
-const WEBHOOK_TEMPLATE_MESSAGE = "A webhook trigger does not use `inputTemplate`; its payload is the input.";
-
 /** The public trigger shape: `getTriggers`' row under `id`. It never carries the webhook secret, which only `createTrigger` returns, once. */
 const toPublicTrigger = (trigger: StoredTrigger) => {
     return {
@@ -1040,10 +1038,6 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
         handler: async ({ body, ctx }) => {
             const request = body as z.infer<typeof zTriggerCreateRequestSchema>;
 
-            if (request.type === "webhook" && request.inputTemplate !== undefined) {
-                throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
-            }
-
             if (request.type === "webhook" && request.cronExpression !== undefined) {
                 throw new PublicApiError("invalid_request", WEBHOOK_CRON_MESSAGE);
             }
@@ -1102,10 +1096,6 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
             const triggerId = idParameter(input, "triggerId");
             const request = input.body as z.infer<typeof zTriggerUpdateRequestSchema>;
             const trigger = await findOwnTrigger(input.ctx, triggerId);
-
-            if (trigger.type === "webhook" && request.inputTemplate !== undefined) {
-                throw new PublicApiError("invalid_request", WEBHOOK_TEMPLATE_MESSAGE);
-            }
 
             if (trigger.type === "webhook" && request.cronExpression !== undefined) {
                 throw new PublicApiError("invalid_request", WEBHOOK_CRON_MESSAGE);

@@ -198,16 +198,16 @@ describe("trigger routes", () => {
         expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ botComputer: true, quietWhenEmpty: false });
     });
 
-    it("refuses inputTemplate on a webhook trigger, on create and on update", async () => {
+    it("accepts and stores inputTemplate on a webhook trigger, on create and on update", async () => {
         const { calls, request } = call({ triggers: ["write"] }, { ...stored, type: "webhook" });
+        const template = "Summarise {{body.issue.title}} from {{header.x-github-event}}: {{payload}}";
 
-        const created = await request("/triggers", json("POST", { inputTemplate: "x", model: "m", name: "Hook", type: "webhook" }));
-        const updated = await request("/triggers/trg1", json("PATCH", { inputTemplate: "x" }));
+        const created = await request("/triggers", json("POST", { inputTemplate: template, model: "m", name: "Hook", type: "webhook" }));
+        const updated = await request("/triggers/trg1", json("PATCH", { inputTemplate: template }));
 
-        expect([created.status, updated.status]).toEqual([400, 400]);
-        expect(
-            calls.some((entry) => entry.name.startsWith("triggers_functions:createTrigger") || entry.name.startsWith("triggers_functions:updateTrigger")),
-        ).toBe(false);
+        expect([created.status, updated.status]).not.toContain(400);
+        expect(calls.find((entry) => entry.name === "triggers_functions:createTrigger")?.args).toMatchObject({ inputTemplate: template });
+        expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ inputTemplate: template });
     });
 
     it("asks updateTrigger to refuse an enabled row inside its own transaction", async () => {

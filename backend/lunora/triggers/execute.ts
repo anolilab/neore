@@ -310,7 +310,13 @@ export const executeTrigger = internalAction
                 inputMessage = eventInputMessage(sanitizedPayload, trigger.inputTemplate);
             } else if (triggerType === "webhook" && (webhookPrompt !== undefined || payload || trigger.inputTemplate)) {
                 // Rendered at the delivery (`http.ts`), where the headers and the query are. A manual test run has only its body.
-                inputMessage = webhookPrompt ?? renderWebhookPrompt(trigger.inputTemplate, { body: payload ?? "", headers: {}, query: {} }, randomFrameId());
+                const rendered = webhookPrompt ?? renderWebhookPrompt(trigger.inputTemplate, { body: payload ?? "", headers: {}, query: {} }, randomFrameId());
+
+                if (rendered === undefined) {
+                    throw new Error("The payload cannot be rendered into the trigger's Input Template.");
+                }
+
+                inputMessage = rendered;
             } else {
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }

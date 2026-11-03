@@ -103,10 +103,10 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         },
     };
 
-    const post = async (body: string | Uint8Array, headers: Record<string, string>) =>
+    const post = async (body: string | Uint8Array, headers: Record<string, string>, search = "") =>
         await handleTriggerWebhook(
             context as never,
-            new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }),
+            new Request(`https://x/triggers/webhook/t${search}`, { body: body as BodyInit, headers, method: "POST" }),
             triggerId,
         );
 
@@ -176,6 +176,43 @@ describe("trigger webhook signing", () => {
         expect(args?.webhookPrompt).toMatch(RENDERED_HEAD);
         expect(args?.webhookPrompt).not.toContain("s3cret");
         expect(args?.webhookPrompt).toMatch(RENDERED_FRAME);
+    });
+
+    it("renders a query parameter from the request URL into the prompt", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "Room {{query.room}}: {{body.msg}}" });
+        const body = '{"msg":"hi"}';
+
+        const response = await post(body, await signedHeaders(body), "?room=ops");
+
+        expect(response.status).toBe(200);
+
+        const [args] = scheduled as { webhookPrompt: string }[];
+
+        expect(args?.webhookPrompt.startsWith('Room "ops": "hi"')).toBe(true);
+    });
+
+    it("refuses a delivery that cannot be rendered, and its retry is refused the same way rather than taken as a duplicate", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{body.deep}}" });
+        const depth = 100_000;
+        const body = `{"deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+        const headers = await signedHeaders(body);
+
+        const first = await post(body, headers);
+        const retry = await post(body, headers);
+
+        expect([first.status, retry.status]).toEqual([422, 422]);
+        expect(scheduled).toHaveLength(0);
+    });
+
+    it("refuses a delivery whose scheduled arguments would exceed the dispatch limit, and gives its claim back", async () => {
+        const { post, scheduled } = await setup();
+        // Every quote is escaped in the scheduled arguments, so this body is near 1.2 MiB there and under the 1 MiB body cap here.
+        const body = '"'.repeat(600_000);
+
+        const response = await post(body, await signedHeaders(body));
+
+        expect(response.status).toBe(413);
+        expect(scheduled).toHaveLength(0);
     });
 
     it("runs a fresh, correctly signed delivery exactly once — a replay is acknowledged but not run", async () => {

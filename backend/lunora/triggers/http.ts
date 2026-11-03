@@ -82,6 +82,9 @@ const MAX_DELIVERY_ID_LENGTH = 128;
 /** `X-Hub-Signature-256` is always `sha256=<64 hex>`; anything else is refused before any HMAC work. */
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
 
+/** Lunora refuses a scheduled dispatch whose serialized arguments are over 1 MiB, after the delivery was acknowledged. */
+const MAX_SCHEDULED_ARGS_BYTES = 1024 * 1024;
+
 /**
  * The trigger fields this handler reads.
  *
@@ -316,17 +319,33 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
                   )
                 : undefined;
 
+        // A delivery that cannot be rendered, or whose scheduled arguments would not fit Lunora's dispatch request, is
+        // refused now and its claim given back: once it is acknowledged, the run could never start. The sender is told.
+        if (webhookPrompt === undefined && (body || trigger.inputTemplate)) {
+            await taken.giveBack();
+
+            return Response.json({ error: "This delivery cannot be rendered into the trigger's Input Template." }, { status: 422 });
+        }
+
+        const scheduled = {
+            ...taken.args,
+            invalidUtf8: strictBody === null ? true : undefined,
+            payload: body || undefined,
+            triggerId: triggerId as Id<"triggers">,
+            webhookPrompt,
+        };
+
+        if (new TextEncoder().encode(JSON.stringify(scheduled)).byteLength > MAX_SCHEDULED_ARGS_BYTES) {
+            await taken.giveBack();
+
+            return Response.json({ error: "This delivery is too large to run." }, { status: 413 });
+        }
+
         // 5. Schedule trigger execution. The claim is already committed, so a
         //    failure here must give it back — otherwise the sender's retry of
         //    this same delivery reads as a replay, and it never runs at all.
         try {
-            await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
-                ...taken.args,
-                invalidUtf8: strictBody === null ? true : undefined,
-                payload: body || undefined,
-                triggerId: triggerId as Id<"triggers">,
-                webhookPrompt,
-            });
+            await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, scheduled);
         } catch (error) {
             await taken.giveBack();
 
