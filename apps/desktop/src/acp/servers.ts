@@ -1,5 +1,5 @@
 /**
- * The coding agents on the servers this computer speaks for (plans/ssh-environments.md §7, S7).
+ * The coding agents on the servers this computer speaks for (ssh-environments.md §7, S7).
  *
  * Each server is a device of its own on the backend, so it gets a runtime of its own: a session manager whose agents
  * are started on the server (`remote-process.ts`), a poster that signs the turn output with THAT server's secret in

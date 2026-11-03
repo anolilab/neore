@@ -11,6 +11,8 @@
  * - Default TTL: 1 hour
  */
 
+import { sqliteTime } from "./sqlite-time.js";
+
 /** Default TTL for cached responses (1 hour) */
 const DEFAULT_TTL_SECONDS = 3600;
 
@@ -92,7 +94,7 @@ export class PromptCache {
         period: "24h" | "7d" = "24h",
     ): Promise<{ hitRate: number; hits: number; misses: number; savedCostMicrodollars: number; savedTokens: number }> {
         const hours = period === "24h" ? 24 : 168;
-        const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+        const since = sqliteTime(Date.now() - hours * 3_600_000);
 
         try {
             const row = await database

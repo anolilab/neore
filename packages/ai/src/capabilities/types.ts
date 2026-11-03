@@ -4,7 +4,7 @@
  * what a MODEL accepts as input.
  *
  * Plain data, no imports: the web app, the desktop main process, the backend and
- * the mobile app all read this subpath. See plans/provider-capabilities.md.
+ * the mobile app all read this subpath. See provider-capabilities.md.
  */
 
 /**

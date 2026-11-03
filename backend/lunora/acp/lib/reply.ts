@@ -1,7 +1,7 @@
 /**
  * The reply a host turn leaves in the thread, built from the chunks the host posted. Pure, so the shape is
  * pinned without a database. Nothing here bills: the agent bills its own account, and host turns write no usage
- * row and charge no credit (`scheduleReplyUsage` is deliberately not called; plans/acp-agent-host.md §5.2).
+ * row and charge no credit (`scheduleReplyUsage` is deliberately not called; acp-agent-host.md §5.2).
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import { toStorageRef } from "../../lib/storage-ref";

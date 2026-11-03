@@ -9,7 +9,7 @@ procedure cannot ship without someone having looked at its authorization.
 **Why it matters here more than usual.** A user's rows live on their own
 shard, which `authorizeShard` opens to them and to anyone they granted a thread
 or page — so a collaborator reaches EVERY procedure on the owner's shard, and
-`__root__` is open to all (plans/per-user-sharding.md). The procedure's own
+`__root__` is open to all (per-user-sharding.md). The procedure's own
 check below is therefore the PRIMARY control.
 Row-level security (next section) sits underneath it as defence in depth: it
 refuses a caller with no connection to a row at all, but does not know which
@@ -236,6 +236,8 @@ for a schema table that is neither policed nor listed:
 | `auth_organization.checkSlug` | query | authQuery | — | none needed (boolean) | ok |
 | `auth_organization.listOrganizations` | query | authQuery | — | org membership/role | ok |
 | `auth_organization.listUserInvitations` | query | authQuery | invitation | caller-scoped (ctx.user) | ok |
+| `auth_organization_policy.getOrganizationPolicy` | query | authQuery | organizationPolicies | org membership/role | ok — new; any member reads the active organization's policy (id from the verified session, never args); `null` for no organization or no policy |
+| `auth_organization_policy.setOrganizationPolicy` | mutation | authMutation + RL | organizationPolicies | org membership/role | ok — new; active-organization owner only (the rule `updateBillingSettings` applies); document parsed by `parseOrganizationPolicy`, nothing invalid is stored |
 | `auth_team.addTeamMember` | mutation | authMutation + RL | member, team, teamMember | caller-scoped (ctx.user) | **fixed** (medium) — org owner/admin or team admin; any org member could add anyone |
 | `auth_team.createTeam` | mutation | authMutation + RL | team | caller-scoped (ctx.user) | ok |
 | `auth_team.deleteTeam` | mutation | authMutation + RL | team, teamMember | caller-scoped (ctx.user) | ok |

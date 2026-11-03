@@ -1,5 +1,5 @@
 /**
- * Child agents an agent starts of its own (plans/acp-agent-host.md §4.7).
+ * Child agents an agent starts of its own (acp-agent-host.md §4.7).
  *
  * A child belongs to the tool call that spawned it, and is shown only when the agent reports its children (the
  * `subagents.ownChildren` capability, decided by the session). The session hands this ledger what the children
@@ -27,7 +27,7 @@ import { MaskedStream, MAX_CHILD_TEXT } from "./masked-stream";
 /**
  * Bytes of child events held for a spawn call that has not appeared, per session. The manager runs at most 8 sessions
  * at once (`MAX_SESSIONS`), and an ended session empties its buffer, so everything held across sessions stays under 8
- * times this. **Not measured:** a provisional figure derived from the caps around it (plans/acp-s7-children.md): the
+ * times this. **Not measured:** a provisional figure derived from the caps around it (acp-s7-children.md): the
  * agent's own buffer for the same ordering problem holds at most 256 updates, and one post carries 200 KB
  * (`MAX_BATCH_BYTES`), a turn's unsent output 4 MB. Pending measurement on a real child-heavy session.
  */

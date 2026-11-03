@@ -34,6 +34,7 @@ import type { Id } from "../../_generated/dataModel";
 import { stepCountIs } from "ai";
 import type { ActionCtx } from "../../_generated/server";
 import { createToolProgressWriter, ProgressStreamClosedError } from "./mcp-progress";
+import { isRunReplaced } from "./run-epoch";
 import type { ToolProgressSink } from "./mcp-progress";
 
 /** Sentence delimiter check — same as persistent/client.ts:30. */
@@ -128,11 +129,12 @@ export const stopWhenStopped = (ctx: Partial<Pick<ActionCtx, "runQuery">>, strea
  * Where a run's MCP tool calls report progress: a chunk on `streamId`, throttled per call (`mcp-progress.ts`).
  * A refused write (the stream was stopped) is the writer's to swallow; it never fails the tool.
  */
-export const toolProgressSink = (ctx: Pick<ActionCtx, "runMutation">, streamId: string): ToolProgressSink =>
+export const toolProgressSink = (ctx: Pick<ActionCtx, "runMutation">, streamId: string, runEpoch?: number): ToolProgressSink =>
     createToolProgressWriter(async (toolProgress) => {
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: false,
+                ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: "",
                 toolProgress,
@@ -141,7 +143,8 @@ export const toolProgressSink = (ctx: Pick<ActionCtx, "runMutation">, streamId: 
             // `addChunk` answers CONFLICT once the stream is no longer streaming; that one is final.
             if (
                 (error as { code?: string; data?: { code?: string } }).code === "CONFLICT" ||
-                (error as { data?: { code?: string } }).data?.code === "CONFLICT"
+                (error as { data?: { code?: string } }).data?.code === "CONFLICT" ||
+                isRunReplaced(error)
             ) {
                 throw new ProgressStreamClosedError();
             }
@@ -246,7 +249,7 @@ export const pipeToPersistentChunks = async (
     ctx: Partial<Pick<ActionCtx, "runQuery">> & Pick<ActionCtx, "runMutation">,
     streamId: string,
     fullStream: AsyncIterable<{ error?: unknown; text?: string; type: string }>,
-    { steeredBefore, stopPollMs = STOP_POLL_MS }: { steeredBefore?: () => boolean; stopPollMs?: number } = {},
+    { runEpoch, steeredBefore, stopPollMs = STOP_POLL_MS }: { runEpoch?: number; steeredBefore?: () => boolean; stopPollMs?: number } = {},
 ): Promise<PipedStream> => {
     let pending: StreamText = { reasoning: "", text: "" };
     let unsaved: StreamText = { reasoning: "", text: "" };
@@ -263,6 +266,7 @@ export const pipeToPersistentChunks = async (
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: false,
                 reasoning: chunk.reasoning || undefined,
+                ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: chunk.text,
             });
@@ -285,6 +289,7 @@ export const pipeToPersistentChunks = async (
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: false,
                 restart: true,
+                ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: "",
             });

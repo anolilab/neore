@@ -1,5 +1,5 @@
 /**
- * The coding-agent commands the BACKEND creates (plans/acp-agent-host.md §4.1): `acp_start`, `acp_send`,
+ * The coding-agent commands the BACKEND creates (acp-agent-host.md §4.1): `acp_start`, `acp_send`,
  * `acp_cancel` and `acp_permission_answer`. `createDeviceCall` is for device tools: it refuses anything the
  * manifest does not list. These calls are signed like any other (the desktop's Rust core verifies them), but have
  * their own open-call budget and claim window (`lib/constants.ts`), a claim that is a lease, and a prompt that is

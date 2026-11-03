@@ -75,9 +75,17 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         userId?: string | null;
     },
     isRetry: boolean,
+    // One per generation, shared by a retry: every attempt's abort work, so the caller waits for the abandoned ones too.
+    abortSettlements: (() => Promise<void>)[] = [],
 ): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<TOOLS, AiContext, OUTPUT>> => {
     const { threadId } = options ?? {};
     const { args, order, promptMessageId, stepOrder, userId, ...call } = await startGeneration(context, component, streamTextArgs, options);
+
+    abortSettlements.push(call.settleAbort);
+
+    const settleAbort = async () => {
+        await Promise.all(abortSettlements.map(async (settle) => await settle()));
+    };
 
     const steps: StepResult<TOOLS>[] = [];
 
@@ -196,7 +204,13 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
                 promptMessageId: undefined,
             } as typeof streamTextArgs;
 
-            return _doStreamText(context, component, retryArgs, options, true);
+            // Awaited so a retry that rejects before it has a handle is seen here, not past this attempt's cleanup.
+            return await _doStreamText(context, component, retryArgs, options, true, abortSettlements).catch(async (retryError: unknown) => {
+                // This attempt's abort work is in the shared list: let it land before the rejection reaches a caller with no handle.
+                await settleAbort();
+
+                throw retryError;
+            });
         }
 
         // If an error occurs during streaming (e.g., in onStepFinish callbacks),
@@ -204,6 +218,9 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         if (streamer && !isStreamConsumed) {
             await streamer.fail(getErrorMessage(error));
         }
+
+        // The caller gets no hook from a throw: let the abort work of every attempt land before it propagates.
+        await settleAbort();
 
         throw error;
     }
@@ -214,7 +231,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
         savedMessages: call.getSavedMessages(),
     };
 
-    return Object.assign(result, metadata, { getPendingMessageId: call.getPendingMessageId });
+    return Object.assign(result, metadata, { getPendingMessageId: call.getPendingMessageId, settleAbort });
 };
 
 export default streamText;

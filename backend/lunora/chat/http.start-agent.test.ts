@@ -1,5 +1,5 @@
 /**
- * `/chat/start` on a thread whose agent was switched (plans/harness-switch.md, S1): the model the stream is
+ * `/chat/start` on a thread whose agent was switched (harness-switch.md, S1): the model the stream is
  * configured with comes from the thread's path, not from the composer, and only for a model the registry knows.
  * The thread, its rows and the lookups behind the gate are real; the runtime around the handler is faked.
  */

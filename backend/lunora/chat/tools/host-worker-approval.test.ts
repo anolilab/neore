@@ -1,5 +1,5 @@
 /**
- * A message to a worker on a computer needs a person's click whatever the tool's mode says (plans/agent-orchestrator.md
+ * A message to a worker on a computer needs a person's click whatever the tool's mode says (agent-orchestrator.md
  * §4 Dispatch, S5): `messageWorker` asks when its target runs on a host, and `delegateToSubAgent` asks when it is
  * given a computer to start a worker on. A cloud worker keeps its mode. A headless run passes its flag to the mutation,
  * which refuses a host target there.

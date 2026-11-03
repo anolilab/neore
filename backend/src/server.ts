@@ -4,7 +4,6 @@
 import { handleAuthRequest } from "@lunora/auth";
 import type { PaymentsFromContextOptions } from "@lunora/payment";
 import { createCreemAdapter } from "@lunora/payment/creem";
-import { Creem } from "creem";
 import type { JSONWebKeySet } from "jose";
 import type { D1DatabaseLike } from "@lunora/d1";
 import type { MessageBatchLike, QueueBindingLike } from "@lunora/queue";
@@ -157,11 +156,16 @@ let payments: PaymentsFromContextOptions | undefined;
 const creemPayments = (env: Env): PaymentsFromContextOptions => {
     payments ??= {
         adapter: createCreemAdapter({
-            client: new Creem({
-                apiKey: env.CREEM_API_KEY ?? "",
-                server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
-                timeoutMs: CREEM_TIMEOUT_MS,
-            }),
+            // The adapter calls this once, on first use, so the SDK is not loaded at worker startup.
+            client: async () => {
+                const { Creem } = await import("creem");
+
+                return new Creem({
+                    apiKey: env.CREEM_API_KEY ?? "",
+                    server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
+                    timeoutMs: CREEM_TIMEOUT_MS,
+                });
+            },
             webhookSecret: env.CREEM_WEBHOOK_SECRET ?? "",
         }),
     };

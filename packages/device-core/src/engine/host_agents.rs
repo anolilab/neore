@@ -1,4 +1,4 @@
-//! Coding agents (ACP) on a server this computer speaks for (plans/ssh-environments.md §7, S7).
+//! Coding agents (ACP) on a server this computer speaks for (ssh-environments.md §7, S7).
 //!
 //! The approvals are the same kind the computer's own agents have and are given in the same local window, but they
 //! belong to the server: the agent's command is a path ON the server, and the folder is one of the folders shared

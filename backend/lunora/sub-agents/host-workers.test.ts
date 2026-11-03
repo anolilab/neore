@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-await-expression-member */
 /**
- * Workers that run on a paired computer's coding agent (plans/agent-orchestrator.md S5), against the in-memory
+ * Workers that run on a paired computer's coding agent (agent-orchestrator.md S5), against the in-memory
  * harness: a dispatch becomes the existing `acp_send` device call, the host's `turn_end` finishes the run, a
  * host that does not answer fails it at once, nothing is charged but the dispatch rate limit is, and a host
  * dispatch needs a person (never a headless lead, never an unattended or outside source).

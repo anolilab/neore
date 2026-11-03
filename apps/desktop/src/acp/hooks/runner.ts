@@ -1,5 +1,5 @@
 /**
- * File-event hooks for one running session (plans/acp-agent-host.md; `.neore/hooks.json`).
+ * File-event hooks for one running session (acp-agent-host.md; `.neore/hooks.json`).
  *
  * The hooks file is repository content, so everything here is built to do as little as possible with it.
  *

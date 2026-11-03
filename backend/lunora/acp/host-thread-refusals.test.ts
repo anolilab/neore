@@ -1,5 +1,5 @@
 /**
- * A host-run thread is never shared, made public or turned into a group chat (plans/acp-agent-host.md §5.1): a
+ * A host-run thread is never shared, made public or turned into a group chat (acp-agent-host.md §5.1): a
  * grant or a public copy would let someone else's request reach a computer that never agreed to answer it.
  */
 import { lunoraTest } from "@lunora/testing";

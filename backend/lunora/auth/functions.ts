@@ -21,6 +21,7 @@ import type { RateLimitName } from "../lib/rate-limiter";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { aiUserPreferencesFields, userSettingsFieldsWithoutUserId } from "./fields";
 import type { McpSecretHeader } from "./lib/mcp-secret-headers";
+import { assertSettingsWritable } from "./lib/preference-writes";
 import { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } from "./lib/mcp-secret-headers";
 import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreferences, type StoredKeyEntry } from "./lib/byok-keys";
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
@@ -287,6 +288,9 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.keyboardShortcuts = { ...storedObject, ...(shortcuts as Record<string, unknown>) };
         }
     }
+
+    // The generic settings write is the other way into a locked key: it takes the same refusal as `preference-writes.ts`.
+    await assertSettingsWritable(context.db, user?.activeOrganization?.id ?? null, toStore);
 
     if (settings) {
         await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
@@ -1070,6 +1074,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            resumeInterruptedRuns: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1092,6 +1097,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1107,6 +1113,8 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
+                resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,

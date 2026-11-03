@@ -1,5 +1,5 @@
 /**
- * Importing an agent's saved session as a host thread (plans/acp-agent-host.md S6).
+ * Importing an agent's saved session as a host thread (acp-agent-host.md S6).
  *
  * - {@link openImport} finds the session an agent session already has here, or makes the thread and a session
  *   that waits for its transcript. The lookup is by `(user, agentKey, nativeSessionId)` in the same mutation that

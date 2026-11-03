@@ -36,7 +36,7 @@
         "dev": {
             "//": "`dependsOn: codegen` so a checkout with no (or a stale) `_generated/` converges BEFORE the worker boots, rather than serving a half-inferred API and failing somewhere unrelated. It is cached on the sources, so a warm start pays nothing and a cold one pays ~11s.",
             "dependsOn": ["codegen"],
-            "command": "PATH=\"./node_modules/.bin:$PATH\" lunora dev --lazy-functions --no-codegen --worker-port 8788 --inspector-port 9235",
+            "command": "PATH=\"./node_modules/.bin:$PATH\" lunora dev --no-codegen --worker-port 8788 --inspector-port 9235",
             "preset": "server",
             "options": {
                 "service": {

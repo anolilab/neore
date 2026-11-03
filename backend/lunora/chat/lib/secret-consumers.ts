@@ -75,7 +75,7 @@ export const consumeAsProviderKey = async (ctx: Pick<MutationCtx, "db">, args: C
         stampMetadata: true,
     });
 
-    await saveAiUserPreferences(ctx.db, existing, args.userId, { providerApiKeys });
+    await saveAiUserPreferences(ctx.db, existing, args.userId, { providerApiKeys }, null);
     console.info(`[BYOK Audit] userId=${args.userId} action=save purposes=[provider-keys] source=requestSecret timestamp=${new Date(args.now).toISOString()}`);
 
     return { provider: use.provider, status: "saved" };
@@ -112,7 +112,7 @@ export const consumeAsMcpHeader = async (ctx: Pick<MutationCtx, "db">, args: Con
             : server,
     );
 
-    await saveAiUserPreferences(ctx.db, existing, args.userId, { mcpSecretHeaders, mcpServers });
+    await saveAiUserPreferences(ctx.db, existing, args.userId, { mcpSecretHeaders, mcpServers }, null);
 
     return { header: use.header, server: use.server, status: "saved" };
 };

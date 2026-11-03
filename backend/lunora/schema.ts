@@ -1594,6 +1594,20 @@ export const schema = defineSchema({
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
 
+    organizationPolicies: defineTable({
+        // The policy as canonical JSON text, written only after `auth/lib/organization-policy.ts`
+        // accepted it. Text, not a typed object, so the parser stays the one place that knows its shape.
+        document: v.string(),
+        organizationId: v.string(),
+        // Moves on every write, so a reader can tell a newer policy from the one it holds.
+        revision: v.number(),
+        schemaVersion: v.number(),
+        updatedAt: v.number(),
+    })
+        .global()
+        .index("organizationId", ["organizationId"])
+        .triggers((t) => auditTriggersFor(t, "organizationPolicies", AUDIT_TABLES["organizationPolicies"]!)),
+
     // The outbox for opt-in task-outcome mail (`notifications/task-email.ts`): written
     // in `notify()`'s own transaction, one row per inbox row, sent by the housekeeping
     // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
@@ -1804,6 +1818,9 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // Liveness of the run writing this stream: set when it registers (`registerResumableRun`), then every ~minute
+        // while it lives and by each resume's claim. A stale beat on a claimed, unpaused stream is a dead worker.
+        beatAt: v.optional(v.number()),
         // The turn's prompt carried a handoff; `turn_start` is the proof the agent received it (`acpSessions.handoffSentAt`).
         carriesHandoff: v.optional(v.boolean()),
         // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
@@ -1820,6 +1837,8 @@ export const schema = defineSchema({
         hostRegenerate: v.optional(v.boolean()),
         hostState: v.optional(vHostState),
         hostTurnId: v.optional(v.string()),
+        // How many times the run was resumed after its worker died (`interrupted.ts`); capped, the next one fails the run.
+        interruptions: v.optional(v.number()),
         messageId: v.string(),
         // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
         // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
@@ -1842,6 +1861,10 @@ export const schema = defineSchema({
         // it ran (the resume gets only the rest of the step cap), and what its usage record needs (`skill`,
         // `timeZone`). The run records ONE reply when it ends, covering these rows; a pause that never resumes
         // (a stop, a superseded run) records them itself (`pause-usage.ts`), once, and clears this.
+        // Set with `pause` when the pause is the resume of a run whose worker died, not a rate-limit wait
+        // (`streaming/persistent/interrupted.ts`); `pause.reason` keeps its one stored value, since widening it
+        // reads as a breaking schema change.
+        pauseCause: v.optional(v.literal("interrupted")),
         pausedRun: v.optional(
             v.object({
                 replyRowIds: v.array(v.string()),
@@ -1853,10 +1876,22 @@ export const schema = defineSchema({
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
         pausedSteps: v.optional(v.array(v.string())),
         producer: v.optional(v.literal("host")),
+        // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
+        // any pause stored it in `pausedRun`.
+        replyContext: v.optional(v.object({ skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })), timeZone: v.optional(v.string()) })),
+        // Whether the person lets a dead run resume (`userSettings.resumeInterruptedRuns`), decided by the run's own action
+        // (the setting lives on the person's shard, the stream may sit on a thread owner's). Absent = on.
+        resumable: v.optional(v.boolean()),
+        // The job's own arguments, stored by a run that may be resumed when its worker dies (`registerResumableRun`).
+        // Absent: tool-approval continuations, group turns and stateless runs, which are never resumed that way.
+        runArgs: v.optional(v.object({ ...runStreamingAgentFields })),
         // Set once, by the ONE run that may write this stream (`claimStreamRun`).
         // The run arrives on the jobs queue, which delivers at least once; a
         // redelivery finds this set and does nothing.
         runClaimedAt: v.optional(v.number()),
+        // Which run holds this stream: absent for the first claim, one more for each resume claim (`claimRunResume`). A run
+        // carries its number on every write that matters and is refused once a newer run holds the stream (`run-epoch.ts`).
+        runEpoch: v.optional(v.number()),
         status: v.string(),
         // Messages the run's user sent into it while it streams (`chat/steering.ts`).
         // `queued` until the run takes them at a step boundary; a delivered entry
@@ -1890,6 +1925,12 @@ export const schema = defineSchema({
             statelessMode: v.optional(v.boolean()),
         }),
         threadId: v.string(),
+        // The real server and tool names of the run's MCP tools (`McpToolLabels`), kept so a reply recovered after its
+        // worker died is stamped like one that finished (`registerResumableRun`, `recoverFinishedReply`).
+        toolLabels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
+        // Tool calls started and not yet finished (`markToolRun`). A worker that dies with one open may have paid for or
+        // changed something, so such a run is never resumed.
+        toolsInFlight: v.optional(v.number()),
         userId: v.string(),
     })
         .shardBy("userId")
@@ -3368,6 +3409,8 @@ export const schema = defineSchema({
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
+        // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
+        resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.

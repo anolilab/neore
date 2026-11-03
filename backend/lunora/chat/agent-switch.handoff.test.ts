@@ -1,5 +1,5 @@
 /**
- * A switch with a handoff (plans/harness-switch.md, S2), driven against the real schema: the mode a switch
+ * A switch with a handoff (harness-switch.md, S2), driven against the real schema: the mode a switch
  * defaults to, the summary charged once, a failed write that leaves nothing behind, a handoff that cannot fit,
  * and a switch back that sends only what the model missed.
  */

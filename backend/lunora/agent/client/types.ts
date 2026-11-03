@@ -282,6 +282,8 @@ export type PendingMessageAccess = {
      * is off, or the last step left no placeholder). It moves on as steps finish, so ask when you need it.
      */
     getPendingMessageId: () => string | undefined;
+    /** Resolves once the work an abort of the generation started (failing its pending row) is done; at once when none was. */
+    settleAbort: () => Promise<void>;
 };
 
 export type UsageHandler = (
@@ -628,6 +630,12 @@ export type Options = {
      * The context options to use for passing in message history to the LLM.
      */
     contextOptions?: ContextOptions;
+
+    /**
+     * The run that saves (`chat/lib/run-epoch.ts`). Each step's rows are written by `addMessages`, which refuses the
+     * write inside its own transaction once a newer run holds the stream, so a replaced run lands nothing beside it.
+     */
+    runHold?: { epoch: number; streamId: string };
 
     /**
      * If true, skip all context fetching (search, recent messages, existing responses).

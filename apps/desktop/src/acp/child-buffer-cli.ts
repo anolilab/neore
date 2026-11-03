@@ -1,4 +1,4 @@
-// The child-buffer measurement of plans/acp-s7-children.md, from a log of a real agent's output.
+// The child-buffer measurement of acp-s7-children.md, from a log of a real agent's output.
 //
 //   pnpm --filter @neore/desktop exec tsx src/acp/child-buffer-cli.ts <agent-output.jsonl> [budgetBytes]
 //

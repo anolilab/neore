@@ -35,6 +35,7 @@ import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
 import { injectsUntrustedContext } from "./low-risk-approval";
+import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
@@ -537,6 +538,8 @@ export const afterRun = async (
         /** From `loadRunContext`; recorded on the reply's first row as citation sources. */
         knowledgeSources?: ReadonlyArray<KnowledgeSource>;
         prompt: string;
+        /** `false` when the caller records the reply's usage itself (the watchdog's close does, inside its transaction). */
+        recordUsage?: boolean;
         /** From `loadRunContext`; recorded on the reply's first row, the id its UI message carries. */
         retrievedMemories?: ReadonlyArray<RetrievedMemoryRef>;
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
@@ -552,7 +555,8 @@ export const afterRun = async (
         threadId: string;
         /** The user's IANA zone, so the usage heatmap files the reply under their calendar day. */
         timeZone?: string;
-        timingStart: number;
+        /** Absent for a reply recovered after its worker died: when it started is not known, so no timing is recorded. */
+        timingStart?: number;
         userId: string;
     },
 ): Promise<void> => {
@@ -561,16 +565,17 @@ export const afterRun = async (
 
     // Started first so it runs beside the scheduling below, awaited last so a
     // returning action never leaves it in flight. A failed patch only loses a timing.
-    const timing = lastAssistantMessage
-        ? (async () =>
-              ctx.runMutation(internal.agent.messages.patchMessageTiming, {
-                  durationMs: Date.now() - timingStart,
-                  messageId: lastAssistantMessage._id as Id<"messages">,
-                  ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
-              }))().catch((error: unknown) => {
-              streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
-          })
-        : undefined;
+    const timing =
+        lastAssistantMessage && timingStart !== undefined
+            ? (async () =>
+                  ctx.runMutation(internal.agent.messages.patchMessageTiming, {
+                      durationMs: Date.now() - timingStart,
+                      messageId: lastAssistantMessage._id as Id<"messages">,
+                      ...(firstTokenTime !== undefined && { ttftMs: firstTokenTime - timingStart }),
+                  }))().catch((error: unknown) => {
+                  streamLogger.warn("[afterRun] Recording the reply's timing failed:", error);
+              })
+            : undefined;
 
     try {
         const results = await scheduleAfterRun(ctx, args);
@@ -641,12 +646,14 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
     // One record per reply: a steered run saved two (`repliesByOrder`).
-    scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
-        at: Date.now(),
-        userId,
-        ...(args.skill && { skill: args.skill }),
-        ...(args.timeZone && { timeZone: args.timeZone }),
-    });
+    if (args.recordUsage !== false) {
+        scheduleRepliesUsage(ctx.scheduler as never, savedMessages, {
+            at: Date.now(),
+            userId,
+            ...(args.skill && { skill: args.skill }),
+            ...(args.timeZone && { timeZone: args.timeZone }),
+        });
+    }
 
     if (!args.extractMemory || !prompt) {
         return await Promise.allSettled(scheduled);
@@ -800,10 +807,23 @@ export const createRunSteering = (
     };
 };
 
+/**
+ * Whether the person lets a run of theirs resume after its worker dies (`userSettings.resumeInterruptedRuns`, absent = on).
+ * Read ON THEIR OWN shard: a collaborator's prompt on a shared thread runs on the thread owner's, which holds no
+ * `userSettings` row for them. A failed read leaves it OFF: the run is then not resumed, which costs a convenience, where
+ * resuming a run the person opted out of would not.
+ */
+export const readResumeInterruptedRuns = async (userId: string): Promise<boolean> =>
+    await callOnShard(internal.auth.functions.getUserPreferencesQuery, { userId }, { shardKey: userId })
+        .then((prefs) => prefs.resumeInterruptedRuns !== false)
+        .catch(() => false);
+
 /** What `stampSavedToolCalls` needs of a run: its labels and auto-approvals, and the rows it saved. */
 export interface SavedToolCallStamp {
     autoApprovals?: AutoApprovals;
     mcpLabels: McpToolLabels;
+    /** The run that stamps (`run-epoch.ts`): a stamp from one a newer run replaced is refused. */
+    run?: { epoch: number; streamId: Id<"persistentStreams"> };
     savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
     userId: string;
 }
@@ -814,11 +834,17 @@ export interface SavedToolCallStamp {
  * call it.
  */
 export const stampSavedToolCalls = async (ctx: Pick<ActionCtx, "runMutation">, stamp: SavedToolCallStamp): Promise<void> => {
-    const { autoApprovals = {}, mcpLabels, savedMessages, userId } = stamp;
+    const { autoApprovals = {}, mcpLabels, run, savedMessages, userId } = stamp;
     const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels, autoApprovals) ? [m._id] : []));
 
     if (labelledIds.length > 0) {
-        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, { autoApprovals, labels: mcpLabels, messageIds: labelledIds, userId });
+        await ctx.runMutation(internal.chat.mcp_tool_labels.labelToolCalls, {
+            autoApprovals,
+            labels: mcpLabels,
+            messageIds: labelledIds,
+            ...(run && { run }),
+            userId,
+        });
     }
 };
 
@@ -850,6 +876,8 @@ export const finishRun = async (
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
         pending: { reasoning: string; text: string };
+        /** The run's epoch (`run-epoch.ts`): a run a newer one replaced finishes nothing and gets `RUN_REPLACED`. */
+        runEpoch?: number;
         savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
         snapshot: ToolRunConfig;
         streamId: string;
@@ -864,6 +892,7 @@ export const finishRun = async (
         keepOpenUnlessPaused,
         mcpLabels,
         pending,
+        runEpoch,
         savedMessages,
         snapshot,
         streamId,
@@ -872,7 +901,10 @@ export const finishRun = async (
         userId,
     } = args;
 
-    await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, savedMessages, userId });
+    // A run a newer one replaced does none of this: each write below checks the epoch in its own mutation.
+    const run = runEpoch === undefined ? undefined : { epoch: runEpoch, streamId: streamId as Id<"persistentStreams"> };
+
+    await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
     const approvalIds = collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
@@ -884,6 +916,7 @@ export const finishRun = async (
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
+            ...(run && { run }),
             ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
             threadId,
             userId,
@@ -896,6 +929,7 @@ export const finishRun = async (
         await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
             final: paused || keepOpenUnlessPaused !== true,
             reasoning: pending.reasoning || undefined,
+            ...(runEpoch !== undefined && { runEpoch }),
             streamId: streamId as Id<"persistentStreams">,
             text: pending.text,
         });
@@ -1316,6 +1350,8 @@ export const setThreadStatus = async (
 export const failRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
     args: {
+        /** The run's epoch (`run-epoch.ts`): a run a newer one replaced ends nothing, and `failRun` returns without a trace. */
+        runEpoch?: number;
         safeMessage: string;
         /** Stamps the run's auto-approved calls onto the rows it saved before it failed. Best effort: it runs after the run is closed. */
         stamp?: () => Promise<void>;
@@ -1323,8 +1359,23 @@ export const failRun = async (
         threadId: string;
         threadStatus: "active" | "error";
     },
-): Promise<void> => {
-    const { safeMessage, stamp, streamId, threadId, threadStatus } = args;
+): Promise<{ replaced: boolean }> => {
+    const { runEpoch, safeMessage, stamp, streamId, threadId, threadStatus } = args;
+
+    // A run a newer one replaced ends nothing: not the stream, not the thread, not the goal whose review the newer run may have
+    // queued. Checked first, whatever the stream's status (a newer run may already have closed it).
+    if (runEpoch !== undefined) {
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.interrupted.assertRunEpoch, {
+                epoch: runEpoch,
+                streamId: streamId as Id<"persistentStreams">,
+            });
+        } catch (error) {
+            if (isRunReplaced(error)) {
+                return { replaced: true };
+            }
+        }
+    }
 
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
     // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
@@ -1338,10 +1389,16 @@ export const failRun = async (
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: true,
+                ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: `\n\nError: ${safeMessage}`,
             });
-        } catch {
+        } catch (error) {
+            // A newer run holds the stream: this one's failure is not the reply's, and it ends nothing of theirs.
+            if (isRunReplaced(error)) {
+                return { replaced: true };
+            }
+
             // A stop can land between the read above and the write, which then refuses it. Read again before
             // calling it a failure, so a stopped run never ends in `error`.
             endedElsewhere = (await readStatus()) === "done";
@@ -1393,6 +1450,8 @@ export const failRun = async (
     } catch (error) {
         streamLogger.warn("[AgentRun] Could not stamp the saved tool calls:", error);
     }
+
+    return { replaced: false };
 };
 
 export { loadModelFilterRules } from "./model-filter-rules";

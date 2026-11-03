@@ -9,7 +9,7 @@ import type { DeviceTaintSource } from "../../devices/lib/taint";
 import { touchSession } from "./sessions";
 
 /**
- * Queues one prompt for a host thread's agent (plans/acp-agent-host.md §4.6): the signed `acp_send`, the prompt as
+ * Queues one prompt for a host thread's agent (acp-agent-host.md §4.6): the signed `acp_send`, the prompt as
  * the user's message and the stream the turn will write (`accepted`), in the caller's transaction. Shared by
  * `/hosts/send` and a host worker's dispatch, so a worker's prompt travels the same signed path and nothing is
  * signed or ingested a second way. The caller has already decided the thread may take a turn now (one at a time).

@@ -6,7 +6,7 @@ import { isFolderRelativePath } from "./lib/changes";
 
 /**
  * Host-run threads: validators shared by the schema, the ingest route and the readers
- * (plans/acp-agent-host.md §4.2, §4.6, §5.1).
+ * (acp-agent-host.md §4.2, §4.6, §5.1).
  */
 
 /**
@@ -106,7 +106,7 @@ export const vHostEvent = v.union(
         outcome: v.union(v.literal("allowed"), v.literal("declined"), v.literal("cancelled")),
         requestId: v.string().max(128),
     }),
-    // One of the agent's own children (plans/acp-agent-host.md §4.7). `spawnId` is the tool call that started the child
+    // One of the agent's own children (acp-agent-host.md §4.7). `spawnId` is the tool call that started the child
     // and keys its transcript; the host posts these only when the agent reports its children.
     v.object({
         field: v.union(v.literal("text"), v.literal("reasoning")),
@@ -154,7 +154,7 @@ export const vHostEvent = v.union(
         error: v.optional(v.string().max(1000)),
         kind: v.literal("turn_end"),
         reason: v.union(v.literal("finished"), v.literal("cancelled"), v.literal("failed"), v.literal("interrupted")),
-        // What the turn's own tool calls wrote (plans/acp-agent-host.md §4.9). Paths are relative to the approved folder.
+        // What the turn's own tool calls wrote (acp-agent-host.md §4.9). Paths are relative to the approved folder.
         summary: v.optional(
             v.object({
                 files: v

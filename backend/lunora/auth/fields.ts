@@ -111,6 +111,7 @@ export const userSettingsFieldsWithoutUserId = {
     nickname: v.optional(v.string().max(MAX_LENGTH.short)), // User's preferred name for the AI to call them (max 50 chars)
     onboardingCompleted: v.optional(v.boolean()),
     profession: v.optional(v.string().max(MAX_LENGTH.short)), // User's profession (e.g., "Product Designer", "Software Developer") (max 100 chars)
+    resumeInterruptedRuns: v.optional(v.boolean()), // A run whose worker died resumes from its last saved row (max 3 times). Absent means on.
     resumeLastChat: v.optional(v.boolean()), // Open /chat on the most recent thread instead of a blank one. OPT-IN: absent means off.
     searchDomainBlocklist: v.optional(
         v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SEARCH_DOMAIN_BLOCKLIST, {

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * UI code reads what a runner can do through `@neore/ai/capabilities` and never
- * from the name of a provider, model family or agent (plans/provider-capabilities.md §6, §8).
+ * from the name of a provider, model family or agent (provider-capabilities.md §6, §8).
  * The scanned set is every file that imports the capabilities subpath, plus the folders
  * where the gated controls and their hooks live, so a control that forgets the import is still checked.
  */

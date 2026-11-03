@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { currentShard, currentUserShard, runInShard, servesUser } from "./shard-context";
-import { routeSchedule, runAfterOnShard, schedulerInstanceFor, shardScopedSchedulerNamespace } from "./shard-scheduler";
+import { routeSchedule, runAfterOnShard, runAfterWithRetry, schedulerInstanceFor, shardScopedSchedulerNamespace } from "./shard-scheduler";
 
 const SCHEDULE_URL = "https://scheduler.internal/schedule";
 
@@ -151,5 +151,22 @@ describe("shard context", () => {
         runInShard("__root__", () => {
             expect(currentUserShard()).toBeUndefined();
         });
+    });
+});
+
+describe("runAfterWithRetry", () => {
+    it("hands the retry policy to the scheduler as the job's options", async () => {
+        const calls: unknown[][] = [];
+        const scheduler = {
+            runAfter: async (...call: unknown[]) => {
+                calls.push(call);
+
+                return "job-1";
+            },
+        };
+        const target = { __lunoraRef: "x:y" };
+
+        expect(await runAfterWithRetry(scheduler, 5, target, { a: 1 }, { baseMs: 10, maxAttempts: 3 })).toBe("job-1");
+        expect(calls).toStrictEqual([[5, target, { a: 1 }, { retry: { baseMs: 10, maxAttempts: 3 } }]]);
     });
 });

@@ -1,10 +1,10 @@
 /**
- * A switch to or from a coding agent on a paired computer (plans/harness-switch.md §3, slice S3).
+ * A switch to or from a coding agent on a paired computer (harness-switch.md §3, slice S3).
  *
  * `chat/agent-switch.ts` routes here whenever the target is a host agent or the thread is a host-run one; the cloud
  * model switch and its summary call stay there. What differs, and why this is one mutation:
  *
- * - **The runner never changes inside a thread** (plans/acp-agent-host.md §5.1). Host to host stays in the thread: the
+ * - **The runner never changes inside a thread** (acp-agent-host.md §5.1). Host to host stays in the thread: the
  *   session it ran in ends and a new one opens in the same thread. Cloud to host and host to cloud make a NEW thread,
  *   linked to the source by a `continuation` relationship, and leave the source thread exactly as it was.
  * - **The handoff is the newest turns, verbatim.** A coding agent is sent a text and nothing else, and the signed call

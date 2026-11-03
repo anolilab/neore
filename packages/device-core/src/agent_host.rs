@@ -1,9 +1,9 @@
-//! A coding agent (ACP) on the server, run by `neore-host` (plans/ssh-environments.md §7, S7).
+//! A coding agent (ACP) on the server, run by `neore-host` (ssh-environments.md §7, S7).
 //!
 //! The desktop has already checked the agent and the folder against the approvals the person gave in the local
 //! window, and it speaks the protocol with the agent itself: the host only owns the process. It starts the agent
 //! beside its sandbox, not inside it (the agent needs its model API, and runs its own tools under its own permission
-//! modes; plans/acp-agent-host.md §6), relays the agent's stdout and stderr back as chunk frames of the request that
+//! modes; acp-agent-host.md §6), relays the agent's stdout and stderr back as chunk frames of the request that
 //! started it (`frame.rs`: tag 1 stdout, tag 2 stderr) and feeds its stdin from the chunk frames the desktop sends
 //! for that request. The request ends, with how the agent ended, when the agent does.
 //!

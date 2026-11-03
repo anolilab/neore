@@ -1,5 +1,5 @@
 /**
- * An agent's own children through a session (plans/acp-agent-host.md §4.7): what an agent that stamps its children's
+ * An agent's own children through a session (acp-agent-host.md §4.7): what an agent that stamps its children's
  * updates with their parent call (`_meta.claudeCode.parentToolUseId`) sends is kept out of the reply, shown after its
  * spawn call appears when the agent reports children, and shown nowhere when it does not.
  */

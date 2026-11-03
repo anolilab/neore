@@ -1,5 +1,5 @@
 /**
- * Starting, stopping and answering a coding agent from the web or the phone (plans/acp-agent-host.md §3, §4.4, §8 S4).
+ * Starting, stopping and answering a coding agent from the web or the phone (acp-agent-host.md §3, §4.4, §8 S4).
  *
  * Each of these is the OWNER's alone and only queues a signed command (`devices/lib/acp-call.ts`); the computer
  * decides whether to carry it out. Nothing here can approve a pair the user has not approved in the local window,

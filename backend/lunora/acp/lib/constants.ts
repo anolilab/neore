@@ -1,5 +1,5 @@
 /**
- * Host-run turns (`plans/acp-agent-host.md`). The desktop (`apps/desktop/src/acp/ingest.ts`) keeps its own
+ * Host-run turns (`acp-agent-host.md`). The desktop (`apps/desktop/src/acp/ingest.ts`) keeps its own
  * copies of the sizes and the post interval; the backend re-applies them and never trusts the host's count.
  */
 
@@ -47,11 +47,11 @@ export const MAX_IMPORT_TURNS = 1000;
 /** Turns in one import post. Each is written as messages in the same mutation, so a post is kept small. */
 export const MAX_IMPORT_TURNS_PER_POST = 25;
 
-/** A turn's summary (plans/acp-agent-host.md §4.9): files listed, and the patch as text. The host keeps its own smaller patch cap to fit a post. */
+/** A turn's summary (acp-agent-host.md §4.9): files listed, and the patch as text. The host keeps its own smaller patch cap to fit a post. */
 export const MAX_SUMMARY_FILES = 200;
 export const MAX_PATCH_CHARS = 256 * 1024;
 
-// ─── Files a host agent writes (plans/acp-agent-host.md §4.8) ──────────────────────────────────────────────────
+// ─── Files a host agent writes (acp-agent-host.md §4.8) ──────────────────────────────────────────────────
 //
 // PROVISIONAL, NOT MEASURED. The plan sets the cap and the types from a sample of real agent output before S8
 // starts; none could be taken when this was written. They are chosen to sit inside what a chat attachment may be
