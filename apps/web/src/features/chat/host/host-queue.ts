@@ -12,7 +12,7 @@ import { followUpControl } from "@neore/ai/capabilities";
  * during a turn: the composer ends the running turn and sends the queued text first, and it enforces that here, so
  * the declaration is ours (provider-capabilities.md §5, the static declarations). Never a model or agent name.
  */
-export const HOST_FOLLOW_UP_REPORT: CapabilityReport = {
+const HOST_FOLLOW_UP_REPORT: CapabilityReport = {
     groups: { turns: { followUp: { degradation: "restart", kind: "steer" } } },
     reportedAt: 0,
     version: 1,
