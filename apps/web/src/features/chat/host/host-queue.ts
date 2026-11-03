@@ -37,9 +37,10 @@ export const shouldQueueMessage = (state: { pendingStart: boolean; queued: numbe
  */
 export const canSendQueueHead = (state: {
     blocked: boolean;
+    loaded: boolean;
     paused: boolean;
     pendingStart: boolean;
     queued: number;
     running: boolean;
     sending: boolean;
-}): boolean => state.queued > 0 && !state.paused && !state.blocked && !state.running && !state.sending && !state.pendingStart;
+}): boolean => state.queued > 0 && state.loaded && !state.paused && !state.blocked && !state.running && !state.sending && !state.pendingStart;

@@ -13,6 +13,8 @@ const harness = vi.hoisted(() => {
         /** What the next sends answer, in order; an empty list answers ok. */
         sendResults: [] as ({ error: string; ok: false } | { ok: true })[],
         data: {} as Record<string, unknown>,
+        /** The client of the mounted composer, so a test can end the turn it started. */
+        client: undefined as QueryClient | undefined,
     };
 });
 
@@ -67,7 +69,15 @@ vi.mock("@/lib/lunora/crpc", async () => {
                                 mutationFn: async (args: unknown) => {
                                     harness.calls.push([path.join("."), args]);
 
-                                    return harness.data[`${path.join(".")}:result`] ?? { sent: true };
+                                    const failure = harness.data[`${path.join(".")}:error`];
+
+                                    if (failure !== undefined) {
+                                        throw failure;
+                                    }
+
+                                    const fallback = path.join(".") === "acp.remote.cancelHostTurn" ? { cancelled: true } : { sent: true };
+
+                                    return harness.data[`${path.join(".")}:result`] ?? fallback;
                                 },
                             };
                         };
@@ -94,12 +104,21 @@ const OPTIONS = [
 
 const mount = (data: Record<string, unknown>) => {
     harness.data = data;
+    harness.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <QueryClientProvider client={harness.client}>
             <HostComposer threadId="thread-1" />
         </QueryClientProvider>,
     );
+};
+
+const sendCalls = () => harness.calls.filter(([name]) => name === "send");
+
+/** Ends the stream the test set up: the next read of it finds no turn running, as after the agent finishes. */
+const endTurn = async () => {
+    harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": null };
+    await harness.client?.invalidateQueries();
 };
 
 const session = (fields: Record<string, unknown> = {}) => {
@@ -201,6 +220,102 @@ describe("the coding-agent composer", () => {
         expect(await screen.findByText("use the other fixture")).toBeTruthy();
         // The turn is still running on the stream, so the text waits for it to end rather than going out now.
         expect(harness.calls.some(([name]) => name === "send")).toBe(false);
+    });
+
+    it("pauses the queue on Stop, so the messages behind a stopped reply do not start on their own", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "after the stop" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("after the stop");
+        fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+
+        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { threadId: "thread-1" }]));
+        await endTurn();
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("sends a queued message once the turn ends, and takes it off the queue", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "then run the tests" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("then run the tests");
+        await endTurn();
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "then run the tests", threadId: "thread-1" }]);
+        await waitFor(() => expect(screen.queryByText("then run the tests")).toBeNull());
+    });
+
+    it("retries a refused queued message under the same request id, so a retry starts no second turn", async () => {
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "then run the tests" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("then run the tests");
+        await endTurn();
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(2));
+        const [first, second] = sendCalls().map(([, input]) => (input as { requestId: string }).requestId);
+
+        expect(second).toBe(first);
+    });
+
+    it("keeps the interrupting text queued and paused when the reply did not stop", async () => {
+        mount({ ...session(), "acp.remote.cancelHostTurn:result": { cancelled: false }, "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "use the other fixture" } });
+        fireEvent.click(screen.getByRole("button", { name: "Interrupt and send" }));
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("keeps the interrupting text queued and paused when the stop was refused", async () => {
+        mount({
+            ...session(),
+            "acp.remote.cancelHostTurn:error": new Error("refused"),
+            "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" },
+        });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "use the other fixture" } });
+        fireEvent.click(screen.getByRole("button", { name: "Interrupt and send" }));
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("queues a message typed right after a send, before the stream shows the turn running", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "first" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(box.value).toBe(""));
+
+        fireEvent.change(box, { target: { value: "second" } });
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        expect(await screen.findByText("second")).toBeTruthy();
+        expect(sendCalls()).toHaveLength(1);
     });
 
     it("says the agent is starting and still takes a message, which goes out once it is up", async () => {

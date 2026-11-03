@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { canInterruptAndSend, canSendQueueHead, shouldQueueMessage } from "./host-queue";
 
-const idle = { blocked: false, paused: false, pendingStart: false, queued: 1, running: false, sending: false };
+const idle = { blocked: false, loaded: true, paused: false, pendingStart: false, queued: 1, running: false, sending: false };
 
 describe("queueing a message during a host turn", () => {
     it("queues while a turn runs, and while the queue already holds messages", () => {
@@ -41,5 +41,9 @@ describe("sending the head of the queue", () => {
 
     it("has nothing to send from an empty queue", () => {
         expect(canSendQueueHead({ ...idle, queued: 0 })).toBe(false);
+    });
+
+    it("waits until the session and the stream have loaded, rather than reading them as idle", () => {
+        expect(canSendQueueHead({ ...idle, loaded: false })).toBe(false);
     });
 });

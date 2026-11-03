@@ -30,6 +30,9 @@ import useHostSendErrorMessages from "./host-send-errors";
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 
+/** How a turn ended when it did not finish: the queue behind it waits for the person rather than starting on its own. */
+const ENDED_UNFINISHED: ReadonlySet<string> = new Set(["failed", "interrupted", "revoked", "timeout"]);
+
 /**
  * How long the queue waits, after a send was accepted, for the thread's stream to show that the turn started. Past it the
  * stream is taken as not coming, and the queue goes on, so a stream that never appears cannot hold the queue for good.
@@ -121,24 +124,40 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         return () => clearTimeout(timer);
     }, [pendingStart]);
 
+    // The hold ends once the stream shows the turn started; the timer above covers a stream that never comes.
+    useEffect(() => {
+        if (running) {
+            setPendingStart(false);
+        }
+    }, [running]);
+
     const send = async (prompt: string, queuedId?: string) => {
-        // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
-        // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
-        // call it a repeat of the first and drop it.
-        if (attempt.current?.text !== prompt) {
-            attempt.current = { id: crypto.randomUUID(), text: prompt };
+        // A queued message is sent under its queue id, which is stored with it, so a retry after a lost answer finds the
+        // first try, even across a reload, and two queued messages with the same text stay two messages. A direct send
+        // keeps the id of its text's previous try: a different text is a different message and gets its own.
+        let requestId = queuedId;
+
+        if (requestId === undefined) {
+            if (attempt.current?.text !== prompt) {
+                attempt.current = { id: crypto.randomUUID(), text: prompt };
+            }
+
+            requestId = attempt.current.id;
         }
 
         setSending(true);
 
-        const result = await sendHostMessage({ requestId: attempt.current.id, text: prompt, threadId });
+        const result = await sendHostMessage({ requestId, text: prompt, threadId });
 
         if (result.ok) {
             attempt.current = undefined;
 
-            // The hold is taken before the head leaves the queue: the queue's next message must not see both as clear.
+            // Every accepted send holds the next message until its stream shows the turn started: one typed in that gap
+            // would be refused as `turn_running`. The hold is taken before the head leaves the queue, so the queue's next
+            // message never sees both as clear.
+            setPendingStart(true);
+
             if (queuedId !== undefined) {
-                setPendingStart(true);
                 remove(threadId, queuedId);
             }
 
@@ -170,9 +189,24 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const canWrite = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !blocked;
     const queueing = shouldQueueMessage({ pendingStart, queued: queue.items.length, running });
     const head = queue.items[0];
+    // Until both queries answer, "no session" and "no stream" are unknown, not idle: nothing drains before that.
+    const loaded = session !== undefined && live !== undefined;
+
+    // A turn that ended in failure leaves what is queued behind it paused, for the person to send next.
+    const wasRunning = useRef(running);
 
     useEffect(() => {
-        if (head === undefined || !canSendQueueHead({ blocked, paused: queue.paused, pendingStart, queued: queue.items.length, running, sending })) {
+        const justEnded = wasRunning.current && !running;
+
+        wasRunning.current = running;
+
+        if (justEnded && lastEnd !== undefined && ENDED_UNFINISHED.has(lastEnd)) {
+            setPaused(threadId, true);
+        }
+    }, [lastEnd, running, setPaused, threadId]);
+
+    useEffect(() => {
+        if (head === undefined || !canSendQueueHead({ blocked, loaded, paused: queue.paused, pendingStart, queued: queue.items.length, running, sending })) {
             return;
         }
 
@@ -199,15 +233,28 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     /** Interrupt and send: the text goes to the head of the queue, then the running reply is stopped, so it goes next. */
     const interrupt = () => {
         interruptAndSend(threadId, trimmed, async () => {
-            await cancel.mutateAsync({ threadId: id }).catch(() => {
-                toast.error(t`Could not stop the reply.`);
-            });
+            const outcome = await cancel.mutateAsync({ threadId: id }).catch(() => undefined);
+
+            if (outcome?.cancelled !== true) {
+                // The reply did not stop, so the text waits at the head of the queue for the person, rather than going out after the reply.
+                setPaused(threadId, true);
+                toast.error(t`Could not stop the reply. Your message is queued; send it next when you are ready.`);
+            }
         });
         setText("");
     };
 
+    /** Stop keeps what is queued behind the reply: the queue pauses first, so nothing starts once the reply is stopped. */
+    const stop = () => {
+        if (queue.items.length > 0) {
+            setPaused(threadId, true);
+        }
+
+        cancel.mutate({ threadId: id });
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || !canSubmit) {
+        if (!canSubmit || event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
 
@@ -261,7 +308,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     <Button
                         disabled={sending}
                         onClick={() => {
-                            send(t`Continue where you left off.`);
+                            submit(t`Continue where you left off.`);
                         }}
                         size="sm"
                         type="button"
@@ -283,7 +330,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                                             {t`Send next`}
                                         </Button>
                                     )}
-                                    <Button onClick={() => remove(threadId, item.id)} size="sm" type="button" variant="ghost">
+                                    <Button disabled={sending && index === 0} onClick={() => remove(threadId, item.id)} size="sm" type="button" variant="ghost">
                                         {t`Remove`}
                                     </Button>
                                 </span>
@@ -321,7 +368,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 )}
                 {running && (
-                    <Button aria-label={t`Stop`} disabled={cancel.isPending} onClick={() => cancel.mutate({ threadId: id })} type="button" variant="outline">
+                    <Button aria-label={t`Stop`} disabled={cancel.isPending} onClick={stop} type="button" variant="outline">
                         <Square aria-hidden="true" className="size-4" />
                     </Button>
                 )}
