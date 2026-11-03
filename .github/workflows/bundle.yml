@@ -35,7 +35,7 @@ jobs:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@e0bf8c3215311c2f9f74daceea7c292e4dc520d7" # v26.0.5
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
               with:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
