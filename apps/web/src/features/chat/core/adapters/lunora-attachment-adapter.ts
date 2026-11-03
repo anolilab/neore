@@ -5,6 +5,7 @@ import { TEXT_PREVIEW_EXTENSIONS } from "@neore/ui/components/file-renderers/fil
 import { decodeTextBytes } from "@neore/ui/utils/decode-text";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
+import { convertHeicToJpeg, isHeicFile } from "@/lib/upload/heic-convert";
 import { downscaleOversizedImage } from "@/lib/upload/image-downscale";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 import { uploadFile } from "@/lib/upload/upload-file";
@@ -281,7 +282,10 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
 
 /** Accept common file types - images, text, documents, PDFs, video, audio, DOCX. The composer's file picker uses the same list. */
 // The types the chat upload accepts (the server's allowlist), so the picker offers nothing it would refuse.
-export const ATTACHMENT_ACCEPT = `image/*,text/plain,text/markdown,text/html,text/css,text/javascript,text/xml,text/yaml,application/pdf,application/json,application/javascript,application/typescript,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx`;
+export const ATTACHMENT_ACCEPT = `image/*,.heic,.heif,text/plain,text/markdown,text/html,text/css,text/javascript,text/xml,text/yaml,application/pdf,application/json,application/javascript,application/typescript,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx`;
+
+/** A HEIC photo is judged by the JPEG it becomes: the image size limit applies to it. */
+const JPEG_OF_HEIC = { name: "photo.jpg", type: "image/jpeg" } as const;
 
 /**
  * A closure rather than a class: two of the three adapter members never touched
@@ -289,7 +293,20 @@ export const ATTACHMENT_ACCEPT = `image/*,text/plain,text/markdown,text/html,tex
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
-        const contentType = attachmentContentType(state.file);
+        // A HEIC/HEIF photo is judged by the JPEG it becomes, and refused by that size before any decode.
+        if (isHeicFile(state.file) && state.file.size > attachmentSizeLimit(JPEG_OF_HEIC).maxBytes) {
+            throw new AttachmentTooLargeError(state.file.name, attachmentSizeLimit(JPEG_OF_HEIC));
+        }
+
+        let source: File;
+
+        try {
+            source = await convertHeicToJpeg(state.file);
+        } catch {
+            throw new AttachmentUploadError(state.file.name, "unsupported");
+        }
+
+        const contentType = attachmentContentType(source);
         const isImage = contentType.startsWith("image/");
         const isVideo = contentType.startsWith("video/");
         const isAudio = contentType.startsWith("audio/");
@@ -298,18 +315,18 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
         const isDocx = contentType === DOCX_TYPE;
 
         if (!isImage && !isText && !isPdf && !isVideo && !isAudio && !isDocx) {
-            throw new AttachmentUploadError(state.file.name, "unsupported");
+            throw new AttachmentUploadError(source.name, "unsupported");
         }
 
-        const limit = attachmentSizeLimit(state.file);
+        const limit = attachmentSizeLimit(source);
 
         // Before any decode: a file over the cap is refused without being opened as an image.
-        if (state.file.size > limit.maxBytes) {
-            throw new AttachmentTooLargeError(state.file.name, limit);
+        if (source.size > limit.maxBytes) {
+            throw new AttachmentTooLargeError(source.name, limit);
         }
 
         // A 12 MB photo is shrunk to fit the provider, not refused for its weight; the result is never larger than the original.
-        const file = await downscaleOversizedImage(state.file);
+        const file = await downscaleOversizedImage(source);
 
         return {
             contentType: attachmentContentType(file),

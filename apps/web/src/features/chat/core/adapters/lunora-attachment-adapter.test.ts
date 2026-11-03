@@ -27,6 +27,14 @@ vi.mock(import("@/lib/upload/upload-file"), () => {
     return { uploadFile };
 });
 
+const { heicTo } = vi.hoisted(() => {
+    return { heicTo: vi.fn(async () => new Blob(["jpeg bytes"], { type: "image/jpeg" })) };
+});
+
+vi.mock("heic-to", () => {
+    return { heicTo };
+});
+
 const MB = 1024 * 1024;
 const UPLOAD_ID = "upload-1";
 
@@ -152,6 +160,34 @@ describe(createLunoraAttachmentAdapter, () => {
         await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
         expect(uploadFile).not.toHaveBeenCalled();
         expect(action).not.toHaveBeenCalled();
+    });
+
+    it("converts a HEIC photo to JPEG before it is decoded and uploaded", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "IMG_9.HEIC", { type: "image/heic" });
+
+        await adapter.upload({ file });
+
+        expect(heicTo).toHaveBeenCalledWith(expect.objectContaining({ blob: file, type: "image/jpeg" }));
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }));
+    });
+
+    it("refuses a HEIC photo whose JPEG would be over the image cap, before it is decoded", async () => {
+        heicTo.mockClear();
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "huge.heic", { type: "image/heic" });
+
+        Object.defineProperty(file, "size", { value: 25 * MB });
+
+        await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
+        expect(heicTo).not.toHaveBeenCalled();
+    });
+
+    it("refuses a HEIC photo the decoder cannot read as an unsupported attachment", async () => {
+        heicTo.mockRejectedValueOnce(new Error("broken"));
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+
+        await expect(adapter.upload({ file: new File(["x"], "broken.heic", { type: "image/heic" }) })).rejects.toBeInstanceOf(AttachmentUploadError);
     });
 
     it("refuses an image over the cap before it is decoded", async () => {

@@ -206,6 +206,9 @@ catalogs:
     slate-react: 0.146.1
   file-renderers:
     hls.js: 1.7.3
+    # HEIC/HEIF decoder for the chat upload conversion (`lib/upload/heic-convert.ts`), loaded only when a HEIC file is picked.
+    # LGPL-3.0 (libheif): a licence review is open for it.
+    heic-to: 1.6.7
     mammoth: 1.13.0
     # EXACTLY the pdfjs-dist react-pdf depends on (11.0.0 -> 6.3.289): the viewer
     # imports the worker from it as a `?url` asset, and a second pdfjs-dist copy
