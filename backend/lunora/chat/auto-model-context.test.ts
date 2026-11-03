@@ -1,3 +1,4 @@
+import { estimateTokensFromCharacters } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -19,6 +20,7 @@ const message = async (order: number, role: "assistant" | "tool" | "user", conte
                 order,
                 status: "success",
                 stepOrder: 0,
+                text: typeof content === "string" ? content : undefined,
                 threadId,
                 tool: false,
                 userId: OWNER,
@@ -65,12 +67,29 @@ describe("autoRouteContextOf", () => {
         await expect(contextFor(prompt)).resolves.toMatchObject({ files: false, images: false });
     });
 
+    it("counts a tool result's output toward the size of the history", async () => {
+        const output = "x".repeat(4000);
+
+        await message(0, "assistant", [{ input: {}, toolCallId: "call-1", toolName: "lookup", type: "tool-call" }]);
+        await message(1, "tool", [{ output: { type: "text", value: output }, toolCallId: "call-1", toolName: "lookup", type: "tool-result" }]);
+        const prompt = await message(2, "user", "summarise");
+
+        const context = await contextFor(prompt);
+
+        expect(context.contextTokens).toBeGreaterThanOrEqual(estimateTokensFromCharacters(output.length));
+    });
+
     it("leaves out the replies a regenerate replaces", async () => {
         const first = await message(0, "user", "write a story");
 
         await message(0, "assistant", [imagePart], { parentMessageId: first, stepOrder: 1 });
 
-        await expect(contextFor(first)).resolves.toEqual({ contextTokens: 0, files: false, images: false });
+        // Only the first message is read: the image reply it replaces adds nothing.
+        await expect(contextFor(first)).resolves.toEqual({
+            contextTokens: Math.ceil(estimateTokensFromCharacters("write a story".length)),
+            files: false,
+            images: false,
+        });
     });
 
     it("classifies every attached file, not only the first fifty", async () => {
@@ -82,7 +101,7 @@ describe("autoRouteContextOf", () => {
 
         const prompt = await message(0, "user", "read these", { fileIds });
 
-        await expect(contextFor(prompt)).resolves.toEqual({ contextTokens: 0, files: true, images: true });
+        await expect(contextFor(prompt)).resolves.toMatchObject({ files: true, images: true });
     });
 
     it("fails when an attached file cannot be classified, so the caller keeps its fallback", async () => {

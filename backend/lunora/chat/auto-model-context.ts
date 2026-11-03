@@ -99,7 +99,12 @@ export const autoRouteContextOf = async (
         }
     }
 
-    const characters = docs.reduce((sum, row) => sum + rowCharacters(row), 0);
+    // A tool result's output is not in `text`, so its JSON is counted here: an understated history would let a smaller
+    // model be routed to a conversation it cannot hold.
+    const characters = docs.reduce(
+        (sum, row) => sum + rowCharacters(row) + (field(row.message, "role") === "tool" ? JSON.stringify(row.message).length : 0),
+        0,
+    );
 
     return { contextTokens: Math.ceil(estimateTokensFromCharacters(characters)), ...found };
 };
