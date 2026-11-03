@@ -2,6 +2,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
+import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
@@ -22,7 +23,12 @@ const AgentSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-    const { data: aiPreferences, isLoading } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const {
+        data: aiPreferences,
+        isError: isAIPreferencesError,
+        isLoading,
+        refetch: refetchAIPreferences,
+    } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const updateAIUserPreferencesMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
     // Server-written (not in the generic settings save): the commit identity has its own setter.
     const setCommitIdentityMutation = useMutation(
@@ -205,11 +211,19 @@ const AgentSettings: FC = () => {
                             <Switch
                                 aria-describedby="commitAsMeDescription"
                                 checked={aiPreferences?.codingAgentCommitIdentity === "user"}
-                                disabled={setCommitIdentityMutation.isPending}
+                                disabled={setCommitIdentityMutation.isPending || isAIPreferencesError}
                                 id="commitAsMe"
                                 onCheckedChange={(checked: boolean) => setCommitIdentityMutation.mutate({ identity: checked ? "user" : "agent" })}
                             />
                         </div>
+                        <p className={isAIPreferencesError ? "text-destructive mt-4 text-sm" : "text-destructive text-sm"} id="commitAsMeError" role="status">
+                            {isAIPreferencesError ? t`Something went wrong. Try again.` : null}
+                        </p>
+                        {isAIPreferencesError ? (
+                            <Button aria-describedby="commitAsMeError" className="mt-2" onClick={() => refetchAIPreferences()} size="sm" variant="outline">
+                                {t`Retry`}
+                            </Button>
+                        ) : null}
                     </CardContent>
                 </Card>
 

@@ -1347,15 +1347,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:226
+#: src/features/settings/components/chat/agent-settings.tsx:250
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:225
+#: src/features/settings/components/chat/agent-settings.tsx:249
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:248
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -2647,11 +2647,11 @@ msgstr "智能体回答"
 msgid "Agent builder"
 msgstr "智能体构建器"
 
-#: src/features/settings/components/chat/agent-settings.tsx:61
+#: src/features/settings/components/chat/agent-settings.tsx:67
 msgid "Agent Capabilities"
 msgstr "智能体能力"
 
-#: src/features/settings/components/chat/agent-settings.tsx:78
+#: src/features/settings/components/chat/agent-settings.tsx:84
 #: src/features/settings/lib/settings-keywords.ts:56
 #: src/features/settings/lib/settings-keywords.ts:57
 #: src/features/settings/lib/settings-keywords.ts:58
@@ -2659,7 +2659,7 @@ msgstr "智能体能力"
 msgid "Agent Modules"
 msgstr "智能体模块"
 
-#: src/features/settings/components/chat/agent-settings.tsx:52
+#: src/features/settings/components/chat/agent-settings.tsx:58
 msgid "Agent settings updated"
 msgstr "智能体设置已更新"
 
@@ -3501,7 +3501,7 @@ msgstr "为任意图片应用艺术风格"
 msgid "Apply artistic style"
 msgstr "应用艺术风格"
 
-#: src/features/settings/components/chat/agent-settings.tsx:109
+#: src/features/settings/components/chat/agent-settings.tsx:115
 msgid "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 msgstr "运用最佳实践、模式和领域专属指南，以专家知识和成熟方法增强回复。"
 
@@ -3951,7 +3951,7 @@ msgstr ""
 msgid "Auto"
 msgstr "自动"
 
-#: src/features/settings/components/chat/agent-settings.tsx:146
+#: src/features/settings/components/chat/agent-settings.tsx:152
 #: src/features/settings/lib/settings-keywords.ts:59
 msgid "Auto Media Enrichment"
 msgstr "自动媒体补充"
@@ -3977,7 +3977,7 @@ msgstr "自动删除已启用"
 msgid "Auto-detect"
 msgstr "自动检测"
 
-#: src/features/settings/components/chat/agent-settings.tsx:171
+#: src/features/settings/components/chat/agent-settings.tsx:177
 #: src/features/settings/lib/settings-keywords.ts:60
 msgid "Auto-Detect Task Complexity"
 msgstr "自动检测任务复杂度"
@@ -4056,15 +4056,15 @@ msgstr "通过熔断器模式自动跟踪提供商健康状况，故障提供商
 msgid "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 msgstr "自动查询分类（简单/标准/复杂/推理）将每个请求路由到最合适的模型。具备健康感知的回退和熔断器模式，确保 99.9% 的可用性。"
 
-#: src/features/settings/components/chat/agent-settings.tsx:174
+#: src/features/settings/components/chat/agent-settings.tsx:180
 msgid "Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when needed."
 msgstr "根据检测到的任务类型自动启用合适的模块，在需要时智能激活功能，简化使用。"
 
-#: src/features/settings/components/chat/agent-settings.tsx:165
+#: src/features/settings/components/chat/agent-settings.tsx:171
 msgid "Automatically enable modules based on task complexity"
 msgstr "根据任务复杂度自动启用模块"
 
-#: src/features/settings/components/chat/agent-settings.tsx:149
+#: src/features/settings/components/chat/agent-settings.tsx:155
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "使用搜索模式时，在文字回复旁自动附上相关图片和视频。"
 
@@ -4076,7 +4076,7 @@ msgstr "根据配置自动运行清理"
 msgid "automation"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:164
+#: src/features/settings/components/chat/agent-settings.tsx:170
 #: src/features/settings/lib/settings-keywords.ts:60
 #: src/features/skills/components/skill-form-dialog.tsx:119
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
@@ -4308,7 +4308,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:223
+#: src/features/settings/components/chat/agent-settings.tsx:247
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -4741,7 +4741,7 @@ msgstr "Brave：如果请求失败，请为此网站降低 Shields 防护。"
 msgid "Brazil"
 msgstr "巴西"
 
-#: src/features/settings/components/chat/agent-settings.tsx:89
+#: src/features/settings/components/chat/agent-settings.tsx:95
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "将复杂任务拆分为带进度跟踪的编号步骤，适合多步骤项目和开发任务。"
 
@@ -6273,7 +6273,7 @@ msgstr "编程"
 msgid "Coding agent log"
 msgstr "编程智能体日志"
 
-#: src/features/settings/components/chat/agent-settings.tsx:192
+#: src/features/settings/components/chat/agent-settings.tsx:198
 msgid "Coding Agent Pull Requests"
 msgstr "编码智能体的拉取请求"
 
@@ -6533,7 +6533,7 @@ msgstr "商业设计"
 msgid "Commercial projects demanding the absolute best image quality from Black Forest Labs"
 msgstr "需要 Black Forest Labs 顶级图像质量的商业项目"
 
-#: src/features/settings/components/chat/agent-settings.tsx:199
+#: src/features/settings/components/chat/agent-settings.tsx:205
 msgid "Commit as me"
 msgstr "以我的身份提交"
 
@@ -6541,7 +6541,7 @@ msgstr "以我的身份提交"
 msgid "Commits"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:202
+#: src/features/settings/components/chat/agent-settings.tsx:208
 msgid "Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email."
 msgstr "提交将使用你的姓名和电子邮件，并将 Neore Agent 列为共同作者。关闭时由智能体担任作者；如果账户没有姓名或未验证的电子邮件，也是如此。"
 
@@ -6803,7 +6803,7 @@ msgstr "条件（JavaScript 表达式）"
 msgid "Conditional branching"
 msgstr "条件分支"
 
-#: src/features/settings/components/chat/agent-settings.tsx:62
+#: src/features/settings/components/chat/agent-settings.tsx:68
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "配置高级 AI 智能体模块，增强任务执行能力"
 
@@ -8759,7 +8759,7 @@ msgstr "数据表格"
 msgid "Data Protection Officer"
 msgstr "数据保护官"
 
-#: src/features/settings/components/chat/agent-settings.tsx:126
+#: src/features/settings/components/chat/agent-settings.tsx:132
 #: src/features/settings/lib/settings-keywords.ts:58
 msgid "Data Source Module"
 msgstr "数据源模块"
@@ -10904,7 +10904,7 @@ msgstr "启用或停用模型，以控制哪些模型出现在模型选择器中
 msgid "Enable skills in Settings to add them as participants."
 msgstr "在设置中启用技能，即可将它们添加为参与者。"
 
-#: src/features/settings/components/chat/agent-settings.tsx:79
+#: src/features/settings/components/chat/agent-settings.tsx:85
 msgid "Enable specialized modules to enhance AI capabilities"
 msgstr "启用专用模块以增强 AI 能力"
 
@@ -11429,7 +11429,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:219
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -12675,7 +12675,7 @@ msgstr "取消关联账号失败"
 msgid "Failed to unpin thread"
 msgstr "取消置顶对话失败"
 
-#: src/features/settings/components/chat/agent-settings.tsx:49
+#: src/features/settings/components/chat/agent-settings.tsx:55
 msgid "Failed to update agent settings"
 msgstr "更新智能体设置失败"
 
@@ -12748,7 +12748,7 @@ msgstr "更新提示词失败"
 msgid "Failed to update provider"
 msgstr "无法更新提供商"
 
-#: src/features/settings/components/chat/agent-settings.tsx:31
+#: src/features/settings/components/chat/agent-settings.tsx:37
 msgid "Failed to update pull request settings"
 msgstr "无法更新拉取请求设置"
 
@@ -16845,7 +16845,7 @@ msgstr "知识集合"
 msgid "Knowledge files to search"
 msgstr "要搜索的知识文件"
 
-#: src/features/settings/components/chat/agent-settings.tsx:106
+#: src/features/settings/components/chat/agent-settings.tsx:112
 #: src/features/settings/lib/settings-keywords.ts:57
 msgid "Knowledge Module"
 msgstr "知识模块"
@@ -17855,7 +17855,7 @@ msgstr ""
 #: src/features/canvas/canvas-panel.tsx:731
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
-#: src/features/settings/components/chat/agent-settings.tsx:41
+#: src/features/settings/components/chat/agent-settings.tsx:47
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
 #: src/features/settings/components/chat/default-models-settings.tsx:185
@@ -21096,7 +21096,7 @@ msgstr "备注（可选）"
 msgid "Note for the next run (optional)"
 msgstr "给下次运行的备注（可选）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:229
+#: src/features/settings/components/chat/agent-settings.tsx:253
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -24260,7 +24260,7 @@ msgstr ""
 msgid "Pull request opened"
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:35
+#: src/features/settings/components/chat/agent-settings.tsx:41
 msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
@@ -25873,6 +25873,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
+#: src/features/settings/components/chat/agent-settings.tsx:234
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28355,6 +28356,7 @@ msgstr "我们这边出了点问题，请稍后重试。"
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "出错了，请重试。"
@@ -29974,7 +29976,7 @@ msgstr "任务完成"
 msgid "Task needs your review: {title}"
 msgstr "任务需要你审核：{title}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:86
+#: src/features/settings/components/chat/agent-settings.tsx:92
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "Task Planning Module"
 msgstr "任务规划模块"
@@ -30505,7 +30507,7 @@ msgstr ""
 msgid "The agent is working. You can send these when it is done."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:69
+#: src/features/settings/components/chat/agent-settings.tsx:75
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "智能体循环始终启用，以系统化地执行任务。这些设置控制额外的专用模块，用于增强 AI 在特定任务类型上的能力。"
 
@@ -32000,7 +32002,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:218
+#: src/features/settings/components/chat/agent-settings.tsx:242
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 
@@ -33589,7 +33591,7 @@ msgstr "乌兹别克斯坦"
 msgid "Valid JSON"
 msgstr "有效的 JSON"
 
-#: src/features/settings/components/chat/agent-settings.tsx:129
+#: src/features/settings/components/chat/agent-settings.tsx:135
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "验证数据质量并优先采用权威来源。对研究任务和事实核查至关重要。"
 
@@ -34742,7 +34744,7 @@ msgstr "包含哪些 AI 模型？"
 msgid "Which providers are supported?"
 msgstr "支持哪些提供商？"
 
-#: src/features/settings/components/chat/agent-settings.tsx:193
+#: src/features/settings/components/chat/agent-settings.tsx:199
 msgid "Who a pull request's commits are made as"
 msgstr "拉取请求的提交以谁的身份创建"
 
