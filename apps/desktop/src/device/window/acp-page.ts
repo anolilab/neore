@@ -754,10 +754,23 @@ const refreshPorts = async (): Promise<void> => {
                     `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`,
                     button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
                         guarded(async () => {
+                            // The list was read for another session: its port may belong to that one, so nothing is stopped.
+                            if (state.selected !== selected) {
+                                $("acp-notice").textContent = "This list belongs to another session. Open the session again to stop its server.";
+
+                                return;
+                            }
+
                             const ended = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
 
                             $("acp-notice").textContent = ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end.`;
                             await refreshPorts();
+
+                            // The button that was pressed is gone with its row: keyboard focus moves to the result, not the top of the page.
+                            const notice = $("acp-notice");
+
+                            notice.tabIndex = -1;
+                            notice.focus();
                         });
                     }),
                 )),
@@ -781,6 +794,8 @@ const refreshSessions = async (): Promise<void> => {
                     label,
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
                         state.selected = session.id;
+                        // The previous session's ports must not stay on screen, where Stop would still act on them.
+                        $("acp-ports-list").replaceChildren(item("Loading…"));
                         refreshSessions();
                         refreshPorts();
                     }),

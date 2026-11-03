@@ -131,13 +131,15 @@ describe("stopping a server", () => {
     });
 
     it("never targets the agent, the app or a process outside the agent's tree", async () => {
-        const service = new PortsService(new FakeSystem(), 1);
+        const system = new FakeSystem();
+        const service = new PortsService(system, 1);
         const started = "Mon Nov 3 10:00:00 2026";
 
         // The agent itself, the app, an unrelated server, and a process that is below the agent but listens on nothing.
         await Promise.all([10, 1, 50, 20].map(async (pid) => await expect(service.stop(10, { pid, startedAt: started })).rejects.toThrow()));
 
-        expect(await new FakeSystem().processes()).toHaveLength(TABLE.length);
+        // Refused targets get no signal at all, not even a SIGTERM that the check would have caught afterwards.
+        expect(system.signals).toEqual([]);
     });
 
     it("sends no signal at all when it refuses", async () => {
@@ -290,5 +292,23 @@ describe("stopping while the process table changes", () => {
 
         expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(true);
         expect(system.signals).not.toContainEqual([31, "SIGKILL"]);
+    });
+});
+
+describe("a process that cannot be signalled", () => {
+    it("reports failure without abandoning the other victims", async () => {
+        const system = new FakeSystem();
+        const kill = system.kill.bind(system);
+
+        system.kill = (pid, signal) => {
+            if (pid === 31) {
+                throw Object.assign(new Error("not permitted"), { code: "EPERM" });
+            }
+
+            kill(pid, signal);
+        };
+
+        expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(false);
+        expect(system.signals).toContainEqual([30, "SIGTERM"]);
     });
 });

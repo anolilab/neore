@@ -113,9 +113,10 @@ export class PortsService {
         }
 
         const signalled: ProcessInfo[] = [current, ...this.newDescendants(fresh, [current], [current], agentPid)];
+        let refused = false;
 
         for (const victim of signalled) {
-            this.system.kill(victim.pid, "SIGTERM");
+            refused = !this.send(victim, "SIGTERM") || refused;
         }
 
         for (let waited = 0; waited < this.graceMs; waited += POLL_MS) {
@@ -125,7 +126,7 @@ export class PortsService {
 
             // A child a victim started while it was still running is ended the same way, before the victim goes.
             for (const newcomer of this.newDescendants(now, alive, signalled, agentPid)) {
-                this.system.kill(newcomer.pid, "SIGTERM");
+                refused = !this.send(newcomer, "SIGTERM") || refused;
                 signalled.push(newcomer);
             }
 
@@ -141,15 +142,26 @@ export class PortsService {
         const survivors = aliveOf(await this.system.processes(), signalled);
 
         for (const survivor of survivors) {
-            this.system.kill(survivor.pid, "SIGKILL");
+            refused = !this.send(survivor, "SIGKILL") || refused;
         }
 
-        return aliveOf(await this.system.processes(), signalled).length === 0;
+        return !refused && aliveOf(await this.system.processes(), signalled).length === 0;
     }
 
     /** Descendants of the agent that may ever be signalled: never the agent, never this app. */
     private below(table: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] {
         return descendantsOf(table, agentPid).filter((row) => row.pid !== agentPid && row.pid !== this.selfPid);
+    }
+
+    /** Sends one signal. A process this app may not signal is reported, not thrown, so the other victims still get theirs. */
+    private send(victim: ProcessInfo, signal: "SIGKILL" | "SIGTERM"): boolean {
+        try {
+            this.system.kill(victim.pid, signal);
+
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /** Descendants of `roots` not already `known`: never the agent, never this app, never a process listed twice. */
