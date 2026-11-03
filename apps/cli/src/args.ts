@@ -27,6 +27,7 @@ export const OPTIONS = {
     title: { type: "string" },
     type: { type: "string" },
     version: { short: "v", type: "boolean" },
+    wait: { type: "boolean" },
     yes: { short: "y", type: "boolean" },
 } as const;
 
@@ -39,6 +40,7 @@ export const GROUPS = {
     kb: ["upload", "search", "ls"],
     skills: ["ls", "run"],
     tasks: ["ls", "create", "run", "status"],
+    thread: ["start", "send"],
     threads: ["ls", "show", "rm"],
 } as const;
 
@@ -81,6 +83,10 @@ export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
         const [sub, ...args] = rest;
 
         if (!sub) {
+            if (!(GROUPS[head] as ReadonlyArray<string>).includes("ls")) {
+                throw new UsageError(`Missing subcommand. Try: ${GROUPS[head].map((name) => `${head} ${name}`).join(", ")}.`);
+            }
+
             // `neore threads` alone lists, like `ls`.
             return { args: [], command: `${head} ls`, flags };
         }
