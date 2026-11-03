@@ -1098,6 +1098,7 @@ export interface InternalApiTypes {
             retryOpenedPullRequestLink: FunctionReference<"action", { attempt: number; prUrl: string; threadId: string; userId: string }, null>;
         };
         pr_thread_attach: {
+            checkThreadForAttach: FunctionReference<"query", { threadId: string; userId: string }, { ok: true }>;
             recordAttachedPullRequests: FunctionReference<"mutation", { links: Array<{ baseBranch?: string; headBranch?: string; number: number; repository: string; title: string }>; threadId: string; userId: string }, Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full" }>>;
         };
         pr_threads: {
@@ -2316,6 +2317,7 @@ export const internal: InternalApiTypes = {
             retryOpenedPullRequestLink: { __lunoraRef: "source_control_pr_link_retry:retryOpenedPullRequestLink" },
         },
         pr_thread_attach: {
+            checkThreadForAttach: { __lunoraRef: "source_control_pr_thread_attach:checkThreadForAttach" },
             recordAttachedPullRequests: { __lunoraRef: "source_control_pr_thread_attach:recordAttachedPullRequests" },
         },
         pr_threads: {

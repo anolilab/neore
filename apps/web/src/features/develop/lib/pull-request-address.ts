@@ -35,12 +35,14 @@ export const parsePullRequestAddresses = (input: string): PullRequestAddressInpu
         }
 
         const [, repo, raw] = match;
+        const number = Number(raw);
 
-        if (repo === undefined || raw === undefined) {
+        // A number from 1: `#0` is not a pull request, and the backend refuses it, so the dialog says so here instead.
+        if (repo === undefined || raw === undefined || !Number.isSafeInteger(number) || number < 1) {
             return null;
         }
 
-        addresses.push({ number: Number(raw), repository: repo });
+        addresses.push({ number, repository: repo });
     }
 
     return addresses;

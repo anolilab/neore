@@ -725,7 +725,7 @@ export interface ApiTypes {
         };
         pr_thread_attach: {
             attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full" }> }>;
-            countsForUser: FunctionReference<"query", {}, Array<{ count: number; threadId: string }>>;
+            countsForUser: FunctionReference<"query", {}, { counts: Array<{ count: number; threadId: string }>; truncated: boolean }>;
             listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
         };
         pr_threads: {

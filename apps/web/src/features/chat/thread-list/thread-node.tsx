@@ -533,7 +533,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                             )}
-                            {linkedPullRequests > 0 && (
+                            {linkedPullRequests !== null && linkedPullRequests > 0 && (
                                 <span
                                     aria-label={t`${linkedPullRequests} linked pull requests`}
                                     className="text-muted-foreground inline-flex shrink-0 items-center gap-0.5 text-xs"

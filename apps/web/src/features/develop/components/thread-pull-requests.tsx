@@ -1,16 +1,19 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { GitPullRequestArrow } from "lucide-react";
 import { useId, useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/pull-request-address";
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
@@ -26,6 +29,10 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const { t } = useLingui();
     const dialogId = useId();
     const ready = useAfterFirstPaint();
+    const crpc = useCRPC();
+    const access = useQuery(
+        crpc.chat.sharing.getThreadAccess.queryOptions(ready && threadId !== undefined ? { threadId: threadId as Id<"threads"> } : skipToken),
+    );
     const links = useThreadPullRequests(ready ? threadId : undefined);
     const attach = useAttachPullRequests();
     const [open, setOpen] = useState(false);
@@ -33,7 +40,8 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
     const [busy, setBusy] = useState(false);
 
-    if (threadId === undefined) {
+    // Only the owner can link: the attach action refuses anyone else, so the control is not shown to them.
+    if (threadId === undefined || access.data?.isOwner !== true) {
         return null;
     }
 
@@ -74,13 +82,27 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         try {
             const outcome = await attach({ pullRequests: parsed, threadId });
             const linked = outcome.results.filter((result) => result.status === "attached").length;
-            const failed = outcome.results.find((result) => result.status !== "attached" && result.status !== "already_linked");
+            const alreadyLinked = outcome.results.some((result) => result.status === "already_linked");
+            const failed = outcome.results.filter((result) => result.status !== "attached" && result.status !== "already_linked");
 
-            setNotice(
-                failed === undefined
-                    ? { kind: "success", text: t`${linked} linked.` }
-                    : { kind: "error", text: `${failed.repository}#${String(failed.number)}: ${statusText[failed.status]}` },
-            );
+            if (failed.length > 0) {
+                // Every failure is named and the input is kept, so a retry does not mean typing the addresses again.
+                setNotice({
+                    kind: "error",
+                    text: failed.map((result) => `${result.repository}#${String(result.number)}: ${statusText[result.status]}`).join(" "),
+                });
+
+                return;
+            }
+
+            if (linked === 0 && alreadyLinked) {
+                setNotice({ kind: "success", text: statusText.already_linked });
+            } else if (alreadyLinked) {
+                setNotice({ kind: "success", text: t`${linked} linked. ${statusText.already_linked}` });
+            } else {
+                setNotice({ kind: "success", text: t`${linked} linked.` });
+            }
+
             setText("");
         } catch {
             setNotice({ kind: "error", text: t`Could not link. Try again.` });

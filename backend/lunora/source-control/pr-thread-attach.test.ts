@@ -4,12 +4,14 @@
  * thread's list and the sidebar counts read the same rows.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { GITHUB_WEB_ORIGIN } from "./drivers/github";
-import { countsForUser, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
+import { attachPullRequests, countsForUser, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -35,10 +37,38 @@ vi.mock("../auth", async (importOriginal) => {
     };
 });
 
+const { host, registry } = vi.hoisted(() => {
+    return { host: { outcome: { status: "not_found" } as Record<string, unknown> }, registry: new Map<string, unknown>() };
+});
+
+// The action reaches its own internal query by reference: resolve it to the registered procedure.
+vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+vi.mock("../connectors/lib/github-token", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../connectors/lib/github-token")>()),
+        resolveGithubToken: async () => {
+            return { accessToken: "test-token" };
+        },
+    };
+});
+
+vi.mock("./read-host", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./read-host")>()),
+        readFromHost: async () => host.outcome,
+    };
+});
+
 const A = "user-a";
 const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
+
+beforeAll(async () => {
+    registerModule(registry, "source_control_pr_thread_attach", await import("./pr-thread-attach"));
+});
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);
@@ -69,8 +99,10 @@ const link = (number: number, repo = "octo/hello") => {
     return { number, repository: repo, title: `PR ${String(number)}` };
 };
 
-const record = async (threadId: string, userId: string, links: ReturnType<typeof link>[]): Promise<any[]> =>
-    await harness.run(async (ctx: any) => await ctx.runMutation(recordAttachedPullRequests as never, { links, threadId, userId } as never));
+const links = async (): Promise<any[]> => await harness.run(async (ctx: any) => await ctx.db.query("pullRequestThreads").collect());
+
+const record = async (threadId: string, userId: string, rows: ReturnType<typeof link>[]): Promise<any[]> =>
+    await harness.run(async (ctx: any) => await ctx.runMutation(recordAttachedPullRequests as never, { links: rows, threadId, userId } as never));
 
 describe("attaching a pull request to a thread by hand", () => {
     it("links it as attached, once: naming it again reports it already linked", async () => {
@@ -117,6 +149,51 @@ describe("attaching a pull request to a thread by hand", () => {
     });
 });
 
+describe("attaching by hand: the host read and the request limits", () => {
+    const attach = (userId: string, threadId: string, pullRequests: { number: number; repository: string }[]): Promise<any> =>
+        as(userId).action(attachPullRequests as never, { pullRequests, threadId } as never);
+
+    it("writes no row for a pull request the host refuses, and reports the host's status for it", async () => {
+        const threadId = await threadOf(A);
+
+        host.outcome = { status: "not_found" };
+
+        expect(await attach(A, threadId, [{ number: 7, repository: "octo/hello" }])).toEqual({
+            results: [{ number: 7, repository: "octo/hello", status: "not_found" }],
+        });
+        expect(await links()).toEqual([]);
+    });
+
+    it("links a pull request the host returns, with its title from the host", async () => {
+        const threadId = await threadOf(A);
+
+        host.outcome = { baseBranch: "main", headBranch: "feature", status: "ok", title: "Host title" };
+
+        expect(await attach(A, threadId, [{ number: 7, repository: "octo/hello" }])).toEqual({
+            results: [{ number: 7, repository: "octo/hello", status: "attached" }],
+        });
+        expect(await links()).toEqual([expect.objectContaining({ headBranch: "feature", kind: "attached", title: "Host title" })]);
+    });
+
+    it("refuses more than ten pull requests in one call before any host read", async () => {
+        const threadId = await threadOf(A);
+        const eleven = Array.from({ length: 11 }, (_, index) => {
+            return { number: index + 1, repository: "octo/hello" };
+        });
+
+        await expect(attach(A, threadId, eleven)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("refuses another user's thread before any host read", async () => {
+        const threadId = await threadOf(B);
+
+        host.outcome = { status: "ok", title: "x" };
+
+        await expect(attach(A, threadId, [{ number: 7, repository: "octo/hello" }])).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(await links()).toEqual([]);
+    });
+});
+
 describe("the thread list and the sidebar counts", () => {
     it("lists a thread's links newest first and counts only links whose thread is still there", async () => {
         const threadId = await threadOf(A);
@@ -124,7 +201,9 @@ describe("the thread list and the sidebar counts", () => {
 
         await record(threadId, A, [link(7)]);
         // Two writes in one millisecond would tie on age, and the id breaks the tie at random: a gap makes the order real.
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
         await record(threadId, A, [link(9, "octo/world")]);
         await record(otherId, A, [link(3)]);
 
@@ -134,12 +213,24 @@ describe("the thread list and the sidebar counts", () => {
 
         const counts = await as(A).query(countsForUser as never, {} as never);
 
-        expect(counts).toEqual(
-            expect.arrayContaining([
+        expect(counts).toEqual({
+            counts: expect.arrayContaining([
                 { count: 2, threadId },
                 { count: 1, threadId: otherId },
             ]),
-        );
+            truncated: false,
+        });
+    });
+
+    it("does not count links whose thread is deleted", async () => {
+        const threadId = await threadOf(A);
+        const deletedId = await threadOf(A);
+
+        await record(threadId, A, [link(7)]);
+        await record(deletedId, A, [link(3)]);
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", deletedId, { deleted: true, deletedAt: 1 }));
+
+        expect(await as(A).query(countsForUser as never, {} as never)).toEqual({ counts: [{ count: 1, threadId }], truncated: false });
     });
 
     it("does not list one user's links to another user's thread", async () => {

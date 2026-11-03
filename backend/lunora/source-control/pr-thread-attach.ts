@@ -10,19 +10,21 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
-import { linksFor, partitionLinks, pullRequestUrl, requireAddress, toOutput, vPullRequestThread } from "./pr-threads";
+import { linksFor, MAX_THREADS_PER_PULL_REQUEST, partitionLinks, pullRequestUrl, requireAddress, toOutput, vPullRequestThread } from "./pr-threads";
 import { readFromHost } from "./read-host";
 
 /** Pull requests one call may attach. Each one is a host read, so the list is short by design. */
 const MAX_ATTACH_PER_CALL = 10;
-/** Links one thread keeps, so its list stays a list. */
+/** Links one attach call keeps per thread, so its list stays a list. Agent-opened links are recorded past it (they are the agent's own record), so reads go wider. */
 const MAX_LINKS_PER_THREAD = 20;
-/** Link rows the sidebar counts read. The index is by thread, not by age: past this cap a count is a floor, not exact. */
+/** Link rows one thread's list reads: above the attach cap, so an agent-opened link past it still shows. */
+const MAX_LINKS_READ_PER_THREAD = 100;
+/** Link rows the sidebar counts read. The index is by thread, not by age: when this cap is reached the counts are not exact, and say so. */
 const MAX_COUNT_ROWS = 500;
 
 const vAddress = v.object({ number: v.number(), repository: v.string().max(MAX_LENGTH.key) });
@@ -77,6 +79,12 @@ export const recordAttachedPullRequests = internalMutation
                 continue;
             }
 
+            if (live.length >= MAX_THREADS_PER_PULL_REQUEST) {
+                results.push({ number: address.number, repository: address.repository, status: "thread_full" });
+
+                continue;
+            }
+
             const onThread = await ctx.db
                 .query("pullRequestThreads")
                 .withIndex("by_user_and_threadId", (q) => q.eq("userId", args.userId).eq("threadId", thread._id))
@@ -107,6 +115,24 @@ export const recordAttachedPullRequests = internalMutation
         return results;
     });
 
+/** The thread exists and is the caller's, checked before any host read so a refused request costs nothing. */
+export const checkThreadForAttach = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ ok: v.literal(true) }))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (!thread || thread.deleted === true) {
+            throw new LunoraError("NOT_FOUND", "That thread is not there");
+        }
+
+        if (thread.userId !== args.userId) {
+            throw new LunoraError("FORBIDDEN", "That thread belongs to someone else");
+        }
+
+        return { ok: true as const };
+    });
+
 /**
  * Attaches existing pull requests to one of your threads. Every one is read from the host first; a read the host
  * refuses is reported for that pull request and the rest still go through.
@@ -119,6 +145,8 @@ export const attachPullRequests = authAction
         if (args.pullRequests.length === 0 || args.pullRequests.length > MAX_ATTACH_PER_CALL) {
             throw new LunoraError("BAD_REQUEST", "Attach between 1 and 10 pull requests at a time");
         }
+
+        await ctx.runQuery(internal.source_control.pr_thread_attach.checkThreadForAttach, { threadId: args.threadId, userId: ctx.user.userId });
 
         // Every address is checked before the first host call, so a malformed one costs no reads.
         const addresses = args.pullRequests.map((pr) => requireAddress(pr.repository, pr.number));
@@ -150,17 +178,22 @@ export const attachPullRequests = authAction
                       threadId: args.threadId,
                       userId: ctx.user.userId,
                   });
-        const statusOf = new Map(recorded.map((row) => [`${row.repository}#${String(row.number)}`, row.status]));
+        // `recorded` answers the verified reads in order, so a pull request named twice gets an answer for each copy.
+        let nextRecorded = 0;
 
         ctx.log.event("source_control.attach_pull_requests", { count: args.pullRequests.length, verified: verified.length });
 
         return {
             results: reads.map(({ address, outcome }) => {
-                return {
-                    number: address.number,
-                    repository: address.repository,
-                    status: outcome.status === "ok" ? (statusOf.get(`${address.repository}#${String(address.number)}`) ?? "host_error") : outcome.status,
-                };
+                if (outcome.status !== "ok") {
+                    return { number: address.number, repository: address.repository, status: outcome.status };
+                }
+
+                const status = recorded[nextRecorded]?.status ?? "host_error";
+
+                nextRecorded += 1;
+
+                return { number: address.number, repository: address.repository, status };
             }),
         };
     });
@@ -173,7 +206,7 @@ export const listForThread = authQuery
         const rows = await ctx.db
             .query("pullRequestThreads")
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", args.threadId as Id<"threads">))
-            .take(MAX_LINKS_PER_THREAD);
+            .take(MAX_LINKS_READ_PER_THREAD);
         const { live } = await partitionLinks(ctx, rows);
 
         return live.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id)).map((row) => toOutput(row));
@@ -182,7 +215,7 @@ export const listForThread = authQuery
 /** How many live pull requests each of your threads is linked to, for the sidebar's badges. Asked after first paint. */
 export const countsForUser = authQuery
     .input({})
-    .output(v.array(v.object({ count: v.number(), threadId: v.string() })))
+    .output(v.object({ counts: v.array(v.object({ count: v.number(), threadId: v.string() })), truncated: v.boolean() }))
     .query(async ({ ctx }) => {
         const rows = await ctx.db
             .query("pullRequestThreads")
@@ -195,7 +228,11 @@ export const countsForUser = authQuery
             counts.set(row.threadId, (counts.get(row.threadId) ?? 0) + 1);
         }
 
-        return [...counts].map(([threadId, count]) => {
-            return { count, threadId };
-        });
+        return {
+            counts: [...counts].map(([threadId, count]) => {
+                return { count, threadId };
+            }),
+            // At the cap there may be rows past it: a thread's count is then not known to be whole.
+            truncated: rows.length >= MAX_COUNT_ROWS,
+        };
     });

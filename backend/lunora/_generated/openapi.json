@@ -49608,22 +49608,34 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "properties": {
-                      "count": {
-                        "type": "number"
+                  "properties": {
+                    "counts": {
+                      "items": {
+                        "properties": {
+                          "count": {
+                            "type": "number"
+                          },
+                          "threadId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "count",
+                          "threadId"
+                        ],
+                        "type": "object"
                       },
-                      "threadId": {
-                        "type": "string"
-                      }
+                      "type": "array"
                     },
-                    "required": [
-                      "count",
-                      "threadId"
-                    ],
-                    "type": "object"
+                    "truncated": {
+                      "type": "boolean"
+                    }
                   },
-                  "type": "array"
+                  "required": [
+                    "counts",
+                    "truncated"
+                  ],
+                  "type": "object"
                 }
               }
             },

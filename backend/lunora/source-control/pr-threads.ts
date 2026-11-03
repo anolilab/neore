@@ -97,9 +97,15 @@ export const partitionLinks = async (
 ): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[] }> => {
     const dead: PullRequestThread[] = [];
     const live: PullRequestThread[] = [];
+    // Several links can sit on one thread: read each thread once per call.
+    const threads = new Map<string, Doc<"threads"> | null>();
 
     for (const row of rows) {
-        const thread = await ctx.db.get("threads", row.threadId);
+        if (!threads.has(row.threadId)) {
+            threads.set(row.threadId, await ctx.db.get("threads", row.threadId));
+        }
+
+        const thread = threads.get(row.threadId);
 
         (thread && thread.deleted !== true ? live : dead).push(row);
     }
