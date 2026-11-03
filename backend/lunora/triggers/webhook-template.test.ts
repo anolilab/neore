@@ -70,9 +70,7 @@ describe("renderWebhookPrompt", () => {
     });
 
     it("reads no body path from a body that is not JSON", () => {
-        expect(renderWebhookPrompt("{{body.a}}|{{payload}}", { body: "not json", headers: {}, query: {} }, FRAME)).toBe(
-            `""|<${TAG}>\nnot json\n</${TAG}>`,
-        );
+        expect(renderWebhookPrompt("{{body.a}}|{{payload}}", { body: "not json", headers: {}, query: {} }, FRAME)).toBe(`""|<${TAG}>\nnot json\n</${TAG}>`);
     });
 
     it("uses the default instruction with the framed body when there is no template", () => {

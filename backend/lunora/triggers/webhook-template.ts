@@ -20,8 +20,7 @@ export const MAX_RENDERED_PROMPT_LENGTH = 20_000;
 export const MAX_PAYLOAD_LENGTH = 10_000;
 
 /** Header and query names that carry credentials. A false positive only blanks a value; a false negative leaks one. */
-const CREDENTIAL_NAME =
-    /authorization|proxy-authorization|cookie|set-cookie|token|secret|signature|key|password|auth|credential|hmac|jwt|assertion/iu;
+const CREDENTIAL_NAME = /authorization|proxy-authorization|cookie|set-cookie|token|secret|signature|key|password|auth|credential|hmac|jwt|assertion/iu;
 
 /** What a delivery presented, the bytes of the body included. Header names are lowercase. */
 export interface WebhookInputs {
