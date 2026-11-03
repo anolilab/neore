@@ -36,6 +36,8 @@ interface DeviceView {
     _id: string;
     /** The (agent, folder) pairs the user approved on the computer; each can be started from here. */
     acpOffers?: { agentKey: string; agentLabel: string; folderId: string; folderLabel: string }[];
+    /** The desktop app version the computer last reported; unset when it never did. */
+    appVersion?: string;
     createdAt: number;
     lastSeenAt?: number;
     name: string;
@@ -176,6 +178,10 @@ const DeviceRow: FC<{
                 <p className="text-muted-foreground text-xs">
                     {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                 </p>
+                {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
+                {device.transport !== "ssh" && (
+                    <p className="text-muted-foreground text-xs">{device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}</p>
+                )}
                 {device.updateRequired === true && (
                     <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
                         {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
