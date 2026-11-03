@@ -14,16 +14,30 @@ import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { E2B_API_KEY } from "../env";
+import { callOnShard } from "../lib/cross-shard";
 import { authAction, rateLimit } from "../lib/crpc";
-import { fetchOk, FETCH_TIMEOUT_MS, HttpError } from "../lib/fetch-timeout";
+import { isHostCapabilityAvailable } from "../source-control/capabilities";
+import { DEVELOP_DRIVER } from "../source-control/develop-driver";
+import { recordOpenedPullRequestWithRetry } from "../source-control/pr-link-retry";
 import type { CodingAgentId } from "./commands";
 import { CODING_AGENTS, missingKeyMessage, parseRepoUrl, RUN_TIMEOUT_MS } from "./commands";
 import { buildRunResultMessage } from "./result-message";
 import { createE2BSandboxProvider, killE2BSandbox } from "./sandbox-provider";
 import { enqueueJob } from "../lib/job-queue";
-import { expandSecrets, redactSecrets } from "./redact";
-import type { PullRequestApi, SandboxHandle } from "./runner";
-import { checkPullRequest, finalizeRun, openPullRequestForBranch, pollRun, PR_BUDGET_MS, pullRequestProblem, startPullRequest, startRun } from "./runner";
+import { expandSecrets } from "./redact";
+import type { SandboxHandle } from "./runner";
+import {
+    checkPullRequest,
+    finalizeRun,
+    openPullRequestForBranch,
+    pollRun,
+    PR_BUDGET_MS,
+    describePullRequestFailure,
+    pullRequestApiFromDriver,
+    pullRequestProblem,
+    startPullRequest,
+    startRun,
+} from "./runner";
 
 const NOT_CONFIGURED = "Coding agents are not available on this server (no sandbox provider is configured).";
 
@@ -33,49 +47,6 @@ const getGithubToken = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, 
 
     return "accessToken" in outcome ? outcome.accessToken : undefined;
 };
-
-/** The GitHub REST call that opens the PR — from the backend, never from a sandbox. */
-const githubPullRequestCreator =
-    (token: string): PullRequestApi["createPullRequest"] =>
-    async ({ base, body, head, owner, repo, title }) => {
-        try {
-            const response = await fetchOk(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`, {
-                body: JSON.stringify({ base, body, head, title }),
-                errorPrefix: "GitHub API error",
-                headers: {
-                    Accept: "application/vnd.github+json",
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "User-Agent": "neore-chat",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                includeBody: true,
-                method: "POST",
-                timeoutMs: FETCH_TIMEOUT_MS,
-            });
-            const json = (await response.json()) as { html_url?: unknown };
-
-            if (typeof json.html_url !== "string" || !json.html_url.startsWith("https://github.com/")) {
-                throw new TypeError("GitHub did not return a pull request URL");
-            }
-
-            return json.html_url;
-        } catch (error) {
-            if (error instanceof HttpError && error.body) {
-                const detail = (() => {
-                    try {
-                        return (JSON.parse(error.body) as { message?: string }).message;
-                    } catch {
-                        return undefined;
-                    }
-                })();
-
-                throw new Error(detail ? `${error.message} — ${detail}` : error.message, { cause: error });
-            }
-
-            throw error;
-        }
-    };
 
 const pullRequestTitle = (prompt: string): string => {
     const firstLine = prompt.split("\n", 1)[0]?.trim() ?? "";
@@ -96,7 +67,10 @@ export const POLL_INTERVAL_MS = 4000;
 /** A run still unfinished this long after it started is over, whatever the sandbox says. */
 const POLL_DEADLINE_MS = RUN_TIMEOUT_MS + 60_000;
 
-type RunnerCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "scheduler">;
+/** The commit identity read gives up after this long, and the agent is the author, so a stalled shard cannot hold a pull request pending. */
+const COMMIT_IDENTITY_READ_MS = 5000;
+
+type RunnerCtx = Pick<ActionCtx, "log" | "runMutation" | "runQuery" | "scheduler">;
 
 /** The user's provider key for `agent`, or `undefined`. */
 const loadProviderKey = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, agent: CodingAgentId): Promise<string | undefined> => {
@@ -272,6 +246,19 @@ export const pollCodingAgentRun = internalAction
     });
 
 /**
+ * Both ways: the thread that opened the PR names it, so the pull request lists the thread that worked on it. Best
+ * effort, so a link that cannot be recorded never fails the result the user is waiting for; a failed write is retried
+ * with backoff (`source-control/pr-link-retry.ts`). Idempotent, so a run reaching it from two paths records one link.
+ */
+const linkOpenedPullRequest = async (ctx: RunnerCtx, run: { prUrl?: string; threadId?: string; userId: string }): Promise<void> => {
+    if (run.prUrl === undefined || run.threadId === undefined) {
+        return;
+    }
+
+    await recordOpenedPullRequestWithRetry(ctx, { prUrl: run.prUrl, threadId: run.threadId, userId: run.userId });
+};
+
+/**
  * The follow-ups of a finished run: the result message in its thread and a
  * waiting task round's answer. Runs once — after the PR, when one was asked for.
  */
@@ -292,6 +279,8 @@ const postFollowUps = async (ctx: RunnerCtx, runId: Id<"codingAgentRuns">): Prom
         });
     }
 
+    await linkOpenedPullRequest(ctx, run);
+
     if (run.taskRunId) {
         // A verifier call: on the jobs queue; it skips a round that is already complete.
         await enqueueJob(internal.tasks.execute.finishCodingAgentRound, { codingRunId: runId });
@@ -309,6 +298,11 @@ const startPullRequestForRun = async (
 ): Promise<{ error: string; followUpsPosted?: boolean } | { started: true }> => {
     if (!E2B_API_KEY) {
         return { error: NOT_CONFIGURED };
+    }
+
+    // The host adapter declares whether it can open one at all; a host that cannot is told so, not worked around.
+    if (!isHostCapabilityAvailable(DEVELOP_DRIVER.view.capabilities, "pullRequest.create")) {
+        return { error: "This host cannot open a pull request from here." };
     }
 
     const claim = await ctx.runMutation(internal.coding_agents.functions.beginPullRequest, input);
@@ -341,8 +335,28 @@ const startPullRequestForRun = async (
         return await fail(problem ?? "not available");
     }
 
+    // Read on the person's own shard: a collaborator's run on a shared thread executes on the owner's, which holds no
+    // preferences row for them. A failed read keeps the agent as author, the default that never guesses an identity.
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+        deadlineTimer = setTimeout(() => reject(new Error("the commit identity read timed out")), COMMIT_IDENTITY_READ_MS);
+    });
+    const person =
+        (await Promise.race([callOnShard(internal.coding_agents.functions.commitAuthorFor, { userId: input.userId }, { shardKey: input.userId }), deadline])
+            .catch((error: unknown) => {
+                ctx.log.event("coding_agents.commit_identity_unreadable", {
+                    message: error instanceof Error ? error.message : "unknown",
+                    runId,
+                });
+
+                return null;
+            })
+            .finally(() => {
+                clearTimeout(deadlineTimer);
+            })) ?? undefined;
+
     const started = await startPullRequest(
-        { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, repo, runId, title: pullRequestTitle(claim.prompt) },
+        { baseBranch: claim.baseBranch, diff: claim.diff, githubToken, person, repo, runId, title: pullRequestTitle(claim.prompt) },
         { sandboxes: createE2BSandboxProvider(E2B_API_KEY) },
     );
 
@@ -433,6 +447,13 @@ export const pollPullRequest = internalAction
 
             if (followUp) {
                 await postFollowUps(ctx, runId);
+            } else if (prUrl !== undefined) {
+                // The button-made PR has no follow-ups to post, but it is still the thread's pull request.
+                const run = await ctx.runQuery(internal.coding_agents.functions.getRunForFollowUp, { runId });
+
+                if (run) {
+                    await linkOpenedPullRequest(ctx, run);
+                }
             }
         };
 
@@ -487,7 +508,7 @@ export const pollPullRequest = internalAction
         }
 
         try {
-            const url = await openPullRequestForBranch(
+            const { url } = await openPullRequestForBranch(
                 {
                     baseBranch: pr.baseBranch,
                     body: pullRequestBody(pr.summary),
@@ -495,14 +516,12 @@ export const pollPullRequest = internalAction
                     repo: parseRepoUrl(pr.repoUrl),
                     title: pullRequestTitle(pr.prompt),
                 },
-                { createPullRequest: githubPullRequestCreator(githubToken) },
+                pullRequestApiFromDriver(DEVELOP_DRIVER, githubToken),
             );
 
             await complete(`${check.log}\nOpened pull request ${url}\n`, url);
         } catch (error) {
-            const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets).slice(0, 1000);
-
-            await complete(`${check.log}\nCould not open the pull request: ${message}\n`);
+            await complete(`${check.log}\n${describePullRequestFailure(error, secrets)}\n`);
         }
 
         return null;

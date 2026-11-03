@@ -645,6 +645,7 @@ export type MessageDoc = Infer<typeof vMessageDoc>; // Public
  * and out of scope upstream for the same reason.
  */
 export const vThreadCreateFields = {
+    autoModel: v.optional(v.boolean()),
     category: v.optional(v.string()), // Auto-categorized thread topic
     createdBy: v.optional(v.string()),
     customSystemPrompt: v.optional(v.string()),
@@ -732,6 +733,7 @@ export const vThreadDoc = v.object(vThreadDocFields);
  * key). `threadFieldsSupportingPatch` in `threads.ts` must list exactly these keys.
  */
 export const vThreadPatchFields = {
+    autoModel: v.optional(v.boolean()),
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     botId: v.optional(v.string()),
     category: v.optional(v.string()),

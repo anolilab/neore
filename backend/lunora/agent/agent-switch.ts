@@ -15,7 +15,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf, lastAgentSwitch, sameAgent } from "./agent-switch-logic";
 import type { AgentRef, AgentSwitchPart } from "./agent-switch-validators";
 import { childrenOf, getThreadRow, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import { findDividerLeaving, findPathHandoff, pathTokens } from "./handoff-source";
@@ -80,7 +80,9 @@ const findPathSwitchRows = async (context: Reader, threadId: Id<"threads">, from
 export const resolvePathAgent = async (context: Reader, thread: Doc<"threads">, from: Row | null): Promise<AgentRef | null> => {
     const found = thread.activeAgent ? await findPathSwitch(context, thread._id, from) : undefined;
 
-    if (found) {
+    // A host agent never runs a cloud thread's turns: a divider that names one (a thread that took over from a
+    // coding agent) is read for its model target only.
+    if (found?.to.kind === "model") {
         return found.to;
     }
 
@@ -95,8 +97,9 @@ const MAX_COLD_START_PAGES = 30;
  * warning about (`PROMPT_CACHE_COLD_START_TOKENS`). Counts the stored text of each row with the
  * shared characters-per-token estimate, and stops as soon as the answer is yes.
  */
-export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<boolean> =>
-    (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES })) > PROMPT_CACHE_COLD_START_TOKENS;
+export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null, options: { maxRows?: number } = {}): Promise<boolean> =>
+    (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES, maxRows: options.maxRows })) >
+    PROMPT_CACHE_COLD_START_TOKENS;
 
 /** Delta dividers followed down to what their own target saw; a chain longer than this stands in as far as it got. */
 const MAX_HANDOFF_DEPTH = 4;
@@ -121,7 +124,7 @@ const handoffBlocksAt = async (context: Reader, threadId: Id<"threads">, from: R
 /** What the target of the `delta` divider `part` saw when it left: the stand-in for the thread through its earlier divider, `[]` when it has none. */
 const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSwitchPart, depth: number): Promise<string[]> => {
     const start = await getThreadRow(context, threadId, part.startMessageId);
-    const earlier = start && (await findDividerLeaving(context, threadId, start, part.to.model));
+    const earlier = start && (await findDividerLeaving(context, threadId, start, agentKeyOf(part.to)));
 
     // The earlier divider's own handoff describes the thread up to the point the model left.
     return earlier ? await handoffBlocksAt(context, threadId, earlier.row, depth) : [];
@@ -133,7 +136,7 @@ const deltaBase = async (context: Reader, threadId: Id<"threads">, part: AgentSw
  * or switched only with its full history — at the cost of one thread read.
  */
 export const handoffAboveOf = async (context: QueryCtx, args: { belowMessageId: Id<"messages">; threadId: Id<"threads"> }): Promise<string[]> => {
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     if (!thread?.activeAgent || !thread.hasHandoff) {
         return [];
@@ -173,7 +176,7 @@ export const getHandoffBeforeDelta = internalQuery
  * A thread that was never switched has nothing to keep in step.
  */
 export const syncActiveAgent = async (context: MutationCtx, threadId: Id<"threads">, fromMessageId: string): Promise<void> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread?.activeAgent) {
         return;
@@ -219,7 +222,7 @@ export const runAgentModelOf = async (
     context: QueryCtx,
     args: { promptMessageId?: Id<"messages">; replacedMessageId?: Id<"messages">; threadId: Id<"threads"> },
 ): Promise<string | null> => {
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     if (!thread?.activeAgent) {
         return null;
@@ -315,7 +318,7 @@ export const getRunAgentModel = internalQuery
  * before the first switch has neither to fix.
  */
 export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threads">): Promise<void> => {
-    const thread = await context.db.get(threadId);
+    const thread = await context.db.get("threads", threadId);
 
     if (!thread || thread.activeAgent) {
         return;
@@ -332,8 +335,10 @@ export const adoptForkAgentOf = async (context: MutationCtx, threadId: Id<"threa
     }
 
     if (switches[0]) {
+        const { to } = switches[0].part;
+
         await patchThread(context.db, threadId, {
-            activeAgent: switches[0].part.to,
+            ...(to.kind === "model" && { activeAgent: to }),
             ...(switches.some(({ part }) => part.handoff) && { hasHandoff: true }),
         });
     }

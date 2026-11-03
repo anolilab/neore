@@ -20,6 +20,7 @@ interface Probe {
     helperPid: () => number | undefined;
     openSettings: () => void;
     outcome: () => string | undefined;
+    shortcut: () => { held: boolean; platform: string; refused: boolean; registered: boolean; wanted: boolean };
     state: () => string;
     useTestEngine: (engine: { args: string[]; command: string; modelPath: string }) => void;
 }
@@ -393,10 +394,15 @@ test("only the dictation window is given the microphone", async () => {
 
 const SETTINGS_PAGE = /\/dictation-settings-window\/settings\.html$/u;
 const DICTATION_KEY = /dictation|settings/iu;
-const SHORTCUT = "CommandOrControl+Shift+D";
+const SHORTCUT = process.platform === "win32" && process.arch === "arm64" ? "CommandOrControl+Shift+Y" : "CommandOrControl+Shift+D";
+
+/** Only this runner's OS has been seen refusing the shortcut for a process that is not ours. */
+const OS_MAY_REFUSE_SHORTCUT = process.platform === "win32" && process.arch === "arm64";
 
 /** Whether the app holds the dictation shortcut with the OS right now. */
 const shortcutHeld = (app: ElectronApplication): Promise<boolean> => app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), SHORTCUT);
+const shortcutState = (app: ElectronApplication): Promise<ReturnType<Probe["shortcut"]>> =>
+    app.evaluate(() => (globalThis as unknown as { neoreShell: { dictation: Probe } }).neoreShell.dictation.shortcut());
 const MODEL_FILES = ["ggml-small.bin", "ggml-large-v3-turbo-q5_0.bin"];
 
 test("on a first run the switch is off: a press opens no window and downloads nothing", async () => {
@@ -447,7 +453,27 @@ test("the settings window turns dictation on, deletes a model file, and is out o
 
         await switchControl.check();
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).enabled).toBe(true);
-        await expect.poll(() => shortcutHeld(app)).toBe(true);
+        const held = { held: true, platform: expect.any(String), refused: false, registered: true, wanted: true };
+
+        if (OS_MAY_REFUSE_SHORTCUT) {
+            // The GitHub-hosted Windows arm64 runner has some process holding Ctrl+Shift+D and, intermittently, Ctrl+Shift+Y, so the
+            // OS refuses `register` there whatever the app does. Wait for the OS's answer; when it is a refusal, what stays checkable
+            // is that the app says so rather than claiming the key: not held, not registered, still wanted, refusal reported.
+            await expect.poll(async () => (await shortcutState(app)).held || (await shortcutState(app)).refused, { message: "the OS neither granted nor refused the shortcut" }).toBe(true);
+
+            if ((await shortcutState(app)).refused) {
+                test.info().annotations.push({ description: "Windows arm64 refused the shortcut (another process holds it); the held-key assertion was skipped", type: "skipped" });
+                expect(await shortcutState(app)).toEqual({ held: false, platform: expect.any(String), refused: true, registered: false, wanted: true });
+            } else {
+                expect(await shortcutState(app)).toEqual(held);
+                await expect.poll(() => shortcutHeld(app)).toBe(true);
+            }
+        } else {
+            // Polls the whole state: when it stays unheld, the failure shows whether the switch wanted it, and what the OS said.
+            await expect.poll(() => shortcutState(app)).toEqual(held);
+            // The app's state comes from its own constant; this checks the accelerator this spec names for the platform.
+            await expect.poll(() => shortcutHeld(app)).toBe(true);
+        }
 
         await page.getByLabel("Language").selectOption("de");
         await expect.poll(async () => JSON.parse(await readFile(path.join(userData, "dictation", "settings.json"), "utf8")).language).toBe("de");

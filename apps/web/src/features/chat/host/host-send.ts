@@ -11,7 +11,19 @@ import env from "@/lib/env";
 
 /** The backend's refusals, by the `error` field of the answer. */
 export type HostSendError =
-    "busy" | "locked" | "not_authenticated" | "not_found" | "offline" | "rate_limited" | "session_ended" | "too_large" | "turn_running" | "unreachable";
+    | "busy"
+    | "locked"
+    | "not_authenticated"
+    | "not_found"
+    | "offline"
+    | "outdated"
+    | "rate_limited"
+    | "session_ended"
+    | "session_starting"
+    | "too_large"
+    | "turn_running"
+    | "unreachable"
+    | "worker_thread";
 
 export type HostSendResult = { ok: true } | { error: HostSendError; ok: false };
 
@@ -21,10 +33,13 @@ const KNOWN: ReadonlySet<string> = new Set([
     "not_authenticated",
     "not_found",
     "offline",
+    "outdated",
     "rate_limited",
     "session_ended",
+    "session_starting",
     "too_large",
     "turn_running",
+    "worker_thread",
 ]);
 
 /** The longest prompt `/hosts/send` takes (`MAX_SEND_CHARS` in `backend/lunora/acp/send.ts`). */

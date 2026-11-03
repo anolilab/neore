@@ -1,5 +1,5 @@
 /**
- * The coding-agent commands the BACKEND creates (plans/acp-agent-host.md §4.1): `acp_start`, `acp_send`,
+ * The coding-agent commands the BACKEND creates (acp-agent-host.md §4.1): `acp_start`, `acp_send`,
  * `acp_cancel` and `acp_permission_answer`. `createDeviceCall` is for device tools: it refuses anything the
  * manifest does not list. These calls are signed like any other (the desktop's Rust core verifies them), but have
  * their own open-call budget and claim window (`lib/constants.ts`), a claim that is a lease, and a prompt that is
@@ -20,13 +20,13 @@ import {
     MAX_OPEN_ACP_CANCELS_PER_DEVICE,
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
-import { countOpenCalls, isAcpTool, isDeviceOnline } from "./state";
+import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./state";
 import type { DeviceTaintSource } from "./taint";
 import { mergeTaint } from "./taint";
 
 export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
 
-export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" };
+export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" };
 
 /** Slack past a window, so the check that enforces it runs after the window rather than a tick before. */
 const CHECK_SLACK_MS = 1000;
@@ -35,7 +35,7 @@ export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
     args: {
         deviceId: Id<"devices">;
-        input: Record<string, string>;
+        input: Record<string, boolean | string>;
         kind: AcpCallKind;
         /** Untrusted content the call's text carries (`lib/taint.ts`); signed into the envelope. Absent = the user's own words. */
         taintedBy?: ReadonlyArray<DeviceTaintSource>;
@@ -50,6 +50,11 @@ export const createAcpCall = async (
 
     if (!device?.encryptedSecret) {
         return { error: "ineligible" };
+    }
+
+    // A computer too old for this backend gets the notice instead of a command it would fail; Stop is not held back by it.
+    if (kind !== "acp_cancel" && isDeviceOutdated(device)) {
+        return { error: "outdated" };
     }
 
     // A cancel is the one command that may wait for a host that is not answering right now.
@@ -111,7 +116,7 @@ export const createAcpCall = async (
     });
     const secret = await decryptKey(device.encryptedSecret, "device-secrets");
 
-    await ctx.db.patch(callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
+    await ctx.db.patch("deviceCalls", callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
     // A call nobody claims is expired and its turn ended when the window closes (`acp/calls.ts`).
     await ctx.scheduler.runAfter(ACP_CLAIM_WINDOW_MS + CHECK_SLACK_MS, internal.acp.calls.checkAcpCall, { callId });
 
@@ -122,14 +127,16 @@ export type AcpCancelResult = { callId: string } | { error: "busy" | "ineligible
 
 export const createAcpCancelCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
-    args: { deviceId: Id<"devices">; hostSessionId: string; threadId: Id<"threads">; turnId: string; userId: string },
+    args: { deviceId: Id<"devices">; hostSessionId: string; keepQueue?: boolean; threadId: Id<"threads">; turnId: string; userId: string },
     now: number,
 ): Promise<AcpCancelResult> => {
     const result = await createAcpCall(
         ctx,
         {
             deviceId: args.deviceId,
-            input: { sessionId: args.hostSessionId, turnId: args.turnId },
+            // `keepQueue` rides inside the signed envelope: only a worker run's stop sets it, so the prompts the person
+            // typed in the desktop window are still dropped by every other Stop.
+            input: { sessionId: args.hostSessionId, turnId: args.turnId, ...(args.keepQueue === true && { keepQueue: true }) },
             kind: "acp_cancel",
             threadId: args.threadId,
             userId: args.userId,

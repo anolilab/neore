@@ -28,7 +28,8 @@
                         "TOO_MANY_REQUESTS",
                         "UNAUTHORIZED",
                         "UNPROCESSABLE",
-                        "VALIDATION_ERROR"
+                        "VALIDATION_ERROR",
+                        "UNIQUE_INDEX_DUPLICATES"
                       ],
                       "type": "string"
                     },
@@ -5242,6 +5243,10 @@
                         },
                         {
                           "const": "offline",
+                          "type": "string"
+                        },
+                        {
+                          "const": "outdated",
                           "type": "string"
                         }
                       ]
@@ -12226,6 +12231,9 @@
                       "profession": {
                         "type": "string"
                       },
+                      "resumeInterruptedRuns": {
+                        "type": "boolean"
+                      },
                       "resumeLastChat": {
                         "type": "boolean"
                       },
@@ -12611,6 +12619,212 @@
           "auth"
         ],
         "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#auth_organization_policy:getOrganizationPolicy": {
+      "post": {
+        "description": "Invoke the `query` `auth_organization_policy:getOrganizationPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_organization_policy:getOrganizationPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_organization_policy:getOrganizationPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "policy": {
+                          "properties": {
+                            "models": {
+                              "properties": {
+                                "allowed": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "allowed"
+                              ],
+                              "type": "object"
+                            },
+                            "permissionCap": {
+                              "anyOf": [
+                                {
+                                  "const": "off",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "ask",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "auto",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "schemaVersion": {
+                              "const": 1
+                            },
+                            "settings": {
+                              "additionalProperties": {
+                                "properties": {
+                                  "locked": {
+                                    "type": "boolean"
+                                  },
+                                  "value": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "locked",
+                                  "value"
+                                ],
+                                "type": "object"
+                              },
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "schemaVersion"
+                          ],
+                          "type": "object"
+                        },
+                        "revision": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "revision",
+                        "updatedAt"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: auth_organization_policy:getOrganizationPolicy",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#auth_organization_policy:setOrganizationPolicy": {
+      "post": {
+        "description": "Invoke the `mutation` `auth_organization_policy:setOrganizationPolicy` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_organization_policy:setOrganizationPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "document": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "document"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_organization_policy:setOrganizationPolicy",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "revision"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: auth_organization_policy:setOrganizationPolicy",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#auth_organization:checkSlug": {
@@ -14940,12 +15154,26 @@
                           },
                           {
                             "properties": {
+                              "agentKey": {
+                                "type": "string"
+                              },
+                              "folderId": {
+                                "type": "string"
+                              },
+                              "hostId": {
+                                "description": "Id<\"devices\">",
+                                "type": "string",
+                                "x-lunora-table": "devices"
+                              },
                               "kind": {
                                 "const": "host",
                                 "type": "string"
                               }
                             },
                             "required": [
+                              "agentKey",
+                              "folderId",
+                              "hostId",
                               "kind"
                             ],
                             "type": "object"
@@ -14993,23 +15221,62 @@
                 "schema": {
                   "properties": {
                     "agent": {
-                      "properties": {
-                        "kind": {
-                          "const": "model",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "model",
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "model"
+                          ],
+                          "type": "object"
                         },
-                        "model": {
-                          "type": "string"
+                        {
+                          "properties": {
+                            "agentKey": {
+                              "type": "string"
+                            },
+                            "agentLabel": {
+                              "type": "string"
+                            },
+                            "folderId": {
+                              "type": "string"
+                            },
+                            "folderLabel": {
+                              "type": "string"
+                            },
+                            "hostId": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "const": "host",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "agentKey",
+                            "agentLabel",
+                            "folderId",
+                            "folderLabel",
+                            "hostId",
+                            "kind"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "model"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     "coldStartCostly": {
                       "type": "boolean"
+                    },
+                    "forkedThreadId": {
+                      "type": "string"
                     },
                     "messageId": {
                       "anyOf": [
@@ -17547,6 +17814,9 @@
                 "schema": {
                   "items": {
                     "properties": {
+                      "autoModel": {
+                        "type": "boolean"
+                      },
                       "category": {
                         "type": "string"
                       },
@@ -20144,6 +20414,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "autoModel": {
+                        "type": "boolean"
+                      },
                       "customSystemPrompt": {
                         "type": "string"
                       },
@@ -22537,6 +22810,9 @@
                       "approvalId": {
                         "type": "string"
                       },
+                      "expectedUrl": {
+                        "type": "string"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -22562,6 +22838,7 @@
                     },
                     "required": [
                       "approvalId",
+                      "expectedUrl",
                       "threadId",
                       "value"
                     ],
@@ -25324,6 +25601,9 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "autoApproveLowRisk": {
+                      "type": "boolean"
+                    },
                     "builtIn": {
                       "items": {
                         "properties": {
@@ -25376,6 +25656,12 @@
                       },
                       "type": "object"
                     },
+                    "lowRiskTrustedServers": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "overrides": {
                       "additionalProperties": {
                         "anyOf": [
@@ -25400,8 +25686,10 @@
                     }
                   },
                   "required": [
+                    "autoApproveLowRisk",
                     "builtIn",
                     "grants",
+                    "lowRiskTrustedServers",
                     "overrides"
                   ],
                   "type": "object"
@@ -25722,6 +26010,169 @@
           }
         },
         "summary": "mutation: chat_tool_permissions:revokeToolPermissionGrant",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_tool_permissions:setAutoApproveLowRisk": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_tool_permissions:setAutoApproveLowRisk` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_tool_permissions:setAutoApproveLowRisk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "enabled"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_tool_permissions:setAutoApproveLowRisk",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_tool_permissions:setAutoApproveLowRisk",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_tool_permissions:setLowRiskTrustedServer": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_tool_permissions:setLowRiskTrustedServer` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_tool_permissions:setLowRiskTrustedServer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "server": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "mcp",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "name",
+                              "url"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "connector",
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "slug"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "trusted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "server",
+                      "trusted"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_tool_permissions:setLowRiskTrustedServer",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_tool_permissions:setLowRiskTrustedServer",
         "tags": [
           "chat"
         ],
@@ -26757,6 +27208,76 @@
           "coding-agents"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#coding_agents_functions:setCodingAgentCommitIdentity": {
+      "post": {
+        "description": "Invoke the `mutation` `coding_agents_functions:setCodingAgentCommitIdentity` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "coding_agents_functions:setCodingAgentCommitIdentity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "identity": {
+                        "anyOf": [
+                          {
+                            "const": "agent",
+                            "type": "string"
+                          },
+                          {
+                            "const": "user",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "identity"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "coding_agents_functions:setCodingAgentCommitIdentity",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: coding_agents_functions:setCodingAgentCommitIdentity",
+        "tags": [
+          "coding-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#connectors_mcp_servers:listMcpServerSignIns": {
@@ -28147,6 +28668,9 @@
                         "const": "ssh",
                         "type": "string"
                       },
+                      "updateRequired": {
+                        "type": "boolean"
+                      },
                       "viaDeviceId": {
                         "type": "string"
                       }
@@ -28156,7 +28680,8 @@
                       "createdAt",
                       "name",
                       "platform",
-                      "toolNames"
+                      "toolNames",
+                      "updateRequired"
                     ],
                     "type": "object"
                   },
@@ -42410,6 +42935,712 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#skills_bundle:exportBundle": {
+      "post": {
+        "description": "Invoke the `action` `skills_bundle:exportBundle` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "skills_bundle:exportBundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "groupChatIds": {
+                        "items": {
+                          "description": "Id<\"threads\">",
+                          "type": "string",
+                          "x-lunora-table": "threads"
+                        },
+                        "type": "array"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "skillIds": {
+                        "items": {
+                          "description": "Id<\"skills\">",
+                          "type": "string",
+                          "x-lunora-table": "skills"
+                        },
+                        "type": "array"
+                      },
+                      "triggerIds": {
+                        "items": {
+                          "description": "Id<\"triggers\">",
+                          "type": "string",
+                          "x-lunora-table": "triggers"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "groupChatIds",
+                      "name",
+                      "skillIds",
+                      "triggerIds"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "skills_bundle:exportBundle",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "filename": {
+                      "type": "string"
+                    },
+                    "itemCount": {
+                      "type": "number"
+                    },
+                    "markdown": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "filename",
+                    "itemCount",
+                    "markdown"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: skills_bundle:exportBundle",
+        "tags": [
+          "skills"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#skills_bundle:importBundle": {
+      "post": {
+        "description": "Invoke the `action` `skills_bundle:importBundle` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "skills_bundle:importBundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "importId": {
+                        "type": "string"
+                      },
+                      "markdown": {
+                        "type": "string"
+                      },
+                      "selected": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "importId",
+                      "markdown",
+                      "selected"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "skills_bundle:importBundle",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "trigger",
+                                "type": "string"
+                              },
+                              {
+                                "const": "group",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "webhookSecret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "kind",
+                          "title"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "warnings": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "warnings"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: skills_bundle:importBundle",
+        "tags": [
+          "skills"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#skills_bundle:listBundleCandidates": {
+      "post": {
+        "description": "Invoke the `query` `skills_bundle:listBundleCandidates` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "skills_bundle:listBundleCandidates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "skills_bundle:listBundleCandidates",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "groupChats": {
+                      "items": {
+                        "properties": {
+                          "exportable": {
+                            "type": "boolean"
+                          },
+                          "id": {
+                            "description": "Id<\"threads\">",
+                            "type": "string",
+                            "x-lunora-table": "threads"
+                          },
+                          "mode": {
+                            "type": "string"
+                          },
+                          "participantSkillIds": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "exportable",
+                          "id",
+                          "mode",
+                          "participantSkillIds",
+                          "title"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "limits": {
+                      "properties": {
+                        "groupChats": {
+                          "type": "number"
+                        },
+                        "skills": {
+                          "type": "number"
+                        },
+                        "triggers": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "groupChats",
+                        "skills",
+                        "triggers"
+                      ],
+                      "type": "object"
+                    },
+                    "skills": {
+                      "items": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "Id<\"skills\">",
+                            "type": "string",
+                            "x-lunora-table": "skills"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "id",
+                          "name",
+                          "slug"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "triggers": {
+                      "items": {
+                        "properties": {
+                          "exportable": {
+                            "type": "boolean"
+                          },
+                          "id": {
+                            "description": "Id<\"triggers\">",
+                            "type": "string",
+                            "x-lunora-table": "triggers"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "schedule": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "anyOf": [
+                              {
+                                "const": "schedule",
+                                "type": "string"
+                              },
+                              {
+                                "const": "webhook",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "exportable",
+                          "id",
+                          "name",
+                          "type"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "groupChats",
+                    "limits",
+                    "skills",
+                    "triggers"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: skills_bundle:listBundleCandidates",
+        "tags": [
+          "skills"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#skills_bundle:previewBundle": {
+      "post": {
+        "description": "Invoke the `action` `skills_bundle:previewBundle` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "skills_bundle:previewBundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "skills_bundle:previewBundle",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "entries": {
+                      "items": {
+                        "properties": {
+                          "group": {
+                            "properties": {
+                              "debateRounds": {
+                                "type": "number"
+                              },
+                              "mode": {
+                                "type": "string"
+                              },
+                              "model": {
+                                "type": "string"
+                              },
+                              "participants": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "synthesizer": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "model",
+                              "participants"
+                            ],
+                            "type": "object"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "trigger",
+                                "type": "string"
+                              },
+                              {
+                                "const": "group",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "problems": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "requires": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "skill": {
+                            "properties": {
+                              "baseSlug": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "disabledTools": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "droppedTools": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "instructions": {
+                                "type": "string"
+                              },
+                              "model": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "type": "number"
+                              },
+                              "searchMode": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              },
+                              "tools": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "baseSlug",
+                              "description",
+                              "disabledTools",
+                              "droppedTools",
+                              "instructions",
+                              "name",
+                              "slug",
+                              "tools"
+                            ],
+                            "type": "object"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "trigger": {
+                            "properties": {
+                              "description": {
+                                "type": "string"
+                              },
+                              "filters": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "model": {
+                                "type": "string"
+                              },
+                              "nextRunAt": {
+                                "type": "number"
+                              },
+                              "schedule": {
+                                "type": "string"
+                              },
+                              "systemPrompt": {
+                                "type": "string"
+                              },
+                              "task": {
+                                "type": "string"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "anyOf": [
+                                  {
+                                    "const": "schedule",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "webhook",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "filters",
+                              "model",
+                              "type"
+                            ],
+                            "type": "object"
+                          },
+                          "warnings": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "kind",
+                          "problems",
+                          "requires",
+                          "title",
+                          "warnings"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "existingSlugs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "skillSlotsLeft": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "description",
+                    "entries",
+                    "existingSlugs",
+                    "name",
+                    "skillSlotsLeft"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: skills_bundle:previewBundle",
+        "tags": [
+          "skills"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#skills_functions:createSkill": {
       "post": {
         "description": "Invoke the `mutation` `skills_functions:createSkill` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -42457,6 +43688,9 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "enabled": {
+                        "type": "boolean"
                       },
                       "icon": {
                         "type": "string"
@@ -47373,6 +48607,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "outdated",
+                              "type": "string"
+                            },
+                            {
                               "const": "rate_limited",
                               "type": "string"
                             },
@@ -48143,6 +49381,319 @@
           "source-control"
         ],
         "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#source_control_pr_threads:getForThread": {
+      "post": {
+        "description": "Invoke the `query` `source_control_pr_threads:getForThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_threads:getForThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_threads:getForThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "baseBranch": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "headBranch": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "anyOf": [
+                            {
+                              "const": "attached",
+                              "type": "string"
+                            },
+                            {
+                              "const": "opened",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "number": {
+                          "type": "number"
+                        },
+                        "repository": {
+                          "type": "string"
+                        },
+                        "threadId": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "createdAt",
+                        "kind",
+                        "number",
+                        "repository",
+                        "threadId",
+                        "title",
+                        "url"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_pr_threads:getForThread",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#source_control_pr_threads:listForPullRequest": {
+      "post": {
+        "description": "Invoke the `query` `source_control_pr_threads:listForPullRequest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_threads:listForPullRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_threads:listForPullRequest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "baseBranch": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "headBranch": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "attached",
+                            "type": "string"
+                          },
+                          {
+                            "const": "opened",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "createdAt",
+                      "kind",
+                      "number",
+                      "repository",
+                      "threadId",
+                      "title",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: source_control_pr_threads:listForPullRequest",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#source_control_pr_threads:startWorkOnPullRequest": {
+      "post": {
+        "description": "Invoke the `mutation` `source_control_pr_threads:startWorkOnPullRequest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_threads:startWorkOnPullRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "baseBranch": {
+                        "type": "string"
+                      },
+                      "headBranch": {
+                        "type": "string"
+                      },
+                      "number": {
+                        "type": "number"
+                      },
+                      "repository": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "repository"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "source_control_pr_threads:startWorkOnPullRequest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "created": {
+                      "type": "boolean"
+                    },
+                    "threadId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created",
+                    "threadId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: source_control_pr_threads:startWorkOnPullRequest",
+        "tags": [
+          "source-control"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#source_control_review_drafts:deleteDraftComment": {
@@ -49722,6 +51273,25 @@
                     "properties": {
                       "clientId": {
                         "type": "string"
+                      },
+                      "host": {
+                        "properties": {
+                          "agentKey": {
+                            "type": "string"
+                          },
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "folderId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "agentKey",
+                          "deviceId",
+                          "folderId"
+                        ],
+                        "type": "object"
                       },
                       "leadThreadId": {
                         "description": "Id<\"threads\">",
@@ -52733,6 +54303,91 @@
           "triggers"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#triggers_functions:rotateWebhookSecret": {
+      "post": {
+        "description": "Invoke the `mutation` `triggers_functions:rotateWebhookSecret` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "triggers_functions:rotateWebhookSecret",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "keepOldFor24h": {
+                        "type": "boolean"
+                      },
+                      "triggerId": {
+                        "description": "Id<\"triggers\">",
+                        "type": "string",
+                        "x-lunora-table": "triggers"
+                      }
+                    },
+                    "required": [
+                      "triggerId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "triggers_functions:rotateWebhookSecret",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "previousSecretExpiresAt": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "webhookSecret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "previousSecretExpiresAt",
+                    "webhookSecret"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: triggers_functions:rotateWebhookSecret",
+        "tags": [
+          "triggers"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#triggers_functions:setTriggerEnabled": {
@@ -57103,7 +58758,7 @@
       "name": "skills"
     },
     {
-      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts, the AI guides and the watched repositories (their cached review-request lists, poll schedule and webhook secrets).",
+      "description": "Develop mode: pull requests across Git hosts, read and reviewed through one host adapter. Owns the review drafts, the AI guides, the threads a pull request is worked on in and the watched repositories (their cached review-request lists, poll schedule and webhook secrets).",
       "name": "source-control"
     },
     {

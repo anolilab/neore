@@ -68,7 +68,7 @@ export const updateCleanupConfig = adminMutation
                 patch["isEnabled"] = input.isEnabled;
             }
 
-            await ctx.db.patch(existing._id, withoutUndefined(patch));
+            await ctx.db.patch("cleanupConfigs", existing._id, withoutUndefined(patch));
         } else {
             await ctx.db.insert("cleanupConfigs", {
                 batchSize: input.batchSize ?? DEFAULT_BATCH_SIZE,

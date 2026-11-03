@@ -72,7 +72,7 @@ const record = async (args: Record<string, unknown>): Promise<void> => {
     await harness.run(async (ctx: any) => await ctx.runMutation(updateTriggerStats, args));
 };
 
-const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("triggers", id as never));
 
 /** A disabled weekly schedule owned by user-a; `insert` drops `undefined` keys, so an override can remove a default. */
 const insertTrigger = async (overrides: Record<string, unknown> = {}): Promise<string> =>
@@ -222,6 +222,19 @@ describe("trigger schedules", () => {
         return { cronExpression, model: "m", name: "Daily", type: "schedule" };
     };
 
+    it("stores the input and system prompt without hidden characters, and refuses ones that were only those", async () => {
+        const created = (await as().mutation(
+            createTrigger as never,
+            { ...schedule("0 9 * * 1"), inputTemplate: "Check\u{E0069}\u{E0067} the news\u{202E}", systemPrompt: "Be brief\u{E0041}" } as never,
+        )) as { triggerId: string };
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("triggers", created.triggerId));
+
+        expect(row).toMatchObject({ inputTemplate: "Check the news", systemPrompt: "Be brief" });
+        await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), inputTemplate: "\u{E0069}\u{E0067}" } as never)).rejects.toThrow(
+            "empty after removing hidden characters",
+        );
+    });
+
     it("refuses a custom model without a runnable endpoint", async () => {
         await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), model: "custom:gone/model" } as never)).rejects.toThrow(
             "custom endpoint is missing",
@@ -314,7 +327,7 @@ describe("trigger schedules", () => {
         const stale = Date.now() - 60_000;
 
         // Left by a schedule that was edited and then stayed disabled past its time.
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: stale }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: stale }));
         await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         const trigger = await readTrigger(triggerId);
@@ -507,7 +520,7 @@ describe("event triggers", () => {
     it("are armed with a fresh baseline when switched on, and a page is checked at once", async () => {
         const triggerId = await create(PAGE);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { eventState: { hash: "stale" } }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { eventState: { hash: "stale" } }));
         await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         expect(await readTrigger(triggerId)).toMatchObject({ enabled: true, eventState: {}, nextTriggerAt: NOW });
@@ -545,7 +558,7 @@ describe("event triggers", () => {
         const triggerId = await create(PAGE);
 
         await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { eventState: { hash: "baseline" }, nextTriggerAt: NOW + 900_000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { eventState: { hash: "baseline" }, nextTriggerAt: NOW + 900_000 }));
 
         await as().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
         await as().mutation(updateTrigger as never, { eventSource: { ...PAGE, intervalMinutes: 30 }, triggerId } as never);
@@ -580,7 +593,7 @@ describe("event triggers", () => {
         const triggerId = await create(PAGE);
 
         await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: NOW + 900_000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: NOW + 900_000 }));
         await as().mutation(updateTrigger as never, { timezone: "Europe/Berlin", triggerId } as never);
 
         const afterZone = await readTrigger(triggerId);
@@ -605,7 +618,7 @@ describe("event triggers", () => {
     it("start a manual test run on their own instruction, whatever was typed as the schedule input", async () => {
         const triggerId = await create(PAGE);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { inputTemplate: "Summarise it" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { inputTemplate: "Summarise it" }));
         await as().action(testRunTrigger as never, { triggerId } as never);
 
         expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, manual: true, payload: undefined, triggerId }]);
@@ -710,7 +723,7 @@ describe("updateTrigger on a new schedule", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule(true);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
 
         const kept = await readTrigger(triggerId);
@@ -788,7 +801,7 @@ describe("updateTrigger and the trigger's time zone", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule("America/New_York");
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await asOwner().mutation(updateTrigger as never, { name: "Renamed", timezone: "America/New_York", triggerId } as never);
 
         const row = await readTrigger(triggerId);
@@ -801,7 +814,7 @@ describe("updateTrigger and the trigger's time zone", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule("America/New_York");
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await asOwner().mutation(updateTrigger as never, { timezone: "", triggerId } as never);
 
         const row = await readTrigger(triggerId);
@@ -814,7 +827,7 @@ describe("updateTrigger and the trigger's time zone", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule(undefined);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await asOwner().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
 
         const row = await readTrigger(triggerId);
@@ -838,7 +851,7 @@ describe("updateTrigger and the trigger's time zone", () => {
     it("arms a schedule with a stored zone in that zone, with no marker", async () => {
         const triggerId = await insertSchedule("Asia/Tokyo");
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
         await asOwner().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         const row = await readTrigger(triggerId);
@@ -862,7 +875,7 @@ describe("updateTrigger and the trigger's time zone", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule("America/New_York");
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await harness
             .withIdentity({ userId: "user-a" } as never)
             .mutation(updateTrigger as never, { cronExpression: "0 9 * * *", timezone: "America/New_York", triggerId } as never);
@@ -876,7 +889,7 @@ describe("updateTrigger and the trigger's time zone", () => {
         const due = NOW - 60_000;
         const triggerId = await insertSchedule(undefined);
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { nextTriggerAt: due }));
         await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { timezone: "UTC", triggerId } as never);
 
         const row = await readTrigger(triggerId);
@@ -887,7 +900,7 @@ describe("updateTrigger and the trigger's time zone", () => {
     it("arms an enabled schedule in its zone", async () => {
         const triggerId = await insertSchedule("Asia/Tokyo");
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { enabled: false, nextTriggerAt: NOW - 1 }));
         await harness.withIdentity({ userId: "user-a" } as never).mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
 
         // 09:00 in Tokyo (UTC+9) is 00:00Z.

@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { deleteVectorRow } from "../agent/table-writes";
@@ -52,10 +53,12 @@ vi.mock("../agent/vector/tables", async (importOriginal) => {
 const OWNER = "owner-user";
 
 let harness: ReturnType<typeof lunoraTest>;
-let memoryId: string;
-let embeddingId: string;
+let memoryId: Id<"memories">;
+let embeddingId: Id<"embeddings_768">;
 
-const run = <T>(body: (ctx: any) => Promise<T>): Promise<T> => harness.run(body as never);
+type Ctx = Parameters<Parameters<ReturnType<typeof lunoraTest>["run"]>[0]>[0];
+
+const run = <T>(body: (ctx: Ctx) => Promise<T>): Promise<T> => harness.run(body);
 const asOwner = () => harness.withIdentity({ userId: OWNER } as never);
 const jobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("retryMemoryVectorDelete") === true);
 
@@ -73,7 +76,7 @@ beforeEach(async () => {
         });
         const memory = await ctx.db.insert("memories", { embeddingId: embedding, memory: "likes tea", type: "preference", userId: OWNER });
 
-        return { embeddingId: embedding as string, memoryId: memory as string };
+        return { embeddingId: embedding, memoryId: memory };
     }));
 });
 
@@ -86,9 +89,11 @@ describe("memory vector deletion", () => {
     it("deletes the row and the vector when nothing fails", async () => {
         await asOwner().mutation(deleteMemory as never, { memoryId } as never);
 
-        expect(await run(async (ctx) => await ctx.db.get(memoryId))).toBeNull();
-        expect(await run(async (ctx) => await ctx.db.get(embeddingId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("embeddings_768", embeddingId))).toBeNull();
         expect(jobs()).toHaveLength(0);
+        // The table `getVectorIdInfo` found is handed down, so the delete does not probe for it again.
+        expect(deleteVectorRow).toHaveBeenCalledWith(expect.anything(), embeddingId, "embeddings_768");
     });
 
     it("keeps the row delete, logs and schedules a retry when the vector delete fails", async () => {
@@ -96,9 +101,9 @@ describe("memory vector deletion", () => {
 
         await asOwner().mutation(deleteMemory as never, { memoryId } as never);
 
-        expect(await run(async (ctx) => await ctx.db.get(memoryId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
         // The orphan is still there, but it is no longer silent: logged with its ids, retry queued.
-        expect(await run(async (ctx) => await ctx.db.get(embeddingId))).not.toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("embeddings_768", embeddingId))).not.toBeNull();
         expect(memoryLogger.warn).toHaveBeenCalledWith(expect.stringContaining(embeddingId), expect.any(Error));
         expect(jobs()).toHaveLength(1);
         expect(jobs()[0]?.args).toMatchObject({ attempt: 2, embeddingId, memoryId, userId: OWNER });
@@ -109,14 +114,14 @@ describe("memory vector deletion", () => {
 
         await asOwner().mutation(clearAllUserMemories as never, {} as never);
 
-        expect(await run(async (ctx) => await ctx.db.get(memoryId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
         expect(jobs()).toHaveLength(1);
     });
 
     it("the retry removes the vector, and gives up loudly after the last attempt", async () => {
         await run(async (ctx) => await ctx.runMutation(retryMemoryVectorDelete, { attempt: 2, embeddingId, memoryId, userId: OWNER }));
 
-        expect(await run(async (ctx) => await ctx.db.get(embeddingId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("embeddings_768", embeddingId))).toBeNull();
 
         const other = await run(
             async (ctx) =>
@@ -142,8 +147,19 @@ describe("memory vector deletion", () => {
 
         await asOwner().mutation(deleteMemory as never, { memoryId } as never);
 
-        expect(await run(async (ctx) => await ctx.db.get(memoryId))).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
         expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringContaining(embeddingId), expect.any(Error));
+        expect(deleteVectorRow).not.toHaveBeenCalled();
+        expect(jobs()).toHaveLength(0);
+    });
+
+    it("returns quietly, without an error log, when the vector is already gone", async () => {
+        await run(async (ctx) => await ctx.db.delete("embeddings_768", embeddingId));
+
+        await asOwner().mutation(deleteMemory as never, { memoryId } as never);
+
+        expect(await run(async (ctx) => await ctx.db.get("memories", memoryId))).toBeNull();
+        expect(memoryLogger.error).not.toHaveBeenCalled();
         expect(deleteVectorRow).not.toHaveBeenCalled();
         expect(jobs()).toHaveLength(0);
     });

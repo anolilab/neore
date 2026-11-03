@@ -90,7 +90,11 @@ export const sweepKnowledgeFiles = internalMutation
         await Promise.all(
             stuck.map(
                 async (file) =>
-                    await ctx.db.patch(file._id, { error: "Indexing did not finish. Remove the file and add it again.", status: "failed", updatedAt: now }),
+                    await ctx.db.patch("knowledgeFiles", file._id, {
+                        error: "Indexing did not finish. Remove the file and add it again.",
+                        status: "failed",
+                        updatedAt: now,
+                    }),
             ),
         );
 

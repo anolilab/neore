@@ -1,5 +1,5 @@
 //! What a coding agent's reply may attach: the files it wrote in the folder it was approved for
-//! (plans/acp-agent-host.md §4.8). Pure rules; the confined read is `fs::read_media`.
+//! (acp-agent-host.md §4.8). Pure rules; the confined read is `fs::read_media`.
 //!
 //! **The caps and the types below are PROVISIONAL, not measured.** The plan asks for them to be set from a sample
 //! of real agent output before S8 starts, and none could be taken here. They are chosen to sit well inside what

@@ -95,6 +95,7 @@ const runWorkflow = async (
     };
 
     const context = {
+        event: { instanceId: "instance-1" },
         params: { requestId: "req-1", userEmail: "a@example.com", userId: "user-1" },
         run,
         step: {

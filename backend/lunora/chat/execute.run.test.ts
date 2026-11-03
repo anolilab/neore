@@ -14,6 +14,7 @@
  *   that reached the real one would fail, so the suite cannot bill by accident.
  */
 import { lunoraTest } from "@lunora/testing";
+import { enabledModelOf, MODEL_REGISTRY } from "@neore/ai/models";
 import { MockLanguageModelV3 } from "ai/test";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,15 +27,21 @@ import { scriptedModel, textStep } from "./group/test-models";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const { groupState, modelState, registry, skillState } = vi.hoisted(() => {
+const { autoState, groupState, modelState, prefsState, registry, skillState, toolsState } = vi.hoisted(() => {
     return {
+        /** What `resolveAutoModel` was asked, and the organization the plan read was made for. */
+        autoState: { plans: [] as unknown[], requests: 0 },
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
         /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
         modelState: { builtAgents: 0, model: undefined as unknown },
+        /** Whether the agent-module preference read reports a failure. */
+        prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
+        /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
+        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
     };
 });
 
@@ -70,11 +77,42 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: null,
+                untrustedContext: false,
                 userProviderKeys: undefined,
             };
         }),
+        readRunPlan: vi.fn(async (_ctx: unknown, _userId: string, organizationId?: string | null) => {
+            autoState.plans.push(organizationId);
+
+            return { isAdmin: false, plan: null };
+        }),
         resolveRunModel: vi.fn(async () => {
-            return { allowTools: false, customProvider: undefined };
+            return { allowTools: toolsState.allowTools, customProvider: undefined };
+        }),
+    };
+});
+
+// The routing call itself has its own suite (`lib/auto-model.test.ts`); here only whether a run asks for it.
+vi.mock("./lib/auto-model", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./lib/auto-model")>()),
+        resolveAutoModel: vi.fn(async (_ctx: unknown, request: { fallbackModel: string; plan: () => Promise<unknown> }) => {
+            autoState.requests += 1;
+            await request.plan();
+
+            return request.fallbackModel;
+        }),
+    };
+});
+
+// Only what the run hands the tools is under test here, not the tools.
+vi.mock("./lib/agent-tools", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./lib/agent-tools")>()),
+        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
+            toolsState.options = options;
+
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
         }),
     };
 });
@@ -121,6 +159,8 @@ beforeAll(async () => {
     registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
+    registerModule(registry, "chat_streaming_persistent_interrupted", await import("./streaming/persistent/interrupted"));
+    registerModule(registry, "chat_streaming_persistent_interrupted_watch", await import("./streaming/persistent/interrupted-watch"));
 
     // The reads whose tables the harness cannot hold, or that touch encrypted keys.
     registry.set(
@@ -134,7 +174,14 @@ beforeAll(async () => {
     registry.set(
         "auth_functions:getAgentModulePreferencesQuery",
         internalQuery.input({ userId: v.string() }).query(async () => {
-            return { autoDetectComplexity: false, autoMediaEnrichment: false, enableDatasource: false, enableKnowledge: false, enablePlanner: false };
+            return {
+                autoDetectComplexity: false,
+                autoMediaEnrichment: false,
+                enableDatasource: false,
+                enableKnowledge: false,
+                enablePlanner: false,
+                ...(prefsState.readFailed && { readFailed: true }),
+            };
         }),
     );
     registry.set(
@@ -166,10 +213,15 @@ beforeEach(async () => {
     vi.mocked(runGroupTurn).mockClear();
     groupState.calls = 0;
     groupState.config = null;
+    prefsState.readFailed = false;
     modelState.builtAgents = 0;
     modelState.model = scriptedModel([textStep("Hello there.")]);
+    autoState.plans = [];
+    autoState.requests = 0;
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
+    toolsState.allowTools = false;
+    toolsState.options = undefined;
 
     harness = lunoraTest(schema as never);
 
@@ -202,23 +254,26 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) =>
-    await harness.action(
+const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+    const { model = "test-model", ...rest } = extra;
+
+    return await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
                 messageId: ids.messageId,
                 streamId: ids.streamId,
-                streamingConfig: { contentType: "text", model: "test-model" },
+                streamingConfig: { contentType: "text", model },
                 threadId: ids.threadId,
                 userId: OWNER,
-                ...extra,
+                ...rest,
             }),
     );
+};
 
 const readState = async () =>
     await harness.run(async (ctx: any) => {
-        const thread = await ctx.db.get(ids.threadId as never);
-        const stream = await ctx.db.get(ids.streamId as never);
+        const thread = await ctx.db.get("threads", ids.threadId as never);
+        const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
         const chunks = await ctx.db
             .query("persistentChunks")
             .withIndex("by_streamId_seq", (q: any) => q.eq("streamId", ids.streamId))
@@ -265,7 +320,7 @@ describe("runStreamingAgent: a successful turn", () => {
 
 describe("runStreamingAgent: a redelivered job", () => {
     it("returns quietly when the stream was already claimed, without reading the thread or touching the model", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.streamId as never, { runClaimedAt: Date.now() }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { runClaimedAt: Date.now() }));
 
         await run();
 
@@ -294,7 +349,7 @@ describe("runStreamingAgent: a redelivered job", () => {
 
 describe("runStreamingAgent: a goal's queued round", () => {
     it("does not run when its goal ended after the round was queued, and gives the thread back", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.messageId as never, { agentName: "neore:goal" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { agentName: "neore:goal" }));
 
         await run();
 
@@ -328,8 +383,23 @@ describe("runStreamingAgent: a failed run", () => {
         expect(scheduleReplyUsage).not.toHaveBeenCalled();
     });
 
+    it("refuses the run, with a readable error and no model call, when the model settings could not be read", async () => {
+        prefsState.readFailed = true;
+
+        await run();
+
+        const state = await readState();
+
+        // The defaults a failed read answers carry no ZDR, region or provider rule: nothing may go out under them.
+        expect(modelState.builtAgents).toBe(0);
+        expect(state.chunkText).toContain("Your model settings could not be read; try again.");
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("error");
+        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+    });
+
     it("finishes the stream and frees the thread when the chat is locked after the stream started", async () => {
-        await harness.run(async (ctx: any) => await ctx.db.patch(ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { lockedAt: Date.now() + 60_000 }));
 
         await run();
 
@@ -385,6 +455,36 @@ describe("runStreamingAgent: group chats and skill commands", () => {
         const [, usageArgs] = vi.mocked(scheduleReplyUsage).mock.calls[0] as [unknown, Record<string, unknown> | undefined];
 
         expect(usageArgs).toMatchObject({ skillName: "/summarise", userId: OWNER });
+    });
+
+    describe("the quick check's view of skill text", () => {
+        const listed = { description: "Summarise a page", name: "Summary", slug: "summarise" };
+
+        it("treats the run as untrusted when any skill is enabled, whoever wrote it", async () => {
+            toolsState.allowTools = true;
+            skillState.answer = { enabledSkills: [listed], invocation: null };
+
+            await run();
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(true);
+        });
+
+        it("treats the run as untrusted when a skill is invoked", async () => {
+            toolsState.allowTools = true;
+            skillState.answer = { enabledSkills: [], invocation: { config: undefined, instructions: "Summarise.", skillId: undefined, slug: "summarise" } };
+
+            await run({ userPrompt: "/summarise the thread" });
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(true);
+        });
+
+        it("control: with no skill text and no injected context the run is trusted", async () => {
+            toolsState.allowTools = true;
+
+            await run();
+
+            await expect(toolsState.options?.untrustedContext).resolves.toBe(false);
+        });
     });
 
     it("ends the run with the skill's own message when the skill cannot run", async () => {
@@ -447,5 +547,46 @@ describe("runStreamingAgent: a run that belongs to a goal", () => {
         const state = await readState();
 
         expect(state.threadStatus).toBe("active");
+    });
+});
+
+describe("runStreamingAgent: an Auto thread", () => {
+    const MODEL = MODEL_REGISTRY.find((row) => enabledModelOf(row.id, { mode: "text" }))!.id;
+
+    const patchThread = async (fields: Record<string, unknown>) =>
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { autoModel: true, model: MODEL, ...fields }));
+
+    it("asks the gateway for a model, on the plan of the run's own organization", async () => {
+        await patchThread({});
+        await run({ model: MODEL, organizationId: "org-1" });
+
+        expect(autoState.requests).toBe(1);
+        expect(autoState.plans).toEqual(["org-1"]);
+    });
+
+    it("reads the plan of a personal run the way the ordinary model gate does: across the user's organizations", async () => {
+        await patchThread({});
+        await run({ model: MODEL });
+
+        expect(autoState.plans).toEqual([undefined]);
+    });
+
+    it("does not route when the invoked skill names a preferred model, even the thread's own", async () => {
+        await patchThread({});
+        skillState.answer = {
+            enabledSkills: [],
+            invocation: { config: { preferredModel: MODEL }, instructions: "Summarise.", skillId: undefined, slug: "summarise" },
+        };
+        await run({ model: MODEL, skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "/summarise the thread" });
+
+        expect(autoState.requests).toBe(0);
+    });
+
+    it("does not route a group chat, including an owner's direct skill command", async () => {
+        await patchThread({ groupChat: { mode: "round-robin", participants: [{ addedAt: 1, skillId: "skill-1" }] } });
+        skillState.answer = { enabledSkills: [], invocation: { config: undefined, instructions: "Summarise.", skillId: undefined, slug: "summarise" } };
+        await run({ model: MODEL, skill: { rawArgs: "the thread", slug: "summarise" }, userPrompt: "/summarise the thread" });
+
+        expect(autoState.requests).toBe(0);
     });
 });

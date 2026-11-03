@@ -1,6 +1,6 @@
 /**
  * The coding-agent commands the backend sends (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`;
- * plans/acp-agent-host.md §4.1), from the relayed envelope to the signed result.
+ * acp-agent-host.md §4.1), from the relayed envelope to the signed result.
  *
  * The core verifies and decides what may be done (`device-core/src/acp_call.rs`); this carries it out, in an order
  * that makes a redelivery safe:
@@ -19,7 +19,7 @@
  * its receipt, until the envelope expires. Receipts are kept for that long and a little more.
  *
  * **A command that is not carried out yet stays in the log.** `start` and `send` are kept with their signed envelope
- * until they are acted on (plans/acp-agent-host.md §4.6): a `send` for a session that is still opening is held by the
+ * until they are acted on (acp-agent-host.md §4.6): a `send` for a session that is still opening is held by the
  * caller (`early-sends.ts`) and the receipt says so (`apply` answers {@link HELD}); a `start` is acted on when its
  * agent has opened, or failed to. {@link HostCommands.recover}, at app start, runs the ones a dead process left in
  * that state, once: it checks the envelope with the core again (consent revoked meanwhile, expiry), and a command
@@ -44,10 +44,10 @@ const MAX_RECEIPTS = 1000;
 const UNREADABLE_LOG_WAIT_MS = 5 * 60_000 + KEEP_AFTER_EXPIRY_MS;
 
 export type AcpCommand
-    = | { kind: "cancel"; sessionId: string; turnId: string }
+    = | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
         | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
         | { kind: "send"; sessionId: string; text: string; turnId: string }
-        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; sessionId: string; threadId: string };
+        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; nativeSessionId?: string; sessionId: string; threadId: string };
 
 interface Prepared {
     callId: string;

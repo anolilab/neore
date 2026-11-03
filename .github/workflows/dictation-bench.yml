@@ -1,4 +1,4 @@
-# Dictation spike (plans/desktop-dictation.md S1): measures on-device speech models on the
+# Dictation spike (desktop-dictation.md S1): measures on-device speech models on the
 # platforms the desktop ships to. Run by hand, or by a pull request that changes the benchmark
 # itself; nothing else depends on it.
 
@@ -38,12 +38,12 @@ jobs:
                 os: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "windows-latest", "windows-11-arm"]
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
@@ -101,7 +101,7 @@ jobs:
 
             - name: "Install GNU time (Linux)"
               if: "runner.os == 'Linux'"
-              run: "sudo apt-get install -y -qq time"
+              run: "dpkg -s time >/dev/null 2>&1 || bash .github/scripts/apt-retry.sh sudo apt-get install -y -qq time"
 
             - name: "Run the benchmark"
               shell: "bash"
@@ -116,7 +116,7 @@ jobs:
                       | tee "$RUNNER_TEMP/result-${{ matrix.os }}.json"
 
             - name: "Upload the result"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "dictation-bench-${{ matrix.os }}"
                   path: "${{ runner.temp }}/result-${{ matrix.os }}.json"

@@ -13,7 +13,7 @@ import { useId, useMemo, useState } from "react";
 import type { HostOffer } from "../lib/guide";
 import { hostOffersFor, offerKey } from "../lib/guide";
 import type { PullRequestAddress } from "../lib/use-develop";
-import { useGuide, useGuideActions, useGuideDevices, useNow } from "../lib/use-guide";
+import { useGuide, useGuideActions, useGuideDevices, useNow, useRefreshPullForOtherGuideHead } from "../lib/use-guide";
 import { GuideProposals, GuideStops } from "./guide-view";
 
 const CLOUD = "cloud";
@@ -41,6 +41,9 @@ const GuideTab = ({
     const { t } = useLingui();
     const instructionsId = useId();
     const guide = useGuide(address, headSha, true);
+
+    useRefreshPullForOtherGuideHead(address, guide.data?.guide.headSha, headSha);
+
     const devices = useGuideDevices(true);
     const now = useNow();
     const actions = useGuideActions(address);
@@ -101,6 +104,7 @@ const GuideTab = ({
             const unavailable = {
                 busy: t`That computer is busy. Try again in a moment.`,
                 offline: t`That computer is not online.`,
+                outdated: t`The Neore app on that computer is out of date. Update it, then try again.`,
                 rate_limited: rateLimited,
                 session_ended: t`That agent session has ended.`,
                 too_large: tooLarge,

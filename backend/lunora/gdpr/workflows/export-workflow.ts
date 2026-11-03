@@ -21,7 +21,8 @@ import { LunoraError } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
-import { collectAllGuides, collectAllReviewDrafts } from "../../source-control/export-pages";
+import { stepDedupId } from "./dedup-id";
+import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -40,6 +41,8 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // Every step works on this user's rows, which live on their shard.
         const context = onUserShard(workflowContext, workflowContext.params.userId);
         const { requestId, userEmail, userId } = context.params;
+        // Scoped to this instance, so a fresh instance for the same request collects again.
+        const scope = `${requestId}:${context.event.instanceId}`;
 
         /** Progress writes are deliberately NOT checkpointed — idempotent and cheap. */
         const progress = async (patch: {
@@ -53,34 +56,62 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         };
 
         await progress({ currentStep: "collecting_profile", progress: 10, status: "processing" });
-        const profile = await context.step.do("collect-profile", async () => await context.run(internal.gdpr.steps.collectProfile, { userId }));
+        const profile = await context.step.do(
+            "collect-profile",
+            async () => await context.run(internal.gdpr.steps.collectProfile, { userId }, { dedupId: stepDedupId(scope, "collect-profile") }),
+        );
 
         await progress({ currentStep: "collecting_settings", progress: 20 });
-        const settings = await context.step.do("collect-settings", async () => await context.run(internal.gdpr.steps.collectSettings, { userId }));
+        const settings = await context.step.do(
+            "collect-settings",
+            async () => await context.run(internal.gdpr.steps.collectSettings, { userId }, { dedupId: stepDedupId(scope, "collect-settings") }),
+        );
 
         await progress({ currentStep: "collecting_conversations", progress: 30 });
         const conversations = await context.step.do(
             "collect-conversations",
-            async () => await context.run(internal.gdpr.steps.collectConversations, { userId }),
+            async () => await context.run(internal.gdpr.steps.collectConversations, { userId }, { dedupId: stepDedupId(scope, "collect-conversations") }),
         );
 
         await progress({ currentStep: "collecting_files", progress: 50 });
-        const files = await context.step.do("collect-files", async () => await context.run(internal.gdpr.steps.collectFiles, { userId }));
+        const files = await context.step.do(
+            "collect-files",
+            async () => await context.run(internal.gdpr.steps.collectFiles, { userId }, { dedupId: stepDedupId(scope, "collect-files") }),
+        );
 
         await progress({ currentStep: "collecting_prompts", progress: 60 });
-        const prompts = await context.step.do("collect-prompts", async () => await context.run(internal.gdpr.steps.collectPrompts, { userId }));
+        const prompts = await context.step.do(
+            "collect-prompts",
+            async () => await context.run(internal.gdpr.steps.collectPrompts, { userId }, { dedupId: stepDedupId(scope, "collect-prompts") }),
+        );
 
-        const threadTags = await context.step.do("collect-thread-tags", async () => await context.run(internal.gdpr.steps.collectThreadTags, { userId }));
+        const threadTags = await context.step.do(
+            "collect-thread-tags",
+            async () => await context.run(internal.gdpr.steps.collectThreadTags, { userId }, { dedupId: stepDedupId(scope, "collect-thread-tags") }),
+        );
 
-        const tasks = await context.step.do("collect-tasks", async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }));
-        const memories = await context.step.do("collect-memories", async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }));
-        const evals = await context.step.do("collect-evals", async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }));
+        const tasks = await context.step.do(
+            "collect-tasks",
+            async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }, { dedupId: stepDedupId(scope, "collect-tasks") }),
+        );
+        const memories = await context.step.do(
+            "collect-memories",
+            async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-memories") }),
+        );
+        const evals = await context.step.do(
+            "collect-evals",
+            async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-evals") }),
+        );
         // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
         // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
         const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {
             const name = page === 0 ? "collect-review-drafts" : `collect-review-drafts-${String(page)}`;
 
-            return await context.step.do(name, async () => await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }));
+            return await context.step.do(
+                name,
+                async () =>
+                    await context.run(internal.source_control.gdpr.collectReviewDraftsForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+            );
         });
         const pullRequestGuides = await collectAllGuides(async (cursor, page) => {
             const name = `collect-pull-request-guides-${String(page)}`;
@@ -91,7 +122,20 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     await context.run(
                         internal.source_control.gdpr.collectGuidesForExport,
                         { cursor, userId },
-                        { dedupId: `collect-pull-request-guides:${requestId}:${String(page)}` },
+                        { dedupId: stepDedupId(scope, "collect-pull-request-guides", page) },
+                    ),
+            );
+        });
+        const pullRequestThreads = await collectAllPullRequestThreads(async (cursor, page) => {
+            const name = `collect-pull-request-threads-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () =>
+                    await context.run(
+                        internal.source_control.gdpr.collectPullRequestThreadsForExport,
+                        { cursor, userId },
+                        { dedupId: stepDedupId(scope, "collect-pull-request-threads", page) },
                     ),
             );
         });
@@ -102,22 +146,44 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 await context.run(
                     internal.source_control.gdpr.collectWatchedRepositoriesForExport,
                     { userId },
-                    { dedupId: `collect-watched-repositories:${requestId}` },
+                    { dedupId: stepDedupId(scope, "collect-watched-repositories") },
                 ),
         );
-        const bots = await context.step.do("collect-bots", async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }));
+        const bots = await context.step.do(
+            "collect-bots",
+            async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-bots") }),
+        );
         const codingAgentRuns = await context.step.do(
             "collect-coding-agent-runs",
-            async () => await context.run(internal.coding_agents.gdpr.collectCodingAgentRunsForExport, { userId }),
+            async () =>
+                await context.run(
+                    internal.coding_agents.gdpr.collectCodingAgentRunsForExport,
+                    { userId },
+                    { dedupId: stepDedupId(scope, "collect-coding-agent-runs") },
+                ),
         );
 
         const notifications = await context.step.do(
             "collect-notifications",
-            async () => await context.run(internal.notifications.gdpr.collectNotificationsForExport, { userId }),
+            async () =>
+                await context.run(
+                    internal.notifications.gdpr.collectNotificationsForExport,
+                    { userId },
+                    { dedupId: stepDedupId(scope, "collect-notifications") },
+                ),
         );
-        const pages = await context.step.do("collect-pages", async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }));
-        const devices = await context.step.do("collect-devices", async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }));
-        const activity = await context.step.do("collect-activity", async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }));
+        const pages = await context.step.do(
+            "collect-pages",
+            async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-pages") }),
+        );
+        const devices = await context.step.do(
+            "collect-devices",
+            async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
+        );
+        const activity = await context.step.do(
+            "collect-activity",
+            async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
+        );
 
         await progress({ currentStep: "generating_export", progress: 80 });
         // `context.run` is typed `Promise<unknown>` — the runner does not thread a
@@ -130,15 +196,19 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             await context.step.do(
                 "notify-export-failed",
                 async () =>
-                    await context.run(internal.notifications.functions.createNotification, {
-                        body: message,
-                        dedupeKey: `data_export:${requestId}`,
-                        link: "/dashboard/settings/privacy",
-                        outcome: "failure",
-                        title: "Data export",
-                        type: "data_export",
-                        userId,
-                    }),
+                    await context.run(
+                        internal.notifications.functions.createNotification,
+                        {
+                            body: message,
+                            dedupeKey: `data_export:${requestId}`,
+                            link: "/dashboard/settings/privacy",
+                            outcome: "failure",
+                            title: "Data export",
+                            type: "data_export",
+                            userId,
+                        },
+                        { dedupId: stepDedupId(scope, "notify-export-failed") },
+                    ),
             );
         };
 
@@ -148,29 +218,34 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             storageId = (await context.step.do(
                 "generate-export-file",
                 async () =>
-                    await context.run(internal.gdpr.steps.generateExportFile, {
-                        activity,
-                        bots,
-                        codingAgentRuns,
-                        conversations,
-                        devices,
-                        evals,
-                        files,
-                        memories,
-                        notifications,
-                        pages,
-                        profile,
-                        prompts,
-                        pullRequestGuides,
-                        requestId,
-                        reviewDrafts,
-                        settings,
-                        tasks,
-                        threadTags,
-                        userEmail,
-                        userId,
-                        watchedRepositories,
-                    }),
+                    await context.run(
+                        internal.gdpr.steps.generateExportFile,
+                        {
+                            activity,
+                            bots,
+                            codingAgentRuns,
+                            conversations,
+                            devices,
+                            evals,
+                            files,
+                            memories,
+                            notifications,
+                            pages,
+                            profile,
+                            prompts,
+                            pullRequestGuides,
+                            pullRequestThreads,
+                            requestId,
+                            reviewDrafts,
+                            settings,
+                            tasks,
+                            threadTags,
+                            userEmail,
+                            userId,
+                            watchedRepositories,
+                        },
+                        { dedupId: stepDedupId(scope, "generate-export-file") },
+                    ),
             )) as Id<"_storage"> | undefined;
         } catch (error) {
             // Do not rethrow: the row is already failed, and a rethrow would make the runtime retry the whole handler.
@@ -191,26 +266,38 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         await context.step.do(
             "notify-export-ready",
             async () =>
-                await context.run(internal.notifications.functions.createNotification, {
-                    dedupeKey: `data_export:${requestId}`,
-                    link: "/dashboard/settings/privacy",
-                    outcome: "success",
-                    title: "Data export",
-                    type: "data_export",
-                    userId,
-                }),
+                await context.run(
+                    internal.notifications.functions.createNotification,
+                    {
+                        dedupeKey: `data_export:${requestId}`,
+                        link: "/dashboard/settings/privacy",
+                        outcome: "success",
+                        title: "Data export",
+                        type: "data_export",
+                        userId,
+                    },
+                    { dedupId: stepDedupId(scope, "notify-export-ready") },
+                ),
         );
-        await context.step.do("send-ready-email", async () => await context.run(internal.gdpr.steps.sendExportReadyEmail, { requestId, userEmail }));
+        await context.step.do(
+            "send-ready-email",
+            async () =>
+                await context.run(internal.gdpr.steps.sendExportReadyEmail, { requestId, userEmail }, { dedupId: stepDedupId(scope, "send-ready-email") }),
+        );
 
         await context.step.do(
             "log-audit",
             async () =>
-                await context.run(internal.gdpr.functions.logAudit, {
-                    action: "export_completed",
-                    details: JSON.stringify({ requestId }),
-                    performedBy: "system",
-                    userId,
-                }),
+                await context.run(
+                    internal.gdpr.functions.logAudit,
+                    {
+                        action: "export_completed",
+                        details: JSON.stringify({ requestId }),
+                        performedBy: "system",
+                        userId,
+                    },
+                    { dedupId: stepDedupId(scope, "log-audit") },
+                ),
         );
     },
 };

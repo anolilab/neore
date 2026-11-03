@@ -1,5 +1,5 @@
 /**
- * What a coding-agent command's end means for the thread (plans/acp-agent-host.md §4.1, §4.6), whichever way the
+ * What a coding-agent command's end means for the thread (acp-agent-host.md §4.1, §4.6), whichever way the
  * call ends: the desktop's signed result, its refusal to run the call, the claim window closing, or the deadline.
  *
  * - `acp_send` accepted: the host holds the prompt, so the turn is `received` (forward only; the host's own
@@ -20,6 +20,7 @@ import { isForwardHostState, updateHostStream } from "../../chat/streaming/persi
 import { isAcpTool } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
+import { markReattachFailed } from "./reattach";
 
 type Call = Doc<"deviceCalls">;
 
@@ -64,7 +65,12 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
         return;
     }
 
-    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
+    await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
+
+    // A session that was to load its saved one never did: the divider that asked is no longer a resumed session.
+    if (session.nativeSessionId !== undefined) {
+        await markReattachFailed(ctx, session.threadId, "load_failed");
+    }
 
     const held = await ctx.db.persistentStreams.findFirst({
         orderBy: [{ _creationTime: "desc" }],

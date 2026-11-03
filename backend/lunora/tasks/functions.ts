@@ -9,6 +9,7 @@
  * cannot be probed.
  */
 import { MODEL_LOOKUP } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
@@ -129,7 +130,7 @@ const vRunResult = v.object({ status: vTaskStatus });
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const requireOwnedTask = async (ctx: QueryCtx, taskId: Id<"tasks">, userId: string): Promise<Doc<"tasks">> => {
-    const task = await ctx.db.get(taskId);
+    const task = await ctx.db.get("tasks", taskId);
 
     if (!task || task.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Task not found");
@@ -139,7 +140,7 @@ const requireOwnedTask = async (ctx: QueryCtx, taskId: Id<"tasks">, userId: stri
 };
 
 const requireOwnedGoal = async (ctx: QueryCtx, goalId: Id<"goals">, userId: string): Promise<Doc<"goals">> => {
-    const goal = await ctx.db.get(goalId);
+    const goal = await ctx.db.get("goals", goalId);
 
     if (!goal || goal.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Goal not found");
@@ -150,7 +151,8 @@ const requireOwnedGoal = async (ctx: QueryCtx, goalId: Id<"goals">, userId: stri
 
 /** Trims, and turns an empty optional into `undefined` so it clears the column. */
 const optionalText = (value: string | undefined, max: number, label: string): string | undefined => {
-    const trimmed = value?.trim();
+    // Hidden characters (tag block, bidi controls) can carry instructions nobody reads; a task never stores them.
+    const trimmed = value === undefined ? undefined : stripHiddenText(value).text.trim();
 
     if (!trimmed) {
         return undefined;
@@ -507,7 +509,7 @@ export const updateGoal = authMutation
     .mutation(async ({ args, ctx }) => {
         await requireOwnedGoal(ctx, args.goalId, ctx.user.userId);
 
-        await patchById(ctx.db, args.goalId, {
+        await patchById(ctx.db, "goals", args.goalId, {
             description: optionalText(args.description, TASK_INSTRUCTIONS_MAX, "Description"),
             status: args.status,
             successCriteria: optionalText(args.successCriteria, TASK_CRITERIA_MAX, "Success criteria"),
@@ -536,8 +538,8 @@ export const deleteGoal = authMutation
             .take(MAX_TASKS_PER_USER);
         const { now } = ctx;
 
-        await Promise.all(tasks.map((task) => patchRow(ctx.db, task, { goalId: undefined, updatedAt: now })));
-        await ctx.db.delete(args.goalId);
+        await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, updatedAt: now })));
+        await ctx.db.delete("goals", args.goalId);
 
         ctx.log.event("tasks.delete_goal", { detachedTaskCount: tasks.length, goalId: args.goalId });
 
@@ -631,7 +633,7 @@ export const updateTask = authMutation
             nextRunAt = definition.cronExpression === task.cronExpression && task.nextRunAt ? task.nextRunAt : nextRecurrenceAt(definition.cronExpression, now);
         }
 
-        await patchById(ctx.db, args.taskId, {
+        await patchById(ctx.db, "tasks", args.taskId, {
             codingAgent: definition.codingAgent,
             cronExpression: definition.cronExpression,
             dependsOn: definition.dependsOn,
@@ -682,8 +684,8 @@ export const deleteTask = authMutation
             .withIndex("by_task_and_startedAt", (q) => q.eq("taskId", task._id))
             .take(MAX_RUNS_DELETED);
 
-        await Promise.all(runs.map((run) => ctx.db.delete(run._id)));
-        await ctx.db.delete(task._id);
+        await Promise.all(runs.map((run) => ctx.db.delete("taskRuns", run._id)));
+        await ctx.db.delete("tasks", task._id);
 
         const remaining = await loadUserTasks(ctx, userId);
         const tasks = remaining.filter((other) => other._id !== task._id);
@@ -704,7 +706,7 @@ export const deleteTask = authMutation
                 continue;
             }
 
-            await patchRow(ctx.db, other, { ...patch, updatedAt: now });
+            await patchRow(ctx.db, "tasks", other, { ...patch, updatedAt: now });
 
             if (patch.dependsOn && other.status === "blocked" && areDependenciesDone(patch.dependsOn, statusById)) {
                 await queueCycle(ctx, other, "dependency", now);
@@ -738,7 +740,7 @@ export const runTask = authMutation
         const { now } = ctx;
 
         // A manual run starts clean; a reviewer's note belongs to "retry with note".
-        await patchById(ctx.db, task._id, { reviewNote: undefined });
+        await patchById(ctx.db, "tasks", task._id, { reviewNote: undefined });
 
         const landed = await startTask(ctx, task, "manual", statusMap(await loadUserTasks(ctx, userId)), now);
 
@@ -763,7 +765,7 @@ export const cancelTask = authMutation
             throw new LunoraError("CONFLICT", "Only a queued, blocked or running task can be cancelled");
         }
 
-        await patchById(ctx.db, task._id, { activeCycle: undefined, status: "todo", updatedAt: ctx.now });
+        await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "todo", updatedAt: ctx.now });
 
         ctx.log.event("tasks.cancel_task", { taskId: task._id });
 
@@ -794,7 +796,7 @@ export const reviewTask = authMutation
         const { now } = ctx;
 
         if (args.decision === "approve") {
-            await patchById(ctx.db, task._id, { lastError: undefined, reviewNote: undefined, status: "done", updatedAt: now });
+            await patchById(ctx.db, "tasks", task._id, { lastError: undefined, reviewNote: undefined, status: "done", updatedAt: now });
             await promoteDependents(ctx, { ...task, status: "done" }, now);
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
@@ -803,7 +805,7 @@ export const reviewTask = authMutation
         }
 
         if (args.decision === "reject") {
-            await ctx.db.patch(task._id, { lastError: "Rejected in review", status: "failed", updatedAt: now });
+            await ctx.db.patch("tasks", task._id, { lastError: "Rejected in review", status: "failed", updatedAt: now });
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 
@@ -814,7 +816,7 @@ export const reviewTask = authMutation
 
         const reviewNote = optionalText(args.note, TASK_NOTE_MAX, "Note");
 
-        await patchById(ctx.db, task._id, { reviewNote });
+        await patchById(ctx.db, "tasks", task._id, { reviewNote });
 
         const landed = await startTask(ctx, task, "retry", statusMap(await loadUserTasks(ctx, userId)), now);
 

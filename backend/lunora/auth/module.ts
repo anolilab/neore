@@ -13,6 +13,7 @@ export default defineModule({
         "member",
         "memberCredits",
         "organization",
+        "organizationPolicies",
         "passkey",
         "rateLimit",
         "session",

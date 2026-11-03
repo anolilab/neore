@@ -914,8 +914,19 @@
                     "userTier": { "type": "string", "default": "free" },
                     "preferredModel": { "type": "string" },
                     "preferredQuality": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "contextTokens": { "type": "integer", "minimum": 0 },
                     "routingProfile": { "type": "string", "enum": ["fast", "balanced", "reasoning", "premium"] },
-                    "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" }
+                    "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" },
+                    "toolCount": { "type": "integer", "minimum": 0 },
+                    "runnableModels": {
+                        "type": "array",
+                        "maxItems": 1000,
+                        "items": {
+                            "type": "object",
+                            "required": ["modelApiId", "provider"],
+                            "properties": { "modelApiId": { "type": "string" }, "provider": { "type": "string" } }
+                        }
+                    }
                 }
             },
             "InternalRouteResponse": {

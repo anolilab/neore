@@ -1,5 +1,5 @@
 /**
- * What a host turn changed, as the reply stores it and the UI reads it (plans/acp-agent-host.md §4.9). It rides
+ * What a host turn changed, as the reply stores it and the UI reads it (acp-agent-host.md §4.9). It rides
  * on the reply row's `providerMetadata.neore.hostChanges`: a new content part would reach model conversion on a
  * fork, and the row is saved once, when the turn ends, so the patch is frozen there.
  */

@@ -1,15 +1,16 @@
 /**
  * What a handoff is built from: the thread's active path read upward from the leaf, a page at a time, as
  * turns. Bounded on purpose — a switch on a 5,000-row thread reads what the tail and the summary can use, not
- * the thread (plans/harness-switch.md, S2).
+ * the thread (harness-switch.md, S2).
  */
 import { CHARACTERS_PER_TOKEN, estimateTokensFromCharacters } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
+import { FILE_TOKEN_ESTIMATE_CHARS, IMAGE_TOKEN_ESTIMATE_CHARS } from "../chat/lib/auto-continue";
 import { walkPath } from "./branch-rows";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
 import { extractText } from "./shared";
@@ -64,6 +65,8 @@ const joinSameRole = (turns: HandoffTurn[]): HandoffTurn[] => {
 };
 
 export interface HandoffSource {
+    /** Who wrote the rows the turns came from: a computer is never handed text someone else wrote. */
+    authorIds: string[];
     /** Rows older than the ones read exist, so the summary does not cover the whole thread. */
     omittedEarlier: boolean;
     /** Newest first. */
@@ -82,6 +85,7 @@ export const collectHandoffSource = async (
 ): Promise<HandoffSource> => {
     const limit = (HANDOFF_BUDGET_TOKENS + HANDOFF_SUMMARY_INPUT_TOKENS) * CHARACTERS_PER_TOKEN;
     const turns: HandoffTurn[] = [];
+    const authorIds = new Set<string>();
     let characters = 0;
     let cursor: Row | null = leaf;
     let cutShort = false;
@@ -95,6 +99,10 @@ export const collectHandoffSource = async (
             if (turn) {
                 turns.push(turn);
                 characters += turn.text.length;
+
+                if (typeof row.userId === "string") {
+                    authorIds.add(row.userId);
+                }
             }
 
             // The limit is checked per row, not per page, so one page of large messages cannot overshoot it.
@@ -108,14 +116,42 @@ export const collectHandoffSource = async (
     }
 
     // The walk stops AT `stopAtId`, leaving it as `cursor`: not a row that was left unread.
-    return { omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId), turns: joinSameRole(turns) };
+    return {
+        authorIds: [...authorIds],
+        omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId),
+        turns: joinSameRole(turns),
+    };
 };
 
+/** The characters an image or file part of a row stands for: it has no text, but the model is sent it. */
+const mediaCharacters = (row: Pick<Row, "message">): number => {
+    const content = (row.message as { content?: unknown } | undefined)?.content;
+
+    if (!Array.isArray(content)) {
+        return 0;
+    }
+
+    let characters = 0;
+
+    for (const part of content as ReadonlyArray<{ type?: unknown } | null>) {
+        if (part?.type === "image") {
+            characters += IMAGE_TOKEN_ESTIMATE_CHARS;
+        } else if (part?.type === "file") {
+            characters += FILE_TOKEN_ESTIMATE_CHARS;
+        }
+    }
+
+    return characters;
+};
+
+/** The characters of a row the model is sent: its stored text plus a fixed estimate for each image or file part. */
+export const rowCharacters = (row: Pick<Row, "message" | "text">): number => (row.text?.length ?? 0) + mediaCharacters(row);
+
 /**
- * Estimated tokens of the stored text of the path ending at `from` (inclusive), counting up toward `cap` and
- * stopping the walk once past it. `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read:
- * a path longer than that many pages counts as past the cap whatever its rows say. `maxRows` counts only that many
- * rows from `from`: the window a reply actually reads.
+ * Estimated tokens of the path ending at `from` (inclusive), counting up toward `cap` and stopping the walk once
+ * past it: the stored text of each row plus a fixed estimate for each image or file part, which have no text.
+ * `stopAtId` ends the count at that row (exclusive). `maxPages` bounds the read: a path longer than that many pages
+ * counts as past the cap whatever its rows say. `maxRows` counts only that many rows from `from`.
  */
 export const pathTokens = async (
     context: Reader,
@@ -138,7 +174,7 @@ export const pathTokens = async (
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: Math.min(PAGE_ROWS, rowsLeft), stopAtId: options.stopAtId });
 
         for (const row of rows) {
-            characters += row.text?.length ?? 0;
+            characters += rowCharacters(row);
         }
 
         rowsLeft -= rows.length;
@@ -151,6 +187,31 @@ export const pathTokens = async (
     }
 
     return estimateTokensFromCharacters(characters);
+};
+
+/**
+ * The rows a reply on the path ending at `from` reads as history, oldest first: the newest `limit` of the
+ * successful ones, as the reply loader takes them (`agent/client/search.ts`). A failed or pending row is skipped
+ * and does not use up the window; a divider is a successful row like any other. Gives up after
+ * {@link MAX_SEARCH_PAGES} pages of rows.
+ */
+export const replyWindowRows = async (context: Reader, threadId: Id<"threads">, from: Row | null, limit: number): Promise<Row[]> => {
+    const window: Row[] = [];
+    let cursor = from;
+
+    for (let page = 0; cursor && window.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS });
+
+        for (const row of rows) {
+            if (row.status === "success" && window.length < limit) {
+                window.push(row);
+            }
+        }
+
+        cursor = next;
+    }
+
+    return window.toReversed();
 };
 
 /** Rows from `from` (inclusive) up to `stopAtId` (exclusive), counted up to `cap`. */
@@ -174,16 +235,20 @@ export interface DividerRow {
     row: Row;
 }
 
+/** The outcome of a divider search: the divider, or whether the search read the whole path (`exhausted: false`) or gave up at its bound. */
+export type DividerSearch = { divider: DividerRow; exhausted: false } | { divider?: undefined; exhausted: boolean };
+
 /**
  * The newest divider on the path ending at `from` (inclusive) that satisfies `accept`, a page at a time.
- * Gives up after {@link MAX_SEARCH_PAGES} pages.
+ * Gives up after {@link MAX_SEARCH_PAGES} pages, and says so: no divider after a complete search is not no divider
+ * within the bound.
  */
-const findDivider = async (
+const searchDivider = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row | null,
     accept: (part: AgentSwitchPart) => boolean,
-): Promise<DividerRow | undefined> => {
+): Promise<DividerSearch> => {
     let cursor = from;
 
     for (let page = 0; cursor && page < MAX_SEARCH_PAGES; page += 1) {
@@ -193,20 +258,35 @@ const findDivider = async (
             const part = agentSwitchOf(row);
 
             if (part && accept(part)) {
-                return { part, row };
+                return { divider: { part, row }, exhausted: false };
             }
         }
 
         cursor = next;
     }
 
-    return undefined;
+    return { exhausted: cursor !== null };
+};
+
+const findDivider = async (
+    context: Reader,
+    threadId: Id<"threads">,
+    from: Row | null,
+    accept: (part: AgentSwitchPart) => boolean,
+): Promise<DividerRow | undefined> => {
+    const { divider } = await searchDivider(context, threadId, from, accept);
+
+    return divider;
 };
 
 /** The newest divider on the path ending at `from` that moved on FROM `model`: the agent had seen the thread through its `startMessageId`. */
 export const findDividerLeaving = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => part.from.model === model);
+    await findDivider(context, threadId, from, (part) => agentKeyOf(part.from) === model);
+
+/** The newest divider on the path ending at `from` that moved on TO `model`: where the agent came into the thread. */
+export const findDividerEntering = async (context: Reader, threadId: Id<"threads">, from: Row | null, model: string): Promise<DividerSearch> =>
+    await searchDivider(context, threadId, from, (part) => agentKeyOf(part.to) === model);
 
 /** The newest divider on the path ending at `from` that carries a handoff: what stands in for the thread up to it. */
 export const findPathHandoff = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<DividerRow | undefined> =>
-    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && part.mode !== "full");
+    await findDivider(context, threadId, from, (part) => Boolean(part.handoff) && (part.mode === "portable" || part.mode === "delta"));

@@ -103,12 +103,13 @@ const insertRun = async (approvalId: string, config: Record<string, unknown> = C
             }),
     );
 
-const save = async (value: string | null, options: { approvalId?: string; callerId?: string } = {}) =>
+const save = async (value: string | null, options: { approvalId?: string; callerId?: string; expectedUrl?: string } = {}) =>
     await harness.run(
         async (ctx: any) =>
             await claimSecretAnswer(ctx, {
                 approvalId: options.approvalId ?? "sec-1",
                 callerId: options.callerId ?? OWNER,
+                expectedUrl: options.expectedUrl,
                 now: Date.now(),
                 reply: value === null ? { kind: "decline" } : { kind: "save", value },
                 threadId: threadId as never,
@@ -190,6 +191,7 @@ const REF_SHAPE = /^sec_[\w-]{32}$/u;
 const BAD_VALUE = /Provide a value/iu;
 const NO_SERVER = /no saved MCP server/iu;
 const AMBIGUOUS_SERVER = /more than one/iu;
+const ADDRESS_CHANGED = /address of the MCP server .* changed/iu;
 const BAD_HEADER_VALUE = /line break|control/iu;
 const COLLABORATOR_TURN = /only a reply you started/iu;
 
@@ -344,7 +346,7 @@ describe("claimSecretAnswer", () => {
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
 
-        await save("t".repeat(2000), { approvalId: "sec-2" });
+        await save("t".repeat(2000), { approvalId: "sec-2", expectedUrl: FILES_URL });
 
         expect(await secretRows()).toHaveLength(1);
     });
@@ -686,7 +688,7 @@ describe("consuming as an MCP server header", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.query("aiUserPreferences").first();
 
-            await ctx.db.patch(row._id, { mcpServers: [server("Files"), server("Files")] });
+            await ctx.db.patch("aiUserPreferences", row._id, { mcpServers: [server("Files"), server("Files")] });
         });
 
         expect(await takeHeader(ref)).toMatchObject({ status: "destination_missing" });
@@ -755,11 +757,11 @@ describe("the audit history of the stored header secrets", () => {
 
         await harness.run(
             async (ctx: any) =>
-                await ctx.db.patch(id, {
+                await ctx.db.patch("aiUserPreferences", id, {
                     mcpSecretHeaders: [{ encryptedValue: "v1:CIPHERTEXT-TWO", header: "Authorization", server: "Files", url: FILES_URL }],
                 }),
         );
-        await harness.run(async (ctx: any) => await ctx.db.delete(id));
+        await harness.run(async (ctx: any) => await ctx.db.delete("aiUserPreferences", id));
 
         const history = JSON.stringify(await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect()));
 
@@ -895,7 +897,7 @@ describe("the audit history of the preferences row", () => {
 
         await harness.run(
             async (ctx: any) =>
-                await ctx.db.patch(id, {
+                await ctx.db.patch("aiUserPreferences", id, {
                     mcpServers: [
                         { enabled: false, headers: [{ key: "Authorization", value: "rotated-token-4567" }], name: "Files", protocol: "http", url: FILES_URL },
                     ],
@@ -936,7 +938,7 @@ describe("answering for an MCP server", () => {
         await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
         await insertRun("sec-2");
 
-        return await save(value, { approvalId: "sec-2" });
+        return await save(value, { approvalId: "sec-2", expectedUrl: FILES_URL });
     };
 
     const servers = async (...mcpServers: { name: string; url: string }[]) =>
@@ -964,7 +966,50 @@ describe("answering for an MCP server", () => {
         expect(await secretRows()).toHaveLength(0);
 
         await servers({ name: "Files", url: FILES_URL }, { name: "Files", url: "https://dup.example.com/mcp" });
-        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(AMBIGUOUS_SERVER);
+        await expect(save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL })).rejects.toThrow(AMBIGUOUS_SERVER);
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+    });
+
+    it("binds the value to the address the card displayed", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        await save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL });
+
+        const [stored] = await secretRows();
+
+        expect(stored.use).toStrictEqual(STORED_HEADER_USE);
+    });
+
+    it("refuses, storing nothing and keeping the claim, when the server moved after the card showed its address", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.query("aiUserPreferences").first();
+
+            await ctx.db.patch("aiUserPreferences", row._id, {
+                mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: "https://evil.example.com/mcp" }],
+            });
+        });
+
+        await expect(save(SECRET, { approvalId: "sec-2", expectedUrl: FILES_URL })).rejects.toThrow(ADDRESS_CHANGED);
+        expect(await secretRows()).toHaveLength(0);
+        expect(await statuses()).toStrictEqual(["pending", "pending"]);
+    });
+
+    it("refuses a header save that names no address, storing nothing and keeping the claim", async () => {
+        await servers({ name: "Files", url: FILES_URL });
+        await insertMessage(2, { content: "and the files server", role: "user" });
+        await insertMessage(3, request("sec-2", "requestSecret", { label: "Files token", use: HEADER_USE }));
+        await insertRun("sec-2");
+
+        await expect(save(SECRET, { approvalId: "sec-2" })).rejects.toThrow(ADDRESS_CHANGED);
         expect(await secretRows()).toHaveLength(0);
         expect(await statuses()).toStrictEqual(["pending", "pending"]);
     });

@@ -48,7 +48,7 @@ const insert = async (table: string, doc: Record<string, unknown>) => {
     return row._id;
 };
 
-const patch = async (id: string, changes: Record<string, unknown>) => {
+const patch = async (_table: string, id: string, changes: Record<string, unknown>) => {
     if (id !== credits._id) {
         throw new Error(`unexpected patch of ${id}`);
     }

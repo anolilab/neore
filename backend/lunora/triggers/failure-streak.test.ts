@@ -36,7 +36,7 @@ const insertTrigger = async (overrides: Record<string, unknown> = {}): Promise<s
             }),
     );
 
-const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get(id));
+const readTrigger = async (id: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("triggers", id));
 
 const fieldOf = async (id: string, key: "enabled" | "failureStreak"): Promise<unknown> => {
     const trigger = await readTrigger(id);
@@ -288,7 +288,7 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
 
         await settle(executionId, "failed", true);
 
-        const row = await harness.run(async (ctx: any) => await ctx.db.get(executionId));
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("triggerExecutions", executionId));
 
         expect(row).toMatchObject({ status: "completed" });
         expect(row.error).toBeUndefined();
@@ -309,7 +309,7 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
             const rows = await ctx.db.query("notifications").collect();
 
             for (const row of rows) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("notifications", row._id);
             }
         });
 
@@ -357,9 +357,15 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
             await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { executionId, requireEnabled, triggerId }));
 
         expect(await admit(true)).toEqual({ skipped: "disabled" });
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(executionId))).toBeNull();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("triggerExecutions", executionId))).toBeNull();
         expect(await notices()).toHaveLength(0);
-        // A manual "Run now" does not ask for it, so a disabled trigger still reaches the rest of admission.
-        expect(await admit(false)).not.toEqual({ skipped: "disabled" });
+        // A manual "Run now" does not ask for it, so a disabled trigger still reaches the rest of admission (it is an execution of its own).
+        const manualId = await startRun(triggerId);
+
+        expect(
+            await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { executionId: manualId, requireEnabled: false, triggerId })),
+        ).not.toEqual({
+            skipped: "disabled",
+        });
     });
 });

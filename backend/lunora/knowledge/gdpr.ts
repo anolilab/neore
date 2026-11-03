@@ -35,7 +35,7 @@ export const eraseKnowledgeForUser = async (ctx: MutationCtx, userId: string): P
                 await eraseEmbeddingRow(ctx, chunk.embeddingId, "knowledge embedding");
             }
 
-            await ctx.db.delete(chunk._id);
+            await ctx.db.delete("knowledgeChunks", chunk._id);
         }
 
         // A file with more chunks than one batch stays for the next round.
@@ -55,10 +55,13 @@ export const eraseKnowledgeForUser = async (ctx: MutationCtx, userId: string): P
                 .collect(),
         ]);
 
-        await Promise.all([...threadLinks, ...projectLinks].map((link) => ctx.db.delete(link._id)));
+        await Promise.all([
+            ...threadLinks.map((link) => ctx.db.delete("threadKnowledge", link._id)),
+            ...projectLinks.map((link) => ctx.db.delete("projectKnowledge", link._id)),
+        ]);
         // A document added without the vault (folder, Notion export) has its own object.
         await scheduleObjectDeletion(ctx, [file.storageKey]);
-        await ctx.db.delete(file._id);
+        await ctx.db.delete("knowledgeFiles", file._id);
     }
 
     // Chunks whose file row is already gone.
@@ -72,7 +75,7 @@ export const eraseKnowledgeForUser = async (ctx: MutationCtx, userId: string): P
             await eraseEmbeddingRow(ctx, chunk.embeddingId, "knowledge embedding");
         }
 
-        await ctx.db.delete(chunk._id);
+        await ctx.db.delete("knowledgeChunks", chunk._id);
     }
 
     // Collection links on this shard, and the user's collections (`.global()`: ORM facade).
@@ -82,7 +85,10 @@ export const eraseKnowledgeForUser = async (ctx: MutationCtx, userId: string): P
         .take(BATCH);
     const { page: collections } = await ctx.db.knowledgeCollections.findMany({ limit: BATCH, where: { userId } });
 
-    await Promise.all([...links, ...collections].map((row) => ctx.db.delete(row._id)));
+    await Promise.all([
+        ...links.map((row) => ctx.db.delete("knowledgeCollectionLinks", row._id)),
+        ...collections.map((row) => ctx.db.delete("knowledgeCollections", row._id)),
+    ]);
 
     return { hasMore: hasMore || full(orphans) || full(links) || full(collections) };
 };
@@ -94,7 +100,7 @@ export const eraseProjectKnowledgeForProject = async (ctx: MutationCtx, projectI
         .withIndex("by_projectId", (q) => q.eq("projectId", projectId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("projectKnowledge", row._id)));
 
     return { hasMore: full(rows) };
 };

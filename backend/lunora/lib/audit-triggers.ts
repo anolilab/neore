@@ -153,10 +153,10 @@ export const auditTriggersFor = (t: TriggerBuilder, table: string, attribution: 
  * Nothing reads this list to WIRE it any more — the schema generator that did is
  * deleted. `schema.ts` now names each table explicitly,
  * `.triggers((t) => auditTriggersFor(t, "<table>", AUDIT_TABLES["<table>"]!))`,
- * 19 times. So the list and `schema.ts` are two hand-maintained halves that must
+ * 20 times. So the list and `schema.ts` are two hand-maintained halves that must
  * agree: **an entry added here without the matching `.triggers(...)` line is
  * silently un-audited**, which is a GDPR gap rather than a broken build (see the
- * note in `crons.ts`). Both halves are at 19; if you add one, add the other.
+ * note in `crons.ts`). Both halves are at 20; if you add one, add the other.
  */
 export const AUDIT_TABLES: Record<string, Attribution> = {
     account: { userId: (d) => asString(d["userId"]) },
@@ -168,6 +168,7 @@ export const AUDIT_TABLES: Record<string, Attribution> = {
     member: { organizationId: (d) => asString(d["organizationId"]), userId: (d) => asString(d["userId"]) },
     memberCredits: { organizationId: (d) => asString(d["organizationId"]), userId: (d) => asString(d["userId"]) },
     organization: { organizationId: (d) => asString(d["_id"]), userId: (d) => asString(d["ownerId"]) },
+    organizationPolicies: { organizationId: (d) => asString(d["organizationId"]) },
     passkey: { userId: (d) => asString(d["userId"]) },
     promptHistory: { userId: (d) => asString(d["userId"]) },
     prompts: { organizationId: (d) => asString(d["organizationId"]), userId: (d) => asString(d["userId"]) },

@@ -71,7 +71,7 @@ export const grantThreadOwnerAccess = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         // `get` throws on a malformed id; that names no thread either.
-        const thread: { userId?: string } | null = await ctx.db.get(args.threadId as Id<"threads">).catch(() => null);
+        const thread: { userId?: string } | null = await ctx.db.get("threads", args.threadId as Id<"threads">).catch(() => null);
 
         await grantFileAccess(ctx, args.fileId, thread?.userId);
 
@@ -94,7 +94,7 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
 
     if (existingFile) {
         // increment the refcount
-        await context.db.patch(existingFile._id, {
+        await context.db.patch("chatFiles", existingFile._id, {
             lastTouchedAt: Date.now(),
             refcount: existingFile.refcount + 1,
         });
@@ -207,7 +207,7 @@ export const fileGatedByLockedChat = async (
             continue;
         }
 
-        const thread = await context.db.get(lockedId);
+        const thread = await context.db.get("threads", lockedId);
 
         if (!thread || !isThreadLocked(thread)) {
             continue;
@@ -358,7 +358,7 @@ export const useExistingFile = internalMutation
             return null;
         }
 
-        await ctx.db.patch(file._id, { lastTouchedAt: ctx.now });
+        await ctx.db.patch("chatFiles", file._id, { lastTouchedAt: ctx.now });
         await grantFileAccess(ctx, file._id, args.userId);
 
         return { fileId: file._id, storageId: file.storageId };
@@ -399,7 +399,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
         const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
 
         if (file && file.refcount > 0) {
-            await patchRow(context.db, file, refcountChange(file, file.refcount - 1));
+            await patchRow(context.db, "chatFiles", file, refcountChange(file, file.refcount - 1));
         } else if (file) {
             // A release with no matching add (a write that counted differently) must not take the count below zero,
             // nor re-stamp `unreferencedSince` on a file that is already released.
@@ -417,7 +417,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
         const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
 
         if (file) {
-            await patchRow(context.db, file, refcountChange(file, file.refcount + 1));
+            await patchRow(context.db, "chatFiles", file, refcountChange(file, file.refcount + 1));
         } else {
             throw new Error(`File ${fileId} not found when incrementing refcount`);
         }
@@ -437,7 +437,7 @@ export const linkChatFiles = async (context: MutationContext, threadId: Id<"thre
     }
 
     // The owner, read past RLS: a collaborator's write must link under the owner, whatever the caller may read.
-    const thread = await systemDb(context).get(threadId);
+    const thread = await systemDb(context).get("threads", threadId);
 
     if (!thread?.userId) {
         return;
@@ -489,7 +489,7 @@ export const deleteChatFileLinksForThread = async (context: MutationContext, thr
         .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
         .take(LINK_BATCH);
 
-    await Promise.all(rows.map((row) => context.db.delete(row._id)));
+    await Promise.all(rows.map((row) => context.db.delete("chatFileThreads", row._id)));
 
     return rows.length === LINK_BATCH;
 };
@@ -508,7 +508,7 @@ export async function copyFileHandler(context: MutationContext, args: { fileId: 
         throw new Error("File not found");
     }
 
-    await context.db.patch(args.fileId, {
+    await context.db.patch("chatFiles", args.fileId, {
         lastTouchedAt: Date.now(),
         refcount: file.refcount + 1,
     });
@@ -557,8 +557,8 @@ export const deleteFiles = internalMutation
 
                 const { page: grants } = await ctx.db.chatFileAccess.findMany({ where: { fileId } });
 
-                await Promise.all(grants.map((grant) => ctx.db.delete(grant._id)));
-                await ctx.db.delete(fileId);
+                await Promise.all(grants.map((grant) => ctx.db.delete("chatFileAccess", grant._id)));
+                await ctx.db.delete("chatFiles", fileId);
 
                 return fileId;
             }),
@@ -579,7 +579,7 @@ export const markExtractionProcessing = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.fileId, { extractionStatus: "processing" });
+        await ctx.db.patch("chatFiles", args.fileId, { extractionStatus: "processing" });
 
         return null;
     });
@@ -597,7 +597,7 @@ export const saveExtractedText = internalMutation
             return null;
         }
 
-        await patchRow(ctx.db, file, {
+        await patchRow(ctx.db, "chatFiles", file, {
             extractedText: args.extractedText,
             extractionError: undefined,
             extractionStatus: "completed",
@@ -619,7 +619,7 @@ export const markExtractionFailed = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.fileId, {
+        await ctx.db.patch("chatFiles", args.fileId, {
             extractionError: args.error,
             extractionStatus: "failed",
         });
@@ -639,7 +639,7 @@ export const markNsfwChecking = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.fileId, { nsfwStatus: "checking" });
+        await ctx.db.patch("chatFiles", args.fileId, { nsfwStatus: "checking" });
 
         return null;
     });
@@ -659,7 +659,7 @@ export const saveNsfwResult = internalMutation
         }
 
         // `v.any()` arguments can arrive undefined, which a patch refuses.
-        await ctx.db.patch(args.fileId, {
+        await ctx.db.patch("chatFiles", args.fileId, {
             ...withoutUndefined({ nsfwScores: args.scores }),
             nsfwStatus: args.isNsfw ? "blocked" : "safe",
         });
@@ -679,7 +679,7 @@ export const markNsfwFailed = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.fileId, { nsfwStatus: "failed" });
+        await ctx.db.patch("chatFiles", args.fileId, { nsfwStatus: "failed" });
 
         return null;
     });
@@ -696,7 +696,7 @@ export const markExtractionUnsupported = internalMutation
             return null;
         }
 
-        await ctx.db.patch(args.fileId, { extractionStatus: "unsupported" });
+        await ctx.db.patch("chatFiles", args.fileId, { extractionStatus: "unsupported" });
 
         return null;
     });

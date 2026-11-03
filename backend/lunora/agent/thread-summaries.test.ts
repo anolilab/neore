@@ -6,6 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { documentTextPart } from "../chat/lib/attached-text";
+import { formatPageContextPart } from "../chat/lib/page-context";
 import schema from "../schema";
 import { threadSummaryTaint } from "./thread-summary-taint";
 import { deleteAllForThreadIdAsync } from "./threads";
@@ -33,6 +35,15 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
+
 vi.mock("../lib/utility-model", () => {
     return {
         getUtilityModel: async () => {
@@ -111,7 +122,8 @@ const storeSummary = async (coveredIndex: number, summary: string, coveredCount 
             }),
     );
 
-const threadRow = async () => (await harness.run(async (ctx: any) => await ctx.db.get(threadId))) as { summaryEpoch?: number; summaryPathTooLongAt?: number };
+const threadRow = async () =>
+    (await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))) as { summaryEpoch?: number; summaryPathTooLongAt?: number };
 
 beforeAll(async () => {
     registerModule(registry, "agent_thread_summaries", await import("./thread-summaries"));
@@ -210,7 +222,7 @@ describe("making a summary", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.query("userSettings").first();
 
-            await ctx.db.patch(row._id, { threadSummariesEnabled: true });
+            await ctx.db.patch("userSettings", row._id, { threadSummariesEnabled: true });
         });
         await runJob(rowIds.at(-1)!);
 
@@ -327,10 +339,10 @@ describe("a branch", () => {
         await seedThread(ROWS + 10);
         // Back on turn 64, the reply is regenerated: a sibling of rows[129], which the original path went on past.
         // The original path's next turn keeps its parent, as `addMessagesHandler` pins it before a sibling lands.
-        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[130], { parentMessageId: rowIds[129] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", rowIds[130], { parentMessageId: rowIds[129] }));
         const regenerated = await insertRow(129, { parentMessageId: rowIds[128] });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: regenerated }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: regenerated }));
         await runJob(regenerated);
 
         expect(generateText).toHaveBeenCalledTimes(1);
@@ -342,10 +354,10 @@ describe("a branch", () => {
 
         await seedThread(ROWS + 10);
         // The original path's next turn keeps its parent, as `addMessagesHandler` pins it before a sibling lands.
-        await harness.run(async (ctx: any) => await ctx.db.patch(rowIds[130], { parentMessageId: rowIds[129] }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", rowIds[130], { parentMessageId: rowIds[129] }));
         const regenerated = await insertRow(129, { parentMessageId: rowIds[128] });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: regenerated }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: regenerated }));
         await runJob(rowIds.at(-1)!);
 
         expect(generateText).not.toHaveBeenCalled();
@@ -358,7 +370,7 @@ describe("rows that called a tool", () => {
 
         await seedThread(ROWS);
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(rowIds[3], { text: "I will look this up.", tool: true });
+            await ctx.db.patch("messages", rowIds[3], { text: "I will look this up.", tool: true });
         });
         await runJob(rowIds.at(-1)!);
 
@@ -462,11 +474,11 @@ describe("what the agent reads", () => {
         // An edit of turn 10's prompt: a sibling of rows[21], parented on rows[20].
         const sibling = await insertRow(21, { parentMessageId: rowIds[20] });
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: sibling }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: sibling }));
 
         expect(await contextSummary(sibling)).toBeNull();
         // Switching back to the original path uses it again.
-        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: rowIds.at(-1) }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { activeLeafMessageId: rowIds.at(-1) }));
 
         expect(await contextSummary(rowIds.at(-1))).toBe("Early turns: trip planning.");
         // And the branch that leaves AFTER the covered row still has it.
@@ -497,7 +509,7 @@ describe("what the agent reads", () => {
 
         expect(await contextSummary(rowIds.at(-1))).toBe("longer");
 
-        await harness.run(async (ctx: any) => await ctx.db.delete(rowIds[49]));
+        await harness.run(async (ctx: any) => await ctx.db.delete("messages", rowIds[49]));
 
         expect(await contextSummary(rowIds.at(-1))).toBe("shorter");
     });
@@ -530,7 +542,7 @@ describe("what the agent reads", () => {
         await harness.run(async (ctx: any) => {
             const row = await ctx.db.query("userSettings").first();
 
-            await ctx.db.patch(row._id, { threadSummariesEnabled: false });
+            await ctx.db.patch("userSettings", row._id, { threadSummariesEnabled: false });
         });
 
         expect(await contextSummary(rowIds.at(-1))).toBeNull();
@@ -574,6 +586,25 @@ describe("what a summary carries over from the rows it folds in", () => {
         expect(stored?.taintedBy).toStrictEqual(["web"]);
     });
 
+    it.each([
+        ["an attached document's extracted text", documentTextPart("report.pdf", "Quarterly numbers.")],
+        ["a captured browser page", formatPageContextPart({ text: "page body", title: "A page", url: "https://example.com" })],
+    ])("records %s as untrusted, since the summary no longer shows it", async (_name, part) => {
+        expect.assertions(1);
+
+        await seedThread(0);
+
+        for (let index = 0; index < ROWS; index += 1) {
+            rowIds.push(await insertRow(index, index === 10 ? { message: { content: [part, { text: "summarise it", type: "text" }], role: "user" } } : {}));
+        }
+
+        await runJob(rowIds.at(-1)!);
+
+        const [head] = await summaries();
+
+        expect(head?.taintedBy).toStrictEqual(["files"]);
+    });
+
     it("keeps a clean summary clean", async () => {
         expect.assertions(1);
 
@@ -592,7 +623,7 @@ describe("what a summary carries over from the rows it folds in", () => {
         // The first cut (rows 0..49) is all tool results.
         await harness.run(async (ctx: any) => {
             for (const id of rowIds.slice(0, 50)) {
-                await ctx.db.patch(id, { message: toolRow.message, tool: true });
+                await ctx.db.patch("messages", id, { message: toolRow.message, tool: true });
             }
         });
         await runJob(rowIds.at(-1)!);
@@ -629,7 +660,7 @@ describe("what a summary carries over from the rows it folds in", () => {
 
         await harness.run(async (ctx: any) => {
             for (const id of rowIds.slice(50, 80)) {
-                await ctx.db.patch(id, { message: toolRow.message, tool: true });
+                await ctx.db.patch("messages", id, { message: toolRow.message, tool: true });
             }
         });
         generateText.mockClear();
@@ -661,7 +692,7 @@ describe("what a summary carries over from the rows it folds in", () => {
         await harness.run(async (ctx: any) => {
             const rows = await ctx.db.query("threadContextSummaries").collect();
 
-            await ctx.db.delete(rows.find((row: any) => row.summary === first?.summary)._id);
+            await ctx.db.delete("threadContextSummaries", rows.find((row: any) => row.summary === first?.summary)._id);
         });
 
         expect(await read()).not.toStrictEqual([]);
@@ -736,7 +767,7 @@ describe("a run refused after its model call", () => {
                     .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
                     .first();
 
-                await ctx.db.patch(settings._id, { threadSummariesEnabled: false });
+                await ctx.db.patch("userSettings", settings._id, { threadSummariesEnabled: false });
             });
 
             return { text: "Made while opting out.", usage: {} };
@@ -751,7 +782,7 @@ describe("a run refused after its model call", () => {
                 .withIndex("by_userId", (q: any) => q.eq("userId", OWNER))
                 .first();
 
-            await ctx.db.patch(settings._id, { threadSummariesEnabled: true });
+            await ctx.db.patch("userSettings", settings._id, { threadSummariesEnabled: true });
         });
         await runJob(rowIds.at(-1)!);
 
@@ -767,7 +798,7 @@ describe("an edit that lands while a summary is being made", () => {
         await seedThread(ROWS);
         // The model call takes a while; a reply is edited in place meanwhile.
         generateText.mockImplementationOnce(async () => {
-            await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { summaryEpoch: 1 }));
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { summaryEpoch: 1 }));
 
             return { text: "Summary of the old text.", usage: {} };
         });

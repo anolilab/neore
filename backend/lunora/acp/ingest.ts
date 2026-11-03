@@ -1,5 +1,5 @@
 /**
- * Host turn output, server side (plans/acp-agent-host.md §4.2–4.3): the internal functions behind
+ * Host turn output, server side (acp-agent-host.md §4.2–4.3): the internal functions behind
  * `POST /hosts/ingest` (`acp/http.ts`).
  *
  * - {@link verifyHostPost}: a query on the owner's shard that loads the device, checks the `turn` signature and
@@ -31,6 +31,7 @@ import {
     nextHostSeq,
     updateHostStream,
 } from "../chat/streaming/persistent/host";
+import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
@@ -39,6 +40,7 @@ import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { reapExpiredHostStreams } from "./lib/reap";
+import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
 import { vHostEvent } from "./validators";
@@ -76,20 +78,23 @@ const sessionTitle = (event: Extract<Event, { kind: "session_open" }>): string =
  * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread.
  */
 const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ApplyResult> => {
-    const [open] = events;
+    const [received] = events;
 
-    if (events.length !== 1 || open?.kind !== "session_open") {
+    if (events.length !== 1 || received?.kind !== "session_open") {
         return REFUSED;
     }
+
+    // An id the computer's core would refuse to load again is never stored, so a later switch cannot choose it.
+    const open = received.nativeSessionId !== undefined && !nativeIdFits(received.nativeSessionId) ? { ...received, nativeSessionId: undefined } : received;
 
     const existing = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
     if (existing) {
         // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.
-        const thread = await ctx.db.get(existing.threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", existing.threadId as Id<"threads">);
 
         if ((!thread || thread.deleted) && existing.status !== "ended") {
-            await ctx.db.patch(existing._id, { status: "ended", updatedAt: now });
+            await ctx.db.patch("acpSessions", existing._id, { status: "ended", updatedAt: now });
 
             return { ended: true, next: 0, outcome: "applied", threadId: existing.threadId as string };
         }
@@ -102,8 +107,26 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
-        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once.
-        const learnedNativeId = existing.nativeSessionId === undefined ? open.nativeSessionId : undefined;
+
+        // A session the backend started with a saved session id (`openHostSession` records it on the row) that the agent
+        // did not end up in: the thread says so and hands the conversation over instead. An agent that cannot say it
+        // loaded the session counts as one that did not.
+        const requestedNativeId = opened ? existing.nativeSessionId : undefined;
+        const reattachFailure = requestedNativeId === undefined ? undefined : reattachFailureOf(requestedNativeId, open);
+
+        if (reattachFailure !== undefined) {
+            await markReattachFailed(ctx, existing.threadId, reattachFailure);
+
+            // An agent that reported no id of its own leaves the asked-for one on the row, which would send a later switch
+            // back to the same session that just failed to load.
+            if (open.nativeSessionId === undefined) {
+                await patchRow(ctx.db, "acpSessions", existing, { nativeSessionId: undefined });
+            }
+        }
+
+        // The agent's own session id, kept for an import to find and a later reattach to use (S6); set once. One the agent
+        // did not load is not the session it opened, so the id it opened replaces it.
+        const learnedNativeId = existing.nativeSessionId === undefined || reattachFailure !== undefined ? open.nativeSessionId : undefined;
         // A message sent while the agent was still starting (§4.6) is waiting for it: the session opens already busy.
         const opening =
             opened &&
@@ -112,7 +135,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             })) !== null;
 
         if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("acpSessions", existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
@@ -167,8 +190,9 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
         return { ended: true, next: 0, outcome: "applied" };
     }
 
+    // Ended first: a worker run that finishes with its turn starts the next queued message, and must find the session gone.
+    await ctx.db.patch("acpSessions", session._id, { status: "ended", updatedAt: now });
     await endLiveHostTurns(ctx, session.threadId, { reason: "interrupted" }, now);
-    await ctx.db.patch(session._id, { status: "ended", updatedAt: now });
 
     return { ended: true, next: 0, outcome: "applied", threadId: session.threadId as string };
 };
@@ -294,9 +318,9 @@ const applyTurnPost = async (
     // host reads `ended` and stops posting.
     if (!isLiveStream(stream)) {
         // A restart that comes after the reaper: the turn was cut off, not merely silent. The reply stays as it
-        // was saved; only the reason moves on, so Continue (plans/acp-agent-host.md §4.5) is offered all the same.
+        // was saved; only the reason moves on, so Continue (acp-agent-host.md §4.5) is offered all the same.
         if (stream.hostEndReason === "timeout" && events.some((event) => event.kind === "turn_end" && event.reason === "interrupted")) {
-            await ctx.db.patch(stream._id, { hostEndReason: "interrupted" });
+            await ctx.db.patch("persistentStreams", stream._id, { hostEndReason: "interrupted" });
         }
 
         return { ended: true, next, outcome: "applied" };
@@ -320,6 +344,11 @@ const applyTurnPost = async (
 
         if (event.kind === "turn_start" && isForwardHostState(hostState, "received")) {
             hostState = "received";
+        }
+
+        // The agent opened the turn whose prompt carried the handoff: only now does its saved session hold it (`receivedItsHandoff`).
+        if (event.kind === "turn_start" && stream.carriesHandoff === true && session.handoffSentAt === undefined) {
+            await ctx.db.patch("acpSessions", session._id, { handoffSentAt: now });
         }
 
         if (isAgentEvent(event)) {

@@ -1,6 +1,7 @@
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import { enabledModelOf, MODEL_LOOKUP } from "@neore/ai/models";
 import type { CinemaSettings } from "@neore/ai/types/cinema";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { HttpActionCtx } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
@@ -28,6 +29,7 @@ import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
+import { documentTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -151,15 +153,7 @@ export const improvePromptHttpAction = async (context: HttpActionCtx, request: R
     } catch (error) {
         chatLogger.error("Error improving prompt:", error);
 
-        const errorMessage = userFacingError(error)?.message ?? "Failed to improve prompt";
-
-        return Response.json(
-            { error: errorMessage },
-            {
-                headers: { "Content-Type": "application/json" },
-                status: 500,
-            },
-        );
+        return respondWithUserError(error, "Failed to improve prompt");
     }
 };
 
@@ -176,7 +170,8 @@ const respondWithUserError = (error: unknown, fallback: string) => {
             );
         }
 
-        return Response.json({ error: userError.message }, { headers: { "Content-Type": "application/json" }, status: 500 });
+        // The refusal's own 4xx (a model filter that allows no model, unreadable settings): a 500 reads as transient and is retried.
+        return Response.json({ error: userError.message }, { headers: { "Content-Type": "application/json" }, status: userError.status });
     }
 
     return Response.json({ error: fallback }, { headers: { "Content-Type": "application/json" }, status: 500 });
@@ -353,6 +348,8 @@ export const chatStartHttpAction = async (context: HttpActionCtx, request: Reque
 
 /** The `/chat/start` request body. Also built by the public API's chat route. */
 export interface ChatStartBody {
+    /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
+    autoModel?: boolean;
     cinemaSettings?: CinemaSettings;
     customSystemPrompt?: string;
     duration?: number;
@@ -405,16 +402,65 @@ const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED
  * runs the SAME path — same limits, same thread creation, same stream — with
  * an API-key identity instead of the gateway's HMAC plus forwarded JWT.
  */
+const cleaned = (value: unknown): unknown => (typeof value === "string" ? stripHiddenText(value).text : value);
+
+/**
+ * Every text field that reaches the model, with the hidden characters removed. The body is untrusted JSON, so each
+ * field is cleaned only when it is a string; a malformed one is left for its own validation to refuse.
+ */
+const withoutHiddenText = (body: ChatStartBody): ChatStartBody => {
+    const { goal, pageContext } = body;
+    const cleanGoal = goal !== null && typeof goal === "object" && typeof goal.text === "string" ? { ...goal, text: cleaned(goal.text) as string } : goal;
+    const cleanPageContext =
+        pageContext !== null && typeof pageContext === "object" && !Array.isArray(pageContext)
+            ? Object.fromEntries(Object.entries(pageContext).map(([key, value]) => [key, cleaned(value)]))
+            : pageContext;
+
+    return {
+        ...body,
+        ...(body.prompt !== undefined && { prompt: cleaned(body.prompt) as string }),
+        ...(body.customSystemPrompt !== undefined && { customSystemPrompt: cleaned(body.customSystemPrompt) as string }),
+        ...(body.negativePrompt !== undefined && { negativePrompt: cleaned(body.negativePrompt) as string }),
+        // Stored on a new thread and interpolated into the system prompt; the other strings are model options.
+        ...(body.language !== undefined && { language: cleaned(body.language) as string }),
+        ...(body.style !== undefined && { style: cleaned(body.style) as string }),
+        ...(body.quality !== undefined && { quality: cleaned(body.quality) as string }),
+        ...(body.imageSize !== undefined && { imageSize: cleaned(body.imageSize) as string }),
+        ...(body.searchMode !== undefined && { searchMode: cleaned(body.searchMode) as string }),
+        ...(goal !== undefined && { goal: cleanGoal }),
+        ...(pageContext !== undefined && { pageContext: cleanPageContext }),
+    };
+};
+
+/** A prompt that was only hidden characters is not an omitted prompt (which means "continue"): it is refused. */
+const emptyAfterStripping = (prompt: unknown): boolean => {
+    if (typeof prompt !== "string") {
+        return false;
+    }
+
+    const { removed, text } = stripHiddenText(prompt);
+
+    return removed > 0 && text.trim() === "";
+};
+
 const hostRunThreadResponse = (): Response =>
     Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
 
 export const runChatStart = async (
     context: HttpActionCtx,
-    body: ChatStartBody,
+    rawBody: ChatStartBody,
     signingSecret: string,
     /** `outside_agent` for the public API's key callers; the user's own chat when unset. */
     origin?: "outside_agent",
 ): Promise<Response> => {
+    // Characters that render as nothing (tag block, bidi controls) can carry instructions the person never sees. The
+    // composer removes them too; this is the check no client can skip, and it covers the public API.
+    if (emptyAfterStripping(rawBody.prompt)) {
+        return Response.json({ error: "The prompt is empty after removing hidden characters" }, { status: 400 });
+    }
+
+    const body = withoutHiddenText(rawBody);
+
     // The gateway forwards this field without looking at it, so this is the
     // only place its shape and size are checked.
     const pageContext = parsePageContext(body.pageContext);
@@ -582,9 +628,7 @@ const runChatStartOnShard = async (
                 if (imagePart && Object.keys(imagePart).length > 0) {
                     messageContent.push(imagePart);
                 } else if (extractedText) {
-                    const label = filename ? `[Document: ${filename}]` : "[Attached Document]";
-
-                    messageContent.unshift({ text: `${label}\n\n${extractedText}`, type: "text" });
+                    messageContent.unshift(documentTextPart(filename, extractedText));
                 } else if (filePart && Object.keys(filePart).length > 0) {
                     messageContent.push(filePart);
                 }
@@ -843,6 +887,8 @@ const runChatStartOnShard = async (
     } else {
         // New thread: batched creation
         const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
+            // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
+            ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
             customSystemPrompt: body.customSystemPrompt,
             enabledFeatures: body.enabledFeatures,
             fileIds: body.fileIds,
@@ -1088,17 +1134,6 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             }
         }
 
-        // An edit regenerates the reply, so it spends the same daily message quota
-        // as `/chat/start` — it used to be an uncounted way to generate.
-        const editLimit = await chargeDailyLimit(context, user, "Text");
-
-        if (!editLimit.ok) {
-            return Response.json(
-                { error: "DAILY_MESSAGE_LIMIT_REACHED", message: "You've reached your daily message limit.", retryAfter: editLimit.retryAfter },
-                { headers: { "Content-Type": "application/json" }, status: 403 },
-            );
-        }
-
         // Convert content to message format
         const messageContent: any[] = [];
 
@@ -1124,12 +1159,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     if (imagePart && Object.keys(imagePart).length > 0) {
                         messageContent.push(imagePart);
                     } else if (extractedText) {
-                        const label = filename ? `[Document: ${filename}]` : "[Attached Document]";
-
-                        messageContent.push({
-                            text: `${label}\n\n${extractedText}`,
-                            type: "text",
-                        });
+                        messageContent.push(documentTextPart(filename, extractedText));
                     } else if (filePart && Object.keys(filePart).length > 0) {
                         messageContent.push(filePart);
                     }
@@ -1146,6 +1176,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         }
 
         // Add text and other content parts
+        let droppedHiddenOnlyText = false;
+
         for (const part of content) {
             switch (part.type) {
                 case "file": {
@@ -1167,7 +1199,21 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                     break;
                 }
                 case "text": {
-                    messageContent.push({ text: part.text, type: "text" });
+                    if (typeof part.text !== "string") {
+                        return Response.json({ error: "A text part needs a text string" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+                    }
+
+                    // The edit is a prompt like any other: the composer strips, and this is the check no client can skip.
+                    const { removed, text } = stripHiddenText(part.text);
+
+                    // A text part that was only hidden characters is dropped; the edit is refused below only when nothing else is left.
+                    if (removed > 0 && text.trim() === "") {
+                        droppedHiddenOnlyText = true;
+
+                        break;
+                    }
+
+                    messageContent.push({ text, type: "text" });
 
                     break;
                 }
@@ -1178,11 +1224,30 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             }
         }
 
+        if (droppedHiddenOnlyText && messageContent.length === 0) {
+            return Response.json(
+                { error: "The prompt is empty after removing hidden characters" },
+                { headers: { "Content-Type": "application/json" }, status: 400 },
+            );
+        }
+
         // Only a prompt can be edited. The edit is saved as a SIBLING of the
         // original (see `agent/branch-tree.ts`): the original and every reply
         // after it stay in the thread, one switch away. This used to delete them.
         if (message.message?.role !== "user") {
             return Response.json({ error: "Only user messages can be edited" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+        }
+
+        // An edit regenerates the reply, so it spends the same daily message quota
+        // as `/chat/start` — it used to be an uncounted way to generate.
+        // Charged after every refusal above (hidden-only text, a missing file, a non-prompt), so a refused edit costs nothing.
+        const editLimit = await chargeDailyLimit(context, user, "Text");
+
+        if (!editLimit.ok) {
+            return Response.json(
+                { error: "DAILY_MESSAGE_LIMIT_REACHED", message: "You've reached your daily message limit.", retryAfter: editLimit.retryAfter },
+                { headers: { "Content-Type": "application/json" }, status: 403 },
+            );
         }
 
         const editedMessageId = await context.runMutation(internal.agent.branches.saveEditedSibling, {

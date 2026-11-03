@@ -4,6 +4,8 @@
  * writes.
  */
 
+import { stripHiddenText } from "@neore/ai/utils";
+
 import { hmacSha256Hex, timingSafeEqual } from "../../lib/crypto";
 
 /** A question is a quick one; anything longer belongs in the thread. */
@@ -101,6 +103,9 @@ export const liveReplyTail = (chunksNewestFirst: ReadonlyArray<LiveChunk>): stri
 
     return text.trim() ? text : undefined;
 };
+
+/** The question as `askAside` signs it and "Add to thread" verifies it: without hidden characters, then trimmed. */
+export const normalizeAsideQuestion = (question: string): string => stripHiddenText(question).text.trim();
 
 export interface AsideAnswerClaim {
     answer: string;

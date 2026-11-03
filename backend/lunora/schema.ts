@@ -161,6 +161,9 @@ export const schema = defineSchema({
         deviceId: v.id("devices"),
         folderId: v.string(),
         folderLabel: v.string(),
+        // When a prompt sent from the app carried the handoff this session was opened for (`acp/lib/send-turn.ts`). A prompt typed
+        // in the computer's own window is a turn too but carries none, so a turn alone does not show the agent got it. Unset: not yet.
+        handoffSentAt: v.optional(v.number()),
         hostSessionId: v.string(),
         // An imported session (S6) takes its transcript from the host a turn at a time: `importedTurns` is how many the backend
         // holds, `importState` whether the host has sent the end. Unset on a session that ran here.
@@ -169,6 +172,9 @@ export const schema = defineSchema({
         lastEventAt: v.optional(v.number()),
         nativeSessionId: v.optional(v.string()),
         status: vAcpSessionStatus,
+        // The untrusted content the agent was handed when it took over (`agent/thread-summary-taint.ts`), signed onto every
+        // prompt it is sent. Unset: it was handed none.
+        taintedBy: v.optional(v.array(vDeviceTaintSource)),
         threadId: v.id("threads"),
         updatedAt: v.number(),
         userId: v.string(),
@@ -193,11 +199,17 @@ export const schema = defineSchema({
         .global(),
 
     aiUserPreferences: defineTable({
+        // Opt-in quick check that approves low-risk `ask` tool calls (chat/lib/low-risk-approval.ts). Absent = off.
+        // Server-written only (`chat_tool_permissions.setAutoApproveLowRisk`); `auth/fields.ts` deliberately omits it.
+        autoApproveLowRisk: v.optional(v.boolean()),
         autoDetectComplexity: v.optional(v.boolean()),
         autoMediaEnrichment: v.optional(v.boolean()),
         browserSettings: v.optional(
             v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }),
         ),
+        // Who a coding-agent pull request's commits are made as: the agent (absent, the default) or the person who
+        // started the run, with the agent as co-author. Server-written only (`coding_agents.functions.setCodingAgentCommitIdentity`).
+        codingAgentCommitIdentity: v.optional(v.union(v.literal("agent"), v.literal("user"))),
         customAIProviders: v.optional(v.any()),
         customization: v.optional(v.any()),
         customModels: v.optional(v.any()),
@@ -206,6 +218,9 @@ export const schema = defineSchema({
         enableKnowledge: v.optional(v.boolean()),
         enablePlanner: v.optional(v.boolean()),
         generalProviders: v.optional(v.any()),
+        // Servers whose tools the quick check may judge (chat/lib/low-risk-trust.ts): an MCP server by name AND url, a connector by slug.
+        // Absent = none, bounded by `MAX_TRUSTED_SERVERS`. Server-written only (`chat_tool_permissions.setLowRiskTrustedServer`); `auth/fields.ts` omits it.
+        lowRiskTrustedServers: v.optional(v.array(v.string())),
         /**
          * Header values the agent obtained with `requestSecret` for one of `mcpServers`, encrypted
          * (`lib/encryption.ts`, `mcp-headers`) and bound to the server's name AND url. Apart from
@@ -672,6 +687,8 @@ export const schema = defineSchema({
         acpOffers: v.optional(v.array(vAcpOffer)),
         createdAt: v.number(),
         encryptedSecret: v.optional(v.string()),
+        // The wire protocol the computer's signed manifest reported (`MIN_DEVICE_PROTOCOL`); unset until a build that reports it has sent one.
+        hostProtocol: v.optional(v.number()),
         lastSeenAt: v.optional(v.number()),
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
@@ -1580,6 +1597,20 @@ export const schema = defineSchema({
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
 
+    organizationPolicies: defineTable({
+        // The policy as canonical JSON text, written only after `auth/lib/organization-policy.ts`
+        // accepted it. Text, not a typed object, so the parser stays the one place that knows its shape.
+        document: v.string(),
+        organizationId: v.string(),
+        // Moves on every write, so a reader can tell a newer policy from the one it holds.
+        revision: v.number(),
+        schemaVersion: v.number(),
+        updatedAt: v.number(),
+    })
+        .global()
+        .index("organizationId", ["organizationId"])
+        .triggers((t) => auditTriggersFor(t, "organizationPolicies", AUDIT_TABLES["organizationPolicies"]!)),
+
     // The outbox for opt-in task-outcome mail (`notifications/task-email.ts`): written
     // in `notify()`'s own transaction, one row per inbox row, sent by the housekeeping
     // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
@@ -1790,6 +1821,11 @@ export const schema = defineSchema({
         }),
 
     persistentStreams: defineTable({
+        // Liveness of the run writing this stream: set when it registers (`registerResumableRun`), then every ~minute
+        // while it lives and by each resume's claim. A stale beat on a claimed, unpaused stream is a dead worker.
+        beatAt: v.optional(v.number()),
+        // The turn's prompt carried a handoff; `turn_start` is the proof the agent received it (`acpSessions.handoffSentAt`).
+        carriesHandoff: v.optional(v.boolean()),
         // The steps whose pause "Retry now" cut short (`retryPausedRunsNow`): the provider's limit may not have lifted, so
         // such a step may pause once more. It still counts toward the cap on pauses.
         earlySteps: v.optional(v.array(v.string())),
@@ -1804,6 +1840,8 @@ export const schema = defineSchema({
         hostRegenerate: v.optional(v.boolean()),
         hostState: v.optional(vHostState),
         hostTurnId: v.optional(v.string()),
+        // How many times the run was resumed after its worker died (`interrupted.ts`); capped, the next one fails the run.
+        interruptions: v.optional(v.number()),
         messageId: v.string(),
         // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
         // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
@@ -1826,6 +1864,10 @@ export const schema = defineSchema({
         // it ran (the resume gets only the rest of the step cap), and what its usage record needs (`skill`,
         // `timeZone`). The run records ONE reply when it ends, covering these rows; a pause that never resumes
         // (a stop, a superseded run) records them itself (`pause-usage.ts`), once, and clears this.
+        // Set with `pause` when the pause is the resume of a run whose worker died, not a rate-limit wait
+        // (`streaming/persistent/interrupted.ts`); `pause.reason` keeps its one stored value, since widening it
+        // reads as a breaking schema change.
+        pauseCause: v.optional(v.literal("interrupted")),
         pausedRun: v.optional(
             v.object({
                 replyRowIds: v.array(v.string()),
@@ -1837,10 +1879,22 @@ export const schema = defineSchema({
         // The rows a run paused on, one per pause (`rate-limit-pause.ts#planPause`): a step is paused on once, a run three times.
         pausedSteps: v.optional(v.array(v.string())),
         producer: v.optional(v.literal("host")),
+        // What the reply's usage record needs, kept from the run's start (`registerResumableRun`) for a run that dies before
+        // any pause stored it in `pausedRun`.
+        replyContext: v.optional(v.object({ skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })), timeZone: v.optional(v.string()) })),
+        // Whether the person lets a dead run resume (`userSettings.resumeInterruptedRuns`), decided by the run's own action
+        // (the setting lives on the person's shard, the stream may sit on a thread owner's). Absent = on.
+        resumable: v.optional(v.boolean()),
+        // The job's own arguments, stored by a run that may be resumed when its worker dies (`registerResumableRun`).
+        // Absent: tool-approval continuations, group turns and stateless runs, which are never resumed that way.
+        runArgs: v.optional(v.object({ ...runStreamingAgentFields })),
         // Set once, by the ONE run that may write this stream (`claimStreamRun`).
         // The run arrives on the jobs queue, which delivers at least once; a
         // redelivery finds this set and does nothing.
         runClaimedAt: v.optional(v.number()),
+        // Which run holds this stream: absent for the first claim, one more for each resume claim (`claimRunResume`). A run
+        // carries its number on every write that matters and is refused once a newer run holds the stream (`run-epoch.ts`).
+        runEpoch: v.optional(v.number()),
         status: v.string(),
         // Messages the run's user sent into it while it streams (`chat/steering.ts`).
         // `queued` until the run takes them at a step boundary; a delivered entry
@@ -1874,6 +1928,12 @@ export const schema = defineSchema({
             statelessMode: v.optional(v.boolean()),
         }),
         threadId: v.string(),
+        // The real server and tool names of the run's MCP tools (`McpToolLabels`), kept so a reply recovered after its
+        // worker died is stamped like one that finished (`registerResumableRun`, `recoverFinishedReply`).
+        toolLabels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
+        // Tool calls started and not yet finished (`markToolRun`). A worker that dies with one open may have paid for or
+        // changed something, so such a run is never resumed.
+        toolsInFlight: v.optional(v.number()),
         userId: v.string(),
     })
         .shardBy("userId")
@@ -2090,6 +2150,26 @@ export const schema = defineSchema({
         .index("by_user_and_pull", ["userId", "hostOrigin", "repository", "number"])
         .index("by_threadId", ["threadId"]),
 
+    // Develop mode: the thread a pull request is worked on in, and the pull requests a coding agent opened FROM a
+    // thread. `kind` says which: `attached` when the person started work on it ("Work on this PR"), `opened` when a run
+    // it belonged to opened it. One row per (user, repository, number, kind) at most; the thread id is the link both
+    // ways, so the PR lists its threads and a thread names its PR.
+    pullRequestThreads: defineTable({
+        baseBranch: v.optional(v.string()),
+        createdAt: v.number(),
+        headBranch: v.optional(v.string()),
+        kind: v.union(v.literal("attached"), v.literal("opened")),
+        number: v.number(),
+        repository: v.string(),
+        threadId: v.id("threads"),
+        title: v.string(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_repository_number", ["userId", "repository", "number"])
+        .index("by_user_and_threadId", ["userId", "threadId"]),
+
     /**
      * better-auth's own rate-limit store.
      *
@@ -2152,7 +2232,7 @@ export const schema = defineSchema({
         ref: v.string(),
         // The reply that asked (`toolApprovalRuns.config.replyKey`): ending it drops this row's ciphertext, another reply's end does not.
         replyKey: v.optional(v.string()),
-        status: v.union(v.literal("saved"), v.literal("used")),
+        status: v.union(v.literal("saved"), v.literal("used"), v.literal("abandoned")),
         threadId: v.string(),
         use: v.union(
             v.object({ header: v.string(), kind: v.literal("mcp_header"), server: v.string(), url: v.optional(v.string()) }),
@@ -2498,6 +2578,12 @@ export const schema = defineSchema({
         // Who sent this dispatch (`sub-agents/logic.ts:DISPATCH_SOURCES`); unset on rows from before it was recorded.
         dispatchedBy: v.optional(vDispatchSource),
         error: v.optional(v.string()),
+        // How many times a host run's message met a busy computer and was put back in line to try again
+        // (`sub-agents/host-runs.ts:HOST_START_MAX_ATTEMPTS`); unset until the first.
+        hostStartAttempts: v.optional(v.number()),
+        // A host run's turn (`persistentStreams.hostTurnId`): the host's `turn_end` finishes the run that sent it,
+        // and a turn nobody dispatched (one typed in the desktop window) finishes none.
+        hostTurnId: v.optional(v.string()),
         // Set when the loop of a run that was stopped while running is known to be gone (it reported, or the
         // reaper fired): until then it may still write into the worker's thread, so the next message waits.
         loopExitedAt: v.optional(v.number()),
@@ -2875,6 +2961,9 @@ export const schema = defineSchema({
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // Each send resolves to one concrete model chosen by the gateway's query routing (`chat/lib/auto-model.ts`).
+        // `model` stays a concrete id (the fallback); unset = off. Never set on a switched thread's behalf.
+        autoModel: v.optional(v.boolean()),
         // The last run paused for the owner (a tool approval, or an askUser question). Set in the
         // same patch that ends the run (`chat/lib/agent-run.ts#setThreadStatus`); removed by any
         // write that puts the thread back to `running` (`agent/table-writes.ts#patchThread`).
@@ -3033,6 +3122,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
+        // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
+        // existed, which `discardPausedThreadSecrets` classifies from the saved messages instead.
+        secretRequest: v.optional(v.boolean()),
         status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
         streamId: v.optional(v.string()),
         threadId: v.string(),
@@ -3041,6 +3133,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_approvalId", ["approvalId"])
         .index("by_threadId", ["threadId"])
+        // Auto-archive's "does this thread still wait on a person" (`agent/auto-archive.ts`).
+        .index("by_threadId_status_createdAt", ["threadId", "status", "createdAt"])
         .index("by_status_createdAt", ["status", "createdAt"])
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).
@@ -3122,6 +3216,9 @@ export const schema = defineSchema({
         type: v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event")),
         updatedAt: v.number(),
         userId: v.string(),
+        // The secret a rotation replaced, still accepted until `webhookPreviousSecretExpiresAt` (an opt-in overlap; `triggers/http.ts`).
+        webhookPreviousSecret: v.optional(v.string()),
+        webhookPreviousSecretExpiresAt: v.optional(v.number()),
         webhookSecret: v.optional(v.string()),
         // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
         // A trigger accepts only its own scheme's headers. Widening this union is additive.
@@ -3318,6 +3415,8 @@ export const schema = defineSchema({
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
+        // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
+        resumeInterruptedRuns: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.
@@ -3469,6 +3568,11 @@ export const schema = defineSchema({
     // `payment_sessions`, `payment_subscriptions`, `payment_usageEvents`), owned by
     // the billing module. Merged, never copied: the store reads and writes them by
     // these names, which the package may change on any upgrade.
-    .extend(paymentExtension);
+    .extend(paymentExtension)
+    // Pins every Durable Object (shards, scheduler, shard registry) to the EU. Codegen reads
+    // this argument as a string literal, so it cannot follow `DATA_JURISDICTION`
+    // (`lib/data-jurisdiction.ts`); `data-jurisdiction.test.ts` pins that it stays "eu", the
+    // setting's default. A DO's jurisdiction is fixed at creation.
+    .jurisdiction("eu");
 
 export default schema;

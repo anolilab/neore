@@ -18,7 +18,9 @@
  *
  * The user's own provider keys and custom endpoints apply to every headless run.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { stepCountIs } from "ai";
+import { LunoraError } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
@@ -37,6 +39,7 @@ import {
     resolveRunModel,
     retrieveMemoryContext,
     setDispatchOrigin,
+    setHeadlessRun,
     setResearchDepth,
     toPersonalization,
 } from "./agent-run";
@@ -159,7 +162,26 @@ const headlessSkillTools = (
     return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: config?.disabledTools };
 };
 
-export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptions): Promise<HeadlessRunResult> => {
+/**
+ * Task instructions, trigger templates and webhook bodies, sub-agent briefs, eval cases and messenger texts all arrive
+ * here, so this is the one place that keeps hidden characters (tag block, bidi controls) out of what the agent is told.
+ */
+const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
+    const prompt = options.prompt === undefined ? undefined : stripHiddenText(options.prompt);
+
+    if (prompt && prompt.removed > 0 && prompt.text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
+    }
+
+    return {
+        ...options,
+        ...(prompt && { prompt: prompt.text }),
+        ...(options.system !== undefined && { system: stripHiddenText(options.system).text }),
+    };
+};
+
+export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
+    const options = withoutHiddenText(rawOptions);
     const { model, prompt, skill, userId } = options;
     const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId);
     const [prefs, userProviderKeys] = await Promise.all([
@@ -185,6 +207,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
     try {
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
+        setHeadlessRun(ctx);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
@@ -324,7 +347,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             charge: async () => await ctx.runMutation(internal.chat.goals.internal.chargeGoalRound, { userId }),
             first,
             goal: { ...options.goal },
-            review: async ({ round, transcript }) => await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, threadId, transcript, userId }),
+            review: async ({ round, transcript }) =>
+                await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, rules: modelFilterRules, threadId, transcript, userId }),
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
             startedAt,
             stopped: options.shouldStop,

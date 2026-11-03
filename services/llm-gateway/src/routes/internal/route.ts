@@ -16,7 +16,7 @@ import { GATEWAY_MODELS } from "../../models.js";
 import { ProviderHealthService } from "../../providers/health.js";
 import { PricingService } from "../../providers/pricing.js";
 import { VerdictCache } from "../../routing/cache.js";
-import { classifyTierWithModel, isClassifierEnabled } from "../../routing/classifier.js";
+import { canClassifyPrompt, classifyTierWithModel, isClassifierEnabled } from "../../routing/classifier.js";
 import { classifyQuery } from "../../routing/classify.js";
 import type { ModelFilterRules } from "../../routing/filters.js";
 import { filterModels, hasActiveFilters } from "../../routing/filters.js";
@@ -30,6 +30,12 @@ import { classifySpecificity, resolveCategoryPin } from "../../routing/specifici
 import { loadTierPools } from "../../routing/tier-assignment.js";
 import { isTierAllowedFor, parseTierOverride, permittedTiersFor, TIER_OVERRIDE_HEADER, tierToCombinedScore } from "../../routing/tier-override.js";
 import { classifyTier, QueryTier, scoreConfidence, tierMidpoint } from "../../routing/tiers.js";
+
+/** Room kept free in the context window for the reply, when a route checks that a model holds the conversation. */
+const RESPONSE_RESERVE_TOKENS = 4096;
+
+/** The share of a model's window a request may fill: the preflight's own limit (`lib/token-estimator.ts`). */
+const PREFLIGHT_CONTEXT_THRESHOLD = 0.95;
 
 const routeRouter = new OpenAPIHono<HonoEnv>();
 
@@ -106,6 +112,14 @@ const requestSchema = z.object({
      * social_media, email_management, calendar_management, trading.
      */
     categoryPins: z.record(z.string(), z.object({ modelId: z.string(), provider: z.string() })).optional(),
+
+    /**
+     * Size of the conversation the caller holds, when `messages` carries only the latest turn. The larger of this and
+     * the estimate from `messages` feeds the downgrade-cost policy, so a short follow-up in a long thread is not
+     * mistaken for a short thread.
+     */
+    contextTokens: z.int().min(0).optional(),
+
     messages: z.array(z.record(z.string(), z.unknown())),
 
     /**
@@ -124,6 +138,7 @@ const requestSchema = z.object({
             requireZDR: z.boolean().optional(),
         })
         .optional(),
+
     preferredModel: z.string().optional(),
     preferredQuality: z.number().min(0).max(1).optional(),
 
@@ -135,7 +150,20 @@ const requestSchema = z.object({
      * - "balanced": default heuristic scoring (same as omitting)
      */
     routingProfile: z.enum(["fast", "balanced", "reasoning", "premium"]).optional(),
+
+    runnableModels: z
+        .array(z.object({ modelApiId: z.string(), provider: z.string() }))
+        .max(1000)
+        .optional(),
+
     threadId: z.string().optional(),
+
+    /**
+     * The (provider, API model) pairs the caller can run. When set, only those candidates are routed to, and only the
+     * ones whose context window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
+     */
+    /** Number of tools the send would offer, when the caller does not send their schemas (`toolSchemas`). */
+    toolCount: z.int().min(0).optional(),
     toolSchemas: z.record(z.string(), z.unknown()).optional(),
 
     /**
@@ -170,9 +198,9 @@ routeRouter.openapi(
     async (c) => {
         const body = c.req.valid("json");
         const messages = body.messages as ModelMessage[];
-        const toolCount = body.toolSchemas ? Object.keys(body.toolSchemas).length : 0;
+        const toolCount = body.toolCount ?? (body.toolSchemas ? Object.keys(body.toolSchemas).length : 0);
         const hasImages = messages.some((m) => Array.isArray(m.content) && m.content.some((p: { type: string }) => p.type === "image" || p.type === "file"));
-        const contextTokens = estimateContextTokens(messages);
+        const contextTokens = Math.max(estimateContextTokens(messages), body.contextTokens ?? 0);
 
         // Header-based tier override. Validated against the caller's userTier
         // so a free-plan request cannot self-promote to the reasoning tier.
@@ -206,6 +234,23 @@ routeRouter.openapi(
                     },
                     403 as 200,
                 );
+            }
+        }
+
+        if (body.runnableModels) {
+            const runnable = new Set(body.runnableModels.map((model) => `${model.provider}/${model.modelApiId}`));
+            const needed = contextTokens + RESPONSE_RESERVE_TOKENS;
+
+            // The same limit the preflight enforces before a request is sent (`estimateTokens`' threshold), so a model
+            // routed here is never refused for size at the preflight.
+            candidates = candidates.filter(
+                (candidate) =>
+                    runnable.has(`${candidate.provider}/${candidate.modelApiId}`) &&
+                    Math.floor((candidate.contextWindow ?? 0) * PREFLIGHT_CONTEXT_THRESHOLD) >= needed,
+            );
+
+            if (candidates.length === 0) {
+                return c.json({ error: { code: "MODEL_BLOCKED", message: "No runnable model has a context window for this conversation." } }, 403 as 200);
             }
         }
 
@@ -259,7 +304,7 @@ routeRouter.openapi(
             messages,
             preferredQuality: body.preferredQuality,
             // Our scorer counts tools rather than inspecting their schemas.
-            toolCount: body.toolSchemas ? Object.keys(body.toolSchemas).length : undefined,
+            toolCount: body.toolCount ?? (body.toolSchemas ? Object.keys(body.toolSchemas).length : undefined),
             userTier: body.userTier,
         });
 
@@ -318,9 +363,9 @@ routeRouter.openapi(
                     // is derived from where the score falls inside its band.
                     verdictConfidence = scoreConfidence(score.combined);
 
-                    if (isClassifierEnabled(c.env) && availableTiers.length > 0) {
+                    if (isClassifierEnabled(c.env) && canClassifyPrompt(c.env, rules) && availableTiers.length > 0) {
                         const verdictCache = new VerdictCache(c.env.PRICING_KV);
-                        const cacheKey = { availableTiers, hasImages, lastUserMessage, toolCount };
+                        const cacheKey = { availableTiers, contextTokens, hasImages, lastUserMessage, toolCount };
                         const cached = await verdictCache.get(cacheKey);
 
                         if (cached) {
@@ -370,6 +415,12 @@ routeRouter.openapi(
         const healthService = new ProviderHealthService(c.env);
         const pricingService = new PricingService(c.env);
         const result = await selectModel(score, candidates, healthService, effectivePreferredModel, pricingService, tierPools);
+
+        // With runnable models supplied, a pick outside them (the selector's fallback to a tier pool no candidate sits in)
+        // is never returned: the caller keeps its own model instead.
+        if (body.runnableModels && candidates.every((candidate) => candidate.modelId !== result.modelId || candidate.provider !== result.provider)) {
+            return c.json({ error: { code: "MODEL_BLOCKED", message: "No runnable model is eligible for this conversation." } }, 403 as 200);
+        }
 
         const classification = classifyQuery(lastUserMessage);
 

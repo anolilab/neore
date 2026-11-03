@@ -1,5 +1,5 @@
 //! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel` and
-//! `acp_permission_answer` (plans/acp-agent-host.md §4.1).
+//! `acp_permission_answer` (acp-agent-host.md §4.1).
 //!
 //! They are signed device calls like any other, but they are not device tools: nothing runs here. Rust checks the
 //! signature, the device and the expiry, decides whether the command may be carried out at all (a start needs an
@@ -54,6 +54,9 @@ pub fn is_acp_tool(tool: &str) -> bool {
 )]
 pub enum AcpCommand {
     Cancel {
+        /// Keep the prompts queued behind the turn (a worker's stop, whose later messages are other runs). Absent or
+        /// anything but `true` drops them, as a person's Stop does.
+        keep_queue: bool,
         session_id: String,
         turn_id: String,
     },
@@ -73,10 +76,18 @@ pub enum AcpCommand {
         folder_id: String,
         folder_label: String,
         folder_path: String,
+        /// The agent's own id of a saved session to load instead of opening a new one (harness switch S4). The
+        /// host loads it only when the agent said it can; it is the backend's record of this same agent, folder and
+        /// computer, and it never widens what the pair is approved for.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        native_session_id: Option<String>,
         session_id: String,
         thread_id: String,
     },
 }
+
+/// An agent's own session ids are longer than the ids the backend mints.
+const NATIVE_ID_MAX: usize = 256;
 
 /// The outcome of step 1. Exactly one of `command` and `refusal` is set.
 #[derive(Debug, Serialize)]
@@ -221,6 +232,7 @@ impl DeviceState {
         match call.tool.as_str() {
             "acp_cancel" => match (id_of(input, "sessionId"), id_of(input, "turnId")) {
                 (Some(session_id), Some(turn_id)) => Ok(AcpCommand::Cancel {
+                    keep_queue: input.get("keepQueue").and_then(Value::as_bool) == Some(true),
                     session_id,
                     turn_id,
                 }),
@@ -273,6 +285,11 @@ impl DeviceState {
         ) else {
             return refusal("a start names a session, a thread, an agent and a folder");
         };
+        let native_session_id = match input.get("nativeSessionId") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(id)) if (1..=NATIVE_ID_MAX).contains(&id.len()) => Some(id.clone()),
+            Some(_) => return refusal("a start's saved session id is not valid"),
+        };
         let settings = self.settings();
         // A server's pairs are its own: an approval for this computer says nothing about a server, or the other way round.
         let (agents, consents) = match host {
@@ -295,6 +312,7 @@ impl DeviceState {
                 folder_id,
                 folder_label: consent.folder_label.clone(),
                 folder_path: consent.folder_path.clone(),
+                native_session_id,
                 session_id,
                 thread_id,
             }),
@@ -474,11 +492,65 @@ mod tests {
                 folder_id: "f1".into(),
                 folder_label: "neore".into(),
                 folder_path: "/home/me/neore".into(),
+                native_session_id: None,
                 session_id: "s1".into(),
                 thread_id: "t1".into(),
             })
         );
         assert_eq!(prepared.call_id, "c1");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_start_may_name_a_saved_session_but_only_a_valid_one() {
+        let (state, dir, _) = state("native");
+        let mut input = start_input("claude", "f1");
+
+        input["nativeSessionId"] = json!("sess_1");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(matches!(
+            prepared.command,
+            Some(AcpCommand::Start { native_session_id: Some(ref id), .. }) if id == "sess_1"
+        ));
+
+        // Exactly the cap, counted in UTF-8 bytes (128 two-byte characters), is kept as sent.
+        let longest = "\u{e9}".repeat(128);
+        let mut input = start_input("claude", "f1");
+
+        input["nativeSessionId"] = json!(longest);
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(matches!(
+            prepared.command,
+            Some(AcpCommand::Start { native_session_id: Some(ref id), .. }) if *id == longest
+        ));
+
+        for bad in [json!(""), json!("x".repeat(257)), json!(7)] {
+            let mut input = start_input("claude", "f1");
+
+            input["nativeSessionId"] = bad;
+
+            let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+            assert!(prepared.command.is_none());
+            assert_eq!(
+                prepared.refusal.as_deref(),
+                Some("a start's saved session id is not valid")
+            );
+        }
+
+        // The pair is checked all the same: a saved session id opens nothing for an unapproved pair.
+        let mut input = start_input("claude", "elsewhere");
+
+        input["nativeSessionId"] = json!("sess_1");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(prepared.command.is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -539,6 +611,40 @@ mod tests {
 
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_cancel_keeps_the_queue_only_when_it_says_so() {
+        let (state, dir, _) = state("keep-queue");
+
+        for (input, keep) in [
+            (json!({ "sessionId": "s1", "turnId": "u1" }), false),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": false }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": "yes" }),
+                false,
+            ),
+            (
+                json!({ "sessionId": "s1", "turnId": "u1", "keepQueue": true }),
+                true,
+            ),
+        ] {
+            let prepared = state.acp_prepare(&call("acp_cancel", input)).unwrap();
+
+            assert_eq!(
+                prepared.command,
+                Some(AcpCommand::Cancel {
+                    keep_queue: keep,
+                    session_id: "s1".into(),
+                    turn_id: "u1".into()
+                })
+            );
         }
 
         let _ = std::fs::remove_dir_all(&dir);

@@ -7,28 +7,38 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
+import { MAX_LENGTH } from "../lib/validators";
 import { patchMessage } from "../agent/table-writes";
 import { labelMcpToolCalls } from "./lib/mcp-tool-labels";
+import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 
 export const labelToolCalls = internalMutation
     .input({
+        // Calls the user's quick check let run unasked, by tool call id (`lib/low-risk-approval.ts`).
+        autoApprovals: v.optional(
+            v.record(v.string(), v.object({ at: v.number(), by: v.literal("quick-check"), model: v.string(), reason: v.string().max(MAX_LENGTH.short) })),
+        ),
         labels: v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() })),
         messageIds: v.array(v.string()),
+        // The run that stamps: refused here, in this mutation, once a newer run holds its stream.
+        run: v.optional(vRunHold),
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { labels, messageIds, userId }, ctx }) => {
+    .mutation(async ({ args: { autoApprovals, labels, messageIds, run, userId }, ctx }) => {
+        await assertRunHeld(ctx, run);
+
         const uniqueIds = new Set(messageIds);
 
         for (const messageId of uniqueIds) {
-            const doc = await ctx.db.get(messageId as Id<"messages">);
+            const doc = await ctx.db.get("messages", messageId as Id<"messages">);
 
             if (!doc || doc.userId !== userId || (doc.message as { role?: string } | undefined)?.role !== "assistant") {
                 continue;
             }
 
             const message = doc.message as { content?: unknown };
-            const content = labelMcpToolCalls(message.content, labels);
+            const content = labelMcpToolCalls(message.content, labels, autoApprovals);
 
             if (content) {
                 await patchMessage(ctx.db, doc._id, { message: { ...message, content } });

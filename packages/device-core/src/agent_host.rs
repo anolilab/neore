@@ -1,9 +1,9 @@
-//! A coding agent (ACP) on the server, run by `neore-host` (plans/ssh-environments.md §7, S7).
+//! A coding agent (ACP) on the server, run by `neore-host` (ssh-environments.md §7, S7).
 //!
 //! The desktop has already checked the agent and the folder against the approvals the person gave in the local
 //! window, and it speaks the protocol with the agent itself: the host only owns the process. It starts the agent
 //! beside its sandbox, not inside it (the agent needs its model API, and runs its own tools under its own permission
-//! modes; plans/acp-agent-host.md §6), relays the agent's stdout and stderr back as chunk frames of the request that
+//! modes; acp-agent-host.md §6), relays the agent's stdout and stderr back as chunk frames of the request that
 //! started it (`frame.rs`: tag 1 stdout, tag 2 stderr) and feeds its stdin from the chunk frames the desktop sends
 //! for that request. The request ends, with how the agent ended, when the agent does.
 //!
@@ -14,6 +14,9 @@
 //! - The agent runs in a process group of its own. A stop signals the group (SIGTERM, then SIGKILL after a grace
 //!   period), and the group is killed again when the agent exits, so the shells and tools it left die with it. A host
 //!   that loses its desktop (the pipe ends) or is told to stop kills every agent group the same way.
+//! - The agent starts at a lower priority than the host and, on Linux, with an out-of-memory score that makes the kernel
+//!   take it before the host or the session around it ([`AgentPriority`]), both relative to the host's own so an agent is
+//!   never above it. What it starts inherits both.
 
 // Everything below `run_agent` is for Unix; a Windows server refuses the request, and what only it uses is unused there.
 #![cfg_attr(not(unix), allow(dead_code, unused_imports))]
@@ -52,6 +55,103 @@ const POLL_SLICE: Duration = Duration::from_millis(100);
 /// Bytes of the desktop's input an agent may leave unread before it is stopped: an agent that does not read its stdin
 /// must not make the host keep what the desktop keeps sending.
 pub const INPUT_BUDGET: usize = 8 * 1024 * 1024;
+
+/// How much nicer than the host an agent runs, and the highest niceness there is.
+#[cfg(unix)]
+const AGENT_NICE_DELTA: libc::c_int = 10;
+#[cfg(unix)]
+const MAX_NICE: libc::c_int = 19;
+
+/// How far an agent's `oom_score_adj` (Linux, -1000 to 1000) is raised above the host's, and its ceiling.
+#[cfg(target_os = "linux")]
+const AGENT_OOM_SCORE_DELTA: i32 = 500;
+#[cfg(target_os = "linux")]
+const MAX_OOM_SCORE_ADJ: i32 = 1000;
+
+/// The niceness an agent gets when the host runs at `host`: below the host's, never above it.
+#[cfg(unix)]
+pub fn agent_niceness(host: libc::c_int) -> libc::c_int {
+    host.saturating_add(AGENT_NICE_DELTA).min(MAX_NICE)
+}
+
+/// The `oom_score_adj` an agent gets when the host has `host`: the OOM killer takes the agent before the host, and the
+/// host's own score is never lowered for it (a host below 0 counts as 0). Raising one's own score needs no privilege.
+#[cfg(target_os = "linux")]
+pub fn agent_oom_score_adj(host: i32) -> i32 {
+    host.max(0)
+        .saturating_add(AGENT_OOM_SCORE_DELTA)
+        .min(MAX_OOM_SCORE_ADJ)
+}
+
+/// What an agent's priority is, worked out in the host before the fork (allocating is fine there) so the child only
+/// makes plain syscalls.
+#[cfg(unix)]
+pub struct AgentPriority {
+    nice: libc::c_int,
+    #[cfg(target_os = "linux")]
+    oom_score_adj: String,
+}
+
+#[cfg(unix)]
+impl AgentPriority {
+    /// Relative to the host's own niceness and (Linux) `oom_score_adj`, so an agent is never above the host.
+    pub fn relative_to_host() -> Self {
+        // SAFETY: `getpriority` takes no pointers.
+        let nice = unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
+
+        #[cfg(target_os = "linux")]
+        let score = std::fs::read_to_string("/proc/self/oom_score_adj")
+            .ok()
+            .and_then(|text| text.trim().parse::<i32>().ok())
+            .unwrap_or(0);
+        #[cfg(not(target_os = "linux"))]
+        let score = 0;
+
+        Self::from_host(nice, score)
+    }
+
+    /// The priority for a host at `nice` and `oom_score_adj` (ignored off Linux).
+    pub fn from_host(nice: libc::c_int, oom_score_adj: i32) -> Self {
+        #[cfg(not(target_os = "linux"))]
+        let _ = oom_score_adj;
+
+        Self {
+            nice: agent_niceness(nice),
+            #[cfg(target_os = "linux")]
+            oom_score_adj: agent_oom_score_adj(oom_score_adj).to_string(),
+        }
+    }
+
+    /// Lowers the calling process's priority and raises its out-of-memory score. Runs in the child between `fork` and
+    /// `exec` (so the agent never runs a moment unlowered), which allows only async-signal-safe calls: plain syscalls,
+    /// no allocation, no locks. Best effort by design: an agent at the normal priority is better than one that cannot
+    /// start (a container may refuse `setpriority` or have no writable `/proc`), so a failure is not reported.
+    pub fn apply(&self) {
+        // SAFETY: `setpriority` takes no pointers.
+        unsafe {
+            libc::setpriority(libc::PRIO_PROCESS, 0, self.nice);
+        }
+
+        #[cfg(target_os = "linux")]
+        // SAFETY: the path is NUL-terminated and the buffer is the score formatted before the fork; `open`, `write`
+        // and `close` are async-signal-safe.
+        unsafe {
+            let fd = libc::open(
+                c"/proc/self/oom_score_adj".as_ptr(),
+                libc::O_WRONLY | libc::O_CLOEXEC,
+            );
+
+            if fd >= 0 {
+                libc::write(
+                    fd,
+                    self.oom_score_adj.as_ptr().cast(),
+                    self.oom_score_adj.len(),
+                );
+                libc::close(fd);
+            }
+        }
+    }
+}
 
 /// What the desktop asks the host to start.
 #[derive(Deserialize)]
@@ -191,7 +291,9 @@ pub fn run_agent(
 
     let cwd = working_folder(params)?;
     let env = agent_environment(app_vars(std::env::vars_os()), &params.env)?;
-    let mut child = Command::new(&params.command)
+    let mut command = Command::new(&params.command);
+
+    command
         .args(&params.args)
         .current_dir(&cwd)
         .env_clear()
@@ -199,7 +301,20 @@ pub fn run_agent(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .process_group(0)
+        .process_group(0);
+
+    let priority = AgentPriority::relative_to_host();
+
+    // SAFETY: `apply` makes only async-signal-safe syscalls, which is all that may run between fork and exec.
+    unsafe {
+        command.pre_exec(move || {
+            priority.apply();
+
+            Ok(())
+        });
+    }
+
+    let mut child = command
         .spawn()
         .map_err(|error| format!("could not start {}: {error}", params.command))?;
     let pid = child.id();
@@ -677,6 +792,132 @@ mod tests {
         assert!(waited.elapsed() < Duration::from_secs(2));
         outbox.close();
         writer.join().unwrap();
+    }
+
+    /// Runs `script` as the agent in a scratch folder and returns what it wrote to the file `out`.
+    #[cfg(unix)]
+    fn agent_output(name: &str, script: &str) -> String {
+        let (root, _outside) = scratch_roots(name);
+        let mut params = params_in(&root, &root.join("inside"));
+
+        params.command = "/bin/sh".into();
+        params.args = vec!["-c".into(), script.to_owned()];
+
+        let (outbox, writer) = crate::outbox::Outbox::new(std::io::sink(), 1 << 20);
+        let (_sender, bytes) = std::sync::mpsc::channel();
+        let input = AgentInput {
+            bytes,
+            queued: Arc::default(),
+        };
+        let result = run_agent(&params, 1, &outbox, input, &AtomicBool::new(false)).unwrap();
+
+        assert_eq!(result["code"], 0);
+        outbox.close();
+        writer.join().unwrap();
+
+        let written = std::fs::read_to_string(root.join("inside").join("out")).unwrap();
+
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
+
+        written.trim().to_owned()
+    }
+
+    #[cfg(unix)]
+    fn own_niceness() -> libc::c_int {
+        // SAFETY: `getpriority` takes no pointers.
+        unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_agent_runs_at_a_lower_priority_than_the_host_and_so_does_what_it_starts() {
+        let host = own_niceness();
+        // `ps` prints the niceness of the shell the agent is, then of a process that shell started.
+        let agent = agent_output(
+            "nice",
+            "ps -o ni= -p $$ > out; sh -c 'ps -o ni= -p $$' >> out",
+        );
+        let seen: Vec<libc::c_int> = agent
+            .lines()
+            .map(|line| line.trim().parse().unwrap())
+            .collect();
+
+        assert_eq!(seen, vec![agent_niceness(host); 2]);
+        assert!(seen[0] > host, "the agent is below the host");
+        assert_eq!(own_niceness(), host, "the host keeps its own priority");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn niceness_is_relative_to_the_host_and_capped() {
+        assert_eq!(agent_niceness(0), 10);
+        assert_eq!(agent_niceness(8), 18);
+        assert_eq!(agent_niceness(15), 19, "capped");
+        assert_eq!(
+            agent_niceness(19),
+            19,
+            "a host at the cap keeps the agent at it"
+        );
+        assert_eq!(agent_niceness(libc::c_int::MAX), 19);
+
+        for host in 0..=19 {
+            assert!(agent_niceness(host) >= host, "never above the host");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_oom_score_is_raised_over_the_hosts_never_below_it() {
+        assert_eq!(agent_oom_score_adj(0), 500);
+        assert_eq!(
+            agent_oom_score_adj(-300),
+            500,
+            "a negative host counts as 0"
+        );
+        assert_eq!(agent_oom_score_adj(400), 900);
+        assert_eq!(agent_oom_score_adj(800), 1000, "capped");
+        assert_eq!(agent_oom_score_adj(1000), 1000);
+
+        for host in -1000..=1000 {
+            assert!(agent_oom_score_adj(host) >= host, "never below the host");
+        }
+    }
+
+    /// Whether this environment lets the process write its own score (a container may mount /proc read-only).
+    #[cfg(target_os = "linux")]
+    fn oom_score_writable() -> bool {
+        std::fs::read_to_string("/proc/self/oom_score_adj")
+            .and_then(|own| std::fs::write("/proc/self/oom_score_adj", own.trim()))
+            .is_ok()
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_agent_is_the_first_the_kernel_takes_when_memory_runs_out() {
+        if !oom_score_writable() {
+            eprintln!("skipped: /proc/self/oom_score_adj is not writable here");
+            return;
+        }
+
+        let host: i32 = std::fs::read_to_string("/proc/self/oom_score_adj")
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        let agent: i32 = agent_output("oom", "cat /proc/self/oom_score_adj > out")
+            .parse()
+            .unwrap();
+
+        assert_eq!(agent, agent_oom_score_adj(host));
+        assert_eq!(
+            std::fs::read_to_string("/proc/self/oom_score_adj")
+                .unwrap()
+                .trim()
+                .parse::<i32>()
+                .unwrap(),
+            host,
+            "the host keeps its own score"
+        );
     }
 
     #[cfg(unix)]

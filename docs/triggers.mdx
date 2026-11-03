@@ -55,10 +55,11 @@ Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.)
 **Security:**
 - Every request must be signed, and a trigger accepts only the headers of its own signature scheme. A request carrying the headers of another scheme is rejected, even when its own signature is valid
 - **Neore (timestamped)**, the default: send `X-Neore-Timestamp` (Unix seconds) and `X-Signature-256: sha256=<hex>`, the HMAC-SHA256 of `<timestamp>.<raw body>` keyed with the secret. Requests more than 5 minutes off are rejected, and each signature is accepted once
-- **GitHub-style (`X-Hub-Signature-256`)**: `sha256=<hex>`, the HMAC-SHA256 of the raw body keyed with the secret. It carries no timestamp, so a captured request can be replayed once the 15-minute duplicate window has passed
+- **GitHub-style (`X-Hub-Signature-256`)**: `sha256=<hex>`, the HMAC-SHA256 of the raw body keyed with the secret. It carries no timestamp, so no window can bound a replay: each signature is accepted once for as long as the trigger exists, and a delivery that did not run (filtered out, refused, or failed before it started) can be redelivered. Two byte-identical bodies are therefore one delivery
 - **GitLab secret token (`X-Gitlab-Token`)**: see [Provider presets](#provider-presets)
 - The scheme is chosen when the trigger is created, together with its secret, and cannot be changed afterwards
 - Requests without a valid signature are rejected
+- **Rotating the secret**: the key button on a webhook trigger issues a new secret, shown once. The old secret stops working at once; tick "Keep accepting the old secret for 24 hours" to update the sender without a gap. The webhook URL does not change
 
 **Payload handling:**
 - The webhook body is passed to the AI as context

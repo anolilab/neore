@@ -175,7 +175,7 @@ export const saveDraftCommentFor = async (ctx: MutationCtx, userId: string, args
 
     const revision = draft.revision + 1;
 
-    await ctx.db.patch(draft._id, {
+    await ctx.db.patch("reviewDrafts", draft._id, {
         comments,
         commitId,
         revision,
@@ -223,12 +223,12 @@ export const deleteDraftComment = authMutation
         const comments = draft.comments.filter((comment) => comment.id !== args.commentId);
 
         if (isEmpty({ ...draft, comments })) {
-            await ctx.db.delete(draft._id);
+            await ctx.db.delete("reviewDrafts", draft._id);
 
             return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
         }
 
-        await ctx.db.patch(draft._id, { comments, revision: draft.revision + 1, updatedAt: now });
+        await ctx.db.patch("reviewDrafts", draft._id, { comments, revision: draft.revision + 1, updatedAt: now });
 
         return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
     });
@@ -286,7 +286,7 @@ export const setDraftReview = authMutation
         }
 
         if (isEmpty({ body: args.body, comments: draft.comments, verdict: args.verdict })) {
-            await ctx.db.delete(draft._id);
+            await ctx.db.delete("reviewDrafts", draft._id);
 
             return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
         }
@@ -294,7 +294,7 @@ export const setDraftReview = authMutation
         // A draft with no comments follows the head, so a verdict set earlier goes out on the commit the reviewer now sees.
         const commitId = commitFor(draft, args.commitId);
 
-        await ctx.db.patch(draft._id, {
+        await ctx.db.patch("reviewDrafts", draft._id, {
             body: args.body,
             commitId: commitId === "head_moved" ? draft.commitId : commitId,
             revision: draft.revision + 1,
@@ -320,7 +320,7 @@ export const discardReviewDraft = authMutation
         }
 
         if (draft !== null) {
-            await ctx.db.delete(draft._id);
+            await ctx.db.delete("reviewDrafts", draft._id);
         }
 
         return { status: "ok" as const };

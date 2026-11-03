@@ -163,6 +163,17 @@ describe("beginHostGuide", () => {
         await nothingLeftBehind();
     });
 
+    it("reports a computer too old for this backend as outdated, not busy, and writes nothing", async () => {
+        const deviceId = await pairedDevice(ownerId);
+
+        await run(async (ctx) => {
+            await ctx.db.patch("devices", deviceId, { hostProtocol: 0 });
+        });
+
+        await expect(begin(deviceId)).rejects.toThrow("guide_host:outdated");
+        await nothingLeftBehind();
+    });
+
     it("runs one guide at a time for a pull request", async () => {
         const deviceId = await pairedDevice(ownerId);
 
@@ -277,7 +288,7 @@ describe("readHostGuideAnswer", () => {
         await expect(read("someone-else")).resolves.toBeNull();
 
         await run(async (ctx) => {
-            await ctx.db.patch(guide!._id, { status: "ready" });
+            await ctx.db.patch("pullRequestGuides", guide!._id, { status: "ready" });
         });
 
         await expect(read(ownerId)).resolves.toBeNull();

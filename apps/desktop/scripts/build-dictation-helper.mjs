@@ -11,7 +11,7 @@
 // builds on the oldest runner it ships from, so a helper that links against a newer one never reaches users.
 //
 // Needs git, cmake and a C++ toolchain; Windows on arm64 needs the "C++ Clang tools for Windows" component (clang-cl).
-// The same pin is used by the benchmark in plans/desktop-dictation.md (Appendix A), so the shipped build is the one that was measured.
+// The same pin is used by the benchmark in desktop-dictation.md (Appendix A), so the shipped build is the one that was measured.
 //
 // CPU floor. `GGML_NATIVE=OFF` stops ggml tuning for the build machine, but on x64 it still enables the AVX2 family
 // (AVX2, FMA, F16C, BMI2), so a CPU older than Haswell (2013) or an AMD one older than Excavator dies with SIGILL at
@@ -169,7 +169,7 @@ const flags = [
 
 if (process.platform === "darwin") {
     // Metal on Apple Silicon, with its shader library compiled in; the Intel build runs on the CPU
-    // (its GPU is slower than the CPU on the machines measured, plans/desktop-dictation.md Appendix A).
+    // (its GPU is slower than the CPU on the machines measured, desktop-dictation.md Appendix A).
     flags.push(
         process.arch === "arm64" ? "-DGGML_METAL_EMBED_LIBRARY=ON" : "-DGGML_METAL=OFF",
         `-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_MINIMUM}`,

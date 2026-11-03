@@ -296,6 +296,7 @@ describe("routing/cache", () => {
 
     const input = {
         availableTiers: ALL_TIERS,
+        contextTokens: 0,
         hasImages: false,
         lastUserMessage: "refactor the payment reconciliation job",
         toolCount: 3,

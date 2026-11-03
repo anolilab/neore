@@ -17,7 +17,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
-import type { QueryCtx as QueryContext } from "../../_generated/server";
+import type { MutationCtx, QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
 import { insertThread, patchMessage, patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
@@ -108,8 +108,16 @@ const loadUsableParticipants = async (
 };
 
 /** Throws unless every id is a skill the owner may use as a participant. */
-const requireUsableSkills = async (context: Pick<QueryContext, "db">, skillIds: ReadonlyArray<string>, subject: SkillAccessSubject): Promise<void> => {
-    const [enabled, skills] = await Promise.all([loadEnabledAmong(context, subject.userId, skillIds), readSkills(context, skillIds)]);
+const requireUsableSkills = async (
+    context: Pick<QueryContext, "db">,
+    skillIds: ReadonlyArray<string>,
+    subject: SkillAccessSubject,
+    requireEnabled = true,
+): Promise<void> => {
+    const [enabled, skills] = await Promise.all([
+        requireEnabled ? loadEnabledAmong(context, subject.userId, skillIds) : Promise.resolve(new Set(skillIds)),
+        readSkills(context, skillIds),
+    ]);
     const usable = new Map(skillIds.map((id, index) => [id, canUseSkillAsParticipant(skills[index], subject, enabled, id)]));
     const error = validateParticipantIds(skillIds, (id) => usable.get(id) === true);
 
@@ -152,6 +160,53 @@ export const listGroupCandidates = authQuery
             .filter((skill): skill is Doc<"skills"> => !!skill && canUseSkillAsParticipant(skill, subject, enabled, skill._id as string))
             .map((skill) => toSummary(skill));
     });
+
+interface NewGroupChat {
+    debateRounds?: number;
+    mode: GroupChatMode;
+    model: string;
+    organizationId?: string;
+    skillIds: string[];
+    synthesizerSkillId?: string;
+    title?: string;
+    userId: string;
+}
+
+/** Validates the participants and options, then inserts the group thread. `requireEnabled` is the opt-in `createGroupChat` demands of every participant. */
+const insertGroupChat = async (
+    ctx: Pick<MutationCtx, "db" | "now">,
+    { debateRounds, mode, model, organizationId, skillIds, synthesizerSkillId, title, userId }: NewGroupChat,
+    { requireEnabled }: { requireEnabled: boolean },
+): Promise<{ threadId: string }> => {
+    if (skillIds.length < 2) {
+        throw new LunoraError("BAD_REQUEST", "A group chat needs at least two participants");
+    }
+
+    const options = requireGroupOptions({ debateRounds, mode, skillIds, synthesizerSkillId });
+
+    await requireUsableSkills(ctx, skillIds, { organizationId, userId }, requireEnabled);
+
+    const { now } = ctx;
+    const threadId = await insertThread(ctx.db, {
+        createdBy: userId,
+        groupChat: {
+            ...options,
+            mode,
+            participants: skillIds.map((skillId) => {
+                return { addedAt: now, skillId };
+            }),
+        },
+        model,
+        ...(organizationId && { organizationId }),
+        status: "active",
+        tags: ["chat"],
+        title: title?.trim().slice(0, 200) || DEFAULT_GROUP_TITLE,
+        updatedAt: now,
+        userId,
+    });
+
+    return { threadId: threadId as string };
+};
 
 /**
  * A thread's group setup, for its owner and members. `null` for a thread that
@@ -244,39 +299,40 @@ export const createGroupChat = authMutation
     })
     .output(v.object({ threadId: v.string() }))
     .mutation(async ({ args: { debateRounds, mode, model, skillIds, synthesizerSkillId, title }, ctx }) => {
-        if (skillIds.length < 2) {
-            throw new LunoraError("BAD_REQUEST", "A group chat needs at least two participants");
-        }
-
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
-        const options = requireGroupOptions({ debateRounds, mode, skillIds, synthesizerSkillId });
 
-        await requireUsableSkills(ctx, skillIds, { organizationId, userId });
-
-        const { now } = ctx;
-        const threadId = await insertThread(ctx.db, {
-            createdBy: userId,
-            groupChat: {
-                ...options,
-                mode,
-                participants: skillIds.map((skillId) => {
-                    return { addedAt: now, skillId };
-                }),
-            },
-            model,
-            ...(organizationId && { organizationId }),
-            status: "active",
-            tags: ["chat"],
-            title: title?.trim().slice(0, 200) || DEFAULT_GROUP_TITLE,
-            updatedAt: now,
-            userId,
-        });
+        const created = await insertGroupChat(
+            ctx,
+            { debateRounds, mode, model, organizationId, skillIds, synthesizerSkillId, title, userId },
+            { requireEnabled: true },
+        );
 
         ctx.log.event("chat.create_group_chat", { mode, participantCount: skillIds.length, titled: title !== undefined });
 
-        return { threadId: threadId as string };
+        return created;
     });
+
+/**
+ * A group chat an imported bundle brings (`skills/bundle.ts`). Its participants are
+ * the skills the same import created, which arrive SWITCHED OFF, so unlike
+ * `createGroupChat` this does not require them to be enabled: they must still be
+ * skills the owner may read. The chat starts nothing, and a turn only runs the
+ * participants the owner has switched on by then (`loadUsableParticipants`).
+ */
+export const createImportedGroupChat = internalMutation
+    .input({
+        debateRounds: v.optional(v.number()),
+        mode: vGroupChatMode,
+        model: v.string().max(MAX_LENGTH.short),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        skillIds: v.array(v.string().max(MAX_LENGTH.id)),
+        synthesizerSkillId: v.optional(v.string().max(MAX_LENGTH.id)),
+        title: v.optional(v.string().max(MAX_LENGTH.long)),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ threadId: v.string() }))
+    .mutation(async ({ args, ctx }) => await insertGroupChat(ctx, args, { requireEnabled: false }));
 
 /**
  * Open a group chat from a seeded template (`templates.ts`): the caller gets
@@ -375,7 +431,7 @@ export const updateGroupChat = authMutation
     .output(v.null())
     .mutation(async ({ args: { debateRounds, mode, skillIds, synthesizerSkillId, threadId }, ctx }) => {
         const { userId } = ctx.user;
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (!thread || thread.deleted === true) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
@@ -506,7 +562,7 @@ export const getGroupRunConfig = internalQuery
         ),
     )
     .query(async ({ args: { organizationId, threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId || !thread.groupChat || thread.groupChat.participants.length === 0) {
             return null;
@@ -554,7 +610,7 @@ export const isGroupStopRequested = internalQuery
     .input({ since: v.number(), threadId: v.string() })
     .output(v.boolean())
     .query(async ({ args: { since, threadId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
         const stoppedAt = thread?.groupChat?.stopRequestedAt;
 
         return stoppedAt !== undefined && stoppedAt >= since;
@@ -598,7 +654,7 @@ export const getGroupHistory = internalQuery
         ),
     )
     .query(async ({ args: { threadId, userId }, ctx }): Promise<GroupHistoryRow[]> => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId) {
             return [];
@@ -652,7 +708,7 @@ export const markSpeakerMessages = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { agentName, messageIds, skillId, threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get(threadId as Id<"threads">).catch(() => null);
+        const thread = await ctx.db.get("threads", threadId as Id<"threads">).catch(() => null);
 
         if (!thread || thread.userId !== userId) {
             return null;
@@ -660,7 +716,7 @@ export const markSpeakerMessages = internalMutation
 
         await Promise.all(
             messageIds.map(async (messageId) => {
-                const row = await ctx.db.get(messageId as Id<"messages">).catch(() => null);
+                const row = await ctx.db.get("messages", messageId as Id<"messages">).catch(() => null);
 
                 if (row && (row.threadId as string) === threadId) {
                     await patchMessage(ctx.db, row._id, { agentName, speakerSkillId: skillId });

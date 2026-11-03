@@ -118,8 +118,8 @@ const idleWorker = async (toolCallId = "call-1"): Promise<string> => {
     return admitted.run.childThreadId!;
 };
 
-const message = async (workerId: string, clientId: string, userId = OWNER) =>
-    await as(userId).mutation(dispatchToWorker as never, { clientId, message: "Next question", workerId } as never);
+const message = async (workerId: string, clientId: string, userId = OWNER, text = "Next question") =>
+    await as(userId).mutation(dispatchToWorker as never, { clientId, message: text, workerId } as never);
 
 /** A message the lead sent through its tool: the run is owed a post-back, which a typed one is not. */
 const dispatchAsLead = async (workerId: string, toolCallId: string) =>
@@ -170,6 +170,23 @@ describe("dispatchToWorker", () => {
         expect(jobsQueueMessages.filter((queued) => queued.body.functionPath.includes("runSubAgent"))).toHaveLength(1);
     });
 
+    it("hands the worker the message without tag or bidi characters", async () => {
+        const workerId = await idleWorker();
+
+        await message(workerId, "client-1", OWNER, "Next\u{E0069}\u{E0067} question\u{202E}");
+
+        const rows = await runRows();
+
+        expect(rows[1]).toMatchObject({ task: "Next question" });
+    });
+
+    it("refuses a message that was only hidden characters, and starts nothing", async () => {
+        const workerId = await idleWorker();
+
+        await expect(message(workerId, "client-1", OWNER, "\u{E0069}\u{E0067}")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(await runRows()).toHaveLength(1);
+    });
+
     it("returns the same run for the same clientId, starting and enqueuing nothing more", async () => {
         const workerId = await idleWorker();
         const first = (await message(workerId, "client-1")) as { runId: string };
@@ -183,7 +200,7 @@ describe("dispatchToWorker", () => {
     it("refuses an archived worker with a clear error, and starts nothing", async () => {
         const workerId = await idleWorker();
 
-        await run(async (context) => await context.db.patch(workerId, { status: "archived" }));
+        await run(async (context) => await context.db.patch("threads", workerId, { status: "archived" }));
 
         await expect(message(workerId, "client-1")).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringMatching(ARCHIVED) });
         expect(await runRows()).toHaveLength(1);
@@ -426,7 +443,7 @@ describe("a busy worker", () => {
             const [a, b, c] = [await message(workerId, "c-a"), await message(workerId, "c-b"), await message(workerId, "c-c")] as { runId: string }[];
             const charged = await dailyCounter();
 
-            await run(async (context) => await context.db.patch(workerId, patch));
+            await run(async (context) => await context.db.patch("threads", workerId, patch));
 
             expect(await claim(a!.runId)).toBeNull();
             expect(startedRuns()).toStrictEqual([a!.runId, b!.runId]);
@@ -484,7 +501,7 @@ describe("reading a busy worker", () => {
         // The first run, which the lead asked for, never reached the lead; the typed ones are not owed.
         const [first] = await runRows();
 
-        await run(async (context) => await context.db.patch(first._id, { postFailed: "The conversation that started this run is gone." }));
+        await run(async (context) => await context.db.patch("subAgentRuns", first._id, { postFailed: "The conversation that started this run is gone." }));
 
         const expected = { activeRunId: a!.runId, postFailed: "The conversation that started this run is gone.", state: "running" };
 
@@ -497,7 +514,7 @@ describe("a locked worker", () => {
     it("refuses a message and shows no title", async () => {
         const workerId = await idleWorker();
 
-        await run(async (context) => await context.db.patch(workerId, { lockedAt: Date.now() }));
+        await run(async (context) => await context.db.patch("threads", workerId, { lockedAt: Date.now() }));
 
         await expect(message(workerId, "client-1")).rejects.toMatchObject({ message: expect.stringMatching(LOCKED) });
         expect(await as(OWNER).query(listWorkers as never, { leadThreadId: leadId } as never)).toMatchObject([{ name: "Locked chat" }]);
@@ -945,7 +962,7 @@ describe("receipts", () => {
         const asked = await asLead(workerId, "call-asked");
 
         await claim(asked.runId);
-        await run(async (context) => await context.db.patch(leadId as never, { deleted: true }));
+        await run(async (context) => await context.db.patch("threads", leadId as never, { deleted: true }));
         await finishOk(asked.runId);
 
         const after = (await as(OWNER).query(getWorker as never, { workerId } as never)) as { runs: { delivery: string; runId: string }[] };
@@ -972,7 +989,7 @@ describe("receipts", () => {
         const waiting = (await message(first.run.childThreadId!, "c-waiting")) as { runId: string };
 
         // The first lead is deleted while both runs are going: its result can never land.
-        await run(async (context) => await context.db.patch(leadId as never, { deleted: true }));
+        await run(async (context) => await context.db.patch("threads", leadId as never, { deleted: true }));
 
         await finishOk(first.run._id);
         await finishOk(second.run._id);
@@ -1005,7 +1022,7 @@ describe("setWorkerPolicy", () => {
     it("stores the policy for the lead's owner with host dispatch fixed to ask, and dispatch follows it", async () => {
         await setPolicy(OWNER, { maxDispatchesPerHour: 5 });
 
-        const lead = await run(async (context) => await context.db.get(leadId));
+        const lead = await run(async (context) => await context.db.get("threads", leadId));
 
         expect(lead.workerPolicy).toStrictEqual({ allowedSources: ["lead", "messenger"], hostDispatch: "ask", maxDispatchesPerHour: 5 });
 
@@ -1023,7 +1040,7 @@ describe("setWorkerPolicy", () => {
     });
 
     it("refuses a locked lead's policy change without its unlock proof", async () => {
-        await run(async (context) => await context.db.patch(leadId, { lockedAt: Date.now() }));
+        await run(async (context) => await context.db.patch("threads", leadId, { lockedAt: Date.now() }));
 
         await expect(setPolicy(OWNER, { maxDispatchesPerHour: 5 })).rejects.toMatchObject({ message: expect.stringMatching(LOCKED) });
     });

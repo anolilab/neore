@@ -269,6 +269,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.crons.vacuumDocumentHistory,
         schedule: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
     },
+    // Policies whose organization is gone, for a removal the queue never delivered (`auth/organization-policy-erase.ts`).
+    {
+        name: "sweepOrphanedOrganizationPolicies",
+        ref: internal.auth.organization_policy_erase.sweepOrphanedOrganizationPolicies,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
+    },
     // 0 0 * * *
     {
         // eslint-disable-next-line no-secrets/no-secrets
@@ -305,7 +311,7 @@ export const claimDueCronJobs = internalMutation
             const existing = byName.get(name);
 
             if (existing) {
-                await ctx.db.patch(existing._id, { lastRunAt: now, lastSlot: slot });
+                await ctx.db.patch("cronRuns", existing._id, { lastRunAt: now, lastSlot: slot });
             } else {
                 await ctx.db.insert("cronRuns", { lastRunAt: now, lastSlot: slot, name });
             }

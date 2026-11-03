@@ -12,14 +12,18 @@
 
 import type { ModelMessage } from "@ai-sdk/provider-utils";
 
+import { computeTaint } from "../../devices/lib/taint";
+import { DROPPED_SUMMARY_NOTE, formatTaintLine, SUMMARY_HEADER } from "./compressed-history";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** Approximate characters per token for English text */
 const CHARS_PER_TOKEN = 4;
+
 /** Estimated token cost for image content parts (~1000 tokens) */
-const IMAGE_TOKEN_ESTIMATE_CHARS = 4000;
+export const IMAGE_TOKEN_ESTIMATE_CHARS = 4000;
 /** Estimated token cost for file content parts (~500 tokens) */
-const FILE_TOKEN_ESTIMATE_CHARS = 2000;
+export const FILE_TOKEN_ESTIMATE_CHARS = 2000;
 /** Overhead chars for tool call framing (name, JSON structure) */
 const TOOL_CALL_OVERHEAD_CHARS = 100;
 /** Safety margin applied to token estimates to avoid context overflow */
@@ -30,8 +34,8 @@ const RECENT_MESSAGES_TO_KEEP = 6;
 const SUMMARY_TRUNCATION_LENGTH = 200;
 /** Replaces the output of a tool result that compression elides. The call keeps its id. */
 const ELIDED_TOOL_OUTPUT = "[Tool output removed to fit the context window]";
-/** Stands in for the summary when the summary alone would not fit. */
-const DROPPED_SUMMARY_NOTE = "[Earlier conversation was removed to fit the context window]";
+
+export { isCompressedHistory } from "./compressed-history";
 
 // ─── Stream Event Types ─────────────────────────────────────────────────────
 
@@ -415,7 +419,7 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
         const recentMessages = conversationMessages.slice(cut);
         // Use "user" role for summary to avoid conflicting with the real system prompt
         const summary = {
-            content: `[Context from earlier in this conversation]\n${summarizeOlderMessages(olderMessages, contextLimit)}`,
+            content: `${SUMMARY_HEADER}\n${formatTaintLine(computeTaint(olderMessages))}\n${summarizeOlderMessages(olderMessages, contextLimit)}`,
             role: "user" as const,
         } as unknown as ModelMessage;
 
@@ -423,7 +427,10 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
 
         // Post-compression size check — if the summary still leaves us over, keep a one-line note instead
         if (estimateTokens(compressed) > threshold) {
-            const note = { content: DROPPED_SUMMARY_NOTE, role: "user" as const } as unknown as ModelMessage;
+            const note = {
+                content: `${DROPPED_SUMMARY_NOTE}\n${formatTaintLine(computeTaint(olderMessages))}`,
+                role: "user" as const,
+            } as unknown as ModelMessage;
 
             compressed = [...systemMessages, note, ...recentMessages];
         }
@@ -665,7 +672,7 @@ const aggressiveCompressMessages = (messages: ModelMessage[], contextLimit: numb
 
     return [
         ...systemMessages,
-        { content: `[Context from earlier in this conversation]\n${summaryText}`, role: "user" as const } as unknown as ModelMessage,
+        { content: `${SUMMARY_HEADER}\n${formatTaintLine(computeTaint(olderMessages))}\n${summaryText}`, role: "user" as const } as unknown as ModelMessage,
         ...recentMessages,
     ];
 };

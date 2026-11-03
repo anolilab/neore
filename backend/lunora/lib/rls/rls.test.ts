@@ -29,6 +29,17 @@ const summaryModel = vi.hoisted(() =>
 vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText: summaryModel };
 });
+// The user's model filters are not what this suite drives: none are set.
+vi.mock("../../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+        loadSharedModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
 vi.mock("../utility-model", () => {
     return {
         getUtilityModel: async () => {
@@ -44,7 +55,9 @@ vi.mock("../../_generated/api", async (importOriginal) => registeredApi(await im
 vi.mock("../../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
 const MODULES = {
+    acp_switch: async () => await import("../../acp/switch"),
     agent_messages: async () => await import("../../agent/messages"),
+    agent_threads: async () => await import("../../agent/threads"),
     chat_agent_switch: async () => await import("../../chat/agent-switch"),
     chat_functions: async () => await import("../../chat/functions"),
     chat_sharing: async () => await import("../../chat/sharing"),
@@ -140,7 +153,7 @@ vi.mock("../audit-triggers", async (importOriginal) => {
 
 // ─── Procedures that forgot their check ──────────────────────────────────────
 
-const byId = { id: v.string() };
+const byId = { id: v.string(), table: v.string() };
 
 const DENIED = /denied by policy/u;
 const ADMIN_REQUIRED = /admin/iu;
@@ -149,7 +162,7 @@ const ADMIN_REQUIRED = /admin/iu;
 const leakyGet = authQuery
     .input(byId)
     .output(v.any())
-    .query(async ({ args, ctx }) => await ctx.db.get(args.id as never));
+    .query(async ({ args, ctx }) => await ctx.db.get(args.table as never, args.id as never));
 
 /** Lists a thread's messages two ways (legacy index read, ORM facade). No check. */
 const leakyMessages = authQuery
@@ -170,7 +183,7 @@ const leakyPatch = authMutation
     .input(byId)
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.patch(args.id as never, { title: "pwned" } as never);
+        await ctx.db.patch(args.table as never, args.id as never, { title: "pwned" } as never);
 
         return null;
     });
@@ -180,7 +193,7 @@ const leakyDelete = authMutation
     .input(byId)
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.delete(args.id as never);
+        await ctx.db.delete(args.table as never, args.id as never);
 
         return null;
     });
@@ -199,13 +212,13 @@ const leakyInsert = authMutation
 const leakyBareGet = query
     .input(byId)
     .output(v.any())
-    .query(async ({ args, ctx }) => await ctx.db.get(args.id as never));
+    .query(async ({ args, ctx }) => await ctx.db.get(args.table as never, args.id as never));
 
 const leakyBarePatch = mutation
     .input(byId)
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.patch(args.id as never, { title: "pwned" } as never);
+        await ctx.db.patch(args.table as never, args.id as never, { title: "pwned" } as never);
 
         return null;
     });
@@ -214,19 +227,19 @@ const leakyBarePatch = mutation
 const leakyPublicGet = publicQuery
     .input(byId)
     .output(v.any())
-    .query(async ({ args, ctx }) => await ctx.db.get(args.id as never));
+    .query(async ({ args, ctx }) => await ctx.db.get(args.table as never, args.id as never));
 
 /** A platform admin procedure: the policies step aside, the admin role is the check. */
 const adminGet = adminQuery
     .input(byId)
     .output(v.any())
-    .query(async ({ args, ctx }) => await ctx.db.get(args.id as never));
+    .query(async ({ args, ctx }) => await ctx.db.get(args.table as never, args.id as never));
 
 /** Internal functions are system code: built without the RLS middleware. */
 const systemGet = internalQuery
     .input(byId)
     .output(v.any())
-    .query(async ({ args, ctx }) => await ctx.db.get(args.id as never));
+    .query(async ({ args, ctx }) => await ctx.db.get(args.table as never, args.id as never));
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
@@ -269,14 +282,14 @@ describe("a procedure that forgot its check", () => {
     it("reads nothing of a stranger's: not the thread, not its messages", async () => {
         const threadId = await seedThread();
 
-        expect(await as(STRANGER).query(leakyGet as never, { id: threadId } as never)).toBeNull();
-        expect(await as(STRANGER).query(leakyMessages as never, { id: threadId } as never)).toEqual({ viaFacade: 0, viaIndex: 0 });
-        expect(await as(STRANGER).query(leakyBareGet as never, { id: threadId } as never)).toBeNull();
-        expect(await harness.query(leakyPublicGet as never, { id: threadId } as never)).toBeNull();
+        expect(await as(STRANGER).query(leakyGet as never, { id: threadId, table: "threads" } as never)).toBeNull();
+        expect(await as(STRANGER).query(leakyMessages as never, { id: threadId, table: "threads" } as never)).toEqual({ viaFacade: 0, viaIndex: 0 });
+        expect(await as(STRANGER).query(leakyBareGet as never, { id: threadId, table: "threads" } as never)).toBeNull();
+        expect(await harness.query(leakyPublicGet as never, { id: threadId, table: "threads" } as never)).toBeNull();
 
         // The same procedures still serve the owner.
-        expect(await as(OWNER).query(leakyGet as never, { id: threadId } as never)).toMatchObject({ userId: OWNER });
-        expect(await as(OWNER).query(leakyMessages as never, { id: threadId } as never)).toEqual({ viaFacade: 1, viaIndex: 1 });
+        expect(await as(OWNER).query(leakyGet as never, { id: threadId, table: "threads" } as never)).toMatchObject({ userId: OWNER });
+        expect(await as(OWNER).query(leakyMessages as never, { id: threadId, table: "threads" } as never)).toEqual({ viaFacade: 1, viaIndex: 1 });
     });
 
     it("writes nothing of a stranger's: patch, delete and a planted insert are refused", async () => {
@@ -286,34 +299,34 @@ describe("a procedure that forgot its check", () => {
                 await context.db.insert("memories", { createdAt: 0, importance: 1, memory: "mine", type: "preference", updatedAt: 0, userId: OWNER }),
         );
 
-        await expect(as(STRANGER).mutation(leakyPatch as never, { id: threadId } as never)).rejects.toThrow(DENIED);
-        await expect(as(STRANGER).mutation(leakyBarePatch as never, { id: threadId } as never)).rejects.toThrow(DENIED);
-        await expect(as(STRANGER).mutation(leakyDelete as never, { id: memoryId } as never)).rejects.toThrow(DENIED);
+        await expect(as(STRANGER).mutation(leakyPatch as never, { id: threadId, table: "threads" } as never)).rejects.toThrow(DENIED);
+        await expect(as(STRANGER).mutation(leakyBarePatch as never, { id: threadId, table: "threads" } as never)).rejects.toThrow(DENIED);
+        await expect(as(STRANGER).mutation(leakyDelete as never, { id: memoryId, table: "memories" } as never)).rejects.toThrow(DENIED);
         await expect(as(STRANGER).mutation(leakyInsert as never, { userId: OWNER } as never)).rejects.toThrow(DENIED);
 
         const titleOf = async () =>
             await run(async (context) => {
-                const thread = await context.db.get(threadId);
+                const thread = await context.db.get("threads", threadId);
 
                 return thread.title;
             });
 
         expect(await titleOf()).toBe("private");
-        expect(await run(async (context) => await context.db.get(memoryId))).not.toBeNull();
+        expect(await run(async (context) => await context.db.get("memories", memoryId))).not.toBeNull();
 
         // The owner's own writes pass.
-        await as(OWNER).mutation(leakyPatch as never, { id: threadId } as never);
+        await as(OWNER).mutation(leakyPatch as never, { id: threadId, table: "threads" } as never);
         expect(await titleOf()).toBe("pwned");
     });
 
     it("steps aside for platform admins and for internal functions", async () => {
         const threadId = await seedThread();
 
-        expect(await as(ADMIN).query(adminGet as never, { id: threadId } as never)).toMatchObject({ userId: OWNER });
+        expect(await as(ADMIN).query(adminGet as never, { id: threadId, table: "threads" } as never)).toMatchObject({ userId: OWNER });
         // A non-admin never reaches the handler of an admin procedure.
-        await expect(as(STRANGER).query(adminGet as never, { id: threadId } as never)).rejects.toThrow(ADMIN_REQUIRED);
+        await expect(as(STRANGER).query(adminGet as never, { id: threadId, table: "threads" } as never)).rejects.toThrow(ADMIN_REQUIRED);
         // An internal function (the scheduler, the jobs queue, a cron) sees every row.
-        expect(await run(async (context) => await (systemGet as any).handler(context, { id: threadId }))).toMatchObject({ userId: OWNER });
+        expect(await run(async (context) => await (systemGet as any).handler(context, { id: threadId, table: "threads" }))).toMatchObject({ userId: OWNER });
     });
 });
 
@@ -335,7 +348,7 @@ describe("shared access still works", () => {
         // now pass, a second private thread of the owner's stays hidden.
         const other = await seedThread();
 
-        expect(await as(GRANTEE).query(leakyGet as never, { id: other } as never)).toBeNull();
+        expect(await as(GRANTEE).query(leakyGet as never, { id: other, table: "threads" } as never)).toBeNull();
     });
 
     it("a collaborator with a write grant is refused a switch while the owner's tool approval is open", async () => {
@@ -446,7 +459,7 @@ describe("shared access still works", () => {
         } as never)) as { page: unknown[] };
 
         expect(expired.page).toEqual([]);
-        expect(await as(GRANTEE).query(leakyGet as never, { id: threadId } as never)).toBeNull();
+        expect(await as(GRANTEE).query(leakyGet as never, { id: threadId, table: "threads" } as never)).toBeNull();
     });
 
     it("the public share token shows an anonymous viewer the thread", async () => {
@@ -496,7 +509,7 @@ describe("shared access still works", () => {
 
         expect(tree.shared.map((page) => page._id)).toEqual([pageId]);
         await expect(as(STRANGER).query(procedureAt("pages_functions", "getPage"), { pageId } as never)).rejects.toThrow();
-        expect(await as(STRANGER).query(leakyGet as never, { id: pageId } as never)).toBeNull();
+        expect(await as(STRANGER).query(leakyGet as never, { id: pageId, table: "pages" } as never)).toBeNull();
     });
 
     it("a public page token reads the page anonymously", async () => {
@@ -527,6 +540,6 @@ describe("shared access still works", () => {
         );
 
         expect(await as(GRANTEE).query(procedureAt("prompts_functions", "getPrompt"), { promptId } as never)).toMatchObject({ name: "Shared" });
-        expect(await as(STRANGER).query(leakyGet as never, { id: promptId } as never)).toBeNull();
+        expect(await as(STRANGER).query(leakyGet as never, { id: promptId, table: "prompts" } as never)).toBeNull();
     });
 });

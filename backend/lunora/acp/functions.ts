@@ -32,7 +32,7 @@ const vHostSessionView = v.object({
 
 /**
  * One session with how its last turn ended, so Continue is offered after a restart or a timeout
- * (plans/acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
+ * (acp-agent-host.md §4.5). Read off the last STREAM, not the reply row: a restart that comes after the
  * reaper moves the reason from `timeout` to `interrupted` and writes no second reply.
  */
 const vHostSessionDetail = v.object({
@@ -84,13 +84,13 @@ export const deleteSessionsOfThread = internalMutation
         const { page } = threadId ? await ctx.db.acpSessions.findMany({ where: { threadId } }) : { page: [] };
 
         for (const session of page) {
-            await ctx.db.delete(session._id);
+            await ctx.db.delete("acpSessions", session._id);
         }
 
         return null;
     });
 
-/** The caller's coding-agent sessions, newest first. */
+/** The caller's coding-agent sessions, newest first: one per thread, since a switch to another agent ends a thread's session and opens the next. */
 export const listHostSessions = authQuery
     .input({})
     .output(v.array(vHostSessionView))
@@ -101,7 +101,15 @@ export const listHostSessions = authQuery
             where: { userId: ctx.user.userId },
         });
 
-        return page.map((row) => toView(row));
+        const newestOfThread = new Map<string, (typeof page)[number]>();
+
+        for (const row of page) {
+            if (!newestOfThread.has(row.threadId as string)) {
+                newestOfThread.set(row.threadId as string, row);
+            }
+        }
+
+        return [...newestOfThread.values()].map((row) => toView(row));
     });
 
 /** The session a host thread runs in, or null for a thread that is not one, or is not the caller's. */
@@ -110,7 +118,9 @@ export const getHostSession = authQuery
     .output(v.union(v.null(), vHostSessionDetail))
     .query(async ({ args, ctx }) => {
         const threadId = ctx.db.normalizeId("threads", args.threadId);
-        const row = threadId ? await ctx.db.acpSessions.findFirst({ where: { threadId, userId: ctx.user.userId } }) : null;
+        const row = threadId
+            ? await ctx.db.acpSessions.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { threadId, userId: ctx.user.userId } })
+            : null;
 
         if (!row || !threadId) {
             return null;
@@ -122,7 +132,7 @@ export const getHostSession = authQuery
     });
 
 /**
- * What the runner of a thread can do (plans/provider-capabilities.md §6): the report its host sent for a host
+ * What the runner of a thread can do (provider-capabilities.md §6): the report its host sent for a host
  * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
  * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
  * stranger learns nothing, not even that the id exists.
@@ -154,7 +164,10 @@ export const getThreadCapabilities = authQuery
             return null;
         }
 
-        const session = await ctx.db.acpSessions.findFirst({ where: { threadId: access.thread._id, userId: ctx.user.userId } });
+        const session = await ctx.db.acpSessions.findFirst({
+            orderBy: [{ _creationTime: "desc" }],
+            where: { threadId: access.thread._id, userId: ctx.user.userId },
+        });
 
         return session?.capabilities ?? unknownCapabilityReport(0);
     });

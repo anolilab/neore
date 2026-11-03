@@ -32,6 +32,8 @@ export interface ThreadData extends ThreadOwnerState {
     _id: string;
     /** The agent the thread's active path runs on, once it has been switched (`agent/agent-switch.ts`). */
     activeAgent?: { kind: "model"; model: string };
+    /** Each send runs on the model the gateway routes it to; the thread's own `model` is the fallback. */
+    autoModel?: boolean;
     /** Set on a bot thread: the bot's model is the one that runs. */
     botId?: string | null;
     branchName?: string;

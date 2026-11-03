@@ -71,7 +71,7 @@ export const backupCapabilities = (definition: ModelDefinition): BackupCapabilit
 };
 
 /** The kinds of attachment in a conversation, for either a model prompt (`file` parts with a media type) or AI SDK messages (`image` and `file` parts). */
-const attachmentsIn = (messages: unknown): { files: boolean; images: boolean } => {
+export const attachmentsIn = (messages: unknown): { files: boolean; images: boolean } => {
     const found = { files: false, images: false };
 
     if (!Array.isArray(messages)) {

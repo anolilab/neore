@@ -107,7 +107,7 @@ export const updateUserRole = adminMutation
         const previousRole = targetUser.role;
 
         // Update the role
-        await ctx.db.patch(input.userId, {
+        await ctx.db.patch("user", input.userId, {
             role: input.role === "admin" ? "admin" : null,
         });
 
@@ -145,7 +145,7 @@ export const grantAdminByEmail = adminMutation
         }
 
         // Update user role to admin
-        await ctx.db.patch(user._id, { role: "admin" });
+        await ctx.db.patch("user", user._id, { role: "admin" });
 
         // Audit log
         await createAuditLogEntry(ctx, {
@@ -186,7 +186,7 @@ export const revokeAdminByEmail = adminMutation
         }
 
         // Update user role to null (regular user)
-        await ctx.db.patch(user._id, { role: null });
+        await ctx.db.patch("user", user._id, { role: null });
 
         // Audit log
         await createAuditLogEntry(ctx, {
@@ -581,7 +581,7 @@ export const revokeAllUserSessions = adminMutation
 
         // Delete all sessions
         for (const session of sessions) {
-            await ctx.db.delete(session._id);
+            await ctx.db.delete("session", session._id);
         }
 
         // Audit log
@@ -661,7 +661,7 @@ export const banUser = adminMutation
         // Calculate ban expiration
         const banExpires = input.banExpiresIn ? ctx.now + input.banExpiresIn * 1000 : null;
 
-        await ctx.db.patch(input.userId, {
+        await ctx.db.patch("user", input.userId, {
             banExpires,
             banned: true,
             banReason: input.banReason || "No reason provided",
@@ -703,7 +703,7 @@ export const unbanUser = adminMutation
             throw new LunoraError("NOT_FOUND", "User not found");
         }
 
-        await ctx.db.patch(input.userId, {
+        await ctx.db.patch("user", input.userId, {
             banExpires: null,
             banned: false,
             banReason: null,

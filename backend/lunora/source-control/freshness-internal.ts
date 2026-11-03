@@ -61,7 +61,7 @@ const takeLease = async (ctx: Pick<MutationCtx, "db" | "scheduler">, row: Doc<"w
         return false;
     }
 
-    await ctx.db.patch(row._id, { leasedAt: now, nextPollAt: now + POLL_LEASE_MS });
+    await ctx.db.patch("watchedRepositories", row._id, { leasedAt: now, nextPollAt: now + POLL_LEASE_MS });
 
     return true;
 };
@@ -120,7 +120,7 @@ export const leaseWatchedRepositoriesForRefresh = internalMutation
                 continue;
             }
 
-            await ctx.db.patch(row._id, { leasedAt: now, nextPollAt: now + POLL_LEASE_MS });
+            await ctx.db.patch("watchedRepositories", row._id, { leasedAt: now, nextPollAt: now + POLL_LEASE_MS });
             leased.push({ lease: now, watchId: row._id });
         }
 
@@ -146,7 +146,7 @@ export const getWatchForPoll = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.watchId);
+        const row = await ctx.db.get("watchedRepositories", args.watchId);
 
         return row === null ? null : { etag: row.etag, leasedAt: row.leasedAt, login: row.login, repository: row.repository, userId: row.userId };
     });
@@ -164,7 +164,7 @@ export const recordRepoPoll = internalMutation
     .input({ lease: v.number(), outcome: vRecorded, watchId: v.id("watchedRepositories") })
     .output(v.object({ applied: v.boolean(), notified: v.number() }))
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.watchId);
+        const row = await ctx.db.get("watchedRepositories", args.watchId);
 
         if (row === null || row.leasedAt !== args.lease) {
             return { applied: false, notified: 0 };
@@ -197,9 +197,9 @@ export const recordRepoPoll = internalMutation
                 }
             }
 
-            await ctx.db.patch(row._id, { ...common, etag: args.outcome.etag, login: args.outcome.login, requested, seeded: true });
+            await ctx.db.patch("watchedRepositories", row._id, { ...common, etag: args.outcome.etag, login: args.outcome.login, requested, seeded: true });
         } else {
-            await ctx.db.patch(row._id, common);
+            await ctx.db.patch("watchedRepositories", row._id, common);
         }
 
         await noteShardDue(ctx, nextPollAt, row.userId);
@@ -211,7 +211,7 @@ export const getWatchForWebhook = internalQuery
     .input({ watchId: v.id("watchedRepositories") })
     .output(v.union(v.null(), v.object({ webhookSecret: v.string() })))
     .query(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.watchId);
+        const row = await ctx.db.get("watchedRepositories", args.watchId);
 
         return row?.webhookSecret === undefined ? null : { webhookSecret: row.webhookSecret };
     });
@@ -225,7 +225,7 @@ export const acceptWatchDelivery = internalMutation
     .input({ signature: v.string().max(MAX_LENGTH.short), watchId: v.id("watchedRepositories") })
     .output(v.union(v.literal("accepted"), v.literal("duplicate"), v.literal("not_found")))
     .mutation(async ({ args, ctx }) => {
-        const row = await ctx.db.get(args.watchId);
+        const row = await ctx.db.get("watchedRepositories", args.watchId);
 
         if (row?.webhookSecret === undefined) {
             return "not_found" as const;
@@ -238,7 +238,7 @@ export const acceptWatchDelivery = internalMutation
         const { now } = ctx;
 
         // A poll in flight keeps its lease; `recordRepoPoll` sees the mark newer than the lease and looks again.
-        await ctx.db.patch(row._id, { dirtyAt: now, webhookSeenAt: now, ...(!isLeased(row, now) && { nextPollAt: now }) });
+        await ctx.db.patch("watchedRepositories", row._id, { dirtyAt: now, webhookSeenAt: now, ...(!isLeased(row, now) && { nextPollAt: now }) });
         await noteShardDue(ctx, now, row.userId);
 
         return "accepted" as const;

@@ -1,4 +1,5 @@
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -17,7 +18,17 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { CLAIM_PREFIX_BATCH, releaseClaim, releaseClaimsWithPrefix, TRIGGER_DELIVERY_SCOPE } from "../lib/claim-once";
+import {
+    CLAIM_PREFIX_BATCH,
+    claimOnce,
+    hasClaim,
+    holdClaim,
+    JOB_CLAIM_TTL_MS,
+    releaseClaim,
+    releaseClaimsWithPrefix,
+    TRIGGER_DELIVERY_CLAIM_TTL_MS,
+    TRIGGER_DELIVERY_SCOPE,
+} from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
@@ -302,12 +313,15 @@ const vGetTriggersOutput = v.array(
         triggerCount: v.number(),
         type: v.string(),
         updatedAt: v.number(),
+        // While a rotation's overlap lasts: when the previous secret stops working. Never the secret itself.
+        webhookPreviousSecretExpiresAt: v.union(v.number(), v.null()),
         webhookSignatureScheme: v.union(vWebhookSignatureScheme, v.null()),
     }),
 );
 
 export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(async ({ ctx: context }): Promise<Infer<typeof vGetTriggersOutput>> => {
     const { userId } = context.user;
+    const { now } = context;
 
     const userTriggers = await context.db
         .query("triggers")
@@ -345,12 +359,29 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             triggerCount: t.triggerCount ?? 0,
             type: t.type,
             updatedAt: t.updatedAt,
+            webhookPreviousSecretExpiresAt:
+                t.webhookPreviousSecret !== undefined && (t.webhookPreviousSecretExpiresAt ?? 0) > now ? (t.webhookPreviousSecretExpiresAt ?? null) : null,
             webhookSignatureScheme: t.type === "webhook" ? (t.webhookSignatureScheme ?? "timestamped") : null,
         };
     });
 });
 
 /** Create a new trigger */
+/** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
+const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+    if (value === undefined) {
+        return value;
+    }
+
+    const { removed, text } = stripHiddenText(value);
+
+    if (removed > 0 && text.trim() === "") {
+        throw new LunoraError("BAD_REQUEST", `${label} is empty after removing hidden characters`);
+    }
+
+    return text as T;
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -443,12 +474,12 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: args.inputTemplate,
+            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
-            systemPrompt: args.systemPrompt,
+            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
             timezone,
             triggerCount: 0,
             type: triggerType,
@@ -522,7 +553,7 @@ export const updateTrigger = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -554,7 +585,7 @@ export const updateTrigger = authMutation
 
         if (args.model !== undefined) patch.model = args.model;
 
-        if (args.systemPrompt !== undefined) patch.systemPrompt = args.systemPrompt;
+        if (args.systemPrompt !== undefined) patch.systemPrompt = cleanPromptField(args.systemPrompt, "The system prompt");
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
@@ -617,7 +648,7 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
+        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;
@@ -647,7 +678,7 @@ export const updateTrigger = authMutation
         const filters = checkedFilters(args.filters, trigger.type);
 
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
-        await patchRow(context.db, trigger, {
+        await patchRow(context.db, "triggers", trigger, {
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
@@ -689,7 +720,7 @@ export const setTriggerEnabled = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -714,7 +745,7 @@ export const setTriggerEnabled = authMutation
             throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
         }
 
-        await context.db.patch(args.triggerId as Id<"triggers">, {
+        await context.db.patch("triggers", args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
             // Turning a disabled trigger back on is the owner saying the cause is fixed: the streak starts over. Enabling one that is already on changes nothing.
@@ -731,6 +762,80 @@ export const setTriggerEnabled = authMutation
         context.log.event("triggers.set_trigger_enabled", { enabled: args.enabled });
     });
 
+/** How long a rotation may keep the old secret working, when the owner asks for it. */
+export const WEBHOOK_SECRET_OVERLAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Replaces a webhook trigger's secret. The new secret is returned once, like the first. By default the old one
+ * stops working at once; `keepOldFor24h` leaves it accepted for `WEBHOOK_SECRET_OVERLAP_MS` so a sender can be
+ * updated without a gap. Only one previous secret is kept: rotating again ends any overlap still running.
+ * The URL names the trigger and does not change.
+ */
+export const rotateWebhookSecret = authMutation
+    .use(rateLimit("triggers/update"))
+    .input({
+        keepOldFor24h: v.optional(v.boolean()),
+        triggerId: v.id("triggers"),
+    })
+    .output(v.object({ previousSecretExpiresAt: v.union(v.number(), v.null()), webhookSecret: v.string() }))
+    .mutation(async ({ args, ctx: context }) => {
+        const { userId } = context.user;
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
+
+        if (!trigger || trigger.userId !== userId) {
+            throw new LunoraError("NOT_FOUND", "Trigger not found");
+        }
+
+        if (trigger.type !== "webhook") {
+            throw new LunoraError("BAD_REQUEST", "Only a webhook trigger has a secret");
+        }
+
+        const keepOld = args.keepOldFor24h === true && trigger.webhookSecret !== undefined;
+        const plaintextSecret = crypto.randomUUID();
+        const previousSecretExpiresAt = keepOld ? context.now + WEBHOOK_SECRET_OVERLAP_MS : null;
+
+        // `undefined` removes the previous secret, so a rotation without an overlap leaves none behind.
+        await patchRow(context.db, "triggers", trigger, {
+            updatedAt: context.now,
+            webhookPreviousSecret: keepOld ? trigger.webhookSecret : undefined,
+            webhookPreviousSecretExpiresAt: previousSecretExpiresAt ?? undefined,
+            webhookSecret: await encryptKey(plaintextSecret, "tool-keys"),
+        });
+
+        context.log.event("triggers.rotate_webhook_secret", { overlap: keepOld });
+
+        return { previousSecretExpiresAt, webhookSecret: plaintextSecret };
+    });
+
+/**
+ * Removes a trigger the caller has already been checked to own: its execution logs, its claims and its shard route.
+ * Returns how many execution logs went. `deleteTrigger` rate-limits first; the bundle rollback does not.
+ */
+export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
+    // Delete associated execution logs
+    const executions = await context.db
+        .query("triggerExecutions")
+        .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
+        .collect();
+
+    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
+    await Promise.allSettled(executions.map((row) => context.db.delete("triggerExecutions", row._id)));
+
+    // Delete the trigger
+    await context.db.delete("triggers", triggerId);
+
+    const deliveryPrefix = `${triggerId}:`;
+
+    if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
+        await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
+    }
+
+    await deleteShardRoute(context, "trigger", triggerId);
+
+    return executions.length;
+};
+
 /** Delete a trigger */
 export const deleteTrigger = authMutation
     .use(rateLimit("triggers/delete"))
@@ -739,34 +844,15 @@ export const deleteTrigger = authMutation
     })
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
-        // Delete associated execution logs
-        const executions = await context.db
-            .query("triggerExecutions")
-            .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
-            .collect();
+        const executionsDeleted = await deleteTriggerRows(context, args.triggerId as Id<"triggers">);
 
-        // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
-        // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
-        await Promise.allSettled(executions.map((row) => context.db.delete(row._id)));
-
-        // Delete the trigger
-        await context.db.delete(args.triggerId as Id<"triggers">);
-
-        const deliveryPrefix = `${args.triggerId}:`;
-
-        if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
-            await context.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix: deliveryPrefix, scope: TRIGGER_DELIVERY_SCOPE });
-        }
-
-        await deleteShardRoute(context, "trigger", args.triggerId);
-
-        context.log.event("triggers.delete_trigger", { executionsDeleted: executions.length });
+        context.log.event("triggers.delete_trigger", { executionsDeleted });
     });
 
 /** Get execution history for a trigger */
@@ -791,7 +877,7 @@ export const getTriggerExecutions = authQuery
         const { userId } = context.user;
 
         // Verify trigger ownership
-        const trigger = await context.db.get(args.triggerId as Id<"triggers">);
+        const trigger = await context.db.get("triggers", args.triggerId as Id<"triggers">);
 
         if (!trigger || trigger.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Trigger not found");
@@ -874,7 +960,7 @@ export const testRunTrigger = authAction
 
 export const getTriggerInternal = internalQuery
     .input({ triggerId: v.id("triggers") })
-    .query(async ({ args: { triggerId }, ctx }): Promise<Doc<"triggers"> | null> => await ctx.db.get(triggerId));
+    .query(async ({ args: { triggerId }, ctx }): Promise<Doc<"triggers"> | null> => await ctx.db.get("triggers", triggerId));
 
 export const getDueScheduleTriggers = internalQuery
     .input({ now: v.number() })
@@ -905,7 +991,7 @@ export const updateTriggerStats = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { error, lastTriggeredAt, nextTriggerAt, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger) {
             return null;
@@ -918,7 +1004,7 @@ export const updateTriggerStats = internalMutation
         // "Run now" over a scheduled run) must not pull a quiet routine's window back over what was already reported.
         const advancesWindow = lastTriggeredAt !== undefined && lastTriggeredAt > (trigger.lastTriggeredAt ?? -Infinity);
 
-        await patchRow(ctx.db, trigger, {
+        await patchRow(ctx.db, "triggers", trigger, {
             lastError: error,
             triggerCount: (trigger.triggerCount ?? 0) + 1,
             updatedAt: ctx.now,
@@ -938,13 +1024,13 @@ export const reserveQuietWindow = internalMutation
     .input({ expected: v.optional(v.number()), triggerId: v.id("triggers"), windowStart: v.number() })
     .output(v.boolean())
     .mutation(async ({ args: { expected, triggerId, windowStart }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger || trigger.lastTriggeredAt !== expected) {
             return false;
         }
 
-        await patchRow(ctx.db, trigger, { lastTriggeredAt: windowStart });
+        await patchRow(ctx.db, "triggers", trigger, { lastTriggeredAt: windowStart });
 
         return true;
     });
@@ -959,10 +1045,10 @@ export const releaseQuietWindow = internalMutation
     .input({ expected: v.optional(v.number()), triggerId: v.id("triggers") })
     .output(v.null())
     .mutation(async ({ args: { expected, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (trigger?.lastTriggeredAt !== undefined && (expected === undefined || expected < trigger.lastTriggeredAt)) {
-            await patchRow(ctx.db, trigger, { lastTriggeredAt: expected });
+            await patchRow(ctx.db, "triggers", trigger, { lastTriggeredAt: expected });
         }
 
         return null;
@@ -977,7 +1063,7 @@ export const releaseQuietWindow = internalMutation
  */
 const switchOffFiredMoment = async (ctx: MutationCtx, trigger: Doc<"triggers">, firing: number | undefined): Promise<void> => {
     if (firing !== undefined && trigger.enabled === true && trigger.eventSource?.kind === "time" && trigger.eventState?.firedAt === firing) {
-        await ctx.db.patch(trigger._id, { enabled: false, updatedAt: ctx.now });
+        await ctx.db.patch("triggers", trigger._id, { enabled: false, updatedAt: ctx.now });
     }
 };
 
@@ -995,7 +1081,7 @@ export const switchOffConsumedMoment = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { firing, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (trigger) {
             await switchOffFiredMoment(ctx, trigger, firing);
@@ -1008,7 +1094,7 @@ export const switchOffConsumedMoment = internalMutation
 const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reason: string, firing: number | undefined): Promise<void> => {
     // The trigger may have been deleted after the run read it. Its
     // deletion cleared the history, so a row written now would outlive it.
-    const trigger = await ctx.db.get(triggerId);
+    const trigger = await ctx.db.get("triggers", triggerId);
 
     if (!trigger) {
         return;
@@ -1022,7 +1108,7 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
         .first();
 
     if (latest) {
-        await patchRow(ctx.db, latest, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
+        await patchRow(ctx.db, "triggerExecutions", latest, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
 
         return;
     }
@@ -1064,6 +1150,16 @@ const giveBackClaim = async (
  * delivery that no longer matches is recorded as filtered (replacing the running
  * row `executionId` names), is never charged, and answers `{ filtered }`.
  */
+/** The scope recording that an execution was admitted and charged, so a retry of its admission does not charge it again. */
+export const TRIGGER_ADMISSION_SCOPE = "trigger-admission";
+
+/** The answers of an admission that removed its execution row. Each is recorded with the removal, so a retry repeats the answer. */
+const ADMISSION_SKIPS = {
+    disabled: { skipped: "disabled" as const },
+    duplicate: { skipped: "duplicate" as const },
+    filtered: { filtered: "Already evaluated against the filters." },
+};
+
 export const admitTriggerRun = internalMutation
     .input({
         // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
@@ -1077,8 +1173,33 @@ export const admitTriggerRun = internalMutation
         requireEnabled: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
     })
-    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.literal("disabled") })))
+    .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() }), v.object({ skipped: v.union(v.literal("disabled"), v.literal("duplicate")) })))
     .mutation(async ({ args: { claim, executionId, filterPayload, releaseUnlessRun, requireEnabled, triggerId }, ctx }) => {
+        // The caller retries an admission that threw. If the first try committed and only its answer was lost, the charge is
+        // already taken: answer the recorded outcome (a run that may go ahead) instead of charging the same execution again.
+        if (executionId && (await hasClaim(ctx, TRIGGER_ADMISSION_SCOPE, executionId))) {
+            return null;
+        }
+
+        for (const outcome of Object.keys(ADMISSION_SKIPS) as (keyof typeof ADMISSION_SKIPS)[]) {
+            if (executionId && (await hasClaim(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId))) {
+                return ADMISSION_SKIPS[outcome];
+            }
+        }
+
+        /** Removes the running row of an execution that will not run and records why, in the same transaction, so a retry cannot run it. */
+        const dropRunning = async (outcome: keyof typeof ADMISSION_SKIPS, ownerId: string): Promise<void> => {
+            const running = executionId ? await ctx.db.get("triggerExecutions", executionId) : null;
+
+            if (running && running.triggerId === triggerId && running.status === "running") {
+                await ctx.db.delete("triggerExecutions", running._id);
+            }
+
+            if (executionId) {
+                await claimOnce(ctx, `${TRIGGER_ADMISSION_SCOPE}:${outcome}`, executionId, JOB_CLAIM_TTL_MS, ownerId);
+            }
+        };
+
         const refused = async (reason: string): Promise<string> => {
             if (claim && releaseUnlessRun) {
                 await giveBackClaim(ctx, claim, triggerId, true);
@@ -1086,7 +1207,7 @@ export const admitTriggerRun = internalMutation
 
             return reason;
         };
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
 
         if (!trigger) {
             return await refused("Trigger not found");
@@ -1095,17 +1216,13 @@ export const admitTriggerRun = internalMutation
         if (requireEnabled === true && trigger.enabled !== true) {
             // Paused by another run since the caller looked: nothing ran and the pause already told the owner, so the
             // running row goes (as for a filter miss) rather than being settled as a failure with a second notice.
-            const running = executionId ? await ctx.db.get(executionId) : null;
-
-            if (running && running.triggerId === triggerId && running.status === "running") {
-                await ctx.db.delete(running._id);
-            }
+            await dropRunning("disabled", trigger.userId);
 
             if (claim) {
                 await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
             }
 
-            return { skipped: "disabled" as const };
+            return ADMISSION_SKIPS.disabled;
         }
 
         if (filterPayload !== undefined) {
@@ -1116,11 +1233,7 @@ export const admitTriggerRun = internalMutation
 
                 await recordFiltered(ctx, triggerId, reason, undefined);
 
-                const running = executionId ? await ctx.db.get(executionId) : null;
-
-                if (running && running.triggerId === triggerId && running.status === "running") {
-                    await ctx.db.delete(running._id);
-                }
+                await dropRunning("filtered", trigger.userId);
 
                 if (claim) {
                     await giveBackClaim(ctx, claim, triggerId, releaseUnlessRun === true);
@@ -1139,15 +1252,29 @@ export const admitTriggerRun = internalMutation
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
-        const bot = trigger.botId ? await ctx.db.get(trigger.botId) : null;
+        const bot = trigger.botId ? await ctx.db.get("bots", trigger.botId) : null;
         const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             return await refused(modelUnavailableMessage(model));
         }
 
+        // A permanent claim is stretched from its retry window to its long life HERE, in the transaction that charges the
+        // run, so no refusal after it can leave a thread or a charge behind. It lapsing before this point is no reason to
+        // drop an acknowledged delivery: the key is taken again unless another delivery holds it, and only then is this one a duplicate.
+        if (claim && releaseUnlessRun && !(await holdClaim(ctx, claim.scope, claim.key, claim.claimedAt, TRIGGER_DELIVERY_CLAIM_TTL_MS, trigger.userId))) {
+            await dropRunning("duplicate", trigger.userId);
+
+            return ADMISSION_SKIPS.duplicate;
+        }
+
         if (!(await chargeRound(ctx, trigger.userId, account))) {
             return await refused(DAILY_LIMIT_MESSAGE);
+        }
+
+        // Recorded in the transaction that charged, so the record exists exactly when the charge does.
+        if (executionId) {
+            await claimOnce(ctx, TRIGGER_ADMISSION_SCOPE, executionId, JOB_CLAIM_TTL_MS, trigger.userId);
         }
 
         return null;
@@ -1221,12 +1348,12 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
     const { pause, streak } = advanceStreak(current, outcome);
 
     if (pause) {
-        await patchRow(ctx.db, trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
+        await patchRow(ctx.db, "triggers", trigger, { enabled: false, failureStreak: streak, updatedAt: ctx.now });
         console.info(`[Triggers] Trigger ${trigger._id} paused after ${streak} consecutive failures its owner can fix`);
     } else if (outcome === "success") {
-        await patchRow(ctx.db, trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
+        await patchRow(ctx.db, "triggers", trigger, { failureStreak: streak, lastSuccessStartedAt: startedAt });
     } else if (streak !== current) {
-        await patchRow(ctx.db, trigger, { failureStreak: streak });
+        await patchRow(ctx.db, "triggers", trigger, { failureStreak: streak });
     }
 
     return pause;
@@ -1248,7 +1375,7 @@ export const updateExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
-        const execution = await ctx.db.get(executionId);
+        const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
             return null;
@@ -1259,7 +1386,7 @@ export const updateExecution = internalMutation
         const settled = settling ? { error, status, threadId } : { error: execution.error, status: execution.status, threadId: execution.threadId };
 
         if (settling) {
-            await ctx.db.patch(executionId, {
+            await ctx.db.patch("triggerExecutions", executionId, {
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
@@ -1271,7 +1398,7 @@ export const updateExecution = internalMutation
             return null;
         }
 
-        const trigger = await ctx.db.get(execution.triggerId);
+        const trigger = await ctx.db.get("triggers", execution.triggerId);
 
         if (!trigger) {
             return null;
@@ -1284,7 +1411,7 @@ export const updateExecution = internalMutation
             paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
 
             if (paused) {
-                await ctx.db.patch(executionId, { pausedTrigger: true });
+                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
             }
         }
 
@@ -1317,11 +1444,11 @@ export const setTriggerEnabledInternal = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { enabled, triggerId }, ctx }) => {
-        const trigger = await ctx.db.get(triggerId);
+        const trigger = await ctx.db.get("triggers", triggerId);
         const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
         const eventArm = enabled && trigger?.type === "event" && trigger.enabled !== true ? armEventTrigger(trigger, ctx.now) : undefined;
 
-        await ctx.db.patch(triggerId, {
+        await ctx.db.patch("triggers", triggerId, {
             enabled,
             updatedAt: ctx.now,
             ...(enabled && trigger && trigger.enabled !== true && { enabledAt: ctx.now, failureStreak: 0 }),

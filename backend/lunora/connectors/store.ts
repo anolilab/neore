@@ -8,7 +8,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { patchRow, withoutUndefined } from "../lib/patch";
@@ -84,7 +84,7 @@ export const createOAuthState = internalMutation
         const live = open.filter((row) => row.expiresAt > now).toSorted((a, b) => a.expiresAt - b.expiresAt);
         const evict = [...open.filter((row) => row.expiresAt <= now), ...live.slice(0, Math.max(0, live.length - (MAX_OPEN_FLOWS_PER_USER - 1)))];
 
-        await Promise.all(evict.map((row) => ctx.db.delete(row._id)));
+        await Promise.all(evict.map((row) => ctx.db.delete("oauthStates", row._id)));
         await ctx.db.insert("oauthStates", { expiresAt, flow, state: stateHash, target, userId });
 
         return null;
@@ -126,7 +126,7 @@ export const consumeOAuthState = internalMutation
 
         if (!check.ok) {
             if (check.reason === "expired" && row) {
-                await ctx.db.delete(row._id);
+                await ctx.db.delete("oauthStates", row._id);
             }
 
             return check;
@@ -134,7 +134,7 @@ export const consumeOAuthState = internalMutation
 
         const stored = row as NonNullable<typeof row>;
 
-        await ctx.db.delete(stored._id);
+        await ctx.db.delete("oauthStates", stored._id);
 
         const target = targetOf(stored);
 
@@ -187,7 +187,7 @@ export const saveConnectorGrant = internalMutation
             .first();
 
         if (existing) {
-            await patchRow(ctx.db, existing, { ...grant, connectedAt: ctx.now });
+            await patchRow(ctx.db, "userConnectors", existing, { ...grant, connectedAt: ctx.now });
 
             return { connectorId: existing._id };
         }
@@ -277,7 +277,7 @@ export const getOwnedConnectorGrant = internalQuery
         ),
     )
     .query(async ({ args: { connectorId, userId }, ctx }) => {
-        const row = await ctx.db.get(connectorId);
+        const row = await ctx.db.get("userConnectors", connectorId);
 
         if (!row || row.userId !== userId) {
             return null;
@@ -350,7 +350,7 @@ export const saveMcpServerGrant = internalMutation
             .first();
 
         if (existing) {
-            await patchRow(ctx.db, existing, grant);
+            await patchRow(ctx.db, "mcpServerGrants", existing, grant);
 
             return { grantId: existing._id };
         }
@@ -429,7 +429,7 @@ export const deleteMcpServerGrant = internalMutation
             return null;
         }
 
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("mcpServerGrants", row._id);
 
         return { encryptedTokens: row.encryptedTokens, oauthClient: row.oauthClient };
     });
@@ -440,7 +440,7 @@ export const deleteMcpServerGrant = internalMutation
 // ---------------------------------------------------------------------------
 
 const getGrantRow = async (ctx: Pick<MutationCtx | QueryCtx, "db">, grant: GrantRef): Promise<Doc<"mcpServerGrants"> | Doc<"userConnectors"> | null> =>
-    await ctx.db.get(grant.id);
+    await ctx.db.get(grant.table, grant.id as Id<typeof grant.table>);
 
 /** The stored ciphertext right now — for a refresher that lost a race to tell "revoked" from "rotated by someone else". */
 export const getCurrentEncryptedTokens = internalQuery
@@ -479,7 +479,7 @@ export const storeRefreshedTokens = internalMutation
             return { applied: false, current: row.encryptedTokens ?? null };
         }
 
-        await patchRow(ctx.db, row, {
+        await patchRow(ctx.db, args.grant.table, row, {
             encryptedTokens: args.encryptedTokens,
             hasRefreshToken: args.hasRefreshToken,
             lastError: undefined,
@@ -497,7 +497,7 @@ export const markConnectorStatus = internalMutation
         const row = await getGrantRow(ctx, grant);
 
         if (row) {
-            await patchRow(ctx.db, row, { lastError: lastError?.slice(0, 500), status });
+            await patchRow(ctx.db, grant.table, row, { lastError: lastError?.slice(0, 500), status });
         }
 
         return null;
@@ -508,13 +508,13 @@ export const clearConnectorGrant = internalMutation
     .input({ connectorId: v.id("userConnectors"), userId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { connectorId, userId }, ctx }) => {
-        const row = await ctx.db.get(connectorId);
+        const row = await ctx.db.get("userConnectors", connectorId);
 
         if (!row || row.userId !== userId) {
             return false;
         }
 
-        await patchRow(ctx.db, row, {
+        await patchRow(ctx.db, "userConnectors", row, {
             encryptedTokens: undefined,
             hasRefreshToken: undefined,
             kvTokenKey: undefined,

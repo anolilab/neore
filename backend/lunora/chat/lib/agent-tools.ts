@@ -11,14 +11,18 @@ import type { MCPClient } from "@ai-sdk/mcp";
 import type { LanguageModel, ToolSet } from "ai";
 
 import { internal } from "../../_generated/internal";
+import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
 import { buildDeviceTools } from "./device-tools";
+import type { AutoApprovals } from "./low-risk-approval";
+import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
@@ -75,10 +79,24 @@ export interface BuildAgentToolsOptions {
      * `toolNames` — never wider than what the original run had.
      */
     snapshot?: { mcpServerNames: string[]; toolNames: string[] };
+    /**
+     * The thread an INTERACTIVE run is in. With it, the user's opt-in quick check for low-risk `ask` calls
+     * (`low-risk-approval.ts`) applies when the setting is on and the thread is one only they write to. Omitted, every
+     * `ask` tool pauses for a person.
+     */
+    threadId?: string;
+    /**
+     * Resolves to whether the run's prompt carries knowledge, memory or project context (`RunContext.untrustedContext`).
+     * The quick check never runs after any of them; omitted, that is unknown and counts as present. A promise, because
+     * the tools are built while the context loads.
+     */
+    untrustedContext?: Promise<boolean> | boolean;
     userId: string;
 }
 
 export interface BuildAgentToolsResult {
+    /** Calls the quick check let run unasked, by tool call id. Fills as the run goes; `finishRun` stamps them onto the saved calls. */
+    autoApprovals: AutoApprovals;
     /** MUST be closed by the caller (`closeMCPClients`) once the run finishes. */
     mcpClients: MCPClient[];
     /** Runtime name -> real server and tool, for every MCP tool in `tools`. Stamped onto saved tool calls for display. */
@@ -108,6 +126,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         searchMode,
         skillTools,
         snapshot,
+        threadId,
+        untrustedContext = true,
         userId,
     } = options;
 
@@ -123,11 +143,22 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, timedGrants, connectorServers] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+        // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
+        headless || origin === "outside_agent" || threadId === undefined
+            ? false
+            : // A failed read turns the quick check off; it must not take the run down.
+              ctx
+                  .runQuery(internal.chat.tool_permissions.getLowRiskApprovalContext, { threadId: threadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Quick-check eligibility unavailable:", error);
+
+                      return false;
+                  }),
         // A broken connector must never take the run down with it.
         getConnectorMcpServers(ctx, userId).catch((error: unknown) => {
             toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
@@ -185,6 +216,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
 
+    // A server counts as trusted by what it is (name AND url), so one whose url changed has lost it.
+    const trusted = quickCheckOn
+        ? new Set<string>(
+              await ctx.runQuery(internal.chat.tool_permissions.getLowRiskTrustedServers, { userId }).catch((error: unknown) => {
+                  toolsLogger.warn("[TOOLS] Trusted servers unavailable:", error);
+
+                  return [];
+              }),
+          )
+        : undefined;
+
     // Keyed from where the tool came from, never parsed back out of its name.
     const describe = (runtimeName: string): ToolDescriptor | undefined => {
         const device = deviceResult.descriptors.get(runtimeName);
@@ -196,16 +238,36 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         const mcp = mcpResult.descriptors.get(runtimeName);
 
         if (mcp?.connectorSlug) {
-            return { annotations: mcp.annotations, key: toolPermissionKey("connector", mcp.toolName, mcp.connectorSlug), source: "connector" };
+            return {
+                annotations: mcp.annotations,
+                key: toolPermissionKey("connector", mcp.toolName, mcp.connectorSlug),
+                source: "connector",
+                trustId: connectorTrustId(mcp.connectorSlug),
+            };
         }
 
-        return mcp && { annotations: mcp.annotations, key: toolPermissionKey("mcp", mcp.toolName, mcp.serverName), source: "mcp" };
+        return (
+            mcp && {
+                annotations: mcp.annotations,
+                key: toolPermissionKey("mcp", mcp.toolName, mcp.serverName),
+                source: "mcp",
+                ...(mcp.url !== undefined && { trustId: mcpTrustId(mcp.serverName, mcp.url) }),
+            }
+        );
     };
+
+    // Built per run: the approvals it records belong to this run's tool calls.
+    const quickCheck =
+        quickCheckOn && threadId !== undefined
+            ? createRunLowRiskCheck(ctx, { threadId, untrustedContext: Promise.resolve(untrustedContext), userId })
+            : undefined;
 
     const { removed, requiresApproval, tools } = applyToolPermissions(candidates, describe, overrides as ToolPermissionOverrides, {
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        ...(quickCheck && { lowRiskCheck: quickCheck.check }),
+        ...(trusted && { lowRiskTrusted: trusted }),
         timedGrants,
     });
 
@@ -231,5 +293,12 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         }
     }
 
-    return { mcpClients: mcpResult.clients, mcpLabels, mcpServerNames: selectedServers.map((s) => s.name), permissionKeys, tools };
+    return {
+        autoApprovals: quickCheck?.approvals ?? {},
+        mcpClients: mcpResult.clients,
+        mcpLabels,
+        mcpServerNames: selectedServers.map((s) => s.name),
+        permissionKeys,
+        tools,
+    };
 };

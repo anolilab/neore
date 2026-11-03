@@ -14,6 +14,7 @@ import { isLockedWithoutProof } from "../agent/thread-passcode";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import getAgent from "../chat/lib/get-agent";
+import { loadOptimizerModelRules } from "../chat/lib/optimizer-model-rules";
 import { gatewayFetch } from "../lib/services";
 import { ActionCache, cacheKeyFor } from "../lib/action-cache";
 import { compareStrings } from "../lib/collections";
@@ -388,7 +389,7 @@ export const updatePrompt = authMutation
                 });
             }
 
-            await ctx.db.patch(promptId, {
+            await ctx.db.patch("prompts", promptId, {
                 ...(content !== undefined && { content }),
                 ...(shouldSaveHistory && { currentVersion: newVersion }),
                 ...(description !== undefined && { description }),
@@ -446,7 +447,7 @@ export const deletePrompt = authMutation
         // Invalidate prompts list cache
         await invalidatePromptsCache(ctx, userId, organizationId);
 
-        await ctx.db.delete(promptId);
+        await ctx.db.delete("prompts", promptId);
 
         ctx.log.event("prompts.delete", { promptId });
     });
@@ -479,7 +480,7 @@ export const recordPromptUsage = authMutation
             return;
         }
 
-        await ctx.db.patch(promptId, {
+        await ctx.db.patch("prompts", promptId, {
             lastUsedAt: now,
             usageCount: (existing.usageCount || 0) + 1,
         });
@@ -513,7 +514,7 @@ export const togglePromptFavorite = authMutation
             throw new LunoraError("FORBIDDEN", "Not authorized to update this prompt");
         }
 
-        await ctx.db.patch(promptId, {
+        await ctx.db.patch("prompts", promptId, {
             isFavorite: !existing.isFavorite,
             updatedAt: ctx.now,
         });
@@ -876,7 +877,7 @@ export const restorePromptVersion = authMutation
 
         // Update the prompt with the restored content. A field the restored
         // version did not have is removed, not kept from the current one.
-        await patchRow(ctx.db, prompt, {
+        await patchRow(ctx.db, "prompts", prompt, {
             content: historyEntry.content,
             currentVersion: newVersion,
             description: historyEntry.description,
@@ -1027,7 +1028,7 @@ export const setThreadVariables = authMutation
             }
 
             // Update existing
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("threadVariables", existing._id, {
                 updatedAt: now,
                 variables,
             });
@@ -1094,7 +1095,7 @@ export const updateThreadVariable = authMutation
                 variables[existingIndex] = { name, value };
             }
 
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("threadVariables", existing._id, {
                 updatedAt: now,
                 variables,
             });
@@ -1156,9 +1157,9 @@ export const deleteThreadVariable = authMutation
 
         if (variables.length === 0) {
             // Delete the entire record if no variables left
-            await ctx.db.delete(existing._id);
+            await ctx.db.delete("threadVariables", existing._id);
         } else {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("threadVariables", existing._id, {
                 updatedAt: now,
                 variables,
             });
@@ -1318,7 +1319,7 @@ export const setUserVariableDefaults = authMutation
         const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } });
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("userVariableDefaults", existing._id, {
                 updatedAt: now,
                 variables,
             });
@@ -1373,7 +1374,7 @@ export const setOrganizationVariableDefaults = authMutation
         const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } });
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            await ctx.db.patch("userVariableDefaults", existing._id, {
                 updatedAt: now,
                 variables,
             });
@@ -1527,7 +1528,8 @@ export const optimizePrompt = internalAction
 
         const model = DEFAULT_PROMPT_IMPROVEMENT_MODEL;
 
-        const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+        const modelFilterRules = await loadOptimizerModelRules(context, userId, model);
+        const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules });
 
         // Create a temporary thread for optimization
         const { thread } = await agent.createThread(context, {

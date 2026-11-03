@@ -14,6 +14,7 @@
  * pointing the thread at it (so it lands as a SIBLING of the earlier reply); an edit saves the new prompt
  * through `saveEditedSiblingHandler`, then the reply under it.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -74,7 +75,10 @@ export interface SaveLocalTurnResult {
 
 /** Exported for the harness test; the procedure below adds auth and the rate limit. */
 export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string, args: SaveLocalTurnArgs): Promise<SaveLocalTurnResult> => {
-    if (!args.prompt.trim()) {
+    // The browser sends what the person typed or said; hidden characters never become a saved turn.
+    const prompt = stripHiddenText(args.prompt).text;
+
+    if (!prompt.trim()) {
         throw new LunoraError("BAD_REQUEST", "The prompt is empty");
     }
 
@@ -92,7 +96,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
     let threadId: Id<"threads">;
 
     if (args.threadId) {
-        const thread = await ctx.db.get(args.threadId);
+        const thread = await ctx.db.get("threads", args.threadId);
 
         if (!thread || thread.deleted) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
@@ -134,7 +138,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             model: args.model,
             status: "active",
             tags: ["chat", "local"],
-            title: deriveLocalThreadTitle(args.prompt),
+            title: deriveLocalThreadTitle(prompt),
             updatedAt: now,
             userId,
         })) as Id<"threads">;
@@ -150,12 +154,12 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         }
     }
 
-    const userMessage = buildLocalPromptMessage(args.prompt);
+    const userMessage = buildLocalPromptMessage(prompt);
     const replyMessage = buildLocalReplyMessage({
         error: args.error,
         modelId: resolved.modelId,
         outcome: args.outcome,
-        prompt: args.prompt,
+        prompt,
         reasoning: args.reasoning,
         reply: args.reply,
     });

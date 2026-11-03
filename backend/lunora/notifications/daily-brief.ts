@@ -34,6 +34,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { loadHomeOverview } from "../home/overview";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { planActivityUpdate } from "../memory/reflection-logic";
@@ -86,7 +87,7 @@ const ensureScheduled = async (ctx: MutationCtx, userId: string, timeZone: strin
     }
 
     if (state) {
-        await ctx.db.patch(state._id, { lastActiveAt: now, ...scheduled });
+        await ctx.db.patch("dailyBriefState", state._id, { lastActiveAt: now, ...scheduled });
     } else {
         await ctx.db.insert("dailyBriefState", { lastActiveAt: now, userId, ...scheduled });
     }
@@ -124,7 +125,7 @@ export const setDailyBriefEnabled = authMutation
 
         const settings = await loadUserSettings(ctx, userId);
 
-        await saveUserSettings(ctx.db, settings, userId, { dailyBriefEnabled: enabled });
+        await saveUserSettings(ctx.db, settings, userId, { dailyBriefEnabled: enabled }, ctx.user.activeOrganization?.id ?? null);
 
         if (enabled) {
             await ensureScheduled(ctx, userId, settings?.timezone);
@@ -174,9 +175,9 @@ export const claimDailyBrief = internalMutation
                 const scheduledFor = nextBriefRunAt(now, settings?.timezone, userId);
                 const scheduledJobId = await ctx.scheduler.runAt(scheduledFor, internal.notifications.daily_brief.runDailyBrief, { userId });
 
-                await patchRow(ctx.db, state, { scheduledFor, scheduledJobId });
+                await patchRow(ctx.db, "dailyBriefState", state, { scheduledFor, scheduledJobId });
             } else {
-                await patchRow(ctx.db, state, clearPending);
+                await patchRow(ctx.db, "dailyBriefState", state, clearPending);
             }
 
             return { claimed: false as const, reason: eligibility.reason };
@@ -184,7 +185,7 @@ export const claimDailyBrief = internalMutation
 
         const since = state.lastRunAt ?? now - DAY_MS;
 
-        await patchRow(ctx.db, state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
+        await patchRow(ctx.db, "dailyBriefState", state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
 
         return { claimed: true as const, localDay: eligibility.localDay, since };
     });
@@ -306,7 +307,7 @@ export const runDailyBrief = internalAction
         try {
             const result = await generateText({
                 maxOutputTokens: BRIEF_LIMITS.maxOutputTokens,
-                model: await getUtilityModel(gatewayFetch(ctx), { userId }),
+                model: await getUtilityModel(gatewayFetch(ctx), { rules: await loadModelFilterRules(ctx, userId), userId }),
                 prompt: buildBriefPrompt(inputs),
                 system: BRIEF_SYSTEM_PROMPT,
             });

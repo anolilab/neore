@@ -55,6 +55,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                     },
                 },
+                coding_agents: {
+                    functions: {
+                        setCodingAgentCommitIdentity: {
+                            mutationOptions: () => {
+                                return { mutationFn: async () => null };
+                            },
+                        },
+                    },
+                },
                 gdpr: {
                     functions: {
                         getDataAccessSummary: query({
@@ -125,7 +134,14 @@ describe(SettingsPageOutline, () => {
 
         const headings = outline();
 
-        expect(headings).toStrictEqual(["h1 Agent", "h2 Agent Capabilities", "h3 Agent Modules", "h3 Automation", "h3 Token Cost Impact"]);
+        expect(headings).toStrictEqual([
+            "h1 Agent",
+            "h2 Agent Capabilities",
+            "h3 Agent Modules",
+            "h3 Automation",
+            "h3 Coding Agent Pull Requests",
+            "h3 Token Cost Impact",
+        ]);
         expectNoSkippedLevel(headings, 1);
     });
 

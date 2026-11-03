@@ -23,6 +23,8 @@ import { z } from "zod";
 import type { AppEnv } from "../env.js";
 import { MODEL_MAP } from "../models.js";
 import { createProviderModelForEnv, resolveApiKey } from "../providers/factory.js";
+import type { ModelFilterRules } from "./filters.js";
+import { getModelRejectionReason, hasActiveFilters } from "./filters.js";
 import { QueryTier } from "./tiers.js";
 
 export const CLASSIFIER_THRESHOLDS = {
@@ -64,6 +66,25 @@ export interface ClassifierVerdict {
 
 /** Whether a classifier model is configured at all. Cheap enough for the hot path. */
 export const isClassifierEnabled = (env: AppEnv): boolean => Boolean(env.ROUTING_CLASSIFIER_MODEL);
+
+/**
+ * Whether the classifier model may read this caller's prompt. The prompt leaves the gateway for that model's provider,
+ * so the caller's filter rules bind it like any other model: a model, provider or region rule it fails keeps the
+ * prompt away, and so does a zero-retention or no-data-collection requirement, which this call cannot guarantee.
+ */
+export const canClassifyPrompt = (env: AppEnv, rules: ModelFilterRules | undefined): boolean => {
+    const candidate = env.ROUTING_CLASSIFIER_MODEL ? MODEL_MAP.get(env.ROUTING_CLASSIFIER_MODEL) : undefined;
+
+    if (!candidate) {
+        return false;
+    }
+
+    if (!hasActiveFilters(rules)) {
+        return true;
+    }
+
+    return rules.requireZDR !== true && rules.denyDataCollection !== true && getModelRejectionReason(candidate, rules) === null;
+};
 
 const buildPrompt = (lastUserMessage: string, available: ReadonlyArray<QueryTier>, contextTokens: number): string => {
     const options = available.map((tier) => `- ${tier}: ${TIER_RUBRIC[tier]}`).join("\n");

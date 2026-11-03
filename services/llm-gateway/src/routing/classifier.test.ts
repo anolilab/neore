@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppEnv } from "../env.js";
-import { CLASSIFIER_THRESHOLDS, classifyTierWithModel, isClassifierEnabled } from "./classifier.js";
+import { canClassifyPrompt, CLASSIFIER_THRESHOLDS, classifyTierWithModel, isClassifierEnabled } from "./classifier.js";
 import { QueryTier } from "./tiers.js";
 
 const mocks = vi.hoisted(() => {
@@ -68,6 +68,28 @@ describe(isClassifierEnabled, () => {
         expect(isClassifierEnabled({} as AppEnv)).toBe(false);
         expect(isClassifierEnabled({ ROUTING_CLASSIFIER_MODEL: "" } as AppEnv)).toBe(false);
         expect(isClassifierEnabled(CONFIGURED)).toBe(true);
+    });
+});
+
+describe(canClassifyPrompt, () => {
+    it("reads when the caller has no active filter rules", () => {
+        expect(canClassifyPrompt(CONFIGURED, undefined)).toBe(true);
+        expect(canClassifyPrompt(CONFIGURED, {})).toBe(true);
+    });
+
+    it("never reads for a caller who requires zero retention or no data collection", () => {
+        expect(canClassifyPrompt(CONFIGURED, { requireZDR: true })).toBe(false);
+        expect(canClassifyPrompt(CONFIGURED, { denyDataCollection: true })).toBe(false);
+    });
+
+    it("follows the caller's model and provider rules", () => {
+        expect(canClassifyPrompt(CONFIGURED, { blockedProviders: ["google"] })).toBe(false);
+        expect(canClassifyPrompt(CONFIGURED, { allowedProviders: ["openai"] })).toBe(false);
+        expect(canClassifyPrompt(CONFIGURED, { allowedProviders: ["google"] })).toBe(true);
+    });
+
+    it("never reads for a model the catalog does not know", () => {
+        expect(canClassifyPrompt({ ROUTING_CLASSIFIER_MODEL: "no-such-model" } as AppEnv, undefined)).toBe(false);
     });
 });
 

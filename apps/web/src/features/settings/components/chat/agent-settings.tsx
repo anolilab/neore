@@ -2,12 +2,13 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
+import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
 import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
 import { toast } from "sonner";
@@ -21,8 +22,26 @@ import { useCRPC } from "@/lib/lunora/crpc";
 const AgentSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { data: aiPreferences, isLoading } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const queryClient = useQueryClient();
+    const {
+        data: aiPreferences,
+        isError: isAIPreferencesError,
+        isLoading,
+        refetch: refetchAIPreferences,
+    } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const updateAIUserPreferencesMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+    // Server-written (not in the generic settings save): the commit identity has its own setter.
+    const setCommitIdentityMutation = useMutation(
+        crpc.coding_agents.functions.setCodingAgentCommitIdentity.mutationOptions({
+            onError: () => {
+                toast.error(t`Failed to update pull request settings`);
+            },
+            onSuccess: () => {
+                void queryClient.invalidateQueries({ queryKey: crpc.auth.functions.getAIUserPreferences.queryKey({}) });
+                toast.success(t`Pull request settings updated`);
+            },
+        }),
+    );
 
     if (isLoading) {
         return <div className="text-muted-foreground text-sm">{t`Loading...`}</div>;
@@ -171,6 +190,40 @@ const AgentSettings: FC = () => {
                                 onCheckedChange={(checked: boolean) => handleToggle("autoDetectComplexity", checked)}
                             />
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t`Coding Agent Pull Requests`}</CardTitle>
+                        <CardDescription>{t`Who a pull request's commits are made as`}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-1">
+                                <Label className="text-base font-medium" htmlFor="commitAsMe">
+                                    {t`Commit as me`}
+                                </Label>
+                                <p className="text-muted-foreground text-sm" id="commitAsMeDescription">
+                                    {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email.`}
+                                </p>
+                            </div>
+                            <Switch
+                                aria-describedby="commitAsMeDescription"
+                                checked={aiPreferences?.codingAgentCommitIdentity === "user"}
+                                disabled={setCommitIdentityMutation.isPending || isAIPreferencesError}
+                                id="commitAsMe"
+                                onCheckedChange={(checked: boolean) => setCommitIdentityMutation.mutate({ identity: checked ? "user" : "agent" })}
+                            />
+                        </div>
+                        <p className={isAIPreferencesError ? "text-destructive mt-4 text-sm" : "text-destructive text-sm"} id="commitAsMeError" role="status">
+                            {isAIPreferencesError ? t`Something went wrong. Try again.` : null}
+                        </p>
+                        {isAIPreferencesError ? (
+                            <Button aria-describedby="commitAsMeError" className="mt-2" onClick={() => refetchAIPreferences()} size="sm" variant="outline">
+                                {t`Retry`}
+                            </Button>
+                        ) : null}
                     </CardContent>
                 </Card>
 

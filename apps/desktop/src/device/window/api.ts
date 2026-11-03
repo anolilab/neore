@@ -46,6 +46,8 @@ export interface DeviceWindowApi {
     acpView: () => Promise<AcpView>;
     auditTail: () => Promise<string[]>;
     confirm: (message: string) => Promise<boolean>;
+    /** Puts the diagnostics of this computer (no id) or of one server on the clipboard. The text holds no secret. */
+    copyDiagnostics: (deviceId?: string) => Promise<void>;
     hostAcpUpdate: (deviceId: string, update: AcpUpdate) => Promise<Pick<AcpView, "agents" | "consents">>;
     hostConnect: (deviceId: string) => Promise<HostProbe>;
     hostDisconnect: (deviceId: string) => Promise<void>;

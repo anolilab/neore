@@ -1,6 +1,7 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
 import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
+import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -26,9 +27,11 @@ import {
     type SystemOptimizerStyle,
     type UserOptimizerStyle,
 } from "@neore/ai/prompts/optimizer";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
+import { parseCustomModelId } from "@neore/ai/models";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 import z from "zod/v4";
@@ -60,6 +63,7 @@ import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGr
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
+import { readableProject } from "../projects/functions";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { headersForConnectionTest } from "../auth/lib/mcp-secret-headers";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -76,6 +80,8 @@ import { mediaJobStamp } from "./media-abandon";
 import type { FalAudioResponse } from "./lib/fal-media-parsing";
 import { extractFalAudioUrl, resolveFalVideoUrl } from "./lib/fal-media-parsing";
 import { canRunPaidModel, INTERNAL_PREFIX_RE, readRunPlan } from "./lib/agent-run";
+import { loadOptimizerModelRules } from "./lib/optimizer-model-rules";
+import { resolveBackgroundModel } from "./lib/background-model";
 import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
 import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
@@ -507,21 +513,18 @@ export const createThread = authMutation
             } = {};
 
             if (projectId) {
-                const project = await context.runQuery(api.agent.projects.getProject, {
-                    projectId: projectId as Id<"projects">,
-                });
+                // A project id from the client is stored on the thread: refuse one the caller cannot read, a missing one alike.
+                const project = await readableProject(context, projectId as Id<"projects">, userId);
 
-                if (project) {
-                    if (project.userId && project.userId !== userId) {
-                        throw new LunoraError("FORBIDDEN", "Project not found or access denied");
-                    }
-
-                    projectDefaults = {
-                        defaultEnabledFeatures: project.defaultEnabledFeatures,
-                        defaultModel: project.defaultModel,
-                        defaultReasoningEffort: project.defaultReasoningEffort,
-                    };
+                if (!project) {
+                    throw new LunoraError("FORBIDDEN", "Project not found or access denied");
                 }
+
+                projectDefaults = {
+                    defaultEnabledFeatures: project.defaultEnabledFeatures,
+                    defaultModel: project.defaultModel,
+                    defaultReasoningEffort: project.defaultReasoningEffort,
+                };
             }
 
             // A bot chat runs on the bot's model. A bot the caller does not own is a
@@ -626,6 +629,7 @@ export const createThread = authMutation
 
 export const createThreadWithInitialMessage = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         fileIds: v.optional(v.array(v.string())),
@@ -645,6 +649,7 @@ export const createThreadWithInitialMessage = internalMutation
     .mutation(
         async ({
             args: {
+                autoModel,
                 customSystemPrompt,
                 enabledFeatures,
                 fileIds,
@@ -672,6 +677,7 @@ export const createThreadWithInitialMessage = internalMutation
             // Batch all settings + status update in one mutation (much faster than separate calls)
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
+                    ...(autoModel === true && { autoModel }),
                     customSystemPrompt,
                     enabledFeatures,
                     language,
@@ -740,7 +746,7 @@ export const gateThreadActionHandler = async (
     // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any. A host-run thread
     // runs on a paired device, never on a cloud model: `runChatStart` refuses it. A switched thread runs on its
     // path's agent (`agent/agent-switch.ts`); the send only looks that up for one that was.
-    const thread = await context.db.get(args.threadId);
+    const thread = await context.db.get("threads", args.threadId);
 
     // A worker's thread takes a turn only through `dispatchToWorker`; the chat entry points refuse it.
     return {
@@ -780,7 +786,7 @@ export const getThreadTemporaryStatus = liteAuthQuery
 
         // Direct DB access - bypasses runQuery validator overhead (200ms+ savings)
         const [thread, temporaryThread] = await Promise.all([
-            context.db.get(threadId as Id<"threads">),
+            context.db.get("threads", threadId as Id<"threads">),
             context.db
                 .query("temporaryThreads")
                 .withIndex("by_thread", (q: any) => q.eq("threadId", threadId as Id<"threads">))
@@ -889,12 +895,15 @@ export const getThreadMessages = authQuery
         const agent = await getAgentForUser(context, userId, model, threadLanguage);
 
         // Fetch messages directly from the thread (branch messages are copied on branch creation)
-        return await agent.listMessages(context, {
+        const messages = await agent.listMessages(context, {
             paginationOpts,
             threadId,
             // The gate above admitted this proof.
             unlockProof,
         });
+
+        // A divider's computer ids and handoff are the owner's alone (`agentSwitchForWire`).
+        return thread?.userId === userId ? messages : { ...messages, page: messages.page.map((message) => withoutSwitchIds(message)) };
     });
 
 /**
@@ -929,7 +938,7 @@ export const getThreadUIMessages = liteAuthQuery
 
         if (!access) {
             // Existence only — past row-level security, which hides it either way.
-            const exists = await systemDb(context).get(threadId);
+            const exists = await systemDb(context).get("threads", threadId);
 
             return exists ? throwUnauthorized("Access denied to this thread") : throwThreadNotFound(threadId);
         }
@@ -1041,6 +1050,12 @@ export const continueThread = authAction
     .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
         const { userId } = context.user;
 
+        const cleanPrompt = stripHiddenText(prompt).text;
+
+        if (cleanPrompt.trim() === "") {
+            throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
+        }
+
         const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
 
         throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
@@ -1064,7 +1079,7 @@ export const continueThread = authAction
             userId,
         });
 
-        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt });
+        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt: cleanPrompt });
 
         context.log.event("chat.continue_thread", { model });
 
@@ -1331,6 +1346,7 @@ export const getThreadSettings = internalQuery
 
 export const updateThreadModel = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -1343,7 +1359,10 @@ export const updateThreadModel = internalMutation
     })
     .output(v.null())
     .mutation(
-        async ({ args: { customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId }, ctx: context }) => {
+        async ({
+            args: { autoModel, customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId },
+            ctx: context,
+        }) => {
             const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
                 threadId: threadId as Id<"threads">,
             });
@@ -1358,6 +1377,7 @@ export const updateThreadModel = internalMutation
             // The operations are logically independent (settings vs order), so this is acceptable.
             await context.runMutation(internal.agent.threads.updateThreadSettings, {
                 patch: {
+                    autoModel,
                     customSystemPrompt,
                     dictationLanguage,
                     enabledFeatures,
@@ -1383,6 +1403,7 @@ export const updateThreadModel = internalMutation
 export const updateThread = authAction
     .use(rateLimit("chat/update"))
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         enabledFeatures: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -1398,7 +1419,20 @@ export const updateThread = authAction
     .output(v.string())
     .action(
         async ({
-            args: { customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode, status, summary, threadId, title, unlockProof },
+            args: {
+                autoModel,
+                customSystemPrompt,
+                enabledFeatures,
+                model,
+                order,
+                reasoningEffort,
+                statelessMode,
+                status,
+                summary,
+                threadId,
+                title,
+                unlockProof,
+            },
             ctx: context,
         }) => {
             const { userId } = context.user;
@@ -1412,6 +1446,10 @@ export const updateThread = authAction
             // A switched thread's stored `model` is where the paths before its first switch recover their agent: only
             // a switch changes what it runs on, so the argument is ignored there (the palette's archive passes the model of
             // whichever thread is open).
+            if (autoModel === true && threadData?.groupChat) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available in a group chat");
+            }
+
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
@@ -1419,6 +1457,11 @@ export const updateThread = authAction
 
             if (!effectiveModel) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
+            }
+
+            // A custom endpoint or a bot's chat never routes (`shouldRouteAuto`), so Auto cannot be saved on one.
+            if (autoModel === true && (threadData?.botId || parseCustomModelId(effectiveModel) !== null)) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available for this chat");
             }
 
             const agent = await getAgentForUser(context, userId, effectiveModel, threadLanguage);
@@ -1449,7 +1492,17 @@ export const updateThread = authAction
                 });
             }
 
+            // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
+            // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
+            // caller says otherwise.
+            // A status change (archive, restore) sends whatever model the caller has open, which is not a pick.
+            const pickEndsAuto = status === undefined && model !== undefined && model !== threadData?.model;
+            const pickFallback = pickEndsAuto ? false : undefined;
+            const stays = !(threadData?.activeAgent || threadData?.runner === "host");
+            const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
+
             await context.runMutation(internal.chat.functions.updateThreadModel, {
+                autoModel: autoModelForWrite,
                 customSystemPrompt,
                 enabledFeatures,
                 model: effectiveModel,
@@ -1526,8 +1579,6 @@ export const convertTemporaryToPermanent = authMutation
     });
 
 export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_TITLE_GENERATION_MODEL;
-
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
@@ -1567,7 +1618,17 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         language = threadLanguage;
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // The user's model filters decide the model; when they allow none the thread keeps its default title.
+    const background = await resolveBackgroundModel(context, userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+    if (!background) {
+        context.log.event("chat.thread_title", { skipped: "no-allowed-model" });
+
+        return;
+    }
+
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1608,8 +1669,6 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
 const THREAD_CATEGORIES = ["coding", "writing", "research", "analysis", "brainstorming", "math", "learning", "business", "creative", "general"] as const;
 
 export const createCategoryChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_TITLE_GENERATION_MODEL;
-
     // As in `createTitleChat`: a thread that is gone is skipped, not retried.
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -1625,7 +1684,17 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
         return;
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
+    const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+    if (!background) {
+        context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
+
+        return;
+    }
+
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1662,8 +1731,6 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
 });
 
 export const createSummarizeChat = internalAction.input({ threadId: v.string(), userId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    const model = DEFAULT_SUMMARIZATION_MODEL;
-
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
@@ -1680,7 +1747,16 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
         throwBadRequest("userId is required for createSummarizeChat");
     }
 
-    const agent = await getAgent(model, { gateway: gatewayFetch(context) });
+    // The thread's messages are the OWNER's: a collaborator who asked for the summary does not widen the models they go to.
+    const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_SUMMARIZATION_MODEL, userId);
+
+    // The owner's model filters allow no background model: the thread is left unsummarised.
+    if (!background) {
+        return;
+    }
+
+    const { billedUserId, model, modelFilterRules } = background;
+    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId as Id<"threads">,
@@ -2648,11 +2724,18 @@ const runOptimizer = async (
     // messages into the prompt — whose rewrite goes back to the caller. So it must
     // be a thread the caller can read (owner or live grantee), else a stranger's
     // conversation leaks through the "improved prompt".
+    let ownerId: string | undefined;
+
     if (threadId) {
         await requireThreadPermissionInAction(context, threadId as Id<"threads">, userId, "read");
+        const continued = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+        ownerId = continued?.userId;
     }
 
-    const agent = await getAgent(modelId, { gateway: gatewayFetch(context) });
+    // A shared thread's messages are the owner's and go to the model with the caller's rewrite, so both users' filters apply.
+    const modelFilterRules = await loadOptimizerModelRules(context, userId, modelId, ownerId);
+    const agent = await getAgent(modelId, { gateway: gatewayFetch(context), modelFilterRules });
     const { thread } = threadId
         ? await agent.continueThread(context, { threadId })
         : await agent.createThread(context, { title: "Prompt Optimization", userId });
@@ -3169,7 +3252,7 @@ export const getBrowserActions = authQuery
     )
     .query(async ({ args: { sessionId }, ctx: context }) => {
         // Verify session ownership
-        const session = await context.db.get(sessionId as Id<"browserSessions">);
+        const session = await context.db.get("browserSessions", sessionId as Id<"browserSessions">);
 
         if (!session || session.userId !== context.user.userId) {
             return [];
@@ -3205,7 +3288,7 @@ export const terminateBrowserSession = authMutation
         sessionId: v.string().max(MAX_LENGTH.id),
     })
     .mutation(async ({ args: { sessionId }, ctx: context }) => {
-        const session = await context.db.get(sessionId as Id<"browserSessions">);
+        const session = await context.db.get("browserSessions", sessionId as Id<"browserSessions">);
 
         if (!session || session.userId !== context.user.userId) {
             throw new LunoraError("FORBIDDEN", "Not allowed");
@@ -3244,7 +3327,7 @@ export const updateBrowserSettings = authMutation
             .withIndex("by_userId", (q: any) => q.eq("userId", userId))
             .first();
 
-        await saveAiUserPreferences(context.db, prefs, userId, { browserSettings });
+        await saveAiUserPreferences(context.db, prefs, userId, { browserSettings }, context.user.activeOrganization?.id ?? null);
         context.log.event("chat.update_browser_settings", {
             allowlistCount: browserSettings.domainAllowlist?.length ?? 0,
             blocklistCount: browserSettings.domainBlocklist?.length ?? 0,
@@ -3643,7 +3726,15 @@ export const getFollowupSuggestions = authAction
         const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
         const language = threadLanguage || userLanguage;
 
-        const agent = await getAgentForUser(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, language);
+        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
+        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
+
+        // The model filters allow no background model: no suggestions, as for a host-run thread.
+        if (!background) {
+            return { suggestions: [] };
+        }
+
+        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
         const messagesResult = await agent.listMessages(context, {
             paginationOpts: { cursor: null, numItems: 10 },
@@ -3725,7 +3816,14 @@ export const generateFollowupSuggestionsForThread = internalAction
             const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
             const language = threadLanguage || userLanguage;
 
-            const agent = await getAgentForUser(context, userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, language);
+            // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
+
+            if (!background) {
+                return;
+            }
+
+            const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
             const messagesResult = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10 },
@@ -3855,11 +3953,12 @@ export const streamAsync = internalAction
         let projectContext: string | undefined;
 
         if (appThread?.projectId) {
-            const project = await context.runQuery(api.agent.projects.getProject, {
-                projectId: appThread.projectId as Id<"projects">,
-            });
-
-            projectContext = project?.context;
+            // The access `createThread` applied (owner or organization member), not the owner-only read.
+            projectContext =
+                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                    projectId: appThread.projectId as Id<"projects">,
+                    userId,
+                })) ?? undefined;
         }
 
         // Get model definition
@@ -4822,10 +4921,8 @@ export const generateVideo = internalAction
         }
     });
 
-// ============================================================================
-// Music Generation Action (fal.ai)
-// ============================================================================
-
+// =====================================================================// Music Generation Action (fal.ai)
+// =====================================================================
 /**
  * Submit a music render to FAL's queue API and poll until completion.
  * Music endpoints take a flat input body (no `{ input: ... }` wrapper),
@@ -5031,10 +5128,8 @@ export const generateMusic = internalAction
         }
     });
 
-// ============================================================================
-// Image Transformation Actions (fal.ai)
-// ============================================================================
-
+// =====================================================================// Image Transformation Actions (fal.ai)
+// =====================================================================
 /**
  * Helper to call fal.ai REST API directly.
  */
@@ -5702,10 +5797,8 @@ export const generateParallelCompare = internalAction
         };
     });
 
-// ============================================================================
-// Outpaint, Background Removal, Object Edit, Image-to-Video, ControlNet, Transcription
-// ============================================================================
-
+// =====================================================================// Outpaint, Background Removal, Object Edit, Image-to-Video, ControlNet, Transcription
+// =====================================================================
 export const generateOutpaint = internalAction
     .input({
         expandDirection: v.string(),

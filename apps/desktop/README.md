@@ -4,7 +4,7 @@
 holds no UI of its own beyond a few local windows; the main window loads the
 site, and a sandboxed preload exposes `window.neoreNative` on that origin only.
 The web side of the bridge is `apps/web/src/lib/native/bridge.ts`, a no-op
-outside the shell. Background: [`plans/desktop-and-mobile-apps.md`](../../plans/desktop-and-mobile-apps.md).
+outside the shell. Background: `desktop-and-mobile-apps.md` (desktop-and-mobile-apps.md).
 
 ## What is in it
 
@@ -103,8 +103,7 @@ Two helpers are built ahead of packaging and shipped as `extraResources`:
   Do not add a second grant system.
 - **Device execution** is remote code execution on the user's machine, so the
   page is a relay only; the approval window is local and the only holder of the
-  approval commands. See [`plans/device-execution.md`](../../plans/device-execution.md),
-  [`plans/ssh-environments.md`](../../plans/ssh-environments.md) and
+  approval commands. See `ssh-environments.md` (ssh-environments.md) and
   [`docs/devices.mdx`](../../docs/devices.mdx). `packages/device-core` holds the
   Rust side; the HMAC vectors are pinned on both sides.
 - **Terminal** is the user's own shell and has no site-facing channel: its
@@ -112,14 +111,13 @@ Two helpers are built ahead of packaging and shipped as `extraResources`:
   request but `file:`. The PTY runs in a utility process, never in main.
   `node-pty` 1.1.0 ships the macOS `spawn-helper` without the execute bit;
   `scripts/after-pack.cjs` fixes the packaged copy. Windows is unavailable.
-  See [`plans/desktop-terminal.md`](../../plans/desktop-terminal.md).
 - **Dictation** is opt-in from a local settings window; with the switch off no
   shortcut, window, download or helper starts. The dictation window has no
   network, and the model is downloaded by the main process after a confirm
   dialog and hashed while streaming. See
-  [`plans/desktop-dictation.md`](../../plans/desktop-dictation.md).
+  `desktop-dictation.md` (desktop-dictation.md).
 - **Coding agents on this computer** (`src/acp/`) post turns to the backend from
   the main process, signed with the device secret; the backend origin is the
   build-time `NEORE_BACKEND_URL`. See
-  [`plans/acp-agent-host.md`](../../plans/acp-agent-host.md).
+  `acp-agent-host.md` (acp-agent-host.md).
 - Never run `pnpm deploy` here or anywhere; CI owns deployment.

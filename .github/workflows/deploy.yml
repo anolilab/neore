@@ -153,18 +153,19 @@ jobs:
             url: "${{ steps.alchemy.outputs.website-url }}"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
 
             # The three origins the app is built against and the backend verifies its
@@ -275,9 +276,18 @@ jobs:
                         pnpm --workspace-root run build:packages
                         pnpm --dir apps/web build
 
-
                   - name: "Build the document-parser Worker"
                     run: "pnpm --filter document-parser run build:worker"
+
+            # Alchemy bundles `backend/src/server.ts` -> `_generated/app.ts`, which imports
+            # the untracked `_generated/architecture.js`. Codegen writes it, and nothing
+            # above does (`apps/web build` is vite + tsc, not the backend's codegen), so a
+            # clean checkout would fail to bundle the backend. It runs AFTER the parallel
+            # block, which ends with the packages built: without their `dist/`, a return
+            # type imported from `@neore/service-sdk` degrades to `unknown` with codegen
+            # still exiting 0.
+            - name: "Generate the backend"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # `vite build` writes a source map for every client and server chunk
             # (`sourcemap: "hidden"`): 2,700 files and ~118 MiB in dist/client alone, about
@@ -342,6 +352,9 @@ jobs:
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
                   # The Alchemy stage (names and state), not the GitHub environment.
                   DEPLOY_ENV: "${{ needs.resolve-env.outputs.stage }}"
+                  # Jurisdiction of the stored D1 databases and R2 buckets: eu unless the
+                  # environment sets DATA_JURISDICTION=default. Fixed when a resource is created.
+                  DATA_JURISDICTION: "${{ vars.DATA_JURISDICTION }}"
                   # Skips Alchemy's lookup of the account's workers.dev subdomain, which
                   # a new account has none of until one is registered.
                   CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
@@ -574,7 +587,7 @@ jobs:
 
             - name: "Keep the Worker bundles"
               if: "${{ !cancelled() && !inputs.dry_run }}"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   # `.alchemy` is a hidden directory, which upload-artifact skips unless told not to.
                   include-hidden-files: true

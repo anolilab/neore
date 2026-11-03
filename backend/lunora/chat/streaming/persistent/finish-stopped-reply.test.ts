@@ -83,7 +83,10 @@ const assistantRowsOf = async (threadId: string): Promise<Row[]> => {
 /** The `status` of the row at `id`, read in its own run. */
 const statusOf = async (id: string): Promise<unknown> =>
     await run(async (context) => {
-        const row = await context.db.get(id);
+        const row =
+            (await context.db.get("threads", id as never)) ??
+            (await context.db.get("persistentStreams", id as never)) ??
+            (await context.db.get("messages", id as never));
 
         return (row as { status?: unknown } | null)?.status;
     });
@@ -150,14 +153,14 @@ describe("finishStoppedReply", () => {
     it("with no owed text, removes the empty pending row and moves the leaf back onto the row before it", async () => {
         const { pendingId, promptId, streamId, threadId } = await seed("done", { pendingRow: true });
 
-        await run(async (context) => await context.db.patch(threadId, { activeLeafMessageId: pendingId }));
+        await run(async (context) => await context.db.patch("threads", threadId, { activeLeafMessageId: pendingId }));
 
         expect(await stop(streamId, { pendingText: "", promptMessageId: promptId })).toBe(true);
 
         expect(await statusOf(pendingId)).toBeUndefined();
         expect(await assistantRowsOf(threadId)).toHaveLength(0);
 
-        const thread = await run(async (context) => await context.db.get(threadId));
+        const thread = await run(async (context) => await context.db.get("threads", threadId));
 
         expect((thread as { activeLeafMessageId?: string } | null)?.activeLeafMessageId).toBe(promptId);
         expect(await statusOf(threadId)).toBe("active");

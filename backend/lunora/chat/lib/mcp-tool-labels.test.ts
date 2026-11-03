@@ -36,3 +36,38 @@ describe("labelMcpToolCalls", () => {
         expect(labelMcpToolCalls("plain text", LABELS)).toBeUndefined();
     });
 });
+
+describe("labelMcpToolCalls: auto-approved calls", () => {
+    const approval = { at: 10, by: "quick-check", model: "m", reason: "Reads a forecast." } as const;
+
+    it("stamps the call by its id and keeps the MCP label next to it", () => {
+        const content = [
+            { input: {}, toolCallId: "c1", toolName: "mcp_my_server__delete_2", type: "tool-call" },
+            { input: {}, toolCallId: "c2", toolName: "mcp_my_server__delete_2", type: "tool-call" },
+        ];
+
+        expect(labelMcpToolCalls(content, LABELS, { c1: approval })).toStrictEqual([
+            { ...content[0], providerOptions: { neore: { autoApproval: approval, mcpServerName: "my_server", mcpToolName: "delete" } } },
+            { ...content[1], providerOptions: { neore: { mcpServerName: "my_server", mcpToolName: "delete" } } },
+        ]);
+    });
+
+    it("stamps a call that is not an MCP tool, and only that call", () => {
+        const content = [{ input: {}, toolCallId: "c1", toolName: "somethingElse", type: "tool-call" }];
+
+        expect(labelMcpToolCalls(content, {}, { c1: approval })).toStrictEqual([{ ...content[0], providerOptions: { neore: { autoApproval: approval } } }]);
+        expect(labelMcpToolCalls(content, {}, { other: approval })).toBeUndefined();
+    });
+
+    it("reports nothing to do once the approval is stamped", () => {
+        const stamped = [{ providerOptions: { neore: { autoApproval: approval } }, toolCallId: "c1", toolName: "x", type: "tool-call" }];
+
+        expect(labelMcpToolCalls(stamped, {}, { c1: approval })).toBeUndefined();
+    });
+});
+
+describe("labelMcpToolCalls: provider-supplied ids", () => {
+    it("never reads an inherited name such as `constructor` as an approval", () => {
+        expect(labelMcpToolCalls([{ input: {}, toolCallId: "constructor", toolName: "webSearch", type: "tool-call" }], {}, {})).toBeUndefined();
+    });
+});

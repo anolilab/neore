@@ -19,6 +19,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
 import { readStoredObject } from "../lib/storage-read";
+import { planSkillImport } from "./import-plan";
 import { getToolRegistry } from "./jit-tool-loader";
 import {
     classifySkillFile,
@@ -32,6 +33,7 @@ import {
     validateSkillFiles,
 } from "./markdown";
 import { fetchSkillMarkdown, SkillSourceError } from "./registry-fetch";
+import { pickFreeSlug } from "./slug";
 import { resolveSkillSourceUrls } from "./source-url";
 import { MAX_LENGTH } from "../lib/validators";
 import { withDependency } from "../lib/dependency";
@@ -87,21 +89,8 @@ export const findFreeSkillSlug = internalQuery
     .output(v.string())
     .query(async ({ args: { slug, userId }, ctx }) => {
         const { page: skills } = await ctx.db.skills.findMany({ where: { userId } });
-        const taken = new Set(skills.map((skill) => skill.slug));
 
-        if (!taken.has(slug)) {
-            return slug;
-        }
-
-        for (let suffix = 2; suffix < 100; suffix += 1) {
-            const candidate = `${slug.slice(0, 60)}-${String(suffix)}`;
-
-            if (!taken.has(candidate)) {
-                return candidate;
-            }
-        }
-
-        throw new LunoraError("CONFLICT", `A skill with slug '${slug}' already exists`);
+        return pickFreeSlug(slug, new Set(skills.map((skill) => skill.slug)));
     });
 
 /** Records stored additional files on a skill the importing user owns. */
@@ -218,28 +207,10 @@ export const importSkill = authAction
         const { skill } = parsed;
         const warnings = [...parsed.warnings];
         const knownTools = new Set(getToolRegistry().map((tool) => tool.name));
-        const keepKnown = (tools: string[] | undefined, label: string): string[] | undefined => {
-            if (!tools) {
-                return undefined;
-            }
+        const planned = planSkillImport(skill, (tool) => knownTools.has(tool));
+        const { config } = planned;
 
-            const unknown = tools.filter((tool) => !knownTools.has(tool));
-
-            if (unknown.length > 0) {
-                warnings.push(`${label}: not available here, ignored: ${unknown.join(", ")}`);
-            }
-
-            const known = tools.filter((tool) => knownTools.has(tool));
-
-            return known.length > 0 ? known : undefined;
-        };
-        const config = skill.config
-            ? {
-                  ...skill.config,
-                  additionalTools: keepKnown(skill.config.additionalTools, "allowed-tools"),
-                  disabledTools: keepKnown(skill.config.disabledTools, "disabled-tools"),
-              }
-            : undefined;
+        warnings.push(...planned.warnings);
         const slug = await ctx.runQuery(internal.skills.io.findFreeSkillSlug, { slug: skill.slug, userId });
 
         if (slug !== skill.slug) {

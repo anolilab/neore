@@ -53,12 +53,17 @@ import { ASIDE_ADD_CLAIM_TTL_MS, ASIDE_ADD_SCOPE, claimOnce } from "../lib/claim
 import { authAction, authMutation, rateLimit } from "../lib/crpc";
 import { chatLogger } from "../lib/logger";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
-import { isAgentRunError, loadModelFilterRules, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import {
+    getUtilityModelForUser,
+    loadSharedModelFilterRules,
+    MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE,
+    ModelFilterRulesUnavailableError,
+} from "./lib/model-filter-rules";
 import {
     ASIDE_AGENT_NAME,
     ASIDE_CONTEXT_CHARS,
@@ -75,6 +80,7 @@ import {
     liveReplyTail,
     MAX_ASIDE_ANSWER_CHARS,
     MAX_ASIDE_QUESTION_CHARS,
+    normalizeAsideQuestion,
     signAsideAnswer,
     verifyAsideAnswer,
 } from "./lib/aside";
@@ -204,13 +210,16 @@ const readLiveReply = async (ctx: Reader, live: Doc<"persistentStreams">): Promi
  * What a side question sees of a thread: the newest usable rows of its ACTIVE
  * path (finished, no tool traffic), clipped and fitted to the context budget,
  * oldest first, and the end of the reply being written, if any. Internal and
- * read-only; the action has already admitted the caller at `read` level,
- * locked chats included.
+ * read-only. The action has admitted the caller at `read` level, locked chats
+ * included, but a grant can be revoked before this query runs, so it checks
+ * again in the same transaction that reads the rows.
  */
 export const readAsideSnapshot = internalQuery
-    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)), userId: v.string() })
     .output(v.object({ liveReply: v.optional(v.string()), rows: v.array(vAsideRow), running: v.boolean() }))
-    .query(async ({ args: { threadId, unlockProof }, ctx }) => {
+    .query(async ({ args: { threadId, unlockProof, userId }, ctx }) => {
+        throwUnlessGranted(await threadGateOutcome(ctx, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
+
         const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
 
         if (!thread) {
@@ -306,7 +315,7 @@ export const askAside = authAction
     )
     .action(async ({ args: { entryId, question: rawQuestion, threadId, unlockProof }, ctx }) => {
         const { plan, role, userId } = ctx.user;
-        const question = rawQuestion.trim();
+        const question = normalizeAsideQuestion(rawQuestion);
 
         if (!question || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "Ask a question first");
@@ -331,7 +340,7 @@ export const askAside = authAction
         const chosen: AsideModel = hostRun ? { kind: "utility" } : await chooseAsideModel(ctx, thread, userId);
 
         // A coding agent's thread keeps its messages off cloud models: the question goes alone.
-        const snapshot = hostRun ? { rows: [], running: false } : await ctx.runQuery(internal.chat.aside.readAsideSnapshot, { threadId, unlockProof });
+        const snapshot = hostRun ? { rows: [], running: false } : await ctx.runQuery(internal.chat.aside.readAsideSnapshot, { threadId, unlockProof, userId });
         const prompt = buildAsidePrompt(question, snapshot.rows, snapshot.liveReply);
         const gateway = gatewayFetch(ctx);
 
@@ -342,7 +351,10 @@ export const askAside = authAction
             const [prefs, userProviderKeys, modelFilterRules, runModel] = await Promise.all([
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
-                loadModelFilterRules(ctx, userId),
+                // An unreadable rules read answers like a refusal, not an internal error.
+                loadSharedModelFilterRules(ctx, userId, thread?.userId).catch((error: unknown) => {
+                    throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
+                }),
                 resolveRunModel(ctx, chosen.model, userId),
             ]);
             const agent = await getAgent(chosen.model, {
@@ -359,7 +371,8 @@ export const askAside = authAction
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
         } else {
-            model = await getUtilityModel(gateway, { threadId, userId });
+            // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too; the call is metered to, and graded by the plan of, the caller.
+            model = await getUtilityModelForUser(ctx, gateway, { filterUserId: thread?.userId, threadId, userId });
         }
 
         // Charged only now that the call is certain to be made: a refusal above, or a failure while the model was
@@ -442,10 +455,12 @@ export const addAsideToThread = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ messageId: v.string() }))
-    .mutation(async ({ args: { answer, entryId, question, threadId, token, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { answer, entryId, question: rawQuestion, threadId, token, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
+        // `askAside` signed and answered the question without hidden characters; what is written into the thread is that one.
+        const question = normalizeAsideQuestion(rawQuestion);
 
-        if (!question.trim() || !answer.trim() || !entryId.trim()) {
+        if (!question || !answer.trim() || !entryId.trim()) {
             throw new LunoraError("BAD_REQUEST", "There is nothing to add");
         }
 

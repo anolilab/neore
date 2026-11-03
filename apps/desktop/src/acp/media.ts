@@ -1,5 +1,5 @@
 /**
- * Files a coding agent's reply shows (plans/acp-agent-host.md §4.8), from the folder to the backend, in the main
+ * Files a coding agent's reply shows (acp-agent-host.md §4.8), from the folder to the backend, in the main
  * process: the page never holds the bytes.
  *
  * An agent has no tool to show an image, so it writes the file and refers to it with a Markdown image. At the end

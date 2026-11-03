@@ -1531,6 +1531,8 @@ impl DeviceState {
             Domain::Manifest,
             &json!({
                 "v": 1, "kind": "manifest", "deviceId": host.device_id, "issuedAt": self.next_manifest_time(), "tools": tools,
+                // The wire protocol this build speaks (see the computer's own manifest).
+                "protocol": crate::envelope::BACKEND_PROTOCOL_VERSION,
                 // The pairs approved for this server, so the web and the phone can start an agent on it.
                 "acpOffers": super::host_agents::host_offers(host),
             }),
@@ -2192,6 +2194,10 @@ mod tests {
             &signed.signature
         ));
         assert_eq!(manifest["deviceId"], host_id("manifest").as_str());
+        assert_eq!(
+            manifest["protocol"],
+            crate::envelope::BACKEND_PROTOCOL_VERSION
+        );
 
         let tools = manifest["tools"].as_array().unwrap();
 
@@ -3411,7 +3417,10 @@ mod tests {
         });
 
         assert!(state.connection(&id).is_none());
-        assert!(state.ssh.attempting.lock().unwrap().is_empty());
+        // The attempt's thread leaves the set just after it closes the link: wait for it, a slow runner sees the gap.
+        eventually("the attempt left the attempting set", || {
+            state.ssh.attempting.lock().unwrap().is_empty()
+        });
 
         let _ = stdfs::remove_dir_all(dir);
     }

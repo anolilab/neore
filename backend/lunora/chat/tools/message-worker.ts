@@ -5,7 +5,8 @@
  * `persistent: true`): another run in the worker's own thread, which still holds what
  * it did before. The tool returns a receipt at once; the answer is posted to this
  * conversation when the run finishes. The tool call id dedupes a redelivered call
- * (`sub-agents/functions.ts:messageWorker`).
+ * (`sub-agents/functions.ts:messageWorker`). A worker that runs on a computer is reached only with a person's approval
+ * of each message, and never from a headless run.
  */
 import z from "zod/v4";
 
@@ -37,6 +38,8 @@ A worker handles one message at a time, in the order sent: a message sent while 
 
         const sent = await context.runMutation(internal.sub_agents.functions.messageWorker, {
             dispatchedBy: context.dispatchOrigin,
+            // A headless run cannot be asked to approve: a worker on a computer is out of its reach (checked at admission).
+            ...(context.headless && { headless: true }),
             message: input.message,
             parentThreadId: context.threadId,
             toolCallId: options.toolCallId,
@@ -62,6 +65,12 @@ A worker handles one message at a time, in the order sent: a message sent while 
             worker: z.string().min(1).max(128).meta({ description: "The workerId returned when the worker was started" }),
         })
         .strict(),
+    // A message to a worker on a computer needs a click whatever the tool's mode, a timed allow included. A headless run
+    // has nobody to click: it is not asked (an approval nobody answers would end its loop), and the mutation refuses instead.
+    needsApproval: async (context, input) =>
+        context.headless !== true &&
+        context.userId !== undefined &&
+        (await context.runQuery(internal.sub_agents.functions.isHostWorker, { userId: context.userId, workerId: input.worker })),
     title: "Message Worker",
 });
 

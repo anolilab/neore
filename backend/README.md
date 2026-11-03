@@ -109,4 +109,4 @@ the area instead of duplicating it here:
   device execution, the public API and everything else per feature.
 - "INVITE-ONLY REGISTRATION" and "Build and deploy".
 
-Plans: `plans/per-user-sharding.md`, `plans/backend-split.md`.
+Plans: `per-user-sharding.md`, `backend-split.md`.

@@ -217,6 +217,9 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/steer:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     "chat/stream:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/stream:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
+    // The opt-in quick check that approves low-risk tool calls (`chat/lib/low-risk-check.ts`): one utility-model call per
+    // `ask` tool call, per user. Untiered: the check is a guard, and the cap is for runaway loops, not for plans.
+    "chat/toolAutoApprove": Ratelimit.tokenBucket(20, MINUTE, 30),
     // "Translate" on a message: one short utility-model call per cache miss
     // (`chat/translate.ts`); its own family so it does not spend the optimizer's.
     // No `:public` tier: the action requires a session.
@@ -363,6 +366,8 @@ export const RATE_LIMIT_CONFIGS = {
     "organization/invite:premium": Ratelimit.fixedWindow(20, MINUTE),
     "organization/leave:free": Ratelimit.fixedWindow(3, MINUTE),
     "organization/leave:premium": Ratelimit.fixedWindow(10, MINUTE),
+    "organization/policy:free": Ratelimit.fixedWindow(10, MINUTE),
+    "organization/policy:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/rejectInvite:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/rejectInvite:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/removeMember:free": Ratelimit.fixedWindow(5, MINUTE),
@@ -478,6 +483,11 @@ export const RATE_LIMIT_CONFIGS = {
     // not starve the prompt optimizer's `chat/promptImprovement`.
     "skills/builder:free": Ratelimit.tokenBucket(10, MINUTE, 20),
     "skills/builder:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
+    // Exporting, previewing and importing a team bundle (`skills/bundle.ts`). The creates an import makes are
+    // charged to their own families (`skills/create`, `triggers/create`, `chat/create`); this one only bounds the
+    // parsing and reading around them.
+    "skills/bundle:free": Ratelimit.fixedWindow(10, MINUTE),
+    "skills/bundle:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/create:free": Ratelimit.fixedWindow(10, MINUTE),
 
     "skills/create:premium": Ratelimit.fixedWindow(30, MINUTE),

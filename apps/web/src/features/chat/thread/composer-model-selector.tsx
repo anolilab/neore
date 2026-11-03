@@ -2,8 +2,11 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
-import { useQuery } from "@tanstack/react-query";
+import { enabledModelOf } from "@neore/ai/models";
+import { Switch } from "@neore/ui/components/switch";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
+import { useId } from "react";
 
 import { ModelPickerButton } from "@/components/model-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
@@ -12,6 +15,7 @@ import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/store
 import AgentSwitchConfirmDialog from "@/features/chat/model-settings/agent-switch-confirm-dialog";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 interface ComposerModelSelectorProps {
     className?: string;
@@ -20,7 +24,17 @@ interface ComposerModelSelectorProps {
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
-    const { cancelSwitch, changeModel, confirmSwitch, pendingSwitch } = useModelCombobox({ threadId });
+    const {
+        autoModel,
+        autoModelPending,
+        cancelSwitch,
+        changeModel,
+        confirmSwitch,
+        pendingSwitch,
+        setAutoModel,
+        thread: loadedThread,
+    } = useModelCombobox({ threadId });
+    const autoLabelId = useId();
     const { isAnonymous } = useIsAnonymous();
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
     const isRunning = useChatIsRunning();
@@ -51,6 +65,21 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const setComparisonMode = useModelStore((state) => state.setComparisonMode);
     const setSelectedModelsForComparison = useModelStore((state) => state.setSelectedModelsForComparison);
+
+    // Auto routes plain hosted text threads: a bot, a coding agent, a switched thread (its path decides the agent), a
+    // custom endpoint, a media mode and a comparison each name their own model.
+    // Auto routes only the owner's own sends (`shouldRouteAuto`), so only the owner is offered the switch.
+    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
+    const canRouteAuto =
+        (!threadId || (access?.isOwner === true && loadedThread !== undefined && loadedThread !== null)) &&
+        !loadedThread?.groupChat &&
+        !isAnonymous &&
+        typeof botId !== "string" &&
+        !comparisonMode &&
+        currentMode === "text" &&
+        thread?.runner !== "host" &&
+        !thread?.activeAgent &&
+        enabledModelOf(model, { mode: "text" }) !== undefined;
 
     const handleSelect = (modelId: string) => {
         // Single model selected — exit comparison mode (also clears selectedModelsForComparison)
@@ -86,6 +115,22 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 }
                 size="sm"
             />
+            {canRouteAuto && (
+                <div aria-labelledby={autoLabelId} className="flex items-center gap-1.5" role="group">
+                    <span className="text-muted-foreground text-xs" id={autoLabelId}>{t`Auto`}</span>
+                    <Switch
+                        aria-labelledby={autoLabelId}
+                        checked={autoModel}
+                        disabled={(Boolean(threadId) && isRunning) || autoModelPending}
+                        onCheckedChange={(checked) => {
+                            setAutoModel(checked).catch((error: unknown) => {
+                                showError(error instanceof Error ? error : t`Could not change Auto. Please try again.`);
+                            });
+                        }}
+                        size="sm"
+                    />
+                </div>
+            )}
             <AgentSwitchConfirmDialog onCancel={cancelSwitch} onConfirm={confirmSwitch} pending={pendingSwitch} />
             {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
         </>

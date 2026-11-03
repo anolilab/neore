@@ -43,7 +43,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
             await recordPausedRunUsage(ctx, stream);
         }
 
-        await patchRow(ctx.db, stream, { status: "timeout", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
+        await patchRow(ctx.db, "persistentStreams", stream, { status: "timeout", ...(steers && { steers }), ...(waiting && { pausedRun: undefined }) });
 
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the

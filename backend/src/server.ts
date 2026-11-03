@@ -4,7 +4,6 @@
 import { handleAuthRequest } from "@lunora/auth";
 import type { PaymentsFromContextOptions } from "@lunora/payment";
 import { createCreemAdapter } from "@lunora/payment/creem";
-import { Creem } from "creem";
 import type { JSONWebKeySet } from "jose";
 import type { D1DatabaseLike } from "@lunora/d1";
 import type { MessageBatchLike, QueueBindingLike } from "@lunora/queue";
@@ -15,6 +14,9 @@ import { d1Executor } from "@lunora/auth";
 
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
+import { env as workerEnv } from "cloudflare:workers";
+
+import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
 import { defineApp } from "../lunora/_generated/app.js";
@@ -157,11 +159,16 @@ let payments: PaymentsFromContextOptions | undefined;
 const creemPayments = (env: Env): PaymentsFromContextOptions => {
     payments ??= {
         adapter: createCreemAdapter({
-            client: new Creem({
-                apiKey: env.CREEM_API_KEY ?? "",
-                server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
-                timeoutMs: CREEM_TIMEOUT_MS,
-            }),
+            // The adapter calls this once, on first use, so the SDK is not loaded at worker startup.
+            client: async () => {
+                const { Creem } = await import("creem");
+
+                return new Creem({
+                    apiKey: env.CREEM_API_KEY ?? "",
+                    server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
+                    timeoutMs: CREEM_TIMEOUT_MS,
+                });
+            },
             webhookSecret: env.CREEM_WEBHOOK_SECRET ?? "",
         }),
     };
@@ -293,6 +300,12 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
 
     return await resolveSessionIdentity(env, request);
 };
+
+// workerd (`lunora dev`) does not implement Durable Object jurisdictions, and the schema pins the
+// EU; codegen reads that as a literal, so nothing can be left out of the generated code. Module
+// scope, so every entry point of the isolate is covered. Development only.
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- must run before any entry point of the isolate
+allowLocalJurisdiction(workerEnv as Parameters<typeof allowLocalJurisdiction>[0]);
 
 const app = defineApp<Env>()
     .shard((env) => routedShardNamespace(env.SHARD, env))

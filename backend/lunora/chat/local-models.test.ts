@@ -53,6 +53,7 @@ hooks.createTemporaryThread = createTemporaryThread;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
+const HIDDEN_CHARACTERS = /[\u{E0000}-\u{E007F}\u{202E}]/u;
 const NOT_FOUND_RE = /not found or disabled/u;
 const FOREIGN_THREAD_RE = /another user's thread/u;
 const NOT_A_PROMPT_RE = /take a prompt of this thread/u;
@@ -108,7 +109,7 @@ describe(saveLocalTurnHandler, () => {
         await seedEndpoint(OWNER, "local-browser");
 
         const result = await save(OWNER, { prompt: "Explain CSP in one line" });
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(result.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", result.threadId));
         const saved = await rowsOf(result.threadId);
         const rows = saved.toSorted((a: any, b: any) => a.stepOrder - b.stepOrder);
 
@@ -119,6 +120,18 @@ describe(saveLocalTurnHandler, () => {
         ]);
         expect(rows[1]).toMatchObject({ provider: "local-browser", text: "hello" });
         expect(rows[1].usage).toBeUndefined();
+    });
+
+    it("saves the prompt without tag or bidi characters, and refuses one that was only those", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const result = await save(OWNER, { prompt: "Explain CSP\u{E0069}\u{E0067}\u{202E}" });
+        const rows = await rowsOf(result.threadId);
+        const user = rows.find((row: any) => row.message.role === "user");
+
+        expect(JSON.stringify(user.message)).not.toMatch(HIDDEN_CHARACTERS);
+        expect(user.text).toBe("Explain CSP");
+        await expect(save(OWNER, { prompt: "\u{E0069}\u{E0067}" })).rejects.toThrow("The prompt is empty");
     });
 
     it("appends the next turn to an existing thread", async () => {
@@ -140,10 +153,10 @@ describe(saveLocalTurnHandler, () => {
         const first = await save(OWNER, {});
         const agent = { kind: "model", model: "openai/gpt-4.1-mini" };
 
-        await harness.run(async (ctx: any) => await ctx.db.patch(first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", first.threadId, { activeAgent: agent, model: "google/gemini-2.0-flash-001" }));
         await save(OWNER, { prompt: "again", threadId: first.threadId });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", first.threadId));
 
         expect(thread).toMatchObject({ activeAgent: agent, model: "google/gemini-2.0-flash-001" });
     });
@@ -192,7 +205,7 @@ describe(saveLocalTurnHandler, () => {
 describe("regenerate and edit on the local path", () => {
     /** The displayed path, oldest first, with the switcher position of each row that has siblings. */
     const activePath = async (threadId: string) => {
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
         const page: any = await harness.run(async (ctx: any) => await listActivePathPage(ctx, thread, { cursor: null, numItems: 50 }));
         const rows = [...page.page].toSorted((a: any, b: any) => a.order - b.order || a.stepOrder - b.stepOrder);
 
@@ -285,7 +298,7 @@ describe("regenerate and edit on the local path", () => {
 
         await save(OWNER, { ...(kind && { branch: { kind, messageId: first.userMessageId } }), prompt: "hi again", threadId: first.threadId });
 
-        expect(await harness.run(async (ctx: any) => await ctx.db.get(goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("threadGoals", goalId))).toMatchObject({ status: "stopped", stopReason: "superseded" });
     });
 
     it("gives the thread back when it ends a goal that was mid-review", async () => {
@@ -294,7 +307,7 @@ describe("regenerate and edit on the local path", () => {
         const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
 
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch(first.threadId, { status: "running" });
+            await ctx.db.patch("threads", first.threadId, { status: "running" });
             await ctx.db.insert("threadGoals", {
                 config: { model: "m" },
                 costMicrodollars: 0,
@@ -314,7 +327,7 @@ describe("regenerate and edit on the local path", () => {
         });
         await save(OWNER, { prompt: "hi again", threadId: first.threadId });
 
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(first.threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", first.threadId));
 
         expect(thread.status).toBe("active");
     });
@@ -350,7 +363,7 @@ describe("temporary new chats on the local path", () => {
         const before = Date.now();
         const { threadId } = await save(OWNER, { temporary: true });
         const [record] = await temporaryRowsOf(threadId);
-        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
 
         expect(record).toMatchObject({ retentionHours: 48, threadId, userId: OWNER });
         expect(record.expiresAt).toBeGreaterThanOrEqual(before + 48 * 3_600_000);

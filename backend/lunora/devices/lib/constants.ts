@@ -24,9 +24,9 @@ export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_c
 
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed
- * again until its deadline (plans/acp-agent-host.md §4.1). The desktop writes its receipt within a second or two
+ * again until its deadline (acp-agent-host.md §4.1). The desktop writes its receipt within a second or two
  * of the claim, so this covers a relay or main process that died in between. A guess, not a measurement: the
- * latency it should be set from is the S4 throttling record (`plans/acp-s4-throttling.md`).
+ * latency it should be set from is the S4 throttling record (`acp-s4-throttling.md`).
  */
 export const ACP_CLAIM_LEASE_MS = 30_000;
 
@@ -56,6 +56,14 @@ export const MAX_MANIFEST_TOOLS = 64;
 export const MAX_MANIFEST_DESCRIPTION_CHARS = 2000;
 export const MAX_MANIFEST_SCHEMA_BYTES = 16 * 1024;
 export const MAX_MANIFEST_BYTES = 256 * 1024;
+
+/**
+ * The oldest backend<->desktop protocol (`BACKEND_PROTOCOL_VERSION` in `packages/device-core/src/envelope.rs`, not the
+ * SSH host's wire version) a computer may report in its signed manifest and still be handed calls. A manifest without one
+ * predates the report and is let through; one below this gets an update notice instead of calls it would fail.
+ * `constants.test.ts` pins it at or below the Rust constant.
+ */
+export const MIN_DEVICE_PROTOCOL = 3;
 
 /** A signed manifest or result older (or further ahead) than this is refused. */
 export const DEVICE_SIGNATURE_WINDOW_MS = 10 * 60_000;

@@ -7,6 +7,8 @@ import type { FollowUpControl } from "@neore/ai/capabilities";
 import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabilities";
 import type { StopCondition, ToolSet } from "ai";
 
+import { HOST_TEXT_MARK } from "../acp/lib/reply";
+
 /**
  * How deep delegation may nest. A user's own thread is depth 0; its sub-agent
  * runs at 1, and that sub-agent's own sub-agent at 2 — the last level allowed.
@@ -259,18 +261,24 @@ export const nextQueuedWorkerRun = <T extends { loopExitedAt?: number; startedAt
  * that is still writing is left alone and checked again when its quiet window would end, a run quiet
  * for the whole window is failed, and a queued one is never reaped, since its clock has not started
  * (a stop, or the queue reaching it, ends it). A run stopped while running is judged the same way:
- * its loop is gone only once it has been quiet for the window.
+ * its loop is gone only once it has been quiet for the window. A host run waiting on a person is checked again later and never failed for it.
  * `lastActivityAt` is the newest message in the worker's thread; `startedAt` floors it.
  */
 export const workerReapDecision = (input: {
     lastActivityAt: number | undefined;
     now: number;
     run: { loopExitedAt?: number; startedAt?: number; status: SubAgentStatus };
+    /** A host run whose agent waits on a person's answer: the person holds it up, so its clock does not run. */
+    waitingOnPerson?: boolean;
 }): { kind: "fail" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
     const { run } = input;
 
     if (!isWorkerLoopLive(run) || run.startedAt === undefined) {
         return { kind: "skip" };
+    }
+
+    if (input.waitingOnPerson) {
+        return { delayMs: SUB_AGENT_STALE_MS, kind: "later" };
     }
 
     const quietFor = input.now - Math.max(run.startedAt, input.lastActivityAt ?? 0);
@@ -391,6 +399,8 @@ export const buildResultMessage = (input: {
     /** Who sent the dispatch; named in the message so the lead reads where it came from. */
     dispatchedBy?: DispatchSource;
     error?: string;
+    /** A run on a coding agent of the user's computer: it is never charged, and a stop cancels its turn there. */
+    hostRun?: boolean;
     result?: string;
     /** Whether the run had been claimed — a cancelled one that had not ran nothing. */
     started?: boolean;
@@ -407,10 +417,12 @@ export const buildResultMessage = (input: {
 
     if (input.status === "succeeded") {
         body = input.result?.trim() || "(The sub-agent returned no text.)";
+    } else if (input.status === "cancelled" && !input.started) {
+        body = "This sub-agent was stopped before it started, so nothing ran.";
     } else if (input.status === "cancelled") {
-        body = input.started
-            ? "This sub-agent was stopped before it finished. The step it was working on when it was stopped still ran to its end and was billed; no further steps ran. Its work so far is in its thread."
-            : "This sub-agent was stopped before it started, so nothing ran.";
+        body = input.hostRun
+            ? "This sub-agent was stopped before it finished. Its turn on the computer was cancelled; runs on a computer are not charged. Its work so far is in its thread."
+            : "This sub-agent was stopped before it finished. The step it was working on when it was stopped still ran to its end and was billed; no further steps ran. Its work so far is in its thread.";
     } else {
         body = input.error ?? "The sub-agent stopped without a result.";
     }
@@ -420,3 +432,10 @@ export const buildResultMessage = (input: {
 
     return `${heading}\n\n${body}${link}${sentBy}`;
 };
+
+/**
+ * The content of the message a run's result is posted as. A run on a computer is the agent's own text, untrusted, so it
+ * carries the same mark as the reply in the worker's thread (`acp/lib/reply.ts`) and the lead's view loads none of its
+ * Markdown images.
+ */
+export const resultContent = (text: string, hostRun: boolean) => (hostRun ? [{ providerMetadata: HOST_TEXT_MARK, text, type: "text" as const }] : text);

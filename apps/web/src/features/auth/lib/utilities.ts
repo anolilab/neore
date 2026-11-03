@@ -102,6 +102,8 @@ const ERROR_TRANSLATIONS: Record<string, (t: TranslateFunction) => string> = {
     SERVER_ONLY_PROPERTY: (t) => t`The property you're trying to set can only be set from the server auth instance only`,
     SERVICE_UNAVAILABLE: (t) => t`Service unavailable`,
     SESSION_EXPIRED: (t) => t`Session expired. Re-authenticate to perform this action.`,
+    SIGN_UP_INVITE_INVALID: (t) => t`This invitation link is invalid or has expired`,
+    SIGN_UP_INVITE_REQUIRED: (t) => t`Sign-up needs an invitation`,
     SOCIAL_ACCOUNT_ALREADY_LINKED: (t) => t`Social account already linked`,
     SUBSCRIPTION_NOT_ACTIVE: (t) => t`Subscription is not active`,
     SUBSCRIPTION_NOT_FOUND: (t) => t`Subscription not found`,

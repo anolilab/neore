@@ -11,8 +11,9 @@
  * | ------------------ | ------------------------ | ----------------------------- | ---------------------------- |
  * | `messenger`        | `<connectionId>:<event>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/webhooks.ts`      |
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
- * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` (`gitlab-token`) |
+ * | `trigger-delivery` | `<triggerId>:<event uuid>:<body sha256>` (`gitlab-token`), `<triggerId>:body:<body sha256>` (`native`) | {@link TRIGGER_DELIVERY_CLAIM_TTL_MS} | `triggers/http.ts` |
  * | `watch-webhook`    | `<watchId>:<sig hex>`    | {@link TRIGGER_CLAIM_TTL_MS}   | `source-control/freshness-internal.ts` (a repository webhook: marks it dirty, nothing more) |
+ * | `trigger-admission` | `<executionId>`         | {@link JOB_CLAIM_TTL_MS}       | `triggers/functions.ts` (`admitTriggerRun`: one charge per execution, however often admission is retried) |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
  * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
@@ -22,9 +23,11 @@
  * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
+ * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-summary`    | `<threadId>:<last covered row id>` | 30 min                         | `agent/thread-summaries.ts` |
+ * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
@@ -80,8 +83,9 @@ export const AI_DISCLOSURE_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
 
 /**
- * A `gitlab-token` trigger's deliveries (`triggers/http.ts`): GitLab sends no timestamp, so no window ends
- * the replay risk, and the claim must outlast any trigger. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
+ * A `gitlab-token` or `native` trigger's deliveries (`triggers/http.ts`): neither sender gives a timestamp, so no window ends
+ * the replay risk, and the claim must outlast any trigger. The claim is TAKEN for {@link TRIGGER_CLAIM_TTL_MS} and stretched to this
+ * once the run is admitted (`holdClaim`, in the admission transaction), so a delivery that never ran frees itself even when its release is lost. Ten years, like {@link AI_DISCLOSURE_CLAIM_TTL_MS},
  * is effectively forever while staying a finite `expiresAt`, so {@link purgeExpiredClaims} still reaps it.
  * It is cleared sooner by {@link releaseClaimsWithPrefix} when the trigger is deleted, and with the account
  * (the claim is tagged with the owner).
@@ -108,6 +112,12 @@ export const WORKER_DISPATCH_SCOPE = "worker-dispatch";
 
 /** The scope of a Stop on a worker (`sub-agents/functions.ts:stopWorker`): one click, retried or redelivered. */
 export const WORKER_STOP_SCOPE = "worker-stop";
+
+/** An organization's first policy write (`auth/organization-policy.ts`): the creator inserts within the same mutation; a second creator inside this window is refused. */
+export const ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS = 60 * 1000;
+
+/** The scope of those claims. */
+export const ORGANIZATION_POLICY_CREATE_SCOPE = "organization-policy-create";
 
 /** Rows deleted per purge call; a full batch reschedules the purge at once. */
 export const CLAIM_PURGE_BATCH = 500;
@@ -150,7 +160,7 @@ export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { le
             return null;
         }
 
-        await ctx.db.delete(existing._id);
+        await ctx.db.delete("idempotencyClaims", existing._id);
     }
 
     await ctx.db.insert("idempotencyClaims", {
@@ -168,6 +178,35 @@ export const claimFence = async (ctx: ClaimCtx, scope: string, key: string, { le
 
 const claim = async (ctx: ClaimCtx, scope: string, key: string, options: ClaimOptions): Promise<boolean> =>
     (await claimFence(ctx, scope, key, options)) !== null;
+
+/**
+ * Keeps a claim for work that turned out to need a longer life: the claim was taken short so that a delivery that never
+ * ran frees itself, and is stretched once the work is admitted. `claimedAt` names the claim the caller took. It is
+ * stretched while it is still the one on the key; if it lapsed and nobody took the key meanwhile it is taken again under
+ * the same `claimedAt` (the caller's fenced release still finds it). Answers `false` only when ANOTHER claim holds the key.
+ */
+export const holdClaim = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, ttlMs: number, userId?: string): Promise<boolean> => {
+    const existing = await findClaim(ctx, scope, key);
+    const expiresAt = claimedAt + ttlMs;
+
+    if (existing && existing.claimedAt === claimedAt) {
+        await patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, expiresAt) });
+
+        return true;
+    }
+
+    if (existing) {
+        if (existing.expiresAt > Date.now()) {
+            return false;
+        }
+
+        await ctx.db.delete("idempotencyClaims", existing._id);
+    }
+
+    await ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, scope, ...(userId !== undefined && { userId }) });
+
+    return true;
+};
 
 /** `true` while an unexpired claim for `(scope, key)` exists. Reads only, so a caller can decide before it acts. */
 export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<boolean> => {
@@ -199,7 +238,7 @@ export const completeClaim = async (ctx: ClaimCtx, scope: string, key: string): 
         return;
     }
 
-    await patchRow(ctx.db, existing, { leaseExpiresAt: undefined, onLapse: undefined });
+    await patchRow(ctx.db, "idempotencyClaims", existing, { leaseExpiresAt: undefined, onLapse: undefined });
 };
 
 /**
@@ -214,7 +253,7 @@ export const releaseClaim = async (ctx: ClaimCtx, scope: string, key: string, cl
     const existing = await findClaim(ctx, scope, key);
 
     if (existing && (claimedAt === undefined || existing.claimedAt === claimedAt)) {
-        await ctx.db.delete(existing._id);
+        await ctx.db.delete("idempotencyClaims", existing._id);
     }
 };
 
@@ -242,7 +281,7 @@ export const releaseClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, pref
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
         .take(limit);
 
-    await Promise.all(rows.map(async (row) => await ctx.db.delete(row._id)));
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("idempotencyClaims", row._id)));
 
     return rows.length >= limit;
 };
@@ -278,9 +317,25 @@ export const claimKey = internalMutation
 
 /** {@link claimKey} that answers with the claim's `claimedAt` (for {@link releaseKey}'s `claimedAt`), or `null` when the key is held. */
 export const claimKeyFenced = internalMutation
-    .input(vClaimArgs)
+    .input({
+        key: v.string(),
+        leaseMs: v.optional(v.number()),
+        onLapse: v.optional(v.object({ args: v.optional(v.string()), target: v.string() })),
+        scope: v.string(),
+        ttlMs: v.number(),
+        // Another claim that already stands for the same work (a key scheme this one replaced): while it is held the key is refused.
+        // Checked in the same transaction as the claim, so the two cannot disagree.
+        unlessHeld: v.optional(v.object({ key: v.string(), scope: v.string() })),
+        userId: v.optional(v.string()),
+    })
     .output(v.union(v.null(), v.number()))
-    .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, userId }, ctx }) => await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId }));
+    .mutation(async ({ args: { key, leaseMs, onLapse, scope, ttlMs, unlessHeld, userId }, ctx }) => {
+        if (unlessHeld && (await hasClaim(ctx, unlessHeld.scope, unlessHeld.key))) {
+            return null;
+        }
+
+        return await claimFence(ctx, scope, key, { leaseMs, onLapse, ttlMs, userId });
+    });
 
 export const completeKey = internalMutation
     .input({ key: v.string(), scope: v.string() })
@@ -362,7 +417,7 @@ export const reapLapsedClaims = internalMutation
                 await ctx.scheduler.runAfter(0, row.onLapse.target, { ...args, claimKey: row.key });
             }
 
-            await patchRow(ctx.db, row, { leaseExpiresAt: undefined, onLapse: undefined });
+            await patchRow(ctx.db, "idempotencyClaims", row, { leaseExpiresAt: undefined, onLapse: undefined });
         }
 
         return lapsed.length;
@@ -378,7 +433,7 @@ export const purgeExpiredClaims = internalMutation
             .withIndex("by_expiresAt", (q) => q.lt("expiresAt", ctx.now))
             .take(CLAIM_PURGE_BATCH);
 
-        await Promise.all(expired.map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all(expired.map(async (row) => await ctx.db.delete("idempotencyClaims", row._id)));
 
         if (expired.length === CLAIM_PURGE_BATCH) {
             await ctx.scheduler.runAfter(0, internal.lib.claim_once.purgeExpiredClaims, {});

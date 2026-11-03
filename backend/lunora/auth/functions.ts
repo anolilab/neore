@@ -21,6 +21,7 @@ import type { RateLimitName } from "../lib/rate-limiter";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { aiUserPreferencesFields, userSettingsFieldsWithoutUserId } from "./fields";
 import type { McpSecretHeader } from "./lib/mcp-secret-headers";
+import { assertSettingsWritable } from "./lib/preference-writes";
 import { mcpServersWithSecretHeaders, pruneMcpSecretHeaders } from "./lib/mcp-secret-headers";
 import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreferences, type StoredKeyEntry } from "./lib/byok-keys";
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
@@ -31,6 +32,7 @@ import roleGuard from "./lib/role-guard";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { liveTrustedServers } from "../chat/lib/low-risk-trust";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
@@ -194,6 +196,15 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         );
     }
 
+    // A server saved away takes its trust with it, so adding the same name and url again does not start trusted.
+    if (tableName === "aiUserPreferences" && Array.isArray(toStore.mcpServers)) {
+        const trusted = (settings as { lowRiskTrustedServers?: string[] } | null)?.lowRiskTrustedServers;
+
+        if (trusted?.some((entry) => entry.startsWith("mcp:"))) {
+            toStore.lowRiskTrustedServers = liveTrustedServers(trusted, toStore.mcpServers as { name: string; url: string }[]);
+        }
+    }
+
     const savedKeyPurposes = Object.keys(inputArguments).filter((k) => KEY_INPUT_FIELDS.has(k));
 
     if (savedKeyPurposes.length > 0) {
@@ -278,8 +289,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         }
     }
 
+    // The generic settings write is the other way into a locked key: it takes the same refusal as `preference-writes.ts`.
+    await assertSettingsWritable(context.db, user?.activeOrganization?.id ?? null, toStore);
+
     if (settings) {
-        await context.db.patch(settings._id, withoutUndefined(toStore));
+        await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
     } else {
         await context.db.insert(tableName, {
             userId,
@@ -1031,7 +1045,7 @@ export const initializeUserSettings = authMutation
             }
 
             if (Object.keys(updates).length > 0) {
-                await context.db.patch(existingSettings._id, withoutUndefined(updates));
+                await context.db.patch("userSettings", existingSettings._id, withoutUndefined(updates));
             }
         } else {
             // Create new user settings with timezone and location
@@ -1060,6 +1074,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            resumeInterruptedRuns: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1082,6 +1097,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1097,6 +1113,8 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
+                resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,
                 threadTitleInstructions: undefined,
                 timezone: undefined,
@@ -1178,6 +1196,8 @@ export const getAgentModulePreferencesQuery = internalQuery
                     requireZDR: v.optional(v.boolean()),
                 }),
             ),
+            /** The read failed and the other fields are defaults, not the user's choices: a privacy rule may be hiding behind them. */
+            readFailed: v.optional(v.boolean()),
         }),
     )
     .query(async ({ args: { userId }, ctx: context }) => {
@@ -1203,6 +1223,7 @@ export const getAgentModulePreferencesQuery = internalQuery
                 enableKnowledge: false,
                 enablePlanner: false,
                 modelFilterRules: undefined,
+                readFailed: true,
             };
         }
     });

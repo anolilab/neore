@@ -13,6 +13,7 @@
 import type { Infer } from "lunorash/server";
 
 import { parseGoalReviewNote } from "../../chat/goals/shared";
+import { readCompressedHistory } from "../../chat/lib/compressed-history";
 import type { vDeviceTaintSource } from "../validators";
 
 export type DeviceTaintSource = Infer<typeof vDeviceTaintSource>;
@@ -89,10 +90,14 @@ const goalNoteTaint = (content: unknown): DeviceTaintSource[] => {
         .filter((source): source is DeviceTaintSource => TAINT_ORDER.includes(source as DeviceTaintSource));
 };
 
+/** A text part a coding agent on a paired computer wrote (`HOST_TEXT_MARK`); the mark rides as metadata or, once mapped, as options. */
+const isHostText = (part: { providerMetadata?: unknown; providerOptions?: unknown }): boolean =>
+    [part.providerMetadata, part.providerOptions].some((meta) => (meta as { neore?: { runner?: unknown } } | undefined)?.neore?.runner === "host");
+
 /**
  * The sorted, de-duplicated taint of a message list. Reads only `role`,
- * `content[].type` and `content[].toolName` (and a goal's review note in a
- * user message), so it takes any model-message shape.
+ * `content[].type`, `content[].toolName`, a host-text mark on an assistant text part,
+ * a goal's review note in a user message and the summary row of compressed history, so it takes any model-message shape.
  */
 export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): DeviceTaintSource[] => {
     const found = new Set<DeviceTaintSource>();
@@ -100,6 +105,20 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
     const list = messages ?? [];
 
     for (const message of list) {
+        // History compressed to text no longer shows its tool results or attachments. The summary records the
+        // sources of what it folded away; one with no record (compressed before it was kept) is unknown: assume a page was read.
+        const compressed = readCompressedHistory(message);
+
+        if (compressed) {
+            const recorded = compressed.taint ?? ["web"];
+
+            for (const source of recorded) {
+                if (TAINT_ORDER.includes(source as DeviceTaintSource)) {
+                    found.add(source as DeviceTaintSource);
+                }
+            }
+        }
+
         if (message.role === "user") {
             for (const source of goalNoteTaint(message.content)) {
                 found.add(source);
@@ -110,10 +129,13 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
             continue;
         }
 
-        const parts = message.content as ReadonlyArray<{ toolName?: unknown; type?: unknown }>;
+        const parts = message.content as ReadonlyArray<{ providerMetadata?: unknown; providerOptions?: unknown; toolName?: unknown; type?: unknown }>;
 
         for (const part of parts) {
-            if (part.type === "tool-result" && typeof part.toolName === "string") {
+            if (message.role === "assistant" && part.type === "text" && isHostText(part)) {
+                // A coding agent's own text, posted from a paired computer: it read files and command output there.
+                found.add("device");
+            } else if (part.type === "tool-result" && typeof part.toolName === "string") {
                 const taint = taintOfTool(part.toolName);
 
                 if (taint) {

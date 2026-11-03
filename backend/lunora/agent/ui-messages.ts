@@ -19,7 +19,7 @@ import type { Infer } from "lunorash/server";
 import type { HostChanges } from "../acp/lib/changes";
 import { readHostChanges, withoutHostChanges } from "../acp/lib/changes";
 import { omit, pick } from "../lib/collections";
-import { agentSwitchOf } from "./agent-switch-logic";
+import { agentSwitchForWire, agentSwitchOf } from "./agent-switch-logic";
 import type { MessageBranch } from "./branch-tree";
 import { fromModelMessage, toModelMessage, toUIFilePart } from "./mapping";
 import { type MessageCost, type StepUsage, sumMessageCosts, sumStepUsage } from "./message-cost";
@@ -321,9 +321,9 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
 
     // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
     const agentSwitch = agentSwitchOf(message);
-    // The handoff is transcript text for the next model, not for the divider: it stays off the wire.
+    // The handoff is transcript text for the next model, not for the divider, and a coding agent's ids are not a reader's: neither goes on the wire.
     const parts = agentSwitch
-        ? ([{ data: omit(agentSwitch, ["handoff"]), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
+        ? ([{ data: agentSwitchForWire(agentSwitch), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
         : [{ text, type: "text", ...partCommon } satisfies TextUIPart];
 
     return {

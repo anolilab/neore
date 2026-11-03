@@ -37,7 +37,7 @@ export const failAbandonedMediaJob = internalMutation
     .output(v.boolean())
     .mutation(async ({ args: { claimKey, threadId }, ctx }) => {
         // A locked chat takes no placeholder text.
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.get("threads", threadId);
 
         if (thread && isThreadLocked(thread)) {
             return false;
@@ -53,7 +53,7 @@ export const failAbandonedMediaJob = internalMutation
             return false;
         }
 
-        await patchRow(ctx.db, row, {
+        await patchRow(ctx.db, "messages", row, {
             error: "The generation stopped before it finished.",
             message: { content: [{ text: ABANDONED_MEDIA_TEXT, type: "text" }], role: "assistant" },
             status: "failed",

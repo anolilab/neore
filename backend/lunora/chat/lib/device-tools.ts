@@ -27,7 +27,7 @@ import {
 } from "../../devices/lib/constants";
 import type { DeviceManifestTool } from "../../devices/lib/manifest";
 import { capUtf8 } from "../../devices/lib/signing";
-import { computeTaint } from "../../devices/lib/taint";
+import { computeTaint, mergeTaint } from "../../devices/lib/taint";
 import { toolsLogger } from "../../lib/logger";
 import { sleep } from "../tools/utilities";
 
@@ -91,6 +91,7 @@ const CREATE_ERRORS: Record<string, string> = {
     ineligible: "This device tool is not available in this conversation.",
     input_too_large: "The input for this device tool is too large.",
     offline: "The user's device is offline.",
+    outdated: "The user's Neore app on that computer is out of date and cannot run this action. Ask them to update it.",
     rate_limited: "Too many device actions in a short time. Try again later.",
 };
 
@@ -199,7 +200,7 @@ export const buildDeviceTools = async (ctx: DeviceCtx, options: { threadId: stri
                     const created = await ctx.runMutation(internal.devices.internal.createDeviceCall, {
                         deviceId: device.deviceId as Id<"devices">,
                         input: JSON.stringify(input ?? {}),
-                        taintedBy: computeTaint(messages),
+                        taintedBy: mergeTaint(context.taintedBy, computeTaint(messages)),
                         threadId: threadId as Id<"threads">,
                         toolCallId,
                         toolName: manifestTool.name,

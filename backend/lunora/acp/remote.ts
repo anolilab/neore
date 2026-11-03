@@ -1,5 +1,5 @@
 /**
- * Starting, stopping and answering a coding agent from the web or the phone (plans/acp-agent-host.md §3, §4.4, §8 S4).
+ * Starting, stopping and answering a coding agent from the web or the phone (acp-agent-host.md §3, §4.4, §8 S4).
  *
  * Each of these is the OWNER's alone and only queues a signed command (`devices/lib/acp-call.ts`); the computer
  * decides whether to carry it out. Nothing here can approve a pair the user has not approved in the local window,
@@ -14,15 +14,16 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimOnce } from "../lib/claim-once";
-import { sha256Hex } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
 import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
-import { countOpenCalls, isDeviceOnline } from "../devices/lib/state";
+import { countOpenCalls, isDeviceOnline, isDeviceOutdated } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
+import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
+import { openHostSession } from "./lib/start-session";
 import { vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
@@ -95,7 +96,7 @@ export interface StartHostSessionInput {
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
 export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
     const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
-    const offer = device?.acpOffers?.find((candidate) => candidate.agentKey === args.agentKey && candidate.folderId === args.folderId);
+    const offer = offerOf(device, args.agentKey, args.folderId);
 
     if (!device?.encryptedSecret || !offer) {
         throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
@@ -106,7 +107,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     }
 
     // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
-    const hostSessionId = `web-${await sha256Hex(`${userId}:${args.clientId}`)}`;
+    const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
 
     if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
         // The first try's answer may have been lost: hand back the session it made.
@@ -127,38 +128,11 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         userId,
     });
 
-    await ctx.db.insert("acpSessions", {
-        agentKey: offer.agentKey,
-        agentLabel: offer.agentLabel,
-        createdAt: ctx.now,
-        deviceId: device._id,
-        folderId: offer.folderId,
-        folderLabel: offer.folderLabel,
-        hostSessionId,
-        status: "starting",
-        threadId,
-        updatedAt: ctx.now,
-        userId,
-    });
-
-    const call = await createAcpCall(
-        ctx,
-        {
-            deviceId: device._id,
-            input: { agentKey: offer.agentKey, folderId: offer.folderId, sessionId: hostSessionId, threadId: threadId as string },
-            kind: "acp_start",
-            threadId,
-            userId,
-        },
-        ctx.now,
-    );
+    const call = await openHostSession(ctx, { device, hostSessionId, offer, threadId, userId }, ctx.now);
 
     if ("error" in call) {
         // Throwing rolls the thread and the session back with the claim.
-        throw new LunoraError(
-            "BAD_REQUEST",
-            call.error === "busy" ? "That computer is busy. Try again in a moment." : "That computer cannot start an agent right now.",
-        );
+        throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
     }
 
     ctx.log.event("acp.start_host_session", { started: true });
@@ -243,7 +217,9 @@ const requestOf = (input: string): string | undefined => {
 export const answerHostPermission = authMutation
     .use(rateLimit("hosts/answer"))
     .input({ optionId: v.string().max(128), requestId: v.string().max(128), threadId: v.id("threads") })
-    .output(v.object({ reason: v.optional(v.union(v.literal("busy"), v.literal("not_waiting"), v.literal("offline"))), sent: v.boolean() }))
+    .output(
+        v.object({ reason: v.optional(v.union(v.literal("busy"), v.literal("not_waiting"), v.literal("offline"), v.literal("outdated"))), sent: v.boolean() }),
+    )
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
 
@@ -267,18 +243,32 @@ export const answerHostPermission = authMutation
 
         // One answer per request: a second tap, or the phone and the web at once, finds the first still on its way.
         // A pending call past its claim window can no longer be claimed, so it does not count.
+        let queuedPending = false;
         const queued = await countOpenCalls(
             ctx,
             session.deviceId,
-            (open) =>
-                open.toolName === "acp_permission_answer" &&
-                open.threadId === args.threadId &&
-                !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS) &&
-                requestOf(open.input) === args.requestId,
+            (open) => {
+                const mine =
+                    open.toolName === "acp_permission_answer" &&
+                    open.threadId === args.threadId &&
+                    !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS) &&
+                    requestOf(open.input) === args.requestId;
+
+                queuedPending ||= mine && open.status === "pending";
+
+                return mine;
+            },
             1,
         );
 
         if (queued > 0) {
+            // A still-pending answer would be failed at claim on a computer that has since gone outdated: not sent.
+            const device = queuedPending ? await ctx.db.devices.findFirst({ where: { _id: session.deviceId, userId } }) : null;
+
+            if (device && isDeviceOutdated(device)) {
+                return { reason: "outdated" as const, sent: false };
+            }
+
             return { sent: true };
         }
 
@@ -295,7 +285,7 @@ export const answerHostPermission = authMutation
         );
 
         if ("error" in call) {
-            return { reason: call.error === "offline" ? ("offline" as const) : ("busy" as const), sent: false };
+            return { reason: call.error === "offline" || call.error === "outdated" ? call.error : ("busy" as const), sent: false };
         }
 
         ctx.log.event("acp.answer_host_permission", { sent: true });

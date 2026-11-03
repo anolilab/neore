@@ -1,5 +1,5 @@
 import { MODEL_LOOKUP } from "@neore/ai/models";
-import { readAgentSwitch } from "@neore/backend/agent/agent-switch-shape";
+import { readAgentSwitch, switchAgentName } from "@neore/backend/agent/agent-switch-shape";
 import type { Doc } from "@neore/backend/dataModel";
 
 import { buildDocx, DOCX_MIME_TYPE } from "./docx";
@@ -101,7 +101,7 @@ const switchNote = (message: Message): string | undefined => {
 
     const nameOf = (model: string): string => MODEL_LOOKUP.get(model)?.name ?? model;
 
-    return `Switched from ${nameOf(part.from.model)} to ${nameOf(part.to.model)}`;
+    return `Switched from ${switchAgentName(part.from, nameOf)} to ${switchAgentName(part.to, nameOf)}`;
 };
 
 /** Every tool-result part as text, in stored order. A reply with no readable output falls back to the row's text. */

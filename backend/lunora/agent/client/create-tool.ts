@@ -14,6 +14,8 @@ export type ToolCtx = ActionContext & {
     agent?: Agent;
     /** What started this run, for a dispatch to a worker to carry as `dispatchedBy`; unset when the run never said, which refuses one. */
     dispatchOrigin?: DispatchOrigin;
+    /** Set when the run is headless (a sub-agent, trigger, task or messenger reply): nobody is there to approve a call. */
+    headless?: boolean;
     messageId?: string;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;

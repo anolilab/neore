@@ -34,7 +34,7 @@ export const recordPausedRunUsage = async (ctx: MutationCtx, stream: Doc<"persis
         return;
     }
 
-    const found = await Promise.all(paused.replyRowIds.map(async (id) => await ctx.db.get(id as Id<"messages">)));
+    const found = await Promise.all(paused.replyRowIds.map(async (id) => await ctx.db.get("messages", id as Id<"messages">)));
     const docs = found.filter((row) => row !== null);
     // The stored `message` is the AI SDK's, wider than the usage record reads: only its role is.
     const rows = docs.map((row) => {

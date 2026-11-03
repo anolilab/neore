@@ -233,7 +233,7 @@ describe("sweep", () => {
         await harness.run(async (ctx: any) => {
             const settings = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
 
-            await ctx.db.patch(settings._id, { taskEmailEnabled: false });
+            await ctx.db.patch("userSettings", settings._id, { taskEmailEnabled: false });
         });
 
         await runSend();

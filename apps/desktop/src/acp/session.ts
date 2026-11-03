@@ -26,7 +26,7 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, METHOD, newSession, promptParams } from "./protocol";
+import { initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -36,6 +36,18 @@ const MAX_QUEUED_PROMPTS = 8;
 const MAX_PROMPT_LENGTH = 100_000;
 /** After a cancel, how long the agent has to answer its prompt before the process is ended. */
 const DEFAULT_CANCEL_GRACE_MS = 5000;
+
+/**
+ * After a cancelled turn, how long the next queued prompt waits. An update carries no turn id, so output an agent
+ * flushes after answering the cancelled prompt would otherwise land in the next turn; in this window it stays with
+ * the cancelled one.
+ */
+const DEFAULT_CANCEL_SETTLE_MS = 500;
+
+const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
@@ -70,6 +82,7 @@ export interface SessionOptions {
     agentLabel: string;
     appVersion: string;
     cancelGraceMs?: number;
+    cancelSettleMs?: number;
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
@@ -87,6 +100,13 @@ export interface SessionOptions {
     /** Called when anything the window shows changed. Coalescing is the caller's. */
     onChange: () => void;
     process: AgentProcess;
+
+    /**
+     * The agent's own id of a saved session to load instead of opening a new one (harness switch S4), when the backend
+     * asked for a reattach (`acp_start`). Loaded only if the agent advertised it; otherwise, or when the load fails, a
+     * new session opens and the backend is told why (`reattach` on the session it hears opened).
+     */
+    resumeSessionId?: string;
     /** The id this session goes by on the backend, when the backend started it (`acp_start`); otherwise one is minted. */
     sessionId?: string;
     startupTimeoutMs?: number;
@@ -102,6 +122,9 @@ export class AgentSession {
     private readonly connection: JsonRpcConnection;
 
     private cancelTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** Until when a new prompt waits after a cancelled turn, so output the agent flushes late is not credited to it. */
+    private settleUntil = 0;
 
     private cancelRequested = false;
 
@@ -136,6 +159,9 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
+    /** What happened to the saved session the backend asked to load; unset when it asked for none. */
+    private reattach: HostSessionInfo["reattach"];
+
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
 
@@ -168,7 +194,7 @@ export class AgentSession {
         try {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
-            this.agentSessionId = await newSession(this.connection, this.options.folder, this.options.startupTimeoutMs);
+            this.agentSessionId = await this.openAgentSession();
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
@@ -199,6 +225,7 @@ export class AgentSession {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
                 ...this.report !== undefined && { capabilities: this.report },
+                ...this.reattach !== undefined && { reattach: this.reattach },
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -227,9 +254,15 @@ export class AgentSession {
             this.observe((observer) => observer.turnReceived?.(this.id, turnId, prompt));
         }
 
-        if (this.status === "busy") {
+        // Right after a cancelled turn the agent may still flush that turn's output: a prompt waits out the pause.
+        if (this.status === "busy" || Date.now() < this.settleUntil) {
             this.queue.push({ prompt, turnId });
             this.options.onChange();
+
+            if (this.status !== "busy") {
+                this.status = "busy";
+                this.startNextAfter(sleep(this.settleUntil - Date.now()));
+            }
 
             return { position: this.queue.length, status: "queued" };
         }
@@ -239,10 +272,17 @@ export class AgentSession {
         return { status: "started" };
     }
 
-    /** Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means. */
-    public cancelTurn(turnId: string): boolean {
+    /**
+     * Stops the turn with this id if it is the one running: a stop the backend asked for names the turn it means.
+     * What waits behind it is dropped, as a person's Stop does (those are prompts typed in the desktop window), unless
+     * the backend signed `keepQueue` (a worker's stop: the prompts behind it are other runs' messages).
+     */
+    public cancelTurn(turnId: string, options: { keepQueue?: boolean } = {}): boolean {
         if (this.current?.id === turnId) {
-            this.cancel();
+            // A stop already under way keeps its choice: the backend's end of the same turn arrives as a second cancel.
+            if (!this.cancelRequested) {
+                this.cancel(options);
+            }
 
             return true;
         }
@@ -261,8 +301,8 @@ export class AgentSession {
         return true;
     }
 
-    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later. */
-    public cancel(): void {
+    /** Stops the running turn. Prompts still waiting are dropped, so a stop releases nothing later, unless `keepQueue` keeps them to run after it. */
+    public cancel(options: { keepQueue?: boolean } = {}): void {
         if (this.status !== "busy" || this.current === undefined) {
             this.dropQueue();
             this.options.onChange();
@@ -270,7 +310,10 @@ export class AgentSession {
             return;
         }
 
-        this.dropQueue();
+        if (options.keepQueue !== true) {
+            this.dropQueue();
+        }
+
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
         // The spec requires pending permission requests to be answered `cancelled`.
@@ -326,6 +369,32 @@ export class AgentSession {
             status: this.status,
             turns: this.turns.map((turn) => turn.toState()),
         };
+    }
+
+    /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
+    private async openAgentSession(): Promise<string> {
+        const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+
+        if (resumeSessionId === undefined) {
+            return await newSession(this.connection, folder, startupTimeoutMs);
+        }
+
+        // No `session/load` frame goes to an agent that did not say it loads them.
+        if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
+            try {
+                await loadSession(this.connection, resumeSessionId, folder);
+                this.reattach = { loaded: true };
+
+                return resumeSessionId;
+            } catch {
+                // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
+                this.reattach = { loaded: false, reason: "load_failed" };
+            }
+        } else {
+            this.reattach = { loaded: false, reason: "load_unsupported" };
+        }
+
+        return await newSession(this.connection, folder, startupTimeoutMs);
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -408,6 +477,8 @@ export class AgentSession {
             return;
         }
 
+        const cancelled = this.cancelRequested || reason === "cancelled";
+
         turn.end(this.cancelRequested ? "cancelled" : reason);
         this.observeUnanswered(turn);
 
@@ -426,10 +497,17 @@ export class AgentSession {
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
 
-        if (delivered === undefined) {
+        const settleMs = this.options.cancelSettleMs ?? DEFAULT_CANCEL_SETTLE_MS;
+
+        // Also covers a prompt that arrives after this one ended, when the queue was still empty (`send`).
+        this.settleUntil = cancelled ? Date.now() + settleMs : 0;
+
+        const settled = cancelled && this.queue.length > 0 ? sleep(settleMs) : undefined;
+
+        if (delivered === undefined && settled === undefined) {
             this.startNext();
         } else {
-            this.startNextAfter(delivered);
+            this.startNextAfter(delivered, settled);
         }
     }
 
@@ -450,8 +528,8 @@ export class AgentSession {
         }
     }
 
-    private async startNextAfter(delivered: Promise<void>): Promise<void> {
-        await delivered;
+    private async startNextAfter(...waits: (Promise<void> | undefined)[]): Promise<void> {
+        await Promise.all(waits);
         this.startNext();
     }
 

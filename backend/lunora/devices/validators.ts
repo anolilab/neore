@@ -47,7 +47,7 @@ export const vDeviceManifestTool = v.object({
 
 /**
  * One (agent, folder) pair the user approved on the computer, as its signed manifest offers it
- * (plans/acp-agent-host.md §3): labels and opaque ids, never a path or a command line.
+ * (acp-agent-host.md §3): labels and opaque ids, never a path or a command line.
  */
 export const vAcpOffer = v.object({
     agentKey: v.string().max(128),
@@ -68,6 +68,8 @@ export const vDeviceView = v.object({
     projectIds: v.optional(v.array(v.string())),
     toolNames: v.array(v.string()),
     transport: v.optional(vDeviceTransport),
+    /** The computer reported a protocol older than the backend serves: it gets no calls until the app is updated. */
+    updateRequired: v.boolean(),
     viaDeviceId: v.optional(v.string()),
 });
 

@@ -86,8 +86,8 @@ export const rewriteOwner = (row: Record<string, unknown>, from: string, to: str
     Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value === from ? to : value]));
 
 type RawDb = {
-    delete: (id: string) => Promise<void>;
-    get: (id: string) => Promise<unknown>;
+    delete: (table: string, id: string) => Promise<void>;
+    get: (table: string, id: string) => Promise<unknown>;
     insert: (table: string, document: Record<string, unknown>, options: { allowExplicitId: boolean }) => Promise<string>;
     query: (table: string) => {
         paginate: (options: {
@@ -133,7 +133,7 @@ export const importShardRows = internalMutation
         let imported = 0;
 
         for (const row of args.rows as Record<string, unknown>[]) {
-            if ((await db.get(row._id as string)) !== null) {
+            if ((await db.get(args.table, row._id as string)) !== null) {
                 continue;
             }
 
@@ -146,14 +146,14 @@ export const importShardRows = internalMutation
 
 /** On the GUEST's shard: delete the moved rows. */
 export const deleteShardRows = internalMutation
-    .input({ ids: v.array(v.string()) })
+    .input({ ids: v.array(v.string()), table: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
 
         for (const id of args.ids) {
-            if ((await db.get(id)) !== null) {
-                await db.delete(id);
+            if ((await db.get(args.table, id)) !== null) {
+                await db.delete(args.table, id);
             }
         }
 
@@ -176,7 +176,7 @@ export const reassignGlobalRows = internalMutation
                 const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
 
                 for (const row of page) {
-                    await ctx.db.patch(row._id as never, { [column]: args.to } as never);
+                    await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
                 }
             }
@@ -185,7 +185,7 @@ export const reassignGlobalRows = internalMutation
         const { page: census } = await ctx.db.shardActivity.findMany({ where: { shardKey: args.from } });
 
         for (const row of census) {
-            await ctx.db.delete(row._id);
+            await ctx.db.delete("shardActivity", row._id);
         }
 
         return { reassigned };
@@ -235,7 +235,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
                 break;
             }
 
-            await call(references.deleteRows, { ids }, from);
+            await call(references.deleteRows, { ids, table }, from);
         }
     }
 

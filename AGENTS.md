@@ -62,7 +62,11 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
 - `vis.config.ts` holds task defaults, `project.json` per-project metadata. In
   `vis.config.ts`, `dependsOn` takes **target names only** — named inputs and
   file globs belong in `inputs`, and vis silently drops them from `dependsOn`,
-  **disabling input tracking without saying so**.
+  **disabling input tracking without saying so**. A cache hit restores files
+  only for declared `outputs`, written `{projectRoot}/dist/**/*` (a bare
+  `dist/**/*` restores nothing): without them `build:packages` said "read from
+  cache" and left a missing or stale `dist` in place. `ai` and `service-sdk`
+  declare theirs for `build` and `build:prod` in `project.json`.
 
 ## ANTI-PATTERNS
 
@@ -157,6 +161,15 @@ written here is what is not.
   stream tokens). Billing: 1 credit = 1,000 microdollars, via
   `deductCreditsFromGateway`.
 
+- **Background model calls follow the user's model filter rules.** `getUtilityModel`
+  (`backend/lunora/lib/utility-model.ts`) takes the user's `modelFilterRules` in its
+  context (`loadModelFilterRules`; the type refuses a `userId` without them), picks the
+  first candidate the same predicate as the backup model allows, and hands the rules to the
+  gateway (where `requireZDR` / `denyDataCollection` route). When none is allowed it throws
+  `NoAllowedUtilityModelError` and the step is skipped (the low-risk classifier, which is
+  `strict`, fails closed = ask). Titles, categories, summaries and follow-ups build their own
+  agent: use `resolveBackgroundModel` there, never a bare `getAgent(DEFAULT_…)`.
+
 - **Knowledge rerank** — `POST /internal/rerank` on the gateway wraps Workers AI
   `bge-reranker-base`; `retrieve.ts` blends its order with the RRF order instead of
   replacing it (the model is English/Chinese). `AI` is unbound in dev, so the route
@@ -232,7 +245,7 @@ written here is what is not.
       nsfw-checker declare `ai` in `env.production` / `env.preview` only; Alchemy
       binds `AI` itself.
     - **document-parser is a RUST Worker** (workers-rs + xberg;
-      plans/document-parser.md). Its `wrangler.jsonc` `build.command` is
+      document-parser.md). Its `wrangler.jsonc` `build.command` is
       `pnpm --filter document-parser run build:worker`, never `./build.sh` or
       `node scripts/build.mjs`: plain wrangler runs a build command in the
       CALLER's cwd and does not resolve `build.cwd` against the config. `lunora
@@ -260,6 +273,24 @@ written here is what is not.
   `persistentChunks`; the client streams from the gateway, which polls
   `/chat/chunks` and relays NDJSON. Stream token is HMAC
   `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}`, 30 min TTL.
+  **Interrupted runs** (`chat/streaming/persistent/interrupted*.ts`,
+  `chat/lib/interrupted-run.ts`): a run about to generate registers its job args on the
+  stream (`registerResumableRun`), beats every minute (`beatRun`; the beat patches the
+  stream row, so never faster) and marks each tool call while it executes
+  (`markToolRun`, via `markToolRuns`). One watchdog chain per stream (`watchRun`, a
+  scheduler action, every minute) sees a claimed, unpaused stream with a beat older
+  than 3 minutes as dead and queues the SAME resume a rate-limit pause queues: a
+  `pause` marked `pauseCause: "interrupted"`, claimed by `claimRunResume` (so redelivery
+  still resumes once). `from`, the reply rows and the step count are DERIVED from the
+  saved rows, never from the dead run's memory (`settleSavedRows`); anything that is
+  not a finished row or an empty placeholder, a trailing tool call without its result,
+  a delivered steer or an open tool mark fails the run visibly instead. At most 3
+  resumes per reply (`interruptions`), independent of the 3 rate-limit pauses; the
+  4th interruption fails with an error line. Opt out with
+  `userSettings.resumeInterruptedRuns === false` (absent = on): the stream then
+  expires into `timeout` as before. An interrupted pause is not shown as a rate-limit
+  wait and "Retry now" skips it. Not covered: tool-approval continuations, group
+  turns and stateless runs register nothing, so they still time out.
 
 - **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
   a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's
@@ -415,7 +446,7 @@ written here is what is not.
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
   via `chargeRound` only when there is something to report.
 
-- **Develop review** (`backend/lunora/source-control/`, plans/develop-mode.md) — the draft is the
+- **Develop review** (`backend/lunora/source-control/`, develop-mode.md) — the draft is the
   `reviewDrafts` row, server-side so a reload or second device sees it. `submitReview` claims it
   first (`submittingAt`, a 60 s lease; edits are refused meanwhile), posts ONE host call, and
   clears the draft only on a confirmed review (`submit-review.ts` fixes the order). The claim
@@ -504,6 +535,51 @@ written here is what is not.
   `ask-user-constants.ts` because `agent-run.ts` importing the tool module
   (which loads the agent client) breaks the import graph in unit tests.
 
+- **Low-risk quick check** (`chat/lib/low-risk-approval.ts`, `low-risk-check.ts`) — opt-in
+  (`aiUserPreferences.autoApproveLowRisk`, absent = off, set only by `setAutoApproveLowRisk`).
+  An eligible `ask` tool's `needsApproval` becomes a function: taint, then the per-user budget
+  (`chat/toolAutoApprove`), then one utility-model call (no tools, strict `{lowRisk, reason}`, 8 s
+  deadline); anything but a clean `lowRisk: true` is a prompt. **Eligibility is decided before the
+  model is asked and the verdict can never widen it:** MCP/connector tools only (every built-in that
+  defaults to `ask` is a person tool or a delegation), **only from a server the user trusts**
+  (`aiUserPreferences.lowRiskTrustedServers`, `chat/lib/low-risk-trust.ts`: a server's tool descriptions and
+  schemas reach the model unfiltered, so a malicious server could steer it into another server's read tool
+  with chat data, and the check sees only the key and arguments; an entry is an MCP server's name AND url,
+  or a connector's slug, so a url change drops the trust; written only by `setLowRiskTrustedServer`, at most
+  50; the run's `describe` stamps `ToolDescriptor.trustId` and the mid-run re-check in
+  `getLowRiskApprovalContext` takes it too, so revoking trust holds from the next call, and a call that
+  names no server is refused), no user override (only the DEFAULT `ask`), no
+  destructive/open-world annotation, not headless, not an API-key run, and the thread must pass
+  `isDeviceEligibleThread` (the owner alone — a collaborator's turn would otherwise replace the
+  owner's consent). **The tool name must START with a read verb** (`READ_VERBS`: get, list, search,
+  read, fetch, find, query, describe, lookup, view — the leading word of the key's tool name, split on
+  `_ - .` or a camelCase boundary), so `create_issue`, `save_issue`, `create_event` and `sendemail` are
+  never checked; `OUTWARD_WORDS` stays as a second gate for a read verb followed by a write
+  (`get_or_create_user`), scanned over the TOOL's name only (a server called "mail" does not turn its
+  tools away; a noun like `message` or `pr` in the tool's own name still does). An allowlist, not a blocklist: a new write verb is a prompt by default.
+  **Never after context the person did not write in this chat:** taint is `computeTaint(options.messages)`
+  (any tool result or attached file or image), `messagesCarryAttachedText` (`chat/lib/attached-text.ts`: an
+  attached document's extracted text and a captured browser page, which `/chat/start` and the edit path put
+  into the user message as plain TEXT parts that `computeTaint` cannot tell from typing — found by their
+  `[Document: …]` / `[Attached Document]` / `[Web page context]` line label or the page's structural marker,
+  and built through `documentTextPart` so the label and the detector cannot drift) AND `untrustedContext`
+  (retrieved knowledge, memories or project context in the system prompt, plus ANY skill text there:
+  `execute.ts` ORs `injectsSkillText(skillRun)` — an enabled skill's description or an invoked skill's
+  instructions — into `RunContext.untrustedContext`). Skills are all-or-nothing on purpose: `skills.source`
+  is client-supplied at creation, agents write skills from chats that may have read third-party content, and
+  marketplace forks, imports and organisation-shared skills are other people's text, so "this user wrote it"
+  cannot be told cheaply or reliably. A user with any enabled skill therefore never gets the check; narrowing
+  that needs a server-minted authorship marker first. A thread summary records attached text as `files` taint
+  when it folds the rows in (`thread-summaries.ts`); summaries written before that are not repaired. The tools are built while the
+  context loads, so the check awaits that promise at the first call; a continuation reloads nothing and
+  reads `toolRunConfig.untrustedContext` off its snapshot (absent = tainted). **The setting and the
+  thread's sharing are re-read at every call**, in the same mutation that spends the budget unit
+  (`consumeLowRiskCheck`), so switching it off or sharing the thread mid-run holds from the next call
+  (`getLowRiskApprovalContext` at run start only decides whether to build the check). The approval is
+  stamped on the saved call by tool call id (`providerOptions.neore.autoApproval`, next to the MCP
+  label) through `stampSavedToolCalls`, which `finishRun`, `endStoppedRun`, `failRun` and the
+  continuation's failure path all call; a stamp that fails is logged and never changes how the run
+  ended. A `chat.low_risk_check` event is logged per decision.
 - **Side questions** (`chat/aside.ts`, `apps/web/src/features/chat/aside/`) — a model call on a
   READ-ONLY snapshot of the thread (active path, plus the reply so far from the live stream) that writes
   nothing: the question and answer live in the client's `useAsideStore` for the session. Same model as the
@@ -535,6 +611,15 @@ written here is what is not.
   only executed past its permission check, and that consent carries down
   (never over `off`, never to other tools, withheld at the depth cap).
   Triggers, tasks and messenger replies inherit nothing, so they lose it.
+  **A worker can run on a paired computer** (`runner: { kind: "host", deviceId }`,
+  `sub-agents/host-runs.ts`; agent-orchestrator.md S5): a run is the existing signed
+  `acp_send`, started in the claim's transaction, never charged. A busy computer is not a
+  failure: the run goes back to the head of its line and `retryHostRunStart` tries again, so the messages
+  behind it do not meet the same refusal. Only a spent call budget counts toward `HOST_START_MAX_ATTEMPTS`; a turn
+  holding the session (`holdsSession`) does not, the run polls every 30 s until it ends. A worker run's stop sends
+  `acp_cancel` with `keepQueue` (signed; the core copies it into the command) so the worker's other queued messages
+  survive; every other Stop leaves it out and the desktop drops what it queued.
+  `functions.ts` and `acp/lib/finish.ts` load each other lazily, never statically.
 
 - **Idle-thread summaries** (`backend/lunora/agent/thread-summaries.ts`, rules in
   `thread-summary-logic.ts`) — the agent reads only the last 100 rows of the
@@ -630,7 +715,16 @@ written here is what is not.
   headers; a save that sends `mcpServers` prunes the ones whose server moved or whose header was typed by hand. Spending
   a ref needs the turn to have been STARTED by the owner: a continuation runs as the owner, so `startedBy` rides in the run
   snapshot (`vToolRunConfig`) and `ToolCtx`. The ciphertext goes when a reply ends for good (`finishRun` unpaused,
-  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run.
+  `failRun`, `endStoppedRun`, a group turn's end), not at a pause — a consumer tool set to `ask` pauses the run — and when a
+  paused reply is ABANDONED: `stopActiveForThread` (also while another reply is live; a live reply keeps its own) or a
+  stopped stream that never started or was waiting out a limit, and `createStreamWithMessage` (a new message moves past the
+  request), all through `discardPausedThreadSecrets` (a group turn's pause is the same snapshot, so the same path). That
+  call skips reply keys that still have a live stream (a pause with several requests shares one key), clears the thread's
+  references in one pass, DENIES the reply's pending SECRET requests (`resolvedBy: "abandoned"`; answering one is refused with
+  `TOOL_REQUEST_ABANDONED`; other pending approvals stay answerable, and a Stop denies them even when a claimed run keeps its
+  ciphertext until it settles) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
+  only that prompt's reply.
+  The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
 
 - **Claim-once and crypto primitives** — `lib/claim-once.ts`
   (`idempotencyClaims`: messenger events, trigger webhooks, queue jobs) and
@@ -668,7 +762,7 @@ written here is what is not.
   continuation takes an `order` past EVERY row (`continuationOrder`), not
   `prompt + 1`, which a sibling branch may already hold.
 
-- **Agent switch** (`agent/agent-switch*.ts`, `chat/agent-switch.ts`, plans/harness-switch.md) —
+- **Agent switch** (`agent/agent-switch*.ts`, `chat/agent-switch.ts`, harness-switch.md) —
   switching a text thread's model leaves one `system` row with no text whose payload
   (`providerMetadata.neoreAgentSwitch`) models never see (`docsToModelMessages` drops it) and the
   transcript renders as a divider (`data-agentSwitch` part). The agent of a turn is the `to` of the
@@ -720,7 +814,7 @@ written here is what is not.
   `neore://auth/callback`, opt-in in `TRUSTED_EXTENSION_REDIRECT_URIS`) and ends
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
   not add a second grant system. See its README.
-  **Terminal** (`apps/desktop/src/terminal/`, plans/desktop-terminal.md) is the user's
+  **Terminal** (`apps/desktop/src/terminal/`) is the user's
   own interactive shell, outside the device sandbox, so it has NO site-facing
   channel: its window (`terminal-window/`, own preload and in-memory session that
   cancels every request but `file:`) is the only sender `index.ts` admits, and the
@@ -735,7 +829,7 @@ written here is what is not.
   (`scrollback.ts`), main and host hold counters and one batch. Windows is
   unavailable until S4. Quit signals every shell synchronously (`killNow`).
   **Device execution** (`packages/device-core/src/{shell,sandbox}.rs`, `backend/lunora/devices/`,
-  `features/devices`, plans/device-execution.md) is remote code execution
+  `features/devices`) is remote code execution
   on the user's machine, so the page is a RELAY only: the backend signs each
   call (HMAC, domain-prefixed payload STRING — no canonical JSON) with a
   per-device secret, Rust verifies signature/device/expiry/nonce, asks in the
@@ -776,7 +870,7 @@ written here is what is not.
   crates. The HMAC vectors are pinned on BOTH sides — change one, update both.
   `tauri-plugin-dialog` is driven from Rust only; no window holds a dialog
   permission.
-  **`device-core` has two halves** (plans/ssh-environments.md). `actions.rs` plans
+  **`device-core` has two halves** (ssh-environments.md). `actions.rs` plans
   and runs `fs_*`/`shell_run` from explicit inputs (folders, shell policy) and
   imports no pairing, envelope, approval or keychain; the desktop `engine.rs`
   verifies, asks, then calls it. The `keychain` feature (default) is the paired
@@ -785,7 +879,7 @@ written here is what is not.
   and re-checks the folders and the sandbox on ITS machine. Both paths share the
   vectors in `tests/common/actions.json`; a new tool or a changed result goes there.
   Desktop main-process calls go through `HostTransport` (`apps/desktop/src/device/transport.ts`).
-  **Servers over SSH** (`device-core/src/ssh.rs`, `engine/hosts.rs`, plans/ssh-environments.md): a server
+  **Servers over SSH** (`device-core/src/ssh.rs`, `engine/hosts.rs`, ssh-environments.md): a server
   is a `devices` row of its own (`transport: "ssh"`, `viaDeviceId` = the desktop that holds it) whose secret
   lives only in THIS desktop's keychain, one entry per device id (`store.rs`). Calls, manifests, progress and
   results for it are verified and signed on the desktop with that secret, after the same local approval
@@ -808,7 +902,7 @@ written here is what is not.
   it connects, so with the master gone it fails instead of opening a connection of its own. No remote command; the
   server starts the user's login shell. Ending the master (Disconnect, forgetting the key) ends the terminal; ssh
   exits 255 and the page words it as the connection ending.
-  **Host software on a server** (`device-core/src/install.rs`, `apps/desktop/scripts/host-bundle.mjs`, plans/ssh-environments.md
+  **Host software on a server** (`device-core/src/install.rs`, `apps/desktop/scripts/host-bundle.mjs`, ssh-environments.md
   §8): the desktop uploads `neore-host` over the server's own ssh master and the server checks the SHA-256 against the
   one shipped in `resources/neore-host/manifest.json` BEFORE `chmod 700` and the rename, so a wrong digest or a dropped
   upload leaves nothing executable at `~/.neore/host/<version>/neore-host`. The remote root is a parameter
@@ -853,7 +947,7 @@ written here is what is not.
   process, never from the window. Unix hosts only: a Windows host answers "not supported". The 10,000-file budget is pinned
   in `tests/ssh_host.rs` with the numbers it was set from.
   **Coding agents on a server** (`device-core/src/{agent_host,engine/host_agents}.rs`, `apps/desktop/src/acp/{remote-process,servers}.ts`,
-  plans/ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
+  ssh-environments.md S7): the desktop speaks ACP and `neore-host` only owns the process, so the whole session stack is
   shared with the computer's own agents. The `agent` request streams stdout/stderr as chunk frames (tag 1/2) and takes stdin as
   chunk frames of the same id; `hello.agents` announces it (no protocol bump), and the host kills the agent's process group on
   cancel, on its stdin ending and on SIGTERM. A server's agents and approvals live on its `Host` row, the core picks the secret by
@@ -880,7 +974,7 @@ written here is what is not.
   subscribes to `getDeviceCallByToolCall` ONLY while the tool part is in
   flight; a finished call reads its outcome from the tool output's `status`.
 
-- **Desktop dictation** (`apps/desktop/src/dictation/`, plans/desktop-dictation.md S2) is behind the build-time
+- **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is behind the build-time
   flag `NEORE_DICTATION=1` until the settings switch (S3) exists; unset, no shortcut, window or channel is created.
   Hold `CommandOrControl+Shift+D`: a `dictation` window opens in its OWN in-memory session (`webRequest` cancels
   everything but its own files, so it has no network), captures 16 kHz mono in the page and sends chunks to the main
@@ -898,7 +992,7 @@ written here is what is not.
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
 
-- **Mobile offline cache** (`apps/mobile/src/offline/`, plans/mobile-acp-and-remote-control.md §3.5) — read-only
+- **Mobile offline cache** (`apps/mobile/src/offline/`, mobile-acp-and-remote-control.md §3.5) — read-only
   `expo-sqlite` copy of the thread list, the last 50 messages of the 20 newest threads, and host/worker status. Every
   row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
   copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
@@ -924,7 +1018,7 @@ written here is what is not.
   mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
 
 - **Host-run threads** (`backend/lunora/acp/`, `apps/desktop/src/acp/`,
-  plans/acp-agent-host.md) — a coding agent runs on a paired computer and the
+  acp-agent-host.md) — a coding agent runs on a paired computer and the
   thread is `threads.runner = "host"` (`acp/lib/host-thread.ts`; deliberately
   not a create field, so a client cannot mint one). The desktop MAIN process
   posts the output to `POST /hosts/ingest` (signed with the device secret under
@@ -945,7 +1039,7 @@ written here is what is not.
   `applyHostEvents`, not by shard isolation. A host stream ends through
   `endHostStream` from every path (the host's `turn_end`, the reaper, a revoked
   device, Stop), which sets the status and `hostState: ended` in one write.
-  **Files a host reply shows** (plans/acp-agent-host.md §4.8): only a Markdown
+  **Files a host reply shows** (acp-agent-host.md §4.8): only a Markdown
   IMAGE in the reply (`![](path)`, never a plain link) is looked at, at the end
   of the turn, by the desktop main process. Rust (`DeviceCore.acpReadMedia`,
   `fs::read_media`) resolves it against the approved folder alone and opens it
@@ -976,7 +1070,7 @@ written here is what is not.
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
   Host turns write no usage row and charge no credit.
-  **File-event hooks** (`apps/desktop/src/acp/hooks/`, plans/acp-agent-host.md §4.10)
+  **File-event hooks** (`apps/desktop/src/acp/hooks/`, acp-agent-host.md §4.10)
   read `.neore/hooks.json` from the approved folder — repository content, so inert until the
   local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
   and a hook can only send a prompt to the already-open session. The watcher drops events
@@ -984,8 +1078,12 @@ written here is what is not.
   their own claim window (60 s) and open-call budget (3 per device); the backend
   queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
   `createDeviceCall` refuses anything the manifest does not list.
+  **A host thread can have several sessions** (harness switch S3): a switch to another host agent ends the thread's session
+  and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
+  The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
+  the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
 
-- **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, plans/acp-agent-host.md) —
+- **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, acp-agent-host.md) —
   the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
   computer's Rust core refuses an `acp_start` for a pair the user did not approve in its local window, whatever the
   signature. These calls spend NO nonce: a claim is a 30 s lease (`acp/calls.ts` returns a lapsed one to `pending`),
@@ -993,7 +1091,7 @@ written here is what is not.
   written BEFORE the command is acted on) makes the second delivery an acknowledgement. The page's relay retries a
   failed claim or completion until the call's deadline, whatever the error. A call's prompt is cleared from `input` and
   `envelope` on every terminal path (`ACP_CLEARED`). Any new way a call can end must go through `onAcpCallEnded`, or its
-  turn stays "Sending". `acp_cancel` has its own open-call budget and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`plans/acp-s4-throttling.md`).
+  turn stays "Sending". `acp_cancel` has its own open-call budget and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`acp-s4-throttling.md`).
 
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
@@ -1230,10 +1328,11 @@ The same window shipped [#1030](https://github.com/anolilab/lunora/pull/1030):
 `unknown` while codegen exited 0 and no advisory fired; only consumers'
 `lint:types` showed it. After a codegen bump, compare
 `cat backend/lunora/_generated/{api,internal}.ts | grep -c "unknown>"` with the
-previous count (35 on codegen 214, 235, 246 and 279 — the GDPR export
-collectors' untyped arrays; 36 once the bots export collector joined them, its
-`v.array(v.any())` kept on purpose so a new bot column cannot fail the export;
-31 on 207, against 157 on 205). Run codegen twice
+previous count. The count moves when procedures are added: it was 36 when the bots export
+collector joined (its `v.array(v.any())` is kept on purpose so a new bot column cannot fail the
+export), and 40 on main and on codegen 396 (2026-11-03: 10 in `api.ts`, 30 in `internal.ts`). A
+rise is a regression only if a procedure that was typed is now `unknown`, so compare the
+procedure names, not the number. Run codegen twice
 after a change that renames references: inference reads the source, and a
 reference codegen cannot resolve yet types its caller's output `unknown`. When probing
 generated output, run `tsc` per project: `vis run lint:types` re-runs the
@@ -1306,6 +1405,17 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
   it is a regression check for a `.pnpm` store-path import codegen once emitted
   (which came back once after an unrelated change). If generated output does not
   compile, the fix goes in a `.d.ts`, in our own source, or upstream.
+- **Functions load lazily**, set by `codegen: { lazyFunctions: true }` in
+  `backend/lunora.config.ts`, which every entry point reads (codegen, `dev`, `build`,
+  `prepare`). The `--lazy-functions` flag still works for one run. The vite and rspack
+  plugins no longer take the option. `LUNORA_FUNCTIONS` holds metadata stubs and
+  each module under `_generated/fn/` is evaluated on first call, which is what
+  keeps the Worker's startup CPU down. Codegen must read every procedure's
+  builder chain statically back to a `_generated/server` factory (a `const`
+  alias is followed, an `export { … } from` re-export is not — hence the const
+  aliases in `lib/crpc.ts`), and `.expose()`/`.x402()` need literal arguments.
+  A test that inspects the registry (`rls.guard.test.ts`) must `loadAllFunctions()`
+  first, or it sees stubs with no `rls`.
 - **One cold pass is reproducible.** `rm -rf lunora/_generated && pnpm codegen`
   reproduces the committed output byte-for-byte.
 - **A cold pass breaks a running vite.** While `_generated/` is gone, the app's
@@ -1323,7 +1433,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 - **Codegen runs the advisor as an exit gate**, and a gate that exits 1 does so
   _before_ the chained post-codegen step — so an advisory regression leaves the
   tree half-generated with no clue why. Run the advisor deliberately with
-  `pnpm --filter @neore/backend run lunora:advise`; it scores 692 procedures and takes
+  `pnpm --filter @neore/backend run lunora:advise`; it scores 1,302 procedures and takes
   `--baseline` for regression gating.
 
 ### Modules
@@ -1365,7 +1475,13 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   devices, evals, pages, tasks … do), wired into the deletion workflow, so it
   draws none. Any `cross_module_table_write` outside `gdpr/steps/` is a
   regression.
-- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`
+- **Architecture view**: codegen writes `_generated/architecture.{json,ts}`,
+  which are GIT-IGNORED (they changed on nearly every backend PR and caused the
+  merge conflicts). `_generated/app.ts` imports `architecture.js`, so anything
+  that compiles or runs it needs codegen first: backend `lint:types`, `test` and
+  `test:coverage` `dependsOn: codegen` in `backend/project.json`; `lunora build`
+  and `lunora dev` run it themselves. A new job running bare `tsc`/`vitest` in
+  `backend/` on a fresh checkout must run `pnpm codegen` first (TS2307 else).
   (Studio → Functions → Architecture; admin-gated
   `GET /_lunora/admin/architecture`). ~1,900 edges and ~510 "call sites could not
   be drawn" — mostly by design: refs held in variables
@@ -1379,12 +1495,13 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
 
 ### Reading advisories
 
-The tree draws **6 ERROR, 425 WARN, 668 INFO** (2026-10-06) — 100 WARN plus the
-325 accepted GDPR `cross_module_table_write` findings. The 6 ERRORs are
-`owner_field_from_args_not_auth` on guarded inserts the lint cannot see through:
-platform-admin `setMemberCreditOverride`, org-admin `addMember`/`addTeamMember`
-(they add ANOTHER user), and the active-org equality checks in
-`createPrompt`/`createSkill`. Advisories never fail codegen; test files
+The tree draws **0 ERROR, 284 WARN, 101 INFO** (2026-11-01, codegen alpha.384) — the
+accepted GDPR `cross_module_table_write` findings are most of the WARNs. Until
+alpha.384 there were six `owner_field_from_args_not_auth` ERRORs on guarded inserts
+the lint could not see through (platform-admin `setMemberCreditOverride`, org-admin
+`addMember`/`addTeamMember`, the active-org equality checks in
+`createPrompt`/`createSkill`); alpha.384 reports none of them as ERROR, and the
+INFO count fell from 668 to 101. Advisories never fail codegen; test files
 (`*.test.ts`, `__tests__/`, …) are not analysed. **Piping codegen's output truncates that list** at wildly
 different points (one run printed 88 and looked like the whole set), so redirect
 to a file and count there:
@@ -1607,11 +1724,15 @@ first real request. They were found by driving the app in a browser
   diffs `schema.ts` against the committed baseline
   `backend/lunora/.lunora-schema.json` and exits 1 on a breaking change with no
   migration — so a field rename fails the build long after working fine in dev,
-  because dev never consults the baseline. `lunora prepare
---update-schema-baseline` is the escape hatch for "you know data is compatible";
+  because dev never consults the baseline. Since `@lunora/cli@alpha.463` the gate
+  classifies each change by what it can do to stored data (a dropped index is safe;
+  a new unique index, a shorter TTL or a shard-mode flip needs a migration that
+  names it) and `--update-schema-baseline` is gone (an unknown option);
   `--allow-schema-drift` skips the gate for one run WITHOUT advancing the
-  baseline. Once there is data at rest, use the widen → migrate → narrow path
-  from the `lunora-migration-helper` skill instead.
+  baseline. Safe changes advance the baseline on `lunora prepare`, so commit
+  `.lunora-schema.json` with the change (a package bump can add columns to the
+  payment tables). Once there is data at rest, use the widen → migrate → narrow
+  path from the `lunora-migration-helper` skill instead.
 - **Delete audited rows one at a time.** Every write to a table in
   `lib/audit-triggers.ts#AUDIT_TABLES` fires a trigger, and a `Promise.all` of
   deletes over a batch nests them past the runtime's limit ("trigger recursion
@@ -1627,7 +1748,7 @@ first real request. They were found by driving the app in a browser
 ### Sharding and concurrency
 
 - **Per-user sharding: a row lives on the shard of the user who OWNS the
-  object it belongs to** (plans/per-user-sharding.md). `ctx.db` never
+  object it belongs to** (per-user-sharding.md). `ctx.db` never
   routes by a table's `.shardBy()` field — a row lands in whichever Durable
   Object executed the write — so what decides placement is which shard each
   REQUEST lands on:
@@ -1717,8 +1838,13 @@ first real request. They were found by driving the app in a browser
   mid-run is NEVER re-run (it may already have paid); when its deadline lapses
   the cron tick (`reapLapsedClaims`) runs its `onLapse` — for media,
   `chat/media-abandon.ts` fails the pending row stamped with that `jobId`
-  (`providerMetadata.neoreJob`), so the user can retry. A redelivered run is dropped, not
-  resumed: a run killed mid-way leaves its stream for the timeout cron.
+  (`providerMetadata.neoreJob`), so the user can retry. A redelivered
+  `runStreamingAgent` is dropped (the claim is taken), but a run whose worker DIED is
+  resumed by the interrupted-run watchdog (see "Edge streaming"): from its last SAVED
+  row, so a step that finished is never run again. The step in flight was lost; its
+  model call may have been billed (the gateway records usage per call) and the re-run
+  is a new call charged on its own, so the guarantee is "no completed step charged
+  twice", not "one model call". A run that died inside a TOOL is never resumed.
   **Local dev:** Miniflare's broker ignores `max_concurrency` and runs one
   batch at a time, so wrangler.jsonc batches 10 per second
   (`JOBS_QUEUE_DEV_CONSUMER_OVERRIDES`) — a batch's messages dispatch
@@ -1759,13 +1885,20 @@ first real request. They were found by driving the app in a browser
   a fresh wrapper per request re-runs it on every request (a timing proxy once
   did, costing ~3s per read). The old note here ("~1s per request, miniflare's
   loopback") was a misreading of this.
-- **An un-hinted `ctx.db.get(id)` of a `.global()` row probes EVERY global
-  table** in one batched D1 round trip (41 tables), because the id is not in
-  the shard's local table set — ~70-125ms locally each time, three of them made
-  a warm `getUserSettings` 0.4-0.5s (7-15ms after the fix). Read a global row
-  by id with `ctx.db.<table>.findFirst({ where: { _id } })` — ONE statement.
-  Neither `ctx.db.asId(table, id)` nor the facade's own `ctx.db.<table>.get(id)`
-  avoids the probe (measured). `lib/global-get.guard.test.ts` fails on a new one.
+- **`ctx.db` by-id calls take the TABLE first** (`@lunora/server` alpha.240+):
+  `get(table, id)`, `patch(table, id, values)`, `replace`, `delete`, `restore`,
+  `deleteMany(table, ids)`, `patchMany(table, patches)`. The bare-id forms probed
+  EVERY table (one batched D1 round trip across 41 global tables, ~70-125ms
+  locally each), which is why they are gone; an unknown table throws
+  `BAD_REQUEST`. The facades (`ctx.db.<table>.get(id)`) are unchanged. The id
+  itself carries no table — `db.normalizeId(table, id)` only checks its SHAPE and
+  returns the id for any table, so never use it to discover a row's table. The
+  `embeddings_*` tables are the one place the table is unknown at the call site:
+  `agent/vector/tables.ts#findVectorTable` reads each dimension's table in turn.
+  `lib/patch.ts`: `patchRow(db, table, row, changes)` / `patchById(db, table, id, changes)`.
+  A test callback typed `ctx: any` is NOT checked by `tsc`, so a stale one-argument
+  call fails at runtime ("<uuid> is not a table in this schema"); `lib/global-get.guard.test.ts`
+  still fails on a new un-hinted global read.
 - Multiply a slow first access by the one-at-a-time shard and N concurrent
   first-paint queries cost N × that of wall clock (measured before per-user
   sharding, on `__root__`): 5 concurrent = 4.9s, 10 = 8.8s and the backend dies. **Count your
@@ -1890,7 +2023,7 @@ first real request. They were found by driving the app in a browser
       admit, or its reads come back empty.
     - **"Load a child by id, then check its parent" returns `null` now** — the
       child is invisible until the parent is admitted. Use
-      `parentKeyOf(ctx, id, "threadId")`, decide on the parent, then read the
+      `parentKeyOf(ctx, "messages", id, "threadId")`, decide on the parent, then read the
       row through `ctx.db`. Likewise, run the access check BEFORE a parallel
       read that depends on it (`getThreadAccess` used to `Promise.all` them).
     - **`systemDb`/`parentKeyOf` bypass RLS** and every importing file is listed
@@ -1908,11 +2041,9 @@ first real request. They were found by driving the app in a browser
       return nothing). A test ctx without them (`lunoraTest` before
       `test/setup-harness.ts` binds them) has none behind `rls()` either — that
       is what #797 reported; do not re-add a workaround.
-    - **An un-hinted `ctx.db.get(id)` of a `.global()` row is expensive behind
-      RLS**: the wrapper cannot tell the table from the id, so it probes EVERY
-      policed table (`findFirst` each, in parallel). Shard rows short-circuit
-      through `lookupById`; global rows do not. Read global rows through the
-      table facade — `ctx.db.user.get(id)` — which passes the table.
+    - **By-id calls name their table** (`ctx.db.get("user", id)`), so the RLS
+      wrapper no longer probes every policed table for a bare id. The facade form
+      `ctx.db.user.get(id)` passes the table too.
     - **RLS layers AND together**, so an admin builder derived from a guarded
       user builder could never widen — each builder chain is spelled out from the
       generated builder.
@@ -2291,9 +2422,13 @@ error")` (any transport, including the SSRF-guarded tool
   comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags
-  and every `@lunora/*` package resolves to one version (2026-10-20: `lunorash` 405, `cli` 406,
-  `workflow` 87 everywhere). A meta-package release lags the package it pins by one release wave
+  beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
+  catalog in `pnpm-workspace.yaml`, aligned to the cluster the meta-packages pin rather than the
+  newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
+  each; a non-branded package may keep two copies when the meta-packages pin different versions,
+  and that is not overridden.
+  `pnpm dedupe` also collapsed `@lunora/errors`, whose range dependencies had resolved to two
+  versions. A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
   fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
   bumping, rather than overriding.
@@ -2336,6 +2471,12 @@ error")` (any transport, including the SSRF-guarded tool
   `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
   scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
   the best of several.
+  Since codegen alpha.384 the generated app already loads `@lunora/auth` and the
+  OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at
+  startup; an evaluation error there now 500s the first request instead of failing the upload.
+  Lazy function mode (`codegen.lazyFunctions`, see "Functions load lazily") also defers the
+  queue registry, workflow and agent entrypoints (upstream measured -31 % on its synthetic app).
+  The Creem SDK is loaded on first use in `src/server.ts`, not at startup, for the same reason.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The composer of a thread a coding agent runs on the user's own computer (plans/acp-agent-host.md §3, §4.4, §4.6).
+ * The composer of a thread a coding agent runs on the user's own computer (acp-agent-host.md §3, §4.4, §4.6).
  * Everything here is a request to that computer, not a cloud run: the message goes to `POST /hosts/send`, Stop and
  * the permission answers are procedures that queue signed commands, and what the agent is doing is read from the
  * thread's stream like any other viewer's. Chat text never answers a permission request: only the buttons do, and
@@ -138,7 +138,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                 onError: () => toast.error(t`Could not send your answer.`),
                 onSuccess: (result) => {
                     if (!result.sent) {
-                        toast.error(result.reason === "busy" ? t`Your computer is busy. Try again in a moment.` : t`That request is no longer waiting.`);
+                        toast.error(result.reason === "not_waiting" ? t`That request is no longer waiting.` : messages[result.reason ?? "busy"]);
                     }
                 },
             },

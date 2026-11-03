@@ -3,8 +3,8 @@
 `@neore/mobile` is the Expo (React Native 0.88, Expo Router) client for iOS and
 Android. It is early: sign-in, a thread list, reading a thread and streaming a
 reply. Scope and status are tracked in
-[`plans/desktop-and-mobile-apps.md`](../../plans/desktop-and-mobile-apps.md) and
-[`plans/mobile-phase-4-slices.md`](../../plans/mobile-phase-4-slices.md).
+`desktop-and-mobile-apps.md` (desktop-and-mobile-apps.md) and
+`mobile-phase-4-slices.md` (mobile-phase-4-slices.md).
 
 ## How it talks to the stack
 

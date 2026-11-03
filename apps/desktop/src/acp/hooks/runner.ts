@@ -1,5 +1,5 @@
 /**
- * File-event hooks for one running session (plans/acp-agent-host.md; `.neore/hooks.json`).
+ * File-event hooks for one running session (acp-agent-host.md; `.neore/hooks.json`).
  *
  * The hooks file is repository content, so everything here is built to do as little as possible with it.
  *
@@ -19,11 +19,12 @@
  */
 import path from "node:path";
 
+import { showHidden } from "@neore/ai/utils";
+
 import type { HookApprovals } from "./approvals";
 import { HOOKS_PATH, loadHooksFile } from "./file";
 import type { HookFs } from "./fs";
 import { compileGlob } from "./glob";
-import { showHidden } from "./hidden-text";
 import type { Hook } from "./schema";
 import type { HooksView, HookView } from "./types";
 
@@ -85,7 +86,7 @@ const ignored = (relative: string): boolean => {
 };
 
 /** One name as a quoted string, hidden characters shown as `?` and the length capped: a line that can only be data. */
-const listedPath = (relative: string): string => JSON.stringify(showHidden(relative).slice(0, MAX_PATH_CHARS));
+const listedPath = (relative: string): string => JSON.stringify(showHidden(relative, { strict: true }).slice(0, MAX_PATH_CHARS));
 
 /** A fence longer than any run of `~` in the content, so nothing inside can close it. */
 const fenceFor = (lines: string[]): string => {

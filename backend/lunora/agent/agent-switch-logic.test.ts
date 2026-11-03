@@ -29,7 +29,7 @@ describe("agentSwitchOf", () => {
 
     it("reads a marker that does not check as no switch, rather than guessing", () => {
         expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { to: "b" } } })).toBeUndefined();
-        expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { ...part("a", "b"), mode: "native" } } })).toBeUndefined();
+        expect(agentSwitchOf({ providerMetadata: { [AGENT_SWITCH_KEY]: { ...part("a", "b"), mode: "restart" } } })).toBeUndefined();
     });
 });
 
@@ -43,7 +43,7 @@ describe("lastAgentSwitch", () => {
     it("takes the newest switch of a path that is listed newest first", () => {
         const rows = [{}, agentSwitchRowContent(part("b", "c")), {}, agentSwitchRowContent(part("a", "b"))];
 
-        expect(lastAgentSwitch(rows)?.to.model).toBe("c");
+        expect(lastAgentSwitch(rows)?.to).toEqual({ kind: "model", model: "c" });
         expect(lastAgentSwitch([{}, {}])).toBeUndefined();
     });
 });

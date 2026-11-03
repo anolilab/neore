@@ -65,7 +65,7 @@ export const ensureTemplateSkills = async (
                 if (!link) {
                     await ctx.db.insert("userSkills", { addedAt: now, autoRun: false, enabled: true, skillId: found._id, userId });
                 } else if (!link.enabled) {
-                    await ctx.db.patch(link._id, { enabled: true });
+                    await ctx.db.patch("userSkills", link._id, { enabled: true });
                 }
 
                 return found._id as string;

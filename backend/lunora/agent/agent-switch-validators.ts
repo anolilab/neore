@@ -10,7 +10,7 @@ import { v } from "lunorash/server";
 
 import { MAX_LENGTH } from "../lib/validators";
 
-/** A cloud model. The host variant `{ kind: "host", … }` joins this union with host switches. */
+/** A cloud model: what `threads.activeAgent` caches. A host agent never does; a host thread's agent is its session's. */
 export const vAgentRef = v.object({
     kind: v.literal("model"),
     model: v.string().max(MAX_LENGTH.short),
@@ -19,11 +19,32 @@ export const vAgentRef = v.object({
 export type AgentRef = Infer<typeof vAgentRef>;
 
 /**
+ * A coding agent on a paired computer, in one folder: the triple a session is bound to, plus the two labels the
+ * divider shows (never a path or a command line, which stay on the desktop).
+ */
+export const vHostAgentRef = v.object({
+    agentKey: v.string().max(128),
+    agentLabel: v.string().max(MAX_LENGTH.short),
+    folderId: v.string().max(128),
+    folderLabel: v.string().max(MAX_LENGTH.short),
+    hostId: v.string().max(MAX_LENGTH.id),
+    kind: v.literal("host"),
+});
+
+export type HostAgentRef = Infer<typeof vHostAgentRef>;
+
+/** Either side of a divider: a cloud model or a host agent. */
+export const vSwitchAgentRef = v.union(vAgentRef, vHostAgentRef);
+
+export type SwitchAgentRef = Infer<typeof vSwitchAgentRef>;
+
+/**
  * What the new agent was given. `full`: the whole active path, as before the switch.
  * `portable`: the stored handoff in place of everything before the divider. `delta`: what the agent
- * saw before it left, then the stored handoff of what happened since, then the turns after.
+ * saw before it left, then the stored handoff of what happened since, then the turns after. `native`: the same coding
+ * agent loads its own saved session (harness switch S4); the portable handoff is stored too, for the fallback.
  */
-export const vAgentSwitchMode = v.union(v.literal("full"), v.literal("portable"), v.literal("delta"));
+export const vAgentSwitchMode = v.union(v.literal("full"), v.literal("portable"), v.literal("delta"), v.literal("native"));
 
 /**
  * Longest handoff a divider may store, in characters. The budget (`agent/handoff.ts`) is far below it;
@@ -38,12 +59,20 @@ export const HANDOFF_MAX_CHARACTERS = 80_000;
  * summary of older turns, for the divider's note.
  */
 export const vAgentSwitch = v.object({
-    from: vAgentRef,
+    // What a `native` reattach is sent with its first prompt: the turns since the agent left, which its own session lacks.
+    catchUp: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
+    // Why a `native` reattach became `portable`, as a code the transcript words in the reader's language: the agent failed to
+    // load the saved session (`load_failed`), does not load saved sessions (`load_unsupported`), opened a session without
+    // saying it loaded one (`not_reattached`, a computer from before reattach), or opened one under another id (`other_session`).
+    fallbackReason: v.optional(v.union(v.literal("load_failed"), v.literal("load_unsupported"), v.literal("not_reattached"), v.literal("other_session"))),
+    from: vSwitchAgentRef,
     handoff: v.optional(v.string().max(HANDOFF_MAX_CHARACTERS)),
     mode: vAgentSwitchMode,
     startMessageId: v.string().max(MAX_LENGTH.id),
     summarized: v.optional(v.boolean()),
-    to: vAgentRef,
+    to: vSwitchAgentRef,
 });
 
 export type AgentSwitchPart = Infer<typeof vAgentSwitch>;
+
+export type ReattachFallbackReason = NonNullable<AgentSwitchPart["fallbackReason"]>;

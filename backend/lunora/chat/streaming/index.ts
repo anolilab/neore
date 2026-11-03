@@ -14,6 +14,7 @@ import { optionalAuthQuery } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
+import { discardPausedThreadSecrets } from "../lib/secret-requests";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
 
 /**
@@ -104,7 +105,7 @@ export const getStreamBody = optionalAuthQuery
     .query(async ({ args: input, ctx }) => {
         // Decided on the stream's THREAD (which admits it), so the stream row is
         // found by its thread id first — row-level security hides it until then.
-        const threadId = await parentKeyOf(ctx, input.streamId, "threadId");
+        const threadId = await parentKeyOf(ctx, "persistentStreams", input.streamId, "threadId");
         const access = threadId ? await resolveThreadReadAccess(ctx, threadId as Id<"threads">, ctx.user?.userId, input.unlockProof) : null;
 
         if (!access) {
@@ -149,6 +150,9 @@ export const createStreamWithMessage = internalMutation
             await endActiveGoals(context, threadId as Id<"threads">, "superseded");
         }
 
+        // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
+        await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
+
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,
             streamingConfig,
@@ -161,7 +165,7 @@ export const createStreamWithMessage = internalMutation
         // enqueueing the run — one more round trip before the client could
         // start streaming, and, on the one-at-a-time scheduler, able to land
         // AFTER a short run had already set the thread back to `active`.
-        const thread = await context.db.get(threadId as Id<"threads">);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         if (thread) {
             await patchThread(context.db, thread._id, { status: "running", updatedAt: context.now });
@@ -243,14 +247,16 @@ export const getActiveStreamForThread = optionalAuthQuery
             streamId: stream._id,
             ...(delivered.length > 0 && { deliveredSteerIds: delivered }),
             ...(stream.hostState !== undefined && { hostState: stream.hostState }),
-            ...(stream.pause && {
-                pause: {
-                    ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
-                    reason: stream.pause.reason,
-                    retryAt: stream.pause.retryAt,
-                    status: stream.pause.status,
-                },
-            }),
+            // Only a rate-limit wait is shown (and offers "Retry now"); an interrupted run's resume is queued at once.
+            ...(stream.pause &&
+                stream.pauseCause === undefined && {
+                    pause: {
+                        ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
+                        reason: stream.pause.reason,
+                        retryAt: stream.pause.retryAt,
+                        status: stream.pause.status,
+                    },
+                }),
         };
     });
 

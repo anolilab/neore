@@ -106,6 +106,29 @@ describe("parseHooks", () => {
             expect(parseHooks(textOf("name", String.raw`\t`)).ok).toBe(false);
         });
 
+        it("refuses a zero width joiner or non-joiner in a name, a glob and a prompt: the file is repository content", () => {
+            for (const joiner of [String.raw`\u200d`, String.raw`\u200c`]) {
+                expect(parseHooks(textOf("name", joiner)).ok).toBe(false);
+                expect(parseHooks(textOf("glob", joiner)).ok).toBe(false);
+                expect(parseHooks(textOf("prompt", joiner)).ok).toBe(false);
+            }
+        });
+
+        it("takes an ordinary emoji (a base and one U+FE0F) in a prompt and a name", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f check`)).ok).toBe(true);
+            expect(parseHooks(textOf("name", String.raw`\u2714\ufe0f`)).ok).toBe(true);
+        });
+
+        it("refuses a selector run or a selector after a letter in a prompt", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f\ufe0f`)).ok).toBe(false);
+            expect(parseHooks(textOf("prompt", String.raw`a\ufe0f`)).ok).toBe(false);
+            expect(parseHooks(textOf("prompt", String.raw`\u26a0\ufe0f\u200d\ud83d\udd25`)).ok).toBe(false);
+        });
+
+        it("refuses a flag tag in a prompt", () => {
+            expect(parseHooks(textOf("prompt", String.raw`\ud83c\udff4\udb40\udc67\udb40\udc7f`)).ok).toBe(false);
+        });
+
         it("refuses them in a manual hook too", () => {
             const text = JSON.stringify({ hooks: [{ id: "m", name: "M", on: "manual", prompt: "x@@" }], version: 1 }).replace("@@", String.raw`\u202e`);
 

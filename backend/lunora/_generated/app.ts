@@ -2,7 +2,7 @@
 // Run `lunora codegen` to regenerate.
 
 import type { AuthNamespaceLike, LunoraAuth, LunoraAuthOptions } from "@lunora/auth";
-import { authDiscoveryPathsFor, createAuth, createAuthAdmin, createAuthAuditReader, createDoAuthWiring, d1Executor, handleAuthDiscoveryRequest, handleAuthRequest, lunoraD1Adapter } from "@lunora/auth";
+import type * as LunoraAuthModule from "./authModule.js";
 import type { D1CtxDbOptions, D1DatabaseLike, D1Exec } from "@lunora/d1";
 import { applyCdcChanges, createD1CtxDb, emitD1QueryCost, exportGlobalRows, facetGlobalColumn, importGlobalRows, listGlobalTables, readD1CdcChanges, readGlobalTablePage, retryingExec } from "@lunora/d1";
 import { createKvIntrospectorFromEnv } from "@lunora/bindings/kv";
@@ -12,17 +12,14 @@ import { createScheduler } from "@lunora/scheduler";
 import type { R2BucketLike, R2S3Credentials, Storage } from "@lunora/storage";
 import { createBucketStorage, createStorage } from "@lunora/storage";
 import { createWorkflowsRestClient } from "@lunora/workflow";
-import type { ExecutionContextLike, GlobalIntrospector, HttpRouterLike, LunoraWorker, Route, ScheduledControllerLike, ShardingInfo, ShardNamespaceLike, TriggerTrace, WorkerOptions } from "lunorash/runtime";
-import { createCrossShardRelationCapabilities, createDynamicShardRegistry, createQueryCoordinator, createWorker, resolveLogArchiveFromEnv, memoizeIdentity } from "lunorash/runtime";
+import type { ExecutionContextLike, GlobalIntrospector, HttpRouterLike, LunoraWorker, Route, ScheduledControllerLike, ShardingInfo, ShardNamespaceLike, ShardRegistryRpc, TriggerTrace, WorkerOptions } from "lunorash/runtime";
+import { createCrossShardRelationCapabilities, createDynamicShardRegistry, createQueryCoordinator, createWorker, declareAppJurisdiction, resolveLogArchiveFromEnv, memoizeIdentity } from "lunorash/runtime";
 
 import schema from "../schema.js";
 import notifyConfig from "../notify.js";
 import { LUNORA_CRONS } from "./crons.js";
 import { LUNORA_FUNCTIONS } from "./functions.js";
 import { createQueueCaptureSink, dispatchQueueBatch, shouldCaptureQueue } from "@lunora/queue";
-import { LUNORA_QUEUE_REGISTRY } from "./queues.js";
-import { architecture } from "./architecture.js";
-import { openApiSpec } from "./openapi.js";
 import { createShardDO } from "./shard.js";
 import { LUNORA_VECTOR_INDEXES } from "./vectors.js";
 
@@ -34,6 +31,30 @@ type ShardConfig = NonNullable<Parameters<typeof createShardDO>[0]>;
 
 /** The identity memo per `env` object, owned by one assembled worker. */
 type IdentityMemoStore = WeakMap<object, ReturnType<typeof memoizeIdentity>>;
+
+/** What the worker reads only once a request arrives: loaded then, not at isolate startup (Cloudflare caps startup at 1 s of CPU). */
+interface DeferredModules {
+    architecture: unknown;
+    auth: typeof LunoraAuthModule;
+    openApiSpec: unknown;
+}
+
+let deferredModules: Promise<DeferredModules> | undefined;
+
+/** Loads {@link DeferredModules} once per isolate; every entry that builds the worker awaits it first. */
+const loadDeferredModules = (): Promise<DeferredModules> =>
+    (deferredModules ??= (async (): Promise<DeferredModules> => {
+        return {
+            architecture: (await import("./architecture.js")).architecture,
+            auth: await import("./authModule.js"),
+            openApiSpec: (await import("./openapi.js")).openApiSpec,
+        };
+    })());
+
+// Module scope, so every isolate loading this script (the worker and each Durable
+// Object class it exports) knows the schema's jurisdiction before a request runs.
+// `@lunora/mail` reads it to pin its shard RPC like every other DO path.
+declareAppJurisdiction("eu");
 
 /** `.storage(...)` declaration — one bucket (required) plus optional extra named buckets and signed-URL config. Backs `ctx.storage` AND the studio file browser. */
 interface StorageDeclaration<Env> {
@@ -92,6 +113,7 @@ interface ComposedApp extends LunoraWorker {
  * first request so per-isolate singletons are built once.
  */
 class AppBuilder<Env extends object> {
+    private adminRevocationsSelector?: Selector<Env, ShardNamespaceLike>;
     private adminToken?: Selector<Env, string>;
     private authDeclaration?: AuthDeclaration<Env>;
     private cdcEnabled = false;
@@ -106,7 +128,7 @@ class AppBuilder<Env extends object> {
     private readonly routeMap: Record<string, Route> = {};
     private schedulerDeclaration?: SchedulerDeclaration<Env>;
     private readonly shardExtras: Partial<ShardConfig> = {};
-    private shardRegistrySelector?: Selector<Env, ShardNamespaceLike>;
+    private shardRegistrySelector?: Selector<Env, ShardNamespaceLike | ShardRegistryRpc>;
     private shardSelector?: Selector<Env, ShardNamespaceLike>;
     private storageDeclaration?: StorageDeclaration<Env>;
 
@@ -248,8 +270,15 @@ class AppBuilder<Env extends object> {
         return this;
     }
 
+    /** The `AdminRevocationDO` namespace (typically `env.ADMIN_REVOCATIONS`). Records revoked named admin tokens where a point-in-time restore of the default shard cannot rewind them. Without it no named admin token can be created and any that exist are refused. */
+    public adminRevocations(selector: Selector<Env, ShardNamespaceLike>): this {
+        this.adminRevocationsSelector = selector;
+
+        return this;
+    }
+
     /** The `ShardRegistryDO` namespace (typically `env.SHARD_REGISTRY`). Each shard registers itself for the `.shardBy()` tables it writes, and cross-shard export, CDC sync and migrations fan out to the shards it lists. Without it they refuse a `.shardBy()` table. */
-    public shardRegistry(selector: Selector<Env, ShardNamespaceLike>): this {
+    public shardRegistry(selector: Selector<Env, ShardNamespaceLike | ShardRegistryRpc>): this {
         this.shardRegistrySelector = selector;
 
         return this;
@@ -292,7 +321,7 @@ class AppBuilder<Env extends object> {
             ...(this.relationExistsPushDownMode === undefined ? {} : { relationExistsPushDown: this.relationExistsPushDownMode }),
             ...(this.globalDeclaration
                 ? {
-                      d1: (rawEnv: Record<string, unknown>, request?: { bookmark?: string; cdc?: boolean; cdcRetentionMs?: number; identity?: Record<string, unknown>; onBookmark?: (bookmark: string | undefined) => void; userId?: string | null }) => {
+                      d1: (rawEnv: Record<string, unknown>, request?: { bookmark?: string; cdc?: boolean; cdcRetentionMs?: number; identity?: Record<string, unknown> | undefined; onBookmark?: (bookmark: string | undefined) => void; userId?: string | null | undefined }) => {
                           const env = rawEnv as Env;
                           const database = this.globalDeclaration?.d1(env);
 
@@ -303,9 +332,13 @@ class AppBuilder<Env extends object> {
                           const origin = this.globalDeclaration?.origin?.(env);
                           const crossShard = origin
                               ? createCrossShardRelationCapabilities({
-                                    ...(request?.identity === undefined ? {} : { identity: request.identity }),
+                                    get identity() {
+                                        return request?.identity;
+                                    },
                                     origin,
-                                    ...(request?.userId == null ? {} : { userId: request.userId }),
+                                    get userId() {
+                                        return request?.userId ?? undefined;
+                                    },
                                 })
                               : undefined;
 
@@ -313,7 +346,17 @@ class AppBuilder<Env extends object> {
                               ...(crossShard ? { crossShardCounter: crossShard.crossShardCounter, crossShardReader: crossShard.crossShardReader } : {}),
                               ...(this.schedulerDeclaration ? { scheduler: this.resolveScheduler(env) as unknown as D1CtxDbOptions["scheduler"] } : {}),
                               ...(request?.cdcRetentionMs === undefined ? {} : { cdcRetentionMs: request.cdcRetentionMs }),
-                              auth: { identity: request?.identity ?? null, userId: request?.userId ?? null },
+                              // Getters, like the cross-shard identity above: reading the
+                              // request's caller marks the live query as caller-dependent, so
+                              // it may happen only when a `.serverDefault` column is stamped.
+                              auth: {
+                                  get identity() {
+                                      return request?.identity ?? null;
+                                  },
+                                  get userId() {
+                                      return request?.userId ?? null;
+                                  },
+                              },
                               // Forwarded from the shard's own `cdc` config, so ONE
                               // switch governs both changelogs. Built without it, the
                               // global `__cdc_log` is never written and the shape
@@ -345,8 +388,8 @@ class AppBuilder<Env extends object> {
         let worker: LunoraWorker | null = null;
         let auth: LunoraAuth | null = null;
         let authInit: Promise<void> | null = null;
-        // One memo per env for THIS assembled worker: a framework-hosted worker rebuilds its options per
-        // request and must reuse it, but a second `assemble()` has its own auth closure and must not share.
+        // One memo per env for THIS assembled worker: every worker it builds reuses it, but a second
+        // `assemble()` has its own auth closure and must not share.
         const identityMemos: IdentityMemoStore = new WeakMap();
 
         const initAuth = async (env: Env): Promise<void> => {
@@ -378,6 +421,7 @@ class AppBuilder<Env extends object> {
             // On a first boot against an unmigrated database this means better-auth's
             // eager schema check runs BEFORE the migration, so one
             // "the auth tables do not match…" line on a cold start is expected.
+            const { createAuth, lunoraD1Adapter } = (await loadDeferredModules()).auth;
             const requestAuth = createAuth({ ...this.authDeclaration.options(env), database: lunoraD1Adapter(d1(env) as never) });
 
             // Loaded on first request, not at module evaluation: the migrator pulls in kysely and
@@ -401,31 +445,49 @@ class AppBuilder<Env extends object> {
                 throw error;
             }));
 
-        const buildWorker = (env: Env): LunoraWorker => createWorker(this.buildWorkerOptions(env, () => auth, identityMemos));
+        // For host-owned events (cron, queue, mail), which must not go down with auth. The failure is
+        // logged each time: auth retries on the next event, and an isolate that only ever sees these
+        // would otherwise repeat it with nothing saying why the admin and auth surfaces are missing.
+        const authReady = (env: Env): Promise<boolean> =>
+            ensureAuth(env).then(
+                () => true,
+                (error: unknown) => {
+                    console.error("[lunora] auth failed to initialise; this event runs without auth:", error);
+
+                    return false;
+                },
+            );
+
+        const buildWorker = (env: Env, deferred: DeferredModules): LunoraWorker => createWorker(this.buildWorkerOptions(env, () => auth, identityMemos, deferred));
 
         const composed: ComposedApp = {
             ShardDO,
             fetch: async (request: Request, rawEnv: unknown, context: ExecutionContextLike): Promise<Response> => {
                 const env = rawEnv as Env;
+                const deferred = await loadDeferredModules();
                 await ensureAuth(env);
-                worker ??= buildWorker(env);
+                worker ??= buildWorker(env, deferred);
 
                 return worker.fetch(request, rawEnv, context);
             },
             scheduled: async (controller: ScheduledControllerLike, rawEnv: unknown, context: ExecutionContextLike): Promise<void> => {
-                worker ??= buildWorker(rawEnv as Env);
+                const deferred = await loadDeferredModules();
+                const target = (await authReady(rawEnv as Env)) ? (worker ??= buildWorker(rawEnv as Env, deferred)) : buildWorker(rawEnv as Env, deferred);
 
-                return worker.scheduled(controller, rawEnv, context);
+                return target.scheduled(controller, rawEnv, context);
             },
-            serverQuery: (request, rawEnv, reference, args, options) => {
-                worker ??= buildWorker(rawEnv as Env);
+            serverQuery: async (request, rawEnv, reference, args, options) => {
+                const deferred = await loadDeferredModules();
+                await ensureAuth(rawEnv as Env);
+                worker ??= buildWorker(rawEnv as Env, deferred);
 
                 return worker.serverQuery(request, rawEnv, reference, args, options);
             },
             queue: async (batch: unknown, rawEnv: unknown, context: ExecutionContextLike): Promise<void> => {
-                worker ??= buildWorker(rawEnv as Env);
+                const deferred = await loadDeferredModules();
+                const target = (await authReady(rawEnv as Env)) ? (worker ??= buildWorker(rawEnv as Env, deferred)) : buildWorker(rawEnv as Env, deferred);
 
-                return worker.queue?.(batch, rawEnv, context);
+                return target.queue?.(batch, rawEnv, context);
             },
         };
 
@@ -442,7 +504,7 @@ class AppBuilder<Env extends object> {
     private resolveScheduler(env: Env): ReturnType<typeof createScheduler> | undefined {
         const namespace = this.schedulerDeclaration?.namespace(env);
 
-        return namespace ? createScheduler({ namespace }) : undefined;
+        return namespace ? createScheduler({ jurisdiction: "eu", namespace }) : undefined;
     }
 
     /**
@@ -555,18 +617,22 @@ class AppBuilder<Env extends object> {
     }
 
     /** Fan the recorded declarations into the worker-side `createWorker` options. */
-    private buildWorkerOptions(env: Env, getAuth: () => LunoraAuth | null, identityMemos: IdentityMemoStore): WorkerOptions {
+    private buildWorkerOptions(env: Env, getAuth: () => LunoraAuth | null, identityMemos: IdentityMemoStore, deferred: DeferredModules): WorkerOptions {
         const options: WorkerOptions = {
+            aiChatBinding: (env as Record<string, unknown>)["AI"] as WorkerOptions["aiChatBinding"],
+            aiOptInLevel: (env as Record<string, unknown>)["LUNORA_AI_OPT_IN"] as WorkerOptions["aiOptInLevel"],
             cronJobs: LUNORA_CRONS,
             functions: LUNORA_FUNCTIONS,
-            architecture,
-            openApiSpec,
-            queue: (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
-                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], LUNORA_QUEUE_REGISTRY, {
+            jurisdiction: "eu",
+            architecture: deferred.architecture,
+            openApiSpec: deferred.openApiSpec,
+            queue: async (batch: unknown, queueEnv: unknown, _context: ExecutionContextLike, trigger: TriggerTrace, _live: Parameters<typeof dispatchQueueBatch>[2]["live"], queueFetch: Parameters<typeof dispatchQueueBatch>[2]["fetchImpl"]): Promise<void> =>
+                dispatchQueueBatch(batch as Parameters<typeof dispatchQueueBatch>[0], (await import("./queues.js")).LUNORA_QUEUE_REGISTRY, {
                     capture: shouldCaptureQueue(queueEnv as Record<string, unknown>)
-                        ? createQueueCaptureSink(queueEnv as Record<string, unknown>)
+                        ? createQueueCaptureSink(queueEnv as Record<string, unknown>, { jurisdiction: "eu" })
                         : undefined,
                     env: queueEnv as Record<string, unknown>,
+                    holdSeconds: trigger.holdSeconds,
                     traceparent: trigger.traceparent,
                     fetchImpl: queueFetch,
                 }),
@@ -648,6 +714,7 @@ class AppBuilder<Env extends object> {
             ["notifications", { mode: { field: "userId", kind: "shardBy" } }],
             ["oauthStates", { mode: { field: "userId", kind: "shardBy" } }],
             ["organization", { mode: { kind: "global" } }],
+            ["organizationPolicies", { mode: { kind: "global" } }],
             ["outcomeEmails", { mode: { field: "userId", kind: "shardBy" } }],
             ["pageAccess", { mode: { kind: "global" } }],
             ["pageComments", { mode: { field: "userId", kind: "shardBy" } }],
@@ -667,6 +734,7 @@ class AppBuilder<Env extends object> {
             ["promptHistory", { mode: { kind: "global" } }],
             ["prompts", { mode: { kind: "global" } }],
             ["pullRequestGuides", { mode: { field: "userId", kind: "shardBy" } }],
+            ["pullRequestThreads", { mode: { field: "userId", kind: "shardBy" } }],
             ["rateLimit", { mode: { kind: "global" } }],
             ["rateLimits", { mode: { kind: "root" } }],
             ["requestedSecrets", { mode: { field: "userId", kind: "shardBy" } }],
@@ -734,7 +802,13 @@ class AppBuilder<Env extends object> {
         const shardRegistry = this.shardRegistrySelector?.(env);
 
         if (shardRegistry) {
-            options.queryCoordinator = createQueryCoordinator({ registry: createDynamicShardRegistry({ namespace: shardRegistry }) });
+            options.queryCoordinator = createQueryCoordinator({ registry: createDynamicShardRegistry({ jurisdiction: "eu", env, namespace: shardRegistry }) });
+        }
+
+        const adminRevocations = this.adminRevocationsSelector?.(env);
+
+        if (adminRevocations) {
+            options.adminRevocations = adminRevocations;
         }
 
         if (this.schedulerDeclaration) {
@@ -760,6 +834,12 @@ class AppBuilder<Env extends object> {
                 // plane: the rows `resolveTableSharding` classifies as `.global()`
                 // land here, and without it they are reported, not written.
                 options.importGlobals = buildGlobalImporter(database, this.cdcEnabled);
+                // The importer above skips the write for a dry run, overwrites an
+                // existing `_id` under `onConflict: "replace"`, and removes the row
+                // an `op: "delete"` row names.
+                options.importGlobalsSupportsDryRun = true;
+                options.importGlobalsSupportsReplace = true;
+                options.importGlobalsSupportsDelete = true;
                 // The read/replay half of the same admin plane. Each one is the
                 // only reason its endpoint can see the global storage plane at
                 // all, and every one of them fails SILENTLY when unset — export
@@ -811,6 +891,7 @@ class AppBuilder<Env extends object> {
         // Captured before the branch so the narrowing survives — reading
         // `this.authDeclaration.namespace` again below would be optional all over again.
         const authDeclaration = this.authDeclaration;
+        const { authDiscoveryPathsFor, createAuthAdmin, createAuthAuditReader, createDoAuthWiring, d1Executor, handleAuthDiscoveryRequest, handleAuthRequest, resolveSessionIdentity } = deferred.auth;
         const authNamespace = authDeclaration?.namespace;
         const authD1 = authDeclaration?.d1;
 
@@ -828,8 +909,8 @@ class AppBuilder<Env extends object> {
                 // The OAuth discovery documents (an `mcp()` resource's metadata, the
                 // issuer's) are derived here from the declared options, so the worker
                 // forwards only those exact paths and no other probe reaches the object.
-                // Memoised on the declaration: a framework-hosted worker rebuilds these
-                // options per request, and `options(env)` rebuilds every plugin.
+                // Memoised on the declaration: each worker built for a new `env` runs
+                // these options again, and `options(env)` rebuilds every plugin.
                 discoveryPaths,
                 internalSecret,
                 namespace,
@@ -869,39 +950,11 @@ class AppBuilder<Env extends object> {
                     return null;
                 }
 
-                const session = await auth.api.getSession({ headers: (request as Request).headers });
-
-                if (!session?.user?.id) {
-                    return null;
-                }
-
-                // `role` rides along so `rls(policies, { roles })` and `auth.can(...)`
-                // work on this wiring without a hand-written resolver. better-auth's
-                // `admin()` plugin owns that column (comma-joined for multiple roles)
-                // and only an administrator can write it; it is absent when the plugin
-                // is off, which reads as no roles.
-                //
-                // `expiresAtMs` is the socket credential expiry the runtime forwards
-                // as `x-lunora-identity-exp`. Without it the DO's expiry check never
-                // fires, so a signed-out, banned or lapsed user keeps streaming their
-                // RLS-scoped rows over an already-open WebSocket while every HTTP call
-                // is anonymous. better-auth hands back a `Date`; anything else means
-                // the adapter did not hydrate it, and omitting beats guessing.
-                const expiresAt = session.session.expiresAt;
-                // `email` and `name` are the claims `ctx.auth.getIdentity()` is
-                // documented to carry ("email, name, roles, custom claims"). Without
-                // them the documented `me` query — `identity?.email` — resolves
-                // `undefined` on the built-in wiring. Empty strings are dropped so an
-                // absent claim reads as absent rather than as "".
-                const user = session.user as { email?: unknown; name?: unknown; role?: unknown };
-
-                return {
-                    ...(typeof user.email === "string" && user.email.length > 0 ? { email: user.email } : {}),
-                    ...(expiresAt instanceof Date ? { expiresAtMs: expiresAt.getTime() } : {}),
-                    ...(typeof user.name === "string" && user.name.length > 0 ? { name: user.name } : {}),
-                    role: user.role,
-                    userId: session.user.id,
-                };
+                // `resolveSessionIdentity` is shared with the DO wiring, so both modes put
+                // the same claims (role, expiry, profile, and the active organization and
+                // team checked against membership) on the identity, and it is unit-tested
+                // where this template cannot be.
+                return resolveSessionIdentity(auth, (request as Request).headers);
             };
             const authInstance = getAuth();
 
@@ -993,6 +1046,8 @@ class AppBuilder<Env extends object> {
             options.resolveIdentity = memo;
         }
 
+        options.agentWorkflows = [];
+
         for (const fn of this.extendFns) {
             Object.assign(options, fn(env, { ...options }));
         }
@@ -1024,22 +1079,14 @@ class AppBuilder<Env extends object> {
  * deployed; the dashboard's own metric is per-database and can't name the query.
  * The emit is best-effort — instrumentation must never fail a served query.
  */
-const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
+const buildSessionExec = (database: D1DatabaseLike, constraint: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
     // Real D1 always exposes `withSession`; guarded the same way as `batch`
     // below so a hand-rolled test double that omits it keeps working via
-    // `prepare()` straight on the raw binding — today's behaviour. With no
-    // inbound bookmark, `"first-unconstrained"` is the documented no-op
-    // equivalent (lowest latency, may read any replica) — see `D1Client.withSession`.
-    const session = typeof database.withSession === "function" ? database.withSession(bookmark ?? "first-unconstrained") : undefined;
+    // `prepare()` straight on the raw binding — today's behaviour. `constraint`
+    // is the Sessions API constraint the session opens with (see `buildExec`).
+    const session = typeof database.withSession === "function" ? database.withSession(constraint) : undefined;
     const target = session ?? database;
     const batchFn = target.batch;
-    const meter = (sql: string, meta: Record<string, unknown> | undefined): void => {
-        try {
-            emitD1QueryCost(sql, meta);
-        } catch {
-            // Best-effort: never let cost accounting fail the query it measures.
-        }
-    };
 
     return retryingExec({
         all: async (sql, parameters) => {
@@ -1111,6 +1158,56 @@ const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bo
     });
 };
 
+const meter = (sql: string, meta: Record<string, unknown> | undefined): void => {
+    try {
+        emitD1QueryCost(sql, meta);
+    } catch {
+        // Best-effort: never let cost accounting fail the query it measures.
+    }
+};
+
+/**
+ * The primary exec, for a read that must see every committed write (a policy check on a write
+ * path). Every statement opens its own `"first-primary"` session, and so does every retry:
+ * that constraint covers only a session's first read, so one session shared by two reads, or by
+ * a retry, can serve the later read from a replica that has not caught up. It reports no
+ * bookmark: the sink keeps the last value it is given, and a later replica read reports an older
+ * one, which would move the client's bookmark backwards.
+ */
+const buildPrimaryExec = (database: D1DatabaseLike): D1Exec => {
+    const statement = (sql: string, parameters: ReadonlyArray<unknown>) =>
+        (typeof database.withSession === "function" ? database.withSession("first-primary") : database).prepare(sql).bind(...parameters);
+
+    return retryingExec({
+        all: async (sql, parameters) => {
+            const result = await statement(sql, parameters).all<Record<string, unknown>>();
+
+            meter(sql, result.meta);
+
+            return result.results;
+        },
+        run: async (sql, parameters) => {
+            const result = await statement(sql, parameters).run();
+
+            meter(sql, result.meta);
+        },
+    });
+};
+
+/**
+ * The replica exec reads at the caller's bookmark, or `"first-unconstrained"` (lowest latency,
+ * any replica) without one. `primary` is the per-statement primary exec (see `buildPrimaryExec`).
+ */
+const buildExec = (database: D1DatabaseLike, bookmark?: string, onBookmark?: (bookmark: string | undefined) => void): D1Exec => {
+    const replica = buildSessionExec(database, bookmark ?? "first-unconstrained", onBookmark);
+
+    if (typeof database.withSession !== "function") {
+        return replica;
+    }
+
+    return { ...replica, primary: buildPrimaryExec(database) };
+};
+
 /** Introspect `.global()` (D1-backed) tables for the studio's global data browser. */
 const buildGlobalIntrospector = (database: D1DatabaseLike): GlobalIntrospector => {
     const exec = buildExec(database);
@@ -1135,19 +1232,23 @@ const buildGlobalIntrospector = (database: D1DatabaseLike): GlobalIntrospector =
  * shard-local ones it filtered out before calling here — a single
  * `startLine` plus positional counting would mis-attribute every row after
  * the first gap. `importGlobalRows` prefers `row.line` when present and
- * falls back to the position-derived count otherwise.
+ * falls back to the position-derived count otherwise. A dry run is passed through and writes nothing;
+ * `onConflict: "replace"` overwrites a row whose `_id` already exists instead of reporting a conflict, and a row's
+ * `op: "delete"` removes the stored row it names.
  */
 const buildGlobalImporter =
     (database: D1DatabaseLike, cdc: boolean) =>
-    (request: { rows: ReadonlyArray<{ doc: Record<string, unknown>; line: number; table: string }>; startLine?: number }) => {
+    (request: { dryRun?: boolean; onConflict?: "replace" | "skip"; rows: ReadonlyArray<{ doc: Record<string, unknown>; line: number; op?: "delete"; table: string }>; startLine?: number }) => {
         const exec = buildExec(database);
         // Same reason the PITR applier carries it: a bulk import that skips the
         // changelog restores rows no downstream consumer is ever told about.
         const writer = createD1CtxDb({ cdc, exec, schema: schema as unknown as D1CtxDbOptions["schema"] });
 
         return importGlobalRows(writer, schema as unknown as D1CtxDbOptions["schema"], {
+            dryRun: request.dryRun === true,
             exec,
-            rows: request.rows.map((row) => ({ doc: row.doc, line: row.line, table: row.table })),
+            onConflict: request.onConflict ?? "skip",
+            rows: request.rows.map((row) => ({ doc: row.doc, line: row.line, ...(row.op === undefined ? {} : { op: row.op }), table: row.table })),
             ...(request.startLine === undefined ? {} : { startLine: request.startLine }),
         });
     };
@@ -1236,8 +1337,8 @@ interface LunoraConfig<Env extends object = object> {
     advisor?: { accept?: ReadonlyArray<{ exportName: string; file: string; reason: string; rule: string }>; minSeverity?: "error" | "info" | "warn" };
     /** Receives this project's `defineApp()` builder and returns it — where a Vite-first app makes the builder calls its generated entry cannot derive. */
     app?: (app: AppBuilder<Env>) => AppBuilder<Env>;
-    /** Codegen's source walk. `exclude` adds globs (relative to `lunora/`, e.g. `"seed/**"`) to skip on top of the built-in test-file patterns. A literal array of strings, for the same reason as `target`. */
-    codegen?: { exclude?: string[] };
+    /** Codegen settings. `exclude` adds globs (relative to `lunora/`, e.g. `"seed/**"`) to skip on top of the built-in test-file patterns. `lazyFunctions: true` emits the per-module lazy function registry for every command and bundler plugin that generates or checks `_generated/`. Literals, for the same reason as `target`. */
+    codegen?: { exclude?: string[]; lazyFunctions?: boolean };
     /** Host the shard, scheduler and shard registry in ONE Durable Object class (`merge: true`, plan 462) — before the first deploy only. A literal, for the same reason as `target`. */
     durableObjects?: { merge?: boolean };
     /** Opt into remote-binding dev without `--remote` or `LUNORA_REMOTE` on every run. A literal, for the same reason as `target`. */

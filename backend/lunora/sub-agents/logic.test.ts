@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     applyToolAllowlist,
     buildResultMessage,
+    resultContent,
     canNest,
     dispatchSourceProblem,
     originOfRun,
@@ -119,6 +120,18 @@ describe(buildResultMessage, () => {
     });
 });
 
+describe(resultContent, () => {
+    it("is plain text for a cloud run", () => {
+        expect(resultContent("**Sub-agent finished:** x", false)).toBe("**Sub-agent finished:** x");
+    });
+
+    it("marks the text of a run on a computer as the agent's own", () => {
+        expect(resultContent("**Sub-agent finished:** x", true)).toEqual([
+            { providerMetadata: { neore: { runner: "host" } }, text: "**Sub-agent finished:** x", type: "text" },
+        ]);
+    });
+});
+
 describe("buildResultMessage for a cancelled run", () => {
     it("tells the parent a running sub-agent's last step still ran and was billed", () => {
         const text = buildResultMessage({ childThreadId: "child-1", started: true, status: "cancelled", task: "Do it" });
@@ -126,6 +139,13 @@ describe("buildResultMessage for a cancelled run", () => {
         expect(text).toContain("**Sub-agent stopped:** Do it");
         expect(text).toContain("was billed");
         expect(text).toContain("/chat/child-1");
+    });
+
+    it("says a stopped run on a computer was not charged", () => {
+        const text = buildResultMessage({ hostRun: true, started: true, status: "cancelled", task: "Do it" });
+
+        expect(text).not.toContain("billed");
+        expect(text).toContain("not charged");
     });
 
     it("says a queued one never ran", () => {
@@ -280,6 +300,16 @@ describe(workerReapDecision, () => {
     it("fails a run quiet for the whole window, measured from its claim when it never wrote", () => {
         expect(workerReapDecision({ lastActivityAt: undefined, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toStrictEqual({ kind: "fail" });
         expect(workerReapDecision({ lastActivityAt: startedAt + 1, now: startedAt + SUB_AGENT_STALE_MS, run: running })).toMatchObject({ kind: "later" });
+    });
+
+    it("never fails a run that waits on a person's answer, however long it has been quiet", () => {
+        const now = startedAt + SUB_AGENT_STALE_MS * 5;
+
+        expect(workerReapDecision({ lastActivityAt: undefined, now, run: running, waitingOnPerson: true })).toStrictEqual({
+            delayMs: SUB_AGENT_STALE_MS,
+            kind: "later",
+        });
+        expect(workerReapDecision({ lastActivityAt: undefined, now, run: running, waitingOnPerson: false })).toStrictEqual({ kind: "fail" });
     });
 
     it("never reaps a queued run, or one that ended", () => {

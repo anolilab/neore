@@ -65,7 +65,7 @@ export const findPendingRequestOnLatestTurn = async (
     threadId: Id<"threads">,
     approvalId: string,
 ): Promise<{ input: unknown; toolCallId: string | null; toolName: string | null } | undefined> => {
-    const thread = await ctx.db.get(threadId);
+    const thread = await ctx.db.get("threads", threadId);
     // A branched thread's latest turn is the end of the path the user is on;
     // the newest rows in storage order may belong to a sibling branch.
     const recent = thread?.activeLeafMessageId
@@ -117,6 +117,12 @@ const canWriteThread = async (ctx: Pick<MutationCtx, "db">, thread: Doc<"threads
     return !!access && (access.permission === "write" || access.permission === "admin") && (!access.expiresAt || access.expiresAt >= Date.now());
 };
 
+/** `resolvedBy` of a request denied because the person walked away from the pause that held it (Stop, or a new message). */
+export const APPROVAL_ABANDONED_BY = "abandoned";
+
+/** `error.data.code` of the refusal to answer such a request; the card words it. */
+export const TOOL_REQUEST_ABANDONED = "TOOL_REQUEST_ABANDONED";
+
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
     args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads">; unlockProof?: string | null },
@@ -166,6 +172,13 @@ export const claimToolApproval = async (
         throw new LunoraError("NOT_FOUND", "This tool request can no longer be resumed");
     }
 
+    // Denied by walking away, not by an answer: nothing is waiting on it any more, so a late answer is refused rather than echoed.
+    if (run.status === "denied" && run.resolvedBy === APPROVAL_ABANDONED_BY) {
+        throw new LunoraError("CONFLICT", "This request was closed when the conversation moved on. Ask again in the chat", {
+            data: { code: TOOL_REQUEST_ABANDONED },
+        });
+    }
+
     if (run.status !== "pending") {
         return { kind: "already-resolved", status: run.status, streamId: run.streamId ?? null };
     }
@@ -176,7 +189,7 @@ export const claimToolApproval = async (
         throw new LunoraError("CONFLICT", "This tool request is no longer pending");
     }
 
-    await ctx.db.patch(run._id, {
+    await ctx.db.patch("toolApprovalRuns", run._id, {
         resolvedAt: Date.now(),
         resolvedBy: callerId,
         status: decision === "deny" ? "denied" : "approved",

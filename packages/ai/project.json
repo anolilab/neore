@@ -4,5 +4,13 @@
     "sourceRoot": "packages/ai/src",
     "projectType": "library",
     "tags": ["type:package"],
-    "implicitDependencies": []
+    "implicitDependencies": [],
+    "targets": {
+        "build": {
+            "outputs": ["{projectRoot}/dist/**/*"]
+        },
+        "build:prod": {
+            "outputs": ["{projectRoot}/dist/**/*"]
+        }
+    }
 }

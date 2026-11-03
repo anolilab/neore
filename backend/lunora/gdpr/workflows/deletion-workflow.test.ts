@@ -42,6 +42,7 @@ const workflowContext = () => {
     };
 
     return {
+        event: { instanceId: "instance-1" },
         params: PARAMS,
         run,
         step: {
@@ -369,5 +370,139 @@ describe("account deletion workflow: watched repositories", () => {
                 .filter((entry) => entry.ref === WATCHED)
                 .map((entry) => entry.dedupId),
         ).toEqual(first);
+    });
+});
+
+/**
+ * A context whose `run` honours `dedupId` the way the workflow runtime does: a seen id answers its cached result without
+ * running the effect. `ids` lists every keyed call, cached or not; `request` is the stored request the progress writes act on.
+ */
+const replayingContext = (
+    effects: string[],
+    cache: Map<string, unknown>,
+    unkeyed: string[],
+    options: { failOn?: string; ids?: string[]; instanceId?: string; request?: { progress: number; status: string } } = {},
+) => {
+    let inStep = false;
+    const request = options.request ?? { progress: 0, status: "pending" };
+
+    return {
+        event: { instanceId: options.instanceId ?? "instance-1" },
+        params: PARAMS,
+        run: async (reference: unknown, args: Record<string, unknown>, callOptions?: { dedupId?: string }) => {
+            const ref = refOf(reference);
+            const isProgress = ref === "gdpr_functions:updateRequestProgress";
+            const apply = (): unknown => {
+                if (ref === options.failOn) {
+                    throw new Error(`${ref} failed`);
+                }
+
+                if (!isProgress) {
+                    return { cursor: null, hasMore: false };
+                }
+
+                const from = args["fromStatus"] as string[] | undefined;
+
+                if (from !== undefined && !from.includes(request.status)) {
+                    return false;
+                }
+
+                request.status = (args["status"] as string | undefined) ?? request.status;
+                request.progress = (args["progress"] as number | undefined) ?? request.progress;
+
+                return true;
+            };
+
+            if (callOptions?.dedupId === undefined) {
+                if (inStep) {
+                    unkeyed.push(ref);
+                }
+
+                return apply();
+            }
+
+            options.ids?.push(callOptions.dedupId);
+
+            if (!cache.has(callOptions.dedupId)) {
+                effects.push(`${ref}#${callOptions.dedupId}`);
+                cache.set(callOptions.dedupId, apply());
+            }
+
+            return cache.get(callOptions.dedupId);
+        },
+        step: {
+            do: async (_name: string, callback: () => Promise<unknown>) => {
+                inStep = true;
+
+                try {
+                    return await callback();
+                } finally {
+                    inStep = false;
+                }
+            },
+        },
+    };
+};
+
+describe("account deletion workflow: replay", () => {
+    it("gives every call made inside a step an id of its own, and a replayed step does not run its effect again", async () => {
+        const effects: string[] = [];
+        const cache = new Map<string, unknown>();
+        const unkeyed: string[] = [];
+        const ids: string[] = [];
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, unkeyed, { ids }) as never);
+
+        expect(unkeyed).toEqual([]);
+        expect(effects.length).toBeGreaterThan(30);
+        // Two steps sharing an id would answer the second from the first's cache: its effect would never run.
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(effects).toHaveLength(ids.length);
+
+        const first = effects.length;
+
+        // A retry within the same instance dedupes.
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, unkeyed) as never);
+
+        expect(effects).toHaveLength(first);
+    });
+
+    it("leaves a completed request completed at 100 percent when a fresh instance runs for it", async () => {
+        const effects: string[] = [];
+        const cache = new Map<string, unknown>();
+        const request = { progress: 0, status: "pending" };
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, [], { request }) as never);
+
+        expect(request).toStrictEqual({ progress: 100, status: "completed" });
+
+        const first = effects.length;
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, [], { instanceId: "instance-2", request }) as never);
+
+        expect(request).toStrictEqual({ progress: 100, status: "completed" });
+        // Only the open check ran: it read the stored state, not the first instance's answer.
+        expect(effects).toHaveLength(first + 1);
+    });
+
+    it("re-runs the task sweeps in a fresh instance after a failure before the auth records, so a task created meanwhile is removed", async () => {
+        const effects: string[] = [];
+        const cache = new Map<string, unknown>();
+        const request = { progress: 0, status: "pending" };
+        const sweeps = (): number => effects.filter((effect) => effect.startsWith("tasks_gdpr:deleteUserTasks#stop-user-tasks")).length;
+
+        await expect(
+            accountDeletionWorkflowConfig.handler(
+                replayingContext(effects, cache, [], { failOn: "gdpr_steps_deletion_steps:deleteAuthRecords", request }) as never,
+            ),
+        ).rejects.toThrow("deleteAuthRecords failed");
+
+        expect(request.status).toBe("processing");
+        expect(sweeps()).toBe(1);
+
+        await accountDeletionWorkflowConfig.handler(replayingContext(effects, cache, [], { instanceId: "instance-2", request }) as never);
+
+        expect(sweeps()).toBe(2);
+        expect(request.status).toBe("completed");
     });
 });

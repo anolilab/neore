@@ -83,7 +83,12 @@ export const deleteUserEvals = internalMutation
                 .take(BATCH),
         ]);
 
-        await Promise.all([...results, ...runs, ...cases, ...datasets].map((row) => ctx.db.delete(row._id)));
+        await Promise.all([
+            ...results.map((row) => ctx.db.delete("evalResults", row._id)),
+            ...runs.map((row) => ctx.db.delete("evalRuns", row._id)),
+            ...cases.map((row) => ctx.db.delete("evalCases", row._id)),
+            ...datasets.map((row) => ctx.db.delete("evalDatasets", row._id)),
+        ]);
 
         return { hasMore: [results, runs, cases, datasets].some((rows) => rows.length >= BATCH) };
     });

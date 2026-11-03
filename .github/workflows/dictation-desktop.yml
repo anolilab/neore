@@ -1,4 +1,4 @@
-# On-device dictation on every OS the desktop ships to (plans/desktop-dictation.md, S4): builds the real
+# On-device dictation on every OS the desktop ships to (desktop-dictation.md, S4): builds the real
 # whisper.cpp helper with `apps/desktop/scripts/build-dictation-helper.mjs`, then runs the S2 acceptance tests on
 # each runner — the dictation unit and integration suites, the helper itself on a spoken clip, and the Electron
 # end-to-end suite (network blocked, checksum mismatch, killed helper, no audio on disk, microphone only for the
@@ -47,12 +47,12 @@ jobs:
                       helper: "linux-arm64"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
                   cp "$RUNNER_TEMP/whisper.cpp/samples/jfk.wav" "$RUNNER_TEMP/stage/jfk.wav"
 
             - name: "Upload the helper"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "speech-helper-${{ matrix.helper }}"
                   if-no-files-found: "error"
@@ -111,18 +111,19 @@ jobs:
             NEORE_DICTATION_EXPECT: "${{ matrix.expect }}"
         steps:
             - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
               with:
                   egress-policy: "audit"
 
             - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
                   persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
               with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
 
@@ -165,10 +166,9 @@ jobs:
               if: "runner.os == 'Linux'"
               run: |
                   sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-                  sudo apt-get update
-                  sudo apt-get install -y xvfb
+                  bash .github/scripts/apt-retry.sh sudo apt-get install -y xvfb
                   # Electron needs the libraries Chromium does (GTK, NSS, GBM, ALSA); the arm64 image does not carry them all.
-                  pnpm --filter @neore/desktop exec playwright install-deps chromium
+                  bash .github/scripts/apt-retry.sh pnpm --filter @neore/desktop exec playwright install-deps chromium
 
             - name: "Build the speech helper (Windows)"
               if: "runner.os == 'Windows'"
@@ -183,7 +183,7 @@ jobs:
 
             - name: "Download the speech helper built on the older runner (Linux)"
               if: "runner.os == 'Linux'"
-              uses: "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+              uses: "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" # v8.0.2
               with:
                   name: "speech-helper-${{ matrix.helper }}"
                   path: "${{ runner.temp }}/stage"
@@ -262,6 +262,9 @@ jobs:
             # The helper alone: the same arguments the app gives it, a spoken clip in, its text out, and the time it took.
             - name: "The real helper on a spoken clip"
               if: "always()"
+              env:
+                  # One retry on the shared windows-latest x64 runner only (see `real-helper.test.ts`).
+                  NEORE_WHISPER_RETRIES: "${{ matrix.os == 'windows-latest' && '1' || '0' }}"
               run: "pnpm --filter @neore/desktop exec vitest run src/dictation/real-helper.test.ts"
 
             - name: "End-to-end tests"
@@ -289,7 +292,7 @@ jobs:
 
             - name: "Upload the Playwright results"
               if: "failure()"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
               with:
                   name: "dictation-desktop-${{ matrix.os }}"
                   if-no-files-found: "ignore"

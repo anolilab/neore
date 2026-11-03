@@ -23,6 +23,11 @@ export default {
             },
         ],
     },
+    // Procedures load lazily (one module each, on first call), which cuts Worker startup CPU.
+    // Read by every entry point: codegen, `lunora dev`, `lunora build` and `prepare`.
+    codegen: {
+        lazyFunctions: true,
+    },
     services: {
         browserRenderer: { dir: "../services/browser-renderer" },
         documentParser: { dir: "../services/document-parser" },

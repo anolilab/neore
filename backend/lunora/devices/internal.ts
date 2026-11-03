@@ -10,7 +10,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
-import { threadSummaryTaint } from "../agent/thread-summary-taint";
+import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
@@ -18,7 +18,7 @@ import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYT
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { mergeTaint } from "./lib/taint";
-import { countOpenCalls, isAcpTool, isDeviceOnline, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
+import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
@@ -37,8 +37,9 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
     thread.externalThreadId === undefined &&
     !hasGrants;
 
-const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
-    const thread = await ctx.db.get(threadId);
+/** The thread when {@link isDeviceEligibleThread} admits it for this user (a grant is looked up here), else null. */
+export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
+    const thread = await ctx.db.get("threads", threadId);
     const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
     return isDeviceEligibleThread(thread, userId, grant !== null) ? thread : null;
@@ -58,6 +59,8 @@ export const getDeviceToolContext = internalQuery
             v.null(),
             v.object({
                 devices: v.array(v.object({ deviceId: v.string(), name: v.string(), tools: v.array(vDeviceManifestTool) })),
+                // What the thread's summaries and takeover already carried when the run's context was built.
+                taintedBy: v.array(vDeviceTaintSource),
             }),
         ),
     )
@@ -84,12 +87,22 @@ export const getDeviceToolContext = internalQuery
                 .map((device) => {
                     return { deviceId: device._id as string, name: device.name, tools: device.manifest ?? [] };
                 }),
+            taintedBy: mergeTaint(await threadSummaryTaint(ctx, args.threadId), await threadHandoffTaint(ctx, args.threadId)),
         };
     });
 
 const vCreateResult = v.union(
     v.object({ callId: v.string() }),
-    v.object({ error: v.union(v.literal("busy"), v.literal("ineligible"), v.literal("input_too_large"), v.literal("offline"), v.literal("rate_limited")) }),
+    v.object({
+        error: v.union(
+            v.literal("busy"),
+            v.literal("ineligible"),
+            v.literal("input_too_large"),
+            v.literal("offline"),
+            v.literal("outdated"),
+            v.literal("rate_limited"),
+        ),
+    }),
 );
 
 /**
@@ -129,6 +142,10 @@ export const createDeviceCall = internalMutation
             return { error: "ineligible" as const };
         }
 
+        if (isDeviceOutdated(device)) {
+            return { error: "outdated" as const };
+        }
+
         const { now } = ctx;
 
         if (!isDeviceOnline(device, now)) {
@@ -148,8 +165,10 @@ export const createDeviceCall = internalMutation
             return { error: "rate_limited" as const };
         }
 
-        // The model may have read untrusted content that only a summary of the thread's older turns still holds.
-        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId));
+        // Taint only grows. `args.taintedBy` is what the run saw when its context was built plus its messages for this step,
+        // but the queries that load the summary and takeover into the prompt run after that snapshot, so a summary committed
+        // in between reaches the model unseen by it. The fresh read is unioned in; a row the model never saw only over-asks.
+        const taintedBy = mergeTaint(args.taintedBy, await threadSummaryTaint(ctx, threadId), await threadHandoffTaint(ctx, threadId));
         const deadline = now + DEVICE_CALL_DEADLINE_MS;
         const callId = await ctx.db.insert("deviceCalls", {
             createdAt: now,
@@ -182,7 +201,7 @@ export const createDeviceCall = internalMutation
         });
         const secret = await decryptKey(device.encryptedSecret, "device-secrets");
 
-        await ctx.db.patch(callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
+        await ctx.db.patch("deviceCalls", callId, { envelope, signature: await signDevicePayload(secret, "call", envelope) });
 
         return { callId: callId as string };
     });
@@ -243,7 +262,7 @@ export const expireDeviceCall = internalMutation
 
         const changes = { completedAt: ctx.now, error: args.reason.slice(0, 500), status: "expired" as const };
 
-        await ctx.db.patch(call._id, changes);
+        await ctx.db.patch("deviceCalls", call._id, changes);
 
         return toCallState({ ...call, ...changes });
     });
@@ -265,7 +284,12 @@ export const sweepDeviceCalls = internalMutation
 
             // One at a time: an expiring coding-agent call also ends its turn, which writes the thread.
             for (const call of page) {
-                await ctx.db.patch(call._id, { completedAt: now, error: "Timed out", status: "expired", ...(isAcpTool(call.toolName) && ACP_CLEARED) });
+                await ctx.db.patch("deviceCalls", call._id, {
+                    completedAt: now,
+                    error: "Timed out",
+                    status: "expired",
+                    ...(isAcpTool(call.toolName) && ACP_CLEARED),
+                });
                 await onAcpCallEnded(ctx, call, { error: HOST_DID_NOT_ANSWER, status: "expired" }, now);
             }
         }
@@ -276,7 +300,7 @@ export const sweepDeviceCalls = internalMutation
             where: { createdAt: { lt: now - DEVICE_CALL_RETENTION_MS } },
         });
 
-        await Promise.all(old.map(async (call) => await ctx.db.delete(call._id)));
+        await Promise.all(old.map(async (call) => await ctx.db.delete("deviceCalls", call._id)));
 
         return null;
     });

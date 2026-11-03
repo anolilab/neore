@@ -13,7 +13,7 @@ export const eraseMessengerConnectionsForUser = async (ctx: MutationCtx, userId:
         .withIndex("by_user_and_platform", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+    await Promise.all(rows.map((row) => ctx.db.delete("messengerConnections", row._id)));
 
     return { hasMore: full(rows) };
 };

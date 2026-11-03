@@ -9,6 +9,7 @@
  * Every public procedure loads by id and compares `userId`; another user's run
  * answers NOT_FOUND, never FORBIDDEN, so ids cannot be probed.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -20,10 +21,12 @@ import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchById, patchRow } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { loadTaskAccount } from "../tasks/account";
+import type { CommitAuthor } from "./commands";
 import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { PR_BUDGET_MS } from "./runner";
@@ -132,7 +135,7 @@ export const getRun = authQuery
     .input({ runId: v.id("codingAgentRuns") })
     .output(v.union(vRunView, v.null()))
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         return run && run.userId === ctx.user.userId ? toView(run) : null;
     });
@@ -155,7 +158,7 @@ export const getLatestRunForTask = authQuery
     .input({ taskId: v.id("tasks") })
     .output(v.union(vRunView, v.null()))
     .query(async ({ args, ctx }) => {
-        const task = await ctx.db.get(args.taskId);
+        const task = await ctx.db.get("tasks", args.taskId);
 
         if (!task || task.userId !== ctx.user.userId) {
             return null;
@@ -175,7 +178,7 @@ export const cancelRun = authMutation
     .input({ runId: v.id("codingAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Run not found");
@@ -187,7 +190,7 @@ export const cancelRun = authMutation
 
         const { now } = ctx;
 
-        await patchById(ctx.db, run._id, {
+        await patchById(ctx.db, "codingAgentRuns", run._id, {
             completedAt: now,
             error: "Cancelled",
             log: appendToLog(run.log, "Cancelled by user.\n"),
@@ -289,7 +292,8 @@ export const createRun = internalMutation
             return { error: "Invalid branch name" };
         }
 
-        const prompt = args.prompt.trim();
+        // The sandbox agent runs this text with the user's key: hidden characters never reach it.
+        const prompt = stripHiddenText(args.prompt).text.trim();
 
         if (prompt.length === 0 || prompt.length > PROMPT_MAX) {
             return { error: `The task must be between 1 and ${String(PROMPT_MAX)} characters` };
@@ -343,7 +347,7 @@ export const claimRun = internalMutation
         ),
     )
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.status !== "queued") {
             return null;
@@ -351,7 +355,7 @@ export const claimRun = internalMutation
 
         const { now } = ctx;
 
-        await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { startedAt: now, status: "running", updatedAt: now });
 
         return {
             agent: run.agent,
@@ -370,13 +374,13 @@ export const appendRunLog = internalMutation
     .input({ runId: v.id("codingAgentRuns"), text: v.string() })
     .output(vCancelled)
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.status !== "running") {
             return { cancelled: true };
         }
 
-        await patchById(ctx.db, run._id, { log: appendToLog(run.log, args.text), updatedAt: ctx.now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { log: appendToLog(run.log, args.text), updatedAt: ctx.now });
 
         return { cancelled: false };
     });
@@ -385,14 +389,14 @@ export const setRunSandbox = internalMutation
     .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string() })
     .output(vCancelled)
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run) {
             return { cancelled: true };
         }
 
         // Recorded even on a cancelled run, so a later sweep can still kill it.
-        await patchById(ctx.db, run._id, { sandboxId: args.sandboxId, updatedAt: ctx.now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { sandboxId: args.sandboxId, updatedAt: ctx.now });
 
         return { cancelled: run.status !== "running" };
     });
@@ -438,7 +442,7 @@ export const completeRun = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { runId, ...outcome }, ctx }) => {
-        const run = await ctx.db.get(runId);
+        const run = await ctx.db.get("codingAgentRuns", runId);
 
         if (!run || !(ACTIVE_STATUSES as ReadonlyArray<string>).includes(run.status)) {
             return null;
@@ -446,7 +450,7 @@ export const completeRun = internalMutation
 
         const { now } = ctx;
 
-        await patchById(ctx.db, runId, { ...outcome, completedAt: now, updatedAt: now });
+        await patchById(ctx.db, "codingAgentRuns", runId, { ...outcome, completedAt: now, updatedAt: now });
 
         if (outcome.status !== "cancelled") {
             await notifyCodingAgentRun(
@@ -465,7 +469,7 @@ export const expireRun = internalMutation
     .input({ runId: v.id("codingAgentRuns") })
     .output(v.union(v.object({ sandboxId: v.optional(v.string()) }), v.null()))
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || !(ACTIVE_STATUSES as ReadonlyArray<string>).includes(run.status)) {
             return null;
@@ -474,7 +478,13 @@ export const expireRun = internalMutation
         const { now } = ctx;
         const error = `Timed out after ${String(RUN_TIMEOUT_MS / 60_000)} minutes`;
 
-        await patchById(ctx.db, run._id, { completedAt: now, error, log: appendToLog(run.log, `${error}.\n`), status: "failed", updatedAt: now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, {
+            completedAt: now,
+            error,
+            log: appendToLog(run.log, `${error}.\n`),
+            status: "failed",
+            updatedAt: now,
+        });
         await notifyCodingAgentRun(ctx, run, "failure", error);
 
         return { ...(run.sandboxId !== undefined && { sandboxId: run.sandboxId }) };
@@ -495,7 +505,7 @@ export const claimPoll = internalMutation
     .input({ prStartedAt: v.optional(v.number()), runId: v.id("codingAgentRuns"), seq: v.number() })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || !isCurrentPoll(run.pollSeq, args.seq)) {
             return false;
@@ -506,7 +516,7 @@ export const claimPoll = internalMutation
             return false;
         }
 
-        await patchById(ctx.db, run._id, { pollSeq: args.seq + 1 });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { pollSeq: args.seq + 1 });
 
         return true;
     });
@@ -528,7 +538,7 @@ export const getRunForPoll = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.status !== "running") {
             return null;
@@ -549,13 +559,13 @@ export const recordPoll = internalMutation
     .input({ offset: v.number(), runId: v.id("codingAgentRuns"), summary: v.optional(v.string()), text: v.string() })
     .output(vCancelled)
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.status !== "running") {
             return { cancelled: true };
         }
 
-        await patchById(ctx.db, run._id, {
+        await patchById(ctx.db, "codingAgentRuns", run._id, {
             ...(args.text && { log: appendToLog(run.log, args.text) }),
             logOffset: args.offset,
             ...(args.summary !== undefined && { summary: args.summary.slice(0, 20_000) }),
@@ -574,13 +584,13 @@ export const claimFinish = internalMutation
     .input({ runId: v.id("codingAgentRuns") })
     .output(v.object({ claimed: v.boolean(), wantsPr: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.finishedAt !== undefined || (ACTIVE_STATUSES as ReadonlyArray<string>).includes(run.status)) {
             return { claimed: false, wantsPr: false };
         }
 
-        await patchById(ctx.db, run._id, { finishedAt: ctx.now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { finishedAt: ctx.now });
 
         return { claimed: true, wantsPr: run.openPr && run.status === "succeeded" && canOpenPullRequest(run) };
     });
@@ -607,7 +617,7 @@ export const getRunForFollowUp = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run) {
             return null;
@@ -629,6 +639,74 @@ export const getRunForFollowUp = internalQuery
     });
 
 // ─── Internal: pull requests ─────────────────────────────────────────────────
+
+const GIT_NAME_CHARACTER = /[\p{L}\p{N}]/u;
+
+/** Control characters (a newline, a NUL) and angle brackets, which Git or the script that writes the identity will not carry. */
+const UNSAFE_IDENTITY_CHARACTER = /[\p{Cc}<>]/u;
+
+/**
+ * The identity a commit is made as, from the account. `null` keeps the agent as author: an account without a
+ * name, or whose email is not verified, gives `null`, so the commit never carries an empty or guessed identity,
+ * and nobody can have commits attributed to an address they have not proved. While the account is being deleted
+ * the identity is refused too: the preference is removed only at the last deletion steps.
+ */
+export const commitAuthorOf = (user: { email?: string; emailVerified?: boolean; name?: string } | null, deletionUnderway: boolean): CommitAuthor | null => {
+    // Git refuses a name made only of spaces, control characters or punctuation, so one with no letter or digit keeps the agent as author.
+    if (deletionUnderway || !user?.email || !user.name || !GIT_NAME_CHARACTER.test(user.name) || user.emailVerified !== true) {
+        return null;
+    }
+
+    if (UNSAFE_IDENTITY_CHARACTER.test(user.name) || UNSAFE_IDENTITY_CHARACTER.test(user.email)) {
+        return null;
+    }
+
+    return { email: user.email, name: user.name };
+};
+
+/**
+ * The person a pull request's commits are made as, when they opted in (`codingAgentCommitIdentity`).
+ * `null` keeps the agent as author (see {@link commitAuthorOf}).
+ */
+export const commitAuthorFor = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.null(), v.object({ email: v.string(), name: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        if (prefs?.codingAgentCommitIdentity !== "user") {
+            return null;
+        }
+
+        const user = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } });
+
+        return commitAuthorOf(user, await isAccountDeletionUnderway(ctx, args.userId));
+    });
+
+/** Choose who a coding agent's pull request commits are made as. Off (`agent`) is the default. */
+export const setCodingAgentCommitIdentity = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ identity: v.union(v.literal("agent"), v.literal("user")) })
+    .output(v.null())
+    .mutation(async ({ args: { identity }, ctx }) => {
+        if (await isAccountDeletionUnderway(ctx, ctx.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "This account is being deleted.");
+        }
+
+        const prefs = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(ctx.db, prefs, ctx.user.userId, { codingAgentCommitIdentity: identity }, ctx.user.activeOrganization?.id ?? null);
+
+        ctx.log.event("coding_agents.set_commit_identity", { identity });
+
+        return null;
+    });
 
 /**
  * Claim the right to open this run's PR: the owner's, finished, with a complete
@@ -653,7 +731,7 @@ export const beginPullRequest = internalMutation
         ),
     )
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.userId !== args.userId) {
             return { error: "Run not found" };
@@ -670,7 +748,13 @@ export const beginPullRequest = internalMutation
             return { error: "This run has no change that can be turned into a pull request." };
         }
 
-        await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prSandboxId: undefined, prStartedAt: now, prStatus: "pending", updatedAt: now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, {
+            prFollowUp: args.followUp,
+            prSandboxId: undefined,
+            prStartedAt: now,
+            prStatus: "pending",
+            updatedAt: now,
+        });
 
         // A reclaimed attempt's reaper may never have run, and its sandbox id is cleared above:
         // schedule the kill in this transaction so the claim and the cleanup commit together.
@@ -702,13 +786,13 @@ export const setPullRequestSandbox = internalMutation
     .input({ runId: v.id("codingAgentRuns"), sandboxId: v.string(), startedAt: v.number() })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
             return false;
         }
 
-        await patchById(ctx.db, run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
+        await patchById(ctx.db, "codingAgentRuns", run._id, { prSandboxId: args.sandboxId, updatedAt: ctx.now });
 
         return true;
     });
@@ -731,7 +815,7 @@ export const getPullRequestForPoll = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || run.prStatus !== "pending" || !run.baseBranch) {
             return null;
@@ -750,7 +834,7 @@ export const getPullRequestForPoll = internalQuery
 
 /** Ends a `pending` PR attempt: the URL, or `failed`. Clears everything the attempt held. Answers whether the follow-ups were waiting on it. */
 const endPullRequest = async (ctx: MutationCtx, run: RunDoc, log: string, prUrl?: string): Promise<boolean> => {
-    await patchRow(ctx.db, run, {
+    await patchRow(ctx.db, "codingAgentRuns", run, {
         log: appendToLog(run.log, log),
         prFollowUp: undefined,
         prSandboxId: undefined,
@@ -768,7 +852,7 @@ export const completePullRequest = internalMutation
     .input({ log: v.string(), prUrl: v.optional(v.string()), runId: v.id("codingAgentRuns"), startedAt: v.number() })
     .output(v.object({ followUp: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         // Only the attempt it was started for may end it; a late one from before a retry changes nothing.
         if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
@@ -788,7 +872,7 @@ export const expirePullRequest = internalMutation
     .input({ runId: v.id("codingAgentRuns"), startedAt: v.number() })
     .output(v.union(v.object({ followUp: v.boolean(), sandboxId: v.optional(v.string()) }), v.null()))
     .mutation(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run || !isCurrentPullRequestAttempt(run, args.startedAt)) {
             return null;
@@ -813,7 +897,7 @@ export const postRunResult = internalMutation
     .input({ agentName: v.string(), runId: v.id("codingAgentRuns"), text: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get(args.threadId as Id<"threads">);
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
 
         if (!thread || thread.deleted || thread.userId !== args.userId || isThreadLocked(thread)) {
             return null;
@@ -833,7 +917,7 @@ export const postRunResult = internalMutation
             userId: args.userId,
         });
 
-        await patchById(ctx.db, thread._id, { updatedAt: ctx.now });
+        await patchById(ctx.db, "threads", thread._id, { updatedAt: ctx.now });
 
         return null;
     });
@@ -856,7 +940,7 @@ export const getRunForTaskRound = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const run = await ctx.db.get(args.runId);
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
         if (!run) {
             return null;

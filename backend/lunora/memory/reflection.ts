@@ -36,6 +36,7 @@ import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
@@ -139,7 +140,7 @@ export const noteMemoryActivity = internalMutation
         }
 
         if (state) {
-            await ctx.db.patch(state._id, { lastActiveAt: now, ...scheduled });
+            await ctx.db.patch("memoryReflectionState", state._id, { lastActiveAt: now, ...scheduled });
         } else {
             await ctx.db.insert("memoryReflectionState", { lastActiveAt: now, userId, ...scheduled });
         }
@@ -192,15 +193,15 @@ export const claimReflectionRun = internalMutation
                 const scheduledFor = nextReflectionRunAt(now, timeZone, userId);
                 const scheduledJobId = await ctx.scheduler.runAt(scheduledFor, internal.memory.reflection.runMemoryReflection, { userId });
 
-                await patchRow(ctx.db, state, { scheduledFor, scheduledJobId });
+                await patchRow(ctx.db, "memoryReflectionState", state, { scheduledFor, scheduledJobId });
             } else {
-                await patchRow(ctx.db, state, clearPending);
+                await patchRow(ctx.db, "memoryReflectionState", state, clearPending);
             }
 
             return { claimed: false as const, reason: eligibility.reason };
         }
 
-        await patchRow(ctx.db, state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
+        await patchRow(ctx.db, "memoryReflectionState", state, { ...clearPending, lastRunAt: now, lastRunLocalDay: eligibility.localDay });
 
         return { claimed: true as const, localDay: eligibility.localDay, ...(timeZone && { timeZone }) };
     });
@@ -260,7 +261,7 @@ export const loadReflectionInputs = internalQuery
             0,
             REFLECTION_LIMITS.maxThreads,
         );
-        const threads = await Promise.all(threadIds.map((id) => ctx.db.get(id as Id<"threads">)));
+        const threads = await Promise.all(threadIds.map((id) => ctx.db.get("threads", id as Id<"threads">)));
         // Titles only feed the user's digest, so a bot scope reads none.
         const threadTitles =
             botId === undefined
@@ -308,7 +309,7 @@ export const applyReflectionOps = internalMutation
 
         // A row outside this scope is refused, so one scope's ops can never write another's rows.
         const active = async (id: string): Promise<Doc<"memories"> | null> => {
-            const row = await ctx.db.get(id as Id<"memories">);
+            const row = await ctx.db.get("memories", id as Id<"memories">);
 
             return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
         };
@@ -323,6 +324,7 @@ export const applyReflectionOps = internalMutation
                     }
 
                     await ctx.db.patch(
+                        "memories",
                         row._id,
                         withoutUndefined({
                             confidence: op.confidence,
@@ -365,7 +367,7 @@ export const applyReflectionOps = internalMutation
                     });
 
                     for (const source of sources) {
-                        await ctx.db.patch(source._id, { supersededBy: promotedId, updatedAt: now });
+                        await ctx.db.patch("memories", source._id, { supersededBy: promotedId, updatedAt: now });
                     }
 
                     promotedIds.push(promotedId);
@@ -381,7 +383,7 @@ export const applyReflectionOps = internalMutation
                         break;
                     }
 
-                    await ctx.db.patch(row._id, { supersededBy: by._id, updatedAt: now });
+                    await ctx.db.patch("memories", row._id, { supersededBy: by._id, updatedAt: now });
                     applied += 1;
                     break;
                 }
@@ -419,7 +421,7 @@ export const saveMemoryDigest = internalMutation
             .order("desc")
             .take(DIGESTS_KEPT + 10);
 
-        await Promise.all(older.slice(DIGESTS_KEPT).map((d) => ctx.db.delete(d._id)));
+        await Promise.all(older.slice(DIGESTS_KEPT).map((d) => ctx.db.delete("memoryDigests", d._id)));
 
         return null;
     });
@@ -587,6 +589,9 @@ export const runMemoryReflection = internalAction
     .input({ userId: v.string() })
     .output(v.null())
     .action(async ({ args: { userId }, ctx }) => {
+        // Read BEFORE the day is claimed: a settings read that fails throws here and leaves the day unclaimed, so the
+        // job can run again. Run with no rules instead, the user's filters would be ignored and the day would be spent.
+        const rules = await loadModelFilterRules(ctx, userId);
         const claim = await ctx.runMutation(internal.memory.reflection.claimReflectionRun, { userId });
 
         if (!claim.claimed) {
@@ -601,7 +606,7 @@ export const runMemoryReflection = internalAction
         let model: UtilityModel | undefined;
 
         try {
-            model = await getUtilityModel(gatewayFetch(ctx), { userId });
+            model = await getUtilityModel(gatewayFetch(ctx), { rules, userId });
         } catch (error) {
             console.warn("[memory/reflection] Utility model unavailable, applying the deterministic plan only:", error);
         }
@@ -681,13 +686,13 @@ export const dismissMemoryDigest = authMutation
     .input({ digestId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { digestId }, ctx }) => {
-        const digest = await ctx.db.get(digestId as Id<"memoryDigests">);
+        const digest = await ctx.db.get("memoryDigests", digestId as Id<"memoryDigests">);
 
         if (digest?.userId !== ctx.user.userId) {
             return null;
         }
 
-        await ctx.db.patch(digest._id, { dismissedAt: ctx.now });
+        await ctx.db.patch("memoryDigests", digest._id, { dismissedAt: ctx.now });
 
         ctx.log.event("memory.dismiss_memory_digest", { dismissed: true });
 

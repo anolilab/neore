@@ -56,6 +56,8 @@ export interface MCPToolDescriptor {
     connectorSlug?: string;
     serverName: string;
     toolName: string;
+    /** The saved server's address, for a server that is not a connector: two servers can share a name, so trust is keyed on the pair. */
+    url?: string;
 }
 
 /**
@@ -296,6 +298,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
                     ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
                     serverName: server.name,
                     toolName,
+                    ...(!server.connectorSlug && { url: server.url }),
                 });
             }
         } else {
@@ -375,4 +378,16 @@ export const closeMCPClients = async (clients: MCPClient[]): Promise<void> => {
     }
 
     toolsLogger.debug(`[MCP] Closed ${clients.length} MCP client(s)`);
+};
+
+/**
+ * Closes the clients, then waits for `settle`. The close needs no database, so a `settle` stalled on a write
+ * must not keep the clients open; `settle` still runs, and its failure still propagates, when the close throws.
+ */
+export const closeMCPClientsThenSettle = async (clients: MCPClient[], settle: () => Promise<void>): Promise<void> => {
+    try {
+        await closeMCPClients(clients);
+    } finally {
+        await settle();
+    }
 };

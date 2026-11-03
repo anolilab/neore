@@ -7,7 +7,7 @@ import { v } from "lunorash/server";
 
 export const vSubAgentRunStatus = v.union(v.literal("queued"), v.literal("running"), v.literal("succeeded"), v.literal("failed"), v.literal("cancelled"));
 
-/** `run` is a one-shot sub-agent; `worker` is a thread that outlives its runs and is dispatched to again (`plans/agent-orchestrator.md`). Unset reads as `run`. */
+/** `run` is a one-shot sub-agent; `worker` is a thread that outlives its runs and is dispatched to again (`agent-orchestrator.md`). Unset reads as `run`. */
 export const vSubAgentRunMode = v.union(v.literal("run"), v.literal("worker"));
 
 /** Where a worker's runs execute. Fixed by the worker's first run; unset reads as the cloud headless runner. */
@@ -25,3 +25,6 @@ export const vWorkerPolicy = v.object({
     hostDispatch: v.literal("ask"),
     maxDispatchesPerHour: v.optional(v.number()),
 });
+
+/** A new host worker's runner as a caller asks for it: the computer and the (agent, folder) pair it offered. */
+export const vHostRunnerRequest = v.object({ agentKey: v.string().max(128), deviceId: v.string().max(128), folderId: v.string().max(128) });

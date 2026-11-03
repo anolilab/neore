@@ -1,5 +1,5 @@
 /**
- * Remote control of a coding agent against the in-memory harness (plans/acp-agent-host.md §4.1, §4.4, §4.6, S4):
+ * Remote control of a coding agent against the in-memory harness (acp-agent-host.md §4.1, §4.4, §4.6, S4):
  * the offers a manifest carries, starting a session, sending into one (`sendToHost`), the lease and the clock on
  * a command, the prompt that is cleared, Stop and the permission answers.
  *
@@ -7,6 +7,7 @@
  * (`checkAcpCall`) is called by the test at the moment it would have fired.
  */
 import { lunoraTest } from "@lunora/testing";
+import { MIN_DEVICE_PROTOCOL } from "../devices/lib/constants";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
@@ -87,6 +88,8 @@ const insertUser = async () =>
 
 let manifestAt = 0;
 
+const OUT_OF_DATE = /out of date/;
+
 const manifest = async (deviceId: string, secret: string, extra: Record<string, unknown>) => {
     manifestAt += 1;
 
@@ -136,7 +139,14 @@ const sessionStatus = async (): Promise<unknown> => {
     return session?.status;
 };
 
-const row = async (id: string): Promise<Row | null> => await run(async (ctx) => await ctx.db.get(id));
+const row = async (id: string): Promise<Row | null> =>
+    await run(
+        async (ctx) =>
+            (await ctx.db.get("devices", id as never)) ??
+            (await ctx.db.get("threads", id as never)) ??
+            (await ctx.db.get("deviceCalls", id as never)) ??
+            (await ctx.db.get("acpSessions", id as never)),
+    );
 
 /** A local-style session on the device: the desktop's `session_open`, as the ingest applies it. */
 const openSession = async (device: Device, hostSessionId = "host-s1"): Promise<string> => {
@@ -219,7 +229,7 @@ const addRequest = async (
             streamId,
             text: "",
         });
-        await ctx.db.patch(streamId, { hostPendingPermissions: [requestId] });
+        await ctx.db.patch("persistentStreams", streamId, { hostPendingPermissions: [requestId] });
     });
 
 /** Several requests waiting at once on one stream. */
@@ -228,7 +238,7 @@ const addRequests = async (streamId: string, ids: string[]) => {
         await addRequest(streamId, seq, id);
     }
 
-    await run(async (ctx) => await ctx.db.patch(streamId as never, { hostPendingPermissions: ids }));
+    await run(async (ctx) => await ctx.db.patch("persistentStreams", streamId as never, { hostPendingPermissions: ids }));
 };
 
 beforeEach(async () => {
@@ -319,6 +329,13 @@ describe("startHostSession", () => {
         expect(call?.envelope).not.toContain("/");
     });
 
+    it("tells the person to update an outdated computer instead of calling it busy or unavailable", async () => {
+        const device = await pairedDevice(ownerId);
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(start("tap-old", {}, device.deviceId)).rejects.toThrow(OUT_OF_DATE);
+    });
+
     it("starts one session for a double tap", async () => {
         const device = await pairedDevice(ownerId);
         const first = (await start("tap-1", {}, device.deviceId)) as { threadId: string };
@@ -335,7 +352,7 @@ describe("startHostSession", () => {
         const [session] = await rows("acpSessions");
 
         for (const status of ["idle", "ended"]) {
-            await run(async (ctx) => await ctx.db.patch(session?._id as never, { status }));
+            await run(async (ctx) => await ctx.db.patch("acpSessions", session?._id as never, { status }));
 
             expect(await start("tap-1", {}, device.deviceId)).toEqual({ started: false, threadId: first.threadId });
         }
@@ -564,7 +581,7 @@ describe("sendToHost", () => {
         await run(async (ctx) => {
             const stream = await ctx.db.persistentStreams.findFirst({ where: { threadId: threadId as never } });
 
-            await ctx.db.patch(stream?._id as never, { status: "done" });
+            await ctx.db.patch("persistentStreams", stream?._id as never, { status: "done" });
         });
         await new Promise((resolve) => {
             setTimeout(resolve, 5);
@@ -600,7 +617,7 @@ describe("sendToHost", () => {
             const hashed = await hashPasscode("a passcode", 1000);
 
             await run(async (ctx) => {
-                await ctx.db.patch(threadId as never, { lockedAt: Date.now() });
+                await ctx.db.patch("threads", threadId as never, { lockedAt: Date.now() });
                 await ctx.db.insert("threadPasscodes", {
                     createdAt: 1,
                     epoch,
@@ -648,7 +665,7 @@ describe("sendToHost", () => {
                 const { page } = await ctx.db.threadPasscodes.findMany({ where: { threadId } });
                 const [passcode] = page;
 
-                await ctx.db.patch(passcode._id, { epoch: newPasscodeEpoch() });
+                await ctx.db.patch("threadPasscodes", passcode._id, { epoch: newPasscodeEpoch() });
             });
 
             expect(await outcomeOfSend(threadId, "one", "r1")).toBe("locked");
@@ -683,7 +700,7 @@ describe("sendToHost", () => {
             const { page } = await ctx.db.acpSessions.findMany({ where: { threadId: open } });
             const [session] = page;
 
-            await ctx.db.patch(session._id, { status: "ended" });
+            await ctx.db.patch("acpSessions", session._id, { status: "ended" });
         });
         expect(await outcomeOfSend(open)).toBe("session_ended");
 
@@ -917,6 +934,8 @@ describe("cancelHostTurn", () => {
         const turnId = await streamField(threadId, "hostTurnId");
 
         expect(JSON.parse(stop?.envelope as string).input).toMatchObject({ sessionId: "host-s1", turnId });
+        // A person's Stop drops the prompts queued on the computer: only a worker run's stop keeps them.
+        expect(JSON.parse(stop?.envelope as string).input).not.toHaveProperty("keepQueue");
         await expect(cancel(threadId)).resolves.toEqual({ cancelled: false });
         expect(await sessionStatus()).toBe("idle");
     });
@@ -1035,7 +1054,7 @@ describe("answerHostPermission", () => {
         const { stream, threadId } = await waiting();
 
         await addRequest(stream._id, 1, "r2", ["allow_once", "reject_once"], false);
-        await run(async (ctx) => await ctx.db.patch(stream._id, { hostPendingPermissions: ["r1", "r2"] }));
+        await run(async (ctx) => await ctx.db.patch("persistentStreams", stream._id, { hostPendingPermissions: ["r1", "r2"] }));
 
         const pending = (await as(ownerId).query(remote.getHostPendingPermissions as never, { threadId } as never)) as Row[];
         const cut = pending.find((request) => request.requestId === "r2");
@@ -1087,6 +1106,26 @@ describe("answerHostPermission", () => {
         }
 
         await expect(answer(threadId, "r3", "r3-allow_once")).resolves.toEqual({ reason: "busy", sent: false });
+    });
+
+    it("reports an outdated computer as outdated, not busy", async () => {
+        const { device, threadId } = await waiting();
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "outdated", sent: false });
+    });
+
+    it("does not report a still-pending answer as sent once its computer has gone outdated, but a claimed one stays sent", async () => {
+        const { device, threadId } = await waiting();
+
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ reason: "outdated", sent: false });
+
+        const [call] = await rows("deviceCalls", { toolName: "acp_permission_answer" });
+
+        await run(async (ctx) => await ctx.db.patch("deviceCalls", call!._id, { claimedAt: Date.now(), status: "claimed" }));
+        await expect(answer(threadId, "r1", "r1-allow_once")).resolves.toEqual({ sent: true });
     });
 
     it("queues one answer per request: a second tap, or the other device, finds the first on its way", async () => {

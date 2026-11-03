@@ -1,5 +1,5 @@
 /**
- * Switching a thread's agent mid-conversation (plans/harness-switch.md, slices S1 and S2: cloud models).
+ * Switching a thread's agent mid-conversation (harness-switch.md, slices S1 and S2: cloud models).
  *
  * `switchThreadAgent` records the change as one divider row in the transcript
  * (`agent/agent-switch-logic.ts`); the next turn runs on the model the active path ends on
@@ -17,30 +17,35 @@
  * daily allowance is spent, `beginSwitchSummary` lets one summary run per thread at a time and counts it
  * against its own rate limit, and only then does the action call the gateway.
  */
+import { estimateTokensFromCharacters } from "@neore/ai/models";
 import { generateText } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { type ActionCtx, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
+import { handoffAboveOf, handoffBeforeDeltaOf, leafRowOf, pathExceedsColdStart, resolvePathAgent } from "../agent/agent-switch";
 import { sameAgent } from "../agent/agent-switch-logic";
-import { type AgentRef, HANDOFF_MAX_CHARACTERS, vAgentRef, vAgentSwitchMode } from "../agent/agent-switch-validators";
+import { type AgentRef, HANDOFF_MAX_CHARACTERS, type SwitchAgentRef, vAgentRef, vAgentSwitchMode, vSwitchAgentRef } from "../agent/agent-switch-validators";
 import {
     assertWithinBudget,
     capSummary,
     composeHandoff,
-    HANDOFF_BUDGET_TOKENS,
-    HANDOFF_SUMMARY_MAX_TOKENS,
+    DEFAULT_HANDOFF_LIMITS,
+    fullHistoryCapFor,
+    handoffLimitsFor,
     HANDOFF_SUMMARY_SYSTEM,
     HandoffTooLargeError,
+    handoffTokens,
     planHandoff,
     summaryPromptOf,
     type HandoffKind,
+    type HandoffLimits,
     type HandoffTurn,
 } from "../agent/handoff";
-import { collectHandoffSource, findDividerLeaving, pathTokens, rowsSince } from "../agent/handoff-source";
+import { assembleHandoffContext, deltaOrphans, needsEarlierHandoff } from "../agent/handoff-context";
+import { collectHandoffSource, findDividerLeaving, pathTokens, replyWindowRows, rowCharacters, rowsSince } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
 import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { insertAgentSwitchRow, patchThread } from "../agent/table-writes";
@@ -52,9 +57,11 @@ import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { createRatelimit } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel } from "../lib/utility-model";
+import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
+import { loadSharedModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "./lib/model-filter-rules";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, hasRoundAllowance, loadTaskAccount } from "../tasks/account";
+import { getModelContextWindow } from "./lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import { findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
 
@@ -95,12 +102,15 @@ export const AGENT_SWITCH_LIMIT = "AGENT_SWITCH_LIMIT";
 export const AGENT_SWITCH_BUSY = "AGENT_SWITCH_BUSY";
 /** Too many summaries in a short while (`chat/agentSwitchSummary`). */
 export const AGENT_SWITCH_RATE_LIMITED = "AGENT_SWITCH_RATE_LIMITED";
+/** The (agent, folder, computer) a switch names is not one the user approved on that computer (`devices.acpOffers`). */
+export const AGENT_SWITCH_NOT_OFFERED = "AGENT_SWITCH_NOT_OFFERED";
+export const AGENT_SWITCH_HOST_OFFLINE = "AGENT_SWITCH_HOST_OFFLINE";
 
 /**
  * A `clientId` is remembered this long. A double tap is over in seconds; the rest is for a stale
  * click replayed after later switches, which must not undo them.
  */
-const AGENT_SWITCH_CLAIM_TTL_MS = 10 * 60 * 1000;
+export const AGENT_SWITCH_CLAIM_TTL_MS = 10 * 60 * 1000;
 
 /** A summary call takes seconds; the claim outlasts a slow one and frees the thread soon after an action that died holding it. */
 const AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS = 2 * 60 * 1000;
@@ -109,7 +119,7 @@ const SUMMARY_CLAIM_SCOPE = "switch-summary";
 /** The preview counts a conversation up to this many tokens; past it the figure is "at least". */
 const PREVIEW_TOKEN_CAP = 250_000;
 
-const refuse = (code: string, message: string): never => {
+export const refuse = (code: string, message: string): never => {
     throw new LunoraError("BAD_REQUEST", message, { data: { code } });
 };
 
@@ -120,17 +130,19 @@ const limitReached = (): LunoraError =>
         { data: { code: AGENT_SWITCH_LIMIT } },
     );
 
-interface SwitchResult {
-    agent: AgentRef;
+export interface SwitchResult {
+    agent: SwitchAgentRef;
     /** The conversation is long enough that the next reply re-reads it without the provider's cache (`PROMPT_CACHE_COLD_START_TOKENS`). */
     coldStartCostly: boolean;
+    /** A switch between a cloud model and a host agent makes a new thread that takes over from this one; this is it. */
+    forkedThreadId?: string;
     messageId: string | null;
     switched: boolean;
 }
 
-type SwitchTarget = { kind: "host" } | { kind: "model"; model: string };
+export type SwitchTarget = { agentKey: string; folderId: string; hostId: Id<"devices">; kind: "host" } | { kind: "model"; model: string };
 
-interface SwitchArgs {
+export interface SwitchArgs {
     clientId: string;
     target: SwitchTarget;
     threadId: Id<"threads">;
@@ -150,15 +162,45 @@ interface StoredHandoff {
 /** The part of a switch the user can ask for; the server decides between `portable` and `delta`. */
 type RequestedMode = "full" | "portable";
 
-const vSwitchTarget = v.union(
+export const vSwitchTarget = v.union(
     v.object({ kind: v.literal("model"), model: v.string().max(MAX_LENGTH.short) }),
-    // Offered host agents arrive with the host slices; the shape is accepted so a refusal can be typed.
-    v.object({ kind: v.literal("host") }),
+    // An (agent, folder) pair a computer offers (`devices.acpOffers`): checked against the offer list when the switch is made.
+    v.object({ agentKey: v.string().max(128), folderId: v.string().max(128), hostId: v.id("devices"), kind: v.literal("host") }),
 );
 
 const vRequestedMode = v.union(v.literal("full"), v.literal("portable"));
 
-type Checked = { agent: AgentRef; kind: "same" } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
+type Checked =
+    { agent: AgentRef; kind: "same"; thread: Doc<"threads"> } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
+
+/**
+ * A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's, and a
+ * media thread has no model to swap: none of them has an agent a switch could replace.
+ */
+export const hasFixedAgent = (thread: Doc<"threads">): boolean =>
+    Boolean(thread.botId || thread.groupChat || thread.multiChat || thread.messengerConnectionId || (thread.mode !== undefined && thread.mode !== "text"));
+
+/** A hard rule, so a transcript never has two agents writing at once: refuses while a reply streams or a request waits for an answer. */
+export const assertNotStreaming = async (ctx: QueryCtx, thread: Doc<"threads">): Promise<void> => {
+    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+
+    if (await hasOpenApproval(ctx, thread._id)) {
+        throw new LunoraError("CONFLICT", "Answer the pending request before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+};
+
+/** Refuses a switch while the path ends on a prompt whose reply has not started. */
+export const assertReplyStarted = async (ctx: QueryCtx, thread: Doc<"threads">, leaf: Doc<"messages">): Promise<void> => {
+    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
+    // reply then hangs off, past the divider. A prompt whose run already started, and was stopped or failed
+    // before a reply, is no gap, or the user could never leave the model that is not answering. A regenerate's
+    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.
+    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
+    }
+};
 
 /** Everything that decides whether a switch may happen, before anything is claimed or written. */
 const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> => {
@@ -172,20 +214,13 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         return refuse(AGENT_SWITCH_UNSUPPORTED, "Guests run on the free model");
     }
 
+    // A host agent is not a cloud model: a switch to or from one is `acp/switch.ts`'s, routed before this runs.
     if (args.target.kind !== "model") {
-        return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a host agent is not available yet");
+        return refuse(AGENT_SWITCH_UNSUPPORTED, "Switching to a coding agent is not a model switch");
     }
 
-    // A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's,
-    // a coding-agent thread on its host, and a media thread has no model to swap.
-    if (
-        thread.botId ||
-        thread.groupChat ||
-        thread.multiChat ||
-        thread.messengerConnectionId ||
-        isHostRunThread(thread) ||
-        (thread.mode !== undefined && thread.mode !== "text")
-    ) {
+    // A coding-agent thread runs on its host: `acp/switch.ts` takes it over into a new thread.
+    if (hasFixedAgent(thread) || isHostRunThread(thread)) {
         return refuse(AGENT_SWITCH_UNSUPPORTED, "This chat runs on a fixed agent");
     }
 
@@ -200,14 +235,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
         await assertPaidModel(ctx, thread.userId, definition);
     }
 
-    // A hard rule, so a transcript never has two agents writing at once.
-    if ((await isThreadStreaming(ctx, thread._id)) || (await hasLiveDeltaStream(ctx, thread._id)) || (await hasUnsettledStop(ctx, thread._id, Date.now()))) {
-        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
-
-    if (await hasOpenApproval(ctx, thread._id)) {
-        throw new LunoraError("CONFLICT", "Answer the pending request before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
+    await assertNotStreaming(ctx, thread);
 
     const leaf = await leafRowOf(ctx, thread);
     const from = leaf && (await resolvePathAgent(ctx, thread, leaf));
@@ -219,22 +247,16 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
     const to: AgentRef = { kind: "model", model: definition.id };
 
     if (sameAgent(from, to)) {
-        return { agent: from, kind: "same" };
+        return { agent: from, kind: "same", thread };
     }
 
-    // The prompt is saved before its stream exists: a divider written in that gap would sit under a prompt the
-    // reply then hangs off, past the divider. A prompt whose run already started — and was stopped or failed
-    // before a reply — is no gap, or the user could never leave the model that is not answering. (A regenerate's
-    // gap, between pointing the leaf at its prompt and creating the stream, is milliseconds and stays open.)
-    if ((leaf.message as { role?: string } | undefined)?.role === "user" && !(await hasStreamFor(ctx, thread._id, leaf._id))) {
-        throw new LunoraError("CONFLICT", "Wait for the reply to start before switching", { data: { code: AGENT_SWITCH_STREAMING } });
-    }
+    await assertReplyStarted(ctx, thread, leaf);
 
     return { from, kind: "ready", leaf, thread, to };
 };
 
 /** The claim key of one click: the caller's, not the thread's — the claims table is shared and a `clientId` is client-chosen. */
-const claimKeyOf = (args: Pick<SwitchArgs, "clientId" | "threadId" | "userId">): string => `${args.userId}:${args.threadId}:${args.clientId}`;
+export const claimKeyOf = (args: Pick<SwitchArgs, "clientId" | "threadId" | "userId">): string => `${args.userId}:${args.threadId}:${args.clientId}`;
 
 /**
  * `switchThreadAgent`'s write, with the caller passed in so the harness can drive it. With no `handoff` the
@@ -250,6 +272,11 @@ export const switchThreadAgentHandler = async (
     if (checked.kind === "same") {
         // Claimed too, so a stale replay of this pick cannot revert a switch made after it.
         await claimOnce(ctx, "switch", claimKeyOf(args), AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
+
+        // Picking the model the thread already runs still ends Auto: it is the pick, with no divider.
+        if (checked.thread.autoModel) {
+            await patchThread(ctx.db, checked.thread._id, { autoModel: false });
+        }
 
         return { agent: checked.agent, coldStartCostly: false, messageId: null, switched: false };
     }
@@ -296,6 +323,8 @@ export const switchThreadAgentHandler = async (
 
     await patchThread(ctx.db, thread._id, {
         activeAgent: to,
+        // A switch names the agent from here on: Auto, which only routes a never-switched thread, ends with it.
+        ...(thread.autoModel && { autoModel: false }),
         ...(args.handoff?.text && { hasHandoff: true }),
         // The row now ends the path the thread displays.
         ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),
@@ -325,8 +354,11 @@ const modeFor = async (
 ): Promise<{ boundaryId?: string; mode: "delta" | "full" | "portable" }> => {
     // Only an unrequested mode needs the size of the path, and only whether it passes the threshold.
     const wanted = requested ?? ((await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf)) ? "portable" : "full");
+    // What the target would be sent whole, as the history or as a delta's restored context, has to fit its window.
+    const fits = await historyFits(ctx, checked);
 
-    if (wanted === "full") {
+    // The whole history goes only to a model whose window holds it: a small one is handed a summary instead of an overflow.
+    if (wanted === "full" && fits) {
         return { mode: "full" };
     }
 
@@ -334,11 +366,43 @@ const modeFor = async (
 
     // A model's earlier context is only sent while it is inside the context window; past it, a delta would tell the
     // model it had worked on a conversation of which it is given none.
-    if (earlier && (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES) {
+    if (
+        fits &&
+        earlier &&
+        (await rowsSince(ctx, checked.thread._id, checked.leaf, earlier.part.startMessageId, DEFAULT_RECENT_MESSAGES)) < DEFAULT_RECENT_MESSAGES
+    ) {
         return { boundaryId: earlier.part.startMessageId, mode: "delta" };
     }
 
     return { mode: "portable" };
+};
+
+/** The context window of the model a switch moves to. */
+const windowOf = (checked: Extract<Checked, { kind: "ready" }>): number => getModelContextWindow(checked.to.model);
+
+/**
+ * Whether what a reply on the target is sent fits its window with room for the reply: the context the reply
+ * loader builds, assembled the same way — the newest DEFAULT_RECENT_MESSAGES successful rows (text, and a fixed
+ * estimate for each image or file), with the stored handoffs `assembleHandoffContext` keeps standing in for the
+ * rows above them and for what a switched-back model saw.
+ */
+const historyFits = async (ctx: QueryCtx, checked: Extract<Checked, { kind: "ready" }>): Promise<boolean> => {
+    const cap = fullHistoryCapFor(windowOf(checked));
+    const threadId = checked.thread._id;
+    const window = await replyWindowRows(ctx, threadId, checked.leaf, DEFAULT_RECENT_MESSAGES);
+    const oldest = window[0];
+    const earlier = oldest && oldest.order > 0 && needsEarlierHandoff(window) ? await handoffAboveOf(ctx, { belowMessageId: oldest._id, threadId }) : [];
+    const bases = new Map(
+        await Promise.all(
+            deltaOrphans(window).map(
+                async ({ id, model }) => [model, await handoffBeforeDeltaOf(ctx, { dividerMessageId: id as Id<"messages">, threadId })] as const,
+            ),
+        ),
+    );
+    const { blocks, docs } = assembleHandoffContext(window, earlier, bases);
+    const characters = docs.reduce((sum, doc) => sum + rowCharacters(doc), 0);
+
+    return estimateTokensFromCharacters(characters) + blocks.reduce((sum, block) => sum + handoffTokens(block.text), 0) <= cap;
 };
 
 const vTurn = v.object({ role: v.union(v.literal("assistant"), v.literal("user")), text: v.string() });
@@ -347,6 +411,8 @@ const vPlan = v.object({
     agent: vAgentRef,
     /** Whether the daily limits have room for the round a summary is charged as; unset when the switch needs no summary call. */
     allowance: v.optional(v.boolean()),
+    /** The target's context window, which the handoff's budget is derived from. */
+    contextWindow: v.optional(v.number()),
     leafId: v.optional(v.string()),
     mode: v.optional(vAgentSwitchMode),
     omittedEarlier: v.optional(v.boolean()),
@@ -354,9 +420,9 @@ const vPlan = v.object({
 });
 
 /** Whether handing these turns over takes a summary call. A thread too large to hand over is reported by the action. */
-const needsSummary = (newestFirst: HandoffTurn[]): boolean => {
+const needsSummary = (newestFirst: HandoffTurn[], limits: HandoffLimits): boolean => {
     try {
-        return planHandoff(newestFirst).older.length > 0;
+        return planHandoff(newestFirst, limits).older.length > 0;
     } catch (error) {
         if (error instanceof HandoffTooLargeError) {
             return false;
@@ -376,6 +442,7 @@ export const planAgentSwitchHandler = async (
 ): Promise<{
     agent: AgentRef;
     allowance?: boolean;
+    contextWindow?: number;
     leafId?: string;
     mode?: "delta" | "full" | "portable";
     omittedEarlier?: boolean;
@@ -395,9 +462,10 @@ export const planAgentSwitchHandler = async (
     }
 
     const source = await collectHandoffSource(ctx, checked.thread._id, checked.leaf, { stopAtId: boundaryId });
-    const base = { agent: checked.from, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
+    const contextWindow = windowOf(checked);
+    const base = { agent: checked.from, contextWindow, leafId: checked.leaf._id, mode, omittedEarlier: source.omittedEarlier, turns: source.turns };
 
-    if (!needsSummary(source.turns)) {
+    if (!needsSummary(source.turns, handoffLimitsFor(contextWindow))) {
         return base;
     }
 
@@ -419,7 +487,13 @@ export const planAgentSwitch = internalQuery
     .output(vPlan)
     .query(async ({ args, ctx }) => await planAgentSwitchHandler(ctx, args));
 
-const vSwitchResult = v.object({ agent: vAgentRef, coldStartCostly: v.boolean(), messageId: v.union(v.string(), v.null()), switched: v.boolean() });
+const vSwitchResult = v.object({
+    agent: vSwitchAgentRef,
+    coldStartCostly: v.boolean(),
+    forkedThreadId: v.optional(v.string()),
+    messageId: v.union(v.string(), v.null()),
+    switched: v.boolean(),
+});
 
 /** Step three: the one transaction that claims the click, charges the summary and writes the divider. */
 export const commitAgentSwitch = internalMutation
@@ -477,17 +551,25 @@ export const beginSwitchSummary = internalMutation
     .mutation(async ({ args, ctx }) => await beginSwitchSummaryHandler(ctx, args));
 
 /** Writes the summary of `older`, or throws a refusal. Costs one utility-model call, metered by the gateway. */
-export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean) => Promise<string>;
+export type Summarise = (older: HandoffTurn[], omittedEarlier: boolean, limits?: HandoffLimits) => Promise<string>;
 
-const summariseWith =
-    (ctx: Parameters<typeof gatewayFetch>[0], who: { threadId: string; userId: string }): Summarise =>
-    async (older, omittedEarlier) => {
+export const summariseWith =
+    (ctx: Parameters<typeof gatewayFetch>[0] & Pick<ActionCtx, "runQuery">, who: { threadId: string; userId: string }): Summarise =>
+    async (older, omittedEarlier, limits) => {
         try {
-            const model = await getUtilityModel(gatewayFetch(ctx), who);
+            // The history is the owner's and the switch is the caller's, so a model must satisfy both users' rules.
+            const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: who.threadId as Id<"threads"> });
+
+            if (!thread) {
+                throw new Error("thread not found");
+            }
+
+            const rules = await loadSharedModelFilterRules(ctx, who.userId, thread.userId);
+            const model = await getUtilityModel(gatewayFetch(ctx), { ...who, rules });
             const { text } = await generateText({
-                maxOutputTokens: HANDOFF_SUMMARY_MAX_TOKENS,
+                maxOutputTokens: (limits ?? DEFAULT_HANDOFF_LIMITS).summaryMaxTokens,
                 model,
-                prompt: summaryPromptOf(older, omittedEarlier),
+                prompt: summaryPromptOf(older, omittedEarlier, limits),
                 system: HANDOFF_SUMMARY_SYSTEM,
                 temperature: 0,
             });
@@ -497,7 +579,16 @@ const summariseWith =
             }
 
             return text;
-        } catch {
+        } catch (error) {
+            // The user's own settings said no: a refusal they can read and act on, not a server fault.
+            if (error instanceof ModelFilterRulesUnavailableError) {
+                throw new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
+            }
+
+            if (error instanceof NoAllowedUtilityModelError) {
+                throw new LunoraError("BAD_REQUEST", NO_ALLOWED_UTILITY_MODEL_MESSAGE);
+            }
+
             throw new LunoraError("INTERNAL_SERVER_ERROR", "Could not summarise the conversation. Try again, or keep the full history.", {
                 data: { code: AGENT_SWITCH_SUMMARY_FAILED },
             });
@@ -528,10 +619,11 @@ const buildHandoff = async (
         return { mode: kind, summarized: false, text: "" };
     }
 
-    const { older, tail } = planHandoff(turns);
+    const limits = handoffLimitsFor(plan.contextWindow);
+    const { older, tail } = planHandoff(turns, limits);
 
     if (older.length === 0) {
-        return { mode: kind, summarized: false, text: assertWithinBudget(composeHandoff({ kind, tail })) };
+        return { mode: kind, summarized: false, text: assertWithinBudget(composeHandoff({ kind, tail }), limits) };
     }
 
     if (plan.allowance === false) {
@@ -546,9 +638,9 @@ const buildHandoff = async (
 
     held.fence = fence;
 
-    const summary = capSummary(await summarise(older, plan.omittedEarlier === true));
+    const summary = capSummary(await summarise(older, plan.omittedEarlier === true, limits), limits);
 
-    return { mode: kind, summarized: true, text: assertWithinBudget(composeHandoff({ kind, summary, tail })) };
+    return { mode: kind, summarized: true, text: assertWithinBudget(composeHandoff({ kind, summary, tail }), limits) };
 };
 
 /**
@@ -556,6 +648,17 @@ const buildHandoff = async (
  * builds the handoff (the summary first, fenced but not yet charged), then commits in one mutation.
  */
 export const runAgentSwitch = async (ctx: SwitchRunner, args: SwitchArgs & { mode?: RequestedMode }, summarise: Summarise): Promise<SwitchResult> => {
+    // To or from a coding agent: no summary and no charge, and a different runner means a new thread (acp/switch.ts).
+    if (args.target.kind === "host" || (await ctx.runQuery(internal.acp.switch.isHostSwitchSource, { threadId: args.threadId }))) {
+        return (await ctx.runMutation(internal.acp.switch.commitHostSwitch, {
+            clientId: args.clientId,
+            target: args.target,
+            threadId: args.threadId,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        })) as SwitchResult;
+    }
+
     const plan = (await ctx.runQuery(internal.chat.agent_switch.planAgentSwitch, args)) as Plan;
 
     if (!plan.leafId || !plan.mode) {
@@ -646,15 +749,17 @@ export const previewAgentSwitchHandler = async (ctx: QueryCtx, args: Omit<Switch
     }
 
     const { boundaryId } = await modeFor(ctx, checked, "portable");
+    const limits = handoffLimitsFor(windowOf(checked));
     // A reply reads the last DEFAULT_RECENT_MESSAGES rows, so that is what keeping the history costs.
     const window = { cap: PREVIEW_TOKEN_CAP, maxRows: DEFAULT_RECENT_MESSAGES };
     const contextTokens = await pathTokens(ctx, checked.thread._id, checked.leaf, window);
     const sinceTokens = boundaryId ? await pathTokens(ctx, checked.thread._id, checked.leaf, { ...window, stopAtId: boundaryId }) : contextTokens;
     // A switch back keeps what the model saw and hands over only what came since; a first handoff is the whole of it.
-    const handoffTokens = contextTokens - sinceTokens + Math.min(sinceTokens, HANDOFF_BUDGET_TOKENS);
+    const handedTokens = contextTokens - sinceTokens + Math.min(sinceTokens, limits.budgetTokens);
     const coldStartCostly = await pathExceedsColdStart(ctx, checked.thread._id, checked.leaf);
+    const defaultMode = coldStartCostly || !(await historyFits(ctx, checked)) ? "portable" : "full";
 
-    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode: coldStartCostly ? "portable" : "full", handoffTokens };
+    return { alreadyThere: false, coldStartCostly, contextTokens, defaultMode, handoffTokens: handedTokens };
 };
 
 export const previewAgentSwitch = authQuery

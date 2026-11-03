@@ -131,7 +131,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { streamId: "stream-1" });
+            await ctx.db.patch("toolApprovalRuns", row._id, { streamId: "stream-1" });
         });
 
         const second = await claim(OWNER, "deny");
@@ -145,7 +145,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { status: "denied" });
+            await ctx.db.patch("toolApprovalRuns", row._id, { status: "denied" });
         });
 
         expect(await claim(OWNER)).toStrictEqual({ kind: "already-resolved", status: "denied", streamId: null });
@@ -155,7 +155,7 @@ describe("claimToolApproval", () => {
         await harness.run(async (ctx: any) => {
             const [row] = await ctx.db.query("toolApprovalRuns").collect();
 
-            await ctx.db.patch(row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
+            await ctx.db.patch("toolApprovalRuns", row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
         });
 
         await expect(claim(OWNER)).rejects.toThrow("can no longer be resumed");
@@ -248,5 +248,50 @@ describe("what a pause notifies as", () => {
 
         expect(pushTitle("secret_request", undefined)).toBe("The assistant is asking for a secret");
         expect(pushUrgency("secret_request")).toBe("high");
+    });
+});
+
+describe("a run a resume replaced between its epoch check and its write", () => {
+    it("records no approval and notifies no one: the epoch is checked inside the writing mutation", async () => {
+        const streamId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m",
+                    runClaimedAt: 1,
+                    runEpoch: 1,
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        const record = async (epoch: number) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordPendingToolApprovals, {
+                        approvalIds: ["approval-stale"],
+                        config: CONFIG,
+                        run: { epoch, streamId },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+        const counts = async () =>
+            await harness.run(async (ctx: any) => {
+                const approvals = await ctx.db.query("toolApprovalRuns").collect();
+                const notifications = await ctx.db.query("notifications").collect();
+
+                return { approvals: approvals.length, notifications: notifications.length };
+            });
+
+        const before = await counts();
+
+        // The old invocation (epoch 0) finishes after the resume claimed the stream (epoch 1).
+        await expect(record(0)).rejects.toMatchObject({ code: "RUN_REPLACED" });
+        expect(await counts()).toStrictEqual(before);
+
+        await record(1);
+        expect(await counts()).toStrictEqual({ approvals: before.approvals + 1, notifications: before.notifications + 1 });
     });
 });

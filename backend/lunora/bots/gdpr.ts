@@ -20,7 +20,7 @@ export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promis
     for (const bot of bots) {
         // The kill is scheduled with the sandbox id, so it still runs after the session row is erased.
         await retireBotComputersIn(ctx, bot._id);
-        await ctx.db.delete(bot._id);
+        await ctx.db.delete("bots", bot._id);
     }
 
     return { hasMore: full(bots) };

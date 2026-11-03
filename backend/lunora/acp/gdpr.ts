@@ -238,7 +238,7 @@ export const deleteUserAcpSessions = internalMutation
     .mutation(async ({ args: { userId }, ctx }) => {
         const { page } = await ctx.db.acpSessions.findMany({ limit: BATCH, where: { userId } });
 
-        await Promise.all(page.map(async (row) => await ctx.db.delete(row._id)));
+        await Promise.all(page.map(async (row) => await ctx.db.delete("acpSessions", row._id)));
 
         return { hasMore: page.length >= BATCH };
     });
