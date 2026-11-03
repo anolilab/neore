@@ -85,10 +85,12 @@ export interface ConversationShape {
  * The models a route may pick: every enabled text row of the registry, as the (provider, API model) pair the gateway
  * matches its candidates by. A gateway model with no row here (a direct provider the app cannot run) is never picked.
  */
-const RUNNABLE_MODELS = MODEL_REGISTRY.filter((row) => enabledModelOf(row.id, { mode: "text" })).map((row) => {return {
-    modelApiId: row.modelApiId,
-    provider: row.provider,
-}});
+const RUNNABLE_MODELS = MODEL_REGISTRY.filter((row) => enabledModelOf(row.id, { mode: "text" })).map((row) => {
+    return {
+        modelApiId: row.modelApiId,
+        provider: row.provider,
+    };
+});
 
 /**
  * How long a route may take before the run keeps its fallback model. Above the gateway classifier's own deadline (3 s)
