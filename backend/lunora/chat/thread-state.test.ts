@@ -121,6 +121,85 @@ describe("awaitingInput leaves with the pause", () => {
     });
 });
 
+describe("a snoozed thread wakes early", () => {
+    const SNOOZED_UNTIL = 9_000_000_000_000;
+
+    const insertSnoozed = async (): Promise<string> =>
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", {
+                    lastReplyAt: 2000,
+                    snoozedUntil: SNOOZED_UNTIL,
+                    status: "active",
+                    title: "Snoozed",
+                    updatedAt: 111,
+                    userId: OWNER,
+                }),
+        );
+
+    const readThread = async (id: string): Promise<any> => await harness.run(async (context: any) => await context.db.get("threads", id as never));
+
+    it("un-snoozes on a pending approval, in the same write that records it", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { awaitingInput: "approval", status: "active", updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row).toMatchObject({ awaitingInput: "approval", status: "active" });
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes on a question through updateThread, the path a run's pause takes", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(updateThread as never, { patch: { awaitingInput: "question", status: "active", updatedAt: 9 }, threadId: id } as never),
+        );
+
+        const row = await readThread(id);
+
+        expect(row.awaitingInput).toBe("question");
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes on a failed run", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { status: "error", updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row.status).toBe("error");
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("stays snoozed for an ordinary write", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { updatedAt: 9 });
+        });
+
+        expect((await readThread(id)).snoozedUntil).toBe(SNOOZED_UNTIL);
+    });
+
+    it("stays snoozed for a finished reply", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { lastReplyAt: 3000, status: "active", updatedAt: 9 });
+        });
+
+        expect((await readThread(id)).snoozedUntil).toBe(SNOOZED_UNTIL);
+    });
+});
+
 describe("markThreadViewed", () => {
     it("stamps lastViewedAt for the owner without touching updatedAt, and only while a reply is unseen", async () => {
         const first: any = await as(OWNER).mutation(markThreadViewed as never, { threadId } as never);

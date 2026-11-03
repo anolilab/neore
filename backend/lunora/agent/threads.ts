@@ -28,7 +28,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
-import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
+import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
@@ -273,12 +273,8 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
-        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
-        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
-            await patchRow(ctx.db, "threads", oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
-        } else {
-            await ctx.db.patch("threads", args.threadId, withoutUndefined(args.patch));
-        }
+        // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
+        await patchThread(ctx.db, args.threadId, args.patch);
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 

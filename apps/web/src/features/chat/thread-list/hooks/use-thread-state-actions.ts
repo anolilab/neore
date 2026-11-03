@@ -12,6 +12,8 @@ import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
     snooze: (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => void;
+    /** Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. */
+    snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => void;
     /** Brings a snoozed thread back; the toast offers an undo that snoozes it again until the same time. */
     unsnooze: (threadId: string, previousUntil: number | undefined) => void;
 }
@@ -37,10 +39,8 @@ export const useThreadStateActions = (): ThreadStateActions => {
         [snoozeMutation, unsnoozeMutation, t],
     );
 
-    const snooze = useCallback(
-        (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => {
-            const until = snoozeUntil(choice, new Date());
-
+    const snoozeAt = useCallback(
+        (threadId: string, until: number, previousUntil: number | undefined) => {
             snoozeMutation({ threadId: threadId as Id<"threads">, until })
                 .then(() => {
                     const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -55,6 +55,13 @@ export const useThreadStateActions = (): ThreadStateActions => {
                 });
         },
         [snoozeMutation, restore, t],
+    );
+
+    const snooze = useCallback(
+        (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => {
+            snoozeAt(threadId, snoozeUntil(choice, new Date()), previousUntil);
+        },
+        [snoozeAt],
     );
 
     const unsnooze = useCallback(
@@ -73,5 +80,5 @@ export const useThreadStateActions = (): ThreadStateActions => {
         [unsnoozeMutation, restore, t],
     );
 
-    return { snooze, unsnooze };
+    return { snooze, snoozeAt, unsnooze };
 };

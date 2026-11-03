@@ -71,14 +71,38 @@ export const patchesWithoutAwaitingInput = (
     fields: Pick<ThreadPatch, "awaitingInput" | "lastReplyAt" | "status">,
 ): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
 
+/**
+ * Whether a write wakes a snoozed thread before its time: a run that pauses for the owner (an approval or a question),
+ * or one that fails. The owner should not have to find the thread in Snoozed to answer it, or to learn that it broke.
+ */
+export const patchesWakeSnooze = (row: Pick<Doc<"threads">, "snoozedUntil"> | null, fields: Pick<ThreadPatch, "awaitingInput" | "status">): boolean =>
+    row?.snoozedUntil !== undefined && (fields.awaitingInput !== undefined || fields.status === "error");
+
+/**
+ * The one writer of a thread's run state. A write that ends a pause or records a reply removes `awaitingInput`
+ * (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails also removes a snooze
+ * (`patchesWakeSnooze`). Both happen in the same patch, so a thread never shows as snoozed while it waits on a person.
+ */
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
-    if (fields.status === "running" || fields.lastReplyAt !== undefined) {
+    const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
+    const wakes = fields.awaitingInput !== undefined || fields.status === "error";
+
+    if (endsPause || wakes) {
         const row = await db.get("threads", threadId);
 
-        if (row && patchesWithoutAwaitingInput(row, fields)) {
-            await patchRow(db, "threads", row, { ...withoutUndefined(fields), awaitingInput: undefined });
+        if (row) {
+            const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
+            const clearsSnooze = patchesWakeSnooze(row, fields);
 
-            return;
+            if (clearsAwaiting || clearsSnooze) {
+                await patchRow(db, "threads", row, {
+                    ...withoutUndefined(fields),
+                    ...(clearsAwaiting && { awaitingInput: undefined }),
+                    ...(clearsSnooze && { snoozedUntil: undefined }),
+                });
+
+                return;
+            }
         }
     }
 

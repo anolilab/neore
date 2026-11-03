@@ -10,7 +10,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2, Trash2, X } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, memo, startTransition, Suspense, useCallback, useId, useMemo, useRef, useState } from "react";
+import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import {
@@ -31,7 +31,9 @@ import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
+import SnoozeUntilDialog from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
+import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
@@ -1237,6 +1239,18 @@ const HierarchicalThreadList: FC<
     };
 
     // Regular rendering with groups
+    // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
+    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
+    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
+
+    // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
+    useEffect(() => {
+        if (snoozeThreadId !== null && snoozeThread === undefined) {
+            setSnoozeThreadId(null);
+        }
+    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
+
     return (
         <div className="relative flex flex-col gap-2">
             {isSelectionMode && (
@@ -1271,6 +1285,18 @@ const HierarchicalThreadList: FC<
                 open={!!projectToDelete}
                 title={t`Delete Project`}
             />
+            {snoozeThread && (
+                <SnoozeUntilDialog
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setSnoozeThreadId(null);
+                        }
+                    }}
+                    open
+                    previousUntil={snoozeThread.snoozedUntil}
+                    threadId={snoozeThread.threadId}
+                />
+            )}
         </div>
     );
 };

@@ -293,6 +293,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     }, [needsYou, node.threadId]);
     // Read when the snooze menu opens, so render never touches the clock.
     const [snoozeMenuNow, setSnoozeMenuNow] = useState(0);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
     const { snooze, unsnooze } = useThreadStateActions();
 
     const formatRemainingTime = useCallback(
@@ -840,6 +841,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             <DropdownMenuItem
                                 onClick={() => snooze(node.threadId, "nextWeek", node.snoozedUntil)}
                             >{t`Snooze until next week`}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSnoozeThreadId(node.threadId)}>{t`Snooze until…`}</DropdownMenuItem>
                             {isSnoozed(snoozedUntil, snoozeMenuNow) && (
                                 <DropdownMenuItem onClick={() => unsnooze(node.threadId, node.snoozedUntil)}>{t`Unsnooze`}</DropdownMenuItem>
                             )}

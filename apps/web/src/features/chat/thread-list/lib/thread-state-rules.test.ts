@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
+import { customSnoozeUntil, hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
 
 const idle = { isOpen: false, isStreaming: false };
 
@@ -63,5 +63,39 @@ describe("snoozeUntil", () => {
 
         expect(afterMonday).toEqual(new Date(2026, 10, 2, 9, 0, 0, 0));
         expect(afterSunday).toEqual(new Date(2026, 9, 26, 9, 0, 0, 0));
+    });
+});
+
+describe("customSnoozeUntil", () => {
+    const now = new Date(2026, 10, 3, 10, 0, 0);
+
+    it("reads a local wall-clock time that is in the future", () => {
+        expect(customSnoozeUntil("2026-11-03T15:30", now)).toBe(new Date(2026, 10, 3, 15, 30).getTime());
+    });
+
+    it("refuses an empty, malformed, past or too distant value", () => {
+        expect(customSnoozeUntil("", now)).toBeUndefined();
+        expect(customSnoozeUntil("tomorrow", now)).toBeUndefined();
+        expect(customSnoozeUntil("2026-11-03T09:00", now)).toBeUndefined();
+        expect(customSnoozeUntil("2027-12-01T09:00", now)).toBeUndefined();
+    });
+});
+
+describe("customSnoozeUntil across a daylight-saving change", () => {
+    const zone = process.env.TZ;
+
+    beforeEach(() => {
+        process.env.TZ = "America/New_York";
+    });
+
+    afterEach(() => {
+        process.env.TZ = zone;
+    });
+
+    it("refuses a time the clock skips, instead of waking at another time", () => {
+        const now = new Date(2027, 2, 1, 12, 0, 0);
+
+        expect(customSnoozeUntil("2027-03-14T02:30", now)).toBeUndefined();
+        expect(customSnoozeUntil("2027-03-14T03:30", now)).toBe(new Date(2027, 2, 14, 3, 30).getTime());
     });
 });

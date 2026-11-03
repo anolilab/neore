@@ -38,6 +38,9 @@ interface ThreadListUIState {
     // Keyboard help
     showKeyboardHelp: boolean;
 
+    /** The thread the snooze dialog is open for, opened from its row. The list renders the dialog, so it survives the row. */
+    snoozeThreadId: string | null;
+
     // Tag manager dialog
     showManageTagsDialog: boolean;
 
@@ -67,6 +70,7 @@ interface ThreadListUIActions {
 
     // Keyboard help actions - supports both direct values and functional updates
     setShowKeyboardHelp: Dispatch<SetStateAction<boolean>>;
+    setSnoozeThreadId: (threadId: string | null) => void;
     setShowManageTagsDialog: (show: boolean) => void;
     // Project form dialog actions
     setShowProjectFormDialog: (show: boolean) => void;
@@ -89,6 +93,7 @@ const initialState: ThreadListUIState = {
     selectedTagIds: [],
     selectedThreadIds: new Set(),
     showKeyboardHelp: false,
+    snoozeThreadId: null,
     showManageTagsDialog: false,
     showProjectFormDialog: false,
     showSearch: false,
@@ -125,6 +130,7 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
                     }),
                 // Reset
                 reset: () => set(initialState),
+                setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
 
                 setEditingProject: (project) => set({ editingProject: project }),
                 setLastSelectedIndex: ((action: SetStateAction<number>) =>
