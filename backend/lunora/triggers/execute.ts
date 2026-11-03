@@ -27,7 +27,7 @@ import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt } from "./webhoo
 const ADMISSION_RETRY_DELAYS_MS = [100, 400];
 
 /** The most of a run's prompt the run log keeps; the run itself gets the whole prompt. */
-const MAX_LOGGED_PROMPT_LENGTH = 2_000;
+const MAX_LOGGED_PROMPT_LENGTH = 2000;
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
