@@ -29,7 +29,9 @@ export interface AutoGate {
     isAnonymous: boolean;
     pinnedByBotOrSkill: boolean;
     prompt: string;
-    thread: { activeAgent?: unknown; autoModel?: boolean; botId?: string; groupChat?: unknown; runner?: "host"; userId?: string };
+    /** The model the request named, before any skill or bot. Auto replaces only the thread's own default, never a named model. */
+    requestedModel: string | undefined;
+    thread: { activeAgent?: unknown; autoModel?: boolean; botId?: string; groupChat?: unknown; model?: string; runner?: "host"; userId?: string };
     userId: string;
 }
 
@@ -37,8 +39,9 @@ export interface AutoGate {
  * Whether this run routes. Plain hosted text threads only, in the owner's own turn, and only while the thread was
  * never switched: a switched thread keeps the agent its path derives.
  */
-export const shouldRouteAuto = ({ currentModel, isAnonymous, pinnedByBotOrSkill, prompt, thread, userId }: AutoGate): boolean =>
+export const shouldRouteAuto = ({ currentModel, isAnonymous, pinnedByBotOrSkill, prompt, requestedModel, thread, userId }: AutoGate): boolean =>
     thread.autoModel === true &&
+    (requestedModel === undefined || requestedModel === thread.model) &&
     !thread.activeAgent &&
     !thread.botId &&
     !thread.groupChat &&

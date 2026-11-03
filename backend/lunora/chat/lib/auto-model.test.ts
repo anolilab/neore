@@ -36,7 +36,8 @@ const gate = (overrides: Partial<AutoGate> = {}, thread: Partial<AutoGate["threa
         isAnonymous: false,
         pinnedByBotOrSkill: false,
         prompt: "hello",
-        thread: { autoModel: true, userId: "user-1", ...thread },
+        requestedModel: undefined,
+        thread: { autoModel: true, model: fallback.id, userId: "user-1", ...thread },
         userId: "user-1",
         ...overrides,
     };
@@ -66,6 +67,11 @@ const route = (modelId: string) => {
 };
 
 describe("shouldRouteAuto", () => {
+    it("does not route a send that names a model other than the thread's own", () => {
+        expect(shouldRouteAuto(gate({ requestedModel: target.id }))).toBe(false);
+        expect(shouldRouteAuto(gate({ requestedModel: fallback.id }))).toBe(true);
+    });
+
     it("routes a plain hosted text thread that opted in", () => {
         expect(shouldRouteAuto(gate())).toBe(true);
     });

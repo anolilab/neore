@@ -333,6 +333,7 @@ export const runStreamingAgent = internalAction
                         isAnonymous: isAnonymous === true,
                         pinnedByBotOrSkill: liveBot !== null || Boolean(invokedSkill?.config?.preferredModel),
                         prompt,
+                        requestedModel,
                         thread,
                         userId,
                     })
