@@ -9,6 +9,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -193,7 +194,16 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                     disabled={blocked}
                     maxLength={MAX_HOST_PROMPT_CHARS}
-                    onChange={(event) => setText(event.target.value)}
+                    onChange={(event) => {
+                        // Typed and pasted text both come through here; a joiner at the end waits for the next letter.
+                        const { removed, text: clean } = stripHiddenText(event.target.value, { keepTrailingJoiner: true });
+
+                        if (removed > 0) {
+                            toast.info(t`Hidden characters were removed from your message.`);
+                        }
+
+                        setText(clean);
+                    }}
                     onKeyDown={onKeyDown}
                     placeholder={t`Message the agent on your computer`}
                     rows={2}

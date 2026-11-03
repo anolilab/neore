@@ -13,6 +13,8 @@
 import type { HttpActionCtx, Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { stripHiddenText } from "@neore/ai/utils";
+
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
@@ -202,7 +204,9 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         return json({ error: "malformed" }, 400);
     }
 
-    const { requestId, text, threadId, unlockProof } = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+    const { requestId, text: rawText, threadId, unlockProof } = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+    // Hidden characters go before the cap and the empty check, so both apply to the text sent. No client can skip this.
+    const text = typeof rawText === "string" ? stripHiddenText(rawText).text : rawText;
 
     if (
         typeof requestId !== "string" ||

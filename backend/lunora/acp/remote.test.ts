@@ -1177,4 +1177,14 @@ describe("POST /hosts/send", () => {
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: 5 })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: "x".repeat(5000) })).resolves.toBe(400);
     });
+
+    it("takes hidden characters out before the checks, so the cap and the empty check apply to the text sent", async () => {
+        vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
+
+        // Only hidden characters is an empty prompt.
+        await expect(post({ requestId: "r", text: "\u{E0041}\u{202E}", threadId: "t" })).resolves.toBe(400);
+        // 30,000 visible characters and one tag character: the tag goes, so the text is within the cap and the request
+        // reaches the caller check (401 with no identity).
+        await expect(post({ requestId: "r", text: `${"x".repeat(30_000)}\u{E0041}`, threadId: "t" })).resolves.toBe(401);
+    });
 });
