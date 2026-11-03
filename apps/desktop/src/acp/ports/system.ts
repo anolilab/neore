@@ -18,22 +18,26 @@ const MAX_BUFFER = 16 * 1024 * 1024;
 export const firstExisting = (paths: ReadonlyArray<string>, exists: (path: string) => boolean = existsSync): string | undefined =>
     paths.find((path) => exists(path));
 
-/** Stdout of the tool; a non-zero exit with output is still output (`lsof` exits 1 when nothing matches). */
+/**
+ * Stdout of the tool. A failed run is refused even when some output arrived (a timeout, an overflow or a crash can leave a
+ * partial table, and acting on it would hide processes). The one exception is `lsof` exiting 1 with no output: nothing listens.
+ */
 const run = async (file: string, args: string[]): Promise<string> =>
     await new Promise((resolve, reject) => {
         execFile(file, args, { encoding: "utf8", env: { LC_ALL: "C", PATH: "/usr/bin:/bin" }, maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS }, (error, stdout) => {
-            if (error !== null && stdout === "") {
-                // Nothing listening is an empty answer, not a failure.
-                if ((error as { code?: number | string }).code === 1) {
-                    resolve("");
-                } else {
-                    reject(error);
-                }
+            if (error === null) {
+                resolve(stdout);
 
                 return;
             }
 
-            resolve(stdout);
+            if (stdout === "" && LSOF.includes(file) && (error as { code?: number | string }).code === 1) {
+                resolve("");
+
+                return;
+            }
+
+            reject(error);
         });
     });
 
@@ -78,7 +82,7 @@ export const realPortsSystem: PortsSystem = {
             throw new Error("ps is not installed, so processes cannot be listed");
         }
 
-        return parsePs(await run(ps, ["-axo", "pid=,ppid=,lstart=,comm="]));
+        return parsePs(await run(ps, ["-axo", "pid=,ppid=,stat=,lstart=,comm="]));
     },
     sleep: async (ms) => {
         await new Promise((resolve) => {

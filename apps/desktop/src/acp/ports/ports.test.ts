@@ -65,7 +65,7 @@ class FakeSystem implements PortsSystem {
 describe("reading the process table", () => {
     it("parses ps rows and keeps only the command's base name", () => {
         const rows = parsePs(
-            "  123     1 Mon Nov  3 10:00:00 2026 /usr/local/bin/node\n  124   123 Tue Nov 10 09:01:02 2026 /Applications/My App/Helper\nnot a row\n",
+            "  123     1 Ss Mon Nov  3 10:00:00 2026 /usr/local/bin/node\n  124   123 Ss Tue Nov 10 09:01:02 2026 /Applications/My App/Helper\nnot a row\n",
         );
 
         expect(rows).toEqual([
@@ -75,7 +75,7 @@ describe("reading the process table", () => {
     });
 
     it("cuts a long command name", () => {
-        expect(parsePs(`1 0 Mon Nov  3 10:00:00 2026 /bin/${"a".repeat(100)}`)[0]?.name).toHaveLength(40);
+        expect(parsePs(`1 0 Ss Mon Nov  3 10:00:00 2026 /bin/${"a".repeat(100)}`)[0]?.name).toHaveLength(40);
     });
 
     it("parses lsof field output, IPv4 and IPv6", () => {
@@ -261,4 +261,34 @@ describe.skipIf(toolsMissing)(toolsMissing ? "real processes (SKIPPED: needs mac
         expect(alive(seen.SLEEPER as number)).toBe(true);
         expect(await service.list(agentPid)).toEqual([]);
     }, 20_000);
+});
+
+describe("stopping while the process table changes", () => {
+    it("ends a child that a victim starts while the stop is waiting", async () => {
+        const system = new FakeSystem();
+        let spawned = false;
+
+        system.sleep = async () => {
+            if (spawned) {
+                return;
+            }
+
+            spawned = true;
+            system.table.push(row(70, 30, "child"));
+        };
+        system.stubborn.add(30);
+
+        expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(true);
+        expect(system.signals).toContainEqual([70, "SIGTERM"]);
+    });
+
+    it("counts a zombie as gone, so it is not killed again and the stop succeeds", async () => {
+        const system = new FakeSystem();
+
+        system.stubborn.add(31);
+        system.table = system.table.map((entry) => entry.pid === 31 ? { ...entry, zombie: true } : entry);
+
+        expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(true);
+        expect(system.signals).not.toContainEqual([31, "SIGKILL"]);
+    });
 });

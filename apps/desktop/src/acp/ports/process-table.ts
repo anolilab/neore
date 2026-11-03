@@ -13,6 +13,8 @@ export interface ProcessInfo {
     ppid: number;
     /** The start time as `ps` prints it. With the pid it identifies one process, so a reused pid does not match. */
     startedAt: string;
+    /** Exited and waiting to be reaped: dead, though its row is still in the table. Unset for a live process. */
+    zombie?: boolean;
 }
 
 export interface Listener {
@@ -33,11 +35,11 @@ const baseName = (command: string): string => {
     return (slash === -1 ? command : command.slice(slash + 1)).slice(0, MAX_NAME_CHARS);
 };
 
-/** One `ps` line: pid, ppid, the start time (five words), then the command. Anything else is not a process. */
+/** One `ps` line: pid, ppid, state, the start time (five words), then the command. Anything else is not a process. */
 const parsePsLine = (line: string): ProcessInfo | undefined => {
-    const [pidText, ppidText, ...rest] = line.trim().split(SPACES);
+    const [pidText, ppidText, state, ...rest] = line.trim().split(SPACES);
 
-    if (pidText === undefined || ppidText === undefined || !DIGITS.test(pidText) || !DIGITS.test(ppidText)) {
+    if (pidText === undefined || ppidText === undefined || state === undefined || !DIGITS.test(pidText) || !DIGITS.test(ppidText)) {
         return undefined;
     }
 
@@ -48,10 +50,11 @@ const parsePsLine = (line: string): ProcessInfo | undefined => {
         return undefined;
     }
 
-    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt };
+    // `Z` is a zombie: the process has exited, and the row stays until its parent reaps it.
+    return { name: baseName(command), pid: Number(pidText), ppid: Number(ppidText), startedAt, ...state.startsWith("Z") && { zombie: true } };
 };
 
-/** Parses `ps -axo pid=,ppid=,lstart=,comm=` (run with `LC_ALL=C`). Lines that do not fit are dropped. */
+/** Parses `ps -axo pid=,ppid=,stat=,lstart=,comm=` (run with `LC_ALL=C`). Lines that do not fit are dropped. */
 export const parsePs = (output: string): ProcessInfo[] => {
     const rows: ProcessInfo[] = [];
 

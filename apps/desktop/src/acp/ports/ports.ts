@@ -37,6 +37,14 @@ export interface StopTarget {
     startedAt: string;
 }
 
+/** The same process: a pid alone is not identity, since the system reuses pids. */
+const sameProcess = (row: { pid: number; startedAt: string }, other: { pid: number; startedAt: string }): boolean =>
+    row.pid === other.pid && row.startedAt === other.startedAt;
+
+/** Which of `victims` are still running in `table`: the same process, and not a zombie (a zombie has already exited). */
+const aliveOf = (table: ReadonlyArray<ProcessInfo>, victims: ReadonlyArray<ProcessInfo>): ProcessInfo[] =>
+    table.filter((row) => row.zombie !== true && victims.some((victim) => sameProcess(victim, row)));
+
 export class PortsService {
     public constructor(
         private readonly system: PortsSystem,
@@ -84,7 +92,7 @@ export class PortsService {
         }
 
         const table = await this.system.processes();
-        const root = this.below(table, agentPid).find((row) => row.pid === target.pid && row.startedAt === target.startedAt);
+        const root = this.below(table, agentPid).find((row) => sameProcess(row, target));
 
         if (root === undefined) {
             throw new Error("that server is no longer running in this session");
@@ -96,16 +104,30 @@ export class PortsService {
             throw new Error("that process no longer listens on a port");
         }
 
-        // The listener's own subtree only; a malformed table cannot put the agent or this app in it.
-        const victims = [root, ...descendantsOf(table, root.pid).filter((row) => row.pid !== agentPid && row.pid !== this.selfPid)];
+        // Read the table again right before the first signal: a child the listener started since the list is part of its tree now.
+        const fresh = await this.system.processes();
+        const current = this.below(fresh, agentPid).find((row) => sameProcess(row, root));
 
-        for (const victim of victims) {
+        if (current === undefined) {
+            throw new Error("that server is no longer running in this session");
+        }
+
+        const signalled: ProcessInfo[] = [current, ...this.newDescendants(fresh, [current], [current], agentPid)];
+
+        for (const victim of signalled) {
             this.system.kill(victim.pid, "SIGTERM");
         }
 
         for (let waited = 0; waited < this.graceMs; waited += POLL_MS) {
             // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
-            const alive = await this.existing(victims);
+            const now = await this.system.processes();
+            const alive = aliveOf(now, signalled);
+
+            // A child a victim started while it was still running is ended the same way, before the victim goes.
+            for (const newcomer of this.newDescendants(now, alive, signalled, agentPid)) {
+                this.system.kill(newcomer.pid, "SIGTERM");
+                signalled.push(newcomer);
+            }
 
             if (alive.length === 0) {
                 return true;
@@ -115,16 +137,14 @@ export class PortsService {
             await this.system.sleep(POLL_MS);
         }
 
-        // Pid AND start time: a pid the system gave to another process since the check above is not ours to kill.
-        const survivors = await this.existing(victims);
+        // Each survivor is matched by pid AND start time in a fresh read, so a pid the system gave to another process is not signalled.
+        const survivors = aliveOf(await this.system.processes(), signalled);
 
         for (const survivor of survivors) {
             this.system.kill(survivor.pid, "SIGKILL");
         }
 
-        const remaining = await this.existing(victims);
-
-        return remaining.length === 0;
+        return aliveOf(await this.system.processes(), signalled).length === 0;
     }
 
     /** Descendants of the agent that may ever be signalled: never the agent, never this app. */
@@ -132,14 +152,20 @@ export class PortsService {
         return descendantsOf(table, agentPid).filter((row) => row.pid !== agentPid && row.pid !== this.selfPid);
     }
 
-    /**
-     * Which of `victims` still exist as the same process. Not required to sit below the agent any more: a victim
-     * whose parent died was reparented, and it is still the process we were told to end.
-     */
-    private async existing(victims: ReadonlyArray<ProcessInfo>): Promise<ProcessInfo[]> {
-        const table = await this.system.processes();
-        const now = new Map(table.map((row) => [row.pid, row]));
+    /** Descendants of `roots` not already `known`: never the agent, never this app, never a process listed twice. */
+    private newDescendants(table: ReadonlyArray<ProcessInfo>, roots: ReadonlyArray<ProcessInfo>, known: ReadonlyArray<ProcessInfo>, agentPid: number): ProcessInfo[] {
+        const found: ProcessInfo[] = [];
 
-        return victims.filter((victim) => now.get(victim.pid)?.startedAt === victim.startedAt);
+        for (const root of roots) {
+            for (const row of descendantsOf(table, root.pid)) {
+                const skipped = row.pid === agentPid || row.pid === this.selfPid;
+
+                if (!skipped && known.every((entry) => !sameProcess(entry, row)) && found.every((entry) => !sameProcess(entry, row))) {
+                    found.push(row);
+                }
+            }
+        }
+
+        return found;
     }
 }

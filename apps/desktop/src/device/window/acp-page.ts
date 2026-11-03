@@ -720,12 +720,29 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
 /** How often the open session's listening ports are read again; a server can start without any session event. */
 const PORTS_POLL_MS = 5000;
 
+/** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
+const portsRead = { latest: 0 };
+
 const refreshPorts = async (): Promise<void> => {
     const { selected } = state;
-    const ports = selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected);
 
-    // Another session was opened while this one was read.
-    if (state.selected !== selected) {
+    portsRead.latest += 1;
+    const read = portsRead.latest;
+    let ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>;
+
+    try {
+        ports = selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected);
+    } catch (error: unknown) {
+        // A read that fails (a tool missing, a timeout) is said where the list is; it never stops the session from refreshing.
+        if (read === portsRead.latest && state.selected === selected) {
+            $("acp-ports-list").replaceChildren(item(`Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`));
+        }
+
+        return;
+    }
+
+    // A newer read started, or another session was opened while this one was read.
+    if (read !== portsRead.latest || state.selected !== selected) {
         return;
     }
 
@@ -765,6 +782,7 @@ const refreshSessions = async (): Promise<void> => {
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
                         state.selected = session.id;
                         refreshSessions();
+                        refreshPorts();
                     }),
                 );
             }),
@@ -779,7 +797,6 @@ const refreshSessions = async (): Promise<void> => {
     }
 
     renderSession(snapshot);
-    await refreshPorts();
 
     if (snapshot === undefined) {
         clearHooks();
@@ -892,13 +909,9 @@ export const initAcp = async (): Promise<void> => {
         renderImport();
     });
 
-    setInterval(async () => {
+    setInterval(() => {
         if (state.selected !== undefined && !document.hidden) {
-            try {
-                await refreshPorts();
-            } catch (error: unknown) {
-                showError(error);
-            }
+            refreshPorts();
         }
     }, PORTS_POLL_MS);
 
