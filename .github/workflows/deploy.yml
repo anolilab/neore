@@ -352,6 +352,9 @@ jobs:
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
                   # The Alchemy stage (names and state), not the GitHub environment.
                   DEPLOY_ENV: "${{ needs.resolve-env.outputs.stage }}"
+                  # Jurisdiction of the stored D1 databases and R2 buckets: eu unless the
+                  # environment sets DATA_JURISDICTION=default. Fixed when a resource is created.
+                  DATA_JURISDICTION: "${{ vars.DATA_JURISDICTION }}"
                   # Skips Alchemy's lookup of the account's workers.dev subdomain, which
                   # a new account has none of until one is registered.
                   CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"

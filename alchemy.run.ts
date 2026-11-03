@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 
 import backendBindings from "./backend/lunora-bindings.json" with { type: "json" };
+import { resolveDataJurisdiction } from "./backend/lunora/lib/data-jurisdiction";
 import { OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
@@ -334,13 +335,19 @@ if (stage === "production" && !mailFrom && !destroying) {
 const named = (name: string): string => (stage === "production" ? name : `${name}-${stage}`);
 const staged = (name: string): string => `${name}-${stage}`;
 
+// Where this stage's stored data is pinned (`DATA_JURISDICTION`, default `eu`; `default` opts a
+// non-EU test stage out). Cloudflare fixes it when a resource is created, so it is set on every
+// D1 database and R2 bucket below and, through the schema, on the Durable Objects. Queues, KV,
+// Vectorize and the Workers themselves take no jurisdiction.
+const dataJurisdiction = resolveDataJurisdiction();
+
 const COMPATIBILITY_DATE = "2026-09-01";
 
 // ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
 // R2 bucket for generated video blobs. Served via GET /v1/videos/:id/content.
-const VideoBucket = Cloudflare.R2.Bucket("llm-gateway-videos", { name: staged("llm-gateway-videos") });
+const VideoBucket = Cloudflare.R2.Bucket("llm-gateway-videos", { jurisdiction: dataJurisdiction, name: staged("llm-gateway-videos") });
 
 // Cloudflare Queues for video render jobs.
 //
@@ -358,7 +365,7 @@ const VideoRendersDlq = Cloudflare.Queues.Queue("llm-gateway-video-renders-dlq",
 const VideoRenders = Cloudflare.Queues.Queue("llm-gateway-video-renders", { name: staged("llm-gateway-video-renders") });
 
 // R2 bucket for generated music blobs. Served via GET /v1/music/:id/content.
-const MusicBucket = Cloudflare.R2.Bucket("llm-gateway-music", { name: staged("llm-gateway-music") });
+const MusicBucket = Cloudflare.R2.Bucket("llm-gateway-music", { jurisdiction: dataJurisdiction, name: staged("llm-gateway-music") });
 
 // Cloudflare Queues for music render jobs (same pattern as video — see above).
 // Music typically renders faster (<30s) so retry_delay is tighter.
@@ -370,6 +377,7 @@ const MusicRenders = Cloudflare.Queues.Queue("llm-gateway-music-renders", { name
 // `wrangler d1 migrations apply` is converted ONE WAY to Alchemy's own bookkeeping
 // table (`__alchemy_migrations`) on the first deploy.
 const GatewayUsageDb = Cloudflare.D1.Database("llm-gateway-usage", {
+    jurisdiction: dataJurisdiction,
     migrations: "./services/llm-gateway/migrations",
     name: staged("llm-gateway-usage"),
 });
@@ -402,9 +410,10 @@ const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: sta
 // access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
 // deploy. Only a data backfill (`defineMigration`) needs `lunora migrate up --prod
 // --yes --url <worker>` after the deploy; none exists yet.
-const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { name: named("neore-backend") });
+const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { jurisdiction: dataJurisdiction, name: named("neore-backend") });
 
 const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
+    jurisdiction: dataJurisdiction,
     name: named("neore-files"),
     // TUS uploads stream into multipart uploads. A part of one that never
     // completes is billed and invisible in a listing, so abort it after a week

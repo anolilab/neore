@@ -3568,6 +3568,11 @@ export const schema = defineSchema({
     // `payment_sessions`, `payment_subscriptions`, `payment_usageEvents`), owned by
     // the billing module. Merged, never copied: the store reads and writes them by
     // these names, which the package may change on any upgrade.
-    .extend(paymentExtension);
+    .extend(paymentExtension)
+    // Pins every Durable Object (shards, scheduler, shard registry) to the EU. Codegen reads
+    // this argument as a string literal, so it cannot follow `DATA_JURISDICTION`
+    // (`lib/data-jurisdiction.ts`); `data-jurisdiction.test.ts` pins that it stays "eu", the
+    // setting's default. A DO's jurisdiction is fixed at creation.
+    .jurisdiction("eu");
 
 export default schema;
