@@ -97,11 +97,17 @@ export interface RouteRequest {
      * ≥ 0.9 confidence, the gateway uses the pin and bypasses tier routing.
      */
     categoryPins?: Record<string, { modelId: string; provider: string }>;
+    /** Size of the conversation when `messages` carries only the latest turn. */
+    contextTokens?: number;
     messages: unknown[];
     modelFilterRules?: ModelFilterRules;
     preferredModel?: string;
     preferredQuality?: number;
+    /** The (provider, API model) pairs the caller can run: the gateway routes only among these (see the route's schema). */
+    runnableModels?: { modelApiId: string; provider: string }[];
     threadId?: string;
+    /** Built-in tools the send would offer. Counted from the tool set when `toolSchemas` is not sent. */
+    toolCount?: number;
     toolSchemas?: Record<string, JSONSchema7>;
     /** Optional W3C `traceparent` for cross-service trace propagation. */
     traceparent?: string;
@@ -252,7 +258,7 @@ export async function* streamViaGateway(context: ActionContext, request: Gateway
 /**
  * Smart model selection via the gateway.
  */
-export const routeViaGateway = async (context: ActionContext, request: RouteRequest): Promise<RouteResult> => {
+export const routeViaGateway = async (context: ActionContext, request: RouteRequest, options: { timeoutMs?: number } = {}): Promise<RouteResult> => {
     const client = getGatewayClient(context);
     const traceparent = request.traceparent ?? generateTraceparent();
 
@@ -260,7 +266,7 @@ export const routeViaGateway = async (context: ActionContext, request: RouteRequ
         body: request as Parameters<typeof sdkInternalRoute>[0]["body"],
         client,
         headers: { traceparent },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? FETCH_TIMEOUT_MS),
     });
 
     if (error || !response?.ok) {

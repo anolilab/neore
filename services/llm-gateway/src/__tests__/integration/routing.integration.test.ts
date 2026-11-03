@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { GATEWAY_MODELS } from "../../models.js";
 import { bindingEnv, makeInternalRequest } from "../helpers/internal.js";
 import { createMockEnv } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
@@ -177,5 +178,79 @@ describe("POST /internal/route (smart routing)", () => {
         const body = (await res.json()) as { modelId: string };
 
         expect(body.modelId).toBe("gpt-4o");
+    });
+});
+
+describe("POST /internal/route (runnable models)", () => {
+    const sized = GATEWAY_MODELS.find((model) => (model.contextWindow ?? 0) > 0)!;
+
+    it("routes only among the models the caller can run", async () => {
+        const res = await fetchApp(
+            signedRoute({
+                messages: [{ content: "What is 2+2?", role: "user" }],
+                runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                userTier: "pro",
+            }),
+            ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { modelApiId: string }).modelApiId).toBe(sized.modelApiId);
+    });
+
+    it("refuses when no runnable model holds the conversation", async () => {
+        const res = await fetchApp(
+            signedRoute({
+                contextTokens: 50_000_000,
+                messages: [{ content: "What is 2+2?", role: "user" }],
+                runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                userTier: "pro",
+            }),
+            ENV,
+        );
+
+        expect(res.status).toBe(403);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe("MODEL_BLOCKED");
+    });
+
+    it("never returns a model outside the runnable set, whatever the query's tier", async () => {
+        const prompts = ["hi", "What is 2+2?", "Write a detailed multi-step plan to migrate a database with zero downtime and rollback steps."];
+
+        for (const content of prompts) {
+            const res = await fetchApp(
+                signedRoute({
+                    messages: [{ content, role: "user" }],
+                    runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                    userTier: "pro",
+                }),
+                ENV,
+            );
+
+            if (res.status === 200) {
+                expect(((await res.json()) as { modelApiId: string }).modelApiId).toBe(sized.modelApiId);
+            } else {
+                expect(res.status).toBe(403);
+            }
+        }
+    });
+
+    it("routes a conversation that fits the preflight's limit, and refuses one that only fits the raw window", async () => {
+        const limit = Math.floor(sized.contextWindow! * 0.95);
+        const send = (contextTokens: number) =>
+            fetchApp(
+                signedRoute({
+                    contextTokens,
+                    messages: [{ content: "What is 2+2?", role: "user" }],
+                    runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                    userTier: "pro",
+                }),
+                ENV,
+            );
+
+        const fits = await send(limit - 4096);
+        const overflows = await send(limit - 4095);
+
+        expect(fits.status).toBe(200);
+        expect(overflows.status).toBe(403);
     });
 });

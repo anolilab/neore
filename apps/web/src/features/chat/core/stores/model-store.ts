@@ -56,6 +56,8 @@ export interface AudioGenerationSettings {
 }
 
 export interface PendingSettings {
+    /** A new thread's choice to route each send to a model picked per request. */
+    autoModel?: boolean;
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     isTempChat?: boolean;

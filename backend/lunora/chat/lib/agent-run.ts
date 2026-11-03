@@ -141,10 +141,10 @@ export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: 
     );
 
 /** Refuses a paid-plan model for a run that cannot pay for it (`canRunPaidModel`). Every run resolves its model here. */
-const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<void> => {
+const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string, plan?: RunPlan): Promise<void> => {
     const definition = MODEL_LOOKUP.get(model);
 
-    if (!definition || (await canRunPaidModel(ctx, userId, definition))) {
+    if (!definition || (await canRunPaidModel(ctx, userId, definition, plan))) {
         return;
     }
 
@@ -180,11 +180,11 @@ export const resolveBackupModelId = async (
     return (await canRunPaidModel(ctx, userId, definition)) ? definition.id : undefined;
 };
 
-export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<RunModel> => {
+export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string, plan?: RunPlan): Promise<RunModel> => {
     const customModel = parseCustomModelId(model);
 
     if (!customModel) {
-        await assertModelAllowed(ctx, model, userId);
+        await assertModelAllowed(ctx, model, userId, plan);
 
         return { allowTools: true, customProvider: undefined };
     }

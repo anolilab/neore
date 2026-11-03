@@ -9,11 +9,13 @@ export type HealthReport = {
 };
 
 export type ErrorResponse = {
-    error?: string | {
-        code?: string;
-        message?: string;
-        type?: string;
-    };
+    error?:
+        | string
+        | {
+              code?: string;
+              message?: string;
+              type?: string;
+          };
 };
 
 export type ModelFilterRules = {
@@ -94,10 +96,12 @@ export type InternalStreamRequest = {
     threadId?: string;
     contextWindow?: number;
     transforms?: Array<string>;
-    guardrails?: boolean | {
-        pii?: string;
-        injection?: string;
-    };
+    guardrails?:
+        | boolean
+        | {
+              pii?: string;
+              injection?: string;
+          };
     modelFilterRules?: ModelFilterRules;
 };
 
@@ -111,8 +115,19 @@ export type InternalRouteRequest = {
     userTier?: string;
     preferredModel?: string;
     preferredQuality?: number;
-    routingProfile?: 'fast' | 'balanced' | 'reasoning' | 'premium';
+    contextTokens?: number;
+    routingProfile?: "fast" | "balanced" | "reasoning" | "premium";
     modelFilterRules?: ModelFilterRules;
+    /**
+     * The (provider, API model) pairs the caller can run: the route considers only those, and only the ones whose context
+     * window holds the conversation plus the reply. A caller with no such candidate gets 403 MODEL_BLOCKED.
+     */
+    /** Number of tools the send would offer, when the caller does not send their schemas (`toolSchemas`). */
+    toolCount?: number;
+    runnableModels?: Array<{
+        modelApiId: string;
+        provider: string;
+    }>;
 };
 
 export type InternalRouteResponse = {
@@ -135,7 +150,7 @@ export type InternalRouteResponse = {
 };
 
 export type ModelProxyRequest = {
-    action: 'generate' | 'stream';
+    action: "generate" | "stream";
     provider: string;
     modelId: string;
     modelApiId: string;
@@ -173,7 +188,7 @@ export type RegisterWebhookRequest = {
     orgId?: string;
     url: string;
     secret?: string;
-    events: Array<'completion' | 'budget_exceeded' | 'guardrail_triggered' | 'provider_error'>;
+    events: Array<"completion" | "budget_exceeded" | "guardrail_triggered" | "provider_error">;
 };
 
 export type Webhook = {
@@ -194,10 +209,12 @@ export type ChatCompletionsRequest = {
      */
     model: string;
     messages: Array<{
-        role: 'system' | 'user' | 'assistant' | 'tool';
-        content: string | Array<{
-            [key: string]: unknown;
-        }>;
+        role: "system" | "user" | "assistant" | "tool";
+        content:
+            | string
+            | Array<{
+                  [key: string]: unknown;
+              }>;
         name?: string;
         tool_call_id?: string;
         tool_calls?: Array<{
@@ -208,7 +225,7 @@ export type ChatCompletionsRequest = {
     temperature?: number;
     max_tokens?: number;
     tools?: Array<{
-        type?: 'function';
+        type?: "function";
         function?: {
             name?: string;
             description?: string;
@@ -222,16 +239,19 @@ export type ChatCompletionsRequest = {
     presence_penalty?: number;
     stop?: string | Array<string>;
     transforms?: Array<string>;
-    response_format?: {
-        type?: 'json_object';
-    } | {
-        type?: 'json_schema';
-        json_schema?: {
-            [key: string]: unknown;
-        };
-    } | {
-        type?: 'text';
-    };
+    response_format?:
+        | {
+              type?: "json_object";
+          }
+        | {
+              type?: "json_schema";
+              json_schema?: {
+                  [key: string]: unknown;
+              };
+          }
+        | {
+              type?: "text";
+          };
 };
 
 export type ChatCompletionResponse = {
@@ -270,7 +290,7 @@ export type ModelsListResponse = {
 export type SaasEmbeddingsRequest = {
     model: string;
     input: string | Array<string>;
-    encoding_format?: 'float' | 'base64';
+    encoding_format?: "float" | "base64";
     dimensions?: number;
     user?: string;
 };
@@ -311,7 +331,7 @@ export type GetHealthData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/health';
+    url: "/health";
 };
 
 export type GetHealthErrors = {
@@ -336,7 +356,7 @@ export type GetLivenessData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/health/live';
+    url: "/health/live";
 };
 
 export type GetLivenessResponses = {
@@ -354,7 +374,7 @@ export type InternalGenerateData = {
     body: InternalGenerateRequest;
     path?: never;
     query?: never;
-    url: '/internal/generate';
+    url: "/internal/generate";
 };
 
 export type InternalGenerateErrors = {
@@ -383,7 +403,7 @@ export type InternalStreamData = {
     body: InternalStreamRequest;
     path?: never;
     query?: never;
-    url: '/internal/stream';
+    url: "/internal/stream";
 };
 
 export type InternalStreamErrors = {
@@ -412,7 +432,7 @@ export type InternalRouteData = {
     body: InternalRouteRequest;
     path?: never;
     query?: never;
-    url: '/internal/route';
+    url: "/internal/route";
 };
 
 export type InternalRouteResponses = {
@@ -428,7 +448,7 @@ export type InternalModelProxyData = {
     body: ModelProxyRequest;
     path?: never;
     query?: never;
-    url: '/internal/model/proxy';
+    url: "/internal/model/proxy";
 };
 
 export type InternalModelProxyErrors = {
@@ -459,7 +479,7 @@ export type InternalEmbeddingsData = {
     body: InternalEmbeddingsRequest;
     path?: never;
     query?: never;
-    url: '/internal/embeddings';
+    url: "/internal/embeddings";
 };
 
 export type InternalEmbeddingsErrors = {
@@ -490,7 +510,7 @@ export type ListWebhooksData = {
     query: {
         userId: string;
     };
-    url: '/internal/webhooks';
+    url: "/internal/webhooks";
 };
 
 export type ListWebhooksResponses = {
@@ -508,7 +528,7 @@ export type RegisterWebhookData = {
     body: RegisterWebhookRequest;
     path?: never;
     query?: never;
-    url: '/internal/webhooks';
+    url: "/internal/webhooks";
 };
 
 export type RegisterWebhookResponses = {
@@ -529,7 +549,7 @@ export type DeleteWebhookData = {
         id: string;
     };
     query?: never;
-    url: '/internal/webhooks/{id}';
+    url: "/internal/webhooks/{id}";
 };
 
 export type DeleteWebhookResponses = {
@@ -549,7 +569,7 @@ export type TestWebhookData = {
         id: string;
     };
     query?: never;
-    url: '/internal/webhooks/{id}/test';
+    url: "/internal/webhooks/{id}/test";
 };
 
 export type TestWebhookErrors = {
@@ -577,7 +597,7 @@ export type ChatCompletionsData = {
     body: ChatCompletionsRequest;
     path?: never;
     query?: never;
-    url: '/v1/chat/completions';
+    url: "/v1/chat/completions";
 };
 
 export type ChatCompletionsErrors = {
@@ -612,7 +632,7 @@ export type StartChatData = {
     };
     path?: never;
     query?: never;
-    url: '/v1/chat';
+    url: "/v1/chat";
 };
 
 export type StartChatErrors = {
@@ -645,7 +665,7 @@ export type ChatMediaData = {
     };
     path?: never;
     query?: never;
-    url: '/v1/chat/media';
+    url: "/v1/chat/media";
 };
 
 export type ChatMediaResponses = {
@@ -665,7 +685,7 @@ export type ChatEditData = {
     };
     path?: never;
     query?: never;
-    url: '/v1/chat/edit';
+    url: "/v1/chat/edit";
 };
 
 export type ChatEditResponses = {
@@ -685,7 +705,7 @@ export type ImprovePromptData = {
     };
     path?: never;
     query?: never;
-    url: '/v1/chat/improve-prompt';
+    url: "/v1/chat/improve-prompt";
 };
 
 export type ImprovePromptResponses = {
@@ -705,7 +725,7 @@ export type OptimizePromptData = {
     };
     path?: never;
     query?: never;
-    url: '/v1/prompts/optimize';
+    url: "/v1/prompts/optimize";
 };
 
 export type OptimizePromptResponses = {
@@ -723,7 +743,7 @@ export type ClientStreamData = {
     body: ClientStreamRequest;
     path?: never;
     query?: never;
-    url: '/v1/stream';
+    url: "/v1/stream";
 };
 
 export type ClientStreamErrors = {
@@ -772,17 +792,17 @@ export type ListModelsData = {
          * Filter by capabilities (comma-separated)
          */
         capability?: string;
-        enabled?: 'true' | 'false';
-        premium?: 'true' | 'false';
-        new?: 'true' | 'false';
-        tools?: 'true' | 'false';
-        multimodal?: 'true' | 'false';
+        enabled?: "true" | "false";
+        premium?: "true" | "false";
+        new?: "true" | "false";
+        tools?: "true" | "false";
+        multimodal?: "true" | "false";
         /**
          * Free-text search
          */
         search?: string;
     };
-    url: '/v1/models';
+    url: "/v1/models";
 };
 
 export type ListModelsResponses = {
@@ -798,7 +818,7 @@ export type CreateEmbeddingsData = {
     body: SaasEmbeddingsRequest;
     path?: never;
     query?: never;
-    url: '/v1/embeddings';
+    url: "/v1/embeddings";
 };
 
 export type CreateEmbeddingsErrors = {
@@ -823,7 +843,7 @@ export type ListEmbeddingModelsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/v1/embeddings/models';
+    url: "/v1/embeddings/models";
 };
 
 export type ListEmbeddingModelsResponses = {
@@ -848,7 +868,7 @@ export type GetUsageData = {
          */
         period?: string;
     };
-    url: '/v1/usage';
+    url: "/v1/usage";
 };
 
 export type GetUsageResponses = {
@@ -872,7 +892,7 @@ export type GetEventsData = {
          */
         types?: string;
     };
-    url: '/v1/events';
+    url: "/v1/events";
 };
 
 export type GetEventsResponses = {
@@ -888,9 +908,9 @@ export type GetCacheStatsData = {
     body?: never;
     path?: never;
     query?: {
-        period?: '24h' | '7d';
+        period?: "24h" | "7d";
     };
-    url: '/v1/cache/stats';
+    url: "/v1/cache/stats";
 };
 
 export type GetCacheStatsResponses = {
@@ -906,7 +926,7 @@ export type FlushCacheData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/v1/cache';
+    url: "/v1/cache";
 };
 
 export type FlushCacheResponses = {

@@ -170,7 +170,8 @@ export const vSwitchTarget = v.union(
 
 const vRequestedMode = v.union(v.literal("full"), v.literal("portable"));
 
-type Checked = { agent: AgentRef; kind: "same" } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
+type Checked =
+    { agent: AgentRef; kind: "same"; thread: Doc<"threads"> } | { from: AgentRef; kind: "ready"; leaf: Doc<"messages">; thread: Doc<"threads">; to: AgentRef };
 
 /**
  * A bot runs on its bot's model, a group chat on its participants, a messenger thread on the connection's, and a
@@ -246,7 +247,7 @@ const checkSwitch = async (ctx: QueryCtx, args: SwitchArgs): Promise<Checked> =>
     const to: AgentRef = { kind: "model", model: definition.id };
 
     if (sameAgent(from, to)) {
-        return { agent: from, kind: "same" };
+        return { agent: from, kind: "same", thread };
     }
 
     await assertReplyStarted(ctx, thread, leaf);
@@ -271,6 +272,11 @@ export const switchThreadAgentHandler = async (
     if (checked.kind === "same") {
         // Claimed too, so a stale replay of this pick cannot revert a switch made after it.
         await claimOnce(ctx, "switch", claimKeyOf(args), AGENT_SWITCH_CLAIM_TTL_MS, args.userId);
+
+        // Picking the model the thread already runs still ends Auto: it is the pick, with no divider.
+        if (checked.thread.autoModel) {
+            await patchThread(ctx.db, checked.thread._id, { autoModel: false });
+        }
 
         return { agent: checked.agent, coldStartCostly: false, messageId: null, switched: false };
     }
@@ -317,6 +323,8 @@ export const switchThreadAgentHandler = async (
 
     await patchThread(ctx.db, thread._id, {
         activeAgent: to,
+        // A switch names the agent from here on: Auto, which only routes a never-switched thread, ends with it.
+        ...(thread.autoModel && { autoModel: false }),
         ...(args.handoff?.text && { hasHandoff: true }),
         // The row now ends the path the thread displays.
         ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),

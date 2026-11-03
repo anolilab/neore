@@ -22,6 +22,7 @@ interface UseModelComboboxProps {
 }
 
 interface ThreadUpdateData {
+    autoModel?: boolean;
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
@@ -39,6 +40,8 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     // A switch on a long conversation waits here for the user to see what it costs.
     // It belongs to the thread it was asked on: shown on another one it is gone, and confirming it there switches nothing.
     const [asked, setPendingSwitch] = useState<{ pending: PendingAgentSwitch; threadId: string } | null>(null);
+    // The Auto choice being written to this thread, shown at once and until the write settles.
+    const [autoWrite, setAutoWrite] = useState<{ enabled: boolean; threadId: string } | null>(null);
     const pendingSwitch = asked && asked.threadId === threadId ? asked.pending : null;
 
     useEffect(() => {
@@ -49,7 +52,12 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     const { data: thread } = useQuery(crpc.chat.functions.getThread.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
 
     // updateThread is an Action, wrapped with TanStack Query for state management
-    const { mutateAsync: updateThreadAction } = useReactQueryMutation(useLunoraActionOptions(api.chat.functions.updateThread));
+    // A write that is not made now must fail now: queued for a reconnect it would land on a choice the user has since changed.
+    const { mutateAsync: updateThreadAction } = useReactQueryMutation({
+        ...useLunoraActionOptions(api.chat.functions.updateThread),
+        networkMode: "always",
+        retry: 0,
+    });
 
     const { mutateAsync: switchAgent } = useReactQueryMutation(useLunoraActionOptions(api.chat.agent_switch.switchThreadAgent));
 
@@ -67,6 +75,11 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
 
     // Get effective model (the agent of a switched thread, then the thread's model, then the pick)
     const effectiveModel = thread?.activeAgent?.model ?? thread?.model ?? selectedModel;
+
+    // A thread that runs on its own model chooses Auto; a switched thread's path decides its agent, so Auto is off there.
+    // An existing thread that has not loaded yet has no Auto state to show, and the new-thread draft is not its own.
+    const pendingAuto = useModelStore((state) => state.pendingSettings?.autoModel === true);
+    const autoModel = threadId ? thread?.autoModel === true && !thread.activeAgent : pendingAuto;
 
     // Update thread settings
     const updateThread = async (data: ThreadUpdateData) => {
@@ -208,6 +221,42 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
+    // Thread writes issued from this picker run one after another, in the order the user made them, so an older
+    // toggle cannot commit after a newer pick. Each write names only the fields it changes.
+    const threadWrites = useRef<Promise<unknown>>(Promise.resolve());
+    const writeThread = (args: Parameters<typeof updateThreadAction>[0]) => {
+        const write = threadWrites.current.catch(() => undefined).then(async () => await updateThreadAction(args));
+
+        threadWrites.current = write;
+
+        return write;
+    };
+
+    // Auto routes each send to a model the gateway picks. The thread's own model stays the fallback.
+    const setAutoModel = async (enabled: boolean) => {
+        if (threadId && thread) {
+            const token = { enabled, threadId };
+
+            setAutoWrite(token);
+
+            try {
+                await writeThread({ autoModel: enabled, threadId: threadId as Id<"threads"> });
+            } finally {
+                setAutoWrite((current) => (current === token ? null : current));
+            }
+
+            return;
+        }
+
+        if (threadId) {
+            return;
+        }
+
+        setPendingSettings((previous) => {
+            return { ...previous, autoModel: enabled };
+        });
+    };
+
     // Change model
     const changeModel = async (newModel: string) => {
         const previousModel = useModelStore.getState().selectedModel;
@@ -215,8 +264,28 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // Always update local store for immediate UI feedback
         setSelectedModel(newModel, threadId);
 
+        // Naming a model is choosing it, so Auto ends with the pick. A new thread holds it in the composer; an existing one
+        // ends it in the same write that stores the model, or with the switch itself, so a pick that is cancelled or fails
+        // leaves Auto as it was.
+        if (autoModel && !threadId) {
+            setPendingSettings((previous) => {
+                return { ...previous, autoModel: false };
+            });
+        }
+
         // A text thread records the change as a switch in its transcript; the thread's own model stays
         // what it was created with, which is what a branch from before the switch runs on.
+        // Naming the model the thread already runs is not a switch: it only ends Auto, with no divider.
+        if (threadId && thread && autoModel && thread.model === newModel) {
+            try {
+                await writeThread({ autoModel: false, threadId: threadId as Id<"threads"> });
+            } catch (error) {
+                showError(error instanceof Error ? error : t`Could not change the model. Please try again.`);
+            }
+
+            return;
+        }
+
         if (threadId && thread && canSwitchAgent(thread, newModel) && (await startSwitch(newModel, threadId, thread))) {
             return;
         }
@@ -224,10 +293,21 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         // If existing thread, also persist to Lunora. A switched thread keeps its model: it is the agent of every
         // branch from before the first switch, and a pick the server cannot switch to lives in the composer only.
         if (threadId && thread && !thread.activeAgent) {
-            await updateThreadAction({
-                model: newModel,
-                threadId: threadId as Id<"threads">,
-            });
+            try {
+                await writeThread({
+                    ...(autoModel && { autoModel: false }),
+                    model: newModel,
+                    threadId: threadId as Id<"threads">,
+                });
+            } catch (error) {
+                if (previousModel) {
+                    setSelectedModel(previousModel, threadId);
+                }
+
+                showError(error instanceof Error ? error : t`Could not change the model. Please try again.`);
+
+                return;
+            }
         }
 
         // Switches on a thread are counted by `runSwitch`; this pick changed the model without one.
@@ -236,12 +316,17 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
         }
     };
 
+    const pendingAutoWrite = autoWrite?.threadId === threadId ? autoWrite : null;
+
     return {
+        autoModel: pendingAutoWrite ? pendingAutoWrite.enabled : autoModel,
+        autoModelPending: pendingAutoWrite !== null,
         cancelSwitch,
         changeModel,
         confirmSwitch,
         pendingSwitch,
         model: effectiveModel,
+        setAutoModel,
         thread,
         updateThread,
     };

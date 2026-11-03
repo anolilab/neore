@@ -17808,6 +17808,9 @@
                 "schema": {
                   "items": {
                     "properties": {
+                      "autoModel": {
+                        "type": "boolean"
+                      },
                       "category": {
                         "type": "string"
                       },
@@ -20405,6 +20408,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "autoModel": {
+                        "type": "boolean"
+                      },
                       "customSystemPrompt": {
                         "type": "string"
                       },

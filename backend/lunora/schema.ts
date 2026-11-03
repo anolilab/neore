@@ -2961,6 +2961,9 @@ export const schema = defineSchema({
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // Each send resolves to one concrete model chosen by the gateway's query routing (`chat/lib/auto-model.ts`).
+        // `model` stays a concrete id (the fallback); unset = off. Never set on a switched thread's behalf.
+        autoModel: v.optional(v.boolean()),
         // The last run paused for the owner (a tool approval, or an askUser question). Set in the
         // same patch that ends the run (`chat/lib/agent-run.ts#setThreadStatus`); removed by any
         // write that puts the thread back to `running` (`agent/table-writes.ts#patchThread`).

@@ -32,6 +32,7 @@ export interface CachedVerdict {
 
 export interface VerdictCacheKeyInput {
     availableTiers: ReadonlyArray<QueryTier>;
+    contextTokens: number;
     hasImages: boolean;
     lastUserMessage: string;
     toolCount: number;
@@ -54,7 +55,10 @@ const digest = async (raw: string): Promise<string> => {
 const buildKey = async (input: VerdictCacheKeyInput): Promise<string> => {
     // JSON encoding keeps the fields unambiguous without needing a separator
     // that the prompt text itself could contain.
+    // The classifier reads the conversation size, so a verdict is shared only between sizes of one doubling band.
+    const contextBucket = Math.floor(Math.log2(1 + input.contextTokens));
     const material = JSON.stringify([
+        contextBucket,
         input.lastUserMessage.slice(0, MAX_KEY_CONTENT_LENGTH),
         input.toolCount,
         input.hasImages,

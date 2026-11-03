@@ -31,6 +31,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
+import { parseCustomModelId } from "@neore/ai/models";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 import z from "zod/v4";
@@ -628,6 +629,7 @@ export const createThread = authMutation
 
 export const createThreadWithInitialMessage = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         fileIds: v.optional(v.array(v.string())),
@@ -647,6 +649,7 @@ export const createThreadWithInitialMessage = internalMutation
     .mutation(
         async ({
             args: {
+                autoModel,
                 customSystemPrompt,
                 enabledFeatures,
                 fileIds,
@@ -674,6 +677,7 @@ export const createThreadWithInitialMessage = internalMutation
             // Batch all settings + status update in one mutation (much faster than separate calls)
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
+                    ...(autoModel === true && { autoModel }),
                     customSystemPrompt,
                     enabledFeatures,
                     language,
@@ -1342,6 +1346,7 @@ export const getThreadSettings = internalQuery
 
 export const updateThreadModel = internalMutation
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -1354,7 +1359,10 @@ export const updateThreadModel = internalMutation
     })
     .output(v.null())
     .mutation(
-        async ({ args: { customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId }, ctx: context }) => {
+        async ({
+            args: { autoModel, customSystemPrompt, dictationLanguage, enabledFeatures, model, order, reasoningEffort, statelessMode, threadId },
+            ctx: context,
+        }) => {
             const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
                 threadId: threadId as Id<"threads">,
             });
@@ -1369,6 +1377,7 @@ export const updateThreadModel = internalMutation
             // The operations are logically independent (settings vs order), so this is acceptable.
             await context.runMutation(internal.agent.threads.updateThreadSettings, {
                 patch: {
+                    autoModel,
                     customSystemPrompt,
                     dictationLanguage,
                     enabledFeatures,
@@ -1394,6 +1403,7 @@ export const updateThreadModel = internalMutation
 export const updateThread = authAction
     .use(rateLimit("chat/update"))
     .input({
+        autoModel: v.optional(v.boolean()),
         customSystemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         enabledFeatures: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -1409,7 +1419,20 @@ export const updateThread = authAction
     .output(v.string())
     .action(
         async ({
-            args: { customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode, status, summary, threadId, title, unlockProof },
+            args: {
+                autoModel,
+                customSystemPrompt,
+                enabledFeatures,
+                model,
+                order,
+                reasoningEffort,
+                statelessMode,
+                status,
+                summary,
+                threadId,
+                title,
+                unlockProof,
+            },
             ctx: context,
         }) => {
             const { userId } = context.user;
@@ -1423,6 +1446,10 @@ export const updateThread = authAction
             // A switched thread's stored `model` is where the paths before its first switch recover their agent: only
             // a switch changes what it runs on, so the argument is ignored there (the palette's archive passes the model of
             // whichever thread is open).
+            if (autoModel === true && threadData?.groupChat) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available in a group chat");
+            }
+
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
@@ -1430,6 +1457,11 @@ export const updateThread = authAction
 
             if (!effectiveModel) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
+            }
+
+            // A custom endpoint or a bot's chat never routes (`shouldRouteAuto`), so Auto cannot be saved on one.
+            if (autoModel === true && (threadData?.botId || parseCustomModelId(effectiveModel) !== null)) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available for this chat");
             }
 
             const agent = await getAgentForUser(context, userId, effectiveModel, threadLanguage);
@@ -1460,7 +1492,17 @@ export const updateThread = authAction
                 });
             }
 
+            // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
+            // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
+            // caller says otherwise.
+            // A status change (archive, restore) sends whatever model the caller has open, which is not a pick.
+            const pickEndsAuto = status === undefined && model !== undefined && model !== threadData?.model;
+            const pickFallback = pickEndsAuto ? false : undefined;
+            const stays = !(threadData?.activeAgent || threadData?.runner === "host");
+            const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
+
             await context.runMutation(internal.chat.functions.updateThreadModel, {
+                autoModel: autoModelForWrite,
                 customSystemPrompt,
                 enabledFeatures,
                 model: effectiveModel,

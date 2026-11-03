@@ -1830,6 +1830,7 @@ export interface Doc_threads {
     _creationTime: number;
     activeAgent?: { kind: "model"; model: string };
     activeLeafMessageId?: string;
+    autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;
@@ -4834,6 +4835,7 @@ export interface Insert_threads {
     _creationTime?: number;
     activeAgent?: { kind: "model"; model: string };
     activeLeafMessageId?: string;
+    autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;

@@ -14,7 +14,7 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
-import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -38,6 +38,7 @@ import {
     isAgentRunError,
     loadRunContext,
     memoryToCarry,
+    readRunPlan,
     resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
@@ -59,9 +60,11 @@ import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
-import type { SearchMode } from "./lib/tool-builder";
+import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
+import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
@@ -313,6 +316,78 @@ export const runStreamingAgent = internalAction
                     ? requestedModel
                     : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 
+                // "Auto": this send runs on the one model the gateway's routing picks, named like any other pick below. A bot's or a
+                // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`). A resume continues a reply that
+                // already has a model: the one recorded in its job arguments below.
+                let routedModel: string | undefined;
+                // The plan Auto authorized its route with (the run's organization). The model gate checks the same plan.
+                let autoPlan: Awaited<ReturnType<typeof readRunPlan>> | undefined;
+
+                // A goal runs on the model it starts with, every round: its continuation rounds are machine-written and read the
+                // goal's saved model, so routing its first round alone would leave the later rounds on another model.
+                if (
+                    resume === undefined &&
+                    goalSkill === undefined &&
+                    sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT &&
+                    shouldRouteAuto({
+                        currentModel: model,
+                        isAnonymous: isAnonymous === true,
+                        pinnedByBotOrSkill: liveBot !== null || Boolean(invokedSkill?.config?.preferredModel),
+                        prompt,
+                        requestedModel,
+                        thread,
+                        userId,
+                    })
+                ) {
+                    // The route is sized for what the model will receive: the history, the instructions it is given (the agent's
+                    // own, the loaded context and the skill's), and the built-in tools. MCP tools are added later and not counted.
+                    const fallbackTools = getToolsForModelAndMode(
+                        model,
+                        "chat",
+                        invokedSkill?.config
+                            ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
+                            : undefined,
+                        { autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment },
+                    );
+
+                    routedModel = await resolveAutoModel(ctx, {
+                        conversation: async () => {
+                            const [history, run, fallbackAgent] = await Promise.all([
+                                ctx.runQuery(internal.chat.auto_model_context.getAutoRouteContext, {
+                                    promptMessageId: messageId,
+                                    stateless: thread?.statelessMode ?? statelessMode,
+                                    threadId: threadId as Id<"threads">,
+                                }),
+                                runContextPromise,
+                                getAgentForUser(ctx, userId, model, thread?.language),
+                            ]);
+                            const systemCharacters =
+                                (fallbackAgent.options.instructions ?? "").length +
+                                run.contextParts.join("\n\n").length +
+                                (invokedSkill?.instructions.length ?? 0);
+
+                            return {
+                                contextTokens: history.contextTokens + Math.ceil(estimateTokensFromCharacters(systemCharacters)),
+                                files: history.files,
+                                images: history.images,
+                            };
+                        },
+                        // The thread's own model is the fallback: a send that names another model must not run on it.
+                        fallbackModel: thread?.model ?? model,
+                        filterRules: agentModulePrefs.modelFilterRules ?? undefined,
+                        plan: async () => {
+                            autoPlan = await readRunPlan(ctx, userId, organizationId);
+
+                            return autoPlan;
+                        },
+                        prompt,
+                        threadId,
+                        toolCount: Object.keys(fallbackTools).length,
+                        userId,
+                    });
+                    model = routedModel;
+                }
+
                 // Auto-detect task complexity
                 let taskAnalysis: TaskAnalysis | undefined;
                 let agentMode: { enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean };
@@ -351,7 +426,7 @@ export const runStreamingAgent = internalAction
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user
                 // said its models support them.
-                const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId);
+                const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId, autoPlan);
 
                 // Built-ins + MCP tools, with the user's per-tool permissions applied
                 // (`off` removed, `ask` gated behind a tool-approval request) — and
@@ -482,7 +557,7 @@ export const runStreamingAgent = internalAction
                     origin,
                     ...(goalSkill && { skill: goalSkill }),
                     streamId,
-                    streamingConfig,
+                    streamingConfig: routedModel === undefined ? streamingConfig : { ...streamingConfig, model: routedModel },
                     threadId,
                     userId,
                     userPrompt,
