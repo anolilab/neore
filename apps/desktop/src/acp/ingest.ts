@@ -28,7 +28,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ChildEvent } from "./children";
-import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, TurnSummary } from "./host-events";
+import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, TurnSummary } from "./host-events";
 import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
@@ -45,6 +45,10 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** The most of a turn's text kept for its references; a reply is capped at the same length on the backend. */
 const MAX_TURN_TEXT_CHARS = 256_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
+
+/** Agent state is coalesced to one post per session per this many ms; a failed post waits this long before its retry. */
+const STATE_DEBOUNCE_MS = 2000;
+const STATE_RETRY_MS = 30_000;
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
@@ -95,6 +99,11 @@ export class HostPoster implements SessionObserver {
 
     private readonly sessions = new Map<string, SessionLink>();
 
+    /** The agent's own reports not yet posted, by session: the newest value of each field (`sessionState`). */
+    private readonly pendingState = new Map<string, SessionStatePatch>();
+
+    private stateTimer: ReturnType<typeof setTimeout> | undefined;
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -142,6 +151,10 @@ export class HostPoster implements SessionObserver {
 
         this.sessions.set(sessionId, link);
 
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
+
         if (this.options.deviceId() === undefined) {
             // Not paired: the session stays on this computer.
             link.threadId = null;
@@ -152,6 +165,15 @@ export class HostPoster implements SessionObserver {
         // A session the backend started already has its thread; the open still goes out, to turn it from starting to idle.
         link.threadId = threadId;
         link.open();
+    }
+
+    /**
+     * What the agent reported about itself. The newest value of each field is kept until the next post, so a burst of
+     * usage updates (one per model step) costs one post, not one each.
+     */
+    public sessionState(sessionId: string, patch: SessionStatePatch): void {
+        this.pendingState.set(sessionId, { ...this.pendingState.get(sessionId), ...patch });
+        this.scheduleState(STATE_DEBOUNCE_MS);
     }
 
     /** This computer was paired: the sessions that stayed local while it was not now open on the backend. */
@@ -331,6 +353,8 @@ export class HostPoster implements SessionObserver {
 
     /** Stops every timer. Output not yet sent is lost, as the process is going away; the next start ends those turns as interrupted. */
     public stop(): void {
+        clearTimeout(this.stateTimer);
+        this.stateTimer = undefined;
         this.stopped = true;
 
         for (const channel of this.channels.values()) {
@@ -436,7 +460,75 @@ export class HostPoster implements SessionObserver {
             }
         }
 
+        // A state report that waited for the thread goes out now.
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
+
         this.persist();
+    }
+
+    private scheduleState(ms: number): void {
+        if (this.stateTimer !== undefined) {
+            return;
+        }
+
+        this.stateTimer = setTimeout(async () => {
+            this.stateTimer = undefined;
+            await this.flushState();
+        }, ms);
+    }
+
+    /**
+     * One signed `session_state` post per session with a pending report. The payload is built here, at send time, so a
+     * retry carries a fresh `issuedAt` (an old one fails the backend's freshness check after an outage). A session with
+     * no thread yet keeps its report; a local-only session drops it.
+     */
+    private async flushState(): Promise<void> {
+        const deviceId = this.options.deviceId();
+        // A snapshot: a retry below writes its entry back, and this pass must not reach that entry again.
+        const snapshot = new Map(this.pendingState);
+
+        for (const sessionId of snapshot.keys()) {
+            const patch = this.pendingState.get(sessionId);
+
+            if (patch === undefined) {
+                continue;
+            }
+
+            const link = this.sessions.get(sessionId);
+
+            // A local-only session never posts; a session not opened yet, or without its thread, keeps the report.
+            if (link?.threadId === null) {
+                this.pendingState.delete(sessionId);
+
+                continue;
+            }
+
+            if (deviceId === undefined || link?.threadId === undefined) {
+                continue;
+            }
+
+            this.pendingState.delete(sessionId);
+
+            const now = this.now();
+            const payload = JSON.stringify({ deviceId, events: [{ ...patch, at: now, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
+            let result: PostResult;
+
+            try {
+                // One post per session, in order: each is signed when it is sent.
+                // eslint-disable-next-line no-await-in-loop
+                result = await this.request(payload);
+            } catch {
+                result = { kind: "retry" };
+            }
+
+            if (result.kind === "retry") {
+                // Keep what is newer than this send, and let the next flush carry it with the rest.
+                this.pendingState.set(sessionId, { ...patch, ...this.pendingState.get(sessionId) });
+                this.scheduleState(STATE_RETRY_MS);
+            }
+        }
     }
 
     private async sendTurn(channel: TurnChannel, firstSeq: number, events: HostEvent[]): Promise<PostResult> {

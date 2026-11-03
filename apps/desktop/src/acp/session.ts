@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
+import { usageOf } from "./agent-state";
 import { reportFromHandshake } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
@@ -777,6 +778,16 @@ export class AgentSession {
             case "tool_call_update": {
                 this.upsertTool(turn, update);
                 break;
+            }
+            case "usage_update": {
+                // Not the window's business: the usage goes to the backend, which shows it in the thread's context meter.
+                const usage = usageOf(update, this.options.process.scrub);
+
+                if (usage !== undefined) {
+                    this.observe((observer) => observer.sessionState?.(this.id, { usage }));
+                }
+
+                return;
             }
             default: {
                 return;

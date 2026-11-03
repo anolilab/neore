@@ -55,6 +55,11 @@
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
   Host turns write no usage row and charge no credit.
+  **Agent-reported state** (`session_state`, a turn-less post like `session_open`): what the agent says about itself
+  outside its turns (`usage_update`: the context meter) is stored on `acpSessions.agentState` with `agentStateAt`.
+  Each field present replaces the stored one; a report older than `agentStateAt` is dropped, and one whose values are
+  stored writes nothing. The desktop coalesces it to one post per session every 2 s, keeps the newest value of each
+  field, and signs a fresh payload on every send (`HostPoster.flushState`). Read it through `getHostSession`.
   **File-event hooks** (`apps/desktop/src/acp/hooks/`, acp-agent-host.md §4.10)
   read `.neore/hooks.json` from the approved folder — repository content, so inert until the
   local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),

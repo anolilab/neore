@@ -18,6 +18,7 @@ import type { FC, KeyboardEvent } from "react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
@@ -74,6 +75,15 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
     );
 };
 
+/** A cost the agent reported, as money. An unknown currency code is shown as the bare number, never a thrown error. */
+const formatReportedCost = (cost: { amount: number; currency: string }): string => {
+    try {
+        return new Intl.NumberFormat(undefined, { currency: cost.currency, style: "currency" }).format(cost.amount);
+    } catch {
+        return `${cost.amount} ${cost.currency}`;
+    }
+};
+
 const HostComposer: FC<{ className?: string; threadId: string }> = ({ className, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -119,6 +129,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const status = session?.status;
     const blocked = status === "ended";
     const canSend = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !sending && !running && !blocked;
+    const usage = session?.agentState?.usage;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
 
@@ -185,6 +196,15 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     >
                         {t`Continue`}
                     </Button>
+                </div>
+            )}
+            {usage !== undefined && usage.size > 0 && (
+                <div className="flex justify-end">
+                    <ContextUsageMeter
+                        contextWindow={usage.size}
+                        detail={usage.cost === undefined ? undefined : t`Cost reported by the agent: ${formatReportedCost(usage.cost)}`}
+                        usedTokens={usage.used}
+                    />
                 </div>
             )}
             <div className="flex items-end gap-2">

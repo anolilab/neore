@@ -13,7 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
-import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vAcpAgentState, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -156,6 +156,10 @@ export const schema = defineSchema({
     acpSessions: defineTable({
         agentKey: v.string(),
         agentLabel: v.string(),
+        // What the agent reported about itself outside its turns (context use, cost). Unset until it reports.
+        agentState: v.optional(vAcpAgentState),
+        // The `at` of the newest report applied to `agentState`; an older report is dropped.
+        agentStateAt: v.optional(v.number()),
         capabilities: v.optional(vCapabilityReport),
         createdAt: v.number(),
         deviceId: v.id("devices"),

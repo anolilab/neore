@@ -30,6 +30,17 @@ export const vHostEndReason = v.union(
     v.literal("stopped"),
 );
 
+/** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
+export const vAcpAgentState = v.object({
+    usage: v.optional(
+        v.object({
+            cost: v.optional(v.object({ amount: v.number(), currency: v.string().max(8) })),
+            size: v.number(),
+            used: v.number(),
+        }),
+    ),
+});
+
 export const vAcpSessionStatus = v.union(v.literal("starting"), v.literal("idle"), v.literal("busy"), v.literal("offline"), v.literal("ended"));
 
 /**
@@ -70,6 +81,24 @@ export const vHostEvent = v.union(
         user: v.string().max(100_000),
     }),
     v.object({ kind: v.literal("import_end") }),
+    // The agent's own state (the desktop's turn-less `session_state` post). Each field present replaces the stored one; `at` orders
+    // the reports, so an older one arriving late is dropped (`applySessionState`).
+    v.object({
+        at: v.number().check((at) => Number.isSafeInteger(at) && at >= 0, { message: "Invalid time" }),
+        kind: v.literal("session_state"),
+        usage: v.optional(
+            v.object({
+                cost: v.optional(
+                    v.object({
+                        amount: v.number().check((amount) => Number.isFinite(amount) && amount >= 0, { message: "Invalid cost" }),
+                        currency: v.string().min(1).max(8),
+                    }),
+                ),
+                size: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+                used: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+            }),
+        ),
+    }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),
     v.object({ kind: v.literal("text"), text: v.string().max(65_536) }),
     v.object({ kind: v.literal("reasoning"), text: v.string().max(65_536) }),

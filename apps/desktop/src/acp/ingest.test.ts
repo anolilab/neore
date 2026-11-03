@@ -1258,3 +1258,98 @@ describe("a restart", () => {
         expect(await runningTurns()).toEqual({ turns: [{ sessionId: "s1", threadId: "thread-1", turnId: "t1" }] });
     });
 });
+
+describe("what the agent reports about itself", () => {
+    const usage = (used: number) => {
+        return { size: 200_000, used };
+    };
+
+    // The state posts the backend received, in order. A state report is not a turn event (`HostEvent`), so its kind is read off the raw event.
+    const statePosts = () => backend.posts.filter((entry) => (entry.post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+
+    it("posts a report as a turn-less session post, signed, once the session has its thread", async () => {
+        const host = poster();
+
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(backend.posts).toEqual([]);
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(20) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post).toMatchObject({ deviceId: "dev1", kind: "turn", sessionId: "s1", v: 1 });
+        expect(statePosts()[0]?.post).not.toHaveProperty("threadId");
+        expect(statePosts()[0]?.post).not.toHaveProperty("turnId");
+        expect(statePosts()[0]?.post.events).toEqual([{ at: clock, kind: "session_state", usage: usage(20) }]);
+        expect(statePosts()[0]?.signature).toMatch(SIGNED);
+    });
+
+    it("sends the newest value of each field once, however many updates arrive inside the window", async () => {
+        const host = poster();
+
+        await open(host);
+
+        for (const used of [1, 2, 3, 4]) {
+            host.sessionState("s1", { usage: usage(used) });
+        }
+
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(4) });
+    });
+
+    it("drops a report for a session that is local only, and never posts it", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(7) });
+        await settle(2000);
+        paired = "dev1";
+        await settle(2000);
+
+        expect(statePosts()).toEqual([]);
+    });
+
+    it("re-signs a retry with a fresh issuedAt and keeps the newer value that arrived meanwhile", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(30_000);
+
+        const sent = statePosts();
+
+        expect(sent).toHaveLength(2);
+        expect(sent[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+        expect(sent[1]?.post.issuedAt).toBeGreaterThan(sent[0]?.post.issuedAt ?? 0);
+    });
+
+    it("drops a report the backend refuses, and the session keeps going", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(12) });
+    });
+});

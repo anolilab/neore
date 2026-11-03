@@ -13,7 +13,7 @@ import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
-import { vAcpSessionStatus, vHostEndReason } from "./validators";
+import { vAcpAgentState, vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -39,6 +39,7 @@ const vHostSessionDetail = v.object({
     _id: v.string(),
     agentKey: v.string(),
     agentLabel: v.string(),
+    agentState: v.optional(vAcpAgentState),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     deviceId: v.string(),
@@ -128,7 +129,11 @@ export const getHostSession = authQuery
 
         const last = await ctx.db.persistentStreams.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { producer: "host", threadId } });
 
-        return { ...toView(row), ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }) };
+        return {
+            ...toView(row),
+            ...(row.agentState !== undefined && { agentState: row.agentState }),
+            ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
+        };
     });
 
 /**

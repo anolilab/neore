@@ -184,6 +184,36 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
  * lost its host's end (the desktop sends the close only after delivering its turns), so it ends as interrupted.
  * Answers success for a session it does not know or has already ended: the desktop has nothing more to try.
  */
+/**
+ * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
+ * one applied is dropped, and one whose values are already stored writes nothing. Answered "applied" either way, so the
+ * desktop does not resend it. Not claim-once: writing the same values twice changes nothing.
+ */
+const applySessionState = async (
+    ctx: MutationCtx,
+    device: Doc<"devices">,
+    hostSessionId: string,
+    event: Extract<Event, { kind: "session_state" }>,
+): Promise<ApplyResult> => {
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
+
+    if (!session || session.userId !== device.userId) {
+        return REFUSED;
+    }
+
+    if (session.status === "ended" || (session.agentStateAt !== undefined && event.at < session.agentStateAt)) {
+        return { ended: false, next: 0, outcome: "applied" };
+    }
+
+    const next = { ...session.agentState, ...(event.usage !== undefined && { usage: event.usage }) };
+
+    if (JSON.stringify(next) !== JSON.stringify(session.agentState ?? {})) {
+        await ctx.db.patch("acpSessions", session._id, { agentState: next, agentStateAt: event.at });
+    }
+
+    return { ended: false, next: 0, outcome: "applied" };
+};
+
 const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, now: number): Promise<ApplyResult> => {
     const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
@@ -439,6 +469,19 @@ export const applyHostEvents = internalMutation
 
         if (args.close === true) {
             return args.threadId === undefined && args.events.length === 0 ? await closeSession(ctx, device, args.sessionId, now) : REFUSED;
+        }
+
+        // A state report is one event, posted turn-less on its own. Anywhere else (in a turn, an import, or beside a session
+        // open) it is refused, so it can never be stored as a chunk or move a turn to `running`.
+        const [first] = args.events;
+        const isStateReport = args.threadId === undefined && args.events.length === 1 && first?.kind === "session_state";
+
+        if (args.events.some((event) => event.kind === "session_state") && !isStateReport) {
+            return REFUSED;
+        }
+
+        if (isStateReport && first?.kind === "session_state") {
+            return await applySessionState(ctx, device, args.sessionId, first);
         }
 
         if (args.threadId === undefined) {

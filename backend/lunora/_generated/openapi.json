@@ -122,6 +122,42 @@
                         "agentLabel": {
                           "type": "string"
                         },
+                        "agentState": {
+                          "properties": {
+                            "usage": {
+                              "properties": {
+                                "cost": {
+                                  "properties": {
+                                    "amount": {
+                                      "type": "number"
+                                    },
+                                    "currency": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "amount",
+                                    "currency"
+                                  ],
+                                  "type": "object"
+                                },
+                                "size": {
+                                  "type": "number"
+                                },
+                                "used": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "size",
+                                "used"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [],
+                          "type": "object"
+                        },
                         "capabilities": {
                           "properties": {
                             "groups": {

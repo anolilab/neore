@@ -2359,3 +2359,121 @@ describe("files a reply refers to", () => {
         expect(finalize).not.toHaveBeenCalled();
     });
 });
+
+describe("what the agent reports about itself", () => {
+    const usage = (used: number) => {
+        return { size: 200_000, used };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>, sessionId?: string) =>
+        ingest(device, { events: [{ at, kind: "session_state", ...body }], ...(sessionId !== undefined && { sessionId }) });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the usage the host reports on the session row, and the owner reads it back with the session", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) });
+
+        expect(result.status).toBe(200);
+        expect(result.json).toEqual({ ended: false, next: 0 });
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("keeps a field a later report leaves out, and replaces one it sends", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: { cost: { amount: 0.5, currency: "USD" }, size: 200_000, used: 10 } });
+        await report(device, 2000, {});
+        await report(device, 3000, { usage: usage(20) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(20) }, agentStateAt: 3000 });
+    });
+
+    it("drops a report older than the one applied, so a late post cannot roll the state back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 3000, { usage: usage(30) });
+        const late = await report(device, 2000, { usage: usage(20) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(30) }, agentStateAt: 3000 });
+    });
+
+    it("writes nothing when the report repeats the stored values", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await report(device, 2000, { usage: usage(10) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentStateAt: 1000 });
+    });
+
+    it("refuses a report for a session the device does not hold", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) }, "no-such-session");
+
+        // Refused as any unknown session is (403): not 401, which counts toward a device's revocation streak.
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report with another event beside it", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await ingest(device, { events: [{ at: 1000, kind: "session_state", usage: usage(10) }, SESSION_OPEN] });
+
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report sent inside a turn, or beside other events of an import, so it is never stored as a turn chunk", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const state = { at: 1000, kind: "session_state", usage: usage(10) };
+
+        const inTurn = await ingest(device, { events: [{ kind: "turn_start", text: "hi" }, state], firstSeq: 0, threadId, turnId: "t9" });
+        const inImport = await ingest(device, { events: [{ kind: "import_end" }, state], firstSeq: 0, threadId, turnId: "t9" });
+
+        expect(inTurn.status).toBe(403);
+        expect(inImport.status).toBe(403);
+        expect(await rowOf(threadId)).not.toHaveProperty("agentStateAt");
+    });
+
+    it("keeps the state in the GDPR export and on every reader of the session row", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectAcpSessionsForExport, { userId: ownerId }))) as {
+            sessions: Record<string, unknown>[];
+        };
+
+        expect(exported.sessions.find((session) => session.threadId === threadId)).toMatchObject({ agentState: { usage: usage(10) } });
+        await expect(as(ownerId).query(listHostSessions as never, {} as never)).resolves.toEqual(
+            expect.arrayContaining([expect.objectContaining({ threadId })]),
+        );
+        // A host thread that sent no capability report reads as all unknown, and the state never leaks into it.
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toEqual({ groups: {}, reportedAt: 0, version: 1 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("refuses a report whose counts are not whole non-negative numbers", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        for (const bad of [
+            { size: 10, used: 1.5 },
+            { size: 10, used: -1 },
+        ]) {
+            const result = await report(device, 1000, { usage: bad });
+
+            expect(result.status).toBe(400);
+        }
+    });
+});

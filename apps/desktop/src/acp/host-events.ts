@@ -47,6 +47,21 @@ export interface TurnSummary {
     patch?: string | { tooLarge: true };
 }
 
+/** The agent's context use (ACP `usage_update`): tokens in context now, of its window, and a cost when it reported one. */
+export interface AgentUsage {
+    cost?: { amount: number; currency: string };
+    size: number;
+    used: number;
+}
+
+/**
+ * What an agent reports about itself outside a turn. Each field present replaces the stored one; an absent field keeps it
+ * (`applySessionState` in the backend). Sent as a turn-less post, not a turn event.
+ */
+export interface SessionStatePatch {
+    usage?: AgentUsage;
+}
+
 export interface TurnEndEvent {
     error?: string;
     kind: "turn_end";
@@ -79,6 +94,8 @@ export interface SessionObserver {
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
+    /** The agent reported something about itself outside a turn (its usage now). Coalesced by the poster. */
+    sessionState?: (sessionId: string, patch: SessionStatePatch) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
     tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;

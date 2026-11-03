@@ -14,7 +14,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
-import { vAcpSessionStatus, vHostEvent } from "./validators";
+import { vAcpAgentState, vAcpSessionStatus, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
@@ -34,6 +34,8 @@ const EVENT_BYTES_BUDGET = 400_000;
 const vExportSession = v.object({
     agentKey: v.string(),
     agentLabel: v.string(),
+    // What the agent reported about its own context use and cost (`session_state`), as the thread's context meter showed it.
+    agentState: v.optional(vAcpAgentState),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     folderLabel: v.string(),
@@ -82,6 +84,7 @@ export const collectAcpSessionsForExport = internalQuery
                     ({
                         agentKey,
                         agentLabel,
+                        agentState,
                         capabilities,
                         createdAt,
                         folderLabel,
@@ -99,6 +102,7 @@ export const collectAcpSessionsForExport = internalQuery
                             folderLabel,
                             status,
                             threadId: threadId as string,
+                            ...(agentState !== undefined && { agentState }),
                             ...(capabilities !== undefined && { capabilities }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),

@@ -53,6 +53,7 @@ const start = async (
     observer: SessionObserver,
     secret?: { scrub: (text: string) => string; secretLength: number },
     remote?: { sessionId: string; threadId: string },
+    fixture = "handshake-and-prompt",
 ) => {
     const agent = memoryAgent();
     const session = new AgentSession({
@@ -68,7 +69,7 @@ const start = async (
         process: { ...agent.process, ...secret },
     });
     const player = transcriptPlayer(agent);
-    const steps = readTranscript("handshake-and-prompt");
+    const steps = readTranscript(fixture);
 
     await Promise.all([session.start(), player.play(steps.slice(0, 4))]);
 
@@ -83,6 +84,25 @@ const refuse: PermissionGate = {
 };
 
 describe("a session's observer", () => {
+    it("is told what the agent reports about its usage, and only that", async () => {
+        const { calls, observer } = recorder();
+        const reported: unknown[] = [];
+        const watched: SessionObserver = {
+            ...observer,
+            sessionState: (_id, patch) => {
+                reported.push(patch);
+            },
+        };
+        const { player, session, steps } = await start(refuse, watched, undefined, undefined, "usage-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
+        expect(calls.map((call) => call[0])).not.toContain("sessionState");
+    });
+
     it("is told the session opened, the turn, its text and its end, in order", async () => {
         const { calls, observer } = recorder();
         const { player, session, steps } = await start(refuse, observer);
