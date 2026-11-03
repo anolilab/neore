@@ -65,6 +65,10 @@ import {
 
 /** The template variable a webhook trigger fills with the request body; code, not copy. */
 const PAYLOAD_TOKEN = "{{payload}}";
+/** The placeholders the webhook hint names. Interpolated, not written in the message: braces in a Lingui message id are ICU syntax. */
+const WEBHOOK_BODY_TOKEN = "{{body.field}}";
+const WEBHOOK_HEADER_TOKEN = "{{header.name}}";
+const WEBHOOK_QUERY_TOKEN = "{{query.name}}";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -370,7 +374,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     />
                     {formData.type === "webhook" && (
                         <p className="text-muted-foreground text-xs" id="trigger-input-hint">
-                            {t`Placeholders: {{payload}} is the body, {{body.field}} a JSON field, {{header.name}} a header and {{query.name}} a query parameter. Each is inserted as quoted data. Headers and the query are not signed, and a credential-looking name is never read.`}
+                            {t`Placeholders: ${PAYLOAD_TOKEN} is the body, ${WEBHOOK_BODY_TOKEN} a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter. Each is inserted as quoted data. Headers and the query are not signed, and a credential-looking name is never read.`}
                         </p>
                     )}
                 </div>
