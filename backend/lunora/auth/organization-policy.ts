@@ -8,7 +8,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { claimOnce, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLICY_CREATE_SCOPE } from "../lib/claim-once";
+import { claimOnce, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLICY_CREATE_SCOPE, releaseClaim } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
@@ -44,14 +44,19 @@ export const setOrganizationPolicy = authMutation
 
         const findRow = async () => await context.db.organizationPolicies.findFirst({ where: { organizationId } });
         let existing = await findRow();
+        let holdsCreateClaim = false;
 
         // The organizationId index is not unique and global-table operations are not one transaction, so two first
         // writes through different shards could both insert revision 1. Only the writer that wins the claim creates.
-        if (!existing && !(await claimOnce(context, ORGANIZATION_POLICY_CREATE_SCOPE, organizationId, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS))) {
-            existing = await findRow();
+        if (!existing) {
+            holdsCreateClaim = await claimOnce(context, ORGANIZATION_POLICY_CREATE_SCOPE, organizationId, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS);
 
-            if (!existing) {
-                throw new LunoraError("CONFLICT", "The organization's policy is being created; try again.");
+            if (!holdsCreateClaim) {
+                existing = await findRow();
+
+                if (!existing) {
+                    throw new LunoraError("CONFLICT", "The organization's policy is being created; try again.");
+                }
             }
         }
 
@@ -73,7 +78,17 @@ export const setOrganizationPolicy = authMutation
                 throw new LunoraError("CONFLICT", "The organization's policy changed while it was being saved; try again.");
             }
         } else {
-            await context.db.insert("organizationPolicies", { ...row, organizationId });
+            try {
+                await context.db.insert("organizationPolicies", { ...row, organizationId });
+            } catch (error) {
+                // The claim guards an insert that did not happen, so give it back: a retry creates the row now instead of
+                // waiting out the claim's TTL.
+                if (holdsCreateClaim) {
+                    await releaseClaim(context, ORGANIZATION_POLICY_CREATE_SCOPE, organizationId);
+                }
+
+                throw error;
+            }
         }
 
         context.log.event("organization.set_policy", { organizationId, revision });

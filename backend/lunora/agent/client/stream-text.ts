@@ -189,7 +189,14 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
             console.warn("[streamText] Retrying with aggressively compressed context");
 
             // Fail the pending message from the first attempt so a fresh one is created
-            await call.fail("Context exceeded — retrying with compression");
+            try {
+                await call.fail("Context exceeded — retrying with compression");
+            } catch (failError) {
+                // The retry never starts, so the abort work of the attempts so far must land before this rejects.
+                await settleAbort();
+
+                throw failError;
+            }
 
             // Compress the messages that were too large
             const modelId = getModelName(args.model);
@@ -215,12 +222,15 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
 
         // If an error occurs during streaming (e.g., in onStepFinish callbacks),
         // make sure to abort the streaming message so it doesn't get stuck
-        if (streamer && !isStreamConsumed) {
-            await streamer.fail(getErrorMessage(error));
+        try {
+            if (streamer && !isStreamConsumed) {
+                await streamer.fail(getErrorMessage(error));
+            }
+        } finally {
+            // The caller gets no hook from a throw: let the abort work of every attempt land before it propagates,
+            // even when failing the stream itself rejects.
+            await settleAbort();
         }
-
-        // The caller gets no hook from a throw: let the abort work of every attempt land before it propagates.
-        await settleAbort();
 
         throw error;
     }
