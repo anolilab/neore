@@ -407,6 +407,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
                 // This prevents expensive re-fetches during route loading
                 const optimisticThread = {
                     _id: data.threadId,
+                    autoModel: requestBody.autoModel === true,
                     language: requestBody.language,
                     mode: composerMode,
                     model,

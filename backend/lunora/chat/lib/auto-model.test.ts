@@ -92,7 +92,11 @@ describe("registryModelForRoute", () => {
     });
 
     it("maps the gateway's short id onto the registry's vendor-prefixed one", () => {
-        expect(registryModelForRoute(route("claude-sonnet-4"))?.id).toBe("anthropic/claude-sonnet-4");
+        expect(registryModelForRoute({ ...route("claude-sonnet-4"), modelApiId: "anthropic/claude-sonnet-4" })?.id).toBe("anthropic/claude-sonnet-4");
+    });
+
+    it("does not match a name on another provider (Google's own model is not the OpenRouter entry)", () => {
+        expect(registryModelForRoute({ ...route("gemini-2.5-flash"), modelApiId: "gemini-2.5-flash", provider: "google" })).toBeUndefined();
     });
 
     it("is none for a gateway-only model", () => {

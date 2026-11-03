@@ -63,7 +63,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         (!threadId || (loadedThread !== undefined && loadedThread !== null)) &&
         !loadedThread?.groupChat &&
         !isAnonymous &&
-        !isBotThread &&
+        typeof botId !== "string" &&
         !comparisonMode &&
         currentMode === "text" &&
         thread?.runner !== "host" &&

@@ -62,7 +62,7 @@ export const autoRouteContextOf = async (
         }
     }
 
-    const long = !args.stateless && (await pathExceedsColdStart(ctx, args.threadId, prompt));
+    const long = !args.stateless && (await pathExceedsColdStart(ctx, args.threadId, prompt, { maxRows: PATH_ROWS }));
 
     return { contextTokens: long ? PROMPT_CACHE_COLD_START_TOKENS + 1 : 0, ...found };
 };

@@ -51,21 +51,21 @@ export const shouldRouteAuto = ({ currentModel, isAnonymous, pinnedByBotOrSkill,
     enabledModelOf(currentModel, { mode: "text" }) !== undefined;
 
 /**
- * The registry row for a route answer. The gateway names its models in its own namespace (`claude-sonnet-4`,
- * `gpt-4.1`); the registry's ids carry a vendor prefix (`anthropic/claude-sonnet-4`). Exact id first, then the one
- * enabled text row whose id ends in `/<routed id>`; an ambiguous or missing answer is `undefined`.
+ * The registry row for a route answer: the enabled text row on the answer's own provider and API model. The gateway's
+ * names (`claude-sonnet-4`) differ from the registry's vendor-prefixed ids, so the match is by provider and API model,
+ * never by name alone. A missing or ambiguous match is `undefined`.
  */
-export const registryModelForRoute = (routed: { modelApiId: string; modelId: string }): ModelDefinition | undefined => {
+export const registryModelForRoute = (routed: { modelApiId: string; modelId: string; provider: string }): ModelDefinition | undefined => {
+    // Only an entry on the gateway's own provider and API model is the routed model. A name match alone reaches a
+    // different provider (the same model through a reseller), so it keeps the fallback instead.
+    const sameModel = (row: ModelDefinition) => row.provider === routed.provider && row.modelApiId === routed.modelApiId;
     const exact = enabledModelOf(routed.modelId, { mode: "text" });
 
-    if (exact) {
+    if (exact && sameModel(exact)) {
         return exact;
     }
 
-    const suffix = `/${routed.modelId}`;
-    const matches = MODEL_REGISTRY.filter(
-        (row) => (row.id.endsWith(suffix) || row.modelApiId === routed.modelApiId) && enabledModelOf(row.id, { mode: "text" }),
-    );
+    const matches = MODEL_REGISTRY.filter((row) => sameModel(row) && enabledModelOf(row.id, { mode: "text" }));
 
     return matches.length === 1 ? matches[0] : undefined;
 };

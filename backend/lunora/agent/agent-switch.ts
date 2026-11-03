@@ -97,8 +97,9 @@ const MAX_COLD_START_PAGES = 30;
  * warning about (`PROMPT_CACHE_COLD_START_TOKENS`). Counts the stored text of each row with the
  * shared characters-per-token estimate, and stops as soon as the answer is yes.
  */
-export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null): Promise<boolean> =>
-    (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES })) > PROMPT_CACHE_COLD_START_TOKENS;
+export const pathExceedsColdStart = async (context: Reader, threadId: Id<"threads">, from: Row | null, options: { maxRows?: number } = {}): Promise<boolean> =>
+    (await pathTokens(context, threadId, from, { cap: PROMPT_CACHE_COLD_START_TOKENS, maxPages: MAX_COLD_START_PAGES, maxRows: options.maxRows })) >
+    PROMPT_CACHE_COLD_START_TOKENS;
 
 /** Delta dividers followed down to what their own target saw; a chain longer than this stands in as far as it got. */
 const MAX_HANDOFF_DEPTH = 4;
