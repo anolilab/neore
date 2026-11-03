@@ -1489,7 +1489,8 @@ export const updateThread = authAction
             // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
             // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
             // caller says otherwise.
-            const pickEndsAuto = model !== undefined && model !== threadData?.model;
+            // A status change (archive, restore) sends whatever model the caller has open, which is not a pick.
+            const pickEndsAuto = status === undefined && model !== undefined && model !== threadData?.model;
             const pickFallback = pickEndsAuto ? false : undefined;
             const stays = !(threadData?.activeAgent || threadData?.runner === "host");
             const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
