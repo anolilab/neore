@@ -106,8 +106,9 @@ type WebhookTrigger = Pick<
 /** The request's query parameters, the first value of each name (a credential-looking name is filtered when it is read). */
 const firstQueryValues = (url: string): Record<string, string> => {
     const query: Record<string, string> = {};
+    const params = new URL(url).searchParams;
 
-    for (const [name, value] of new URL(url).searchParams) {
+    for (const [name, value] of params) {
         if (!Object.hasOwn(query, name)) {
             query[name] = value;
         }

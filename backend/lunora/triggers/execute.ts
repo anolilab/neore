@@ -48,11 +48,11 @@ export const executeTrigger = internalAction
         // A manual run ("Run now"): the user is waiting for a chat, so a quiet routine is not skipped.
         manual: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
-        // A webhook delivery's prompt, rendered in `http.ts` from the Input Template, its headers and its query.
-        webhookPrompt: v.optional(v.string().max(MAX_LENGTH.text)),
         // The claim is permanent (`gitlab-token`): every way this delivery ends without a run gives it back, so a redelivery can run.
         releaseUnlessRun: v.optional(v.boolean()),
         triggerId: v.id("triggers"),
+        // A webhook delivery's prompt, rendered in `http.ts` from the Input Template, its headers and its query.
+        webhookPrompt: v.optional(v.string().max(MAX_LENGTH.text)),
     })
     .action(async ({ args: { claim, firing, ignoreDisabled, invalidUtf8, manual, payload, releaseUnlessRun, triggerId, webhookPrompt }, ctx }) => {
         /**
@@ -310,8 +310,7 @@ export const executeTrigger = internalAction
                 inputMessage = eventInputMessage(sanitizedPayload, trigger.inputTemplate);
             } else if (triggerType === "webhook" && (webhookPrompt !== undefined || payload || trigger.inputTemplate)) {
                 // Rendered at the delivery (`http.ts`), where the headers and the query are. A manual test run has only its body.
-                inputMessage =
-                    webhookPrompt ?? renderWebhookPrompt(trigger.inputTemplate, { body: payload ?? "", headers: {}, query: {} }, randomFrameId());
+                inputMessage = webhookPrompt ?? renderWebhookPrompt(trigger.inputTemplate, { body: payload ?? "", headers: {}, query: {} }, randomFrameId());
             } else {
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }

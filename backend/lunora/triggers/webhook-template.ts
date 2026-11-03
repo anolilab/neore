@@ -13,7 +13,7 @@
  */
 
 /** Longest value inserted for one placeholder, before quoting. */
-export const MAX_RENDERED_VALUE_LENGTH = 2_000;
+export const MAX_RENDERED_VALUE_LENGTH = 2000;
 /** Longest prompt a delivery runs with. */
 export const MAX_RENDERED_PROMPT_LENGTH = 20_000;
 /** Longest body the frame carries; a longer body is cut. */
@@ -29,8 +29,8 @@ export interface WebhookInputs {
     readonly query: Readonly<Record<string, string>>;
 }
 
-// One placeholder, with no nested braces: the text between the braces is the expression.
-const PLACEHOLDER = /\{\{\s*([^{}]*?)\s*\}\}/gu;
+// One placeholder, with no nested braces: the text between the braces is the expression, trimmed by the caller.
+const PLACEHOLDER = /\{\{([^{}]*)\}\}/gu;
 
 /** A frame tag for one delivery: six random bytes in hex, so the body cannot anticipate it. */
 export const randomFrameId = (): string => [...crypto.getRandomValues(new Uint8Array(6))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -44,7 +44,7 @@ const parseJson = (body: string): unknown => {
 };
 
 /** Walks dotted `segments` into a JSON value. Anything that is not an object or an array on the way is missing. */
-const lookupJson = (root: unknown, segments: readonly string[]): unknown => {
+const lookupJson = (root: unknown, segments: ReadonlyArray<string>): unknown => {
     let current = root;
 
     for (const segment of segments) {
@@ -95,18 +95,18 @@ export const renderWebhookPrompt = (template: string | undefined, input: Webhook
     const json = parseJson(input.body);
 
     // A function replacement: its result is never scanned for placeholders again, so a value cannot expand into another one.
-    const rendered = template.replaceAll(PLACEHOLDER, (match: string, expression: string) => {
-        const [root, ...segments] = expression.split(".");
+    const rendered = template.replaceAll(PLACEHOLDER, (match: string, rawExpression: string) => {
+        const [root, ...segments] = rawExpression.trim().split(".");
 
         switch (root) {
-            case "payload": {
-                return segments.length === 0 ? frame : match;
-            }
             case "body": {
                 return segments.length === 0 ? match : quoted(lookupJson(json, segments));
             }
             case "header": {
                 return segments.length === 0 ? match : quoted(readNamed(input.headers, segments.join(".").toLowerCase()));
+            }
+            case "payload": {
+                return segments.length === 0 ? frame : match;
             }
             case "query": {
                 return segments.length === 0 ? match : quoted(readNamed(input.query, segments.join(".")));

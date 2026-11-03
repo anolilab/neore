@@ -154,6 +154,10 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+/** The rendered prompt's first line, and its framed body at the end. */
+const RENDERED_HEAD = /^Issue "Login broken" from "issues", token "": <webhook-data-[\da-f]{12}>\n/u;
+const RENDERED_FRAME = /<webhook-data-[\da-f]{12}>\n\{"issue":\{"title":"Login broken"\}\}\n<\/webhook-data-[\da-f]{12}>$/u;
+
 describe("trigger webhook signing", () => {
     it("renders the Input Template from the body, a header and the query, and schedules only the rendered prompt", async () => {
         const { scheduled, statusOf } = await setup({
@@ -166,12 +170,12 @@ describe("trigger webhook signing", () => {
         expect(await statusOf(body, headers)).toBe(200);
         expect(scheduled).toHaveLength(1);
 
-        const [args] = scheduled as Array<{ payload: string; webhookPrompt: string }>;
+        const [args] = scheduled as { payload: string; webhookPrompt: string }[];
 
         expect(args?.payload).toBe(body);
-        expect(args?.webhookPrompt).toMatch(/^Issue "Login broken" from "issues", token "": <webhook-data-[\da-f]{12}>\n/u);
+        expect(args?.webhookPrompt).toMatch(RENDERED_HEAD);
         expect(args?.webhookPrompt).not.toContain("s3cret");
-        expect(args?.webhookPrompt).toMatch(/<webhook-data-[\da-f]{12}>\n\{"issue":\{"title":"Login broken"\}\}\n<\/webhook-data-[\da-f]{12}>$/u);
+        expect(args?.webhookPrompt).toMatch(RENDERED_FRAME);
     });
 
     it("runs a fresh, correctly signed delivery exactly once — a replay is acknowledged but not run", async () => {
