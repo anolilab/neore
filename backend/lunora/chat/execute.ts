@@ -338,7 +338,8 @@ export const runStreamingAgent = internalAction
                                 stateless: thread?.statelessMode ?? statelessMode,
                                 threadId: threadId as Id<"threads">,
                             }),
-                        fallbackModel: model,
+                        // The thread's own model is the fallback: a send that names another model must not run on it.
+                        fallbackModel: thread?.model ?? model,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
                         plan: async () => await readRunPlan(ctx, userId, organizationId ?? null),
                         prompt,

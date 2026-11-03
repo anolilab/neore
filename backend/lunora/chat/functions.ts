@@ -1445,11 +1445,11 @@ export const updateThread = authAction
             // A switched thread's stored `model` is where the paths before its first switch recover their agent: only
             // a switch changes what it runs on, so the argument is ignored there (the palette's archive passes the model of
             // whichever thread is open).
-            const threadLanguage = threadData?.language;
-
             if (autoModel === true && threadData?.groupChat) {
                 throw new LunoraError("BAD_REQUEST", "Auto is not available in a group chat");
             }
+
+            const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
             const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
@@ -1486,9 +1486,16 @@ export const updateThread = authAction
                 });
             }
 
+            // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
+            // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
+            // caller says otherwise.
+            const pickEndsAuto = model !== undefined && model !== threadData?.model;
+            const pickFallback = pickEndsAuto ? false : undefined;
+            const stays = !(threadData?.activeAgent || threadData?.runner === "host");
+            const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
+
             await context.runMutation(internal.chat.functions.updateThreadModel, {
-                // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud model to route.
-                autoModel: threadData?.activeAgent || threadData?.runner === "host" ? undefined : autoModel,
+                autoModel: autoModelForWrite,
                 customSystemPrompt,
                 enabledFeatures,
                 model: effectiveModel,
