@@ -34,6 +34,9 @@ import { classifyTier, QueryTier, scoreConfidence, tierMidpoint } from "../../ro
 /** Room kept free in the context window for the reply, when a route checks that a model holds the conversation. */
 const RESPONSE_RESERVE_TOKENS = 4096;
 
+/** The share of a model's window a request may fill: the preflight's own limit (`lib/token-estimator.ts`). */
+const PREFLIGHT_CONTEXT_THRESHOLD = 0.95;
+
 const routeRouter = new OpenAPIHono<HonoEnv>();
 
 const recordRoutingMetric = (
@@ -238,8 +241,12 @@ routeRouter.openapi(
             const runnable = new Set(body.runnableModels.map((model) => `${model.provider}/${model.modelApiId}`));
             const needed = contextTokens + RESPONSE_RESERVE_TOKENS;
 
+            // The same limit the preflight enforces before a request is sent (`estimateTokens`' threshold), so a model
+            // routed here is never refused for size at the preflight.
             candidates = candidates.filter(
-                (candidate) => runnable.has(`${candidate.provider}/${candidate.modelApiId}`) && (candidate.contextWindow ?? 0) >= needed,
+                (candidate) =>
+                    runnable.has(`${candidate.provider}/${candidate.modelApiId}`) &&
+                    Math.floor((candidate.contextWindow ?? 0) * PREFLIGHT_CONTEXT_THRESHOLD) >= needed,
             );
 
             if (candidates.length === 0) {

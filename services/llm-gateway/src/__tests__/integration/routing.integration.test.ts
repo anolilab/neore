@@ -233,4 +233,21 @@ describe("POST /internal/route (runnable models)", () => {
             }
         }
     });
+
+    it("routes a conversation that fits the preflight's limit, and refuses one that only fits the raw window", async () => {
+        const limit = Math.floor(sized.contextWindow! * 0.95);
+        const send = (contextTokens: number) =>
+            fetchApp(
+                signedRoute({
+                    contextTokens,
+                    messages: [{ content: "What is 2+2?", role: "user" }],
+                    runnableModels: [{ modelApiId: sized.modelApiId, provider: sized.provider }],
+                    userTier: "pro",
+                }),
+                ENV,
+            );
+
+        expect((await send(limit - 4096)).status).toBe(200);
+        expect((await send(limit - 4095)).status).toBe(403);
+    });
 });
