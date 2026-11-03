@@ -31,6 +31,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
+import { parseCustomModelId } from "@neore/ai/models";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 import z from "zod/v4";
@@ -1456,6 +1457,11 @@ export const updateThread = authAction
 
             if (!effectiveModel) {
                 throw new LunoraError("BAD_REQUEST", "Model is required when thread has no existing model");
+            }
+
+            // A custom endpoint or a bot's chat never routes (`shouldRouteAuto`), so Auto cannot be saved on one.
+            if (autoModel === true && (threadData?.botId || parseCustomModelId(effectiveModel) !== null)) {
+                throw new LunoraError("BAD_REQUEST", "Auto is not available for this chat");
             }
 
             const agent = await getAgentForUser(context, userId, effectiveModel, threadLanguage);
