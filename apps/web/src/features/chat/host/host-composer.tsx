@@ -185,7 +185,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const status = session?.status;
     const blocked = status === "ended";
     const lastEnd = session?.lastEndReason;
-    const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
+    // With messages queued, Continue would wait behind them, so the queue's own Send next is the way on.
+    const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd) && queue.items.length === 0;
     const canWrite = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !blocked;
     const queueing = shouldQueueMessage({ pendingStart, queued: queue.items.length, running });
     const head = queue.items[0];

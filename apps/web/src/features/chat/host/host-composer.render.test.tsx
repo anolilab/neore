@@ -342,6 +342,14 @@ describe("the coding-agent composer", () => {
         );
     });
 
+    it("hides Continue while messages are queued, since they go first", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "queued first" });
+        mount(session({ lastEndReason: "interrupted" }));
+
+        expect(await screen.findByText("queued first")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+    });
+
     it("offers no Continue after a turn that finished or was stopped", async () => {
         mount(session({ lastEndReason: "finished" }));
 
