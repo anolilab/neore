@@ -1861,6 +1861,7 @@ export const userSettings = sqliteTable("userSettings", {
     resumeLastChat: integer("resumeLastChat", { mode: "boolean" }),
     searchDomainBlocklist: text("searchDomainBlocklist", { mode: "json" }).$type<Array<string>>(),
     sendBehavior: text("sendBehavior"),
+    setupStepsSkipped: text("setupStepsSkipped", { mode: "json" }).$type<Array<string>>(),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
     threadSummariesEnabled: integer("threadSummariesEnabled", { mode: "boolean" }),

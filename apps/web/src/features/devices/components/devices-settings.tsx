@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import SetupChecklist from "@/features/onboarding/components/setup-checklist";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
 import {
@@ -443,6 +444,7 @@ const DevicesSettings: FC = () => {
 
     return (
         <div className="space-y-6">
+            <SetupChecklist />
             <SettingsCard
                 description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
                 title={t`Devices`}

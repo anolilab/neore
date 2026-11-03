@@ -119,6 +119,7 @@ export const userSettingsFieldsWithoutUserId = {
         }),
     ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
     sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
+    setupStepsSkipped: v.optional(v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= 8, { message: "Too many skipped setup steps" })), // First-run setup steps the user skipped. Absent means none.
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
     threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.
