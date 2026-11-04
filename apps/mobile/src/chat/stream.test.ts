@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch } from "../auth/grant";
 import { CHAT_START_TIMEOUT_MS } from "./chat-api";
+import type { StreamDelta } from "./stream";
 import { relayReply, splitLines } from "./stream";
 
 const encoder = new TextEncoder();
@@ -59,18 +60,19 @@ describe("splitLines", () => {
 describe("relayReply", () => {
     it("passes a restart on the chunk that begins the reply after a steered message", async () => {
         const { fetch } = scripted([streamResponse(['{"text":"Before"}\n', '{"restart":true,"text":"After"}\n', '{"type":"end"}\n'])]);
-        const deltas: { restart?: true; text: string }[] = [];
+        const deltas: StreamDelta[] = [];
 
         await relayReply({
             fetch,
             gatewayUrl: "https://gw",
             onDelta: (delta) => {
-                deltas.push({ ...delta.restart && { restart: delta.restart }, text: delta.text });
+                deltas.push(delta);
             },
             streamToken: "tok",
         });
 
-        expect(deltas).toEqual([{ text: "Before" }, { restart: true, text: "After" }]);
+        expect(deltas).toMatchObject([{ text: "Before" }, { restart: true, text: "After" }]);
+        expect(deltas[0]).not.toHaveProperty("restart");
     });
 
     it("reassembles a line split across reads", async () => {
