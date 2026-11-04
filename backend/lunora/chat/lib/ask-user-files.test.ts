@@ -9,7 +9,17 @@ import { describe, expect, it, vi } from "vitest";
 import { ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
 import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, withAnswerFiles } from "./ask-user-files";
 
-const PNG_BYTES = new Uint8Array([137, 80, 78, 71]);
+const PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const PDF_BYTES = new TextEncoder().encode("%PDF-1.4\n");
+
+/** A file of `size` bytes that begins with `head`, so its bytes look like its type. */
+const sized = (head: Uint8Array, size: number): Uint8Array => {
+    const bytes = new Uint8Array(size);
+
+    bytes.set(head);
+
+    return bytes;
+};
 
 const fileRow = (id: string, mediaType: string, filename = `${id}.png`) => {
     return {
@@ -57,10 +67,10 @@ describe("loadAskUserFiles", () => {
     });
 
     it("leaves out an image above the provider's per-image limit, though a PDF of that size is read", async () => {
-        const fourMb = new Uint8Array(4 * 1024 * 1024);
+        const fourMb = 4 * 1024 * 1024;
         const { ctx } = makeCtx(
             { doc: fileRow("doc", "application/pdf", "doc.pdf"), img: fileRow("img", "image/png") },
-            { "key/doc": objectOf(fourMb), "key/img": objectOf(fourMb) },
+            { "key/doc": objectOf(sized(PDF_BYTES, fourMb)), "key/img": objectOf(sized(PNG_BYTES, fourMb)) },
         );
 
         const files = await loadAskUserFiles(ctx, { fileIds: ["img", "doc"], threadId: "t1", userId: "u1" });
@@ -69,11 +79,11 @@ describe("loadAskUserFiles", () => {
     });
 
     it("reads an owned PDF as base64", async () => {
-        const { ctx } = makeCtx({ doc: fileRow("doc", "application/pdf", "doc.pdf") }, { "key/doc": objectOf(PNG_BYTES) });
+        const { ctx } = makeCtx({ doc: fileRow("doc", "application/pdf", "doc.pdf") }, { "key/doc": objectOf(PDF_BYTES) });
 
         const files = await loadAskUserFiles(ctx, { fileIds: ["doc"], threadId: "t1", userId: "u1" });
 
-        expect(files).toEqual([{ data: Buffer.from(PNG_BYTES).toString("base64"), filename: "doc.pdf", mediaType: "application/pdf" }]);
+        expect(files).toEqual([{ data: Buffer.from(PDF_BYTES).toString("base64"), filename: "doc.pdf", mediaType: "application/pdf" }]);
     });
 
     it("leaves out a file that is not an allowed type, before reading it", async () => {
@@ -106,7 +116,7 @@ describe("loadAskUserFiles", () => {
     });
 
     it("stops at the answer's total budget: a file that would exceed what is left is left out", async () => {
-        const eightMb = new Uint8Array(8 * 1024 * 1024);
+        const eightMb = sized(PDF_BYTES, 8 * 1024 * 1024);
         const ids = ["big1", "big2", "big3"];
         const { ctx } = makeCtx(
             Object.fromEntries(ids.map((id) => [id, fileRow(id, "application/pdf", `${id}.pdf`)])),
@@ -118,7 +128,7 @@ describe("loadAskUserFiles", () => {
         expect(files).toHaveLength(2);
     }, 30_000);
 
-    it("raises a storage failure that is not a missing or oversized file", async () => {
+    it("leaves out a file whose storage read fails, so the answer still goes through with the rest", async () => {
         const ctx = {
             runQuery: vi.fn(async () => fileRow("a", "image/png")),
             storage: {
@@ -128,7 +138,13 @@ describe("loadAskUserFiles", () => {
             },
         } as never;
 
-        await expect(loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" })).rejects.toThrow("bucket unavailable");
+        await expect(loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" })).resolves.toEqual([]);
+    });
+
+    it("leaves out a file whose bytes do not match its stored type", async () => {
+        const { ctx } = makeCtx({ a: fileRow("a", "image/png") }, { "key/a": objectOf(PDF_BYTES) });
+
+        await expect(loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" })).resolves.toEqual([]);
     });
 });
 

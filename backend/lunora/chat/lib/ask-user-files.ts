@@ -15,6 +15,7 @@ import type { ModelMessage } from "ai";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
+import { contentMatchesType, SNIFF_BYTES } from "../../lib/content-sniff";
 import { streamLogger } from "../../lib/logger";
 import { readStoredObject } from "../../lib/storage-read";
 import type { AskUserFile } from "../tools/ask-user-constants";
@@ -59,6 +60,15 @@ const skipped = (args: { threadId: string }, fileId: string, reason: string): vo
  * first, so the carried messages never hold two; everything else (compression, steering) is kept as it is.
  */
 export const withAnswerFiles = <T>(messages: ReadonlyArray<T>, files: T): T[] => [...messages.filter((message) => message !== files), files];
+
+/** Why a read the storage refused left the file out: the answer's budget, the file's own cap, or a missing object. */
+const skipReasonOf = (code: string, withinBudgetOnly: boolean): string => {
+    if (code !== "PAYLOAD_TOO_LARGE") {
+        return "missing";
+    }
+
+    return withinBudgetOnly ? "budget" : "too-large";
+};
 
 /** The error codes that mean "leave this file out" rather than "the read failed". */
 const SKIP_CODES: ReadonlySet<string> = new Set(["NOT_FOUND", "PAYLOAD_TOO_LARGE"]);
@@ -123,20 +133,30 @@ export const loadAskUserFiles = async (
             break;
         }
 
+        const limit = file.mediaType.startsWith("image/") ? ASK_USER_IMAGE_MAX_BYTES : ASK_USER_FILE_MAX_BYTES;
+
         try {
-            const limit = file.mediaType.startsWith("image/") ? ASK_USER_IMAGE_MAX_BYTES : ASK_USER_FILE_MAX_BYTES;
             const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: Math.min(limit, remaining) });
+
+            // The stored type is the uploader's word: the bytes must look like it before they reach the model.
+            if (!contentMatchesType(new Uint8Array(bytes, 0, Math.min(SNIFF_BYTES, bytes.byteLength)), file.mediaType)) {
+                skipped(args, fileId, "mismatch");
+                continue;
+            }
 
             total += bytes.byteLength;
             files.push({ data: toBase64(bytes), filename: file.filename ?? "file", mediaType: file.mediaType });
         } catch (error) {
-            // Only "gone" and "too big" are the file's fault; a failed read is the run's, and it fails as one.
+            // The answer is already claimed, so one unreadable attachment must not lose the whole answer: it is left out and logged.
             if (error instanceof LunoraError && SKIP_CODES.has(error.code)) {
-                skipped(args, fileId, error.code === "PAYLOAD_TOO_LARGE" ? "too-large" : "missing");
+                // Over the remaining budget is a budget bound, not the file's own cap.
+                skipped(args, fileId, skipReasonOf(error.code, remaining < limit));
                 continue;
             }
 
-            throw error;
+            streamLogger.error(`[AskUser] Answer file ${fileId} could not be read in thread ${args.threadId}`, error);
+
+            skipped(args, fileId, "read-failed");
         }
     }
 
