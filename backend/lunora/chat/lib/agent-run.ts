@@ -25,7 +25,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
@@ -1102,6 +1102,9 @@ export const resumeApprovedRun = async (
     // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.
     let started: { savedMessages?: SavedToolCallStamp["savedMessages"] } | undefined;
 
+    // The answered files the model reads, for its first step only (`answerFilesMessage`); never saved.
+    let answerFiles: ReturnType<typeof answerFilesMessage>;
+
     try {
         // Checked against our own state rather than inferred from the agent
         // library's error text: the request must still be the open one on the
@@ -1130,6 +1133,7 @@ export const resumeApprovedRun = async (
             const readableFiles = filesTheModelReads(loaded, definition ? backupCapabilities(definition) : undefined);
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, loaded, readableFiles) as (typeof toolResult.tools)[string];
+            answerFiles = answerFilesMessage(readableFiles);
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.
@@ -1187,6 +1191,23 @@ export const resumeApprovedRun = async (
 
         streamTextArgs.abortSignal = stopping.signal;
         streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
+
+        if (answerFiles) {
+            // The files follow the answer's tool result on the first step only, so every later step (and the saved
+            // history) carries the answer alone.
+            const compressStep = streamTextArgs.prepareStep as ((options: unknown) => unknown) | undefined;
+            const attached = answerFiles;
+
+            streamTextArgs.prepareStep = async (options: { messages: ReadonlyArray<unknown>; stepNumber: number }) => {
+                const adjusted = (await compressStep?.(options)) as { messages?: ReadonlyArray<unknown> } | undefined;
+
+                if (options.stepNumber !== 0) {
+                    return adjusted;
+                }
+
+                return { ...adjusted, messages: [...(adjusted?.messages ?? options.messages), attached] };
+            };
+        }
 
         await options.beforeStream?.();
 

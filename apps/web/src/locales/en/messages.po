@@ -3315,7 +3315,7 @@ msgstr "Answer messages to a WeChat Official Account (safe mode). Beta: not yet 
 msgid "Answer ready"
 msgstr "Answer ready"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:242
+#: src/features/chat/thread/ask-user-prompt.tsx:275
 msgid "Answer sent — continuing"
 msgstr "Answer sent — continuing"
 
@@ -3323,7 +3323,7 @@ msgstr "Answer sent — continuing"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:238
+#: src/features/chat/thread/ask-user-prompt.tsx:271
 msgid "Answered"
 msgstr "Answered"
 
@@ -3842,7 +3842,7 @@ msgstr "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgid "Attach as file"
 msgstr "Attach as file"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:365
+#: src/features/chat/thread/ask-user-prompt.tsx:403
 msgid "Attach file"
 msgstr "Attach file"
 
@@ -3850,7 +3850,7 @@ msgstr "Attach file"
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Attach files or whole collections for the AI to reference and cite in this conversation."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:324
+#: src/features/chat/thread/ask-user-prompt.tsx:357
 msgid "Attached files"
 msgstr "Attached files"
 
@@ -3858,15 +3858,15 @@ msgstr "Attached files"
 msgid "Attached image"
 msgstr "Attached image"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:282
+#: src/features/chat/thread/ask-user-prompt.tsx:315
 msgid "Attached:"
 msgstr "Attached:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:355
+#: src/features/chat/thread/ask-user-prompt.tsx:392
 msgid "Attaching files…"
 msgstr "Attaching files…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:365
+#: src/features/chat/thread/ask-user-prompt.tsx:403
 msgid "Attaching…"
 msgstr "Attaching…"
 
@@ -7726,7 +7726,7 @@ msgid "Could not apply the changes"
 msgstr "Could not apply the changes"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:227
+#: src/features/chat/thread/ask-user-prompt.tsx:258
 msgid "Could not attach {0}. The other files were attached; try those again."
 msgstr "Could not attach {0}. The other files were attached; try those again."
 
@@ -8012,7 +8012,7 @@ msgstr "Could not send the message."
 msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:139
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "Could not send your answer. Please try again."
@@ -9859,7 +9859,7 @@ msgstr "Discord Public Key"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:373
+#: src/features/chat/thread/ask-user-prompt.tsx:411
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9895,7 +9895,7 @@ msgstr "Dismiss webhook secret"
 msgid "Dismissed"
 msgstr "Dismissed"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:240
+#: src/features/chat/thread/ask-user-prompt.tsx:273
 msgid "Dismissed — continuing without an answer"
 msgstr "Dismissed — continuing without an answer"
 
@@ -11204,7 +11204,7 @@ msgstr "Enter the API key"
 msgid "Enter the endpoint URL first"
 msgstr "Enter the endpoint URL first"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:341
+#: src/features/chat/thread/ask-user-prompt.tsx:378
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter to send, Shift+Enter for a new line."
 
@@ -21511,7 +21511,7 @@ msgstr "Only organization owners can manage billing settings"
 msgid "Only participants you @mention answer."
 msgstr "Only participants you @mention answer."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:167
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 
@@ -22277,7 +22277,7 @@ msgstr "Or fetch from a link"
 msgid "Or from a terminal:"
 msgstr "Or from a terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:313
+#: src/features/chat/thread/ask-user-prompt.tsx:346
 msgid "Or type your own answer…"
 msgstr "Or type your own answer…"
 
@@ -23518,7 +23518,7 @@ msgstr "Premium-tier reasoning and instruction following"
 msgid "Premium-tier reasoning transparency"
 msgstr "Premium-tier reasoning transparency"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:244
+#: src/features/chat/thread/ask-user-prompt.tsx:277
 msgid "Preparing a question…"
 msgstr "Preparing a question…"
 
@@ -25258,7 +25258,7 @@ msgstr "Remove “{0}”?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:329
+#: src/features/chat/thread/ask-user-prompt.tsx:362
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27289,7 +27289,7 @@ msgstr "Send a message below to start"
 msgid "Send a message to begin"
 msgstr "Send a message to begin"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:369
+#: src/features/chat/thread/ask-user-prompt.tsx:407
 msgid "Send answer"
 msgstr "Send answer"
 
@@ -29620,7 +29620,7 @@ msgstr "Suggest video ideas for a tech YouTube channel"
 msgid "Suggested"
 msgstr "Suggested"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:289
+#: src/features/chat/thread/ask-user-prompt.tsx:322
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Suggested answers"
@@ -30575,7 +30575,7 @@ msgstr "The archive contains an unsafe file path."
 msgid "The archive holds too many files."
 msgstr "The archive holds too many files."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:265
+#: src/features/chat/thread/ask-user-prompt.tsx:298
 msgid "The assistant has a question"
 msgstr "The assistant has a question"
 
@@ -32074,6 +32074,11 @@ msgstr "tone"
 msgid "too large"
 msgstr "too large"
 
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:257
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "Too large to attach: {0}. Reduce the file and attach it again."
+
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
 msgstr "Too long to check as JSON"
@@ -32622,7 +32627,7 @@ msgstr "Type it again"
 msgid "Type to search"
 msgstr "Type to search"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:313
+#: src/features/chat/thread/ask-user-prompt.tsx:346
 msgid "Type your answer…"
 msgstr "Type your answer…"
 
@@ -34370,7 +34375,7 @@ msgstr "Waiting for the agent…"
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:246
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Waiting for the owner to answer"
 msgstr "Waiting for the owner to answer"
 
@@ -34391,7 +34396,7 @@ msgstr "Waiting for you"
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:246
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Waiting for your answer"
 msgstr "Waiting for your answer"
 
@@ -35337,7 +35342,7 @@ msgstr "Your account and all associated data are being deleted. This cannot be c
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Your AI workspace <0>starts here.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:305
+#: src/features/chat/thread/ask-user-prompt.tsx:338
 msgid "Your answer"
 msgstr "Your answer"
 
@@ -35345,7 +35350,7 @@ msgstr "Your answer"
 msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:275
+#: src/features/chat/thread/ask-user-prompt.tsx:308
 msgid "Your answer:"
 msgstr "Your answer:"
 

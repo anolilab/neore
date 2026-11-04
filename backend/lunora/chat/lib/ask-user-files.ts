@@ -6,10 +6,11 @@
  * as the thread owner (the run's user). A file the owner may not use, a file
  * that is not an allowed type, or one over the size cap is LEFT OUT, not
  * an error — so an answer never reveals that someone else's file id exists.
- * The bytes are read here only and handed to the model in that call's result;
- * they are never stored on the message.
+ * The bytes are read here only and handed to the model for that one call
+ * (`answerFilesMessage`); they are never stored on a message.
  */
 import { LunoraError } from "lunorash/server";
+import type { ModelMessage } from "ai";
 
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
@@ -24,6 +25,28 @@ import {
     ASK_USER_IMAGE_MAX_BYTES,
     ASK_USER_MAX_FILES,
 } from "../tools/ask-user-constants";
+
+/**
+ * The readable answer files as one user message for the continuation's first model call. It is never saved: the answer's
+ * stored output names the files and carries no bytes, so this message exists only in the model's input for that step.
+ */
+export const answerFilesMessage = (files: ReadonlyArray<AskUserFile>): ModelMessage | undefined => {
+    if (files.length === 0) {
+        return undefined;
+    }
+
+    return {
+        content: [
+            { text: "The files attached to the answer are below, in the order they were attached.", type: "text" },
+            ...files.map((file) =>
+                file.mediaType === "application/pdf"
+                    ? { data: file.data, filename: file.filename, mediaType: file.mediaType, type: "file" as const }
+                    : { image: file.data, mediaType: file.mediaType, type: "image" as const },
+            ),
+        ],
+        role: "user",
+    };
+};
 
 /** The error codes that mean "leave this file out" rather than "the read failed". */
 const SKIP_CODES: ReadonlySet<string> = new Set(["NOT_FOUND", "PAYLOAD_TOO_LARGE"]);

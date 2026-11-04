@@ -58,9 +58,10 @@ const askUserTool = createTool<AskUserInput, AskUserOutput, ToolContext>({
 });
 
 /**
- * The same tool for one resumed run, answering with `answer`. Every attached file is named in the stored output; only
- * `readableFiles` ones go to the model, as content parts of this call's result (images as image data, PDFs as file data).
- * A file the model cannot read is listed in `unreadFiles`, so the answer says it was not shown.
+ * The same tool for one resumed run, answering with `answer`. The stored output is the answer object, with every
+ * attached file named in it, so the card can show it after a reload and no bytes reach the row. The readable files
+ * are handed to the model separately (`answerFilesMessage`, on the continuation's first step). A file the model
+ * cannot read is listed in `unreadFiles`, so the answer says it was not shown.
  */
 export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<AskUserFile> = [], readableFiles: ReadonlyArray<AskUserFile> = files) => {
     const attachedFiles = files.map(({ filename, mediaType }) => {
@@ -81,21 +82,6 @@ export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<A
         inputSchema,
         needsApproval: true,
         title: "Ask User",
-        ...(readableFiles.length > 0 && {
-            toModelOutput: (_context, { output }) => {
-                return {
-                    type: "content" as const,
-                    value: [
-                        { text: JSON.stringify(output), type: "text" as const },
-                        ...readableFiles.map((file) =>
-                            file.mediaType === "application/pdf"
-                                ? { data: file.data, filename: file.filename, mediaType: file.mediaType, type: "file-data" as const }
-                                : { data: file.data, mediaType: file.mediaType as `image/${string}`, type: "image-data" as const },
-                        ),
-                    ],
-                };
-            },
-        }),
     });
 };
 

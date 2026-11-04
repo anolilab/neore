@@ -27,7 +27,7 @@ import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { MessageCircleQuestion, Paperclip, Send, X } from "lucide-react";
 import type { ChangeEvent, FC, FormEvent, KeyboardEvent } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
@@ -103,6 +103,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const attachButtonRef = useRef<HTMLButtonElement>(null);
     // Stops the selection in progress when the question is answered or dismissed, so no later file is uploaded or finalized.
     const uploadAbort = useRef<AbortController | null>(null);
+
+    // A card that goes away (the thread changes, the message is removed) stops its selection in progress.
+    useEffect(() => () => uploadAbort.current?.abort(), []);
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as AskUserInput;
@@ -191,8 +194,10 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         uploadAbort.current = controller;
 
-        // One file's failure does not stop the others: each is attached or named as failed.
+        // One file's failure does not stop the others: each is attached or named as failed. A file over a size limit is
+        // named apart, since choosing it again cannot succeed.
         const failed: string[] = [];
+        const tooLarge: string[] = [];
 
         try {
             for (const file of accepted) {
@@ -207,7 +212,13 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     // Some images cannot be re-encoded, so an image is checked against the provider's limit as it stands.
                     const limit = file.type.startsWith("image/") ? IMAGE_MAX_BYTES : FILE_MAX_BYTES;
 
-                    if (prepared.size > limit || total + prepared.size > FILES_TOTAL_MAX_BYTES) {
+                    if (prepared.size > limit) {
+                        tooLarge.push(file.name);
+
+                        continue;
+                    }
+
+                    if (total + prepared.size > FILES_TOTAL_MAX_BYTES) {
                         failed.push(file.name);
 
                         continue;
@@ -241,8 +252,18 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             setUploading(false);
         }
 
-        if (failed.length > 0) {
-            const message = t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`;
+        if (tooLarge.length > 0 || failed.length > 0) {
+            const notices: string[] = [];
+
+            if (tooLarge.length > 0) {
+                notices.push(t`Too large to attach: ${tooLarge.join(", ")}. Reduce the file and attach it again.`);
+            }
+
+            if (failed.length > 0) {
+                notices.push(t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`);
+            }
+
+            const message = notices.join(" ");
 
             setAttachNotice(message);
             showError(message);

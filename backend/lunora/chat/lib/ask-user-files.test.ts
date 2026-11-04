@@ -7,7 +7,7 @@ import { LunoraError } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
-import { filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71]);
 
@@ -142,5 +142,25 @@ describe("filesTheModelReads", () => {
 
     it("reads none of the files when the model is not in the catalogue", () => {
         expect(filesTheModelReads([image, pdf], undefined)).toEqual([]);
+    });
+});
+
+describe(answerFilesMessage, () => {
+    it("is nothing when no file is readable", () => {
+        expect(answerFilesMessage([])).toBeUndefined();
+    });
+
+    it("sends images as image parts and PDFs as file parts, in one user message", () => {
+        const message = answerFilesMessage([
+            { data: "aW1n", filename: "photo.png", mediaType: "image/png" },
+            { data: "cGRm", filename: "spec.pdf", mediaType: "application/pdf" },
+        ]);
+
+        expect(message?.role).toBe("user");
+        expect(message?.content).toEqual([
+            expect.objectContaining({ type: "text" }),
+            { image: "aW1n", mediaType: "image/png", type: "image" },
+            { data: "cGRm", filename: "spec.pdf", mediaType: "application/pdf", type: "file" },
+        ]);
     });
 });

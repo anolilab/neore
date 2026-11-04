@@ -3316,7 +3316,7 @@ msgstr "Responde mensajes de una cuenta oficial de WeChat (modo seguro). Beta: a
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:242
+#: src/features/chat/thread/ask-user-prompt.tsx:275
 msgid "Answer sent — continuing"
 msgstr "Respuesta enviada — continuando"
 
@@ -3324,7 +3324,7 @@ msgstr "Respuesta enviada — continuando"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Responde mensajes de WhatsApp con tu número de WhatsApp Business (Meta Cloud API). Las respuestas siguen la regla de 24 horas de WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:238
+#: src/features/chat/thread/ask-user-prompt.tsx:271
 msgid "Answered"
 msgstr "Respondida"
 
@@ -3843,7 +3843,7 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:365
+#: src/features/chat/thread/ask-user-prompt.tsx:403
 msgid "Attach file"
 msgstr ""
 
@@ -3851,7 +3851,7 @@ msgstr ""
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Adjunta archivos o colecciones completas para que la IA los consulte y cite en esta conversación."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:324
+#: src/features/chat/thread/ask-user-prompt.tsx:357
 msgid "Attached files"
 msgstr ""
 
@@ -3859,15 +3859,15 @@ msgstr ""
 msgid "Attached image"
 msgstr "Imagen adjunta"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:282
+#: src/features/chat/thread/ask-user-prompt.tsx:315
 msgid "Attached:"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:355
+#: src/features/chat/thread/ask-user-prompt.tsx:392
 msgid "Attaching files…"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:365
+#: src/features/chat/thread/ask-user-prompt.tsx:403
 msgid "Attaching…"
 msgstr ""
 
@@ -7727,7 +7727,7 @@ msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:227
+#: src/features/chat/thread/ask-user-prompt.tsx:258
 msgid "Could not attach {0}. The other files were attached; try those again."
 msgstr ""
 
@@ -8013,7 +8013,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:139
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "No se pudo enviar tu respuesta. Inténtalo de nuevo."
@@ -9860,7 +9860,7 @@ msgstr "Clave pública de Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:373
+#: src/features/chat/thread/ask-user-prompt.tsx:411
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9896,7 +9896,7 @@ msgstr "Descartar secreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:240
+#: src/features/chat/thread/ask-user-prompt.tsx:273
 msgid "Dismissed — continuing without an answer"
 msgstr "Descartada — continuando sin respuesta"
 
@@ -11205,7 +11205,7 @@ msgstr "Introduce la clave de API"
 msgid "Enter the endpoint URL first"
 msgstr "Introduce primero la URL del endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:341
+#: src/features/chat/thread/ask-user-prompt.tsx:378
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Intro para enviar, Mayús+Intro para una nueva línea."
 
@@ -21512,7 +21512,7 @@ msgstr "Solo los propietarios de la organización pueden gestionar la facturaci�
 msgid "Only participants you @mention answer."
 msgstr "Solo responden los participantes que @menciones."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:167
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr ""
 
@@ -22278,7 +22278,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "O desde una terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:313
+#: src/features/chat/thread/ask-user-prompt.tsx:346
 msgid "Or type your own answer…"
 msgstr "O escribe tu propia respuesta…"
 
@@ -23519,7 +23519,7 @@ msgstr "Razonamiento y seguimiento de instrucciones de nivel premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Transparencia de razonamiento de nivel premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:244
+#: src/features/chat/thread/ask-user-prompt.tsx:277
 msgid "Preparing a question…"
 msgstr "Preparando una pregunta…"
 
@@ -25259,7 +25259,7 @@ msgstr "¿Eliminar «{0}»?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:329
+#: src/features/chat/thread/ask-user-prompt.tsx:362
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27290,7 +27290,7 @@ msgstr "Envía un mensaje abajo para empezar"
 msgid "Send a message to begin"
 msgstr "Envía un mensaje para empezar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:369
+#: src/features/chat/thread/ask-user-prompt.tsx:407
 msgid "Send answer"
 msgstr "Enviar respuesta"
 
@@ -29621,7 +29621,7 @@ msgstr "Sugiere ideas de videos para un canal de tecnología en YouTube"
 msgid "Suggested"
 msgstr "Sugeridos"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:289
+#: src/features/chat/thread/ask-user-prompt.tsx:322
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Respuestas sugeridas"
@@ -30576,7 +30576,7 @@ msgstr "El archivo contiene una ruta de archivo no segura."
 msgid "The archive holds too many files."
 msgstr "El archivo contiene demasiados archivos."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:265
+#: src/features/chat/thread/ask-user-prompt.tsx:298
 msgid "The assistant has a question"
 msgstr "El asistente tiene una pregunta"
 
@@ -32075,6 +32075,11 @@ msgstr ""
 msgid "too large"
 msgstr "demasiado grande"
 
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:257
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr ""
+
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
 msgstr "Demasiado largo para comprobar como JSON"
@@ -32623,7 +32628,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Escribe para buscar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:313
+#: src/features/chat/thread/ask-user-prompt.tsx:346
 msgid "Type your answer…"
 msgstr "Escribe tu respuesta…"
 
@@ -34371,7 +34376,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:246
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Waiting for the owner to answer"
 msgstr "Esperando la respuesta del propietario"
 
@@ -34392,7 +34397,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:246
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Waiting for your answer"
 msgstr "Esperando tu respuesta"
 
@@ -35338,7 +35343,7 @@ msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede 
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:305
+#: src/features/chat/thread/ask-user-prompt.tsx:338
 msgid "Your answer"
 msgstr "Tu respuesta"
 
@@ -35346,7 +35351,7 @@ msgstr "Tu respuesta"
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:275
+#: src/features/chat/thread/ask-user-prompt.tsx:308
 msgid "Your answer:"
 msgstr "Tu respuesta:"
 
