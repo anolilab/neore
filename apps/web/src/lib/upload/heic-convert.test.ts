@@ -24,6 +24,10 @@ describe("isHeicFile", () => {
         expect(isHeicFile({ name: "IMG_0002.heic", type: "" })).toBe(true);
     });
 
+    it("trusts a declared type over the name, so a renamed text file is not a photo", () => {
+        expect(isHeicFile({ name: "notes.heic", type: "text/plain" })).toBe(false);
+    });
+
     it("leaves every other file alone", () => {
         expect(isHeicFile({ name: "photo.jpg", type: "image/jpeg" })).toBe(false);
         expect(isHeicFile({ name: "notes.txt", type: "text/plain" })).toBe(false);

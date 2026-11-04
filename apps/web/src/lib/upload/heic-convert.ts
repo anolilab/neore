@@ -10,8 +10,15 @@ const HEIC_TYPES: ReadonlySet<string> = new Set(["image/heic", "image/heic-seque
 const HEIC_NAME_RE = /\.(?:heic|heif)$/iu;
 const JPEG_QUALITY = 0.92;
 
-/** A HEIC or HEIF file, by its declared type or, where the browser gives none, by its name. */
-export const isHeicFile = (file: Pick<File, "name" | "type">): boolean => HEIC_TYPES.has(file.type.toLowerCase()) || HEIC_NAME_RE.test(file.name);
+/**
+ * A HEIC or HEIF file: by its declared type, or, where the browser gives none, by its name. A file that declares another
+ * type keeps it even if its name ends in `.heic`, so a renamed text file is not mistaken for a photo.
+ */
+export const isHeicFile = (file: Pick<File, "name" | "type">): boolean => {
+    const type = file.type.toLowerCase();
+
+    return type === "" ? HEIC_NAME_RE.test(file.name) : HEIC_TYPES.has(type);
+};
 
 /** The name a converted photo is uploaded under: the same name with a `.jpg` extension. */
 export const jpegNameFor = (name: string): string => `${name.replace(HEIC_NAME_RE, "")}.jpg`;

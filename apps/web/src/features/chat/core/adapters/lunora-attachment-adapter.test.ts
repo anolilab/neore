@@ -192,12 +192,12 @@ describe(createLunoraAttachmentAdapter, () => {
         isSafariUserAgent.mockReturnValue(true);
     });
 
-    it("refuses a HEIC photo whose JPEG would be over the image cap, before it is decoded", async () => {
+    it("refuses a HEIC photo over the source ceiling before it is decoded", async () => {
         heicToJpegBlob.mockClear();
         const adapter = createLunoraAttachmentAdapter(client().lunora);
         const file = new File(["heic"], "huge.heic", { type: "image/heic" });
 
-        Object.defineProperty(file, "size", { value: 25 * MB });
+        Object.defineProperty(file, "size", { value: 60 * MB });
 
         await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
         expect(heicToJpegBlob).not.toHaveBeenCalled();
