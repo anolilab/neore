@@ -697,7 +697,8 @@ export const updateTask = authMutation
         }
 
         const tasks = await loadUserTasks(ctx, userId);
-        const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks, args.taskId);
+        // The task keeps the organization it was created under: an edit made from another space must not move its skill scope or its cap.
+        const definition = await resolveDefinition(ctx, { organizationId: task.organizationId ?? undefined, userId }, args, tasks, args.taskId);
         const { now } = ctx;
         let nextRunAt: number | undefined;
 
