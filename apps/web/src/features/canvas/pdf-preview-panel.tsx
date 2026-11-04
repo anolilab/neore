@@ -4,7 +4,7 @@ import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins
 import cn from "@neore/ui/utils/cn";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
@@ -14,6 +14,9 @@ const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-vie
 
 // The backend serves the signed storage URLs, so its origin is the one the viewer and the download may fetch from.
 const PANEL_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
+
+/** How long a downloaded PDF's object URL stays valid: long enough for the browser to start the download. */
+const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 
 const ICON_LINK = "hover:bg-accent rounded p-2";
 
@@ -27,6 +30,7 @@ interface PdfPreviewPanelProps {
  * viewer's own page and zoom controls.
  */
 const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
+    const [downloadFailed, setDownloadFailed] = useState(false);
     const { t } = useLingui();
     const { closeCanvas } = useCanvasState();
     const headingReference = useRef<HTMLHeadingElement>(null);
@@ -66,10 +70,18 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
 
             link.href = objectUrl;
             link.download = file.filename ?? "document.pdf";
+            // Attached while it is clicked: a detached link is ignored by some browsers. The URL outlives the click, so the
+            // download can start before it is revoked.
+            document.body.appendChild(link);
             link.click();
-            URL.revokeObjectURL(objectUrl);
+            link.remove();
+            globalThis.setTimeout(() => {
+                URL.revokeObjectURL(objectUrl);
+            }, DOWNLOAD_URL_LIFETIME_MS);
+            setDownloadFailed(false);
         } catch (error) {
             console.error("Failed to download the PDF:", error);
+            setDownloadFailed(true);
             showError(t`The PDF could not be downloaded.`);
         }
     };
@@ -95,6 +107,11 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                     </button>
                 </div>
             </div>
+            {downloadFailed && (
+                <p className="text-destructive px-3 pt-2 text-xs" role="alert">
+                    {t`The PDF could not be downloaded.`}
+                </p>
+            )}
             <div className="flex min-h-0 flex-1 flex-col p-2">
                 <Suspense fallback={<span className="text-muted-foreground text-sm" role="status">{t`Loading preview…`}</span>}>
                     {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
