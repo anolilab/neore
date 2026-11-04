@@ -12,6 +12,8 @@ export const NPM_REGISTRY = "https://registry.npmjs.org";
 export const NPM_HOST = new URL(NPM_REGISTRY).host;
 
 const LOOKUP_TIMEOUT_MS = 15_000;
+/** The core's limit on the recorded source (`validate_provenance`), in bytes: a longer address would fail after the download. */
+const MAX_SOURCE_BYTES = 1000;
 const MAX_METADATA_BYTES = 5 * 1024 * 1024;
 /** `sha512-` and 64 bytes of base64 (88 characters with padding), the form npm publishes. */
 const INTEGRITY = /^sha512-[\d+/A-Za-z]{86}==$/u;
@@ -68,6 +70,10 @@ export const lookupNpmIntegrity = async (fetchImpl: typeof fetch, name: string, 
 
     if (url.protocol !== "https:" || url.host !== NPM_HOST) {
         throw new Error("The package index points the download somewhere other than itself over https.");
+    }
+
+    if (Buffer.byteLength(url.href) > MAX_SOURCE_BYTES) {
+        throw new Error("The package index gave a download address longer than Neore records.");
     }
 
     return { integrity, tarball: url.href };

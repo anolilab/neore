@@ -30,6 +30,16 @@ describe("lookupNpmIntegrity", () => {
         expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
     });
 
+    it("refuses a download address longer than the core records, before anything is downloaded", async () => {
+        const base = "https://registry.npmjs.org/@acme/agent/-/agent-1.2.3.tgz?x=";
+
+        const fits = lookup(metadata({}, { tarball: base.padEnd(1000, "a") }));
+        const tooLong = lookup(metadata({}, { tarball: base.padEnd(1001, "a") }));
+
+        await expect(fits.result).resolves.toBeDefined();
+        await expect(tooLong.result).rejects.toThrow("longer than Neore records");
+    });
+
     it("addresses a plain package without escaping", () => {
         expect(npmVersionUrl("thing", "1.0.0")).toBe("https://registry.npmjs.org/thing/1.0.0");
     });

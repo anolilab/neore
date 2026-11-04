@@ -640,3 +640,69 @@ fn a_small_staging_folder_is_within_budget() {
     fs::write(guard.path().join("a"), vec![0_u8; 4096]).unwrap();
     assert!(!stage_over_budget(guard.path()));
 }
+
+#[test]
+fn a_tarball_swapped_after_the_check_is_refused() {
+    let (state, guard) = state("swap");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    // npm reads the tarball, then another process rewrites it before the installer looks again.
+    let mut script = fs::read_to_string(&npm).unwrap();
+
+    script.push_str("echo tamper >> \"$last\"\n");
+    fs::write(&npm, script).unwrap();
+
+    let error = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap_err();
+
+    assert!(
+        error.contains("changed while it was being installed"),
+        "{error}"
+    );
+    assert!(state.acp_view().agents.is_empty());
+    assert!(!installed(&dir).exists());
+}
+
+#[test]
+fn a_node_that_is_gone_stops_the_start_with_a_message_that_names_it() {
+    let (state, guard) = state("node-gone");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    fs::remove_file(&node).unwrap();
+
+    let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+
+    assert!(
+        error.contains("which is gone") && error.contains("Reinstall"),
+        "{error}"
+    );
+}
+
+#[test]
+fn names_that_differ_only_in_bytes_no_text_keeps_hash_differently() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let first = tempfile::tempdir().unwrap();
+    let second = tempfile::tempdir().unwrap();
+
+    // APFS refuses a name that is not valid UTF-8; there the case cannot arise and the test has nothing to say.
+    if fs::write(first.path().join(OsStr::from_bytes(b"a\xff")), "x").is_err() {
+        return;
+    }
+
+    fs::write(second.path().join(OsStr::from_bytes(b"a\xfe")), "x").unwrap();
+    assert_ne!(
+        tree_hash(first.path()).unwrap(),
+        tree_hash(second.path()).unwrap()
+    );
+}

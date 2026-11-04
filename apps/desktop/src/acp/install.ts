@@ -5,7 +5,7 @@
  * SHA-256, unpacking it and registering the command are the core's (`device-core/src/acp_install.rs`); this
  * module only fetches bytes into the staging folder the core made, with a deadline and a size cap.
  */
-import { createWriteStream } from "node:fs";
+import { createWriteStream, realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { Transform } from "node:stream";
@@ -104,6 +104,14 @@ const countBytes = (max: number): Transform => {
     });
 };
 
+const realpathOr = (file: string): string => {
+    try {
+        return realpathSync(file);
+    } catch {
+        return file;
+    }
+};
+
 /** Downloads `url` to `file`, which must not exist. https only, also after redirects. */
 export const download = async (fetchImpl: typeof fetch, url: string, file: string, onlyHost?: string): Promise<void> => {
     const response = await fetchHttps(fetchImpl, url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }, onlyHost);
@@ -161,11 +169,14 @@ export class AgentInstaller {
      * that cannot happen (no node, no hash) never asks. Nothing is downloaded until the answer is yes.
      */
     private async installNpm(resolved: ResolvedNpmInstall): Promise<AcpView | null> {
-        const tools = (this.options.locateTools ?? (() => findNodeTools()))();
+        const found = (this.options.locateTools ?? (() => findNodeTools()))();
 
-        if (tools === undefined) {
+        if (found === undefined) {
             throw new Error("Node.js and npm were not found. Install Node.js (which includes npm), then try again.");
         }
+
+        // The core records the resolved path of node; the dialog shows that one, not a link that may be re-pointed.
+        const tools = { ...found, node: realpathOr(found.node) };
 
         const fetchImpl = this.options.fetch ?? globalThis.fetch;
         const entry = await lookupNpmIntegrity(fetchImpl, resolved.name, resolved.version);

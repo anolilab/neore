@@ -367,6 +367,20 @@ fn stage_over_budget(dir: &Path) -> bool {
     add(dir, &mut 0, &mut 0)
 }
 
+/// A path's bytes as the file system holds them (Unix); elsewhere its text.
+fn raw_bytes(path: &Path) -> Vec<u8> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+
+        path.as_os_str().as_bytes().to_vec()
+    }
+    #[cfg(not(unix))]
+    {
+        path.to_string_lossy().replace('\\', "/").into_bytes()
+    }
+}
+
 fn put(hasher: &mut Sha256, tag: u8, parts: &[&[u8]]) {
     hasher.update([tag]);
 
@@ -431,11 +445,11 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
 
         let path = dir.join(&name);
         let meta = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
-        let relative = path
-            .strip_prefix(root)
-            .map_err(|error| error.to_string())?
-            .to_string_lossy()
-            .replace('\\', "/");
+        let relative_path = path.strip_prefix(root).map_err(|error| error.to_string())?;
+        // The hash takes the names as the file system holds them: two names that differ only in bytes no
+        // text form keeps must not hash alike. `relative` is for messages.
+        let raw = raw_bytes(relative_path);
+        let relative = relative_path.to_string_lossy().into_owned();
         let kind = meta.file_type();
 
         if kind.is_symlink() {
@@ -447,13 +461,9 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
                 ));
             }
 
-            put(
-                hasher,
-                b'L',
-                &[relative.as_bytes(), target.to_string_lossy().as_bytes()],
-            );
+            put(hasher, b'L', &[&raw, &raw_bytes(&target)]);
         } else if kind.is_dir() {
-            put(hasher, b'D', &[relative.as_bytes()]);
+            put(hasher, b'D', &[&raw]);
             walk(root, &path, hasher, entries)?;
         } else if kind.is_file() {
             #[cfg(unix)]
@@ -471,7 +481,7 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
                 hasher,
                 b'F',
                 &[
-                    relative.as_bytes(),
+                    &raw,
                     &[u8::from(executable)],
                     &meta.len().to_le_bytes(),
                     content.as_bytes(),
@@ -565,6 +575,17 @@ impl DeviceState {
         create_private_dir(&home)?;
         run_npm(node, npm, &prefix, &tarball, &home, stage_dir)?;
 
+        // npm opened the tarball by name. A copy swapped in between the check above and npm's read would have
+        // been installed: what is on disk now must still be the bytes that matched the index.
+        let (after, _) =
+            digests(&mut fs::File::open(&tarball).map_err(|error| error.to_string())?)?;
+
+        if after != request.integrity {
+            return Err(
+                "the download changed while it was being installed. Nothing was installed".into(),
+            );
+        }
+
         let package_dir = prefix.join("node_modules").join(&request.package);
 
         if !fs::symlink_metadata(&package_dir).is_ok_and(|meta| meta.is_dir()) {
@@ -657,6 +678,15 @@ impl DeviceState {
             return Ok(());
         };
         let dir = self.install_root().join(&agent.key).join(&pin.version);
+
+        // The interpreter is the person's own Node, not part of the hashed files. When an upgrade or a version
+        // manager removed it, say so rather than letting the start fail with an operating-system error.
+        if !fs::metadata(&agent.command).is_ok_and(|meta| meta.is_file()) {
+            return Err(format!(
+                "{} {} was installed to run with {}, which is gone. Reinstall it from the registry, or edit its command, to use the Node.js that is here now.",
+                agent.label, pin.version, agent.command
+            ));
+        }
 
         let actual = if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir()) {
             tree_hash(&dir).ok()
