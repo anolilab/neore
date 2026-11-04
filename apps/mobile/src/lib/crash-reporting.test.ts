@@ -224,6 +224,38 @@ describe("making the client", () => {
 });
 
 describe("the global error handler", () => {
+    it("holds a crash until the saved choice is known, then sends it when the choice is on", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client);
+        crash.installGlobalErrorReporting();
+
+        handlers.installed?.(new Error("during startup"), true);
+
+        expect(client.captureException).not.toHaveBeenCalled();
+
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+
+        expect(client.captureException).toHaveBeenCalledOnce();
+        expect(client.captureException.mock.calls[0]?.[1]).toEqual({ fatal: true });
+    });
+
+    it("drops a crash held before the saved choice is known, when the choice is off", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client);
+        crash.installGlobalErrorReporting();
+
+        handlers.installed?.(new Error("during startup"), false);
+        await crash.applyStoredCrashReportChoice(memoryStore(events, null), returningInstall);
+
+        expect(client.captureException).not.toHaveBeenCalled();
+    });
+
     it("hands no error to the SDK while reporting is off, and still runs the previous handler", async () => {
         const events: string[] = [];
         const crash = await load();

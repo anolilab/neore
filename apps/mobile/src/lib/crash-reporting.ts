@@ -8,7 +8,25 @@ import { createSerialQueue } from "./serial-queue";
 /** The part of the SDK this module uses. A test can supply its own. */
 export type CrashReportClient = Pick<PostHog, "captureException" | "optIn" | "optOut">;
 
-const state: { client?: CrashReportClient; create?: () => CrashReportClient; isHandlerInstalled: boolean; isOn: boolean } = {
+/** A scrubbed report, and whether it was a fatal error. */
+interface HeldReport {
+    fatal: boolean;
+    report: ReturnType<typeof toCrashReport>;
+}
+
+/** How many reports are kept while the saved choice is not yet known. The newest are kept. */
+const MAX_HELD_REPORTS = 5;
+
+const state: {
+    client?: CrashReportClient;
+    create?: () => CrashReportClient;
+    held: HeldReport[];
+    isChoiceKnown: boolean;
+    isHandlerInstalled: boolean;
+    isOn: boolean;
+} = {
+    held: [],
+    isChoiceKnown: false,
     isHandlerInstalled: false,
     isOn: false,
 };
@@ -57,6 +75,37 @@ const applyToClient = async (isOn: boolean): Promise<void> => {
     state.isOn = true;
 };
 
+/** Hands one scrubbed report to the SDK. Only reached once the applied choice is on. */
+const sendReport = ({ fatal, report }: HeldReport): void => {
+    try {
+        // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
+        // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
+        const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
+
+        state.client?.captureException(sendable, { fatal });
+    } catch {
+        // A reporting failure must not hide the crash. The error itself is not logged: its message and stack can hold chat text.
+        console.warn("A crash report could not be sent.");
+    }
+};
+
+/**
+ * Records that the saved choice is known. The reports held until now are sent if the applied choice is on, and
+ * dropped if it is off.
+ */
+const settleChoice = (): void => {
+    const { held } = state;
+
+    state.isChoiceKnown = true;
+    state.held = [];
+
+    if (state.isOn) {
+        for (const item of held) {
+            sendReport(item);
+        }
+    }
+};
+
 /** Whether reports are being sent right now. Read through the queue, so it follows any change still in progress. */
 export const crashReportsOn = (): Promise<boolean> => runChoice(async () => state.isOn);
 
@@ -67,6 +116,7 @@ export const crashReportsOn = (): Promise<boolean> => runChoice(async () => stat
 export const changeCrashReports = (store: PreferenceStore, isOn: boolean): Promise<void> =>
     runChoice(async () => {
         await applyToClient(isOn);
+        settleChoice();
         await writeCrashReportsEnabled(store, isOn);
     });
 
@@ -77,38 +127,45 @@ export interface InstallMarker {
 }
 
 /**
- * Applies the saved choice at startup. A store that cannot be read leaves reports off.
- * On a new install the saved choice is reset to off first: the Keychain can still hold a choice from an app
- * that was deleted, and nobody has agreed to that choice on this install. If the reset cannot be saved, the
- * client is not started, and the next launch tries again.
+ * The choice to start with. A new install starts off: the Keychain can still hold a choice from an app that was
+ * deleted, and nobody has agreed to that choice on this install. If the reset cannot be saved, the next launch
+ * tries again. A store that cannot be read is off.
+ */
+const startupChoice = async (store: PreferenceStore, marker: InstallMarker): Promise<boolean> => {
+    if (!marker.exists()) {
+        try {
+            await writeCrashReportsEnabled(store, false);
+            marker.create();
+        } catch {
+            console.warn("Could not reset the saved crash-report choice.");
+        }
+
+        return false;
+    }
+
+    try {
+        return await readCrashReportsEnabled(store);
+    } catch {
+        // Nothing was sent: the client starts opted out.
+        return false;
+    }
+};
+
+/**
+ * Applies the saved choice at startup, then sends or drops the crashes held until the choice was known. Errors
+ * caught before this runs are held, not sent.
  */
 export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: InstallMarker): Promise<void> =>
     runChoice(async () => {
-        if (!marker.exists()) {
-            try {
-                await writeCrashReportsEnabled(store, false);
-                marker.create();
-            } catch {
-                console.warn("Could not reset the saved crash-report choice.");
-            }
-
-            return;
-        }
-
-        let isOn: boolean;
-
-        try {
-            isOn = await readCrashReportsEnabled(store);
-        } catch {
-            // Nothing was sent: the client starts opted out.
-            return;
-        }
+        const isOn = await startupChoice(store, marker);
 
         try {
             await applyToClient(isOn);
         } catch (applyError) {
             console.warn("Could not apply the crash-report setting.", applyError);
         }
+
+        settleChoice();
     });
 
 /**
@@ -127,18 +184,16 @@ export const installGlobalErrorReporting = (): void => {
 
     ErrorUtils.setGlobalHandler((error, isFatal) => {
         try {
-            // Nothing is sent unless the applied choice is on, so an error is never handed to the SDK for a user who has not opted in.
-            if (state.isOn) {
-                const report = toCrashReport(error);
-                // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
-                // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
-                const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
+            const held: HeldReport = { fatal: isFatal === true, report: toCrashReport(error) };
 
-                state.client?.captureException(sendable, { fatal: isFatal === true });
+            if (!state.isChoiceKnown) {
+                // The saved choice is not read yet, so the report waits for it. The newest are kept.
+                state.held = [...state.held, held].slice(-MAX_HELD_REPORTS);
+            } else if (state.isOn) {
+                sendReport(held);
             }
         } catch {
-            // A reporting failure must not hide the crash, so the original handler still runs below. The error itself
-            // is not logged: its message and stack can hold chat text.
+            // A reporting failure must not hide the crash, so the original handler still runs below.
             console.warn("A crash report could not be sent.");
         }
 

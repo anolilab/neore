@@ -1,3 +1,5 @@
+import "@/lib/crash-boot";
+
 import { Link, Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -7,7 +9,7 @@ import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
-import { applyStoredCrashReportChoice, installGlobalErrorReporting, startCrashReporting } from "@/lib/crash-reporting";
+import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-reporting";
 import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
 import { OfflineProvider } from "@/offline/offline-provider";
@@ -22,7 +24,6 @@ const CrashReportingStartup = () => {
         }
 
         startCrashReporting(() => createPostHogClient(posthog));
-        installGlobalErrorReporting();
         applyStoredCrashReportChoice(crashReportStore, installMarker);
     }, []);
 

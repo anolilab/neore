@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { ScrollView, Switch, Text, View } from "react-native";
 
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
@@ -47,7 +47,7 @@ const SettingsScreen = () => {
     };
 
     return (
-        <View style={{ gap: 12, padding: 16 }}>
+        <ScrollView contentContainerStyle={{ gap: 12, padding: 16 }}>
             <View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between" }}>
                 <Text>Send crash reports</Text>
                 <Switch
@@ -66,7 +66,7 @@ const SettingsScreen = () => {
             </Text>
             {isConfigured ? null : <Text style={{ fontSize: 13 }}>Crash reports are not set up in this build.</Text>}
             {failure ? <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>{failure}</Text> : null}
-        </View>
+        </ScrollView>
     );
 };
 
