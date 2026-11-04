@@ -170,7 +170,8 @@ export interface ResolvedToolPermission {
 /**
  * The tool's default as the thread's mode moves it. Applied to the DEFAULT only (see {@link resolveToolPermissionWithGrant}).
  *
- * - `supervised`: a tool that would run asks, unless it is read-only. `auto-edit` is the same, except the file-edit built-ins run.
+ * - `supervised`: a tool that would run asks, unless it is a built-in read-only lookup. `auto-edit` is the same, except the file-edit
+ *   built-ins run. A third-party tool's read-only hint is the server's own word, so it asks under both.
  * - `full`: a tool that would ask runs, unless it waits for a person.
  * - `auto` / absent: the default unchanged.
  * Device tools are approved on the device itself and keep their default in every mode. Only built-ins are classed read-only
@@ -192,8 +193,13 @@ const threadModeDefault = (
         return chosen === "ask" && !needsPerson ? "auto" : chosen;
     }
 
-    if (chosen !== "auto" || builtinName === undefined) {
+    if (chosen !== "auto") {
         return chosen;
+    }
+
+    // A third-party tool's read-only hint is the server's own word, so under these modes it asks like any other tool.
+    if (builtinName === undefined) {
+        return "ask";
     }
 
     const stays = BUILTIN_TOOLS_READ_ONLY.has(builtinName) || (threadMode === "auto-edit" && BUILTIN_TOOLS_FILE_EDIT.has(builtinName));

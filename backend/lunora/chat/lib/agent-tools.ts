@@ -65,6 +65,11 @@ export interface BuildAgentToolsOptions {
     model: LanguageModel | string;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
+    /**
+     * The thread whose permission mode applies to these tools, when it is not `threadId`: a group turn's speakers build their tools
+     * without a thread of their own, but the mode is the group thread's. Omitted, the mode is read for `threadId`.
+     */
+    permissionModeThreadId?: string;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -123,6 +128,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpServerNames,
         model,
         origin,
+        permissionModeThreadId,
         searchMode,
         skillTools,
         snapshot,
@@ -130,6 +136,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         untrustedContext = true,
         userId,
     } = options;
+    const modeThreadId = permissionModeThreadId ?? threadId;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
@@ -165,14 +172,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
-        // A headless run ignores the thread's mode, so it does not read it. A failed read leaves the default.
-        headless || threadId === undefined
+        // A headless run ignores the thread's mode, so it does not read it. A failed read falls back to the restrictive mode: a
+        // read that fails must not restore the automatic defaults for tools the thread's mode would ask about.
+        headless || modeThreadId === undefined
             ? null
-            : ctx.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: threadId as Id<"threads">, userId }).catch((error: unknown) => {
-                  toolsLogger.warn("[TOOLS] Thread permission mode unavailable:", error);
+            : ctx
+                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: modeThreadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Thread permission mode unavailable, using supervised:", error);
 
-                  return null;
-              }),
+                      return "supervised" as const;
+                  }),
     ]);
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant

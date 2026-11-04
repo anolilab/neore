@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -91,6 +91,7 @@ const ComposerThreadPermissionMode: FC = () => {
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
     const { mutateAsync } = useMutation(crpc.chat.thread_state.setThreadPermissionMode.mutationOptions());
     const [pending, setPending] = useState<ThreadPermissionMode>();
+    const latestSave = useRef(0);
 
     if (!threadId || thread?.runner === "host" || access?.isOwner !== true) {
         return null;
@@ -103,13 +104,19 @@ const ComposerThreadPermissionMode: FC = () => {
             disabled={isRunning}
             mode={pending ?? stored}
             onModeChange={(mode) => {
+                latestSave.current += 1;
+                const save = latestSave.current;
+
                 setPending(mode);
                 mutateAsync({ mode, threadId: threadId as never })
                     .catch((error: unknown) => {
                         showError(error instanceof Error ? error : t`Could not change the permission mode. Please try again.`);
                     })
                     .finally(() => {
-                        setPending(undefined);
+                        // Only the newest save clears the selection: an older save finishing must not show the stored mode over a newer pending one.
+                        if (latestSave.current === save) {
+                            setPending(undefined);
+                        }
                     })
                     .catch(() => {});
             }}

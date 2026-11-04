@@ -269,6 +269,8 @@ const runSpeaker = async (
                   mcpServerNames: turn.mcpServerNames,
                   model,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
+                  // The group thread's mode governs every speaker's tools; a speaker has no thread of its own.
+                  permissionModeThreadId: turn.threadId,
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,

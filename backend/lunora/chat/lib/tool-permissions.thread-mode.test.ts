@@ -31,14 +31,15 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("somethingNew"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
-        expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, options)).toBe("auto");
+        expect(resolveToolPermission(builtin("visionAnalysis"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
     });
 
     it("auto-edit lets the file-edit built-ins run and asks for the rest", () => {
         const options = { threadMode: "auto-edit" } as const;
 
-        expect(resolveToolPermission(FILES, undefined, options)).toBe("auto");
+        expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("updateDocument"), undefined, options)).toBe("auto");
         expect(resolveToolPermission(SHELL, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("browser"), undefined, options)).toBe("ask");
