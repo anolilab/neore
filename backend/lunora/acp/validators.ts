@@ -31,15 +31,15 @@ export const vHostEndReason = v.union(
 );
 
 /**
- * The agent's context use and cost, as it reports them (`session_state`). Counts are whole and non-negative, the cost is a
- * finite non-negative amount, and the currency is cut to 8 characters on the desktop (`apps/desktop/src/acp/agent-state.ts`).
- */
-/**
  * An id the agent chose, as the computer checks it: at most 128 UTF-8 bytes. A character count would admit an id the computer
  * refuses, after the change is already sent.
  */
 export const fitsIdBytes = (text: string): boolean => new TextEncoder().encode(text).length <= 128;
 
+/**
+ * The agent's context use and cost, as it reports them (`session_state`). Counts are whole and non-negative, the cost is a
+ * finite non-negative amount, and the currency is cut to 8 characters on the desktop (`apps/desktop/src/acp/agent-state.ts`).
+ */
 export const vAgentUsage = v.object({
     cost: v.optional(
         v.object({

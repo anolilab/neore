@@ -36,7 +36,6 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
     };
 };
 
-/** The backend stores at most this many modes in a capability report (`lib/capability-report.ts`); a longer list would refuse the whole session open. */
 /** The first option the agent filed under a category, if it sent any. */
 const optionIn = (options: SessionStatePatch, category: string) => options.configOptions?.find((option) => option.category === category);
 

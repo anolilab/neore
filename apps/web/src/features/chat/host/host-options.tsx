@@ -168,10 +168,6 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         return () => clearTimeout(timer);
     }, [awaitingAnswer]);
 
-    if (rows.length === 0) {
-        return null;
-    }
-
     const unknownOutcome = awaitingAnswer !== undefined && unknownChange === awaitingAnswer;
 
     const waiting = (awaitingAnswer !== undefined && !unknownOutcome) || catchingUp;
@@ -187,6 +183,21 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
 
         return messages[reason ?? "busy"];
     };
+
+    // The backend sends one of a fixed set of English phrases (`acp/lib/calls.ts`). Each is shown in the person's language.
+    const refusalTexts = new Map<string, string>([
+        ["that session no longer exists", t`that session no longer exists`],
+        ["the agent did not accept the change", t`the agent did not accept the change`],
+        ["the agent did not answer", t`the agent did not answer`],
+        ["the agent did not apply the change", t`the agent did not apply the change`],
+        ["the agent does not offer that choice", t`the agent does not offer that choice`],
+        ["the app restarted before the agent answered", t`the app restarted before the agent answered`],
+        ["the device was removed", t`the device was removed`],
+        ["The host did not answer.", t`the host did not answer`],
+        ["The host did not change the option.", t`the host did not change the option`],
+        ["this session is not open", t`this session is not open`],
+    ]);
+    const refusalText = (reason: string | undefined): string => refusalTexts.get(reason ?? "") ?? t`the change was refused`;
 
     const choose = (row: Row, valueId: string) => {
         if (valueId === row.current || waiting) {
@@ -225,12 +236,17 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     } else if (answered !== undefined) {
         refused = answered.outcome === "refused";
         status = refused
-            ? t`The agent did not change ${changed?.name ?? ""}: ${answered.reason ?? ""}`
+            ? t`The agent did not change ${changed?.name ?? ""}: ${refusalText(answered.reason)}`
             : t`The agent confirmed: ${changed?.name ?? ""} is now ${nameOfValue(changed, answered.valueId)}.`;
     } else if (unknownOutcome) {
         status = t`No answer came for the change to ${changed?.name ?? ""}. Check the agent before changing it again.`;
     } else if (waiting) {
         status = t`Waiting for the agent to change ${changed?.name ?? ""} to ${nameOfValue(changed, change?.valueId ?? "")}.`;
+    }
+
+    // Without an option left, a pending change or its answer is still shown; nothing is shown when neither is left.
+    if (rows.length === 0 && status === undefined) {
+        return null;
     }
 
     return (
