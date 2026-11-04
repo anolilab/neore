@@ -38,7 +38,7 @@ vi.mock("../auth", async (importOriginal) => {
 });
 
 const { host, registry } = vi.hoisted(() => {
-    return { host: { outcome: { status: "not_found" } as Record<string, unknown> }, registry: new Map<string, unknown>() };
+    return { host: { outcome: { status: "not_found" } as Record<string, unknown>, reads: 0 }, registry: new Map<string, unknown>() };
 });
 
 // The action reaches its own internal query by reference: resolve it to the registered procedure.
@@ -57,7 +57,11 @@ vi.mock("../connectors/lib/github-token", async (importOriginal) => {
 vi.mock("./read-host", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./read-host")>()),
-        readFromHost: async () => host.outcome,
+        readFromHost: async () => {
+            host.reads += 1;
+
+            return host.outcome;
+        },
     };
 });
 
@@ -181,7 +185,10 @@ describe("attaching by hand: the host read and the request limits", () => {
             return { number: index + 1, repository: "octo/hello" };
         });
 
-        await expect(attach(A, threadId, eleven)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        host.reads = 0;
+
+        await expect(attach(A, threadId, eleven)).rejects.toThrow("Attach at most 10 pull requests at a time");
+        expect(host.reads).toBe(0);
     });
 
     it("refuses another user's thread before any host read", async () => {

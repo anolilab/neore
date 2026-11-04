@@ -142,10 +142,13 @@ export const checkThreadForAttach = internalQuery
  */
 export const attachPullRequests = authAction
     .use(rateLimit("sourceControl/write"))
-    .input({ pullRequests: v.array(vAddress), threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        pullRequests: v.array(vAddress).check((value) => value.length <= MAX_ATTACH_PER_CALL, { message: "Attach at most 10 pull requests at a time" }),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.object({ results: v.array(vAttachResult) }))
     .action(async ({ args, ctx }) => {
-        if (args.pullRequests.length === 0 || args.pullRequests.length > MAX_ATTACH_PER_CALL) {
+        if (args.pullRequests.length === 0) {
             throw new LunoraError("BAD_REQUEST", "Attach between 1 and 10 pull requests at a time");
         }
 
