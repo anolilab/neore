@@ -1,4 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
+import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
+import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import cn from "@neore/ui/utils/cn";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
@@ -9,6 +11,9 @@ import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import { showError } from "@/lib/toast";
 
 const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
+
+// The backend serves the signed storage URLs, so its origin is the one the viewer and the download may fetch from.
+const PANEL_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
 
 const ICON_LINK = "hover:bg-accent rounded p-2";
 
@@ -26,14 +31,29 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     const { closeCanvas } = useCanvasState();
     const headingReference = useRef<HTMLHeadingElement>(null);
 
-    // The panel opens from a thumbnail click; focus moves here, so a keyboard user is not left behind in the thread.
+    // The panel opens from a thumbnail click; focus moves here, so a keyboard user is not left behind in the thread. When the
+    // panel closes, focus goes back to the control that opened it, if that is still on the screen.
     useEffect(() => {
+        const opener = document.activeElement;
+
         headingReference.current?.focus();
+
+        return () => {
+            if (opener instanceof HTMLElement && opener.isConnected) {
+                opener.focus();
+            }
+        };
     }, []);
 
     // The link is cross-origin, and a browser opens a cross-origin PDF inline whatever the `download` attribute says.
     // The file is fetched and saved from a local object URL instead.
     const download = async () => {
+        if (!isFetchableUrl(file.url, PANEL_ORIGINS)) {
+            showError(t`The PDF could not be downloaded.`);
+
+            return;
+        }
+
         try {
             const response = await fetch(file.url);
 
@@ -60,7 +80,7 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                 <h2 className="truncate text-sm font-medium" ref={headingReference} tabIndex={-1}>
                     {file.filename ?? t`PDF`}
                 </h2>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-2">
                     <button aria-label={t`Download PDF`} className={ICON_LINK} onClick={download} type="button">
                         <Download aria-hidden="true" className="size-4" />
                     </button>
@@ -75,7 +95,15 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             <div className="flex min-h-0 flex-1 flex-col p-2">
                 <Suspense fallback={<span className="text-muted-foreground text-sm">{t`Loading preview…`}</span>}>
                     {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
-                    <PdfViewer className="my-0 min-h-0 max-w-none flex-1 rounded-none border-0" filename={file.filename} fill key={file.url} url={file.url} />
+                    <FetchableOriginsProvider origins={PANEL_ORIGINS}>
+                        <PdfViewer
+                            className="my-0 min-h-0 max-w-none flex-1 rounded-none border-0"
+                            filename={file.filename}
+                            fill
+                            key={file.url}
+                            url={file.url}
+                        />
+                    </FetchableOriginsProvider>
                 </Suspense>
             </div>
         </div>

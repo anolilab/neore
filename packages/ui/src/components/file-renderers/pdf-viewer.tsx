@@ -14,6 +14,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import "./pdf-worker";
 
 import { useLingui } from "@lingui/react/macro";
+import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
 import { ChevronLeft, ChevronRight, Minus, Plus, ZoomIn } from "lucide-react";
 import type { FC } from "react";
@@ -34,6 +35,9 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
     const [loadState, setLoadState] = useState<"failed" | "loaded" | "loading">("loading");
+    // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
+    const origins = useFetchableOrigins();
+    const refused = !isFetchableUrl(url, origins);
     const [pageNumber, setPageNumber] = useState(1);
     const [scale, setScale] = useState(1);
     const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
@@ -153,7 +157,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
                 ref={containerRef}
                 style={fill ? undefined : { maxHeight: "600px" }}
             >
-                {loadState === "failed" ? (
+                {loadState === "failed" || refused ? (
                     <p className="text-muted-foreground py-12 text-center text-sm" role="status">
                         {t`This preview could not be loaded.`}
                     </p>

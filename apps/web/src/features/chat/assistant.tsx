@@ -81,6 +81,18 @@ const AssistantContent: FC<{
         return () => globalThis.removeEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
     }, [openPreviewFile, threadId]);
 
+    // A PDF belongs to the thread it was opened in: leaving that thread closes its preview, so it does not come back on return.
+    useEffect(
+        () => () => {
+            const { closeCanvas, previewFile: opened } = useChatUIStore.getState();
+
+            if (opened?.threadId === threadId) {
+                closeCanvas();
+            }
+        },
+        [threadId],
+    );
+
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
             <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />

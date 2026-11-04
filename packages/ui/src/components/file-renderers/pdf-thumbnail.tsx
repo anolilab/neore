@@ -9,6 +9,7 @@ import "./pdf-worker";
 
 import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
+import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
 import type { FC } from "react";
 import { useEffect, useState } from "react";
@@ -29,9 +30,13 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     const { t } = useLingui();
     const [pages, setPages] = useState(0);
     const [failed, setFailed] = useState(false);
-    // Each progress report restarts the deadline, so a large file that is still arriving is not failed.
+    // Each progress report restarts the deadline, so a large file that is still arriving is not failed. A URL the page may not
+    // fetch is refused before any request, the way the text previews refuse it.
     const [progress, setProgress] = useState(0);
-    const loading = !failed && pages === 0;
+    const origins = useFetchableOrigins();
+    const refused = !isFetchableUrl(url, origins);
+    const unavailable = failed || refused;
+    const loading = !unavailable && pages === 0;
 
     useEffect(() => {
         if (!loading) {
@@ -53,8 +58,10 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
             onClick={onOpen}
             type="button"
         >
-            {failed ? (
-                <span className="text-muted-foreground w-[200px] p-6 text-sm">{t`This preview could not be loaded.`}</span>
+            {unavailable ? (
+                <span className="text-muted-foreground w-[200px] p-6 text-sm" role="status">
+                    {t`This preview could not be loaded.`}
+                </span>
             ) : (
                 <Document
                     error={<span className="text-muted-foreground w-[200px] p-6 text-sm">{t`This preview could not be loaded.`}</span>}
