@@ -6,7 +6,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -91,5 +91,40 @@ describe("a coding agent's turn", () => {
         expect(screen.queryByText("Working…")).toBeNull();
         expect(screen.queryByText("Sending…")).toBeNull();
         expect(screen.queryByText("Waiting for the agent…")).toBeNull();
+    });
+
+    it("shows the agent's latest plan as a task list, each entry with its status in words", async () => {
+        mount({
+            hostActivity: {
+                plan: [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                    { content: "Run the tests", priority: "low", status: "pending" },
+                ],
+                tools: [],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        });
+
+        const list = await screen.findByRole("list");
+        const items = within(list).getAllByRole("listitem");
+
+        expect(items.map((item) => item.textContent)).toEqual(["Read the codeDone", "Write the fixIn progress", "Run the testsTo do"]);
+    });
+
+    it("shows no plan once the turn has ended", async () => {
+        mount({
+            hostActivity: { plan: [{ content: "Read the code", priority: "high", status: "completed" }], tools: [] },
+            hostState: "ended",
+            reasoning: "",
+            status: "done",
+            text: "partial",
+        });
+
+        expect(await screen.findByTestId("content")).toBeTruthy();
+        expect(screen.queryByRole("list")).toBeNull();
     });
 });

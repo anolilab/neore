@@ -2,6 +2,7 @@
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { ChildEvent } from "./children";
+import type { PlanEntry } from "./plan";
 import type { StopReason } from "./types";
 
 export interface PermissionOption {
@@ -90,8 +91,14 @@ export interface TurnEndEvent {
     summary?: TurnSummary;
 }
 
+/** The agent's plan for the turn, whole (`plan.ts`): each one replaces the one before. */
+export interface PlanEvent {
+    entries: PlanEntry[];
+    kind: "plan";
+}
+
 export type HostEvent
-    = MediaEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = MediaEvent | PlanEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
@@ -112,6 +119,8 @@ export interface SessionObserver {
     child?: (sessionId: string, turnId: string, spawnId: string, event: ChildEvent) => void;
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
+    /** The agent's plan for the turn changed; `entries` is the whole list, already scrubbed and cut (`plan.ts`). */
+    plan?: (sessionId: string, turnId: string, entries: PlanEntry[]) => void;
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;

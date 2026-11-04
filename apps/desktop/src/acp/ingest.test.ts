@@ -691,6 +691,27 @@ describe("a turn", () => {
         expect(backend.texts("t1")).toBe("Hello world!!");
     });
 
+    it("posts the agent's plan as one event, and a plan still waiting is replaced by the next", async () => {
+        const host = poster();
+        const first = [{ content: "Read", priority: "high" as const, status: "in_progress" as const }];
+        const second = [{ content: "Read", priority: "high" as const, status: "completed" as const }];
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.plan("s1", "t1", first);
+        host.text("s1", "t1", "ok");
+        host.plan("s1", "t1", first);
+        host.plan("s1", "t1", second);
+        await settle(POST_INTERVAL_MS);
+
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "go" },
+            { entries: first, kind: "plan" },
+            { kind: "text", text: "ok" },
+            { entries: second, kind: "plan" },
+        ]);
+    });
+
     it("never posts twice inside the interval", async () => {
         const host = poster();
 

@@ -118,6 +118,10 @@ export class TurnChannel {
         if (isText && last?.kind === event.kind && last.text.length + event.text.length <= MAX_EVENT_TEXT) {
             last.text += event.text;
             this.pendingJson += event.text.length;
+        } else if (event.kind === "plan" && last?.kind === "plan") {
+            // A plan is the whole list each time: one still waiting is replaced, so a burst of updates costs one slot.
+            this.pending[this.pending.length - 1] = event;
+            this.pendingJson += jsonLength(event);
         } else {
             this.pending.push(event);
             this.pendingJson += jsonLength(event);

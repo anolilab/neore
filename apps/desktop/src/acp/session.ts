@@ -27,6 +27,7 @@ import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
+import { planOf } from "./plan";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
@@ -954,6 +955,16 @@ export class AgentSession {
                     this.offered = { ...this.offered, configOptions };
                     this.configVersion += 1;
                     this.reportOptions();
+                }
+
+                return;
+            }
+            case "plan": {
+                // Not the window's business either: the plan rides the turn to the backend, which shows it live in the thread.
+                const entries = planOf(update, this.options.process.scrub);
+
+                if (turn !== undefined && entries !== undefined) {
+                    this.observe((observer) => observer.plan?.(this.id, turn.id, entries));
                 }
 
                 return;

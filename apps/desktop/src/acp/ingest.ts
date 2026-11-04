@@ -33,6 +33,7 @@ import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHos
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
 import { collectMedia, imageReferences } from "./media";
+import type { PlanEntry } from "./plan";
 import { SessionLink } from "./session-link";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
@@ -330,6 +331,10 @@ export class HostPoster implements SessionObserver {
         for (const posted of childHostEvents(spawnId, event)) {
             this.channels.get(turnId)?.enqueue(posted);
         }
+    }
+
+    public plan(_sessionId: string, turnId: string, entries: PlanEntry[]): void {
+        this.channels.get(turnId)?.enqueue({ entries, kind: "plan" });
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {

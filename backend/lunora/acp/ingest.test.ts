@@ -937,6 +937,53 @@ describe("a host turn", () => {
         }
     });
 
+    it("shows the latest plan and each tool call at its latest report while the turn runs, and keeps neither on the reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const plan = (status: "completed" | "in_progress") => {
+            return { entries: [{ content: "Read the code", priority: "high", status }], kind: "plan" };
+        };
+        const tool = (status: "completed" | "in_progress") => {
+            return { id: "c1", kind: "tool", status, title: "Run the tests", toolKind: "execute" };
+        };
+
+        await turn(device, threadId, "t1", 0, [START(), plan("in_progress"), tool("in_progress"), TEXT("Working"), plan("completed"), tool("completed")]);
+
+        const stream = await streamFor("t1");
+        const body = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+
+        expect(body.hostActivity).toEqual({
+            plan: [{ content: "Read the code", priority: "high", status: "completed" }],
+            tools: [{ id: "c1", status: "completed", title: "Run the tests", toolKind: "execute" }],
+        });
+
+        await turn(device, threadId, "t1", 6, [{ kind: "turn_end", reason: "finished" }]);
+
+        const after = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+        const saved = ((await messagesOf(threadId)) as Record<string, any>[]).filter((message) => message.message?.role === "assistant");
+
+        expect(after.hostActivity).toBeUndefined();
+        expect(JSON.stringify(saved)).toContain("Working");
+        expect(JSON.stringify(saved)).not.toContain("Read the code");
+        expect(JSON.stringify(saved)).not.toContain("Run the tests");
+    });
+
+    it("refuses a plan past its limits", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const entries = Array.from({ length: 51 }, () => {
+            return { content: "x", priority: "low", status: "pending" };
+        });
+
+        await expect(turn(device, threadId, "t1", 0, [START(), { entries, kind: "plan" }])).resolves.toMatchObject({ status: 400 });
+        await expect(
+            turn(device, threadId, "t1", 0, [START(), { entries: [{ content: "x".repeat(501), priority: "low", status: "pending" }], kind: "plan" }]),
+        ).resolves.toMatchObject({ status: 400 });
+        await expect(
+            turn(device, threadId, "t1", 0, [START(), { entries: [{ content: "x", priority: "urgent", status: "pending" }], kind: "plan" }]),
+        ).resolves.toMatchObject({ status: 400 });
+    });
+
     it("reads back every host state through the live queries a second client uses", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

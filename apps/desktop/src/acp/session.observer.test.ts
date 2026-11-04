@@ -105,6 +105,41 @@ describe("a session's observer", () => {
         expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
     });
 
+    it("is told each plan the agent sends for the turn, whole", async () => {
+        const { observer } = recorder();
+        const plans: unknown[] = [];
+        const watched: SessionObserver = {
+            ...observer,
+            plan: (_id, turnId, entries) => {
+                plans.push([turnId, entries]);
+            },
+        };
+        const { player, session, steps } = await start(refuse, watched, undefined, undefined, "plan-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        const [turn] = session.snapshot().turns;
+
+        expect(plans).toEqual([
+            [
+                turn?.id,
+                [
+                    { content: "Read the code", priority: "high", status: "in_progress" },
+                    { content: "Write the fix", priority: "medium", status: "pending" },
+                ],
+            ],
+            [
+                turn?.id,
+                [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                ],
+            ],
+        ]);
+    });
+
     it("is told the session opened, the turn, its text and its end, in order", async () => {
         const { calls, observer } = recorder();
         const { player, session, steps } = await start(refuse, observer);
