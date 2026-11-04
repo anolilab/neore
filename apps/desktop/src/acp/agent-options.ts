@@ -17,6 +17,45 @@ const MAX_ID_CHARS = 128;
 const MAX_NAME_CHARS = 200;
 const MAX_CATEGORY_CHARS = 64;
 
+/**
+ * The most JSON one part of the report may take. The backend refuses a `session_state` post over 256 KiB (`MAX_INGEST_BYTES`),
+ * and a refused post drops its usage with it. Counts do not bound that alone: a name of 200 characters can be 800 bytes.
+ */
+const OPTIONS_BYTE_BUDGET = 64 * 1024;
+const LEGACY_LIST_BYTE_BUDGET = 32 * 1024;
+
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
+
+/** The longest prefix of `items` whose JSON array fits in `budget` bytes. */
+const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
+    const kept: T[] = [];
+    let used = 2; // the brackets
+
+    for (const item of items) {
+        const size = bytesOf(item) + 1; // with its comma
+
+        if (used + size > budget) {
+            break;
+        }
+
+        kept.push(item);
+        used += size;
+    }
+
+    return kept;
+};
+
+/** The option with as many of its choices as fit in `budget` bytes; `undefined` when the option without them does not fit. */
+const fitOption = (option: AgentOption, budget: number): AgentOption | undefined => {
+    const bare = bytesOf({ ...option, choices: [] });
+
+    if (bare > budget) {
+        return undefined;
+    }
+
+    return { ...option, choices: fitPrefix(option.choices, budget - bare) };
+};
+
 type Scrub = (text: string) => string;
 
 /** What the agent reported, before the precedence between options and legacy states is applied. */
@@ -94,7 +133,7 @@ const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
         currentValue,
         id,
         name: nameOf(entry.name, id, scrub),
-        ...category !== "" && { category },
+        ...(category !== "" && { category }),
     };
 };
 
@@ -105,12 +144,20 @@ export const configOptionsOf = (value: unknown, scrub: Scrub): AgentOption[] | u
     }
 
     const options: AgentOption[] = [];
+    let used = 2; // the brackets of the list
 
     for (const entry of value as unknown[]) {
         const option = optionOf(entry, scrub);
 
         if (option !== undefined && options.length < MAX_OPTIONS && options.every((other) => other.id !== option.id)) {
-            options.push(option);
+            const fitted = fitOption(option, OPTIONS_BYTE_BUDGET - used);
+
+            if (fitted === undefined) {
+                break;
+            }
+
+            options.push(fitted);
+            used += bytesOf(fitted) + 1;
         }
     }
 
@@ -139,7 +186,7 @@ const listOf = (state: unknown, currentKey: string, listKey: string, idKey: stri
         }
     }
 
-    return { available, current };
+    return { available: fitPrefix(available, LEGACY_LIST_BYTE_BUDGET), current };
 };
 
 /** What a `session/new` or `session/load` answer says about options, in the agent's own shape. */
@@ -152,7 +199,7 @@ export const optionsOf = (answer: unknown, scrub: Scrub): RawOptions => {
     const modes = listOf(answer.modes, "currentModeId", "availableModes", "id", scrub);
     const models = listOf(answer.models, "currentModelId", "availableModels", "modelId", scrub);
 
-    return { ...configOptions !== undefined && { configOptions }, ...modes !== undefined && { modes }, ...models !== undefined && { models } };
+    return { ...(configOptions !== undefined && { configOptions }), ...(modes !== undefined && { modes }), ...(models !== undefined && { models }) };
 };
 
 /** The state to send and to offer: the agent's options, or its legacy states when it sent no options. */
@@ -162,7 +209,11 @@ export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
     }
 
     // An empty list is the agent saying it has no options now: it is sent, so the options stored before are replaced.
-    return { ...raw.configOptions !== undefined && { configOptions: raw.configOptions }, ...raw.modes !== undefined && { modes: raw.modes }, ...raw.models !== undefined && { models: raw.models } };
+    return {
+        ...(raw.configOptions !== undefined && { configOptions: raw.configOptions }),
+        ...(raw.modes !== undefined && { modes: raw.modes }),
+        ...(raw.models !== undefined && { models: raw.models }),
+    };
 };
 
 /** `current_mode_update`: the mode the agent is in now. The legacy state, and the mode option when the agent has one, follow. */
@@ -175,11 +226,12 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
 
     return {
         ...raw,
-        ...raw.modes !== undefined && { modes: { ...raw.modes, current: id } },
-        ...raw.configOptions !== undefined && {
+        ...(raw.modes !== undefined && { modes: { ...raw.modes, current: id } }),
+        ...(raw.configOptions !== undefined && {
             configOptions: raw.configOptions.map((option) =>
-                option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option),
-        },
+                option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
+            ),
+        }),
     };
 };
 
@@ -187,9 +239,9 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
 export const withOptionValue = (raw: RawOptions, optionId: string, value: string): RawOptions => {
     return {
         ...raw,
-        ...raw.configOptions !== undefined && {
-            configOptions: raw.configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option),
-        },
+        ...(raw.configOptions !== undefined && {
+            configOptions: raw.configOptions.map((option) => (option.id === optionId ? { ...option, currentValue: value } : option)),
+        }),
     };
 };
 

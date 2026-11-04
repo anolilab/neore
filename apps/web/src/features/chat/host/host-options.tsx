@@ -22,6 +22,12 @@ import useHostSendErrorMessages from "./host-send-errors";
 /** How long the row waits for a confirmed value to show in the options before it stops waiting. */
 const CATCH_UP_MS = 15_000;
 
+/**
+ * How long a change waits for its own answer. The call ends at its deadline (five minutes on the backend) and that ending is
+ * recorded, so a result that never reaches this page was replaced by another client's. The wait ends a little after.
+ */
+const ANSWER_WAIT_MS = 5 * 60_000 + 15_000;
+
 const SELECT_CLASS = "border-input bg-background h-9 max-w-full min-w-0 rounded-md border px-2 py-1 text-sm disabled:opacity-60";
 
 interface Option {
@@ -147,11 +153,28 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         return () => clearTimeout(timer);
     }, [catchingUpCall]);
 
+    // A change still waiting for its answer. Another client's completed change can replace the session's one result before this
+    // page sees its own, so the wait is bounded: past it the row says the outcome is unknown and the controls come back.
+    const awaitingAnswer = change !== undefined && answered === undefined && failure === undefined ? change : undefined;
+    const [unknownChange, setUnknownChange] = useState<typeof change>(undefined);
+
+    useEffect(() => {
+        if (awaitingAnswer === undefined) {
+            return undefined;
+        }
+
+        const timer = setTimeout(setUnknownChange, ANSWER_WAIT_MS, awaitingAnswer);
+
+        return () => clearTimeout(timer);
+    }, [awaitingAnswer]);
+
     if (rows.length === 0) {
         return null;
     }
 
-    const waiting = (change !== undefined && answered === undefined && failure === undefined) || catchingUp;
+    const unknownOutcome = awaitingAnswer !== undefined && unknownChange === awaitingAnswer;
+
+    const waiting = (awaitingAnswer !== undefined && !unknownOutcome) || catchingUp;
 
     const failureText = (reason: "busy" | "ended" | "offline" | "outdated" | "unpaired" | undefined): string => {
         if (reason === "ended") {
@@ -204,6 +227,8 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         status = refused
             ? t`The agent did not change ${changed?.name ?? ""}: ${answered.reason ?? ""}`
             : t`The agent confirmed: ${changed?.name ?? ""} is now ${nameOfValue(changed, answered.valueId)}.`;
+    } else if (unknownOutcome) {
+        status = t`No answer came for the change to ${changed?.name ?? ""}. Check the agent before changing it again.`;
     } else if (waiting) {
         status = t`Waiting for the agent to change ${changed?.name ?? ""} to ${nameOfValue(changed, change?.valueId ?? "")}.`;
     }

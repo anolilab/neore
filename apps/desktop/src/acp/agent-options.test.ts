@@ -36,7 +36,12 @@ describe("configOptionsOf", () => {
     });
 
     it("flattens grouped choices into one list", () => {
-        const grouped = select("m", { options: [{ group: "g1", name: "G1", options: [{ name: "A", value: "a" }] }, { group: "g2", name: "G2", options: [{ name: "B", value: "b" }] }] });
+        const grouped = select("m", {
+            options: [
+                { group: "g1", name: "G1", options: [{ name: "A", value: "a" }] },
+                { group: "g2", name: "G2", options: [{ name: "B", value: "b" }] },
+            ],
+        });
 
         expect(configOptionsOf([grouped], plain)?.[0]?.choices).toEqual([
             { name: "A", value: "a" },
@@ -45,7 +50,9 @@ describe("configOptionsOf", () => {
     });
 
     it("leaves out a boolean option and one without a usable id or value", () => {
-        expect(configOptionsOf([select("b", { currentValue: true, type: "boolean" }), select("", {}), select("x", { currentValue: "" }), "junk", null], plain)).toEqual([]);
+        expect(
+            configOptionsOf([select("b", { currentValue: true, type: "boolean" }), select("", {}), select("x", { currentValue: "" }), "junk", null], plain),
+        ).toEqual([]);
     });
 
     it("keeps at most 20 options and 100 choices, and one of each id", () => {
@@ -58,12 +65,64 @@ describe("configOptionsOf", () => {
         expect(configOptionsOf(many, plain)).toHaveLength(MAX_OPTIONS);
         expect(configOptionsOf([long], plain)?.[0]?.choices).toHaveLength(MAX_CHOICES);
         expect(configOptionsOf([select("m"), select("m")], plain)).toHaveLength(1);
-        expect(configOptionsOf([select("m", { options: [{ name: "A", value: "a" }, { name: "A2", value: "a" }] })], plain)?.[0]?.choices).toHaveLength(1);
+        expect(
+            configOptionsOf(
+                [
+                    select("m", {
+                        options: [
+                            { name: "A", value: "a" },
+                            { name: "A2", value: "a" },
+                        ],
+                    }),
+                ],
+                plain,
+            )?.[0]?.choices,
+        ).toHaveLength(1);
+    });
+
+    it("cuts the options by bytes as well as by count, so the post stays under the ingest cap", () => {
+        // A name is cut at 200 characters, which is 400 bytes here: 20 options of 100 such choices would be far over the cap.
+        const wide = Array.from({ length: 20 }, (_unused, index) =>
+            select(`w${String(index)}`, {
+                options: Array.from({ length: 100 }, (_inner, choice) => {
+                    return { name: "é".repeat(200), value: `w${String(index)}-${String(choice)}-${"x".repeat(100)}` };
+                }),
+            }),
+        );
+        const options = configOptionsOf(wide, plain) ?? [];
+
+        expect(new TextEncoder().encode(JSON.stringify(options)).length).toBeLessThanOrEqual(64 * 1024);
+        expect(options[0]?.choices.length).toBeGreaterThan(0);
+    });
+
+    it("cuts a legacy mode or model list by bytes too", () => {
+        const modes = {
+            availableModes: Array.from({ length: 100 }, (_unused, index) => {
+                return { id: `m${String(index)}`, name: "é".repeat(200) };
+            }),
+            currentModeId: "m0",
+        };
+        const report = optionsOf({ modes }, plain);
+
+        expect(new TextEncoder().encode(JSON.stringify(report.modes)).length).toBeLessThanOrEqual(32 * 1024);
+        expect(report.modes?.available.length).toBeGreaterThan(0);
     });
 
     it("scrubs every text, cuts names, and drops an id the scrub would change", () => {
         const scrub = (text: string) => text.replaceAll("SECRET", "");
-        const [option] = configOptionsOf([select("m", { name: `aSECRETb${"n".repeat(300)}`, options: [{ name: "x SECRET", value: "v" }, { name: "y", value: "SECRET-v" }] })], scrub) ?? [];
+        const [option] =
+            configOptionsOf(
+                [
+                    select("m", {
+                        name: `aSECRETb${"n".repeat(300)}`,
+                        options: [
+                            { name: "x SECRET", value: "v" },
+                            { name: "y", value: "SECRET-v" },
+                        ],
+                    }),
+                ],
+                scrub,
+            ) ?? [];
 
         expect(option?.name).toHaveLength(200);
         expect(option?.name.startsWith("ab")).toBe(true);
@@ -123,8 +182,22 @@ describe("resolveOptions", () => {
 describe("a change the agent reports", () => {
     const raw = optionsOf(
         {
-            configOptions: [select("mode", { category: "mode", options: [{ name: "Ask", value: "ask" }, { name: "Code", value: "code" }] })],
-            modes: { availableModes: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code" }], currentModeId: "ask" },
+            configOptions: [
+                select("mode", {
+                    category: "mode",
+                    options: [
+                        { name: "Ask", value: "ask" },
+                        { name: "Code", value: "code" },
+                    ],
+                }),
+            ],
+            modes: {
+                availableModes: [
+                    { id: "ask", name: "Ask" },
+                    { id: "code", name: "Code" },
+                ],
+                currentModeId: "ask",
+            },
         },
         plain,
     );
