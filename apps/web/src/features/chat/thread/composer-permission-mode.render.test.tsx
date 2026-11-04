@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { showError } from "@/lib/toast";
 
 import ComposerThreadPermissionMode from "./composer-permission-mode";
 
@@ -37,6 +39,11 @@ vi.mock("@/lib/lunora/crpc", () => {
         useCRPC: () => {
             return {
                 chat: {
+                    functions: {
+                        getThread: {
+                            queryKey: (args: unknown) => ["thread", args],
+                        },
+                    },
                     sharing: {
                         getThreadAccess: {
                             queryOptions: () => {
@@ -132,5 +139,13 @@ describe("permission mode control", () => {
 
         await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
         expect(state.save.mock.calls[0]?.[0]).toStrictEqual({ mode: "supervised", threadId: "t1" });
+
+        // Let the saved mode's follow-up (the cache refresh) run, then check that nothing failed.
+        await act(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+        });
+        expect(showError).not.toHaveBeenCalled();
     });
 });
