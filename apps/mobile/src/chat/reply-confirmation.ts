@@ -1,3 +1,4 @@
+import { isThreadRefusal } from "../offline/message-read";
 import type { ReplyState, SeenMessage } from "./reply-state";
 import { replyStateAfter } from "./reply-state";
 
@@ -89,4 +90,38 @@ export const readReplyState = async (fetchPage: ConfirmPageFetch, threadId: stri
     }
 
     return state;
+};
+
+/** The state of one pending confirmation's reply in a round of checks, or that the chat can no longer be read. */
+export interface ConfirmOutcome {
+    confirmation: Confirmation;
+    isChatRefused: boolean;
+    state: ReplyState;
+}
+
+/**
+ * Checks every pending confirmation of a thread in one round. Each walk starts from the newest page, so a page is
+ * requested once per round, however many confirmations need it.
+ */
+export const readAllReplyStates = async (fetchPage: ConfirmPageFetch, threadId: string, confirmations: ReadonlyArray<Confirmation>): Promise<ConfirmOutcome[]> => {
+    const pages = new Map<string, Promise<ConfirmPage>>();
+    const sharedFetch: ConfirmPageFetch = (id, cursor) => {
+        const key = `${id}:${cursor ?? ""}`;
+        const known = pages.get(key) ?? fetchPage(id, cursor);
+
+        pages.set(key, known);
+
+        return known;
+    };
+
+    return await Promise.all(
+        confirmations.map(async (confirmation) => {
+            try {
+                return { confirmation, isChatRefused: false, state: await readReplyState(sharedFetch, threadId, confirmation.messageId, confirmation.steers) };
+            } catch (error) {
+                // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
+                return { confirmation, isChatRefused: isThreadRefusal(error), state: "unknown" as ReplyState };
+            }
+        }),
+    );
 };

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isThreadRefusal } from "@/offline/message-read";
-
 import type { Confirmation, ConfirmPageFetch } from "./reply-confirmation";
-import { CONFIRM_READ_INTERVAL_MS, readReplyState, tallyChecks } from "./reply-confirmation";
-import type { ReplyState } from "./reply-state";
+import { CONFIRM_READ_INTERVAL_MS, readAllReplyStates, tallyChecks } from "./reply-confirmation";
 
 interface ReplyConfirmationOptions {
     fetchPage: ConfirmPageFetch;
@@ -46,16 +43,7 @@ export const useReplyConfirmation = ({ fetchPage, onEnded, onRefused, threadId }
             }
 
             isChecking = true;
-            const outcomes = await Promise.all(
-                own.map(async (confirmation) => {
-                    try {
-                        return { confirmation, isChatRefused: false, state: await readReplyState(fetchPage, threadId, confirmation.messageId, confirmation.steers) };
-                    } catch (error_) {
-                        // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
-                        return { confirmation, isChatRefused: isThreadRefusal(error_), state: "unknown" as ReplyState };
-                    }
-                }),
-            );
+            const outcomes = await readAllReplyStates(fetchPage, threadId, own);
 
             isChecking = false;
 
