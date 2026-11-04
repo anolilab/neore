@@ -701,12 +701,19 @@ mod tests {
             "completed"
         );
         assert_eq!(
-            result_of(&state.acp_sign(&signed, "the agent does not offer that choice").unwrap())["status"],
+            result_of(
+                &state
+                    .acp_sign(&signed, "the agent does not offer that choice")
+                    .unwrap()
+            )["status"],
             "failed"
         );
 
         // A forged signature is no command at all.
-        let mut forged = call("acp_set_config", json!({ "sessionId": "s1", "valueId": "deep" }));
+        let mut forged = call(
+            "acp_set_config",
+            json!({ "sessionId": "s1", "valueId": "deep" }),
+        );
 
         forged.signature = "0".repeat(64);
         assert!(state.acp_prepare(&forged).is_err());
