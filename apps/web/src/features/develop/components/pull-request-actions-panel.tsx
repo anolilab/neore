@@ -27,6 +27,29 @@ async function attempt<T>(promise: Promise<T>): Promise<{ outcome: T } | { throw
     }
 }
 
+/**
+ * Each handler it wraps runs once at a time: a run is refused while the previous one of the same name is in flight. The flag is
+ * set when the handler is called, which a disabled button cannot do: it turns off only after the next render, so a second click
+ * can arrive before it.
+ */
+const useSingleFlight = () => {
+    const inFlight = useRef<Record<string, boolean>>({});
+
+    return (name: string, run: () => Promise<void>) => async (): Promise<void> => {
+        if (inFlight.current[name] === true) {
+            return;
+        }
+
+        inFlight.current[name] = true;
+
+        try {
+            await run();
+        } finally {
+            inFlight.current[name] = false;
+        }
+    };
+};
+
 type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { href?: string; kind: "success"; text: string };
 
 /** The same login rule the backend applies, so a bad name is refused here with its reason. */
@@ -71,11 +94,7 @@ const PullRequestActionsPanel = ({
     const titleId = useId();
     const messages = useReviewMessages(hostLabel);
     const actions = usePullRequestActions(address);
-    // A second click before the first revert has rendered must not open a second revert pull request.
-    const revertInFlight = useRef(false);
-    // The same for a reviewer request: the button is off only after the next render, so a second click can arrive first.
-    const reviewInFlight = useRef(false);
-    const editInFlight = useRef(false);
+    const singleFlight = useSingleFlight();
     const canEdit = isHostCapabilityAvailable(capabilities, "pullRequest.edit");
     const canReview = isHostCapabilityAvailable(capabilities, "reviewers.request") && state === "open";
     const canRevert = isHostCapabilityAvailable(capabilities, "pullRequest.revert") && state === "merged";
@@ -202,63 +221,31 @@ const PullRequestActionsPanel = ({
         setFeedback(next);
     };
 
-    // A second Save before the first has rendered must not send a second edit over a newer change.
-    const saveEdit = async () => {
-        if (editInFlight.current) {
-            return;
-        }
+    // A second Save, reviewer request or revert must not start a second host write: each is guarded on its click.
+    const saveEdit = singleFlight("edit", submitEdit);
+    const sendReviewers = singleFlight("review", submitReviewers);
 
-        editInFlight.current = true;
-
-        try {
-            await submitEdit();
-        } finally {
-            editInFlight.current = false;
-        }
-    };
-
-    const sendReviewers = async () => {
-        if (reviewInFlight.current) {
-            return;
-        }
-
-        reviewInFlight.current = true;
-
-        try {
-            await submitReviewers();
-        } finally {
-            reviewInFlight.current = false;
-        }
-    };
-
-    const revertNow = async () => {
-        if (revertInFlight.current) {
-            return;
-        }
-
-        revertInFlight.current = true;
+    const submitRevert = async () => {
         setReverting(false);
         setFeedback(null);
 
-        try {
-            const result = await attempt(actions.revert.mutateAsync());
+        const result = await attempt(actions.revert.mutateAsync());
 
-            if ("thrown" in result) {
-                setFeedback(thrownFailure(result.thrown));
-            } else if (result.outcome.status === "ok") {
-                // Only a link the host gave, checked again before it is shown as an address to open.
-                setFeedback({
-                    kind: "success",
-                    href: safeExternalUrl(result.outcome.url) ?? undefined,
-                    text: t`Opened a revert pull request on ${hostLabel}.`,
-                });
-            } else {
-                setFeedback(failure(result.outcome));
-            }
-        } finally {
-            revertInFlight.current = false;
+        if ("thrown" in result) {
+            setFeedback(thrownFailure(result.thrown));
+        } else if (result.outcome.status === "ok") {
+            // Only a link the host gave, checked again before it is shown as an address to open.
+            setFeedback({
+                kind: "success",
+                href: safeExternalUrl(result.outcome.url) ?? undefined,
+                text: t`Opened a revert pull request on ${hostLabel}.`,
+            });
+        } else {
+            setFeedback(failure(result.outcome));
         }
     };
+
+    const revertNow = singleFlight("revert", submitRevert);
 
     return (
         <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
