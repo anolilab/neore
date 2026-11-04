@@ -97,6 +97,32 @@ describe("threads", () => {
     });
 });
 
+describe("share text", () => {
+    it("keeps the display text and the share text apart through a save and a read", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "Look at this", text: "Look at this[Attachment]" })]);
+
+        const [row] = await scoped.loadMessages("t1");
+
+        expect(row?.text).toBe("Look at this[Attachment]");
+        expect(row?.shareText).toBe("Look at this");
+    });
+
+    it("a newer save replaces the share text", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "first draft", updatedAt: 1 })]);
+        await scoped.saveMessages("t1", [message("m1", "t1", 1, { shareText: "final", updatedAt: 2 })]);
+
+        const [row] = await scoped.loadMessages("t1");
+
+        expect(row?.shareText).toBe("final");
+    });
+});
+
 describe("messages", () => {
     it("keeps the last 50 messages of a thread", async () => {
         const { cache } = makeCache();
