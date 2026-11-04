@@ -79,6 +79,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
                         <Input
                             aria-describedby={error ? errorId : undefined}
                             aria-invalid={error ? true : undefined}
+                            aria-required="true"
                             id={inputId}
                             onChange={(event) => {
                                 setValue(event.target.value);
