@@ -2442,7 +2442,7 @@ export interface IndexNamesByTable {
     deviceCalls: "by_deviceId_status" | "by_userId_toolCallId" | "by_userId_createdAt" | "by_status_deadline" | "by_createdAt";
     devices: "by_userId";
     documentHistory: "by_table_ts" | "by_table_doc_ts" | "by_user_ts" | "by_org_ts" | "by_ts";
-    documents: "by_messageId" | "by_userId" | "by_threadId_and_kind";
+    documents: "by_messageId" | "by_userId" | "by_threadId_and_kind" | "by_userId_and_kind";
     documentVersions: "by_documentId_version";
     emails: "by_email";
     embeddings_128: "by_userId" | "model_table_threadId";

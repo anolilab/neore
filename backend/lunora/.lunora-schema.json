@@ -6133,6 +6133,13 @@
             "userId"
           ],
           "unique": false
+        },
+        "by_userId_and_kind": {
+          "fields": [
+            "userId",
+            "kind"
+          ],
+          "unique": false
         }
       },
       "memory": false,
