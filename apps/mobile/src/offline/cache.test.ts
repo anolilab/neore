@@ -561,4 +561,28 @@ describe("the version-one cache", () => {
         expect(messages[0]?.shareText).toBe("");
         expect(version?.user_version).toBe(2);
     });
+
+    it("takes the share text from a live read even when the device clock has moved back past the saved stamp", async () => {
+        const database = createTestDatabase();
+
+        open.push(database);
+        await database.execAsync(`
+            CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, runner TEXT, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE TABLE cached_messages (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE INDEX cached_messages_by_thread ON cached_messages (thread_id, created_at);
+            PRAGMA user_version = 1;
+        `);
+        await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
+        // Saved long after the clock was last right, so the stamp is later than any read made now.
+        await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 900]);
+
+        const cache = createOfflineCache(database, { now: () => 100 });
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "Saved reply", text: "Saved reply", updatedAt: 5 })], { syncedAt: 100 });
+
+        const [saved] = await scoped.loadMessages("t1");
+
+        expect(saved?.shareText).toBe("Saved reply");
+    });
 });

@@ -57,6 +57,12 @@ const SCHEMA_VERSION = 2;
 const newerThan = (table: string) =>
     `WHERE excluded.updated_at > ${table}.updated_at OR (excluded.updated_at = ${table}.updated_at AND excluded.synced_at >= ${table}.synced_at)`;
 
+/**
+ * A live copy with share text replaces a saved copy that has none, whatever their stamps say. Version-one rows were
+ * saved before share text existed, and their old stamps could outrank a live read after the device clock moved back.
+ */
+const FILLS_EMPTY_SHARE_TEXT = "OR (cached_messages.share_text = '' AND excluded.share_text <> '')";
+
 const RECENT_THREAD_IDS = `SELECT id FROM cached_threads ORDER BY updated_at DESC, id DESC LIMIT ${MAX_THREADS_WITH_MESSAGES}`;
 
 interface ThreadSql {
@@ -354,7 +360,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                                 `INSERT INTO cached_messages (id, thread_id, role, text, share_text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                                  ON CONFLICT(id) DO UPDATE SET role = excluded.role, text = excluded.text, share_text = excluded.share_text, status = excluded.status, created_at = excluded.created_at,
                                      updated_at = excluded.updated_at, synced_at = excluded.synced_at
-                                 ${newerThan("cached_messages")}`,
+                                 ${newerThan("cached_messages")} ${FILLS_EMPTY_SHARE_TEXT}`,
                                 params,
                             );
                         }
