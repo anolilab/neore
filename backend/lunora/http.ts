@@ -3,60 +3,34 @@
 // context is `c.var.lunora`; `c.env` is the Worker env.
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
+import type { HttpActionCtx } from "lunorash/server";
 import { httpAction, httpRouter } from "lunorash/server";
 
-import {
-    authorizeExtensionHttpAction,
-    exchangeExtensionCodeHttpAction,
-    extensionAccessTokenHttpAction,
-    revokeExtensionSessionHttpAction,
-} from "./auth/extension-grant-http";
-import { hostIngestHttpAction } from "./acp/http";
-import { hostSendHttpAction } from "./acp/send";
 import { HOST_UPLOAD_PATH } from "./acp/lib/constants";
-import { hostUploadHttpAction } from "./acp/upload-http";
-import { E2E_INVITATIONS_PATH, e2eSeedInvitationHttpAction } from "./auth/e2e-seed-http";
-import { seedInvitationsHttpAction } from "./auth/seed-invitations-http";
-import {
-    chatStartHttpAction,
-    editMessageHttpAction,
-    improvePromptHttpAction,
-    iteratePromptHttpAction,
-    mediaGenerationHttpAction,
-    optimizeSystemPromptHttpAction,
-} from "./chat/http";
-import { gatewayNotificationsHttpAction } from "./chat/lib/gateway-notifications";
-import { gatewayUsageReportHttpAction } from "./chat/lib/gateway-usage";
-import { callMCPToolFromAppHttpAction, readMCPResourceHttpAction } from "./chat/lib/mcp-apps";
-import { getChunksHttpAction } from "./chat/streaming/persistent/http-api";
-import { handleCreemWebhook } from "./billing/webhook";
-import { handleResendWebhook } from "./email/webhook";
 import { ENVIRONMENT, PUBLIC_ORIGIN, SITE_URL, TRUSTED_EXTENSION_ORIGINS, TURNSTILE_SECRET_KEY, TURNSTILE_SITE_KEY } from "./env";
 import { assertEnv } from "./lib/env-validation";
 import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import pailLogger from "./lib/hono-logger";
 import { handleSignedGet } from "./lib/signed-storage";
-import { handleUploadRequest, refuseDeclaredPurpose, TUS_REQUEST_HEADERS, TUS_RESPONSE_HEADERS, UPLOAD_PATH } from "./lib/upload-route";
+import { TUS_REQUEST_HEADERS, TUS_RESPONSE_HEADERS, UPLOAD_PATH } from "./lib/upload-paths";
 import { httpLogger } from "./lib/logger";
-import {
-    handleDiscordWebhook,
-    handleFeishuWebhook,
-    handleLineWebhook,
-    handleSlackWebhook,
-    handleTeamsWebhook,
-    handleTelegramWebhook,
-    handleWeChatVerification,
-    handleWeChatWebhook,
-    handleWhatsAppVerification,
-    handleWhatsAppWebhook,
-} from "./messenger/webhooks";
 import { onCallerShard, onRoutedShard, onThreadShard } from "./lib/http-shard";
-import optimizePromptHttpAction from "./prompts/http";
 import { PUBLIC_API_PREFIX } from "./public-api/identity";
 import { createPublicApiRouter, publicApiUploadGate } from "./public-api/router";
-import { routeWatchWebhook } from "./source-control/webhook";
-import handleTriggerWebhook from "./triggers/http";
-import streamWorkflowHttpAction from "./workflow/http";
+
+type RouteHandler = (context: HttpActionCtx, request: Request) => Promise<Response>;
+
+/**
+ * A route whose module loads on its first request rather than at Worker startup: Cloudflare refuses an upload
+ * whose module scope runs past its startup CPU limit, and the handler modules pull in the agent and the chat stack.
+ */
+const lazy =
+    <Name extends string>(load: () => Promise<Record<Name, RouteHandler>>, name: Name): RouteHandler =>
+    async (context, request) => {
+        const module = await load();
+
+        return await module[name](context, request);
+    };
 
 const app = httpRouter();
 
@@ -124,20 +98,20 @@ app.use(
 // Session-authenticated routes run on the caller's own shard, where their rows
 // live (`lib/http-shard.ts`); `/chat/start`, `/chat/edit` and `/chat/media`
 // re-route to a shared thread's owner.
-app.post("/chat/media", httpAction(onThreadShard(mediaGenerationHttpAction)));
-app.post("/chat/edit", httpAction(onThreadShard(editMessageHttpAction)));
-app.post("/chat/improve-prompt", httpAction(onCallerShard(improvePromptHttpAction)));
-app.post("/chat/optimize-system-prompt", httpAction(onCallerShard(optimizeSystemPromptHttpAction)));
-app.post("/chat/iterate-prompt", httpAction(onCallerShard(iteratePromptHttpAction)));
-app.post("/prompts/optimize", httpAction(onCallerShard(optimizePromptHttpAction)));
-app.post("/workflow/stream", httpAction(onCallerShard(streamWorkflowHttpAction)));
+app.post("/chat/media", httpAction(onThreadShard(lazy(async () => await import("./chat/http"), "mediaGenerationHttpAction"))));
+app.post("/chat/edit", httpAction(onThreadShard(lazy(async () => await import("./chat/http"), "editMessageHttpAction"))));
+app.post("/chat/improve-prompt", httpAction(onCallerShard(lazy(async () => await import("./chat/http"), "improvePromptHttpAction"))));
+app.post("/chat/optimize-system-prompt", httpAction(onCallerShard(lazy(async () => await import("./chat/http"), "optimizeSystemPromptHttpAction"))));
+app.post("/chat/iterate-prompt", httpAction(onCallerShard(lazy(async () => await import("./chat/http"), "iteratePromptHttpAction"))));
+app.post("/prompts/optimize", httpAction(onCallerShard(lazy(async () => await import("./prompts/http"), "default"))));
+app.post("/workflow/stream", httpAction(onCallerShard(lazy(async () => await import("./workflow/http"), "default"))));
 
 // MCP Apps proxy endpoints — fetch ui:// resources and call tools on behalf of the browser
 // Auth headers stay server-side; the client authenticates via session cookie
-app.post("/mcp/resource", httpAction(onCallerShard(readMCPResourceHttpAction)));
-app.post("/mcp/tool", httpAction(onCallerShard(callMCPToolFromAppHttpAction)));
-app.post("/email/resend/webhook", httpAction(handleResendWebhook));
-app.post("/billing/creem/webhook", httpAction(handleCreemWebhook));
+app.post("/mcp/resource", httpAction(onCallerShard(lazy(async () => await import("./chat/lib/mcp-apps"), "readMCPResourceHttpAction"))));
+app.post("/mcp/tool", httpAction(onCallerShard(lazy(async () => await import("./chat/lib/mcp-apps"), "callMCPToolFromAppHttpAction"))));
+app.post("/email/resend/webhook", httpAction(lazy(async () => await import("./email/webhook"), "handleResendWebhook")));
+app.post("/billing/creem/webhook", httpAction(lazy(async () => await import("./billing/webhook"), "handleCreemWebhook")));
 
 // Messenger platform webhooks (no CORS/auth — platform-signed requests). Each
 // runs on the connection owner's shard, found through `shardRoutes`.
@@ -145,164 +119,157 @@ app.post("/billing/creem/webhook", httpAction(handleCreemWebhook));
 app.post(
     "/messenger/telegram/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleTelegramWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleTelegramWebhook } = await import("./messenger/webhooks");
+
+            return await handleTelegramWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/slack/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleSlackWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleSlackWebhook } = await import("./messenger/webhooks");
+
+            return await handleSlackWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/discord/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleDiscordWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleDiscordWebhook } = await import("./messenger/webhooks");
+
+            return await handleDiscordWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.get(
     "/messenger/whatsapp/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleWhatsAppVerification(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleWhatsAppVerification } = await import("./messenger/webhooks");
+
+            return await handleWhatsAppVerification(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/whatsapp/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleWhatsAppWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleWhatsAppWebhook } = await import("./messenger/webhooks");
+
+            return await handleWhatsAppWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/line/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleLineWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleLineWebhook } = await import("./messenger/webhooks");
+
+            return await handleLineWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/feishu/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleFeishuWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleFeishuWebhook } = await import("./messenger/webhooks");
+
+            return await handleFeishuWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/teams/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleTeamsWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleTeamsWebhook } = await import("./messenger/webhooks");
+
+            return await handleTeamsWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.get(
     "/messenger/wechat/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleWeChatVerification(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleWeChatVerification } = await import("./messenger/webhooks");
+
+            return await handleWeChatVerification(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 app.post(
     "/messenger/wechat/:connectionId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "messenger",
-            c.req.param("connectionId"),
-            async (ctx) => await handleWeChatWebhook(ctx, c.req.raw, c.req.param("connectionId")),
-        ),
+        await onRoutedShard(c.var.lunora, "messenger", c.req.param("connectionId"), async (ctx) => {
+            const { handleWeChatWebhook } = await import("./messenger/webhooks");
+
+            return await handleWeChatWebhook(ctx, c.req.raw, c.req.param("connectionId"));
+        }),
 );
 
 // Trigger webhooks (no CORS/auth — signature-verified requests)
 app.post(
     "/triggers/webhook/:triggerId",
     async (c) =>
-        await onRoutedShard(
-            c.var.lunora,
-            "trigger",
-            c.req.param("triggerId"),
-            async (ctx) => await handleTriggerWebhook(ctx, c.req.raw, c.req.param("triggerId")),
-        ),
+        await onRoutedShard(c.var.lunora, "trigger", c.req.param("triggerId"), async (ctx) => {
+            const { default: handleTriggerWebhook } = await import("./triggers/http");
+
+            return await handleTriggerWebhook(ctx, c.req.raw, c.req.param("triggerId"));
+        }),
 );
 
 // A watched repository's webhook (no CORS/auth — signature-verified; it only marks the repository dirty). The
 // route is limited per client address on the root shard, then finds the owner's shard from the watch id
 // (`source-control/webhook.ts`).
-app.post("/source-control/webhook/:watchId", async (c) => await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId")));
+app.post("/source-control/webhook/:watchId", async (c) => {
+    const { routeWatchWebhook } = await import("./source-control/webhook");
+
+    return await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId"));
+});
 
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).
-app.post("/hosts/ingest", httpAction(hostIngestHttpAction));
+app.post("/hosts/ingest", httpAction(lazy(async () => await import("./acp/http"), "hostIngestHttpAction")));
 
 // A message into a coding-agent thread from the web or the phone: the owner's bearer, on their own shard
 // (a host thread is never shared, so it always lives there). `acp/send.ts`.
-app.post("/hosts/send", httpAction(onCallerShard(hostSendHttpAction)));
+app.post("/hosts/send", httpAction(onCallerShard(lazy(async () => await import("./acp/send"), "hostSendHttpAction"))));
 
 // The same computer's file uploads (TUS), signed with the device secret instead of a session — see
 // `acp/upload-http.ts`. Not under `/uploads`: that route resolves a session or an API key.
 // `GET` is listed for the TUS `HEAD`, as above; a real `GET` is refused there.
-app.on(
-    ["POST", "PATCH", "GET"],
-    [HOST_UPLOAD_PATH, `${HOST_UPLOAD_PATH}/:uploadId`],
-    async (c) => await hostUploadHttpAction(c.var.lunora, c.req.raw, c.env["FILES"]),
-);
+app.on(["POST", "PATCH", "GET"], [HOST_UPLOAD_PATH, `${HOST_UPLOAD_PATH}/:uploadId`], async (c) => {
+    const { hostUploadHttpAction } = await import("./acp/upload-http");
+
+    return await hostUploadHttpAction(c.var.lunora, c.req.raw, c.env["FILES"]);
+});
 
 // Gateway-first entry point — HMAC-signed by gateway, user JWT forwarded for auth
 // Extension sign-in without cookies (the Firefox build) — PKCE code flow; see
 // `auth/extension-grant.ts`. `authorize` needs the caller's bearer JWT; the
 // other three authenticate with the code or the extension's session token.
-app.post("/extension/auth/authorize", httpAction(authorizeExtensionHttpAction));
-app.post("/extension/auth/exchange", httpAction(exchangeExtensionCodeHttpAction));
-app.post("/extension/auth/token", httpAction(extensionAccessTokenHttpAction));
-app.post("/extension/auth/revoke", httpAction(revokeExtensionSessionHttpAction));
+app.post("/extension/auth/authorize", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "authorizeExtensionHttpAction")));
+app.post("/extension/auth/exchange", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "exchangeExtensionCodeHttpAction")));
+app.post("/extension/auth/token", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "extensionAccessTokenHttpAction")));
+app.post("/extension/auth/revoke", httpAction(lazy(async () => await import("./auth/extension-grant-http"), "revokeExtensionSessionHttpAction")));
 
-app.post("/chat/start", httpAction(onCallerShard(chatStartHttpAction)));
+app.post("/chat/start", httpAction(onCallerShard(lazy(async () => await import("./chat/http"), "chatStartHttpAction"))));
 
 // Chunk polling endpoint for LLM Gateway edge streaming (HMAC-signed)
-app.post("/chat/chunks", httpAction(getChunksHttpAction));
+app.post("/chat/chunks", httpAction(lazy(async () => await import("./chat/streaming/persistent/http-api"), "getChunksHttpAction")));
 
 // LLM Gateway usage report webhook (HMAC-signed by gateway)
-app.post("/gateway/usage-report", httpAction(gatewayUsageReportHttpAction));
+app.post("/gateway/usage-report", httpAction(lazy(async () => await import("./chat/lib/gateway-usage"), "gatewayUsageReportHttpAction")));
 
 // Usage-rule alerts from the gateway (HMAC-signed by gateway) — land in the user's inbox.
-app.post("/gateway/notifications", httpAction(gatewayNotificationsHttpAction));
+app.post("/gateway/notifications", httpAction(lazy(async () => await import("./chat/lib/gateway-notifications"), "gatewayNotificationsHttpAction")));
 
 // Operator bootstrap for invite-only sign-up; bearer `LUNORA_ADMIN_TOKEN`.
-app.post("/admin/seed-invitations", httpAction(seedInvitationsHttpAction));
+app.post("/admin/seed-invitations", httpAction(lazy(async () => await import("./auth/seed-invitations-http"), "seedInvitationsHttpAction")));
 
 // The e2e suite's invitations. 404 anywhere but a local development stack
 // holding `E2E_SEED_TOKEN` — see `auth/e2e-seed-http.ts`.
-app.post(E2E_INVITATIONS_PATH, httpAction(e2eSeedInvitationHttpAction));
+app.post("/e2e/invitations", httpAction(lazy(async () => await import("./auth/e2e-seed-http"), "e2eSeedInvitationHttpAction")));
 
 // File uploads (TUS), for the signed-in browser — see `lib/upload-route.ts`.
 // The finalize procedures take it from there by upload id. `GET` is listed for
@@ -310,23 +277,26 @@ app.post(E2E_INVITATIONS_PATH, httpAction(e2eSeedInvitationHttpAction));
 // keeps its method); a real `GET` is refused there, the route being write-only.
 const UPLOAD_METHODS = ["POST", "PATCH", "GET", "DELETE"];
 
-app.on(UPLOAD_METHODS, [UPLOAD_PATH, `${UPLOAD_PATH}/:uploadId`], async (c) => await handleUploadRequest(c.var.lunora, c.req.raw, c.env["FILES"]));
+app.on(UPLOAD_METHODS, [UPLOAD_PATH, `${UPLOAD_PATH}/:uploadId`], async (c) => {
+    const { handleUploadRequest } = await import("./lib/upload-route");
+
+    return await handleUploadRequest(c.var.lunora, c.req.raw, c.env["FILES"]);
+});
 
 // The same route for public API clients, API-key authenticated like the rest of
 // `/api/v1` and gated on `knowledge:write` — the only v1 resource that uploads.
 // Chat uploads only: a `purpose` is refused before the key is checked. Registered
 // before the v1 router so it is reached at all.
-app.on(
-    UPLOAD_METHODS,
-    [`${PUBLIC_API_PREFIX}${UPLOAD_PATH}`, `${PUBLIC_API_PREFIX}${UPLOAD_PATH}/:uploadId`],
-    async (c) =>
-        await handleUploadRequest(
-            c.var.lunora,
-            c.req.raw,
-            c.env["FILES"],
-            async (ctx, request) => refuseDeclaredPurpose(request) ?? (await publicApiUploadGate(ctx, request)),
-        ),
-);
+app.on(UPLOAD_METHODS, [`${PUBLIC_API_PREFIX}${UPLOAD_PATH}`, `${PUBLIC_API_PREFIX}${UPLOAD_PATH}/:uploadId`], async (c) => {
+    const { handleUploadRequest, refuseDeclaredPurpose } = await import("./lib/upload-route");
+
+    return await handleUploadRequest(
+        c.var.lunora,
+        c.req.raw,
+        c.env["FILES"],
+        async (ctx, request) => refuseDeclaredPurpose(request) ?? (await publicApiUploadGate(ctx, request)),
+    );
+});
 
 // Public v1 API — API-key authenticated (see `public-api/identity.ts`), with its
 // own error shape, per-key limits and OpenAPI document at /api/v1/openapi.json.

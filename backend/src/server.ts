@@ -1,7 +1,6 @@
 // Lunora's structural binding types, not @cloudflare/workers-types': the app
 // builder is declared against these, and the concrete Workers types are not
 // assignable to them. Each lives in the add-on package that owns it.
-import { handleAuthRequest } from "@lunora/auth";
 import type { PaymentsFromContextOptions } from "@lunora/payment";
 import { createCreemAdapter } from "@lunora/payment/creem";
 import type { JSONWebKeySet } from "jose";
@@ -10,7 +9,6 @@ import type { MessageBatchLike, QueueBindingLike } from "@lunora/queue";
 import type { DurableObjectNamespaceLike } from "@lunora/scheduler";
 import type { R2BucketLike } from "@lunora/storage";
 import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike } from "lunorash/runtime";
-import { d1Executor } from "@lunora/auth";
 
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
@@ -20,7 +18,6 @@ import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
 import { defineApp } from "../lunora/_generated/app.js";
-import { buildAuth } from "../lunora/auth.js";
 import { ensureGlobalTables } from "../lunora/auth/lib/ensure-global-tables.js";
 import httpApp, { getAllowedOrigins } from "../lunora/http.js";
 import type { ApiKeyAuthApi } from "../lunora/public-api/identity.js";
@@ -31,6 +28,17 @@ import { runInShard } from "../lunora/lib/shard-context.js";
 import { shardScopedSchedulerNamespace } from "../lunora/lib/shard-scheduler.js";
 import { withoutStage } from "./queue-stage.js";
 import { createGrantLookup, createShardAuthorizer, isShardRoutedRequest, withCallerShard } from "./shard-routing.js";
+
+/**
+ * Builds better-auth for this env, loading it with its plugins and our options on
+ * the first request that needs it rather than while the Worker starts: together they
+ * were the largest part of the startup CPU the upload is checked against.
+ */
+const authFor = async (env: Env) => {
+    const { buildAuth } = await import("../lunora/auth.js");
+
+    return buildAuth(env);
+};
 
 interface Env {
     /**
@@ -211,7 +219,11 @@ const routedIdentities = new WeakMap<Request, CallerIdentity>();
  * isolate every 30s (`src/jwks-cache.ts`).
  */
 const verifyBearer = async (env: Env, token: string, origin: string) => {
-    jwksCache ??= createJwksCache(async () => await (buildAuth(env).api as unknown as { getJwks: () => Promise<JSONWebKeySet> }).getJwks());
+    jwksCache ??= createJwksCache(async () => {
+        const auth = await authFor(env);
+
+        return await (auth.api as unknown as { getJwks: () => Promise<JSONWebKeySet> }).getJwks();
+    });
 
     return await jwksCache.verify(token, { audience: origin, issuer: origin });
 };
@@ -264,7 +276,8 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<null 
     }
 
     // Cookie-borne session: same-origin calls and SSR carry it.
-    const session = await buildAuth(env).api.getSession({ headers: request.headers });
+    const auth = await authFor(env);
+    const session = await auth.api.getSession({ headers: request.headers });
 
     return session?.user?.id ? { sessionId: session.session.id, userId: session.user.id } : null;
 };
@@ -280,7 +293,11 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
     // else is ignored — so a key can never reach `/_lunora/rpc`,
     // where no scope check runs. See `public-api/identity.ts`.
     if (isPublicApiPath(new URL(request.url).pathname)) {
-        return await resolveApiKeyIdentity(request, async (key) => await (buildAuth(env).api as unknown as ApiKeyAuthApi).verifyApiKey({ body: { key } }));
+        return await resolveApiKeyIdentity(request, async (key) => {
+            const auth = await authFor(env);
+
+            return await (auth.api as unknown as ApiKeyAuthApi).verifyApiKey({ body: { key } });
+        });
     }
 
     // The live-query socket's upgrade carries a single-use ticket
@@ -696,9 +713,11 @@ export default {
         // on a fresh database the first isolate failed every auth request
         // (`SchemaMismatchError`, all tables missing) until it was recycled,
         // even though this call then created the tables.
+        const { d1Executor, handleAuthRequest } = await import("@lunora/auth");
+
         await ensureGlobalTables(d1Executor(env.DB));
 
-        const auth = buildAuth(env);
+        const auth = await authFor(env);
 
         // `ensureMigrated(auth)` used to run here, on EVERY request. It is both
         // redundant and fatal:
