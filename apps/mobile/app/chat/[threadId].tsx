@@ -586,10 +586,7 @@ const Chat = () => {
                         isSteered = true;
                         steerCount += 1;
                         activeId = `${assistantId}-${steerCount}`;
-
-                        const continuationId = activeId;
-
-                        writeRows((current) => [...current, localRow(continuationId, "assistant", threadId ?? NEW_THREAD, text)]);
+                        writeRows((current) => [...current, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)]);
 
                         return;
                     }
