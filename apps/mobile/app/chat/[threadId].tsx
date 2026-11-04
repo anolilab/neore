@@ -437,7 +437,7 @@ const Chat = () => {
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ restart, text }) => {
-                    // A send stopped by a refusal of the chat writes nothing more into it.
+                    // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
                     if (controller.signal.aborted) {
                         return;
                     }
