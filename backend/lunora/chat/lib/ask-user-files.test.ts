@@ -132,6 +132,24 @@ describe("loadAskUserFiles", () => {
     });
 });
 
+describe("loadAskUserFiles with a model that cannot read a file", () => {
+    it("names an unreadable file without downloading its bytes or spending the budget", async () => {
+        const { ctx, download } = makeCtx(
+            { a: fileRow("a", "image/png"), p: fileRow("p", "application/pdf", "spec.pdf") },
+            { "key/a": objectOf(PNG_BYTES) },
+        );
+
+        const files = await loadAskUserFiles(ctx, { fileIds: ["p", "a"], threadId: "t1", userId: "u1" }, (mediaType) => mediaType.startsWith("image/"));
+
+        expect(download).toHaveBeenCalledTimes(1);
+        expect(download.mock.calls[0]?.[0]).toBe("key/a");
+        expect(files).toEqual([
+            { data: "", filename: "spec.pdf", mediaType: "application/pdf" },
+            { data: Buffer.from(PNG_BYTES).toString("base64"), filename: "a.png", mediaType: "image/png" },
+        ]);
+    });
+});
+
 describe("filesTheModelReads", () => {
     const image = { data: "AAAA", filename: "shot.png", mediaType: "image/png" };
     const pdf = { data: "AAAA", filename: "doc.pdf", mediaType: "application/pdf" };

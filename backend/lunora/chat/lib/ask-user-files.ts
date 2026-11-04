@@ -82,12 +82,17 @@ const toBase64 = (bytes: ArrayBuffer): string => {
  * turn without attachments, so a file the model cannot read is left out (its name still reaches the answer) rather than
  * failing the resumed call. A model the catalogue does not know reads none of them.
  */
+export const modelReads = (readable: BackupCapabilities | undefined, mediaType: string): boolean =>
+    readable?.[mediaType.startsWith("image/") ? "images" : "files"] === true;
+
 export const filesTheModelReads = (files: ReadonlyArray<AskUserFile>, readable: BackupCapabilities | undefined): AskUserFile[] =>
-    files.filter((file) => readable?.[file.mediaType.startsWith("image/") ? "images" : "files"] === true);
+    files.filter((file) => modelReads(readable, file.mediaType));
 
 export const loadAskUserFiles = async (
     ctx: Pick<ActionCtx, "runQuery" | "storage">,
     args: { fileIds: ReadonlyArray<string>; threadId: string; userId: string },
+    /** Whether the run's model reads this media type. A file it cannot read is named, but its bytes are never read or budgeted. */
+    reads?: (mediaType: string) => boolean,
 ): Promise<AskUserFile[]> => {
     const files: AskUserFile[] = [];
     const ids = [...new Set(args.fileIds)].slice(0, ASK_USER_MAX_FILES);
@@ -102,6 +107,11 @@ export const loadAskUserFiles = async (
 
         if (!file || !ASK_USER_FILE_TYPES.includes(file.mediaType)) {
             skipped(args, fileId, file ? "type" : "unavailable");
+            continue;
+        }
+
+        if (reads?.(file.mediaType) === false) {
+            files.push({ data: "", filename: file.filename ?? "file", mediaType: file.mediaType });
             continue;
         }
 

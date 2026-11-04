@@ -25,7 +25,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, withAnswerFiles } from "./ask-user-files";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, modelReads, withAnswerFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
@@ -1128,9 +1128,13 @@ export const resumeApprovedRun = async (
 
             // Loaded here, not at the top: the tool module pulls in the agent client.
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
-            const loaded = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
             const definition = MODEL_LOOKUP.get(config.model);
-            const readableFiles = filesTheModelReads(loaded, definition ? backupCapabilities(definition) : undefined);
+            const capabilities = definition ? backupCapabilities(definition) : undefined;
+            // Read only what the model can take: a file it cannot read is named in the answer, but costs no bytes or budget.
+            const loaded = answerFileIds?.length
+                ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }, (mediaType) => modelReads(capabilities, mediaType))
+                : [];
+            const readableFiles = filesTheModelReads(loaded, capabilities);
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, loaded, readableFiles) as (typeof toolResult.tools)[string];
             answerFiles = answerFilesMessage(readableFiles);
