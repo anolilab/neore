@@ -971,10 +971,11 @@ written here is what is not.
   asks for a `neore-host` code on the device-authorization plugin the CLI sign-in uses (same table, rate limits, expiry,
   one-time claim), announcing `storage: keychain|file` so the approval page says where the secret will live. The owner
   approves in the web app; the machine's NEXT poll claims the code and only then is the device registered, and the secret
-  is in that one response — never in the approval, never readable again. The backend address must be https (or loopback):
-  the secret crosses it. Storage is the OS keychain when a probe round-trips, else a 0600 file in a 0700 folder
+  is in that one response — never in the approval, never readable again. The backend address must be https, always:
+  the secret crosses it. Plain http to a loopback address is accepted only by a DEBUG build with
+  `NEORE_HOST_DEV_INSECURE_LOOPBACK=1`; a release build never reads the flag. Storage is the OS keychain when a probe round-trips, else a 0600 file in a 0700 folder
   (`NEORE_HOST_DIR`; macOS `~/Library/Application Support/Neore Host`, Linux `$XDG_CONFIG_HOME/neore-host` or
-  `~/.config/neore-host`) with a notice; a group-readable file or a keychain that lost its secret is refused at load,
+  `~/.config/neore-host`), the choice the owner was shown before approving and never switched afterwards; a group-readable file or a keychain that lost its secret is refused at load,
   never re-paired quietly. `pair` opens no listener; `neore-host run` only DECIDES which signed calls are for this
   device (`envelope::verify_call`, nonces persisted) over its own stdin. Running them and fetching them from the
   backend, and the launchd/systemd user service, are the next slice.

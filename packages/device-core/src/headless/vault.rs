@@ -113,6 +113,7 @@ pub fn default_dir() -> Option<PathBuf> {
 
 /// `$XDG_CONFIG_HOME/neore-host`; the spec says to ignore a relative value, which would put the secret file in
 /// whatever directory the command happened to start in.
+#[cfg_attr(any(target_os = "macos", windows), allow(dead_code))]
 fn xdg_dir(config_home: Option<std::ffi::OsString>, home: Option<PathBuf>) -> Option<PathBuf> {
     config_home
         .map(PathBuf::from)
@@ -204,9 +205,8 @@ impl<'a> Vault<'a> {
             Storage::File => {
                 record.secret = pairing.secret.to_owned();
 
-                write_private(&self.dir, &self.file(), &record).map_err(|error| {
-                    format!("the secret file could not be written: {error}")
-                })
+                write_private(&self.dir, &self.file(), &record)
+                    .map_err(|error| format!("the secret file could not be written: {error}"))
             }
         }
     }
@@ -232,7 +232,10 @@ impl<'a> Vault<'a> {
 
                 record.secret.clone()
             }
-            Storage::Keychain => match self.keychain.get(&account_of(&record.backend, &record.device_id)) {
+            Storage::Keychain => match self
+                .keychain
+                .get(&account_of(&record.backend, &record.device_id))
+            {
                 Ok(Some(secret)) => secret,
                 Ok(None) => {
                     return Err("this machine is paired, but the keychain no longer holds its secret; remove the device in the web app and pair again".into());
@@ -247,8 +250,10 @@ impl<'a> Vault<'a> {
     /// Forgets the pairing on this machine (the owner removes the device in the web app).
     pub fn forget(&self) -> Result<(), String> {
         if let Some(loaded) = self.load().ok().flatten() {
-            self.keychain
-                .delete(&account_of(&loaded.record.backend, &loaded.record.device_id));
+            self.keychain.delete(&account_of(
+                &loaded.record.backend,
+                &loaded.record.device_id,
+            ));
         }
 
         match fs::remove_file(self.file()) {
@@ -505,6 +510,8 @@ pub(crate) mod tests {
         assert!(keychain.entries.borrow().is_empty());
     }
 
+    // Paths like `/etc/xdg` are only absolute on Unix.
+    #[cfg(unix)]
     #[test]
     fn a_relative_config_home_is_ignored() {
         let home = Some(PathBuf::from("/home/me"));

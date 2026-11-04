@@ -313,7 +313,9 @@ pub fn pair(
             Some("authorization_pending") => {}
             Some("slow_down") => interval += SLOW_DOWN_STEP,
             Some("expired_token") => return Err(PairError::Expired),
-            Some("invalid_grant") if after_lost_answer => return Err(PairError::PossiblyRegistered),
+            Some("invalid_grant") if after_lost_answer => {
+                return Err(PairError::PossiblyRegistered)
+            }
             Some("invalid_grant") => return Err(PairError::Invalid),
             // The owner's "deny" is a 400; a refusal of the account itself (no room for another device) is a 403.
             Some("access_denied") if reply.status == 403 => {
@@ -669,24 +671,30 @@ mod tests {
 
     #[test]
     fn refuses_an_insecure_backend_before_sending_anything() {
-        let backend = FakeBackend::new(vec![]);
-        let timer = FakeTimer::default();
-        let keychain = FakeKeychain::default();
-        let vault = Vault::new(temp_dir("insecure"), &keychain);
-        let outcome = pair(
-            &backend,
-            &timer,
-            &vault,
+        for address in [
             "http://neore.example",
-            &Identity {
-                hostname: "x",
-                platform: "linux",
-            },
-            &mut Vec::new(),
-        );
+            "http://localhost:8788",
+            "http://127.0.0.1:8788",
+        ] {
+            let backend = FakeBackend::new(vec![]);
+            let timer = FakeTimer::default();
+            let keychain = FakeKeychain::default();
+            let vault = Vault::new(temp_dir("insecure"), &keychain);
+            let outcome = pair(
+                &backend,
+                &timer,
+                &vault,
+                address,
+                &Identity {
+                    hostname: "x",
+                    platform: "linux",
+                },
+                &mut Vec::new(),
+            );
 
-        assert!(matches!(outcome, Err(PairError::Refused(_))));
-        assert!(backend.requests.borrow().is_empty());
+            assert!(matches!(outcome, Err(PairError::Refused(_))), "{address}");
+            assert!(backend.requests.borrow().is_empty(), "{address}");
+        }
     }
 
     #[test]

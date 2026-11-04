@@ -23,9 +23,22 @@ pub trait Http {
     fn post_json(&self, url: &str, body: &Value) -> Result<Reply, String>;
 }
 
-/// Where the backend may be reached. The secret crosses this connection, so it is `https` — or loopback, for a
-/// local backend in development. Returns the origin without a trailing slash.
+/// Set to `1` to pair against a plain-http loopback backend. Honoured by debug builds only: a release build never
+/// reads it, so a packaged `neore-host` cannot be told to send the secret unencrypted.
+pub const DEV_INSECURE_LOOPBACK_VAR: &str = "NEORE_HOST_DEV_INSECURE_LOOPBACK";
+
+fn dev_insecure_loopback() -> bool {
+    cfg!(debug_assertions) && std::env::var(DEV_INSECURE_LOOPBACK_VAR).as_deref() == Ok("1")
+}
+
+/// Where the backend may be reached. The secret crosses this connection, so it is `https`, always. The one
+/// exception is a loopback address over plain http for local development, refused unless the debug-build-only
+/// flag above is set. Returns the origin without a trailing slash.
 pub fn validate_backend(raw: &str) -> Result<String, String> {
+    validate_backend_with(raw, dev_insecure_loopback())
+}
+
+fn validate_backend_with(raw: &str, dev_loopback: bool) -> Result<String, String> {
     let url = raw.trim().trim_end_matches('/');
     let (scheme, rest) = url
         .split_once("://")
@@ -46,7 +59,7 @@ pub fn validate_backend(raw: &str) -> Result<String, String> {
 
     match scheme {
         "https" => Ok(url.to_owned()),
-        "http" if loopback => Ok(url.to_owned()),
+        "http" if loopback && dev_loopback => Ok(url.to_owned()),
         _ => Err("the device secret is sent over this connection, so the backend address must be https://".into()),
     }
 }
@@ -102,26 +115,28 @@ impl Http for UreqHttp {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_backend;
+    use super::validate_backend_with;
 
     #[test]
-    fn takes_https_and_loopback_only() {
+    fn takes_https_only_and_plain_http_loopback_only_with_the_dev_flag() {
         assert_eq!(
-            validate_backend("https://neore.ai/").as_deref(),
+            validate_backend_with("https://neore.ai/", false).as_deref(),
             Ok("https://neore.ai")
         );
-        assert_eq!(
-            validate_backend("http://localhost:8788").as_deref(),
-            Ok("http://localhost:8788")
-        );
-        assert_eq!(
-            validate_backend("http://127.0.0.1:8788").as_deref(),
-            Ok("http://127.0.0.1:8788")
-        );
-        assert_eq!(
-            validate_backend("http://[::1]:8788").as_deref(),
-            Ok("http://[::1]:8788")
-        );
+        // https to a loopback address is encrypted, so it needs no flag.
+        assert!(validate_backend_with("https://localhost:8788", false).is_ok());
+
+        for local in [
+            "http://localhost:8788",
+            "http://127.0.0.1:8788",
+            "http://[::1]:8788",
+        ] {
+            assert!(
+                validate_backend_with(local, false).is_err(),
+                "{local} was accepted without the dev flag"
+            );
+            assert_eq!(validate_backend_with(local, true).as_deref(), Ok(local));
+        }
 
         for bad in [
             "http://neore.ai",
@@ -135,7 +150,12 @@ mod tests {
             "https://neore.ai/app/",
             "",
         ] {
-            assert!(validate_backend(bad).is_err(), "{bad} was accepted");
+            for dev in [false, true] {
+                assert!(
+                    validate_backend_with(bad, dev).is_err(),
+                    "{bad} was accepted"
+                );
+            }
         }
     }
 }
