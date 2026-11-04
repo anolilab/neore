@@ -11,7 +11,7 @@ import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
-import { shareableMessageText } from "@/chat/share-message";
+import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -408,7 +408,7 @@ const Chat = () => {
                                 <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
                                 {shareText !== undefined && (
                                     <Pressable
-                                        accessibilityLabel="Share message"
+                                        accessibilityLabel={shareLabel(item)}
                                         accessibilityRole="button"
                                         onPress={() => shareMessage(shareText)}
                                         style={{ alignSelf: "flex-start", paddingVertical: 4 }}

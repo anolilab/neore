@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shareableMessageText } from "./share-message";
+import { shareableMessageText, shareLabel } from "./share-message";
 
 describe("shareableMessageText", () => {
     it("returns the message text without surrounding whitespace", () => {
@@ -14,5 +14,22 @@ describe("shareableMessageText", () => {
     it("returns undefined for an empty or whitespace-only message", () => {
         expect(shareableMessageText({ text: "" })).toBeUndefined();
         expect(shareableMessageText({ text: " \n\t " })).toBeUndefined();
+    });
+});
+
+describe("shareLabel", () => {
+    it("names the speaker and the start of the message", () => {
+        expect(shareLabel({ role: "user", text: "Summarise the\nlast meeting" })).toBe("Share your message: Summarise the last meeting");
+        expect(shareLabel({ role: "assistant", text: "Here it is." })).toBe("Share reply: Here it is.");
+    });
+
+    it("cuts a long message to a short preview", () => {
+        const label = shareLabel({ role: "assistant", text: "a".repeat(100) });
+
+        expect(label).toBe(`Share reply: ${"a".repeat(40)}…`);
+    });
+
+    it("gives two rows with the same role different labels", () => {
+        expect(shareLabel({ role: "assistant", text: "First answer" })).not.toBe(shareLabel({ role: "assistant", text: "Second answer" }));
     });
 });
