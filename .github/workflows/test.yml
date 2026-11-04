@@ -73,6 +73,15 @@ jobs:
               with:
                   egress-policy: "audit"
 
+            # The standard runner has about 14 GB free, and the affected build and coverage run filled it: the job ran out
+            # of disk ("No space left on device") and failed. Toolchains this job never uses are removed first.
+            - name: "Free runner disk"
+              shell: "bash"
+              run: |
+                  df -h /
+                  sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
+                  df -h /
+
             - name: "Git checkout ${{ env.HEAD_REPOSITORY }}:${{ env.HEAD_REF }}"
               uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
