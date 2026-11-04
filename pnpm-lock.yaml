@@ -520,9 +520,6 @@ catalogs:
       specifier: 0.146.1
       version: 0.146.1
   file-renderers:
-    heic-to:
-      specifier: 1.6.7
-      version: 1.6.7
     hls.js:
       specifier: 1.7.3
       version: 1.7.3
@@ -2115,9 +2112,6 @@ importers:
       geist:
         specifier: catalog:style
         version: 1.8.1
-      heic-to:
-        specifier: catalog:file-renderers
-        version: 1.6.7
       html2canvas:
         specifier: catalog:utils
         version: 1.4.1
@@ -19004,9 +18998,6 @@ packages:
 
   headers-polyfill@5.0.1:
     resolution: {integrity: sha512-1TJ6Fih/b8h5TIcv+1+Hw0PDQWJTKDKzFZzcKOiW1wJza3XoAQlkCuXLbymPYB8+ZQyw8mHvdw560e8zVFIWyA==}
-
-  heic-to@1.6.7:
-    resolution: {integrity: sha512-GCPYNl86u6eZ7mr2aa+uQB+PrQOVKSBYfH8esovr8kh2c6EYQSDYIJ6uhXSmM2hPC8PdBVJ/Trn0jnfM9H9gvg==}
 
   hermes-compiler@260318099.0.4:
     resolution: {integrity: sha512-8odcPFkPC82HlqCl0C5QI9mBN4rEAT+IAo55sJhzwKw//K3qZloiv3ex6J2O8CuBbhdmkJozfidNsset2KH25w==}
@@ -42609,8 +42600,6 @@ snapshots:
     dependencies:
       '@types/set-cookie-parser': 2.4.10
       set-cookie-parser: 3.1.3
-
-  heic-to@1.6.7: {}
 
   hermes-compiler@260318099.0.4: {}
 

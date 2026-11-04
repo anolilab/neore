@@ -5,7 +5,7 @@ import { TEXT_PREVIEW_EXTENSIONS } from "@neore/ui/components/file-renderers/fil
 import { decodeTextBytes } from "@neore/ui/utils/decode-text";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
-import { convertHeicToJpeg, isHeicFile } from "@/lib/upload/heic-convert";
+import { convertHeicToJpeg, willConvertHeic } from "@/lib/upload/heic-convert";
 import { downscaleOversizedImage } from "@/lib/upload/image-downscale";
 import { UploadFailedError } from "@/lib/upload/upload-error";
 import { uploadFile } from "@/lib/upload/upload-file";
@@ -293,8 +293,8 @@ const JPEG_OF_HEIC = { name: "photo.jpg", type: "image/jpeg" } as const;
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
-        // A HEIC/HEIF photo is judged by the JPEG it becomes, and refused by that size before any decode.
-        if (isHeicFile(state.file) && state.file.size > attachmentSizeLimit(JPEG_OF_HEIC).maxBytes) {
+        // A HEIC/HEIF photo this browser converts is judged by the JPEG it becomes, and refused by that size before any decode.
+        if (willConvertHeic(state.file) && state.file.size > attachmentSizeLimit(JPEG_OF_HEIC).maxBytes) {
             throw new AttachmentTooLargeError(state.file.name, attachmentSizeLimit(JPEG_OF_HEIC));
         }
 
