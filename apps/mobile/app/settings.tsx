@@ -60,8 +60,9 @@ const SettingsScreen = () => {
                 />
             </View>
             <Text style={{ fontSize: 13 }}>
-                Off by default. Reports go to PostHog, a third-party service. A report has the name of the error and where in the app it happened. It never
-                includes the text of a chat or the message of the error.
+                Off by default. Reports go to PostHog, a third-party service. A report has the name of the error and where in the app it happened. PostHog
+                also adds an anonymous install ID and basic details of the device, operating system, app version and language. A report never includes the
+                text of a chat or the message of the error.
             </Text>
             {isConfigured ? null : <Text style={{ fontSize: 13 }}>Crash reports are not set up in this build.</Text>}
             {failure ? <Text accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>{failure}</Text> : null}
