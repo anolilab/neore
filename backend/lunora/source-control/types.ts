@@ -248,7 +248,7 @@ export interface HostView {
     connectorSlug: string;
     label: string;
     /** The ceilings the host puts on a list; past them a count of what was left out is shown instead. */
-    limits: { commits: number; files: number };
+    limits: { commits: number; files: number; reviewers: number };
     /** The host's word for the change: "pull request", "merge request". */
     requestNoun: "merge request" | "pull request";
 }

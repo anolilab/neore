@@ -18,6 +18,17 @@ import { usePullRequestActions } from "../lib/use-pull-request-actions";
 import type { WriteResult } from "../lib/use-review-messages";
 import { useReviewMessages } from "../lib/use-review-messages";
 
+/** The answer of a write, or the error it threw: a refusal the server named is a thrown coded error, a lost answer is not. */
+async function attempt<T>(promise: Promise<T>): Promise<{ outcome: T } | { thrown: unknown }> {
+    try {
+        return { outcome: await promise };
+    } catch (error) {
+        return { thrown: error };
+    }
+}
+
+const isCodedError = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && typeof error.code === "string";
+
 type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { href?: string; kind: "success"; text: string };
 
 /** The same login rule the backend applies, so a bad name is refused here with its reason. */
@@ -78,13 +89,21 @@ const PullRequestActionsPanel = ({
         return null;
     }
 
+    const titleEmpty = (editing?.title ?? "").trim() === "";
     const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
-    // An answer that never came, or one the host marked unconfirmed, may still have changed the pull request.
-    const failure = (outcome: WriteResult | undefined): Feedback =>
-        outcome === undefined
-            ? { kind: "error", text: t`Could not confirm that. Check on ${hostLabel} before you try again.`, unconfirmed: true }
-            : { kind: "error", text: messages.write(outcome), unconfirmed: outcome.status === "unconfirmed" };
+    // A thrown error without a code (a dropped connection, say) may still have reached the host: it is unconfirmed.
+    const thrownFailure = (thrown: unknown): Feedback =>
+        isCodedError(thrown)
+            ? { kind: "error", text: t`The request was refused before it reached ${hostLabel}. Nothing was changed.`, unconfirmed: false }
+            : { kind: "error", text: t`Could not confirm that. Check on ${hostLabel} before you try again.`, unconfirmed: true };
+
+    // A host answer that is not ok: refused, or marked unconfirmed (its answer never came back).
+    const failure = (outcome: WriteResult): Feedback => {return {
+        kind: "error",
+        text: messages.write(outcome),
+        unconfirmed: outcome.status === "unconfirmed",
+    }};
 
     const reviewerProblem = (logins: string[]): string | null => {
         if (logins.length > MAX_REVIEWERS) {
@@ -114,9 +133,13 @@ const PullRequestActionsPanel = ({
             return;
         }
 
-        const outcome = await actions.edit.mutateAsync(change).catch(() => undefined);
+        const result = await attempt(actions.edit.mutateAsync(change));
 
-        setFeedback(outcome?.status === "ok" ? { kind: "success", text: t`Saved on ${hostLabel}.` } : failure(outcome));
+        if ("thrown" in result) {
+            setFeedback(thrownFailure(result.thrown));
+        } else {
+            setFeedback(result.outcome.status === "ok" ? { kind: "success", text: t`Saved on ${hostLabel}.` } : failure(result.outcome));
+        }
     };
 
     const sendReviewers = async () => {
@@ -138,9 +161,13 @@ const PullRequestActionsPanel = ({
             return;
         }
 
-        const outcome = await actions.requestReviewers.mutateAsync(logins).catch(() => undefined);
+        const result = await attempt(actions.requestReviewers.mutateAsync(logins));
 
-        setFeedback(outcome?.status === "ok" ? { kind: "success", text: t`Review requested.` } : failure(outcome));
+        if ("thrown" in result) {
+            setFeedback(thrownFailure(result.thrown));
+        } else {
+            setFeedback(result.outcome.status === "ok" ? { kind: "success", text: t`Review requested.` } : failure(result.outcome));
+        }
     };
 
     const revertNow = async () => {
@@ -153,13 +180,19 @@ const PullRequestActionsPanel = ({
         setFeedback(null);
 
         try {
-            const outcome = await actions.revert.mutateAsync().catch(() => undefined);
+            const result = await attempt(actions.revert.mutateAsync());
 
-            if (outcome?.status === "ok") {
+            if ("thrown" in result) {
+                setFeedback(thrownFailure(result.thrown));
+            } else if (result.outcome.status === "ok") {
                 // Only a link the host gave, checked again before it is shown as an address to open.
-                setFeedback({ kind: "success", href: safeExternalUrl(outcome.url) ?? undefined, text: t`Opened a revert pull request on ${hostLabel}.` });
+                setFeedback({
+                    kind: "success",
+                    href: safeExternalUrl(result.outcome.url) ?? undefined,
+                    text: t`Opened a revert pull request on ${hostLabel}.`,
+                });
             } else {
-                setFeedback(failure(outcome));
+                setFeedback(failure(result.outcome));
             }
         } finally {
             revertInFlight.current = false;
@@ -228,10 +261,18 @@ const PullRequestActionsPanel = ({
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-title`}>{t`Title`}</Label>
                             <Input
+                                aria-describedby={titleEmpty ? `${titleId}-title-note` : undefined}
+                                aria-invalid={titleEmpty || undefined}
                                 id={`${titleId}-title`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, title: event.target.value }))}
+                                required
                                 value={editing?.title ?? ""}
                             />
+                            {titleEmpty && (
+                                <p className="text-muted-foreground text-xs" id={`${titleId}-title-note`}>
+                                    {t`A pull request needs a title. Enter one to save.`}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-body`}>{t`Description`}</Label>

@@ -46618,11 +46618,15 @@
                             },
                             "files": {
                               "type": "number"
+                            },
+                            "reviewers": {
+                              "type": "number"
                             }
                           },
                           "required": [
                             "commits",
-                            "files"
+                            "files",
+                            "reviewers"
                           ],
                           "type": "object"
                         },

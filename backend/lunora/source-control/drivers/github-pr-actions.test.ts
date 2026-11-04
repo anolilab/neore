@@ -70,7 +70,7 @@ describe("editPullRequest", () => {
 
     it("counts a title the host did not keep as unconfirmed", async () => {
         const { request } = graphql(() => {
-            return { data: { updatePullRequest: { pullRequest: { id: "PR_node", title: "Old" } } } };
+            return { data: { updatePullRequest: { pullRequest: { body: null, id: "PR_node", title: "Old" } } } };
         });
 
         await expect(githubDriver.editPullRequest(request, REF, { title: "New" })).rejects.toMatchObject({ unconfirmed: true });
@@ -139,6 +139,12 @@ describe("editPullRequest body", () => {
 });
 
 describe("a host answer that cannot be read after an accepted change", () => {
+    it("is unconfirmed for a GraphQL error with no type, such as a timeout after the host may have acted", async () => {
+        const { request } = graphql(() => {return { errors: [{ message: "Something went wrong while executing your query. This may be the result of a timeout." }] }});
+
+        await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ unconfirmed: true });
+    });
+
     it("is unconfirmed for a revert, never a plain failure a retry would repeat", async () => {
         const { request } = graphql(() => new HostApiError("unreadable", 0));
 

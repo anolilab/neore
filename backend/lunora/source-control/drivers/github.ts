@@ -1292,7 +1292,8 @@ const confirmedOrUnknown = async <T>(mutation: () => Promise<T>): Promise<T> => 
     try {
         return await mutation();
     } catch (error) {
-        if (error instanceof HostApiError && error.status === 0 && !error.unconfirmed && error.detail === undefined && !error.rateLimited) {
+        // A real refusal always carries a status, so only a failure that could not be read lands here.
+        if (error instanceof HostApiError && error.status === 0 && !error.unconfirmed && !error.rateLimited) {
             throw new HostApiError("The host's answer to the change could not be read", 0, false, { unconfirmed: true });
         }
 
@@ -1400,7 +1401,7 @@ export const githubDriver: HostDriver = {
         capabilities: GITHUB_CAPABILITIES,
         connectorSlug: "github",
         label: "GitHub",
-        limits: { commits: GITHUB_COMMIT_LIMIT, files: GITHUB_FILE_LIMIT },
+        limits: { commits: GITHUB_COMMIT_LIMIT, files: GITHUB_FILE_LIMIT, reviewers: MAX_REVIEWERS_PER_CALL },
         requestNoun: "pull request",
     },
     webhookScheme: "native",

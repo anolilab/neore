@@ -37,7 +37,9 @@ export const graphqlRequest = async <T>(
     const [first] = body?.errors ?? [];
 
     if (first !== undefined) {
-        const status = statusOfGraphqlError(typeof first.type === "string" ? first.type : undefined);
+        // An error with no type is not a refusal we can name, and a timeout comes that way after the host may have acted:
+        // status 0 lets a write read it as unconfirmed.
+        const status = typeof first.type === "string" ? statusOfGraphqlError(first.type) : 0;
         const detail = typeof first.message === "string" ? first.message.slice(0, DETAIL_MAX_CHARS) : undefined;
 
         throw new HostApiError("The host refused the GraphQL request", status, status === 429, { detail });

@@ -40,6 +40,12 @@ describe("graphqlRequest", () => {
         await expect(graphqlRequest(limited.request, "q", {}, SCHEMA)).rejects.toMatchObject({ rateLimited: true, status: 429 });
     });
 
+    it("reads an error with no type as a failure the host may have acted on: status 0", async () => {
+        const { request } = answering({ errors: [{ message: "Something went wrong while executing your query. This may be the result of a timeout." }] });
+
+        await expect(graphqlRequest(request, "q", {}, SCHEMA)).rejects.toMatchObject({ status: 0 });
+    });
+
     it("refuses data of the wrong shape", async () => {
         const { request } = answering({ data: { viewer: { login: 7 } } });
 

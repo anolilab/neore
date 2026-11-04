@@ -11,7 +11,6 @@ import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { requireCapability } from "./capability-gate";
-import { MAX_REVIEWERS_PER_CALL } from "./drivers/github";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { vWriteFailed } from "./validators";
 import { writeToHost } from "./write-host";
@@ -25,8 +24,8 @@ const vRef = {
 
 /** A title the host accepts is at most 256 characters; the validator only bounds what one request can store. */
 const vTitle = v.string().max(MAX_LENGTH.short);
-/** A description is as long as a prompt the workbench takes, well inside the host's own limit. */
-const vBody = v.string().max(MAX_LENGTH.text);
+// GitHub's limit on a description (65,536 characters); the host refuses a longer one, so the check is here too.
+const vBody = v.string().max(65_536);
 
 /** Changes the title and/or description. A field left out keeps its value; an empty change is refused here. */
 export const editPullRequest = authAction
@@ -60,9 +59,11 @@ export const requestReviewers = authAction
     .action(async ({ args, ctx }) => {
         requireCapability("reviewers.request");
 
-        // Refused before the token is read, so an oversized list costs nothing.
-        if (args.logins.length === 0 || args.logins.length > MAX_REVIEWERS_PER_CALL) {
-            throw new LunoraError("BAD_REQUEST", `Request between 1 and ${String(MAX_REVIEWERS_PER_CALL)} reviewers at a time`);
+        // Refused before the token is read, so an oversized list costs nothing. The limit is the driver's own.
+        const maxReviewers = DEVELOP_DRIVER.view.limits.reviewers;
+
+        if (args.logins.length === 0 || args.logins.length > maxReviewers) {
+            throw new LunoraError("BAD_REQUEST", `Request between 1 and ${String(maxReviewers)} reviewers at a time`);
         }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
