@@ -78,6 +78,16 @@ const localRow = (id: string, role: string, threadId: string, text: string): Row
 
 const byCreation = (rows: Row[]): Row[] => rows.toSorted((a, b) => a.createdAt - b.createdAt);
 
+/** Marks a row on this screen as finished, so it can be shared before the server's copy replaces it. */
+const finishRow = (rows: Row[], id: string): Row[] =>
+    rows.map((row) => {
+        if (row.id !== id) {
+            return row;
+        }
+
+        return { ...row, status: "success" };
+    });
+
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
 const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
     rows.map((row) => {
@@ -313,11 +323,12 @@ const Chat = () => {
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
         setDraft("");
         const stamp = Date.now();
+        const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
 
         setRows((current) => [
             ...current,
-            localRow(`user-${stamp}`, "user", threadId ?? NEW_THREAD, prompt),
+            localRow(userId, "user", threadId ?? NEW_THREAD, prompt),
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
         ]);
 
@@ -341,6 +352,8 @@ const Chat = () => {
                 }));
 
             setThreadId(started.threadId);
+            // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
+            setRows((current) => finishRow(current, userId));
 
             if (routeThreadId === NEW_THREAD) {
                 router.setParams({ threadId: started.threadId });
@@ -357,6 +370,8 @@ const Chat = () => {
             if (outcome === "failed") {
                 throw new ChatError("The reply did not finish. Try again.");
             }
+
+            setRows((current) => finishRow(current, assistantId));
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {

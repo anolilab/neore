@@ -507,3 +507,32 @@ describe("read-only by construction", () => {
         expect(rows.map((row) => row.name)).toEqual(["cache_meta", "cached_messages", "cached_statuses", "cached_threads"]);
     });
 });
+
+describe("the version-one cache", () => {
+    it("keeps the saved chats when it is opened, and their messages have no share text until a read replaces them", async () => {
+        const database = createTestDatabase();
+
+        open.push(database);
+        // The tables an installed version-one app left behind: no share text column yet.
+        await database.execAsync(`
+            CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, runner TEXT, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE TABLE cached_messages (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
+            CREATE INDEX cached_messages_by_thread ON cached_messages (thread_id, created_at);
+            PRAGMA user_version = 1;
+        `);
+        await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
+        await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 10]);
+
+        const cache = createOfflineCache(database, { now: () => 1000 });
+        const scoped = await owned(cache);
+
+        const threads = await scoped.loadThreads();
+        const messages = await scoped.loadMessages("t1");
+        const [version] = await database.getAllAsync<{ user_version: number }>("PRAGMA user_version");
+
+        expect(threads.map((row) => row.title)).toEqual(["Saved chat"]);
+        expect(messages.map((row) => row.text)).toEqual(["Saved reply"]);
+        expect(messages[0]?.shareText).toBe("");
+        expect(version?.user_version).toBe(2);
+    });
+});
