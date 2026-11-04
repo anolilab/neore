@@ -138,16 +138,6 @@ export const getHostSession = authQuery
         };
     });
 
-/**
- * What the runner of a thread can do (provider-capabilities.md §6): the report its host sent for a host
- * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
- * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
- * stranger learns nothing, not even that the id exists.
- *
- * A local-browser thread is told by its model's endpoint TYPE (`custom:<endpoint>/<model>` against the owner's
- * endpoints), never by a model name. Only the owner's endpoints are readable here, so a grantee reads the cloud
- * declaration for it; the composer that runs a local model picks `LOCAL_BROWSER_CAPABILITIES` itself.
- */
 const NATIVE_REASONING = { degradation: "none", supported: true } as const;
 const NOT_OFFERED_REASONING = { reason: "not_offered", supported: false } as const;
 
@@ -171,13 +161,26 @@ const withLiveOptions = (report: Infer<typeof vCapabilityReport>, state: Infer<t
             ...report.groups,
             identity: {
                 ...report.groups.identity,
-                models: model?.choices.map((choice) => ({ id: choice.value, name: choice.name })) ?? [],
+                models:
+                    model?.choices.map((choice) => {
+                        return { id: choice.value, name: choice.name };
+                    }) ?? [],
                 reasoningEffort: hasReasoning ? NATIVE_REASONING : NOT_OFFERED_REASONING,
             },
         },
     };
 };
 
+/**
+ * What the runner of a thread can do (provider-capabilities.md §6): the report its host sent for a host
+ * thread (all unknown while it has sent none), the local-browser declaration for a thread on one of the owner's
+ * `local-browser` endpoints, the cloud declaration for any other. Null for a thread the caller cannot read, so a
+ * stranger learns nothing, not even that the id exists.
+ *
+ * A local-browser thread is told by its model's endpoint TYPE (`custom:<endpoint>/<model>` against the owner's
+ * endpoints), never by a model name. Only the owner's endpoints are readable here, so a grantee reads the cloud
+ * declaration for it; the composer that runs a local model picks `LOCAL_BROWSER_CAPABILITIES` itself.
+ */
 export const getThreadCapabilities = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.null(), vCapabilityReport))

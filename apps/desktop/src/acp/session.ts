@@ -434,7 +434,6 @@ export class AgentSession {
         };
     }
 
-    /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     /** Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. */
     private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown): boolean {
         if (optionId === undefined) {
@@ -451,6 +450,7 @@ export class AgentSession {
         return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
     }
 
+    /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, resumeSessionId, startupTimeoutMs } = this.options;
 

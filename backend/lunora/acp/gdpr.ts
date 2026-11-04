@@ -14,7 +14,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
-import { vAcpAgentState, vAcpSessionStatus, vHostEvent } from "./validators";
+import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
@@ -65,6 +65,8 @@ const vExportSession = v.object({
     importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
     lastEventAt: v.optional(v.number()),
     nativeSessionId: v.optional(v.string()),
+    // The last option change the person made on this session, and how it ended (`acp/lib/calls.ts`).
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
@@ -116,6 +118,7 @@ export const collectAcpSessionsForExport = internalQuery
                         importState,
                         lastEventAt,
                         nativeSessionId,
+                        optionResult,
                         status,
                         threadId,
                     }) => {
@@ -132,6 +135,7 @@ export const collectAcpSessionsForExport = internalQuery
                             ...(importState !== undefined && { importState }),
                             ...(lastEventAt !== undefined && { lastEventAt }),
                             ...(nativeSessionId !== undefined && { nativeSessionId }),
+                            ...(optionResult !== undefined && { optionResult }),
                         };
                     },
                 );

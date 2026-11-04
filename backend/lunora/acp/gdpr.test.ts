@@ -135,6 +135,22 @@ describe("the export of coding-agent sessions and events", () => {
         }
     });
 
+    it("includes the last option change the person made on a session", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { optionResult: { at: 5, callId: "c1", optionId: "model", outcome: "confirmed", valueId: "deep" } });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ optionResult: { outcome: "confirmed", valueId: "deep" } });
+    });
+
     it("is complete past one page of sessions, and carries no other user's", async () => {
         const device = await insertDevice(A);
         const other = await insertDevice(B);
