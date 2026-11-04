@@ -49,7 +49,11 @@ const SetupChecklist: FC = () => {
                 queryClient.setQueryData(settingsKey, { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) });
             }
         },
-        onError: () => {
+        onError: (_error, args: { skipped: boolean; stepId: SetupStepId }) => {
+            // Back to what the click replaced right away; the read that follows settles on whatever is stored.
+            queryClient.setQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey, (row) =>
+                row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
+            );
             toast.error(t`Could not save that choice. Try again.`);
         },
         // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.

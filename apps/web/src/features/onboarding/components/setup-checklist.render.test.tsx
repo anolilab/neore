@@ -243,6 +243,18 @@ describe("<SetupChecklist>", () => {
         expect(screen.queryByText(COULD_NOT_READ_DEVICES)).toBeNull();
     });
 
+    it("reverts the click and says so when the save fails and the stored list cannot be re-read", async () => {
+        server.fail = true;
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+        server.readFail = true;
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
+        expect(screen.queryByText("(Skipped)")).toBeNull();
+    });
+
     it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {
         let release = () => {};
 

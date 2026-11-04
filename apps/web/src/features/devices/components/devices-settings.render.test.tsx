@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { StartAgents } from "./devices-settings";
+import { ServerSetupNote, StartAgents } from "./devices-settings";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/react/macro", () => {
@@ -17,6 +17,12 @@ vi.mock("@lingui/react/macro", () => {
                 t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
             };
         },
+    };
+});
+
+vi.mock("@/components/settings/settings-card", () => {
+    return {
+        default: ({ children, title }: { children: React.ReactNode; title: string }) => <section aria-label={title}>{children}</section>,
     };
 });
 
@@ -45,6 +51,9 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 });
+
+const BROWSER_NOTE = /The form to add a server is in the Neore desktop app/;
+const PAIRED_NOTE = /appears here as soon as it is paired/;
 
 const device = {
     _id: "d1",
@@ -78,5 +87,20 @@ describe("<StartAgents>", () => {
 
         expect(button.disabled).toBe(false);
         expect(button.getAttribute("aria-describedby")).toBeNull();
+    });
+});
+
+describe("<ServerSetupNote>", () => {
+    it("tells a browser the form is in the desktop app, not that pairing reveals it here", () => {
+        render(<ServerSetupNote inDesktop={false} />);
+
+        expect(screen.getByText(BROWSER_NOTE)).toBeTruthy();
+        expect(screen.queryByText(PAIRED_NOTE)).toBeNull();
+    });
+
+    it("tells the desktop app that pairing reveals the form", () => {
+        render(<ServerSetupNote inDesktop />);
+
+        expect(screen.getByText(PAIRED_NOTE)).toBeTruthy();
     });
 });

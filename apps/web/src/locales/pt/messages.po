@@ -2073,7 +2073,7 @@ msgstr "Adicione um alerta acima para ser notificado quando seu uso ultrapassar 
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Adicione uma camada extra de segurança à sua conta ativando a autenticação de dois fatores."
 
-#: src/features/onboarding/components/setup-checklist.tsx:74
+#: src/features/onboarding/components/setup-checklist.tsx:80
 msgid "Add an SSH server"
 msgstr ""
 
@@ -5672,7 +5672,7 @@ msgstr "As integrações marcadas serão oferecidas para configuração depois q
 msgid "Checked: {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:78
+#: src/features/onboarding/components/setup-checklist.tsx:84
 msgid "Checking"
 msgstr ""
 
@@ -6307,11 +6307,11 @@ msgstr ""
 msgid "Coding agents you can start on {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:81
+#: src/features/onboarding/components/setup-checklist.tsx:87
 msgid "Coding setup"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:83
+#: src/features/onboarding/components/setup-checklist.tsx:89
 msgid "Coding setup steps"
 msgstr ""
 
@@ -7755,7 +7755,7 @@ msgstr ""
 msgid "Could not change where this device is offered."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:78
+#: src/features/onboarding/components/setup-checklist.tsx:84
 msgid "Could not check"
 msgstr ""
 
@@ -7887,7 +7887,7 @@ msgstr "Não foi possível carregar as ferramentas: {error}"
 msgid "Could not load your activity."
 msgstr "Não foi possível carregar sua atividade."
 
-#: src/features/onboarding/components/setup-checklist.tsx:139
+#: src/features/onboarding/components/setup-checklist.tsx:145
 msgid "Could not load your saved choices, so Skip and Resume are off for now."
 msgstr ""
 
@@ -7907,7 +7907,7 @@ msgstr "Não foi possível abrir como página"
 msgid "Could not open the pull request."
 msgstr "Não foi possível abrir o pull request."
 
-#: src/features/devices/components/devices-settings.tsx:439
+#: src/features/devices/components/devices-settings.tsx:462
 msgid "Could not pair this computer. Try again."
 msgstr "Não foi possível emparelhar este computador. Tente novamente."
 
@@ -7946,7 +7946,7 @@ msgstr "Não foi possível ler essa conversa"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
-#: src/features/onboarding/components/setup-checklist.tsx:125
+#: src/features/onboarding/components/setup-checklist.tsx:131
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
 
@@ -7982,7 +7982,7 @@ msgstr ""
 msgid "Could not retry. Please try again."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:51
+#: src/features/onboarding/components/setup-checklist.tsx:57
 msgid "Could not save that choice. Try again."
 msgstr ""
 
@@ -9714,7 +9714,7 @@ msgstr "Desenvolvedores que precisam de bons recursos de programação e uso ger
 msgid "Development"
 msgstr "Desenvolvimento"
 
-#: src/features/devices/components/devices-settings.tsx:534
+#: src/features/devices/components/devices-settings.tsx:543
 msgid "Device activity"
 msgstr "Atividade dos dispositivos"
 
@@ -9726,7 +9726,7 @@ msgstr "Nome do dispositivo"
 msgid "Device removed"
 msgstr "Dispositivo removido"
 
-#: src/features/devices/components/devices-settings.tsx:451
+#: src/features/devices/components/devices-settings.tsx:474
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Dispositivos"
@@ -10018,7 +10018,7 @@ msgstr "Não tem uma conta?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:256
-#: src/features/onboarding/components/setup-checklist.tsx:77
+#: src/features/onboarding/components/setup-checklist.tsx:83
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -14566,8 +14566,8 @@ msgstr "Ir para a mensagem: {snippet}"
 msgid "Go to next page"
 msgstr "Ir para a próxima página"
 
-#: src/features/devices/components/devices-settings.tsx:527
-#: src/features/onboarding/components/setup-checklist.tsx:67
+#: src/features/devices/components/devices-settings.tsx:402
+#: src/features/onboarding/components/setup-checklist.tsx:73
 msgid "Go to pairing"
 msgstr ""
 
@@ -14579,7 +14579,7 @@ msgstr "Ir para a página anterior"
 msgid "Go to Prompts"
 msgstr "Ir para os prompts"
 
-#: src/features/onboarding/components/setup-checklist.tsx:72
+#: src/features/onboarding/components/setup-checklist.tsx:78
 msgid "Go to servers"
 msgstr ""
 
@@ -16278,11 +16278,11 @@ msgstr ""
 msgid "Install"
 msgstr "Instalar"
 
-#: src/features/onboarding/components/setup-checklist.tsx:64
+#: src/features/onboarding/components/setup-checklist.tsx:70
 msgid "Install a coding agent"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:63
+#: src/features/onboarding/components/setup-checklist.tsx:69
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr ""
 
@@ -17410,15 +17410,15 @@ msgstr ""
 msgid "Let replies use tools"
 msgstr "Permitir ferramentas nas respostas"
 
-#: src/features/devices/components/devices-settings.tsx:450
+#: src/features/devices/components/devices-settings.tsx:473
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Permita que o agente use arquivos, um terminal e servidores MCP locais no seu próprio computador pelo aplicativo de desktop do Neore. Cada ação pede sua aprovação primeiro nesse computador, e nada é executado a partir de chats compartilhados ou tarefas em segundo plano."
 
-#: src/features/devices/components/devices-settings.tsx:510
+#: src/features/devices/components/devices-settings.tsx:533
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:73
+#: src/features/onboarding/components/setup-checklist.tsx:79
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer."
 msgstr ""
 
@@ -19649,11 +19649,11 @@ msgstr "Silenciar"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "My Linux computer"
 msgstr "Meu computador Linux"
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "My Mac"
 msgstr "Meu Mac"
 
@@ -19665,7 +19665,7 @@ msgstr "Meu servidor MCP"
 msgid "My skills"
 msgstr "Minhas habilidades"
 
-#: src/features/devices/components/devices-settings.tsx:413
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "My Windows PC"
 msgstr "Meu PC com Windows"
 
@@ -20503,7 +20503,7 @@ msgstr "Sem descrição"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:502
+#: src/features/devices/components/devices-settings.tsx:525
 msgid "No devices paired."
 msgstr "Nenhum dispositivo emparelhado."
 
@@ -21735,7 +21735,7 @@ msgstr ""
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:455
+#: src/features/devices/components/devices-settings.tsx:478
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Abra o Neore no aplicativo de desktop para emparelhar este computador. Os dispositivos emparelhados antes aparecem abaixo."
 
@@ -22623,15 +22623,15 @@ msgstr "Pinte as áreas que você quer editar. As regiões brancas serão gerada
 msgid "Pair one in Settings"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:69
+#: src/features/onboarding/components/setup-checklist.tsx:75
 msgid "Pair this computer"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:525
+#: src/features/devices/components/devices-settings.tsx:399
 msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:68
+#: src/features/onboarding/components/setup-checklist.tsx:74
 msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
 msgstr ""
 
@@ -22639,11 +22639,11 @@ msgstr ""
 msgid "Paired"
 msgstr "Pareado"
 
-#: src/features/devices/components/devices-settings.tsx:488
+#: src/features/devices/components/devices-settings.tsx:511
 msgid "Paired devices"
 msgstr "Dispositivos emparelhados"
 
-#: src/features/devices/components/devices-settings.tsx:429
+#: src/features/devices/components/devices-settings.tsx:452
 msgid "Pairing was cancelled on this computer."
 msgstr "O emparelhamento foi cancelado neste computador."
 
@@ -24661,7 +24661,7 @@ msgstr "Somente leitura"
 msgid "Read the docs"
 msgstr "Ler a documentação"
 
-#: src/features/onboarding/components/setup-checklist.tsx:62
+#: src/features/onboarding/components/setup-checklist.tsx:68
 msgid "Read the guide"
 msgstr ""
 
@@ -25893,7 +25893,7 @@ msgstr "Resultado"
 msgid "Result not delivered"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:114
+#: src/features/onboarding/components/setup-checklist.tsx:120
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Retomar"
@@ -25954,7 +25954,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:141
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:147
+#: src/features/onboarding/components/setup-checklist.tsx:153
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -25976,7 +25976,7 @@ msgstr "Tente novamente em {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:133
+#: src/features/onboarding/components/setup-checklist.tsx:139
 msgid "Retry the device check"
 msgstr ""
 
@@ -27508,12 +27508,12 @@ msgstr "Banco de dados Postgres serverless com branching"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:520
+#: src/features/devices/components/devices-settings.tsx:393
 msgid "Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:511
-#: src/features/devices/components/devices-settings.tsx:521
+#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:534
 msgid "Servers over SSH"
 msgstr ""
 
@@ -27664,7 +27664,7 @@ msgstr "compartilhada"
 msgid "Shared conversation"
 msgstr "Conversa compartilhada"
 
-#: src/features/devices/components/devices-settings.tsx:483
+#: src/features/devices/components/devices-settings.tsx:506
 msgid "Shared folders and local servers…"
 msgstr "Pastas compartilhadas e servidores locais…"
 
@@ -28198,7 +28198,7 @@ msgid "Skills views"
 msgstr "Visualizações de habilidades"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:114
+#: src/features/onboarding/components/setup-checklist.tsx:120
 msgid "Skip"
 msgstr "Pular"
 
@@ -28220,7 +28220,7 @@ msgstr "Pular tour"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:77
+#: src/features/onboarding/components/setup-checklist.tsx:83
 #: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "Ignorado"
@@ -30800,6 +30800,10 @@ msgstr "Os dois primeiros outros participantes, na ordem da lista, debatem a fav
 msgid "The folder has no supported documents."
 msgstr "A pasta não contém documentos suportados."
 
+#: src/features/devices/components/devices-settings.tsx:400
+msgid "The form to add a server is in the Neore desktop app, on a computer paired with your account. Open this page there; the browser does not show it."
+msgstr ""
+
 #: src/features/chat/forward/forward-dialog.tsx:88
 msgid "The forwarded messages were shortened to fit."
 msgstr "As mensagens encaminhadas foram encurtadas para caber."
@@ -31367,20 +31371,20 @@ msgstr "Este computador"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:460
+#: src/features/devices/components/devices-settings.tsx:483
 msgid "This computer is not paired yet."
 msgstr "Este computador ainda não está emparelhado."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:476
+#: src/features/devices/components/devices-settings.tsx:499
 msgid "This computer is paired as “{0}”."
 msgstr "Este computador está emparelhado como “{0}”."
 
-#: src/features/devices/components/devices-settings.tsx:460
+#: src/features/devices/components/devices-settings.tsx:483
 msgid "This computer is paired with another account."
 msgstr "Este computador está emparelhado com outra conta."
 
-#: src/features/devices/components/devices-settings.tsx:436
+#: src/features/devices/components/devices-settings.tsx:459
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Este computador está emparelhado. Escolha no aplicativo de desktop quais pastas compartilhar."
 
@@ -31920,7 +31924,7 @@ msgstr "As conversas guardam todo o seu histórico. Crie ramificações de ideia
 msgid "Threads working on this {requestNoun}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:81
+#: src/features/onboarding/components/setup-checklist.tsx:87
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr ""
 
@@ -32004,7 +32008,7 @@ msgstr ""
 msgid "to {0}"
 msgstr "para {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:77
+#: src/features/onboarding/components/setup-checklist.tsx:83
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "A fazer"
@@ -33505,7 +33509,7 @@ msgstr "Usar os modelos permitidos da organização"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Use estes atalhos de teclado para navegar e interagir com a grade de dados com mais eficiência."
 
-#: src/features/devices/components/devices-settings.tsx:470
+#: src/features/devices/components/devices-settings.tsx:493
 msgid "Use this computer for agent tools"
 msgstr "Usar este computador para as ferramentas do agente"
 
@@ -34731,7 +34735,7 @@ msgstr "Como a IA deve chamar você?"
 msgid "What should the guide pay attention to?"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:534
+#: src/features/devices/components/devices-settings.tsx:543
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "O que o agente pediu aos seus dispositivos nos últimos 30 dias."
 

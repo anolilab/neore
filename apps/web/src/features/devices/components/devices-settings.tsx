@@ -384,6 +384,29 @@ const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, 
  * shared folders and local MCP servers are managed in the desktop app's own
  * window, which the web page cannot reach.
  */
+/** Where a server is added before this computer is paired: the form is in the desktop app, so a browser is told so. */
+export const ServerSetupNote: FC<{ inDesktop: boolean }> = ({ inDesktop }) => {
+    const { t } = useLingui();
+
+    return (
+        <SettingsCard
+            description={t`Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting.`}
+            title={t`Servers over SSH`}
+        >
+            <CardContent>
+                <p className="text-muted-foreground text-sm">
+                    {inDesktop
+                        ? t`Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired.`
+                        : t`The form to add a server is in the Neore desktop app, on a computer paired with your account. Open this page there; the browser does not show it.`}{" "}
+                    <a className="underline" href="#devices-pairing">
+                        {t`Go to pairing`}
+                    </a>
+                </p>
+            </CardContent>
+        </SettingsCard>
+    );
+};
+
 const DevicesSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -515,21 +538,7 @@ const DevicesSettings: FC = () => {
                         </CardContent>
                     </SettingsCard>
                 )}
-                {(pairedHere === undefined || !native?.deviceId) && (
-                    <SettingsCard
-                        description={t`Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting.`}
-                        title={t`Servers over SSH`}
-                    >
-                        <CardContent>
-                            <p className="text-muted-foreground text-sm">
-                                {t`Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired.`}{" "}
-                                <a className="underline" href="#devices-pairing">
-                                    {t`Go to pairing`}
-                                </a>
-                            </p>
-                        </CardContent>
-                    </SettingsCard>
-                )}
+                {(pairedHere === undefined || !native?.deviceId) && <ServerSetupNote inDesktop={native !== undefined} />}
             </div>
             <SettingsCard description={t`What the agent asked your devices to do in the last 30 days.`} title={t`Device activity`}>
                 <CardContent>
