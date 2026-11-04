@@ -31,6 +31,7 @@ import { requireOnline } from "@/offline/write-gate";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
 type Row = MessageRow & { finished?: boolean };
+
 /** A send whose reply is still being checked. `holdsSend` keeps the composer shut while the checks run. */
 interface Confirmation {
     holdsSend: boolean;
@@ -142,7 +143,7 @@ interface CheckRound {
     isRefreshDue: boolean;
 }
 
-/** Counts a reply's checks and sorts each reply by what this round of checks says. */
+/** Counts one more check for each reply, and sorts the replies by what this round of checks says. */
 const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation; state: ReplyState }>, reads: Map<string, number>): CheckRound => {
     const round: CheckRound = { ended: new Set(), holdEnds: new Set(), isRefreshDue: false };
 
