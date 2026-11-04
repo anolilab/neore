@@ -71,8 +71,8 @@ const SetupChecklist: FC = () => {
         },
         pair: {
             action: t`Go to pairing`,
-            description: t`Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer.`,
-            title: t`Pair this computer`,
+            description: t`Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account.`,
+            title: t`Pair a computer`,
         },
         ssh: {
             action: t`Go to servers`,

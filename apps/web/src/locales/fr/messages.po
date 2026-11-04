@@ -22623,21 +22623,29 @@ msgstr "Pages partagées avec vous"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Peignez sur les zones à modifier. Les zones blanches seront régénérées, les zones sombres conservées."
 
+#: src/features/onboarding/components/setup-checklist.tsx:75
+msgid "Pair a computer"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:74
+msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
+msgstr ""
+
 #: src/features/code/components/code-shell.tsx:63
 msgid "Pair one in Settings"
 msgstr ""
 
 #: src/features/onboarding/components/setup-checklist.tsx:75
-msgid "Pair this computer"
-msgstr ""
+#~ msgid "Pair this computer"
+#~ msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:393
 msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 msgstr ""
 
 #: src/features/onboarding/components/setup-checklist.tsx:74
-msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
-msgstr ""
+#~ msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
+#~ msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:190
 msgid "Paired"

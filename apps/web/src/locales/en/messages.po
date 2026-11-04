@@ -22622,21 +22622,29 @@ msgstr "Pages shared with you"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 
+#: src/features/onboarding/components/setup-checklist.tsx:75
+msgid "Pair a computer"
+msgstr "Pair a computer"
+
+#: src/features/onboarding/components/setup-checklist.tsx:74
+msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
+msgstr "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
+
 #: src/features/code/components/code-shell.tsx:63
 msgid "Pair one in Settings"
 msgstr "Pair one in Settings"
 
 #: src/features/onboarding/components/setup-checklist.tsx:75
-msgid "Pair this computer"
-msgstr "Pair this computer"
+#~ msgid "Pair this computer"
+#~ msgstr "Pair this computer"
 
 #: src/features/devices/components/devices-settings.tsx:393
 msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 msgstr "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 
 #: src/features/onboarding/components/setup-checklist.tsx:74
-msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
-msgstr "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
+#~ msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
+#~ msgstr "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
 
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:190
 msgid "Paired"

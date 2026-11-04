@@ -109,7 +109,8 @@ vi.mock("@/lib/lunora/crpc", () => {
 const SKIP_ADD_AN_SSH_SERVER = /Skip.*Add an SSH server/;
 const RESUME_ADD_AN_SSH_SERVER = /Resume.*Add an SSH server/;
 const SKIP_INSTALL_A_CODING_AGENT = /Skip.*Install a coding agent/;
-const RESUME_PAIR_THIS_COMPUTER = /Resume.*Pair this computer/;
+const RESUME_PAIR_A_COMPUTER = /Resume.*Pair a computer/;
+const PAIR_THIS_COMPUTER = /Pair this computer/;
 const SKIP = /Skip/;
 const RETRY = /^Retry$/;
 const RETRY_DEVICES = /Retry the device check/;
@@ -177,7 +178,7 @@ describe("<SetupChecklist>", () => {
 
         await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(screen.getAllByText("(Skipped)")).toHaveLength(1));
-        expect(screen.getByRole("button", { name: RESUME_PAIR_THIS_COMPUTER })).toBeTruthy();
+        expect(screen.getByRole("button", { name: RESUME_PAIR_A_COMPUTER })).toBeTruthy();
         expect(server.skipped).toEqual(["pair"]);
     });
 
@@ -294,12 +295,23 @@ describe("<SetupChecklist>", () => {
         expect(await screen.findByText(COULD_NOT_LOAD)).toBeTruthy();
         expect(screen.getByText("(Skipped)")).toBeTruthy();
         expect((screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }) as HTMLButtonElement).disabled).toBe(true);
-        expect((screen.getByRole("button", { name: RESUME_PAIR_THIS_COMPUTER }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: RESUME_PAIR_A_COMPUTER }) as HTMLButtonElement).disabled).toBe(true);
 
         server.readFail = false;
         fireEvent.click(screen.getByRole("button", { name: RETRY }));
 
         await waitFor(() => expect((screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }) as HTMLButtonElement).disabled).toBe(false));
+    });
+
+    it("counts the pairing step done when another computer is paired, and words it for any computer", async () => {
+        // The page cannot tell which computer it runs on; a computer paired with the account is what counts.
+        devices.current = [{ _id: "other-laptop", name: "Other laptop" }];
+        renderChecklist();
+
+        expect(await screen.findByText("Pair a computer")).toBeTruthy();
+        expect(await screen.findAllByText("(Done)")).not.toHaveLength(0);
+        expect(screen.queryByText(PAIR_THIS_COMPUTER)).toBeNull();
+        expect(screen.queryByRole("link", { name: GO_TO_PAIRING })).toBeNull();
     });
 
     it("keeps an earlier skip when a second step is skipped right after", async () => {
