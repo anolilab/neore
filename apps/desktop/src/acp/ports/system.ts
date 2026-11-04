@@ -25,7 +25,7 @@ export const firstExisting = (paths: ReadonlyArray<string>, exists: (path: strin
  */
 const run = async (file: string, args: string[]): Promise<string> =>
     await new Promise((resolve, reject) => {
-        execFile(file, args, { encoding: "utf8", env: { LC_ALL: "C", PATH: "/usr/bin:/bin" }, maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS }, (error, stdout) => {
+        execFile(file, args, { encoding: "utf8", env: { LC_ALL: "C", PATH: "/usr/bin:/bin" }, maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS }, (error, stdout, stderr) => {
             if (error === null) {
                 resolve(stdout);
 
@@ -35,7 +35,7 @@ const run = async (file: string, args: string[]): Promise<string> =>
             // lsof exits 1 when a requested pid is gone (a short-lived child) and still prints the sockets of the others.
             const failure = error as { code?: number | string; killed?: boolean; signal?: string | null };
 
-            if (LSOF.includes(file) && failure.code === 1 && failure.killed !== true && (failure.signal ?? null) === null) {
+            if (LSOF.includes(file) && failure.code === 1 && String(stderr).trim() === "" && failure.killed !== true && (failure.signal ?? null) === null) {
                 resolve(stdout);
 
                 return;

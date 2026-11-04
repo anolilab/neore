@@ -13,6 +13,7 @@ import { descendantsOf } from "./process-table";
 /** How long a polite stop waits before the survivors are killed. */
 export const STOP_GRACE_MS = 2000;
 const POLL_MS = 100;
+const READ_ATTEMPTS = 3;
 
 export interface PortView {
     address: string;
@@ -51,6 +52,8 @@ export class PortsService {
         /** This app's own pid: never a target, whatever the table says. */
         private readonly selfPid: number = process.pid,
         private readonly graceMs: number = STOP_GRACE_MS,
+        /** Milliseconds on a monotonic clock; injected so the grace deadline is tested without real waiting. */
+        private readonly now: () => number = () => performance.now(),
     ) {}
 
     public async list(agentPid: number | undefined): Promise<PortView[]> {
@@ -65,7 +68,14 @@ export class PortsService {
         }
 
         const byPid = new Map(below.map((row) => [row.pid, row]));
-        const listeners = await this.system.listeners(below.map((row) => row.pid));
+        const found = await this.system.listeners(below.map((row) => row.pid));
+        // A pid alone is not identity: re-read, and keep a socket only while the process it was joined to is still the same one.
+        const reread = await this.system.processes();
+        const listeners = found.filter((listener) => {
+            const row = byPid.get(listener.pid);
+
+            return row !== undefined && reread.some((entry) => sameProcess(entry, row));
+        });
         const seen = new Set<string>();
         const views: PortView[] = [];
 
@@ -120,11 +130,20 @@ export class PortsService {
         }
 
         // Both the polls and the clock count: a slow process-table read spends grace time too.
-        const deadline = performance.now() + this.graceMs;
+        const deadline = this.now() + this.graceMs;
 
-        for (let waited = 0; waited < this.graceMs && performance.now() < deadline; waited += POLL_MS) {
+        for (let waited = 0; waited < this.graceMs && this.now() < deadline; waited += POLL_MS) {
             // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
-            const now = await this.system.processes();
+            const now = await this.tryProcesses();
+
+            // A read that failed says nothing about the victims: wait and ask again, the deadline still runs.
+            if (now === undefined) {
+                // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
+                await this.system.sleep(POLL_MS);
+
+                continue;
+            }
+
             const alive = aliveOf(now, signalled);
 
             // A child a victim started while it was still running is ended the same way, before the victim goes.
@@ -134,21 +153,63 @@ export class PortsService {
             }
 
             if (alive.length === 0) {
-                return true;
+                // A signal that was refused earlier is still a stop that did not fully happen.
+                return !refused;
             }
 
             // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
             await this.system.sleep(POLL_MS);
         }
 
-        // Each survivor is matched by pid AND start time in a fresh read, so a pid the system gave to another process is not signalled.
-        const survivors = aliveOf(await this.system.processes(), signalled);
+        return await this.escalate(signalled, refused, agentPid);
+    }
 
-        for (const survivor of survivors) {
-            refused = !this.send(survivor, "SIGKILL") || refused;
+    /** SIGKILL for the victims still running, matched by pid AND start time in a fresh read; true once every one is gone. */
+    private async escalate(signalled: ProcessInfo[], alreadyRefused: boolean, agentPid: number): Promise<boolean> {
+        let refused = alreadyRefused;
+        const last = await this.readProcesses();
+
+        // Never a blind kill: without a fresh pid + start time match nothing is signalled, and the stop reports failure.
+        if (last === undefined) {
+            return false;
         }
 
-        return !refused && aliveOf(await this.system.processes(), signalled).length === 0;
+        // A child a survivor started since the last poll is in the same fresh read: it goes down with its parent.
+        const survivors = aliveOf(last, signalled);
+        const newcomers = this.newDescendants(last, survivors, signalled, agentPid);
+
+        for (const target of [...survivors, ...newcomers]) {
+            refused = !this.send(target, "SIGKILL") || refused;
+        }
+
+        signalled.push(...newcomers);
+
+        const after = await this.readProcesses();
+
+        return !refused && after !== undefined && aliveOf(after, signalled).length === 0;
+    }
+
+    /** One process-table read, or undefined when it failed (a slow or failing `ps`). */
+    private async tryProcesses(): Promise<ProcessInfo[] | undefined> {
+        try {
+            return await this.system.processes();
+        } catch {
+            return undefined;
+        }
+    }
+
+    /** A read that is tried a few times before it is given up. */
+    private async readProcesses(): Promise<ProcessInfo[] | undefined> {
+        for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+            // eslint-disable-next-line no-await-in-loop -- attempts are sequential by design
+            const table = await this.tryProcesses();
+
+            if (table !== undefined) {
+                return table;
+            }
+        }
+
+        return undefined;
     }
 
     /** Descendants of the agent that may ever be signalled: never the agent, never this app. */
